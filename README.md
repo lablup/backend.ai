@@ -2,7 +2,7 @@ Lablup Sorna
 ============
 
 Sorna ("Software on Remote Networking Appliances") is a distributed back-end computation service with highly abstracted API.
-Unlike AWS Lambda, it provides a preset of kernel images representing various programming environments and allows users to execute their code snippets without a cumbersome packaging process.
+Unlike AWS Lambda, it provides a preset of kernel images representing various programming environments and allows users to execute their code snippets without a cumbersome packaging process. All sub-projects are licensed under LGPLv3+.
 
 Components
 ----------
