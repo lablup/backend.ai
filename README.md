@@ -37,7 +37,7 @@ A collection of utility modules commonly shared throughout Sorna projects, such 
  * Package namespaces: `sorna.proto`, `sorna`
  * https://github.com/lablup/sorna-common
  
-### Sorna Common
+### Sorna Client
 
 A client library to access the Sorna API servers with ease.
 
