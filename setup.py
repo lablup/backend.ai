@@ -38,7 +38,7 @@ setup(
     namespace_packages=['sorna'],
 
     install_requires=['sorna-common', 'sorna-manager', 'sorna-agent',
-                      'sorna-client', 'sorna-repl'],
+                      'sorna-client'],
     extras_require={
         'dev': [],
         'test': [],
