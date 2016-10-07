@@ -1,0 +1,5 @@
+sorna-common>=0.5
+sorna-manager>=0.5
+sorna-agent>=0.5
+sorna-client
+sorna-repl
