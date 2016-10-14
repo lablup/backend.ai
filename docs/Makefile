@@ -94,9 +94,9 @@ qthelp:
 	@echo
 	@echo "Build finished; now you can run "qcollectiongenerator" with the" \
 	      ".qhcp project file in $(BUILDDIR)/qthelp, like this:"
-	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/SornaClientLibrary.qhcp"
+	@echo "# qcollectiongenerator $(BUILDDIR)/qthelp/SornaDocs.qhcp"
 	@echo "To view the help file:"
-	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/SornaClientLibrary.qhc"
+	@echo "# assistant -collectionFile $(BUILDDIR)/qthelp/SornaDocs.qhc"
 
 .PHONY: applehelp
 applehelp:
@@ -113,8 +113,8 @@ devhelp:
 	@echo
 	@echo "Build finished."
 	@echo "To view the help file:"
-	@echo "# mkdir -p $$HOME/.local/share/devhelp/SornaClientLibrary"
-	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/SornaClientLibrary"
+	@echo "# mkdir -p $$HOME/.local/share/devhelp/SornaDocs"
+	@echo "# ln -s $(BUILDDIR)/devhelp $$HOME/.local/share/devhelp/SornaDocs"
 	@echo "# devhelp"
 
 .PHONY: epub

@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Sorna API Library
-=================
+Sorna Documentation
+===================
 
 Sorna is an online code execution service that runs arbitrary user codes
 safely in resource-constrained environments, using Docker and our own sandbox
