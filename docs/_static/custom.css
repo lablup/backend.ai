@@ -1,0 +1,27 @@
+/* override table width restrictions */
+.wy-table-responsive table td, .wy-table-responsive table th {
+    white-space: normal;
+}
+
+.wy-table-responsive {
+    margin-bottom: 24px;
+    max-width: 100%;
+    overflow: visible;
+}
+
+code, .code, .pre, tt {
+    font-family: Menlo, Monaco, Consolas, "DejaVu Sans Mono", "Roboto Mono", "Bitstream Vera Sans Mono", monospace !important;
+    font-size: 13px !important;
+}
+
+.docutils.literal {
+    /*padding: 1px 2px;*/
+    background: none;
+    border: 0px none;
+    padding: 0;
+}
+
+.highlight pre {
+    font-family: Menlo, Monaco, Consolas, "DejaVu Sans Mono", "Roboto Mono", "Bitstream Vera Sans Mono", monospace !important;
+    font-size: 12px !important;
+}
