@@ -1,0 +1,22 @@
+# Setup
+title: The Sorna Project
+tagline:      Sorna is a distributed code snippet execution engine.
+baseurl:      ""
+paginate:     1
+
+# About/contact
+author:
+  name:       Lablup Inc
+  url:        http://www.lablup.com 
+
+# Gems
+gems:
+  - jekyll-paginate
+
+#Others
+markdown: kramdown
+
+exclude:
+  - README.md
+  - Gemfile
+  - Gemfile.lock
