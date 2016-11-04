@@ -12,7 +12,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.5.0',
+    version='0.5.1',
     description='Sorna meta-package',
     long_description='',
     url='https://github.com/lablup/sorna',
@@ -37,8 +37,7 @@ setup(
     packages=['sorna'],
     namespace_packages=['sorna'],
 
-    install_requires=['sorna-common', 'sorna-manager', 'sorna-agent',
-                      'sorna-client'],
+    install_requires=['sorna-common', 'sorna-manager', 'sorna-agent'],
     extras_require={
         'dev': [],
         'test': [],
