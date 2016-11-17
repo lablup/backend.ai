@@ -1,7 +1,7 @@
 # Setup
 title: The Sorna Project
 tagline:      A distributed code snippet execution engine.
-baseurl:      "/sorna"
+baseurl:      ""
 paginate:     1
 
 # About/contact
