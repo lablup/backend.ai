@@ -46,6 +46,7 @@ Table of Contents
    api/kernels
    api/exec
    api/stream
+   dev/repl
 
 
 
