@@ -3,14 +3,12 @@ layout: default
 title: {{ site.name }}
 ---
 
-# Sorna Project
-
-Sorna is now fully open-sourced!  
-<sup>* Python 3.5.2+, Linux 64bit or macOS, Docker 1.10+ required</sup>
-
 ## Getting Started
 
-Just do some magic:
+All you need is Python 3.5 or higher.  
+(Yes, it works as well on Windows!)
+
+Just do some magic on your command line:
 
 ```sh
 # configure virtualenv
@@ -37,9 +35,12 @@ destroy_kernel(kid)
 ```
 
 Now you have executed a real Lua code without installing Lua!  
+
+Want more? How about GPU-supported TensorFlow?  
 There are [many more languages you can use](http://github.com/lablup/sorna-repl).
 
-You may run also [your own Sorna API server on your machines](https://github.com/lablup/sorna).
+You may run also [your own Sorna API server on your machines](https://github.com/lablup/sorna).  
+<sup>* Python 3.5.2+, Linux 64bit or macOS, Docker 1.10+ required</sup>
 
 Note: public API key registration site is under construction!
 
