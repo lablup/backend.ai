@@ -34,15 +34,15 @@ print(result['stdout'])
 destroy_kernel(kid)
 ```
 
-Now you have executed a real Lua code without installing Lua!  
+Now you have executed a real Lua code without installing Lua (in our clouds)!  
 
 Want more? How about GPU-supported TensorFlow?  
 There are [many more languages you can use](http://github.com/lablup/sorna-repl).
 
 You may run also [your own Sorna API server on your machines](https://github.com/lablup/sorna).  
-<sup>* Python 3.5.2+, Linux 64bit or macOS, Docker 1.10+ required</sup>
+<sup>* Python 3.5.2+, Linux 64bit or macOS, Docker 1.12+ required</sup>
 
-Note: public API key registration site is under construction!
+Note: public API key registration site is *under construction!*
 
 ## Server Architecture
 
