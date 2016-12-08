@@ -35,17 +35,34 @@ Here we describe key differences to existing products and software with similar 
 Table of Contents
 -----------------
 
+.. _gsg:
+
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
+   :caption: User Manuals
 
    gsg/registration
    gsg/clientlib
+
+.. _api:
+
+.. toctree::
+   :maxdepth: 1
+   :caption: API Reference
+
    api/convention
    api/auth
    api/ratelimit
    api/kernels
    api/exec
    api/stream
+
+.. _dev:
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Developer Manuals
+
    dev/repl
 
 
