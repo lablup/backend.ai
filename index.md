@@ -25,7 +25,7 @@ export SORNA_SECRET_KEY=...
 Then run the following Python code:
 
 ```python
-import sorna.kernel import *
+from sorna.kernel import *
 
 kid = create_kernel('lua5')
 result = execute_code('code001', 'print("hello world!")')
