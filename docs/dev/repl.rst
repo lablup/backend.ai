@@ -34,6 +34,7 @@ A kernel is a Docker image with the following format:
 
    * Optional Labels
 
+     * ``io.sorna.envs.corecount``: a comma-separated string of environment variable names which will be set to the number of assigned CPU cores by the agent. (e.g., ``JULIA_CPU_CORES``, ``OPENBLAS_NUM_THREADS``)
      * ``io.sorna.nvidia.enabled``: ``yes`` or ``no`` (if yes, Sorna Agent attaches an NVIDIA CUDA GPU device with a driver volume. You must use `nvidia-docker images <https://github.com/NVIDIA/nvidia-docker>`_ as base of your Dockerfile.)
      * ``io.sorna.extra_volumes``: a comma-separated string of extra volume mounts (volume name and path inside container separated by a colon), such as deep learning sample data sets (e.g., ``sample-data:/home/work/samples,extra-data:/home/work/extra``).
        Note that we allow only read-only mounts.
