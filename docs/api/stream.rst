@@ -11,8 +11,9 @@ Terminal Emulation
 * Method: GET upgraded to WebSockets
 
 This endpoint provides a duplex continuous stream of JSON objects via the native WebSocket.
-Although WebSocket supports binary streams, we currently rely on only text-based JSON messages
-to avoid quirks in typed array support in Javascript across browsers.
+Although WebSocket supports binary streams, we currently rely on TEXT messages only
+conveying JSON payloads to avoid quirks in typed array support in Javascript
+across different browsers.
 
 .. note::
 
@@ -105,6 +106,8 @@ This means there is no way to distinguish stdout and stderr in the client-side,
 unless your kernel applies some special formatting to distinguish them (e.g.,
 make all stderr otuputs red).
 
+The terminal output is compatible with xterm (including 256-color support).
+
 .. code-block:: json
 
    {
@@ -119,11 +122,8 @@ Server-side errors
 
    {
      "type": "error",
-     "data": "<base64-encoded-raw-characters>"
+     "data": "<human-readable-message>"
    }
-
-
-This API function is compatible with `node-webterm <https://github.com/Gottox/node-webterm/>`_.
 
 
 Monitoring events from the kernel session
