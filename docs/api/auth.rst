@@ -7,6 +7,12 @@ Access Tokens and Secret Key
 To make requests to the API server, a client needs to get a pair of an access token and a secret key as sepcified in :doc:`/gsg/registration`.
 The server uses access tokens to identify each client and secret keys to verify integrity of API requests as well as to authenticate clients.
 
+.. warning::
+
+   For security reasons (to avoid exposition of your API access key and secret keys to arbitrary
+   Internet users), we highly recommend to setup a server-side proxy to our API
+   service if you are building a public-facing front-end service using Sorna.
+
 For local deployments, you may create a master dummy pair in the configuration (TODO).
 
 Common Structure of API Requests
@@ -178,7 +184,7 @@ Success example for checking the latest API version
    {
       "version": "v1.20160915"
    }
-   
+
 
 Failure example with a missing authorization header
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
