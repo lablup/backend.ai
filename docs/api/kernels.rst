@@ -20,6 +20,8 @@ Parameters
      - Description
    * - ``lang``
      - The kernel type, usually the name of one of our supported programming languages.
+   * - ``clientSessionToken``
+     - Client session token. Should be unique for continuous execution (for REPL).
    * - ``resourceLimits``
      - An optional argument to specify resource requirements.
        Additional charges may apply on the public API service.
@@ -43,6 +45,7 @@ Example:
 
    {
      "lang": "python3",
+     "clientSessionToken": "EXAMPLE:STRING",
      "resourceLimits": {
        "maxMem": 51240,
        "timeout": 5000
