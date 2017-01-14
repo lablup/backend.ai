@@ -148,7 +148,7 @@ Finally, the client now should construct the following HTTP ``Authorization`` he
 
 .. code-block:: text
 
-   Authorization: Sorna method=HMAC-SHA256, credential=<access-key>:<signature>
+   Authorization: Sorna signMethod=HMAC-SHA256, credential=<access-key>:<signature>
 
 
 Example Requests and Responses
@@ -167,7 +167,7 @@ Success example for checking the latest API version
    GET /v1 HTTP/1.1
    Host: your.sorna.api.endpoint
    Date: 20160930T01:23:45Z
-   Authorization: Sorna method=HMAC-SHA256, credential=AKIAIOSFODNN7EXAMPLE:022ae894b4ecce097bea6eca9a97c41cd17e8aff545800cd696112cc387059cf
+   Authorization: Sorna signMethod=HMAC-SHA256, credential=AKIAIOSFODNN7EXAMPLE:022ae894b4ecce097bea6eca9a97c41cd17e8aff545800cd696112cc387059cf
    Content-Type: application/json
    X-Sorna-Version: v1.20160915
 
