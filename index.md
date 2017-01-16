@@ -3,6 +3,20 @@ layout: default
 title: {{ site.name }}
 ---
 
+## Featured Highlight
+
+Now [API key registration](https://cloud.sorna.io) is open (beta)!
+
+For more fun, we have also released an Atom editor plugin, `live-code-runner`,
+that runs your code directly from the editor without installing anything else!
+
+ * Install `live-code-runner` package.
+ * Get Sorna API access / secret key at [Sorna Cloud](https://cloud.sorna.io)
+ * Type your keys on package preferences page.
+ * You are ready to go!
+
+<iframe width="853" height="480" src="https://www.youtube.com/embed/IVX1SClEaMY" frameborder="0" allowfullscreen></iframe>
+
 ## Getting Started
 
 All you need is Python 3.5 or higher.  
@@ -38,11 +52,10 @@ Now you have executed a real Lua code without installing Lua (in our clouds)!
 
 Want more? How about GPU-backed TensorFlow?  
 There are [many more languages you can use](http://github.com/lablup/sorna-repl).
+Currently Sorna supports 11 programming languages now.
 
 You may run also [your own Sorna API server on your machines](https://github.com/lablup/sorna).  
 <sup>* Python 3.5.2+, Linux 64bit or macOS, Docker 1.12+ required</sup>
-
-Note: public API key registration site is *under construction!*
 
 ## Server Architecture
 
