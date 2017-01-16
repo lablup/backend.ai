@@ -7,15 +7,18 @@ title: {{ site.name }}
 
 Now [API key registration](https://cloud.sorna.io) is open (beta)!
 
-For more fun, we have also released an Atom editor plugin, `live-code-runner`,
+For more fun, we have also released an Atom editor plugin,
+[`live-code-runner`](https://atom.io/packages/live-code-runner),
 that runs your code directly from the editor without installing anything else!
 
- * Install `live-code-runner` package.
+ * Search and install `live-code-runner` in Atom's package manager.
  * Get Sorna API access / secret key at [Sorna Cloud](https://cloud.sorna.io)
  * Type your keys on package preferences page.
  * You are ready to go!
 
-<iframe width="853" height="480" src="https://www.youtube.com/embed/IVX1SClEaMY" frameborder="0" allowfullscreen></iframe>
+<div class="video-container">
+  <iframe width="853" height="480" src="https://www.youtube.com/embed/IVX1SClEaMY" frameborder="0" allowfullscreen></iframe>
+</div>
 
 ## Getting Started
 
