@@ -44,11 +44,11 @@ Then run the following Python code:
 ```python
 from sorna.kernel import *
 
-kid = create_kernel('lua5')
-result = execute_code('code001', 'print("hello world!")')
+kernel_id = create_kernel('lua5')
+result = execute_code(kernel_id, 'code001', 'print("hello world!")')
 print(result['stdout'])
 # hello world!
-destroy_kernel(kid)
+destroy_kernel(kernel_id)
 ```
 
 Now you have executed a real Lua code without installing Lua (in our clouds)!  
