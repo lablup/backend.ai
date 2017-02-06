@@ -9,6 +9,14 @@
     overflow: visible;
 }
 
+td > p {
+    margin: 0 0 8px 0;
+    font-size: inherit;
+}
+td > p:last-child {
+    margin: 0;
+}
+
 code, .code, .pre, tt {
     font-family: Menlo, Monaco, Consolas, "DejaVu Sans Mono", "Roboto Mono", "Bitstream Vera Sans Mono", monospace !important;
     font-size: 13px !important;
