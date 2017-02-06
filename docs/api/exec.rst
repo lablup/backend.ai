@@ -69,7 +69,7 @@ Response
        When making continuation calls, you should not put anything in ``code`` field of the request, otherwise you will get 400 Bad Request.
 
        If this is ``"waiting-input"``, you should make another API call with setting ``code`` field of the request to the user-input text.
-       This happens for interactive ``input()`` functions are called by the code sent during the previous API call.
+       This happens when the user code calls interactive ``input()`` functions.
        Until you send the user input, the kernel code is blocked.
        You may use modal dialogs or other input forms (e.g., HTML input) to retrieve user inputs.
        When the server receives the user input, the kernel's ``input()`` returns the given value.
