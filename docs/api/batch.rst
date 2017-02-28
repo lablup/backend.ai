@@ -11,10 +11,41 @@ Uploading files
 * URI: ``/v2/kernel/:id/upload``
 * Method: ``POST``
 
+Parameters
+""""""""""
+
 Upload files to the kernel session.
-You may upload multiple files at once using multi-part MIME encoding in the request body.
+You may upload multiple files at once using multi-part form-data encoding in the request body (RFC 1867/2388).
 The uploaded files are placed under ``/home/work`` directory (which is the home directory for all kernels by default),
 and existing files are always overwritten.
+If the filename has a directory part, non-existing directories will be auto-created.
+The path may be either absolute or relative, but only sub-directories under ``/home/work`` is allowed to be created.
+
+There are several limits on this API:
+
+.. list-table::
+   :widths: 75 25
+
+   * - The maximum size of each file
+     - 1 MiB
+   * - The number of files per upload request
+     - 20
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - The kernel has responded with the execution result.
+       The response body contains a JSON object as described below.
+   * - 400 Bad Request
+     - Returned when one of the uploaded file exeeds the size limit or there are too many files.
+
 
 Executing
 ---------

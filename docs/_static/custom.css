@@ -34,7 +34,11 @@ code, .code, .pre, tt {
     font-size: 12px !important;
 }
 
-.rst-content ul, .rst-content ol {
+.rst-content table ul,
+.rst-content .admonition ul,
+.rst-content table ol,
+.rst-content .admonition ol
+{
     line-height: inherit !important;
     margin-top: 8px !important;
     margin-bottom: 8px !important;
