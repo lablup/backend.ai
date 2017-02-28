@@ -4,7 +4,7 @@ Kernel Management
 Creating a kernel session
 -------------------------
 
-* URI: ``/v1/kernel/create``
+* URI: ``/v2/kernel/create``
 * Method: ``POST``
 
 Creates a kernel session to run user-input code snippets.
@@ -89,7 +89,7 @@ Example:
 Getting kernel information
 --------------------------
 
-* URI: ``/v1/kernel/:id``
+* URI: ``/v2/kernel/:id``
 * Method: ``GET``
 
 Retrieves information about a kernel session.
@@ -170,7 +170,7 @@ Example:
 Destroying a kernel session
 ---------------------------
 
-* URI: ``/v1/kernel/:id``
+* URI: ``/v2/kernel/:id``
 * Method: ``DELETE``
 
 Terminates a kernel session.
@@ -205,7 +205,7 @@ Response
 Restarting a kernel session
 ---------------------------
 
-* URI: ``/v1/kernel/:id``
+* URI: ``/v2/kernel/:id``
 * Method: ``PATCH``
 
 Restarts a kernel session.

@@ -4,7 +4,7 @@ Code Execution (Query Mode)
 Executing a user code snippet
 -----------------------------
 
-* URI: ``/v1/kernel/:id``
+* URI: ``/v2/kernel/:id``
 * Method: ``POST``
 
 Executes a snippet of user code using the specified kernel session.
@@ -24,8 +24,8 @@ Parameters
      - Description
    * - ``:id``
      - The kernel ID.
-   * - ``codeId``
-     - A unique identifier of the given code.  Currently, the API server ignores it.
+   * - ``type``
+     - A constant string ``"query"``.
    * - ``code``
      - A string of user-written code.  All non-ASCII data must be encoded in UTF-8 or any format acceptable by the kernel.
 
@@ -34,7 +34,7 @@ Example:
 .. code-block:: json
 
    {
-     "codeId": "ea24bba4-5499-4f4c-bdbd-c475cf019bfe",
+     "type": "query",
      "code": "print('Hello, world!')"
    }
 
@@ -60,7 +60,7 @@ Response
      - Values
    * - ``result.status``
 
-     - One of ``"finished"``, ``"continued"``, ``"waiting-input"``.
+     - One of ``"continued"``, ``"waiting-input"``, ``"finished"``.
 
        If this is ``"continued"``, you should repeat making another API call until you get ``"finished"`` status.
        This happens when the user code runs longer than a few seconds, to allow the client to show its progress.
@@ -99,7 +99,8 @@ Response
 
        .. note::
 
-          All returned strings are *not* escaped. You should take care of this as well as formatting new lines properly (use ``<pre>`` element or replace them with ``<br>``) when rendering the result to web browsers.
+          All returned strings are *not* escaped. You should take care of this as well as formatting new lines properly
+          (use ``<pre>`` element or replace them with ``<br>``) when rendering the result to web browsers.
           An easy way to do this safely is to use ``insertAdjacentText()`` DOM API.
 
    * - ``result.options``

@@ -120,11 +120,11 @@ The success example in `Example Requests and Responses`_ makes a string to sign 
 .. code-block:: text
 
    GET
-   /v1
+   /v2
    20160930T01:23:45Z
    host:your.sorna.api.endpoint
    content-type:application/json
-   x-sorna-version:v1.20160915
+   x-sorna-version:v2.20170215
    e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
 In this example, the hash value  ``e3b0c4...`` is generated from an empty string using the SHA256 hash function since there is no body for GET requests.
@@ -135,7 +135,7 @@ Then, the client should calculate the signature using the derived signing key an
 
    import hashlib, hmac
 
-   str_to_sign = 'GET\n/v1...'
+   str_to_sign = 'GET\n/v2...'
    sign_key = get_sign_key()  # see "Generating a signing key"
    m = hmac.new(sign_key, str_to_sign.encode('utf8'), hashlib.sha256)
    signature = m.hexdigest()
@@ -164,12 +164,12 @@ Success example for checking the latest API version
 
 .. code-block:: text
 
-   GET /v1 HTTP/1.1
+   GET /v2 HTTP/1.1
    Host: your.sorna.api.endpoint
    Date: 20160930T01:23:45Z
    Authorization: Sorna signMethod=HMAC-SHA256, credential=AKIAIOSFODNN7EXAMPLE:022ae894b4ecce097bea6eca9a97c41cd17e8aff545800cd696112cc387059cf
    Content-Type: application/json
-   X-Sorna-Version: v1.20160915
+   X-Sorna-Version: v2.20170215
 
 .. code-block:: text
 
@@ -182,7 +182,7 @@ Success example for checking the latest API version
    X-RateLimit-Reset: 897065
 
    {
-      "version": "v1.20160915"
+      "version": "v2.20170215"
    }
 
 
@@ -191,11 +191,11 @@ Failure example with a missing authorization header
 
 .. code-block:: text
 
-   GET /v1/kernel/create HTTP/1.1
+   GET /v2/kernel/create HTTP/1.1
    Host: your.sorna.api.endpoint
    Content-Type: application/json
    X-Sorna-Date: 20160930T01:23:45Z
-   X-Sorna-Version: v1.20160915
+   X-Sorna-Version: v2.20170215
 
 .. code-block:: text
 

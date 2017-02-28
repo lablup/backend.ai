@@ -33,3 +33,18 @@ code, .code, .pre, tt {
     font-family: Menlo, Monaco, Consolas, "DejaVu Sans Mono", "Roboto Mono", "Bitstream Vera Sans Mono", monospace !important;
     font-size: 12px !important;
 }
+
+.rst-content ul, .rst-content ol {
+    line-height: inherit !important;
+    margin-top: 8px !important;
+    margin-bottom: 8px !important;
+}
+
+.rst-content li {
+    margin-bottom: 3px !important;
+}
+
+.admonition p, .admonition div {
+    line-height: 1.2;
+    margin-bottom: 12px;
+}

@@ -56,6 +56,7 @@ Table of Contents
    api/kernels
    api/exec
    api/stream
+   api/batch
 
 .. _dev:
 
