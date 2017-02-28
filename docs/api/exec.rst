@@ -75,32 +75,38 @@ Response
        When the server receives the user input, the kernel's ``input()`` returns the given value.
        Note that the exact functions that trigger this mechanism are different language by langauge.
 
-   * - ``result.stdout``
+   * - ``result.console``
 
-     - A string containing standard output.
-       Both ``result.stdout`` and ``result.stderr`` is truncated to 524,288 Unicode characters.
+     - Contains a list of console output items. Each item is a pair of the item type and its value.
+       The type can be one of ``"stdout"``, ``"stderr"``, ``"media"``, ``"html"``, or ``"log"``.
 
-   * - ``result.stderr``
+       When this is ``"stdout"`` or ``"stderr"``, the value is the standard I/O stream outputs as (non-escaped) UTF-8 string.
+       Both fields are truncated to 524,288 Unicode characters.
+       The stderr field includes not only stderr outputs but also language-specific tracebacks of (unhandled) exceptions or errors occurred in the user code.
 
-     - A string containing standard error.
-       This includes not only stderr outputs but also language-specific tracebacks of (unhandled) exceptions or errors occurred in the user code.
-
-   * - ``result.media``
-
-     - A list representing media outputs. Each list item consists of pairs of the media MIME-type and the data.
-       Depending on the MIME-type, the data may be encoded in different ways.
-       For instance, for ``"image/xxx"`` types the data is encoded as the data URI format.
+       When this is ``"media"``, the value is a pair of the MIME type and the content data.
+       If the MIME type is text-based (e.g., ``"text/plain"``) or XML-based (e.g., ``"image/svg+xml"``), the content is just a string that represent the content.
+       Otherwise, the data is encoded as a data URI format (RFC 2397).
        You may use `sorna-media library <https://github.com/lablup/sorna-media>`_ to handle this field in Javascript on web-browsers.
+
+       When this is ``"html"``, the value is a partial HTML document string, such as a table to show tabular data.
+       If you are implementing a web-based front-end, you may use it directly to the standard DOM API, for instance, ``consoleElem.insertAdjacentHTML(value, "beforeend")``.
+
+       When this is ``"log"``, the value is a 4-tuple of the log level, the timestamp in the ISO 8601 format, the logger name and the log message string.
+       The log level may be one of ``"debug"``, ``"info"``, ``"warning"``, ``"error"``, or ``"fatal"``.
+       You may use different colors/formatting by the log level when printing the log message.
+       This rich logging facilities are available to only supported kernels.
+
+       .. note::
+
+          All returned strings are *not* escaped. You should take care of this as well as formatting new lines properly (use ``<pre>`` element or replace them with ``<br>``) when rendering the result to web browsers.
+          An easy way to do this safely is to use ``insertAdjacentText()`` DOM API.
 
    * - ``result.options``
 
-     - An object containing extra options.  If there is no options indicated by the kernel, this field is ``null``.
-       When the ``status`` is ``"waiting-input"``, it has a boolean field ``is_password`` so that you could use
+     - An object containing extra display options.  If there is no options indicated by the kernel, this field is ``null``.
+       When ``result.status`` is ``"waiting-input"``, it has a boolean field ``is_password`` so that you could use
        different types of text boxes for user inputs.
-
-   * - ``result.exceptions``
-
-     - *Deprecated.*  Will contain an empty list only for backward compatibility.
 
 .. note::
 
@@ -127,11 +133,59 @@ Here we demonstrate a few example returns when various Python codes are executed
    {
      "result": {
        "status": "finished",
-       "stdout": "Hello, world!\n",
-       "stderr": "",
-       "options": null,
-       "media": [],
-       "exceptions": []
+       "console": [
+         ["stdout", "Hello, world!\n"]
+       ],
+       "options": null
+     }
+   }
+
+**Example: Runtime error.**
+
+.. code-block:: python
+
+   a = 123
+   print('what happens now?')
+   a = a / 0
+
+.. code-block:: json
+
+   {
+     "result": {
+       "status": "finished",
+       "console": [
+         ["stdout", "what happens now?\n"],
+         ["stderr", "Traceback (most recent call last):\n  File \"<input>\", line 3, in <module>\nZeroDivisionError: division by zero"],
+       ],
+       "options": null
+     }
+   }
+
+**Example: Multimedia output.**
+
+Media outputs are also mixed with other console outputs according to their execution order.
+
+.. code-block:: python
+
+   import matplotlib.pyplot as plt
+   a = [1,2]
+   b = [3,4]
+   print('plotting simple line graph')
+   plt.plot(a, b)
+   plt.show()
+   print('done')
+
+.. code-block:: json
+
+   {
+     "result": {
+       "status": "finished",
+       "console": [
+         ["stdout", "plotting simple line graph\n"],
+         ["media", ["image/svg+xml", "<?xml version=\"1.0\" ..."]],
+         ["stdout", "done\n"]
+       ],
+       "options": null
      }
    }
 
@@ -150,11 +204,10 @@ Here we demonstrate a few example returns when various Python codes are executed
    {
      "result": {
        "status": "continued",
-       "stdout": "Tick 1\nTick 2\n",
-       "stderr": "",
-       "options": null,
-       "media": [],
-       "exceptions": []
+       "console": [
+         ["stdout", "Tick 1\nTick 2\n"]
+       ],
+       "options": null
      }
    }
 
@@ -165,11 +218,10 @@ Here you should make another API query with the empty ``code`` field.
    {
      "result": {
        "status": "continued",
-       "stdout": "Tick 3\nTick 4\n",
-       "stderr": "",
-       "options": null,
-       "media": [],
-       "exceptions": []
+       "console": [
+         ["stdout", "Tick 3\nTick 4\n"]
+       ],
+       "options": null
      }
    }
 
@@ -180,11 +232,10 @@ Again.
    {
      "result": {
        "status": "finished",
-       "stdout": "Tick 5\ndone\n",
-       "stderr": "",
-       "options": null,
-       "media": [],
-       "exceptions": []
+       "console": [
+         ["stdout", "Tick 5\ndone\n"],
+       ],
+       "options": null
      }
    }
 
@@ -201,13 +252,12 @@ Again.
    {
      "result": {
        "status": "waiting-input",
-       "stdout": "What is your name?\n>> ",
-       "stderr": "",
+       "console": [
+         ["stdout", "What is your name?\n>> "]
+       ],
        "options": {
          "is_password": false
-       },
-       "media": [],
-       "exceptions": []
+       }
      }
    }
 
@@ -218,10 +268,9 @@ You should make another API query with the ``code`` field filled with the user i
    {
      "result": {
        "status": "finished",
-       "stdout": "Hello, Lablup!\n",
-       "stderr": "",
-       "options": null,
-       "media": [],
-       "exceptions": []
+       "console": [
+         ["stdout", "Hello, Lablup!\n"]
+       ],
+       "options": null
      }
    }
