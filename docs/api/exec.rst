@@ -97,7 +97,7 @@ Response
        You may use different colors/formatting by the log level when printing the log message.
        This rich logging facilities are available to only supported kernels.
 
-       .. note::
+       .. tip::
 
           All returned strings are *not* escaped. You should take care of this as well as formatting new lines properly
           (use ``<pre>`` element or replace them with ``<br>``) when rendering the result to web browsers.

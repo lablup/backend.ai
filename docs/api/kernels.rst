@@ -18,26 +18,35 @@ Parameters
 
    * - Parameter
      - Description
+
    * - ``lang``
      - The kernel type, usually the name of one of our supported programming languages.
+
    * - ``clientSessionToken``
      - Client session token. Should be unique for continuous execution (for REPL).
-   * - ``resourceLimits``
-     - An optional argument to specify resource requirements.
+
+   * - ``limits``
+     - An optional object to specify resource requirements.
        Additional charges may apply on the public API service.
        If the requested limits exceeds our internal hard-limits,
        the API may return HTTP 406 "Not acceptable".
 
-       .. list-table::
-          :widths: 20 80
-          :header-rows: 1
+   * - ``limits.maxMem``
+     - Maximum memory to use in KBytes.
 
-          * - Fields
-            - Values
-          * - ``maxMem``
-            - Maximum memory to use in KBytes.
-          * - ``timeout``
-            - Maximum execution timeout in milliseconds.
+   * - ``limits.execTimeout``
+     - Maximum total CPU time in milliseconds.
+
+   * - ``mounts``
+     - An optional list of the name of virtual folders that belongs to the current API key.
+       These virtual folders are mounted under ``/home/work``.
+       For example, if the virtual folder name is ``abc``, you can access it on
+       ``/home/work/abc``.
+
+       If the name contains a colon in the middle, the second part of the string indicates
+       the alias location in the kernel's file system which is relative to ``/home/work``.
+
+       You may mount up to 5 folders for each kernel session.
 
 Example:
 
@@ -46,10 +55,14 @@ Example:
    {
      "lang": "python3",
      "clientSessionToken": "EXAMPLE:STRING",
-     "resourceLimits": {
+     "limits": {
        "maxMem": 51240,
        "timeout": 5000
-     }
+     },
+     "mounts": [
+       "mydata",
+       "mypkgs:.local/lib/python3.6/site-packages"
+     ]
    }
 
 
@@ -93,7 +106,8 @@ Getting kernel information
 * Method: ``GET``
 
 Retrieves information about a kernel session.
-For performance reasons, the returned information may not be real-time; usually they are updated every a few seconds in the server-side.
+For performance reasons, the returned information may not be real-time; usually
+they are updated every a few seconds in the server-side.
 
 Parameters
 """"""""""

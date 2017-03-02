@@ -21,6 +21,18 @@ and existing files are always overwritten.
 If the filename has a directory part, non-existing directories will be auto-created.
 The path may be either absolute or relative, but only sub-directories under ``/home/work`` is allowed to be created.
 
+.. hint::
+
+   This API is for uploading frequently-changing source files in prior to batch-mode execution.
+   All files uploaded via this API is deleted when the kernel terminates.
+   Use :doc:`virtual folders </api/vfolders>` to store and access larger, persistent,
+   static data and library files for your codes.
+
+.. warning::
+
+   You cannot upload files to mounted virtual folders using this API directly.
+   However, you may copy/move the generated files to virtual folders in your build script or the main program for later uses.
+
 There are several limits on this API:
 
 .. list-table::

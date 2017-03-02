@@ -57,6 +57,7 @@ Table of Contents
    api/exec
    api/stream
    api/batch
+   api/vfolders
 
 .. _dev:
 
