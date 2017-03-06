@@ -9,7 +9,7 @@ Sorna Documentation
 Sorna is an online code execution service that runs arbitrary user codes
 safely in resource-constrained environments, using Docker and our own sandbox
 wrapper.
-It currently supports Python 2/3, R, PHP and NodeJS, with more being added.
+It currently supports Python 2/3, R, PHP, Javascript, Julia, Octave, Haskell, Lua and NodeJS for general programming language, and TensorFlow, Keras, Theano for Deep-learning environments (more being added).
 Sorna's primary target is to provide a zero-configuration evaluation tool for
 short-running programs used in education and scientific researches, such as
 problem solving and plotting.
