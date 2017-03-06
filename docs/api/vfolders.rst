@@ -81,7 +81,7 @@ Example:
 .. code-block:: json
 
    {
-     "kernelId": "oyU2WOYRYmjCGuKoSkiJ7H2rlN4"
+     "folderId": "oyU2WOYRYmjCGuKoSkiJ7H2rlN4"
    }
 
 
