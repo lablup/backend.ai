@@ -76,7 +76,7 @@ Parameters
      - Description
    * - ``:id``
      - The kernel ID.
-   * - ``type``
+   * - ``mode``
      - A constant string ``"batch"``.
 
    * - ``options.build``
@@ -128,7 +128,7 @@ Parameters
    .. code-block:: text
 
       TERM=xterm
-      LANG=en_US.UTF-8
+      LANG=C.UTF-8
       SHELL=/bin/bash
       USER=work
       HOME=/home/work

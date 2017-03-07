@@ -24,7 +24,7 @@ Parameters
      - Description
    * - ``:id``
      - The kernel ID.
-   * - ``type``
+   * - ``mode``
      - A constant string ``"query"``.
    * - ``code``
      - A string of user-written code.  All non-ASCII data must be encoded in UTF-8 or any format acceptable by the kernel.

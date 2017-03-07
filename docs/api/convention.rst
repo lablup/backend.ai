@@ -39,5 +39,5 @@ Example version check response body:
 .. code-block:: json
 
    {
-      "version": "v2.20170215"
+      "version": "v2.20170315"
    }
