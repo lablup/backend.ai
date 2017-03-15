@@ -40,7 +40,7 @@ A collection of utility modules commonly shared throughout Sorna projects, such 
 
  * Package namespaces: `sorna.proto`, `sorna`
  * https://github.com/lablup/sorna-common
- 
+
 ### Sorna Client
 
 A client library to access the Sorna API servers with ease.
@@ -59,7 +59,7 @@ A front-end and kernel-side support libraries for multi-media (e.g., animated ve
 Installation
 ------------
 
-The Sorna project uses latest features in Python 3.5+ and docker.
+The Sorna project uses latest features in Python 3.6+ and docker.
 We highly recommend to use [pyenv](https://github.com/yyuu/pyenv) to use an
 isolated setup with custom Python versions that might not be supported by your
 
@@ -76,4 +76,3 @@ Development
 
 The sorna repositories use [git flow](http://danielkummer.github.io/git-flow-cheatsheet/index.html) to streamline branching during development and deployment.
 We use the default configuration (master -> preparation for release, develop -> main development, feature/ -> features, etc.) as-is.
-
