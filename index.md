@@ -45,22 +45,20 @@ print(result['console'])
 kern.destroy()
 ```
 
-*Coming soon:* run your code from the command line!
-
-```sh
-$ python -m sorna plot.py some-data.csv
-```
-
-*Coming soon:* compile your code as well!
-
-```sh
-$ python -m sorna --build="make" main.c lib.c lib.h Makefile
-```
-
-
 Now you have executed a real Lua code without installing Lua (in our clouds)!  
 
-Want more? How about GPU-backed TensorFlow?  
+**Coming soon:** run your code from the command line!
+
+```sh
+$ python -m sorna --gpu my-tensorflow-model.py some-data.csv
+```
+
+**Coming soon:** compile your code as well!
+
+```sh
+$ python -m sorna --build="make" --exec="./main" main.c lib.c lib.h Makefile
+```
+
 There are [many more languages you can use](http://github.com/lablup/sorna-repl).
 Currently Sorna supports 11 programming languages now.
 
