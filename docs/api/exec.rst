@@ -29,7 +29,7 @@ Parameters
    * - ``code``
      - A string of user-written code.  All non-ASCII data must be encoded in UTF-8 or any format acceptable by the kernel.
 
-Example:
+**Example:**
 
 .. code-block:: json
 
@@ -275,3 +275,90 @@ You should make another API query with the ``code`` field filled with the user i
        "options": null
      }
    }
+
+Auto-completion
+---------------
+
+* URI: ``/v2/kernel/:id``
+* Method: ``POST``
+
+.. warning::
+
+   This API is draft and may be changed without notices.
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 20 80
+   :header-rows: 1
+
+   * - Parameter
+     - Description
+   * - ``:id``
+     - The kernel ID.
+   * - ``mode``
+     - A constant string ``"complete"``.
+   * - ``preCode``
+     - A string containing the code until the current cursor position.
+   * - ``postCode``
+     - A string containing the code after the current cursor position.
+   * - ``line``
+     - A string containing the content of the current line.
+   * - ``row``
+     - An integer indicating the line number (0-based) of the cursor.
+   * - ``col``
+     - An integer indicating the column number (0-based) in the current line of the cursor.
+
+**Example:**
+
+.. code-block:: json
+
+   {
+     "type": "complete",
+     "preCode": "pri",
+     "postCode": "\nprint(\"world\")\n",
+     "line": "pri",
+     "row": 0,
+     "col": 3
+   }
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - The kernel has responded with the execution result.
+       The response body contains a JSON object as described below.
+
+.. list-table::
+   :widths: 20 80
+   :header-rows: 1
+
+   * - Fields
+     - Values
+   * - ``result``
+
+     - An ordered list containing the possible auto-completion matches as strings.
+       This may be empty if the current kernel does not implement auto-completion
+       or no matches have been found.
+
+       Selecting a match and merging it into the code text are up to the front-end
+       implementation.
+
+**Example:**
+
+.. code-block:: json
+
+   {
+     "result": [
+       "print",
+       "printf"
+     ]
+   }
+
