@@ -299,15 +299,15 @@ Parameters
      - The kernel ID.
    * - ``mode``
      - A constant string ``"complete"``.
-   * - ``preCode``
+   * - ``code``
      - A string containing the code until the current cursor position.
-   * - ``postCode``
+   * - ``options.post``
      - A string containing the code after the current cursor position.
-   * - ``line``
+   * - ``options.line``
      - A string containing the content of the current line.
-   * - ``row``
+   * - ``options.row``
      - An integer indicating the line number (0-based) of the cursor.
-   * - ``col``
+   * - ``options.col``
      - An integer indicating the column number (0-based) in the current line of the cursor.
 
 **Example:**
@@ -316,11 +316,13 @@ Parameters
 
    {
      "type": "complete",
-     "preCode": "pri",
-     "postCode": "\nprint(\"world\")\n",
-     "line": "pri",
-     "row": 0,
-     "col": 3
+     "code": "pri",
+     "options": {
+       "post": "\nprint(\"world\")\n",
+       "line": "pri",
+       "row": 0,
+       "col": 3
+     }
    }
 
 Response
