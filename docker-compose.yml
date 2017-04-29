@@ -23,7 +23,7 @@ services:
       - "SORNA_DB_ADDR=sorna-db:5432"  # provisioned to agent via ectd
       - "SORNA_ETCD_ADDR=sorna-etcd:2379"
       - "SORNA_REDIS_ADDR=sorna-redis:6379"  # private use (rate-limit)
-    ports:
+    ports:  # for host-side debugging / integration tests
       - "8081:8080"
       - "8443:8443"
 
@@ -31,9 +31,6 @@ services:
     container_name: sorna-agent
     build:
       context: sorna-agent
-    environment:
-      - SORNA_MQ_ADDR=sorna-mq
-      - SORNA_ETCD_ADDR=sorna-etcd
     volumes:
       - ./sorna-agent:/usr/src/app
     environment:
@@ -53,7 +50,7 @@ services:
   sorna-redis:
     container_name: sorna-redis
     image: redis:latest
-    ports:
+    ports:  # for host-side debugging
       - "6389:6379"
 
   sorna-mq:
@@ -64,7 +61,7 @@ services:
   sorna-db:
     container_name: sorna-db
     image: postgres:9.6-alpine
-    ports:
+    ports:  # for host-side debugging
       - "5442:5432"
     environment:
       - POSTGRES_PASSWORD=develove
@@ -75,7 +72,7 @@ services:
     image: quay.io/coreos/etcd:v3.1.5
     volumes:
       - /tmp/etcd-data:/etcd-data
-    ports:
+    ports:  # for host-side debugging
       - "2379:2379"
       - "2380:2380"
     command: >
