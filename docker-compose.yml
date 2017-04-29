@@ -1,0 +1,92 @@
+version: "3"
+
+services:
+
+  # NOTE:
+  #  You need to create a symlink "sorna-gateway" and
+  #  "sorna-agent" to their respective working copies
+  #  or decompressed tarballs.
+
+  sorna-gateway:
+    container_name: sorna-gateway
+    build:
+      context: sorna-gateway
+    depends_on:
+      - sorna-db
+      - sorna-redis
+      - sorna-mq
+      - sorna-etcd
+    volumes:
+      - ./sorna-gateway:/usr/src/app
+    environment:
+      - "SORNA_MQ_ADDR=sorna-mq:5672"  # provisioned to agent via etcd
+      - "SORNA_DB_ADDR=sorna-db:5432"  # provisioned to agent via ectd
+      - "SORNA_ETCD_ADDR=sorna-etcd:2379"
+      - "SORNA_REDIS_ADDR=sorna-redis:6379"  # private use (rate-limit)
+    ports:
+      - "8081:8080"
+      - "8443:8443"
+
+  sorna-agent:
+    container_name: sorna-agent
+    build:
+      context: sorna-agent
+    environment:
+      - SORNA_MQ_ADDR=sorna-mq
+      - SORNA_ETCD_ADDR=sorna-etcd
+    volumes:
+      - ./sorna-agent:/usr/src/app
+    environment:
+      - "SORNA_ETCD_ADDR=sorna-etcd:2379"
+      - "DOCKER_HOST=tcp://sorna-docker:2375"
+    depends_on:
+      - sorna-db
+      - sorna-mq
+      - sorna-etcd
+      - sorna-docker
+      - sorna-gateway
+
+  sorna-docker:
+    image: docker:dind
+    privileged: true
+
+  sorna-redis:
+    container_name: sorna-redis
+    image: redis:latest
+    ports:
+      - "6389:6379"
+
+  sorna-mq:
+    container_name: sorna-mq
+    hostname: sorna-mq
+    image: rabbitmq:3.6-alpine
+
+  sorna-db:
+    container_name: sorna-db
+    image: postgres:9.6-alpine
+    ports:
+      - "5442:5432"
+    environment:
+      - POSTGRES_PASSWORD=develove
+      - POSTGRES_DB=sorna
+
+  sorna-etcd:
+    container_name: sorna-etcd
+    image: quay.io/coreos/etcd:v3.1.5
+    volumes:
+      - /tmp/etcd-data:/etcd-data
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    command: >
+      /usr/local/bin/etcd
+      --name sorna-etcd
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://0.0.0.0:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://0.0.0.0:2380
+      --initial-cluster sorna-etcd=http://0.0.0.0:2380
+      --initial-cluster-token sorna-etcd-token
+      --initial-cluster-state new
+      --auto-compaction-retention 1
