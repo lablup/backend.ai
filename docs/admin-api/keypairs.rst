@@ -105,8 +105,8 @@ Response
      - ``str``
      - The secret key part.
 
-Get Properties of KeyPair
--------------------------
+Getting KeyPair Properties
+--------------------------
 
 * URI: ``/v2/admin/keypairs/:user/:accessKey``
 * Method: ``GET``
@@ -158,8 +158,8 @@ Response
      - ``list[*]``
      - The values of the request properties, in the same order of the request.
 
-Change Properties of KeyPair
-----------------------------
+Updating KeyPair Properties
+---------------------------
 
 * URI: ``/v2/admin/keypairs/:user/:accessKey``
 * Method: ``PATCH``

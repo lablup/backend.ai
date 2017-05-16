@@ -16,7 +16,7 @@ most kernels) as internally it uses a networked file system.
    limits are subject to change in the future.
 
 
-Listing virtual folders
+Listing Virtual Folders
 -----------------------
 
 Retruns the list of virtual folders created by the current keypair.
@@ -136,7 +136,7 @@ Example:
    }
 
 
-Getting virtual folder information
+Getting Virtual Folder Information
 ----------------------------------
 
 * URI: ``/v2/folders/:id``
@@ -186,8 +186,8 @@ Response
      - :ref:`vfolder-item-object`.
 
 
-Deleting a virtual folder
--------------------------
+Deleting Virtual Folder
+-----------------------
 
 * URI: ``/v2/folders/:id``
 * Method: ``DELETE``
@@ -230,7 +230,3 @@ Response
    * - 404 Not Found
      - There is no such folder.
 
-Acessing virtual folders via WebDAV
------------------------------------
-
-(TODO)

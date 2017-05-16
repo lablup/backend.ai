@@ -19,6 +19,7 @@ If ``index`` exceeds the number of pages calculated by the server, an empty list
    * - ``size``
      - ``int``
      - The number of items per page.
+       If set zero or this object is entirely omitted, all items are returned and ``index`` is ignored.
    * - ``index``
      - ``int``
      - The page number to show, zero-based.
@@ -95,7 +96,7 @@ KeyPair Properties Object
      - ``int``
      - Sets the number of instances clustered together when launching new machine learning kernel sessions. (default: ``1``)
    * - ``ML.instanceMemory``
-     - ``int`` (GiB)
+     - ``int`` (MiB)
      - Sets the memory limit of each instance in the cluster launched for new machine learning kernel sessions. (default: ``8``)
 
 The enterprise edition offers the following additional properties:
@@ -120,8 +121,8 @@ The enterprise edition offers the following additional properties:
 
 .. _session-filter-object:
 
-Session Filter Object
----------------------
+Kernel Session Filter Object
+----------------------------
 
 .. list-table::
    :widths: 15 5 80
@@ -137,8 +138,8 @@ Session Filter Object
 
 .. _session-item-object:
 
-Session Item Object
----------------------
+Kernel Session Item Object
+--------------------------
 
 .. list-table::
    :widths: 15 5 80
@@ -150,29 +151,38 @@ Session Item Object
    * - ``kernelId``
      - ``slug``
      - The kernel session ID.
+   * - ``type``
+     - ``str``
+     - The kernel type (typically the name of runtime or programming lanauge).
    * - ``status``
      - ``enum[str]``
      - One of ``"preparing"``, ``"building``", ``"running"``, ``"restarting"``, ``"resizing"``, ``"success"``, ``"error"``, ``"terminating"``, ``"suspended"``.
+   * - ``age``
+     - ``int`` (msec)
+     - The time elapsed since the kernel has started.
+   * - ``execTime``
+     - ``int`` (msec)
+     - The time taken for execution. Excludes the time taken for being suspended, restarting, and resizing.
    * - ``statusInfo``
      - ``str``
      - An optional message related to the current status. (e.g., error information)
-   * - ``usedMemory``
-     - ``int`` (KiB)
-     - The amount of memory currently using. It may show a stale value.
+   * - ``numQueriesExecuted``
+     - ``int``
+     - The total number of queries executed after start-up.
+   * - ``memoryUsed``
+     - ``int`` (MiB)
+     - The amount of memory currently used (sum of all resident-set size across instances). It may show a stale value.
    * - ``cpuUtil``
      - ``int`` (%)
      - The current CPU utilization (sum of all used cores across instances, hence may exceed 100%). It may show a stale value.
-   * - ``config.clusterSize``
-     - ``int``
-     - The configured number of instances bundled for this session.
-   * - ``config.instanceMemory``
-     - ``int`` (GiB)
-     - The configured memory size per instance.
+   * - ``config``
+     - ``object``
+     - :ref:`resource-config-object` specified when created.
 
-.. _resource-limit-object:
+.. _resource-config-object:
 
-Resource Limit Object
----------------------
+Resource Config Object
+----------------------
 
 .. list-table::
    :widths: 15 5 80
@@ -181,12 +191,12 @@ Resource Limit Object
    * - Key
      - Type
      - Description
-   * - ``maxMem``
-     - ``int`` (KiB)
-     - Maximum memory allowed.
-   * - ``execTimeout``
-     - ``int`` (msec)
-     - Maximum total CPU time.
+   * - ``clusterSize``
+     - ``int``
+     - The number of instances bundled for this session.
+   * - ``instanceMemory``
+     - ``int`` (MiB)
+     - The maximum memory allowed per instance.
 
 .. _vfolder-item-object:
 

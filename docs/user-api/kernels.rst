@@ -1,8 +1,8 @@
 Kernel Management
 =================
 
-Creating a kernel session
--------------------------
+Creating Kernel Session
+-----------------------
 
 * URI: ``/v2/kernel/create``
 * Method: ``POST``
@@ -28,9 +28,9 @@ Parameters
      - ``str``
      - Client session token. Should be unique for continuous execution (for REPL).
 
-   * - ``limits``
+   * - ``config``
      - ``object``
-     - An optional :ref:`resource-limit-object` to specify resource requirements.
+     - An optional :ref:`resource-config-object` to specify resource requirements.
        Additional charges may apply on the public API service.
        If the requested limits exceeds our internal hard-limits,
        the API may return HTTP 406 "Not acceptable".
@@ -100,7 +100,7 @@ Example:
    }
 
 
-Getting kernel information
+Getting Kernel Information
 --------------------------
 
 * URI: ``/v2/kernel/:id``
@@ -145,57 +145,13 @@ Response
    * - Fields
      - Type
      - Values
-   * - ``lang``
-     - ``str``
-     - The kernel type.
-   * - ``age``
-     - ``int`` (msec)
-     - The time elapsed since the kernel has started.
-   * - ``idle``
-     - ``int`` (msec)
-     - The time elapsed since the kernel has generated any output.
-   * - ``queryTimeout``
-     - ``int`` (msec)
-     - The timeout for executing each query (the time between accepting a query and receiving the output) in milliseconds.
-       If exceeded, the kernel is automatically destroyed.
-   * - ``idleTimeout``
-     - ``int`` (msec)
-     - The maximum duration between queries.
-       If exceeded, the kernel is automatically destroyed.
-   * - ``maxCpuCredit``
-     - ``int`` (msec)
-     - The maximum amount of CPU time that this kernel can use.
-       If exceeded, the kernel is automatically destroyed.
-       If zero, there is no limit imposed.
-   * - ``numQueriesExecuted``
-     - ``int``
-     - The total number of queries executed after start-up.
-   * - ``memoryUsed``
-     - ``int`` (KiB)
-     - The amount of memory that this kernel is using now.
-   * - ``cpuCreditUsed``
-     - ``int`` (msec)
-     - The amount of CPU time that this kernel has used so far.
-
-Example:
-
-.. code-block:: json
-
-   {
-     "lang": "python3",
-     "age": 30220,
-     "idle": 1204,
-     "queryTimeout": 15000,
-     "idleTimeout": 3600000,
-     "maxCpuCredit": 0,
-     "numQueriesExecuted": 12,
-     "memoryUsed": 6531,
-     "cpuCreditUsed": 102
-   }
+   * - ``item``
+     - ``object``
+     - :ref:`session-item-object`.
 
 
-Destroying a kernel session
----------------------------
+Destroying Kernel Session
+-------------------------
 
 * URI: ``/v2/kernel/:id``
 * Method: ``DELETE``
@@ -231,8 +187,8 @@ Response
      - There is no such kernel.
 
 
-Restarting a kernel session
----------------------------
+Restarting Kernel Session
+-------------------------
 
 * URI: ``/v2/kernel/:id``
 * Method: ``PATCH``
