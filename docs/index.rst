@@ -44,20 +44,39 @@ Table of Contents
    gsg/registration
    gsg/clientlib
 
-.. _api:
+.. _common_api:
 
 .. toctree::
    :maxdepth: 1
-   :caption: API Reference
+   :caption: API Common Reference
 
-   api/convention
-   api/auth
-   api/ratelimit
-   api/kernels
-   api/exec
-   api/stream
-   api/batch
-   api/vfolders
+   common-api/convention
+   common-api/auth
+   common-api/ratelimit
+   common-api/objects
+
+.. _user_api:
+
+.. toctree::
+   :maxdepth: 1
+   :caption: User API Reference
+
+   user-api/intro
+   user-api/kernels
+   user-api/exec
+   user-api/stream
+   user-api/batch
+   user-api/vfolders
+
+.. _admin_api:
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Admin API Reference
+
+   admin-api/intro
+   admin-api/keypairs
+   admin-api/sessions
 
 .. _dev:
 

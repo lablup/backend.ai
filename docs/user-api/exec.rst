@@ -17,16 +17,20 @@ Parameters
 """"""""""
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Parameter
+     - Type
      - Description
    * - ``:id``
+     - ``slug``
      - The kernel ID.
    * - ``mode``
+     - ``str``
      - A constant string ``"query"``.
    * - ``code``
+     - ``str``
      - A string of user-written code.  All non-ASCII data must be encoded in UTF-8 or any format acceptable by the kernel.
 
 **Example:**
@@ -53,12 +57,14 @@ Response
        The response body contains a JSON object as described below.
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Fields
+     - Type
      - Values
    * - ``result.status``
+     - ``enum[str]``
 
      - One of ``"continued"``, ``"waiting-input"``, ``"finished"``.
 
@@ -76,6 +82,7 @@ Response
        Note that the exact functions that trigger this mechanism are different language by langauge.
 
    * - ``result.console``
+     - ``object``
 
      - Contains a list of console output items. Each item is a pair of the item type and its value.
        The type can be one of ``"stdout"``, ``"stderr"``, ``"media"``, ``"html"``, or ``"log"``.
@@ -104,6 +111,7 @@ Response
           An easy way to do this safely is to use ``insertAdjacentText()`` DOM API.
 
    * - ``result.options``
+     - ``object``
 
      - An object containing extra display options.  If there is no options indicated by the kernel, this field is ``null``.
        When ``result.status`` is ``"waiting-input"``, it has a boolean field ``is_password`` so that you could use
@@ -290,24 +298,32 @@ Parameters
 """"""""""
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Parameter
+     - Type
      - Description
    * - ``:id``
+     - ``slug``
      - The kernel ID.
    * - ``mode``
+     - ``enum[str]``
      - A constant string ``"complete"``.
    * - ``code``
+     - ``str``
      - A string containing the code until the current cursor position.
    * - ``options.post``
+     - ``str``
      - A string containing the code after the current cursor position.
    * - ``options.line``
+     - ``str``
      - A string containing the content of the current line.
    * - ``options.row``
+     - ``int``
      - An integer indicating the line number (0-based) of the cursor.
    * - ``options.col``
+     - ``int``
      - An integer indicating the column number (0-based) in the current line of the cursor.
 
 **Example:**
@@ -339,12 +355,14 @@ Response
        The response body contains a JSON object as described below.
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Fields
+     - Type
      - Values
    * - ``result``
+     - ``list[str]``
 
      - An ordered list containing the possible auto-completion matches as strings.
        This may be empty if the current kernel does not implement auto-completion

@@ -16,10 +16,59 @@ most kernels) as internally it uses a networked file system.
    limits are subject to change in the future.
 
 
+Listing virtual folders
+-----------------------
+
+Retruns the list of virtual folders created by the current keypair.
+
+* URI: ``/v2/folders``
+* Method: ``GET``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``paging``
+     - ``object``
+     - :ref:`paging-query-object`.
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``paging``
+     - ``object``
+     - :ref:`paging-info-object`.
+   * - ``items``
+     - ``list[object]``
+     - A list of :ref:`vfolder-item-object`.
+
+
 Creating a virtual folder
 -------------------------
 
-* URI: ``/v2/folder/create``
+* URI: ``/v2/folders/create``
 * Method: ``POST``
 
 Creates a virtual folder associated with the current API key.
@@ -28,23 +77,23 @@ Parameters
 """"""""""
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Parameter
+     - Type
      - Description
 
-   * - ``name``
+   * - ``tagName``
+     - ``str``
      - The human-readable name of the virtual folder.
-       Only ASCII alpha-numeric characters, hyphens, and underscores are allowed.
-       The name must start with alpha-numeric characters.
 
 Example:
 
 .. code-block:: json
 
    {
-     "name": "mydata",
+     "tagName": "My Data",
    }
 
 
@@ -67,12 +116,14 @@ Response
        (e.g., the maximum number of folders you can have.)
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Fields
+     - Type
      - Values
    * - ``folderId``
+     - ``slug``
      - The unique folder ID used for later API calls.
 
 
@@ -88,7 +139,7 @@ Example:
 Getting virtual folder information
 ----------------------------------
 
-* URI: ``/v2/folder/:id``
+* URI: ``/v2/folders/:id``
 * Method: ``GET``
 
 Retrieves information about a virtual folder.
@@ -99,12 +150,14 @@ Parameters
 """"""""""
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Parameter
+     - Type
      - Description
    * - ``:id``
+     - ``slug``
      - The virtual folder ID.
 
 Response
@@ -121,13 +174,22 @@ Response
    * - 404 Not Found
      - There is no such folder.
 
-(TODO)
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``item``
+     - ``object``
+     - :ref:`vfolder-item-object`.
 
 
 Deleting a virtual folder
 -------------------------
 
-* URI: ``/v2/folder/:id``
+* URI: ``/v2/folders/:id``
 * Method: ``DELETE``
 
 This immediately deletes all contents of the given virtual folder and makes the

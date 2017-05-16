@@ -24,12 +24,14 @@ Parameters
 """"""""""
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Parameter
+     - Type
      - Description
    * - ``:id``
+     - ``slug``
      - The kernel ID.
 
 Client-to-Server Protocol
@@ -148,12 +150,14 @@ Parameters
 """"""""""
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Parameter
+     - Type
      - Description
    * - ``:id``
+     - ``slug``
      - The kernel ID.
 
 Responses

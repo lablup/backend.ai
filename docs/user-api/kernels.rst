@@ -13,31 +13,30 @@ Parameters
 """"""""""
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Parameter
+     - Type
      - Description
 
    * - ``lang``
+     - ``str``
      - The kernel type, usually the name of one of our supported programming languages.
 
    * - ``clientSessionToken``
+     - ``str``
      - Client session token. Should be unique for continuous execution (for REPL).
 
    * - ``limits``
-     - An optional object to specify resource requirements.
+     - ``object``
+     - An optional :ref:`resource-limit-object` to specify resource requirements.
        Additional charges may apply on the public API service.
        If the requested limits exceeds our internal hard-limits,
        the API may return HTTP 406 "Not acceptable".
 
-   * - ``limits.maxMem``
-     - Maximum memory to use in KBytes.
-
-   * - ``limits.execTimeout``
-     - Maximum total CPU time in milliseconds.
-
    * - ``mounts``
+     - ``list[str]``
      - An optional list of the name of virtual folders that belongs to the current API key.
        These virtual folders are mounted under ``/home/work``.
        For example, if the virtual folder name is ``abc``, you can access it on
@@ -57,7 +56,7 @@ Example:
      "clientSessionToken": "EXAMPLE:STRING",
      "limits": {
        "maxMem": 51240,
-       "timeout": 5000
+       "execTimeout": 5000
      },
      "mounts": [
        "mydata",
@@ -81,12 +80,14 @@ Response
      - The requested resource limits exceed the server's own limits.
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Fields
+     - Type
      - Values
    * - ``kernelId``
+     - ``slug``
      - The kernel ID used for later API calls.
 
 
@@ -113,12 +114,14 @@ Parameters
 """"""""""
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Parameter
+     - Type
      - Description
    * - ``:id``
+     - ``slug``
      - The kernel ID.
 
 Response
@@ -136,33 +139,43 @@ Response
      - There is no such kernel.
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Fields
+     - Type
      - Values
    * - ``lang``
+     - ``str``
      - The kernel type.
    * - ``age``
-     - The time elapsed since the kernel has started in milliseconds.
+     - ``int`` (msec)
+     - The time elapsed since the kernel has started.
    * - ``idle``
-     - The time elapsed since the kernel has generated any output in milliseconds.
+     - ``int`` (msec)
+     - The time elapsed since the kernel has generated any output.
    * - ``queryTimeout``
+     - ``int`` (msec)
      - The timeout for executing each query (the time between accepting a query and receiving the output) in milliseconds.
        If exceeded, the kernel is automatically destroyed.
    * - ``idleTimeout``
-     - The maximum duration between queries in milliseconds.
+     - ``int`` (msec)
+     - The maximum duration between queries.
        If exceeded, the kernel is automatically destroyed.
    * - ``maxCpuCredit``
-     - The maximum amount of CPU time that this kernel can use in milliseconds.
+     - ``int`` (msec)
+     - The maximum amount of CPU time that this kernel can use.
        If exceeded, the kernel is automatically destroyed.
        If zero, there is no limit imposed.
    * - ``numQueriesExecuted``
+     - ``int``
      - The total number of queries executed after start-up.
    * - ``memoryUsed``
-     - The amount of memory that this kernel is using now in KB.
+     - ``int`` (KiB)
+     - The amount of memory that this kernel is using now.
    * - ``cpuCreditUsed``
-     - The amount of CPU time that this kernel has used so far in milliseconds.
+     - ``int`` (msec)
+     - The amount of CPU time that this kernel has used so far.
 
 Example:
 
@@ -193,12 +206,14 @@ Parameters
 """"""""""
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Parameter
+     - Type
      - Description
    * - ``:id``
+     - ``slug``
      - The kernel ID.
 
 Response
@@ -230,12 +245,14 @@ Parameters
 """"""""""
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Parameter
+     - Type
      - Description
    * - ``:id``
+     - ``slug``
      - The kernel ID.
 
 Response

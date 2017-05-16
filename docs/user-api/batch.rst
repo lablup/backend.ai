@@ -25,7 +25,7 @@ The path may be either absolute or relative, but only sub-directories under ``/h
 
    This API is for uploading frequently-changing source files in prior to batch-mode execution.
    All files uploaded via this API is deleted when the kernel terminates.
-   Use :doc:`virtual folders </api/vfolders>` to store and access larger, persistent,
+   Use :doc:`virtual folders </user-api/vfolders>` to store and access larger, persistent,
    static data and library files for your codes.
 
 .. warning::
@@ -69,17 +69,25 @@ Parameters
 """"""""""
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Parameter
+     - Type
      - Description
    * - ``:id``
+     - ``slug``
      - The kernel ID.
    * - ``mode``
+     - ``enum[str]``
      - A constant string ``"batch"``.
 
+   * - ``options``
+     - ``object``
+     - (see below)
+
    * - ``options.build``
+     - ``str``
 
      - The bash command to build the main program from the given uploaded files.
 
@@ -92,8 +100,9 @@ Parameters
        executable, with commonly used C/link flags: ``"-pthread -lm -lrt -ldl"``.
 
    * - ``options.buildLog``
+     - ``bool``
 
-     - A boolean that indicates whether to separately report the logs from the build step.
+     - Indicates whether to separately report the logs from the build step.
        (default: ``false``)
 
        If set ``false``, all console outputs during the build step
@@ -113,6 +122,7 @@ Parameters
        long time.
 
    * - ``options.exec``
+     - ``str``
 
      - The bash command to execute the main program.
 
@@ -174,15 +184,17 @@ Response
        The response body contains a JSON object as described below.
 
 .. list-table::
-   :widths: 20 80
+   :widths: 15 5 80
    :header-rows: 1
 
    * - Fields
+     - Type
      - Values
    * - ``result.status``
+     - ``enum[str]``
 
      - One of ``"continued"``, ``"waiting-input"``, or ``"finished"``, like the query mode.
-       Please refer :doc:`the query mode documentation </api/exec>`
+       Please refer :doc:`the query mode documentation </user-api/exec>`
        for their meanings and how you should handle them.
 
        Even when this is ``"continued"``, you may notice if the build step is
@@ -190,12 +202,14 @@ Response
        and ``result.options.step`` is ``"build"``.
 
    * - ``result.console``
+     - ``object``
 
-     - Refer :doc:`the query mode documentation </api/exec>`.
+     - Refer :doc:`the query mode documentation </user-api/exec>`.
 
    * - ``result.options``
+     - ``object``
 
-     - Refer :doc:`the query mode documentation </api/exec>`.
+     - Refer :doc:`the query mode documentation </user-api/exec>`.
        In the batch mode, it always has at least the following fields:
 
        * ``exitCode``: An integer whose value is the exit code of the build command or the main command.
