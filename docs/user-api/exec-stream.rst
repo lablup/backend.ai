@@ -128,10 +128,10 @@ Server-side errors
    }
 
 
-Monitoring events from the kernel session
------------------------------------------
+Executing Snippet via WebSocket
+-------------------------------
 
-* URI: ``/v2/stream/kernel/:id/events``
+* URI: ``/v2/stream/kernel/:id/ws``
 * Method: GET upgraded to WebSockets
 
 This API function is read-only --- meaning that you cannot send any data to this URI.

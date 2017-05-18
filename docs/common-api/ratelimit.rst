@@ -20,9 +20,13 @@ Upon a valid request, the HTTP response contains the following header fields to 
    * - ``X-RateLimit-Limit``
      - The maximum allowed number of requests per each rate-limit windows (15-minutes).
    * - ``X-RateLimit-Remaining``
-     - The number of requests left for the time window. If zero, the client should wait for the time specified by ``X-RateLimit-Reset``.
-   * - ``X-RateLimit-Reset``
+     - The number of requests left for the time window. If zero, the client should wait for the time specified by ``X-Retry-After``.
+   * - ``X-Retry-After``
      - The time to wait until the current rate limit window resets, in milli-seconds.
+
+       .. versionchanged:: v3.20170615
+
+          Formerly this header was named ``X-RateLimit-Reset``, but it has caused confusion with GitHub API which uses this name for absolute timestamp.
 
 When the limit is exceeded, further API calls will get HTTP 429 "Too Many Requests".
 If the client seems to be DDoS-ing, the server may block the client without prior notice.

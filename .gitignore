@@ -91,3 +91,7 @@ ENV/
 # IDE/vim
 .idea
 .*.swp
+
+sorna-agent
+
+sorna-gateway

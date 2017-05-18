@@ -118,6 +118,179 @@ The enterprise edition offers the following additional properties:
      - The string representation of money amount as decimals.
        The currency is fixed to USD. (default: ``"50.00"``)
 
+.. _batch-execution-query-object:
+
+Batch Execution Query Object
+----------------------------
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+   * - ``build``
+     - ``str``
+
+     - The bash command to build the main program from the given uploaded files.
+
+       If this field is not present, an empty string or ``null``, it skips the build step.
+
+       If this field is a constant string ``"*"``, it will use a default build script provided
+       by the kernel.
+       For example, the C kernel's default Makefile adds all C source files
+       under the working directory and copmiles them into ``./main``
+       executable, with commonly used C/link flags: ``"-pthread -lm -lrt -ldl"``.
+
+   * - ``buildLog``
+     - ``bool``
+
+     - Indicates whether to separately report the logs from the build step.
+       (default: ``false``)
+
+       If set ``false``, all console outputs during the build step
+       are swallowed silently and only the console outputs from the main
+       program are returned.
+       This looks like you only run the main program with a hidden build step.
+
+       However, if the build command fails with a non-zero exit code, then the
+       ``"finished"`` response contains the swallowed console outputs of the
+       build command.  You can distinguish failures from the build step and the
+       execution step using ``result.options.step`` value.
+
+       If set ``true``, at least one ``"continued"`` response will be generated
+       to explicitly report the console outputs from the build step.
+       Like the execution step, there may be mulitple ``"continued"`` responses
+       with ``result.options.exitCode`` set ``null`` when the build step takes
+       long time.
+
+   * - ``exec``
+     - ``str``
+
+     - The bash command to execute the main program.
+
+       If this is not present, an empty string, or ``null``, the server only
+       performs the build step and ``options.buildLog`` is assumed to be
+       ``true`` (the given value is ignored).
+
+.. note::
+
+   All shell commands are by default executed under ``/home/work``.
+   The common environment is:
+
+   .. code-block:: text
+
+      TERM=xterm
+      LANG=C.UTF-8
+      SHELL=/bin/bash
+      USER=work
+      HOME=/home/work
+
+   but individual kernels may have additional environment settings.
+
+.. warning::
+
+   The shell does NOT have access to sudo or the root privilege.
+   Though, some kernels may allow installation of language-specific packages in
+   the user directory.
+
+   Also, your build script and the main program is executed inside
+   Sorna Jail, meaning that some system calls are blocked by our policy.
+   Since ``ptrace`` syscall is blocked, you cannot use native debuggers
+   such as gdb.
+
+   This limitation, however, is subject to change in the future.
+
+Example:
+
+.. code-block:: json
+
+   {
+     "build": "gcc -Wall main.c -o main -lrt -lz",
+     "exec": "./main"
+   }
+
+
+.. _execution-result-object:
+
+Execution Result Object
+-----------------------
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+   * - ``status``
+     - ``enum[str]``
+
+     - One of ``"continued"``, ``"waiting-input"``, ``"finished"``.
+
+       If this is ``"continued"``, you should repeat making another API call until you get ``"finished"`` status.
+       This happens when the user code runs longer than a few seconds, to allow the client to show its progress.
+       When each call returns, the below ``result.stdout`` and ``result.stderr`` fields have the console logs captured since the last previous call.
+       You should append returned console logs to your UI view to make it a complete log.
+       When making continuation calls, you should not put anything in ``code`` field of the request, otherwise you will get 400 Bad Request.
+
+       If this is ``"waiting-input"``, you should make another API call with setting ``code`` field of the request to the user-input text.
+       This happens when the user code calls interactive ``input()`` functions.
+       Until you send the user input, the kernel code is blocked.
+       You may use modal dialogs or other input forms (e.g., HTML input) to retrieve user inputs.
+       When the server receives the user input, the kernel's ``input()`` returns the given value.
+       Note that the exact functions that trigger this mechanism are different language by langauge.
+
+   * - ``console``
+     - .. code-block:: text
+
+          list[
+            tuple[
+              enum[str], *
+            ]
+          ]
+
+     - Contains a list of console output items. Each item is a pair of the item type (``enum[str]``) and its value (``*``).
+       The item type is one of ``"stdout"``, ``"stderr"``, ``"media"``, ``"html"``, or ``"log"``.
+
+       When this is ``"stdout"`` or ``"stderr"``, the value is the standard I/O stream outputs as (non-escaped) UTF-8 string.
+       Both fields are truncated to 524,288 Unicode characters.
+       The stderr field includes not only stderr outputs but also language-specific tracebacks of (unhandled) exceptions or errors occurred in the user code.
+
+       When this is ``"media"``, the value is a pair of the MIME type and the content data.
+       If the MIME type is text-based (e.g., ``"text/plain"``) or XML-based (e.g., ``"image/svg+xml"``), the content is just a string that represent the content.
+       Otherwise, the data is encoded as a data URI format (RFC 2397).
+       You may use `sorna-media library <https://github.com/lablup/sorna-media>`_ to handle this field in Javascript on web-browsers.
+
+       When this is ``"html"``, the value is a partial HTML document string, such as a table to show tabular data.
+       If you are implementing a web-based front-end, you may use it directly to the standard DOM API, for instance, ``consoleElem.insertAdjacentHTML(value, "beforeend")``.
+
+       When this is ``"log"``, the value is a 4-tuple of the log level, the timestamp in the ISO 8601 format, the logger name and the log message string.
+       The log level may be one of ``"debug"``, ``"info"``, ``"warning"``, ``"error"``, or ``"fatal"``.
+       You may use different colors/formatting by the log level when printing the log message.
+       This rich logging facilities are available to only supported kernels.
+
+       In the *batch* mode, it always has at least the following fields:
+
+       * ``exitCode``: An integer whose value is the exit code of the build command or the main command.
+         Until the process for the current step exits, this field is ``null``.
+       * ``step``: Which step it generated this response. Either ``"build"`` or ``"exec"``.
+         It is useful when you wish to separately display the console outputs from the different steps.
+
+       .. tip::
+
+          All returned strings are *not* escaped. You should take care of this as well as formatting new lines properly
+          (use ``<pre>`` element or replace them with ``<br>``) when rendering the result to web browsers.
+          An easy way to do this safely is to use ``insertAdjacentText()`` DOM API.
+
+   * - ``options``
+     - ``object``
+
+     - An object containing extra display options.  If there is no options indicated by the kernel, this field is ``null``.
+       When ``result.status`` is ``"waiting-input"``, it has a boolean field ``is_password`` so that you could use
+       different types of text boxes for user inputs.
+
 
 .. _session-filter-object:
 
@@ -148,7 +321,7 @@ Kernel Session Item Object
    * - Key
      - Type
      - Description
-   * - ``kernelId``
+   * - ``id``
      - ``slug``
      - The kernel session ID.
    * - ``type``
@@ -175,6 +348,12 @@ Kernel Session Item Object
    * - ``cpuUtil``
      - ``int`` (%)
      - The current CPU utilization (sum of all used cores across instances, hence may exceed 100%). It may show a stale value.
+
+       .. versionchanged:: v3.20170615
+
+          This had been separated into multiple credit-based fields, but that was never implemented properly.
+          We has changed it to represent more intuitive value.
+
    * - ``config``
      - ``object``
      - :ref:`resource-config-object` specified when created.

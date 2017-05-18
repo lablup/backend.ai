@@ -6,6 +6,8 @@
 Sorna Documentation
 ===================
 
+**Latest API version: v3.20170615** (beta)
+
 Sorna is an online code execution service that runs arbitrary user codes
 safely in resource-constrained environments, using Docker and our own sandbox
 wrapper.
@@ -17,19 +19,22 @@ problem solving and plotting.
 FAQ
 ---
 
-The idea of a code (or function) execution service is not new.
+The idea of a code (or function) execution service has existed for years, but no one ever reached the comfort offered by Sorna.
 Here we describe key differences to existing products and software with similar purposes.
 
 * What is the difference to AWS Lambda?
 
   * *On-the-fly execution of code snippets:* AWS Lambda mandates its users to package their own programs with libraries as a series of zip files and explicitly deploy them to run.  Meanwhile, Sorna provides a variety of pre-configured sandbox containers and its users pass the code snippets on-the-fly at runtime as individual API requests.
-  * *Result evaluation API:* Sorna offers additional APIs to evaluate the code execution results with a given set of answers for educators.
+  * *Long-running large-scale computing sessions:* You can run even large-scale machine-learning training sessions with no time limits [1]_.  Sorna automatically bundles of multiple different servers for distributed, paralllel computation.
   * *On-premise deployability:* AWS Lambda is a strictly cloud-only service which requires Internet connections always, while Sorna can be deployed on your on-premise machines and portable PCs such as Intel NUC devices for use in off-line lecture rooms.
 
 * What is the difference to Jupyter/IPython Notebook?
 
   * *Horizontal scalability:* Jupyter Notebook is designed for a single-user PC. JupyterHub supports multi-user scenarios but for only modest-sized, semi-trusted user groups. Sorna is designed for multiple arbitrary users and multiple servers to scale out from the very beginning.
   * *Additional security:* Sorna adds a sandbox layer using Docker containers and a custom system call filter to safely execute malicious, unpredictable user inputs without breaking the system and other users.
+
+
+.. [1] On the public cloud service, we apply different limits depending on the subscription levels.
 
 
 Table of Contents
@@ -41,7 +46,7 @@ Table of Contents
    :maxdepth: 1
    :caption: User Manuals
 
-   gsg/registration
+   gsg/overview
    gsg/clientlib
 
 .. _common_api:
@@ -63,9 +68,9 @@ Table of Contents
 
    user-api/intro
    user-api/kernels
-   user-api/exec
-   user-api/stream
-   user-api/batch
+   user-api/exec-query
+   user-api/exec-stream
+   user-api/exec-batch
    user-api/vfolders
 
 .. _admin_api:

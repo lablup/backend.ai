@@ -1,8 +1,8 @@
 Code Execution (Query Mode)
 ===========================
 
-Executing a user code snippet
------------------------------
+Executing Snippet
+-----------------
 
 * URI: ``/v2/kernel/:id``
 * Method: ``POST``
@@ -63,59 +63,9 @@ Response
    * - Fields
      - Type
      - Values
-   * - ``result.status``
-     - ``enum[str]``
-
-     - One of ``"continued"``, ``"waiting-input"``, ``"finished"``.
-
-       If this is ``"continued"``, you should repeat making another API call until you get ``"finished"`` status.
-       This happens when the user code runs longer than a few seconds, to allow the client to show its progress.
-       When each call returns, the below ``result.stdout`` and ``result.stderr`` fields have the console logs captured since the last previous call.
-       You should append returned console logs to your UI view to make it a complete log.
-       When making continuation calls, you should not put anything in ``code`` field of the request, otherwise you will get 400 Bad Request.
-
-       If this is ``"waiting-input"``, you should make another API call with setting ``code`` field of the request to the user-input text.
-       This happens when the user code calls interactive ``input()`` functions.
-       Until you send the user input, the kernel code is blocked.
-       You may use modal dialogs or other input forms (e.g., HTML input) to retrieve user inputs.
-       When the server receives the user input, the kernel's ``input()`` returns the given value.
-       Note that the exact functions that trigger this mechanism are different language by langauge.
-
-   * - ``result.console``
+   * - ``result``
      - ``object``
-
-     - Contains a list of console output items. Each item is a pair of the item type and its value.
-       The type can be one of ``"stdout"``, ``"stderr"``, ``"media"``, ``"html"``, or ``"log"``.
-
-       When this is ``"stdout"`` or ``"stderr"``, the value is the standard I/O stream outputs as (non-escaped) UTF-8 string.
-       Both fields are truncated to 524,288 Unicode characters.
-       The stderr field includes not only stderr outputs but also language-specific tracebacks of (unhandled) exceptions or errors occurred in the user code.
-
-       When this is ``"media"``, the value is a pair of the MIME type and the content data.
-       If the MIME type is text-based (e.g., ``"text/plain"``) or XML-based (e.g., ``"image/svg+xml"``), the content is just a string that represent the content.
-       Otherwise, the data is encoded as a data URI format (RFC 2397).
-       You may use `sorna-media library <https://github.com/lablup/sorna-media>`_ to handle this field in Javascript on web-browsers.
-
-       When this is ``"html"``, the value is a partial HTML document string, such as a table to show tabular data.
-       If you are implementing a web-based front-end, you may use it directly to the standard DOM API, for instance, ``consoleElem.insertAdjacentHTML(value, "beforeend")``.
-
-       When this is ``"log"``, the value is a 4-tuple of the log level, the timestamp in the ISO 8601 format, the logger name and the log message string.
-       The log level may be one of ``"debug"``, ``"info"``, ``"warning"``, ``"error"``, or ``"fatal"``.
-       You may use different colors/formatting by the log level when printing the log message.
-       This rich logging facilities are available to only supported kernels.
-
-       .. tip::
-
-          All returned strings are *not* escaped. You should take care of this as well as formatting new lines properly
-          (use ``<pre>`` element or replace them with ``<br>``) when rendering the result to web browsers.
-          An easy way to do this safely is to use ``insertAdjacentText()`` DOM API.
-
-   * - ``result.options``
-     - ``object``
-
-     - An object containing extra display options.  If there is no options indicated by the kernel, this field is ``null``.
-       When ``result.status`` is ``"waiting-input"``, it has a boolean field ``is_password`` so that you could use
-       different types of text boxes for user inputs.
+     - :ref:`execution-result-object`.
 
 .. note::
 

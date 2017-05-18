@@ -6,8 +6,8 @@ We provide an official Python client library that abstracts the low-level HTTP R
 Requirements
 ------------
 
-Python 3.5 or higher is required.
-You can download `the official installer from python.org <https://www.python.org/downloads/>`_, or use 3rd-party version managers such as `homebrew <http://brew.sh/index_ko.html>`_, `miniconda <http://conda.pydata.org/miniconda.html>`_, or `pyenv <https://github.com/yyuu/pyenv>`_.
+Python 3.6 or higher is required.
+You can download `its official installer from python.org <https://www.python.org/downloads/>`_, or use a 3rd-party package/version manager such as `homebrew <http://brew.sh/index_ko.html>`_, `miniconda <http://conda.pydata.org/miniconda.html>`_, or `pyenv <https://github.com/yyuu/pyenv>`_.
 It works on Linux, macOS, and Windows.
 
 Installation

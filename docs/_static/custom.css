@@ -9,6 +9,20 @@
     overflow: visible;
 }
 
+.rst-content .footnote-reference, .rst-content .citiation-reference {
+    font-size: 80%;
+    line-height: 1.0;
+}
+
+.rst-content .versionchanged p {
+    font-size: inherit;
+}
+.rst-content .versionmodified {
+    color: #849c9c;
+    font-style: italic;
+    font-weight: bold;
+}
+
 td > p {
     margin: 0 0 8px 0;
     font-size: inherit;

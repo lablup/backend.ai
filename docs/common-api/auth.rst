@@ -25,7 +25,7 @@ Common Structure of API Requests
    * - HTTP Headers
      - Values
    * - Method
-     - GET / POST / PUT / PATCH / DELETE
+     - ``GET`` / ``REPORT`` / ``POST`` / ``PUT`` / ``PATCH`` / ``DELETE``
    * - ``Content-Type``
      - Always should be ``application/json``
    * - ``Authorization``
