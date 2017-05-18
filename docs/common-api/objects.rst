@@ -330,15 +330,15 @@ Kernel Session Item Object
    * - ``status``
      - ``enum[str]``
      - One of ``"preparing"``, ``"building``", ``"running"``, ``"restarting"``, ``"resizing"``, ``"success"``, ``"error"``, ``"terminating"``, ``"suspended"``.
+   * - ``statusInfo``
+     - ``str``
+     - An optional message related to the current status. (e.g., error information)
    * - ``age``
      - ``int`` (msec)
      - The time elapsed since the kernel has started.
    * - ``execTime``
      - ``int`` (msec)
      - The time taken for execution. Excludes the time taken for being suspended, restarting, and resizing.
-   * - ``statusInfo``
-     - ``str``
-     - An optional message related to the current status. (e.g., error information)
    * - ``numQueriesExecuted``
      - ``int``
      - The total number of queries executed after start-up.
