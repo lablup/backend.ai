@@ -85,24 +85,49 @@ Jupyter kernel integration of the Sorna Cloud API.
 * Package namespaces: ``sorna.integration``
 * https://github.com/lablup/sorna-jupyter-kernel
 
+Visual Studio Code Extension
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Extension for Visual Studio Code to run your code on the Lablup.AI clouds or your own Backend.AI servers.
+
+* Search 'live code runner' to VSCode extension search.
+* https://github.com/lablup/vscode-live-code-runner
+
+Atom Editor plugin
+~~~~~~~~~~~~~~~~~~
+
+Atom Editor Plugin that allows running your code on the Lablup.AI clouds or your own Backend.AI servers.
+
+* Search 'live code runner' to Atom plugin search.
+* https://github.com/lablup/atom-live-code-runner
+
 
 Installation
 ------------
 
-The Sorna project uses latest features in Python 3.6+ and docker.
-We highly recommend to use [pyenv](https://github.com/yyuu/pyenv) to use an
-isolated setup with custom Python versions that might not be supported by your
+The Sorna project uses latest features in Python 3.6+ and Docker CE 17.05+.
 
-First, install Docker on your system. We have tested Sorna on Linux/Ubuntu and
-macOS ("Docker for Mac").
+To install the manager with API gateway, run:
 
-For a single PC setup, just run `pip install sorna`.
-It will automatically install all above sub-projects as well as their dependencies.
+.. code-block:: sh
+
+   pip install backend.ai[manager]
+
+For each computing servers, install the agent using:
+
+.. code-block:: sh
+
+   pip install backend.ai[agent]
+
+
+NOTE: More details about configuration will be released soon.
+
 
 Development
 -----------
 
-### git flow
+git flow
+~~~~~~~~
 
-The sorna repositories use [git flow](http://danielkummer.github.io/git-flow-cheatsheet/index.html) to streamline branching during development and deployment.
+The sorna repositories use `git flow <http://danielkummer.github.io/git-flow-cheatsheet/index.html>`_ to streamline branching during development and deployment.
 We use the default configuration (master -> preparation for release, develop -> main development, feature/ -> features, etc.) as-is.
