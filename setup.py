@@ -1,39 +1,15 @@
-from setuptools import setup, find_packages
-import pip
-
-try:
-    import pypandoc
-    long_description = pypandoc.convert('README.md', 'rst')
-except (IOError, ImportError):
-    long_description = ""
-
-
-requires = []
-links = []
-requirements = pip.req.parse_requirements(
-    'requirements.txt', session=pip.download.PipSession()
-)
-for item in requirements:
-    if getattr(item, 'url', None):  # older pip has url
-        links.append(str(item.url))
-    if getattr(item, 'link', None):  # newer pip has link
-        links.append(str(item.link))
-    if item.req:
-        requires.append(str(item.req))  # always the package name
+from setuptools import setup
+from pathlib import Path
 
 
 setup(
     name='sorna',
-
-    # Versions should comply with PEP440.  For a discussion on single-sourcing
-    # the version across setup.py and the project code, see
-    # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.9.1',
-    description='Sorna meta-package',
-    long_description=long_description,
+    version='1.0.0',
+    description='Sorna Meta-package',
+    long_description=Path('README.rst').read_text(),
     url='https://github.com/lablup/sorna',
     author='Lablup Inc.',
-    author_email='joongi@lablup.com',
+    author_email='devops@lablup.com',
     license='LGPLv3',
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -54,11 +30,16 @@ setup(
     namespace_packages=['sorna'],
 
     python_requires='>=3.6',
-    install_requires=requires,
-    dependency_links=links,
+    install_requires=[
+        'sorna-common~=1.0.0',
+    ],
     extras_require={
-        'dev': [],
-        'test': [],
+        'manager': [
+            'sorna-manager~=1.0.0',
+        ],
+        'agent': [
+            'sorna-agent~=1.0.0',
+        ],
     },
     data_files=[],
 )
