@@ -1,3 +1,1 @@
-sorna-common>=0.9,<1.0
-sorna-manager>=0.9,<1.0
-sorna-agent>=0.9,<1.0
+-e .

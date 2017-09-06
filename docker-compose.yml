@@ -2,74 +2,14 @@ version: "3"
 
 services:
 
-  # NOTE:
-  #  You need to create a symlink "sorna-gateway" and
-  #  "sorna-agent" to their respective working copies
-  #  or decompressed tarballs.
-
-  sorna-gateway:
-    container_name: sorna-gateway
-    build:
-      context: sorna-gateway
-    depends_on:
-      - sorna-db
-      - sorna-redis
-      - sorna-mq
-      - sorna-etcd
-    volumes:
-      - ./sorna-gateway:/usr/src/app
-    environment:
-      - "SORNA_MQ_ADDR=sorna-mq:5672"  # provisioned to agent via etcd
-      - "SORNA_MQ_LOGIN=sorna"
-      - "SORNA_MQ_PASS=develove"
-      - "SORNA_DB_ADDR=sorna-db:5432"  # provisioned to agent via ectd
-      - "SORNA_ETCD_ADDR=sorna-etcd:2379"
-      - "SORNA_REDIS_ADDR=sorna-redis:6379"  # private use (rate-limit)
-      - "SORNA_NAMESPACE=local"
-    ports:  # for host-side debugging / integration tests
-      - "8081:8080"
-      - "8443:8443"
-
-  sorna-agent:
-    container_name: sorna-agent
-    build:
-      context: sorna-agent
-    volumes:
-      - ./sorna-agent:/usr/src/app
-    environment:
-      - "SORNA_ETCD_ADDR=sorna-etcd:2379"
-      - "SORNA_NAMESPACE=local"
-      - "DOCKER_HOST=tcp://sorna-docker:2375"
-    depends_on:
-      - sorna-db
-      - sorna-mq
-      - sorna-etcd
-      - sorna-docker
-      - sorna-gateway
-
-  sorna-docker:
-    image: docker:dind
-    privileged: true
-
   sorna-redis:
-    container_name: sorna-redis
+    container_name: sorna-local-redis
     image: redis:latest
     ports:  # for host-side debugging
       - "6389:6379"
 
-  sorna-mq:
-    container_name: sorna-mq
-    hostname: sorna-mq
-    image: rabbitmq:3.6-management
-    ports:  # for host-side debugging/mgmt
-      - "15682:15672"
-    environment:
-      - "RABBITMQ_DEFAULT_USER=sorna"
-      - "RABBITMQ_DEFAULT_PASS=develove"
-      - "RABBITMQ_DEFAULT_VHOST=local"
-
   sorna-db:
-    container_name: sorna-db
+    container_name: sorna-local-db
     image: postgres:9.6-alpine
     ports:  # for host-side debugging
       - "5442:5432"
@@ -78,7 +18,7 @@ services:
       - POSTGRES_DB=sorna
 
   sorna-etcd:
-    container_name: sorna-etcd
+    container_name: sorna-local-etcd
     image: quay.io/coreos/etcd:v3.1.5
     volumes:
       - /tmp/etcd-data:/etcd-data

@@ -3,9 +3,9 @@ from pathlib import Path
 
 
 setup(
-    name='sorna',
+    name='backend.ai',
     version='1.0.0',
-    description='Sorna Meta-package',
+    description='Lablup Backend.AI Meta-package',
     long_description=Path('README.rst').read_text(),
     url='https://github.com/lablup/sorna',
     author='Lablup Inc.',
@@ -26,8 +26,8 @@ setup(
         'Topic :: Software Development',
     ],
 
-    packages=['sorna'],
-    namespace_packages=['sorna'],
+    packages=['backend'],
+    namespace_packages=['backend'],
 
     python_requires='>=3.6',
     install_requires=[
