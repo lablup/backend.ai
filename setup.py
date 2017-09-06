@@ -4,7 +4,7 @@ from pathlib import Path
 
 setup(
     name='backend.ai',
-    version='1.0.0',
+    version='1.0.1',
     description='Lablup Backend.AI Meta-package',
     long_description=Path('README.rst').read_text(),
     url='https://github.com/lablup/sorna',
@@ -25,20 +25,17 @@ setup(
         'Topic :: Scientific/Engineering',
         'Topic :: Software Development',
     ],
-
-    packages=['backend'],
-    namespace_packages=['backend'],
-
+    packages=['backend.ai.meta'],
     python_requires='>=3.6',
     install_requires=[
-        'sorna-common~=1.0.0',
+        'backend.ai-common~=1.0.0',
     ],
     extras_require={
         'manager': [
-            'sorna-manager~=1.0.0',
+            'backend.ai-manager~=1.0.0',
         ],
         'agent': [
-            'sorna-agent~=1.0.0',
+            'backend.ai-agent~=1.0.0',
         ],
     },
     data_files=[],
