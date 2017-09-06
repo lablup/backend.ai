@@ -58,11 +58,14 @@ Client Libraries
 A client library to access the Sorna API servers with ease.
 
 * Python
-  * ``pip install lablup-client``
-  * https://github.com/lablup/client
+   * ``pip install backend.ai-client``
+   * https://github.com/lablup/backend.ai-client-py
 * Javascript (under preparation)
-  * ``npm install lablup-client``
-  * https://github.com/lablup/client-js
+   * ``npm install backend.ai-client``
+   * https://github.com/lablup/backend.ai-client-js
+* PHP (under preparation)
+   * ``composer require lablup/backend.ai-client``
+   * https://github.com/lablup/backend.ai-client-php
 
 Sorna Media
 ~~~~~~~~~~~
