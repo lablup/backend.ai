@@ -25,7 +25,7 @@ setup(
         'Topic :: Scientific/Engineering',
         'Topic :: Software Development',
     ],
-    packages=['backend.ai.meta'],
+    packages=['ai.backend.meta'],
     python_requires='>=3.6',
     install_requires=[
         'backend.ai-common~=1.0.0',
