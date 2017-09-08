@@ -16,8 +16,8 @@ Manager with API Gateway
 It routes external API requests from front-end services to individual agents.
 It also monitors and scales the cluster of multiple agents (a few tens to hundreds).
 
-* Package namespace: ``backend.ai.gateway``, ``backend.ai.manager``
-* https://github.com/lablup/backend.ai.manager
+* Package namespace: ``backend.ai-gateway`` and ``backend.ai-manager``
+* https://github.com/lablup/backend.ai-manager
 
 Agent
 ~~~~~
@@ -25,8 +25,8 @@ Agent
 It manages individual server instances and launches/destroys Docker containers where REPL daemons (kernels) run.
 Each agent on a new EC2 instance self-registers itself to the instance registry via heartbeats.
 
-* Package namespace: ``backend.ai.agent``
-* https://github.com/lablup/backend.ai.agent
+* Package namespace: ``backend.ai-agent``
+* https://github.com/lablup/backend.ai-agent
 
 REPL
 ~~~~
@@ -34,7 +34,7 @@ REPL
 A set of small ZMQ-based REPL daemons in various programming languages and configurations.
 It also includes a sandbox implemented using ptrace-based sytem call filtering written in Go.
 
-* https://github.com/lablup/backend.ai.repl
+* https://github.com/lablup/backend.ai-repl
 * Each daemon is a separate program, usually named "run.{lang-specific-extension}".
 
 Backend.AI Common
@@ -42,8 +42,8 @@ Backend.AI Common
 
 A collection of utility modules commonly shared throughout Backend.AI projects.
 
-* Package namespaces: ``backend.ai.common``
-* https://github.com/lablup/backend.ai.common
+* Package namespaces: ``backend.ai-common``
+* https://github.com/lablup/backend.ai-common
 
 
 Client-side Components
@@ -82,8 +82,8 @@ Backend.AI Jupyter Kernel
 
 Jupyter kernel integration of the Backend.AI Cloud API.
 
-* Package namespaces: ``backend.ai.integration``
-* https://github.com/lablup/backend.ai.jupyter-kernel
+* Package namespaces: ``backend.ai-integration``
+* https://github.com/lablup/backend.ai-jupyter-kernel
 
 Visual Studio Code Extension
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
