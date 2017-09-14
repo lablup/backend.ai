@@ -28,17 +28,23 @@ Each agent on a new EC2 instance self-registers itself to the instance registry 
 * Package namespace: ``backend.ai-agent``
 * https://github.com/lablup/backend.ai-agent
 
-REPL
-~~~~
+Kernels
+~~~~~~~
 
-A set of small ZMQ-based REPL daemons in various programming languages and configurations.
-It also includes a sandbox implemented using ptrace-based sytem call filtering written in Go.
+A set of small ZeroMQ-based REPL daemons in various programming languages and configurations.
 
-* https://github.com/lablup/backend.ai-repl
+* https://github.com/lablup/backend.ai-kernels
 * Each daemon is a separate program, usually named "run.{lang-specific-extension}".
 
-Backend.AI Common
-~~~~~~~~~~~~
+Jail
+~~~~
+
+A programmable sandbox implemented using ptrace-based sytem call filtering written in Go.
+
+* https://github.com/lablup/backend.ai-jail
+
+Commons
+~~~~~~~
 
 A collection of utility modules commonly shared throughout Backend.AI projects.
 
