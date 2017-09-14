@@ -89,7 +89,7 @@ Backend.AI Jupyter Kernel
 Jupyter kernel integration of the Backend.AI Cloud API.
 
 * Package namespaces: ``backend.ai-integration``
-* https://github.com/lablup/backend.ai-jupyter-kernel
+* https://github.com/lablup/backend.ai-integration-jupyter
 
 Visual Studio Code Extension
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
