@@ -43,6 +43,13 @@ A programmable sandbox implemented using ptrace-based sytem call filtering writt
 
 * https://github.com/lablup/backend.ai-jail
 
+Hook
+~~~~
+
+A set of libc overrides for resource control and web-based interactive stdin (paired with agents).
+
+* https://github.com/lablup/backend.ai-hook
+
 Commons
 ~~~~~~~
 
@@ -70,8 +77,8 @@ A client library to access the Backend.AI API servers with ease.
    * ``composer require lablup/backend.ai-client``
    * https://github.com/lablup/backend.ai-client-php
 
-Backend.AI Media
-~~~~~~~~~~~
+Media
+~~~~~
 
 The front-end support libraries to handle multi-media outputs (e.g., SVG plots, animated vector graphics)
 
@@ -83,8 +90,8 @@ The front-end support libraries to handle multi-media outputs (e.g., SVG plots, 
 Integrations with IDEs and Editors
 ----------------------------------
 
-Backend.AI Jupyter Kernel
-~~~~~~~~~~~~~~~~~~~~
+Jupyter Kernel
+~~~~~~~~~~~~~~
 
 Jupyter kernel integration of the Backend.AI Cloud API.
 
