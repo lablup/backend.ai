@@ -16,7 +16,7 @@ Manager with API Gateway
 It routes external API requests from front-end services to individual agents.
 It also monitors and scales the cluster of multiple agents (a few tens to hundreds).
 
-* Package namespace: ``backend.ai-gateway`` and ``backend.ai-manager``
+* Package namespace: ``ai.backend.gateway`` and ``ai.backend.manager``
 * https://github.com/lablup/backend.ai-manager
 
 Agent
@@ -25,7 +25,7 @@ Agent
 It manages individual server instances and launches/destroys Docker containers where REPL daemons (kernels) run.
 Each agent on a new EC2 instance self-registers itself to the instance registry via heartbeats.
 
-* Package namespace: ``backend.ai-agent``
+* Package namespace: ``ai.backend.agent``
 * https://github.com/lablup/backend.ai-agent
 
 Kernels
@@ -55,7 +55,7 @@ Commons
 
 A collection of utility modules commonly shared throughout Backend.AI projects.
 
-* Package namespaces: ``backend.ai-common``
+* Package namespaces: ``ai.backend.common``
 * https://github.com/lablup/backend.ai-common
 
 
