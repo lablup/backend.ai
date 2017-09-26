@@ -143,28 +143,6 @@ Batch Execution Query Object
        under the working directory and copmiles them into ``./main``
        executable, with commonly used C/link flags: ``"-pthread -lm -lrt -ldl"``.
 
-   * - ``buildLog``
-     - ``bool``
-
-     - Indicates whether to separately report the logs from the build step.
-       (default: ``false``)
-
-       If set ``false``, all console outputs during the build step
-       are swallowed silently and only the console outputs from the main
-       program are returned.
-       This looks like you only run the main program with a hidden build step.
-
-       However, if the build command fails with a non-zero exit code, then the
-       ``"finished"`` response contains the swallowed console outputs of the
-       build command.  You can distinguish failures from the build step and the
-       execution step using ``result.options.step`` value.
-
-       If set ``true``, at least one ``"continued"`` response will be generated
-       to explicitly report the console outputs from the build step.
-       Like the execution step, there may be mulitple ``"continued"`` responses
-       with ``result.options.exitCode`` set ``null`` when the build step takes
-       long time.
-
    * - ``exec``
      - ``str``
 
@@ -173,6 +151,12 @@ Batch Execution Query Object
        If this is not present, an empty string, or ``null``, the server only
        performs the build step and ``options.buildLog`` is assumed to be
        ``true`` (the given value is ignored).
+
+.. note::
+
+   A client can distinguish whether the current output is from the build phase
+   or the execution phase by whether it has received ``build-finished`` status
+   or not.
 
 .. note::
 
@@ -227,13 +211,17 @@ Execution Result Object
    * - ``status``
      - ``enum[str]``
 
-     - One of ``"continued"``, ``"waiting-input"``, ``"finished"``.
+     - One of ``"continued"``, ``"waiting-input"``, ``"finished"``, or ``"build-finished"``.
 
-       If this is ``"continued"``, you should repeat making another API call until you get ``"finished"`` status.
+       If this is ``"continued"``, the client should repeat making another API call until you get ``"finished"`` status.
        This happens when the user code runs longer than a few seconds, to allow the client to show its progress.
-       When each call returns, the below ``result.stdout`` and ``result.stderr`` fields have the console logs captured since the last previous call.
+       When each call returns, the below ``console`` field have the console logs captured since the last previous call.
        You should append returned console logs to your UI view to make it a complete log.
-       When making continuation calls, you should not put anything in ``code`` field of the request, otherwise you will get 400 Bad Request.
+       When making subsequent continuation calls, the client should send an "empty" execution request with the same value in the ``mode`` field.
+       Otherwise it will get 400 Bad Request.
+
+       (Batch mode only) If this is ``"build-finished"``, the client should repeat making another API call like ``"continued"``.
+       All outputs prior to this status return are from the build program and all future outputs are from the executed program built.
 
        If this is ``"waiting-input"``, you should make another API call with setting ``code`` field of the request to the user-input text.
        This happens when the user code calls interactive ``input()`` functions.
@@ -291,23 +279,6 @@ Execution Result Object
        When ``result.status`` is ``"waiting-input"``, it has a boolean field ``is_password`` so that you could use
        different types of text boxes for user inputs.
 
-
-.. _session-filter-object:
-
-Kernel Session Filter Object
-----------------------------
-
-.. list-table::
-   :widths: 15 5 80
-   :header-rows: 1
-
-   * - Key
-     - Type
-     - Description
-   * - ``status``
-     - ``enum[str]``
-     - Either ``"ongoing"`` or ``"finished"``.
-       Note that ``"finished"`` status includes ``"success"`` and ``"error"`` only whereas ``"ongoing"`` includes all other status.
 
 .. _session-item-object:
 

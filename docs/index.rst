@@ -82,6 +82,8 @@ Table of Contents
    admin-api/intro
    admin-api/keypairs
    admin-api/sessions
+   admin-api/vfolders
+   admin-api/stats
 
 .. _dev:
 
