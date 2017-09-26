@@ -1,41 +1,85 @@
-.. Sorna API Library documentation master file, created by
+.. Backend.AI documentation master file, created by
    sphinx-quickstart on Tue Mar  1 21:26:20 2016.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Sorna Documentation
-===================
+Backend.AI Documentation
+========================
 
 **Latest API version: v3.20170615** (beta)
 
-Sorna is an online code execution service that runs arbitrary user codes
-safely in resource-constrained environments, using Docker and our own sandbox
-wrapper.
-It currently supports Python 2/3, R, PHP, Javascript, Julia, Octave, Haskell, Lua and NodeJS for general programming language, and TensorFlow, Keras, Theano for Deep-learning environments (more being added).
-Sorna's primary target is to provide a zero-configuration evaluation tool for
-short-running programs used in education and scientific researches, such as
-problem solving and plotting.
+Backend.AI is a hassle-free backend for AI programming and service.
+It runs arbitrary user codes safely in resource-constrained environments, using Docker and our own sandbox wrapper.
+
+Backend.AI supports various programming languages and runtimes, such as Python 2/3, R, PHP, C/C++, Java, Javascript, Julia, Octave, Haskell, Lua and NodeJS, as well as AI-oriented libraries such as TensorFlow, Keras, Caffe, and MXNet.
 
 FAQ
 ---
 
-The idea of a code (or function) execution service has existed for years, but no one ever reached the comfort offered by Sorna.
-Here we describe key differences to existing products and software with similar purposes.
+vs. Notebooks
+~~~~~~~~~~~~~
 
-* What is the difference to AWS Lambda?
+.. list-table::
+   :header-rows: 1
 
-  * *On-the-fly execution of code snippets:* AWS Lambda mandates its users to package their own programs with libraries as a series of zip files and explicitly deploy them to run.  Meanwhile, Sorna provides a variety of pre-configured sandbox containers and its users pass the code snippets on-the-fly at runtime as individual API requests.
-  * *Long-running large-scale computing sessions:* You can run even large-scale machine-learning training sessions with no time limits [1]_.  Sorna automatically bundles of multiple different servers for distributed, paralllel computation.
-  * *On-premise deployability:* AWS Lambda is a strictly cloud-only service which requires Internet connections always, while Sorna can be deployed on your on-premise machines and portable PCs such as Intel NUC devices for use in off-line lecture rooms.
+   * - Product
+     - Role
+     - Problem and Solution
 
-* What is the difference to Jupyter/IPython Notebook?
+   * - Apache Zeppelin, Jupyter Notebook
+     - Notebook-style document + code *front-ends*
+     - Insecure host resource sharing
 
-  * *Horizontal scalability:* Jupyter Notebook is designed for a single-user PC. JupyterHub supports multi-user scenarios but for only modest-sized, semi-trusted user groups. Sorna is designed for multiple arbitrary users and multiple servers to scale out from the very beginning.
-  * *Additional security:* Sorna adds a sandbox layer using Docker containers and a custom system call filter to safely execute malicious, unpredictable user inputs without breaking the system and other users.
+   * - **Backend.AI**
+     - Pluggable *back-end* to any front-ends
+     - Built for multi-tenancy: scalable and better isolation
+
+vs. Orchestration Frameworks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+
+   * - Product
+     - Target
+     - Value
+
+   * - Amazon ECS, Kubernetes
+     - Long-running service daemons
+     - Laod balancing, fault tolerance, incremental deployment
+
+   * - **Backend.AI**
+     - Stateful compute sessions
+     - Low-cost high-density computation
+
+   * - Amazon Lambda
+     - Stateless, light-weight functions
+     - Serverless, zero-management
+
+vs. Big-data and AI Frameworks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. list-table::
+   :header-rows: 1
+
+   * - Product
+     - Role
+     - Problem and Solution
+
+   * - TensorFlow, Apache Spark, Apache Hive
+     - Computation runtime
+     - Difficult to install, configure, and operate
+
+   * - Amazon ML, Azure ML, GCP ML
+     - Managed MLaaS
+     - Still complicated for scientists, too restrictive for engineers
+
+   * - **Backend.AI**
+     - Host of computation runtimes
+     - Pre-configured, versioned, reproducible, customizable (open-source)
 
 
-.. [1] On the public cloud service, we apply different limits depending on the subscription levels.
-
+(All product names and trade-marks are the properties of their respective owners.)
 
 Table of Contents
 -----------------

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Sorna API Library documentation build configuration file, created by
+# Backend.AI Library documentation build configuration file, created by
 # sphinx-quickstart on Tue Mar  1 21:26:20 2016.
 #
 # This file is execfile()d with the current directory set to its
@@ -47,9 +47,9 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'Sorna'
+project = 'Backend.AI'
 copyright = '2016-2017, Lablup Inc'
-author = 'Joongi Kim'
+author = 'DevOps Team'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -211,7 +211,7 @@ html_static_path = ['_static']
 #html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'SornaDoc'
+htmlhelp_basename = 'BackendAIDoc'
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -233,7 +233,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'SornaDoc.tex', 'Sorna API Library Documentation',
+    (master_doc, 'BackendAIDoc.tex', 'Backend.AI Documentation',
      'Joongi Kim', 'manual'),
 ]
 
@@ -263,7 +263,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'sorna', 'Sorna Documentation',
+    (master_doc, 'backend.ai', 'Backend.AI Documentation',
      [author], 1)
 ]
 
@@ -277,8 +277,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'Sorna', 'Sorna Documentation',
-     author, 'Sorna', 'Sorna is a distributed code snippet execution engine.',
+    (master_doc, 'Backend.AI', 'Backend.AI Documentation',
+     author, 'Backend.AI', 'Backend.AI is a hassle-free backend for AI programming and service.',
      'Miscellaneous'),
 ]
 
