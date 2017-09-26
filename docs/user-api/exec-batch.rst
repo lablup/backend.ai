@@ -81,7 +81,10 @@ Parameters
    * - ``mode``
      - ``enum[str]``
      - A constant string ``"batch"``.
-
+   * - ``runId``
+     - ``str``
+     - A string of client-side unique identifier for this particular execution (run).
+       See details in :doc:`/user-api/exec-query`.
    * - ``options``
      - ``object``
      - :ref:`batch-execution-query-object`.
@@ -93,6 +96,7 @@ Example:
    {
      "type": "batch",
      "options": "{batch-execution-query-object}",
+     "runId": "af9185c5fb0eacb2"
    }
 
 Response

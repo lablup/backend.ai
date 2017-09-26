@@ -32,6 +32,11 @@ Parameters
    * - ``code``
      - ``str``
      - A string of user-written code.  All non-ASCII data must be encoded in UTF-8 or any format acceptable by the kernel.
+   * - ``runId``
+     - ``str``
+     - A string of client-side unique identifier for this particular execution (run).
+       The client should keep the same value until this execution completely finishes with ``finished`` at the result's ``status`` field.
+       Also, the client should use a new value for the subsequent executions.
 
 **Example:**
 
@@ -39,7 +44,8 @@ Parameters
 
    {
      "type": "query",
-     "code": "print('Hello, world!')"
+     "code": "print('Hello, world!')",
+     "runId": "5facbf2f2697c1b7"
    }
 
 
