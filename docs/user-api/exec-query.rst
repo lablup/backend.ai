@@ -243,12 +243,8 @@ You should make another API query with the ``code`` field filled with the user i
 Auto-completion
 ---------------
 
-* URI: ``/v2/kernel/:id``
+* URI: ``/v2/kernel/:id/complete``
 * Method: ``POST``
-
-.. warning::
-
-   This API is draft and may be changed without notices.
 
 Parameters
 """"""""""
@@ -263,9 +259,6 @@ Parameters
    * - ``:id``
      - ``slug``
      - The kernel ID.
-   * - ``mode``
-     - ``enum[str]``
-     - A constant string ``"complete"``.
    * - ``code``
      - ``str``
      - A string containing the code until the current cursor position.
@@ -287,7 +280,6 @@ Parameters
 .. code-block:: json
 
    {
-     "type": "complete",
      "code": "pri",
      "options": {
        "post": "\nprint(\"world\")\n",
@@ -338,3 +330,35 @@ Response
      ]
    }
 
+Interrupt
+---------
+
+* URI: ``/v2/kernel/:id/interrupt``
+* Method: ``POST``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:id``
+     - ``slug``
+     - The kernel ID.
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 204 No Content
+     - Sent the interrupt signal to the kernel.
+       Note that this does *not* guarantee the effectiveness of the interruption.
