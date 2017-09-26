@@ -1,36 +1,19 @@
 Statistics
 ==========
 
-Per-keypair Usage Counter
--------------------------
+Full Admin
+----------
 
-* URI: ``/v2/admin/usage/:access_key``
-* Method: ``GET``
+Query Schema
+~~~~~~~~~~~~
 
-Parameters
-""""""""""
+TODO
 
-.. list-table::
-   :widths: 20 80
-   :header-rows: 1
 
-   * - Parameter
-     - Description
-   * - ``:access_key``
-     - The access key of the keypair.
-   * - ``keys``
-     - The comman-separated key list of desired statistic values.
+Restricted Owner Access
+-----------------------
 
-       Available keys are:
+Query Schema
+~~~~~~~~~~~~
 
-       * storage
-
-Response
-""""""""
-
-Per-keypair Billing Calculator
-------------------------------
-
-* URI: ``/v2/admin/bill/:access_key``
-* Method: ``GET``
-
+TODO
