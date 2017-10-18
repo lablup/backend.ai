@@ -1,0 +1,41 @@
+language: python
+cache: pip
+
+stages:
+  - name: test
+  - name: deploy
+    if: tag IS present
+
+# build matrix for test stage
+python:
+  - "3.6"
+os:
+  - linux
+  # - osx  # not supported yet
+
+# other stages
+jobs:
+  fast_finish: true
+  include:
+    - stage: test
+      install:
+        - pip install -U pip setuptools
+        - pip install -r requirements-ci.txt
+      script:
+        - python -m flake8 ai/backend
+        - python -m pytest tests
+      after_success:
+        - codecov
+    - stage: deploy
+      python: "3.6"
+      install: skip
+      script: skip
+      deploy:
+        on:
+          tags: true
+        provider: pypi
+        distributions: sdist bdist_wheel
+        user: lablup
+        password:
+          secure: "lwuiZWXrskBjlSkSfyUJUWa52HzRRv34VLIGLky0u4ihT5v7Ljc2XJgcxm6IXX/N4gBqEgUXhxm6IKI5GnnxOfDPFybRV5f8JKFcn9+YniDbGxSOv9+sJQWIDMherT997Mle3vb6JSDzJxCXupmEghnuaL+3RY0kqnUFQdJyq/vIHFL6z4nuxXJ0XGfa0Y+c8O0cEQDQsLXMay+Ln5MQ5TYFw6FRUW19sY4KvvXfs3Bzc/Cbch/TOZ5GrEJfPt0K7TWIkZlZOANKFh7aODv7sKKmn9R3w/ItmBcNcxL2sl5/HWPRsNu102K4dqAbffnvql3OlhwWemXSNLgR0Wv6RcATkyyJbj43/3fGGxsc+WhtyyMFZEpY4cnUlvT10HbS6HH0kDTi8bTaO7gYm0Cns+r8+cy4z/fBY8L4sygk2OCQXOWSNHyFzM/dkdYG8ZtYos9yFzNcWLTrZxTfv88zB5j/R2loUe4PLenC4ukzFwoLZOG9euQEK+vffOW0XP64zacJFNTEH8NVKeL4pi75bzNAnWY3cZ2D6fRll0Ka0e8lbB/uLKizmi6ZgNDSaRh8muSDrmppPxG2LFqb1PCrSbNkJMBK+dfOd+2Bi2b9Ab/KcKGB9ZtrpnDqdESRngJS617JGkOxleD028vn/o8quIAjPOtgOziZsyge2ONtmmA="
+        skip_upload_docs: true

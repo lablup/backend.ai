@@ -4,10 +4,10 @@ from pathlib import Path
 
 setup(
     name='backend.ai',
-    version='1.0.1',
+    version='1.0.2',
     description='Lablup Backend.AI Meta-package',
     long_description=Path('README.rst').read_text(),
-    url='https://github.com/lablup/sorna',
+    url='https://github.com/lablup/backend.ai',
     author='Lablup Inc.',
     author_email='devops@lablup.com',
     license='LGPLv3',
@@ -29,6 +29,7 @@ setup(
     python_requires='>=3.6',
     install_requires=[
         'backend.ai-common~=1.0.0',
+        'backend.ai-client~=1.0.0',
     ],
     extras_require={
         'manager': [
@@ -36,6 +37,12 @@ setup(
         ],
         'agent': [
             'backend.ai-agent~=1.0.0',
+        ],
+        'dev': [
+            'pytest',
+        ]
+        'ci': [
+            'flake8',
         ],
     },
     data_files=[],

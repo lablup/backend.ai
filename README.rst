@@ -1,10 +1,25 @@
 Backend.AI
 ==========
 
-Backend.AI is a streamlined backend service framework hosting heterogeneous programming languages and popular AI frameworks.
-It manages the underlying computing resources for multi-tenant computation sessions where such sessions are spawned and executed instantly on demand.
+Backend.AI is a streamlined backend service framework hosting heterogeneous
+programming languages and popular AI frameworks.
+It manages the underlying computing resources for multi-tenant computation
+sessions where such sessions are spawned and executed instantly on demand.
 
 All sub-projects are licensed under LGPLv3+.
+
+By installing this meta-package, you get the client with command-line interface
+by default and optionally you may add the manager and agent using pip extra
+tags.
+
+.. code-block:: console
+
+   $ pip install backend.ai
+   (installs the common and client libs which includes CLI)
+   $ pip install backend.ai[manager]
+   (installs the common and client libs with the manager/gateway daemon)
+   $ pip install backend.ai[agent]
+   (installs the common and client libs with the agent daemon)
 
 
 Server-side Components
