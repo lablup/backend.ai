@@ -40,7 +40,7 @@ setup(
         ],
         'dev': [
             'pytest',
-        ]
+        ],
         'ci': [
             'flake8',
         ],
