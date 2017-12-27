@@ -122,29 +122,17 @@ The front-end support libraries to handle multi-media outputs (e.g., SVG plots, 
 Integrations with IDEs and Editors
 ----------------------------------
 
-Jupyter Kernel
-~~~~~~~~~~~~~~
-
-Jupyter kernel integration of the Backend.AI Cloud API.
-
-* Package namespaces: ``backend.ai-integration``
-* https://github.com/lablup/backend.ai-integration-jupyter
-
-Visual Studio Code Extension
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Extension for Visual Studio Code to run your code on the Lablup.AI clouds or your own Backend.AI servers.
-
-* Search 'live code runner' to VSCode extension search.
-* https://github.com/lablup/vscode-live-code-runner
-
-Atom Editor plugin
-~~~~~~~~~~~~~~~~~~
-
-Atom Editor Plugin that allows running your code on the Lablup.AI clouds or your own Backend.AI servers.
-
-* Search 'live code runner' to Atom plugin search.
-* https://github.com/lablup/atom-live-code-runner
+* Jupyter Kernel: data scientists' favorite tool
+   * Package namespaces: ``backend.ai-integration``
+   * https://github.com/lablup/backend.ai-integration-jupyter
+* Visual Studio Code Extension
+   * Search 'live code runner' among VSCode extensions.
+   * https://github.com/lablup/vscode-live-code-runner
+* Atom Editor plugin
+   * Search 'live code runner' among Atom plugins.
+   * https://github.com/lablup/atom-live-code-runner
+* IntelliJ / PyCharm plugin
+   * Coming soon!
 
 
 Installation
