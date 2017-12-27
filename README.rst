@@ -34,6 +34,9 @@ without modification in your codes).
 Please contact us (contact-at-lablup-com) for commercial consulting and more
 licensing details/options about individual use-cases.
 
+For details about server installation and configuration, please visit `our
+wiki <https://github.com/lablup/backend.ai/wiki>_`.
+
 Manager with API Gateway
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -133,34 +136,3 @@ Integrations with IDEs and Editors
    * https://github.com/lablup/atom-live-code-runner
 * IntelliJ / PyCharm plugin
    * Coming soon!
-
-
-Installation
-------------
-
-The Backend.AI project uses latest features in Python 3.6+ and Docker CE 17.05+.
-
-To install the manager with API gateway, run:
-
-.. code-block:: sh
-
-   pip install backend.ai[manager]
-
-For each computing servers, install the agent using:
-
-.. code-block:: sh
-
-   pip install backend.ai[agent]
-
-
-NOTE: More details about configuration will be released soon.
-
-
-Development
------------
-
-git flow
-~~~~~~~~
-
-The Backend.AI repositories use `git flow <http://danielkummer.github.io/git-flow-cheatsheet/index.html>`_ to streamline branching during development and deployment.
-We use the default configuration (master -> preparation for release, develop -> main development, feature/ -> features, etc.) as-is.
