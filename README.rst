@@ -1,12 +1,10 @@
 Backend.AI
 ==========
 
-Backend.AI is a streamlined backend service framework hosting heterogeneous
+Backend.AI is a streamlined backend API server that hosts heterogeneous
 programming languages and popular AI frameworks.
 It manages the underlying computing resources for multi-tenant computation
 sessions where such sessions are spawned and executed instantly on demand.
-
-All sub-projects are licensed under LGPLv3+.
 
 By installing this meta-package, you get the client with command-line interface
 by default and optionally you may add the manager and agent using pip extra
@@ -24,6 +22,17 @@ tags.
 
 Server-side Components
 ----------------------
+
+If you want to run a Backend.AI cluster on your own, you need to install and
+configure the following server-side components.
+All server-side components are licensed under LGPLv3 to promote non-proprietary open
+innovation in the open-source community.
+
+There is no obligation to open your service/system codes if you just run the
+server-side components as-is (e.g., just run as daemons or import the components
+without modification in your codes).
+Please contact us (contact-at-lablup-com) for commercial consulting and more
+licensing details/options about individual use-cases.
 
 Manager with API Gateway
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -48,8 +57,11 @@ Kernels
 
 A set of small ZeroMQ-based REPL daemons in various programming languages and configurations.
 
+* https://github.com/lablup/backend.ai-kernel-runner
+   * Package namespace: ``ai.backend.kernel``
+   * A common interface for the agent to deal with various language runtimes
 * https://github.com/lablup/backend.ai-kernels
-* Each daemon is a separate program, usually named "run.{lang-specific-extension}".
+   * Runtime-specific recipes to build the Docker images (Dockerfile)
 
 Jail
 ~~~~
@@ -77,15 +89,20 @@ A collection of utility modules commonly shared throughout Backend.AI projects.
 Client-side Components
 ----------------------
 
-Client Libraries
-~~~~~~~~~~~~~~~~
+Client SDK Libraries
+~~~~~~~~~~~~~~~~~~~~
 
-A client library to access the Backend.AI API servers with ease.
+We offer client SDKs in popular programming languages.
+These SDKs are freely available with MIT License to ease integration with both
+commercial and non-commercial software products and services.
 
-* Python
+* Python (provides the command-line interface)
    * ``pip install backend.ai-client``
    * https://github.com/lablup/backend.ai-client-py
-* Javascript (under preparation)
+* Java
+   * Currently only available via GitHub releases
+   * https://github.com/lablup/backend.ai-client-java
+* Javascript
    * ``npm install backend.ai-client``
    * https://github.com/lablup/backend.ai-client-js
 * PHP (under preparation)
