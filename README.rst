@@ -35,7 +35,7 @@ Please contact us (contact-at-lablup-com) for commercial consulting and more
 licensing details/options about individual use-cases.
 
 For details about server installation and configuration, please visit `our
-wiki <https://github.com/lablup/backend.ai/wiki>_`.
+wiki <https://github.com/lablup/backend.ai/wiki>`_.
 
 Manager with API Gateway
 ~~~~~~~~~~~~~~~~~~~~~~~~
