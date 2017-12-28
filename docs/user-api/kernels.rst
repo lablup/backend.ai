@@ -1,13 +1,18 @@
 Kernel Management
 =================
 
+Here are the API calls to create and manage compute sessions.
+
 Creating Kernel Session
 -----------------------
 
-* URI: ``/v2/kernel/create``
+* URI: ``/v2/kernel/`` (``/v2/kernel/create`` also works for legacy)
 * Method: ``POST``
 
-Creates a kernel session to run user-input code snippets.
+Creates a kernel session if there is no existing (running) kernel with the same ``clientSessionToken``.
+If there is an existing session and it has the same ``lang``, no new session is created but the API returns successfully.
+In this case, ``config`` options are *ignored* and the ``created`` field in the response is set ``false`` (otherwise it's ``true``).
+If there is an existing session but with a different ``lang``, then the API server returns an error.
 
 Parameters
 """"""""""
@@ -22,7 +27,8 @@ Parameters
 
    * - ``lang``
      - ``str``
-     - The kernel type, usually the name of one of our supported programming languages.
+     - The kernel runtime type, usually in the form of the language name and its version tag connected with a colon.
+       (e.g., ``"python:latest"``)
 
    * - ``clientSessionToken``
      - ``str``
@@ -38,7 +44,7 @@ Example:
 .. code-block:: json
 
    {
-     "lang": "python3",
+     "lang": "python:3.6",
      "clientSessionToken": "EXAMPLE:STRING",
      "config": {
        "clusterSize": 1,
@@ -78,6 +84,9 @@ Response
    * - ``kernelId``
      - ``slug``
      - The kernel ID used for later API calls.
+   * - ``created``
+     - ``bool``
+     - True if the kernel is freshly created.
 
 
 Example:
@@ -85,7 +94,8 @@ Example:
 .. code-block:: json
 
    {
-     "kernelId": "TSSJT2Z4SnmQhxjWMnJljg"
+     "kernelId": "TSSJT2Z4SnmQhxjWMnJljg",
+     "created": true
    }
 
 

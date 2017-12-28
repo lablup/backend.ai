@@ -81,10 +81,14 @@ Parameters
    * - ``mode``
      - ``enum[str]``
      - A constant string ``"batch"``.
+   * - ``code``
+     - ``str``
+     - Must be an empty string ``""``.
    * - ``runId``
      - ``str``
-     - A string of client-side unique identifier for this particular execution (run).
-       See details in :doc:`/user-api/exec-query`.
+     - A string of client-side unique identifier for this particular run.
+       For more details about the concept of a run, see :ref:`code-execution-model`.
+       If not given, the API server will assign a random one in the first response and the client must use it for the same run afterwards.
    * - ``options``
      - ``object``
      - :ref:`batch-execution-query-object`.

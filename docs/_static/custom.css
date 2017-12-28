@@ -66,3 +66,13 @@ code, .code, .pre, tt {
     line-height: 1.2;
     margin-bottom: 12px;
 }
+
+.rst-content .caption {
+    margin-top: 8px;
+    text-align: center;
+}
+
+.rst-content .caption-number:after {
+    margin-left: -0.25em;
+    content: ": ";
+}

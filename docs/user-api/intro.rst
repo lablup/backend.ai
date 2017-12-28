@@ -9,17 +9,22 @@ Backend.AI User API is for running instant compute sessions at scale in clouds o
 Code Execution Model
 --------------------
 
-The core of the user API is the **execute** call which allows the clients to execute user-provided codes in isolated **compute sessions** (aka **kernels**).
+The core of the user API is the **execute** call which allows clients to execute user-provided codes in isolated **compute sessions** (aka **kernels**).
+Each session is managed by a **kernel runtime**, whose implementation is language-specific.
+A runtime is often a containerized daemon that interacts with the Backend.AI agent via our internal ZeroMQ protocol.
+In some cases, kernel runtimes may be just proxies to other code execution services instead of actual executor daemons.
 
-Inside each compute session, the client may perform multiple **runs**.
-Each run is for executing different code snippets (**the query mode**) or dffierent sets of source files (**the batch mode**).
+Inside each compute session, a client may perform multiple **runs**.
+Each run is for executing different code snippets (**the query mode**) or different sets of source files (**the batch mode**).
 The client often has to call the **execute** API *multiple times* to finish a single run.
+It is completely legal to mix query-mode runs and batch-mode runs inside the same session, given that the kernel runtime supports both modes.
 
 To distinguish different runs which may be overlapped, the client must provide the same **run ID** to all **execute** calls during a single run.
 The run ID should be unique for each run and can be an arbitrary random string.
+If the run ID is not provided by the client at the first execute call of a run, the API server will assign a random one and inform it to the client via the first response.
 Normally, if two or more runs are overlapped, they are processed in a FIFO order using an internal queue.
 But they may be processed in parallel if the kernel runtime supports parallel processing.
-Note that the API server may raise a timeout error if the waiting time exceeds a certain limit.
+Note that the API server may raise a timeout error and cancel the run if the waiting time exceeds a certain limit.
 
 In the query mode, usually the runtime context (e.g., global variables) is preserved for next subsequent runs, but this is not guaranteed by the API itself---it's up to the kernel runtime implementation.
 
@@ -28,21 +33,21 @@ In the query mode, usually the runtime context (e.g., global variables) is prese
 
    The state diagram of a “run” with the **execute** API.
 
-The **execute** API accepts 4 arguments: ``mode``, ``runId``, ``code``, and ``opts``.
+The **execute** API accepts 4 arguments: ``mode``, ``runId``, ``code``, and ``options`` (``opts``).
 It returns an :ref:`execution-result-object` encoded as JSON.
 
 Depending on the value of ``status`` field in the returned :ref:`execution-result-object`,
 the client must perform another subsequent **execute** call with appropriate arguments or stop.
-:numref:`run-state-diagram` shows all possible states and its transition via the ``status`` field value.
-At each state except ``"finished"``, the client must make a call using the arguments displayed besides each state.
+:numref:`run-state-diagram` shows all possible states and transitions between them via the ``status`` field value.
+At each state except the final one, the client must make a new call using the arguments displayed besides each state.
 
-If ``status`` is ``"continued"``, the client should call **execute** again with empty ``code`` and ``opts`` but setting ``mode`` to ``"continue"``.
-This happens when the user code runs longer than a few seconds, to allow the client to show its progress.
+If ``status`` is ``"continued"``, the client should call the **execute** API again with empty ``code`` and ``opts`` but setting ``mode`` to ``"continue"``.
+Continuation happens when the user code runs longer than a few seconds, to allow the client to show its progress.
 
-If ``status`` is ``"build-finished"`` (this happens at the batch-mode only), the client should make a ``"continued"`` call.
+If ``status`` is ``"build-finished"`` (this happens at the batch-mode only), the client should make the same ``"continue"`` call.
 All outputs prior to this status return are from the build program and all future outputs are from the executed program built.
 
-If ``status`` is ``"waiting-input"``, you should make another API call with setting ``code`` field of the request to the user-input text.
+If ``status`` is ``"waiting-input"``, you should make another API call with the ``code`` field set to the user-input text.
 This happens when the user code calls interactive ``input()`` functions.
 Until you send the user input, the current run is blocked.
 You may use modal dialogs or other input forms (e.g., HTML input) to retrieve user inputs.
@@ -50,4 +55,50 @@ When the server receives the user input, the kernel's ``input()`` returns the gi
 Note that each kernel runtime may provide different ways to trigger this interactive input cycle or may not provide at all.
 
 When each call returns, the ``console`` field in the :ref:`execution-result-object` have the console logs captured since the last previous call.
-The client user should render returned console logs into its UI view.
+Check out the following section for details.
+
+
+.. _handling-console-output:
+
+Handling Console Output
+-----------------------
+
+The console output consists of a list of tuple pairs of item type and item data.
+The item type is one of ``"stdout"``, ``"stderr"``, ``"media"``, ``"html"``, or ``"log"``.
+
+When the item type is ``"stdout"`` or ``"stderr"``, the item data is the standard I/O stream outputs as (non-escaped) UTF-8 string.
+The total length of either streams is limited to 524,288 Unicode characters per each **execute** API call; all excessive outputs are truncated.
+The stderr often includes language-specific tracebacks of (unhandled) exceptions or errors occurred in the user code.
+If the user code generates a mixture of stdout and stderr, the print ordering is preserved and each contiguous block of stdout/stderr becomes a separate item in the console output list so that the client user can reconstruct the same console output by sequentially rendering the items.
+
+.. note::
+
+   The text in the stdout/stderr item may contain arbitrary terminal control sequences such as ANSI color codes and cursor/line manipulations.
+   It is the user's job to strip out them or implement some sort of terminal emulation.
+
+.. tip::
+
+   Since the console texts are *not* escaped, the client user should take care of rendering and escaping depending on the UI implementation.
+   For example, use ``<pre>`` element, replace newlines with ``<br>``, or apply ``white-space: pre`` CSS style when rendering as HTML.
+   An easy way to do escape the text safely is to use ``insertAdjacentText()`` DOM API.
+
+When the item type is ``"media"``, the item data is a pair of the MIME type and the content data.
+If the MIME type is text-based (e.g., ``"text/plain"``) or XML-based (e.g., ``"image/svg+xml"``), the content is just a string that represent the content.
+Otherwise, the data is encoded as a data URI format (RFC 2397).
+You may use `backend.ai-media library <https://github.com/lablup/backend.ai-media>`_ to handle this field in Javascript on web-browsers.
+
+When the item type is ``"html"``, the item data is a partial HTML document string, such as a table to show tabular data.
+If you are implementing a web-based front-end, you may use it directly to the standard DOM API, for instance, ``consoleElem.insertAdjacentHTML(value, "beforeend")``.
+
+When the item type is ``"log"``, the item data is a 4-tuple of the log level, the timestamp in the ISO 8601 format, the logger name and the log message string.
+The log level may be one of ``"debug"``, ``"info"``, ``"warning"``, ``"error"``, or ``"fatal"``.
+You may use different colors/formatting by the log level when printing the log message.
+Not every kernel runtime supports this rich logging facility.
+
+In the *batch* mode, it always has at least the following fields:
+
+* ``exitCode``: An integer whose value is the exit code of the build command or the main command.
+  Until the process for the current step exits, this field is ``null``.
+* ``step``: Which step it generated this response. Either ``"build"`` or ``"exec"``.
+  It is useful when you wish to separately display the console outputs from the different steps.
+

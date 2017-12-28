@@ -208,6 +208,13 @@ Execution Result Object
    * - Key
      - Type
      - Description
+
+   * - ``runId``
+     - ``str``
+     - The user-provided run identifier.
+       If the user has NOT provided it, this will be set by the API server upon the first execute API call.
+       In that case, the client should use it for the subsequent execute API calls during the same run.
+
    * - ``status``
      - ``enum[str]``
 
@@ -223,38 +230,9 @@ Execution Result Object
             ]
           ]
 
-     - Contains a list of console output items. Each item is a pair of the item type (``enum[str]``) and its value (``*``).
-       The item type is one of ``"stdout"``, ``"stderr"``, ``"media"``, ``"html"``, or ``"log"``.
-
-       When this is ``"stdout"`` or ``"stderr"``, the value is the standard I/O stream outputs as (non-escaped) UTF-8 string.
-       Both fields are truncated to 524,288 Unicode characters.
-       The stderr field includes not only stderr outputs but also language-specific tracebacks of (unhandled) exceptions or errors occurred in the user code.
-
-       When this is ``"media"``, the value is a pair of the MIME type and the content data.
-       If the MIME type is text-based (e.g., ``"text/plain"``) or XML-based (e.g., ``"image/svg+xml"``), the content is just a string that represent the content.
-       Otherwise, the data is encoded as a data URI format (RFC 2397).
-       You may use `sorna-media library <https://github.com/lablup/sorna-media>`_ to handle this field in Javascript on web-browsers.
-
-       When this is ``"html"``, the value is a partial HTML document string, such as a table to show tabular data.
-       If you are implementing a web-based front-end, you may use it directly to the standard DOM API, for instance, ``consoleElem.insertAdjacentHTML(value, "beforeend")``.
-
-       When this is ``"log"``, the value is a 4-tuple of the log level, the timestamp in the ISO 8601 format, the logger name and the log message string.
-       The log level may be one of ``"debug"``, ``"info"``, ``"warning"``, ``"error"``, or ``"fatal"``.
-       You may use different colors/formatting by the log level when printing the log message.
-       This rich logging facilities are available to only supported kernels.
-
-       In the *batch* mode, it always has at least the following fields:
-
-       * ``exitCode``: An integer whose value is the exit code of the build command or the main command.
-         Until the process for the current step exits, this field is ``null``.
-       * ``step``: Which step it generated this response. Either ``"build"`` or ``"exec"``.
-         It is useful when you wish to separately display the console outputs from the different steps.
-
-       .. tip::
-
-          All returned strings are *not* escaped. You should take care of this as well as formatting new lines properly
-          (use ``<pre>`` element or replace them with ``<br>``) when rendering the result to web browsers.
-          An easy way to do this safely is to use ``insertAdjacentText()`` DOM API.
+     - Contains a list of console output items.
+       Each item is a pair of the item type (``enum[str]``) and its value (``*``).
+       See more details at :ref:`handling-console-output`.
 
    * - ``options``
      - ``object``

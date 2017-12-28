@@ -31,12 +31,13 @@ Parameters
      - A constant string ``"query"``.
    * - ``code``
      - ``str``
-     - A string of user-written code.  All non-ASCII data must be encoded in UTF-8 or any format acceptable by the kernel.
+     - A string of user-written code.
+       All non-ASCII data must be encoded in UTF-8 or any format acceptable by the kernel.
    * - ``runId``
      - ``str``
-     - A string of client-side unique identifier for this particular execution (run).
-       The client should keep the same value until this execution completely finishes with ``finished`` at the result's ``status`` field.
-       Also, the client should use a new value for the subsequent executions.
+     - A string of client-side unique identifier for this particular run.
+       For more details about the concept of a run, see :ref:`code-execution-model`.
+       If not given, the API server will assign a random one in the first response and the client must use it for the same run afterwards.
 
 **Example:**
 
@@ -97,6 +98,7 @@ Here we demonstrate a few example returns when various Python codes are executed
 
    {
      "result": {
+       "runId": "5facbf2f2697c1b7",
        "status": "finished",
        "console": [
          ["stdout", "Hello, world!\n"]
@@ -117,6 +119,7 @@ Here we demonstrate a few example returns when various Python codes are executed
 
    {
      "result": {
+       "runId": "5facbf2f2697c1b7",
        "status": "finished",
        "console": [
          ["stdout", "what happens now?\n"],
@@ -144,6 +147,7 @@ Media outputs are also mixed with other console outputs according to their execu
 
    {
      "result": {
+       "runId": "5facbf2f2697c1b7",
        "status": "finished",
        "console": [
          ["stdout", "plotting simple line graph\n"],
@@ -168,6 +172,7 @@ Media outputs are also mixed with other console outputs according to their execu
 
    {
      "result": {
+       "runId": "5facbf2f2697c1b7",
        "status": "continued",
        "console": [
          ["stdout", "Tick 1\nTick 2\n"]
@@ -182,6 +187,7 @@ Here you should make another API query with the empty ``code`` field.
 
    {
      "result": {
+       "runId": "5facbf2f2697c1b7",
        "status": "continued",
        "console": [
          ["stdout", "Tick 3\nTick 4\n"]
@@ -196,6 +202,7 @@ Again.
 
    {
      "result": {
+       "runId": "5facbf2f2697c1b7",
        "status": "finished",
        "console": [
          ["stdout", "Tick 5\ndone\n"],
@@ -216,6 +223,7 @@ Again.
 
    {
      "result": {
+       "runId": "5facbf2f2697c1b7",
        "status": "waiting-input",
        "console": [
          ["stdout", "What is your name?\n>> "]
@@ -232,6 +240,7 @@ You should make another API query with the ``code`` field filled with the user i
 
    {
      "result": {
+       "runId": "5facbf2f2697c1b7",
        "status": "finished",
        "console": [
          ["stdout", "Hello, Lablup!\n"]
