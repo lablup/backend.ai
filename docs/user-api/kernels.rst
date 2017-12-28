@@ -30,22 +30,8 @@ Parameters
 
    * - ``config``
      - ``object``
-     - An optional :ref:`resource-config-object` to specify resource requirements.
-       Additional charges may apply on the public API service.
-       If the requested limits exceeds our internal hard-limits,
-       the API may return HTTP 406 "Not acceptable".
-
-   * - ``mounts``
-     - ``list[str]``
-     - An optional list of the name of virtual folders that belongs to the current API key.
-       These virtual folders are mounted under ``/home/work``.
-       For example, if the virtual folder name is ``abc``, you can access it on
-       ``/home/work/abc``.
-
-       If the name contains a colon in the middle, the second part of the string indicates
-       the alias location in the kernel's file system which is relative to ``/home/work``.
-
-       You may mount up to 5 folders for each kernel session.
+     - An optional :ref:`creation-config-object` to specify extra kernel
+       configuration.
 
 Example:
 
@@ -54,14 +40,17 @@ Example:
    {
      "lang": "python3",
      "clientSessionToken": "EXAMPLE:STRING",
-     "limits": {
-       "maxMem": 51240,
-       "execTimeout": 5000
-     },
-     "mounts": [
-       "mydata",
-       "mypkgs:.local/lib/python3.6/site-packages"
-     ]
+     "config": {
+       "clusterSize": 1,
+       "instanceMemory": 51240,
+       "environ": {
+         "MYCONFIG": "XXX",
+       },
+       "mounts": [
+         "mydata",
+         "mypkgs:.local/lib/python3.6/site-packages"
+       ],
+     }
    }
 
 

@@ -27,6 +27,7 @@ Query Schema
 
    type root {
      ...
+     keypair(access_key: String): KeyPair
      keypairs(user_id: Int!, is_active: Boolean): [KeyPair]
    }
 
@@ -80,7 +81,7 @@ Also the returned value is always a single object.
 
    type root {
      ...
-     keypair(): KeyPair
+     keypair(): KeyPair!
    }
 
 Mutation Schema

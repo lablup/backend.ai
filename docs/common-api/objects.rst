@@ -212,23 +212,7 @@ Execution Result Object
      - ``enum[str]``
 
      - One of ``"continued"``, ``"waiting-input"``, ``"finished"``, or ``"build-finished"``.
-
-       If this is ``"continued"``, the client should repeat making another API call until you get ``"finished"`` status.
-       This happens when the user code runs longer than a few seconds, to allow the client to show its progress.
-       When each call returns, the below ``console`` field have the console logs captured since the last previous call.
-       You should append returned console logs to your UI view to make it a complete log.
-       When making subsequent continuation calls, the client should send an "empty" execution request with the same value in the ``mode`` field.
-       Otherwise it will get 400 Bad Request.
-
-       (Batch mode only) If this is ``"build-finished"``, the client should repeat making another API call like ``"continued"``.
-       All outputs prior to this status return are from the build program and all future outputs are from the executed program built.
-
-       If this is ``"waiting-input"``, you should make another API call with setting ``code`` field of the request to the user-input text.
-       This happens when the user code calls interactive ``input()`` functions.
-       Until you send the user input, the kernel code is blocked.
-       You may use modal dialogs or other input forms (e.g., HTML input) to retrieve user inputs.
-       When the server receives the user input, the kernel's ``input()`` returns the given value.
-       Note that the exact functions that trigger this mechanism are different language by langauge.
+       See more details at :ref:`code-execution-model`.
 
    * - ``console``
      - .. code-block:: text
@@ -327,11 +311,11 @@ Kernel Session Item Object
 
    * - ``config``
      - ``object``
-     - :ref:`resource-config-object` specified when created.
+     - :ref:`creation-config-object` specified when created.
 
-.. _resource-config-object:
+.. _creation-config-object:
 
-Resource Config Object
+Creation Config Object
 ----------------------
 
 .. list-table::
@@ -341,12 +325,45 @@ Resource Config Object
    * - Key
      - Type
      - Description
+
+   * - ``environ``
+     - ``object``
+     - A dictionary object specifying additional environment variables.
+       The values must be strings.
+
+   * - ``mounts``
+     - ``list[str]``
+     - An optional list of the name of virtual folders that belongs to the current API key.
+       These virtual folders are mounted under ``/home/work``.
+       For example, if the virtual folder name is ``abc``, you can access it on
+       ``/home/work/abc``.
+
+       If the name contains a colon in the middle, the second part of the string indicates
+       the alias location in the kernel's file system which is relative to ``/home/work``.
+
+       You may mount up to 5 folders for each kernel session.
+
    * - ``clusterSize``
      - ``int``
      - The number of instances bundled for this session.
+
    * - ``instanceMemory``
      - ``int`` (MiB)
      - The maximum memory allowed per instance.
+       The value is capped by the per-kernel image limit.
+       Additional charges may apply on the public API service.
+
+   * - ``instanceCores``
+     - ``int``
+     - The number of CPU cores.
+       The value is capped by the per-kernel image limit.
+       Additional charges may apply on the public API service.
+
+   * - ``instanceGPUs``
+     - ``float``
+     - The fraction of GPU devices (1.0 means a whole device).
+       The value is capped by the per-kernel image limit.
+       Additional charges may apply on the public API service.
 
 .. _vfolder-item-object:
 
