@@ -6,10 +6,15 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 charset = utf-8
 
-[*.{py,md,rst}]
+[*.{py,md}]
 max_line_length = 85
 indent_style = space
 indent_size = 4
+
+[*.rst]
+max_line_length = 0
+indent_style = space
+indent_size = 3
 
 [.travis.yml]
 indent_style = space
