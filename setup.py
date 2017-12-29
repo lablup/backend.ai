@@ -29,7 +29,7 @@ setup(
     python_requires='>=3.6',
     install_requires=[
         'backend.ai-common~=1.0.0',
-        'backend.ai-client~=1.0.0',
+        'backend.ai-client~=1.1.0',
     ],
     extras_require={
         'manager': [

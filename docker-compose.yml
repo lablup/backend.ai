@@ -2,23 +2,23 @@ version: "3"
 
 services:
 
-  sorna-redis:
-    container_name: sorna-local-redis
+  backendai-redis:
+    container_name: backendai-local-redis
     image: redis:latest
     ports:  # for host-side debugging
       - "6389:6379"
 
-  sorna-db:
-    container_name: sorna-local-db
+  backendai-db:
+    container_name: backendai-local-db
     image: postgres:9.6-alpine
     ports:  # for host-side debugging
       - "5442:5432"
     environment:
       - POSTGRES_PASSWORD=develove
-      - POSTGRES_DB=sorna
+      - POSTGRES_DB=backend
 
-  sorna-etcd:
-    container_name: sorna-local-etcd
+  backendai-etcd:
+    container_name: backendai-local-etcd
     image: quay.io/coreos/etcd:v3.1.5
     volumes:
       - /tmp/etcd-data:/etcd-data
@@ -27,13 +27,13 @@ services:
       - "2380:2380"
     command: >
       /usr/local/bin/etcd
-      --name sorna-etcd
+      --name backendai-etcd
       --data-dir /etcd-data
       --listen-client-urls http://0.0.0.0:2379
       --advertise-client-urls http://0.0.0.0:2379
       --listen-peer-urls http://0.0.0.0:2380
       --initial-advertise-peer-urls http://0.0.0.0:2380
-      --initial-cluster sorna-etcd=http://0.0.0.0:2380
-      --initial-cluster-token sorna-etcd-token
+      --initial-cluster backendai-etcd=http://0.0.0.0:2380
+      --initial-cluster-token backendai-etcd-token
       --initial-cluster-state new
       --auto-compaction-retention 1
