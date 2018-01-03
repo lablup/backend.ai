@@ -32,7 +32,10 @@ Parameters
 
    * - ``clientSessionToken``
      - ``str``
-     - Client session token. Should be unique for continuous execution (for REPL).
+     - Client-provided session token which can contain ASCII alphabets, numbers, and hyphens in the middle.
+       The length must be between 4 to 64 characters inclusively.
+       It is useful for aliasing the session with a human-friendly name.
+       There can exist only one running session with the same token at a time, but you can reuse the same token if previous session has been terminated.
 
    * - ``config``
      - ``object``
