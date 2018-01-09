@@ -221,6 +221,22 @@ Execution Result Object
      - One of ``"continued"``, ``"waiting-input"``, ``"finished"``, or ``"build-finished"``.
        See more details at :ref:`code-execution-model`.
 
+   * - ``exitCode``
+     - ``int | null``
+     - The exit code of the last process.
+       This field has a valid value only when the ``status`` is ``"finished"`` or ``"build-finished"``.
+       Otherwise it is set to ``null``.
+
+       For batch-mode kernels and query-mode kernels *without* global context support,
+       ``exitCode`` is the return code of the last executed child process in the kernel.
+       In the execution step of a batch mode run, this is always 127 (a UNIX shell common practice for "command not found")
+       when the build step has failed.
+
+       For query-mode kernels with global context support, this value is always zero,
+       regardless of whether the user code has caused an exception or not.
+
+       A negative value (which cannot happen with normal process termination) indicates a Backend.AI-side error.
+
    * - ``console``
      - .. code-block:: text
 

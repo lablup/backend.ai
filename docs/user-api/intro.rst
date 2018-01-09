@@ -39,15 +39,17 @@ It returns an :ref:`execution-result-object` encoded as JSON.
 Depending on the value of ``status`` field in the returned :ref:`execution-result-object`,
 the client must perform another subsequent **execute** call with appropriate arguments or stop.
 :numref:`run-state-diagram` shows all possible states and transitions between them via the ``status`` field value.
-At each state except the final one, the client must make a new call using the arguments displayed besides each state.
 
-If ``status`` is ``"continued"``, the client should call the **execute** API again with empty ``code`` and ``opts`` but setting ``mode`` to ``"continue"``.
-Continuation happens when the user code runs longer than a few seconds, to allow the client to show its progress.
+If ``status`` is ``"finished"``, the client should stop.
 
-If ``status`` is ``"build-finished"`` (this happens at the batch-mode only), the client should make the same ``"continue"`` call.
+If ``status`` is ``"continued"``, the client should make another **execute** API call with the ``code`` field set to an empty string and the ``mode`` field set to ``"continue"``.
+Continuation happens when the user code runs longer than a few seconds to allow the client to show its progress, or when it requires extra step to finish the run cycle.
+
+If ``status`` is ``"build-finished"`` (this happens at the batch-mode only), the client should make the same continuation call.
 All outputs prior to this status return are from the build program and all future outputs are from the executed program built.
+Note that even when the ``exitCode`` value is non-zero (failed), the client must continue once again to complete the run cycle.
 
-If ``status`` is ``"waiting-input"``, you should make another API call with the ``code`` field set to the user-input text.
+If ``status`` is ``"waiting-input"``, you should make another **execute** API call with the ``code`` field set to the user-input text and the ``mode`` field set to ``"input"``.
 This happens when the user code calls interactive ``input()`` functions.
 Until you send the user input, the current run is blocked.
 You may use modal dialogs or other input forms (e.g., HTML input) to retrieve user inputs.
@@ -94,11 +96,3 @@ When the item type is ``"log"``, the item data is a 4-tuple of the log level, th
 The log level may be one of ``"debug"``, ``"info"``, ``"warning"``, ``"error"``, or ``"fatal"``.
 You may use different colors/formatting by the log level when printing the log message.
 Not every kernel runtime supports this rich logging facility.
-
-In the *batch* mode, it always has at least the following fields:
-
-* ``exitCode``: An integer whose value is the exit code of the build command or the main command.
-  Until the process for the current step exits, this field is ``null``.
-* ``step``: Which step it generated this response. Either ``"build"`` or ``"exec"``.
-  It is useful when you wish to separately display the console outputs from the different steps.
-
