@@ -28,7 +28,7 @@ setup(
     packages=['ai.backend.meta'],
     python_requires='>=3.6',
     install_requires=[
-        'backend.ai-common~=1.1.2',
+        'backend.ai-common~=1.2.0',
         'backend.ai-client~=1.1.7',
     ],
     extras_require={
