@@ -1,0 +1,47 @@
+version: "3"
+
+services:
+
+  backendai-half-db:
+    container_name: backendai-half-db
+    image: postgres:9.6-alpine
+    networks:
+      - half
+    ports:
+      - "8100:5432"
+    environment:
+      - POSTGRES_PASSWORD=develove
+      - POSTGRES_DB=backend
+
+  backendai-half-redis:
+    container_name: backendai-half-redis
+    image: redis:latest
+    networks:
+      - half
+    ports:
+      - "8110:6379"
+
+  backendai-half-etcd:
+    container_name: backendai-half-etcd
+    image: quay.io/coreos/etcd:v3.2.15
+    volumes:
+      - /tmp/backend.ai/etcd-data:/etcd-data
+    networks:
+      - half
+    ports:
+      - "8120:2379"
+    command: >
+      /usr/local/bin/etcd
+      --name backendai-etcd
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --advertise-client-urls http://0.0.0.0:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --initial-advertise-peer-urls http://0.0.0.0:2380
+      --initial-cluster backendai-etcd=http://0.0.0.0:2380
+      --initial-cluster-token backendai-etcd-token
+      --initial-cluster-state new
+      --auto-compaction-retention 1
+
+networks:
+  half:

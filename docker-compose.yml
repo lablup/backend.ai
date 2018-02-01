@@ -2,11 +2,65 @@ version: "3"
 
 services:
 
+  backendai-manager:
+    container_name: backendai-local-manager
+    build:
+      context: docker/manager
+      args:
+        branch: "1.2"
+    networks:
+      - full
+    ports:
+      - 8081:8081
+    environment:
+      - BACKEND_NAMESPACE=local
+      - BACKEND_ETCD_ADDR=backendai-etcd:2379
+      - BACKEND_REDIS_ADDR=backendai-redis:6379
+      - BACKEND_DB_ADDR=backendai-db:5432
+      - BACKEND_DB_NAME=backend
+      - BACKEND_DB_USER=postgres
+      - BACKEND_DB_PASSWORD=develove
+      - BACKEND_SERVICE_IP=0.0.0.0
+      - BACKEND_SERVICE_PORT=8081
+    volumes:
+      - "./docker/manager/init.sh:/app/init.sh:ro"
+    depends_on:
+      - backendai-etcd
+      - backendai-db
+      - backendai-redis
+    command: ["sh", "/app/init.sh"]
+
+  backendai-agent:
+    container_name: backendai-local-agent
+    build:
+      context: docker/agent
+      args:
+        branch: "1.2"
+    networks:
+      - full
+    environment:
+      - BACKEND_NAMESPACE=local
+      - BACKEND_ETCD_ADDR=backendai-etcd:2379
+      - ETCD_ADDR=backendai-etcd:2379  # bug in v1.2
+      - DOCKER_HOST=http://backendai-docker:2375
+    depends_on:
+      - backendai-etcd
+      - backendai-manager
+      - backendai-docker
+
+  backendai-docker:
+    container_name: backendai-local-docker
+    image: docker:17.06-dind
+    privileged: true
+    networks:
+      - full
+    command: ["dockerd", "-H", "tcp://0.0.0.0:2375"]
+
   backendai-db:
     container_name: backendai-local-db
     image: postgres:9.6-alpine
-    ports:
-      - "8100:5432"
+    networks:
+      - full
     environment:
       - POSTGRES_PASSWORD=develove
       - POSTGRES_DB=backend
@@ -14,16 +68,16 @@ services:
   backendai-redis:
     container_name: backendai-local-redis
     image: redis:latest
-    ports:
-      - "8110:6379"
+    networks:
+      - full
 
   backendai-etcd:
     container_name: backendai-local-etcd
     image: quay.io/coreos/etcd:v3.2.15
     volumes:
       - /tmp/backend.ai/etcd-data:/etcd-data
-    ports:
-      - "8120:2379"
+    networks:
+      - full
     command: >
       /usr/local/bin/etcd
       --name backendai-etcd
@@ -36,3 +90,6 @@ services:
       --initial-cluster-token backendai-etcd-token
       --initial-cluster-state new
       --auto-compaction-retention 1
+
+networks:
+  full:
