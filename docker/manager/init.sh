@@ -1,17 +1,10 @@
 #! /bin/sh
+set -e
+
 cd /app
 
-echo 'Waiting for database...'
-case $BACKEND_DB_ADDR in
-  (*:*) DB_HOST=${BACKEND_DB_ADDR%:*} DB_PORT=${BACKEND_DB_ADDR##*:};;
-  (*)   DB_HOST=$BACKEND_DB_ADDR      DB_PORT=5432;;
-esac
-export PGPASSWORD="$BACKEND_DB_PASSWORD"
-until psql -h "$DB_HOST" -U "$BACKEND_DB_USER" -p $DB_PORT -c '\q'; do
-  >&2 echo "(waiting...)"
-  sleep 1
-done
-unset PGPASSWORD
+wait-for backendai-etcd:2379
+wait-for backendai-db:5432
 
 if [ ! -f alembic.ini ]; then
   echo 'Initializing for the first time...'
