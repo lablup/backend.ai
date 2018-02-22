@@ -15,8 +15,6 @@ RUN git clone -b $branch --single-branch https://github.com/lablup/backend.ai-ag
         -e "git+https://github.com/lablup/backend.ai-common@$branch#egg=backend.ai-common" \
         -e .
 
-RUN mkdir /tmp/vfroot && \
-    mkdir -p /tmp/scratches
-ENV BACKEND_SCRATCH_ROOT=/tmp/scratches
+RUN mkdir -p /tmp/vfroot && mkdir -p /tmp/scratches
 
 CMD ["wait-for", "backendai-etcd:2379", "--", "python", "-m", "ai.backend.agent.server"]

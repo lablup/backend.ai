@@ -42,14 +42,20 @@ services:
       # Allow access to the host Docker server
       # WARNING: this is INSECURE in production deployment!
       - "/var/run/docker.sock:/var/run/docker.sock:rw"
+      - "/tmp/scratches:/tmp/scratches"
     networks:
       - full
     environment:
       - BACKEND_DEBUG=yes
       - BACKEND_NAMESPACE=local
       - BACKEND_ETCD_ADDR=backendai-etcd:2379
+      - BACKEND_SCRATCH_ROOT=/tmp/scratches
       - BACKEND_AGENT_HOST_OVERRIDE=backendai-agent            # advertise my linked hostname
-      - BACKEND_KERNEL_HOST_OVERRIDE=docker.for.mac.host.internal  # use the host's hostname
+      # Windows: change this value to "docker.for.win.localhost"
+      # Linux: 172.17.0.1
+      # NOTE: As of Docker 17.12.0-ce, it is recommended to use the new name
+      #       "docker.for.mac.host.internal".
+      - BACKEND_KERNEL_HOST_OVERRIDE=docker.for.mac.localhost
     depends_on:
       - backendai-etcd
       - backendai-manager
