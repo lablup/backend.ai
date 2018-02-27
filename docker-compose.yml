@@ -26,6 +26,7 @@ services:
       - BACKEND_ADVERTISED_MANAGER_HOST=backendai-manager
     volumes:
       - "./docker/manager/init.sh:/app/init.sh:ro"
+      - "/tmp/scratches:/tmp/scratches"
     depends_on:
       - backendai-etcd
       - backendai-db
