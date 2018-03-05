@@ -6,7 +6,7 @@ HTTP Methods
 
 We use the standard HTTP/1.1 methods (`RFC-2616 <https://tools.ietf.org/html/rfc2616>`_), such as ``GET``, ``POST``, ``PUT``, ``PATCH`` and ``DELETE``, with some additions from WebDAV (`RFC-3253 <https://tools.ietf.org/html/rfc3253>`_) such as ``REPORT`` method to send JSON objects in request bodies with ``GET`` semantics.
 
-If your client runs under a restrictive environment that only allows a subset of above methods, you may use the universal ``POST`` method with an extra HTTP header like ``X-Method-Override: REPORT``, so that the Sorna gateway can recognize the intended HTTP method.
+If your client runs under a restrictive environment that only allows a subset of above methods, you may use the universal ``POST`` method with an extra HTTP header like ``X-Method-Override: REPORT``, so that the Backend.AI gateway can recognize the intended HTTP method.
 
 Parameters in URI and JSON Request Body
 ---------------------------------------
@@ -85,7 +85,7 @@ We also define several custom types:
 API Versioning
 --------------
 
-A version string of the Sorna API uses two parts: a major revision (prefixed with ``v``) and minor release dates after a dot following the major revision.
+A version string of the Backend.AI API uses two parts: a major revision (prefixed with ``v``) and minor release dates after a dot following the major revision.
 For example, ``v23.20250101`` indicates a 23rd major revision with a minor release at January 1st in 2025.
 
 We keep backward compatibility between minor releases within the same major version.
@@ -93,7 +93,7 @@ Therefore, all API query URLs are prefixed with the major revision, such as ``/v
 Minor releases may introduce new parameters and response fields but no URL changes.
 Accessing unsupported major revision returns HTTP 404 Not Found.
 
-A client must specify the API version in the HTTP request header named ``X-Sorna-Version``.
+A client must specify the API version in the HTTP request header named ``X-BackendAI-Version``.
 To check the latest minor release date of a specific major revision, try a GET query to the URL with only the major revision part (e.g., ``/v2``).
 The API server will return a JSON string in the response body containing the full version.
 When querying the API version, you do not have to specify the authorization header and the rate-limiting is enforced per the client IP address.

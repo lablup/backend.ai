@@ -1,7 +1,7 @@
 API Overview
 ============
 
-Sorna API v3 consists of two parts: User APIs and Admin APIs.
+Backend.AI API v3 consists of two parts: User APIs and Admin APIs.
 
 .. warning::
 
@@ -11,7 +11,7 @@ Sorna API v3 consists of two parts: User APIs and Admin APIs.
 API KeyPair Registration
 ------------------------
 
-For managed, best-experience service, you may register to our cloud version of Sorna API service instead of installing it to your own machines.
+For managed, best-experience service, you may register to our cloud version of Backend.AI API service instead of installing it to your own machines.
 Simply create an account at `cloud.sorna.io <https://cloud.sorna.io>`_ and generate a new API keypair.
 You may also use social accounts for log-ins such as Twitter, Facebook, and GitHub.
 

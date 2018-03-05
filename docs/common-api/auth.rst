@@ -11,7 +11,7 @@ The server uses access tokens to identify each client and secret keys to verify 
 
    For security reasons (to avoid exposition of your API access key and secret keys to arbitrary
    Internet users), we highly recommend to setup a server-side proxy to our API
-   service if you are building a public-facing front-end service using Sorna.
+   service if you are building a public-facing front-end service using Backend.AI.
 
 For local deployments, you may create a master dummy pair in the configuration (TODO).
 
@@ -34,13 +34,13 @@ Common Structure of API Requests
      - The date/time of the request formatted in RFC 8022 or ISO 8601.
        If no timezone is specified, UTC is assumed.
        The deviation with the server-side clock must be within 15-minutes.
-   * - ``X-Sorna-Date``
+   * - ``X-BackendAI-Date``
      - Same as ``Date``. May be omitted if ``Date`` is present.
-   * - ``X-Sorna-Version``
+   * - ``X-BackendAI-Version``
      - ``vX.yyymmdd`` where ``X`` is the major version and
        ``yyyymmdd`` is the minor release date of the specified API version.
        (e.g., 20160915)
-   * - ``X-Sorna-Client-Token``
+   * - ``X-BackendAI-Client-Token``
      - An optional, client-generated random string to allow the server to distinguish repeated duplicate requests.
        It is important to keep idempotent semantics with multiple retries for intermittent failures.
        (Not implemented yet)
@@ -105,10 +105,10 @@ The string to sign is generated from the following request-related values:
 
 * HTTP Method (uppercase)
 * URI including query strings
-* The value of ``Date`` (or ``X-Sorna-Date`` if ``Date`` is not present) formatted in ISO 8601 (``YYYYmmddTHHMMSSZ``) using the UTC timezone.
+* The value of ``Date`` (or ``X-BackendAI-Date`` if ``Date`` is not present) formatted in ISO 8601 (``YYYYmmddTHHMMSSZ``) using the UTC timezone.
 * The canonicalized header/value pair of ``Host``
 * The canonicalized header/value pair of ``Content-Type``
-* The canonicalized header/value pair of ``X-Sorna-Version``
+* The canonicalized header/value pair of ``X-BackendAI-Version``
 * The hex-encoded hash value of body as-is. The hash function must be same to the one given in the ``Authorization`` header (e.g., SHA256).
 
 To generate a string to sign, the client should join the above values using the newline (``"\n"``, ASCII 10) character.
@@ -148,7 +148,7 @@ Finally, the client now should construct the following HTTP ``Authorization`` he
 
 .. code-block:: text
 
-   Authorization: Sorna signMethod=HMAC-SHA256, credential=<access-key>:<signature>
+   Authorization: BackendAI signMethod=HMAC-SHA256, credential=<access-key>:<signature>
 
 
 Example Requests and Responses
@@ -167,9 +167,9 @@ Success example for checking the latest API version
    GET /v2 HTTP/1.1
    Host: your.sorna.api.endpoint
    Date: 20160930T01:23:45Z
-   Authorization: Sorna signMethod=HMAC-SHA256, credential=AKIAIOSFODNN7EXAMPLE:022ae894b4ecce097bea6eca9a97c41cd17e8aff545800cd696112cc387059cf
+   Authorization: BackendAI signMethod=HMAC-SHA256, credential=AKIAIOSFODNN7EXAMPLE:022ae894b4ecce097bea6eca9a97c41cd17e8aff545800cd696112cc387059cf
    Content-Type: application/json
-   X-Sorna-Version: v2.20170215
+   X-BackendAI-Version: v2.20170215
 
 .. code-block:: text
 
@@ -194,8 +194,8 @@ Failure example with a missing authorization header
    GET /v2/kernel/create HTTP/1.1
    Host: your.sorna.api.endpoint
    Content-Type: application/json
-   X-Sorna-Date: 20160930T01:23:45Z
-   X-Sorna-Version: v2.20170215
+   X-BackendAI-Date: 20160930T01:23:45Z
+   X-BackendAI-Version: v2.20170215
 
 .. code-block:: text
 

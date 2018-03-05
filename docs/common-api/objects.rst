@@ -180,7 +180,7 @@ Batch Execution Query Object
    the user directory.
 
    Also, your build script and the main program is executed inside
-   Sorna Jail, meaning that some system calls are blocked by our policy.
+   Backend.AI Jail, meaning that some system calls are blocked by our policy.
    Since ``ptrace`` syscall is blocked, you cannot use native debuggers
    such as gdb.
 
