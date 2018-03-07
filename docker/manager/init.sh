@@ -15,7 +15,7 @@ if [ ! -f alembic.ini ]; then
   python -m ai.backend.manager.cli etcd update-images -f sample-configs/image-metadata.yml
   python -m ai.backend.manager.cli etcd update-aliases -f sample-configs/image-aliases.yml
   python -m ai.backend.manager.cli etcd put volumes/_mount /tmp
-  python -m ai.backend.manager.cli etcd put volumes/_vfroot scratches
+  python -m ai.backend.manager.cli etcd put volumes/_vfroot vfolders
 fi
 
 echo 'Launching the API gateway...'

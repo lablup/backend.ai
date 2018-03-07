@@ -93,6 +93,4 @@ ENV/
 .idea
 .*.swp
 
-sorna-agent
-
-sorna-gateway
+tmp/
