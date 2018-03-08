@@ -7,7 +7,7 @@ services:
     build:
       context: docker/manager
       args:
-        branch: "master"
+        branch: "1.3"
     networks:
       - full
     ports:
@@ -39,7 +39,7 @@ services:
     build:
       context: docker/agent
       args:
-        branch: "master"
+        branch: "1.3"
     volumes:
       # Allow access to the host Docker server
       # WARNING: this is INSECURE in production deployment!
@@ -53,7 +53,7 @@ services:
       - BACKEND_NAMESPACE=local
       - BACKEND_ETCD_ADDR=backendai-etcd:2379
       - BACKEND_SCRATCH_ROOT=/tmp/scratches
-      - BACKEND_AGENT_HOST_OVERRIDE=backendai-agent            # advertise my linked hostname
+      - BACKEND_AGENT_HOST_OVERRIDE=backendai-agent
       # Windows: change this value to "docker.for.win.localhost"
       # Linux: 172.17.0.1
       # NOTE: As of Docker 17.12.0-ce, it is recommended to use the new name
