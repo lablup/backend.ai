@@ -4,7 +4,7 @@ from pathlib import Path
 
 setup(
     name='backend.ai',
-    version='1.2.0',
+    version='1.3.0',
     description='Lablup Backend.AI Meta-package',
     long_description=Path('README.rst').read_text(),
     url='https://github.com/lablup/backend.ai',
@@ -28,15 +28,15 @@ setup(
     packages=['ai.backend.meta'],
     python_requires='>=3.6',
     install_requires=[
-        'backend.ai-common~=1.2.0',
-        'backend.ai-client~=1.1.7',
+        'backend.ai-common~=1.3.0',
+        'backend.ai-client~=1.2.1',
     ],
     extras_require={
         'manager': [
-            'backend.ai-manager~=1.2.0',
+            'backend.ai-manager~=1.3.0',
         ],
         'agent': [
-            'backend.ai-agent~=1.2.0',
+            'backend.ai-agent~=1.3.0',
         ],
         'dev': [
             'pytest',
