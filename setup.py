@@ -4,7 +4,7 @@ from pathlib import Path
 
 setup(
     name='backend.ai',
-    version='1.3.0',
+    version='1.4.0a1',
     description='Lablup Backend.AI Meta-package',
     long_description=Path('README.rst').read_text(),
     url='https://github.com/lablup/backend.ai',
