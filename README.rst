@@ -1,23 +1,18 @@
 Backend.AI
 ==========
 
+.. image:: https://badge.fury.io/py/backend.ai.svg
+   :target: https://badge.fury.io/py/backend.ai
+   :alt: PyPI release version
+
+.. image:: https://img.shields.io/pypi/pyversions/backend.ai.svg
+   :target: https://pypi.org/project/backend.ai/
+   :alt: Supported Python versions
+
 Backend.AI is a streamlined backend API server that hosts heterogeneous
 programming languages and popular AI frameworks.
 It manages the underlying computing resources for multi-tenant computation
 sessions where such sessions are spawned and executed instantly on demand.
-
-By installing this meta-package, you get the client with command-line interface
-by default and optionally you may add the manager and agent using pip extra
-tags.
-
-.. code-block:: console
-
-   $ pip install backend.ai
-   (installs the common and client libs which includes CLI)
-   $ pip install backend.ai[manager]
-   (installs the common and client libs with the manager/gateway daemon)
-   $ pip install backend.ai[agent]
-   (installs the common and client libs with the agent daemon)
 
 
 Server-side Components
