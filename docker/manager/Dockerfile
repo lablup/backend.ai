@@ -1,6 +1,6 @@
 FROM python:3.6
 
-ARG branch=master
+ARG branch=1.3
 
 RUN pip install -U -q pip setuptools
 RUN apt-get update && \
@@ -10,10 +10,11 @@ WORKDIR /app
 RUN curl https://raw.githubusercontent.com/eficode/wait-for/master/wait-for --output /usr/local/bin/wait-for && \
     chmod +x /usr/local/bin/wait-for
 RUN apt-get install -y postgresql-client
-RUN git clone -b $branch --single-branch https://github.com/lablup/backend.ai-manager --depth 50 /app && \
+RUN git clone -b ${branch} --single-branch https://github.com/lablup/backend.ai-manager --depth 50 /app && \
     pip install \
         --no-cache-dir \
-        -e "git+https://github.com/lablup/backend.ai-common@$branch#egg=backend.ai-common" \
+        -e "git+https://github.com/lablup/backend.ai-common@${branch}#egg=backend.ai-common" \
+        --process-dependency-links \
         -e .
 
 CMD ["wait-for", "backendai-etcd:2379", "--", "wait-for", "backendai-db:5432", "--", "python", "-m", "ai.backend.gateway.server"]
