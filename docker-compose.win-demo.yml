@@ -53,9 +53,9 @@ services:
       - BACKEND_ETCD_ADDR=backendai-etcd:2379
       - BACKEND_SCRATCH_ROOT=/tmp/scratches
       - BACKEND_AGENT_HOST_OVERRIDE=backendai-agent
-      - BACKEND_KERNEL_HOST_OVERRIDE=docker.for.win.localhost
+      - BACKEND_KERNEL_HOST_OVERRIDE=host.docker.internal
       # Turn on "Expose daemon on tcp://localhost:2375 without TLS" in general settings
-      - DOCKER_HOST="tcp://docker.for.win.localhost:2375"
+      - DOCKER_HOST="tcp://host.docker.internal:2375"
     depends_on:
       - backendai-etcd
       - backendai-manager

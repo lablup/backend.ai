@@ -54,11 +54,7 @@ services:
       - BACKEND_ETCD_ADDR=backendai-etcd:2379
       - BACKEND_SCRATCH_ROOT=/tmp/scratches
       - BACKEND_AGENT_HOST_OVERRIDE=backendai-agent
-      # Windows: change this value to "docker.for.win.localhost"
-      # Linux: 172.17.0.1
-      # NOTE: As of Docker 17.12.0-ce, it is recommended to use the new name
-      #       "docker.for.mac.host.internal".
-      - BACKEND_KERNEL_HOST_OVERRIDE=docker.for.mac.localhost
+      - BACKEND_KERNEL_HOST_OVERRIDE=host.docker.internal
     depends_on:
       - backendai-etcd
       - backendai-manager
