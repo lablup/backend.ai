@@ -126,3 +126,99 @@ Response
    * - ``result``
      - ``object``
      - :ref:`execution-result-object`.
+
+
+Listing Files
+-------------
+
+Once files are uploaded to the kernel session or generated during the execution
+of the code, there is a need to identify what files actually are in the current
+session. In this case, use this API to get the list of files of your compute
+sesison.
+
+* URI: ``/v2/kernel/:id/files``
+* Method: ``GET``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:id``
+     - ``slug``
+     - The kernel ID.
+   * - ``path``
+     - ``str``
+     - Path inside the session (default: ``/home/work``).
+
+Response
+""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+   * - 404 Not Found
+     - There is no such path.
+
+.. list-table::
+   :widths: 20 20 75
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``files``
+     - ``str``
+     - Stringified json containing list of files.
+   * - ``folder_path``
+     - ``str``
+     - Absolute path inside kernel session.
+
+
+Downloading Files
+-----------------
+
+Download files from your compute session.
+
+The response contents are multiparts with tarfile binaries. Post-processing,
+such as unpacking and save them, should be handled by the client.
+
+* URI: ``/v2/kernel/:id/download``
+* Method: ``GET``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:id``
+     - ``slug``
+     - The kernel ID.
+   * - ``files``
+     - ``list`` of ``str``
+     - File paths inside the virtual folder to download.
+
+Response
+""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.

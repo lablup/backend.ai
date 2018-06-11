@@ -244,6 +244,7 @@ Parameters
 """"""""""
 
 .. list-table::
+   :widths: 15 10 80
    :header-rows: 1
 
    * - Parameter
@@ -270,6 +271,7 @@ Response
      - There is no such path.
 
 .. list-table::
+   :widths: 15 10 80
    :header-rows: 1
 
    * - Fields
@@ -299,6 +301,7 @@ Parameters
 """"""""""
 
 .. list-table::
+   :widths: 15 10 80
    :header-rows: 1
 
    * - Parameter
@@ -308,10 +311,10 @@ Parameters
      - ``slug``
      - The virtual folder ID.
    * - Request content
-     - ``list`` of ``aiohttp.web.FileField``_
+     - ``list`` of ``aiohttp.web.FileField_``
      - List of file objects to upload.
 
-.. _``aiohttp.web.FileField``: https://docs.aiohttp.org/en/stable/web_reference.html#aiohttp.web.FileField
+.. _aiohttp.web.FileField: https://docs.aiohttp.org/en/stable/web_reference.html#aiohttp.web.FileField
 
 Response
 """"""""
@@ -341,6 +344,7 @@ Parameters
 """"""""""
 
 .. list-table::
+   :widths: 15 10 80
    :header-rows: 1
 
    * - Parameter
@@ -382,6 +386,7 @@ Parameters
 """"""""""
 
 .. list-table::
+   :widths: 15 10 80
    :header-rows: 1
 
    * - Parameter
