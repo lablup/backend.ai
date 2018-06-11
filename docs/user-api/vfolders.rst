@@ -1,7 +1,8 @@
 Virtual Folders
 ===============
 
-Virtual folders provide access to shared, persistent, and reused files across different kernel sessions.
+Virtual folders provide access to shared, persistent, and reused files across
+different kernel sessions.
 
 You can mount virtual folders when creating new kernel sessions, and use them
 like a plain directory on the local filesystem.
@@ -230,3 +231,176 @@ Response
    * - 404 Not Found
      - There is no such folder.
 
+
+Listing Files in Virtual Folder
+---------------------------------
+
+Returns the list of files in a virtual folder associated with current keypair.
+
+* URI: ``/v2/folders/:id/files``
+* Method: ``GET``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:id``
+     - ``slug``
+     - The virtual folder ID.
+   * - ``path``
+     - ``str``
+     - Path inside the virtual folder (default: root).
+
+Response
+""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+   * - 404 Not Found
+     - There is no such path.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``files``
+     - ``str``
+     - Stringified json containing list of files.
+   * - ``folder_path``
+     - ``str``
+     - Absolute path inside the virtual folder.
+
+
+Uploading Files to Virtual Folder
+---------------------------------
+
+Upload local files to a virtual folder associated with current keypair.
+
+* URI: ``/v2/folders/:id/upload``
+* Method: ``POST``
+
+.. warning::
+   If a file with the same name already exists in the virtual folder, it will
+   be overwritten without warning.
+
+Parameters
+""""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:id``
+     - ``slug``
+     - The virtual folder ID.
+   * - Request content
+     - ``list`` of ``aiohttp.web.FileField``_
+     - List of file objects to upload.
+
+.. _``aiohttp.web.FileField``: https://docs.aiohttp.org/en/stable/web_reference.html#aiohttp.web.FileField
+
+Response
+""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 201 Created
+     - Success.
+
+
+Downloading Files from Virtual Folder
+-------------------------------------
+
+Download files from a virtual folder associated with the current keypair.
+
+The response contents are streamed as gzipped binaries
+(``Content-Encoding: gzip``). Post-processing, such as reading by chunk or
+unpacking the binaries, should be handled by the client.
+
+* URI: ``/v2/folders/:id/download``
+* Method: ``GET``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:id``
+     - ``slug``
+     - The virtual folder ID.
+   * - ``files``
+     - ``list`` of ``str``
+     - File paths inside the virtual folder to download.
+
+Response
+""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+   * - 404 Not Found
+     - File not found.
+
+
+Deleting Files in Virtual Folder
+--------------------------------
+
+This deletes files inside a virtual folder.
+
+.. warning::
+   There is NO way to get back the files once this API is invoked.
+
+* URI: ``/v2/folders/:id/delete_files``
+* Method: ``DELETE``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:id``
+     - ``slug``
+     - The virtual folder ID.
+   * - ``files``
+     - ``list`` of ``str``
+     - File paths inside the virtual folder to delete.
+
+Response
+""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
