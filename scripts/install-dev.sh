@@ -43,7 +43,7 @@ if ! type "pyenv" > /dev/null; then
     echo "${BLUE}[INFO]${NC} ${GREEN}Installing pyenv...${NC}"
     git clone https://github.com/pyenv/pyenv.git ${HOME}/.pyenv
     git clone https://github.com/pyenv/pyenv-virtualenv.git ${HOME}/.pyenv/plugins/pyenv-virtualenv
-    for PROFILE_FILE in "zshrc" "bashrc" "profile"
+    for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
     do
         if [ -e "${HOME}/.${PROFILE_FILE}" ]
         then
