@@ -33,12 +33,12 @@ ENV_ID=$(LC_CTYPE=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
 
 # Check prerequistics
 if ! type "docker" > /dev/null; then
-    echo " "
-    echo "${RED}[ERROR]${NC} ${LRED}You need docker install backend.ai environment.${NC}"
-    echo " "
-    echo "${BLUE}[INFO]${NC} ${GREEN}Install latest docker before starting installation.${NC}"
-    cd ${ROOT_PATH}
-    exit 0
+  echo " "
+  echo "${RED}[ERROR]${NC} ${LRED}You need docker install backend.ai environment.${NC}"
+  echo " "
+  echo "${BLUE}[INFO]${NC} ${GREEN}Install latest docker before starting installation.${NC}"
+  cd "${ROOT_PATH}"
+  exit 0
 fi
 
 echo "${BLUE}[INFO]${NC} ${GREEN}Creating backend.ai-dev directory...${NC}"
@@ -53,21 +53,21 @@ docker ps | grep "${ENV_ID}"   # You should see three containers here.
 
 # install pyenv
 if ! type "pyenv" > /dev/null; then
-    echo "${BLUE}[INFO]${NC} ${GREEN}Installing pyenv...${NC}"
-    git clone https://github.com/pyenv/pyenv.git ${HOME}/.pyenv
-    git clone https://github.com/pyenv/pyenv-virtualenv.git ${HOME}/.pyenv/plugins/pyenv-virtualenv
-    for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
-    do
-        if [ -e "${HOME}/.${PROFILE_FILE}" ]
-        then
-            echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ${HOME}/.${PROFILE_FILE}
-            echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ${HOME}/.${PROFILE_FILE}
-            echo 'eval "$(pyenv init -)"' >> ${HOME}/.${PROFILE_FILE}
-            echo 'eval "$(pyenv virtualenv-init -)"' >> ${HOME}/.${PROFILE_FILE}
-            exec $SHELL -l
-        fi
-    done
-    pyenv
+  echo "${BLUE}[INFO]${NC} ${GREEN}Installing pyenv...${NC}"
+  git clone https://github.com/pyenv/pyenv.git "${HOME}/.pyenv"
+  git clone https://github.com/pyenv/pyenv-virtualenv.git "${HOME}/.pyenv/plugins/pyenv-virtualenv"
+  for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
+  do
+    if [ -e "${HOME}/.${PROFILE_FILE}" ]
+    then
+      echo 'export PYENV_ROOT="$HOME/.pyenv"' >> "${HOME}/.${PROFILE_FILE}"
+      echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> "${HOME}/.${PROFILE_FILE}"
+      echo 'eval "$(pyenv init -)"' >> "${HOME}/.${PROFILE_FILE}"
+      echo 'eval "$(pyenv virtualenv-init -)"' >> ""${HOME}/.${PROFILE_FILE}
+      exec "$SHELL" -l
+    fi
+  done
+  pyenv
 fi
 
 # Install python to pyenv environment
@@ -132,20 +132,20 @@ cp sample-configs/image-aliases.yml image-aliases.yml
 
 # Virtual folder setup
 echo "${BLUE}[INFO]${NC} ${GREEN}Setup virtual folder...${NC}"
-mkdir -p ${INSTALL_PATH}/vfolder
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_vfroot ${INSTALL_PATH}/vfolder
-cd ${INSTALL_PATH}/backend.ai-agent
+mkdir -p "${INSTALL_PATH}/vfolder"
+./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_vfroot "${INSTALL_PATH}/vfolder"
+cd "${INSTALL_PATH}/backend.ai-agent"
 mkdir -p scratches
 
 # DB schema
 echo "${BLUE}[INFO]${NC} ${GREEN}Setup databases / images...${NC}"
-cd ${INSTALL_PATH}/backend.ai-manager
+cd "${INSTALL_PATH}/backend.ai-manager"
 cp alembic.ini.sample alembic.ini
 python -m ai.backend.manager.cli schema oneshot head
 python -m ai.backend.manager.cli --db-addr=localhost:8100 --db-user=postgres --db-password=develove --db-name=backend fixture populate example_keypair
 
 echo "${BLUE}[INFO]${NC} ${GREEN}Install Python client SDK/CLI source...${NC}"
-cd ${INSTALL_PATH}
+cd "${INSTALL_PATH}"
 # Install python client package
 git clone https://github.com/lablup/backend.ai-client-py
 cd "${INSTALL_PATH}/backend.ai-client-py"
@@ -156,7 +156,7 @@ echo "${BLUE}[INFO]${NC} ${GREEN}Downloading Python kernel images for Backend.AI
 docker pull lablup/kernel-python:3.6-debian
 docker pull lablup/kernel-python-tensorflow:1.7-py36
 
-cd ${INSTALL_PATH}
+cd "${INSTALL_PATH}"
 echo " "
 echo "${GREEN}Installation finished.${NC}"
 echo " "
@@ -178,15 +178,14 @@ echo "> ${WHITE}./scripts/run-with-halfstack.sh python -m ai.backend.agent.serve
 echo " "
 echo "${BLUE}[NOTE]${NC} How to run your first code:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/backend.ai-client-py${NC}"
+echo "> ${WHITE}backend.ai --help${NC}"
 echo "> ${WHITE}backend.ai run python -c \"print('Hello World!')\"${NC}"
-echo " "
-echo "${BLUE}[NOTE]${NC} type 'backend.ai' for more commands."
 echo " "
 echo "${GREEN}Development environment is now ready.${NC}"
 echo " "
 echo "${BLUE}[NOTE]${NC} Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 echo "  * When using docker-compose, do:"
-echo "    > ${WHITE}cd ${INSTALL_PATH}/backend.ai-manager; {$NC}"
+echo "    > ${WHITE}cd ${INSTALL_PATH}/backend.ai-manager${NC}"
 echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml ...${NC}"
 echo "  * To delete this development environment, run:"
 echo "    > ${WHITE}./delete-dev.sh ${ENV_ID}${NC}"
