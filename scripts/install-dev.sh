@@ -1,23 +1,35 @@
-#!/bin/sh
-# Pre-setup
-RED='\033[0;91m'
-GREEN='\033[0;92m'
-YELLOW='\033[0;93m'
-BLUE='\033[0;94m'
-LRED='\033[1;31m'
-LGREEN='\033[1;32m'
-LYELLOW='\033[1;33m'
-LBLUE='\033[1;34m'
-LG='\033[0;37m'
-NC='\033[0m'
+#! /bin/bash
 
-ROOT_PATH=${PWD}
+# Pre-setup
+RED="\033[0;91m"
+GREEN="\033[0;92m"
+YELLOW="\033[0;93m"
+BLUE="\033[0;94m"
+WHITE="\033[0;97m"
+LRED="\033[1;31m"
+LGREEN="\033[1;32m"
+LYELLOW="\033[1;33m"
+LBLUE="\033[1;34m"
+LWHITE="\033[1;37m"
+LG="\033[0;37m"
+NC="\033[0m"
+
+# TODO: get from command arguments
+
+PYTHON_VERSION="3.6.6"
+ROOT_PATH=$(pwd)
+INSTALL_PATH="$(pwd)/backend.ai-dev"
+
+# Set "echo -e" as default
+shopt -s xpg_echo
+
 # Make directories
 echo " "
-echo "${LGREEN}Backend.AI one-line installer for developers"
+echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 echo " "
 
-ENV_ID=$(LC_CTYPE=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 8)
+# NOTE: docker-compose enforce lower-cased project names
+ENV_ID=$(LC_CTYPE=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
 
 # Check prerequistics
 if ! type "docker" > /dev/null; then
@@ -30,9 +42,8 @@ if ! type "docker" > /dev/null; then
 fi
 
 echo "${BLUE}[INFO]${NC} ${GREEN}Creating backend.ai-dev directory...${NC}"
-mkdir -p backend.ai-dev
-cd backend.ai-dev
-INSTALL_PATH=${PWD}
+mkdir -p "${INSTALL_PATH}"
+cd "${INSTALL_PATH}"
 
 # Install postgresql, etcd packages via  docker
 git clone https://github.com/lablup/backend.ai
@@ -61,21 +72,21 @@ fi
 
 # Install python to pyenv environment
 echo "${BLUE}[INFO]${NC} ${GREEN}Creating virtualenv on pyenv...${NC}"
-pyenv install -s 3.6.6
-pyenv virtualenv 3.6.6 venv-manager
-pyenv virtualenv 3.6.6 venv-agent
-pyenv virtualenv 3.6.6 venv-common
-pyenv virtualenv 3.6.6 venv-client
+pyenv install -s "${PYTHON_VERSION}"
+pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-manager"
+pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-agent"
+pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-common"
+pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
 
 # Clone source codes
 echo "${BLUE}[INFO]${NC} ${GREEN}Cloning backend.ai source codes...${NC}"
-cd ${INSTALL_PATH}
+cd "${INSTALL_PATH}"
 git clone https://github.com/lablup/backend.ai-manager
 git clone https://github.com/lablup/backend.ai-agent
 git clone https://github.com/lablup/backend.ai-common
 
 # Setup virtual environments
-cd ${INSTALL_PATH}/backend.ai-manager
+cd "${INSTALL_PATH}/backend.ai-manager"
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     if [ $(python -c "from ctypes.util import find_library;print(find_library('snappy'))") = "None" ]; then
         echo " "
@@ -88,32 +99,32 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
 fi
 
 echo "${BLUE}[INFO]${NC} ${GREEN}Install packages on virtual environments...${NC}"
-cd ${INSTALL_PATH}/backend.ai-manager
-pyenv local venv-manager
+cd "${INSTALL_PATH}/backend.ai-manager"
+pyenv local "venv-${ENV_ID}-manager"
 pip install -U -r requirements-dev.txt
 
-cd ${INSTALL_PATH}/backend.ai-agent
-pyenv local venv-agent
+cd "${INSTALL_PATH}/backend.ai-agent"
+pyenv local "venv-${ENV_ID}-agent"
 pip install -U -r requirements-dev.txt
 
-cd ${INSTALL_PATH}/backend.ai-common
-pyenv local venv-common
+cd "${INSTALL_PATH}/backend.ai-common"
+pyenv local "venv-${ENV_ID}-common"
 pip install -U -r requirements-dev.txt
 
 # Make symlink to current backend.ai-common source code from other modules
 echo "${BLUE}[INFO]${NC} ${GREEN}Linking package dependency between sources...${NC}"
 
-cd "$(pyenv prefix venv-manager)/src"
+cd "$(pyenv prefix venv-${ENV_ID}-manager)/src"
 mv backend.ai-common backend.ai-common-backup
 ln -s "${INSTALL_PATH}/backend.ai-common" backend.ai-common
 
-cd "$(pyenv prefix venv-agent)/src"
+cd "$(pyenv prefix venv-${ENV_ID}-agent)/src"
 mv backend.ai-common backend.ai-common-backup
 ln -s "${INSTALL_PATH}/backend.ai-common" backend.ai-common
 
 # Manager DB setup
 echo "${BLUE}[INFO]${NC} ${GREEN}Setup databases / images...${NC}"
-cd ${INSTALL_PATH}/backend.ai-manager
+cd "${INSTALL_PATH}/backend.ai-manager"
 cp sample-configs/image-metadata.yml image-metadata.yml
 cp sample-configs/image-aliases.yml image-aliases.yml
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd update-images -f image-metadata.yml
@@ -137,38 +148,46 @@ echo "${BLUE}[INFO]${NC} ${GREEN}Install Python client SDK/CLI source...${NC}"
 cd ${INSTALL_PATH}
 # Install python client package
 git clone https://github.com/lablup/backend.ai-client-py
-cd ${INSTALL_PATH}/backend.ai-client-py
-pyenv local venv-client
+cd "${INSTALL_PATH}/backend.ai-client-py"
+pyenv local "venv-${ENV_ID}-client"
 pip install -U -r requirements-dev.txt
 
-echo "${BLUE}[INFO]${NC} ${GREEN}Downloading python runtime for backend.ai...${NC}"
+echo "${BLUE}[INFO]${NC} ${GREEN}Downloading Python kernel images for Backend.AI...${NC}"
 docker pull lablup/kernel-python:3.6-debian
+docker pull lablup/kernel-python-tensorflow:1.7-py36
 
 cd ${INSTALL_PATH}
 echo " "
 echo "${GREEN}Installation finished.${NC}"
 echo " "
 echo "${BLUE}[NOTE]${NC} Default API keypair configuration for test / develop:"
-echo "> export BACKEND_ENDPOINT=http://127.0.0.1:8081/"
-echo "> export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE"
-echo "> export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+echo "> ${WHITE}export BACKEND_ENDPOINT=http://127.0.0.1:8081/${NC}"
+echo "> ${WHITE}export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE${NC}"
+echo "> ${WHITE}export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY${NC}"
 echo " "
 echo "Please add these environment variables to your shell configuration files."
 echo "${LRED}[NOTE]${NC} You should change your default admin API keypairs for production environment!"
 echo " "
 echo "${BLUE}[NOTE]${NC} How to run Backend.AI manager:"
-echo "> cd ${INSTALL_PATH}/backend.ai-manager"
-echo "> ./scripts/run-with-halfstack.sh python -m ai.backend.gateway.server --service-port=8081 --debug"
+echo "> ${WHITE}cd ${INSTALL_PATH}/backend.ai-manager${NC}"
+echo "> ${WHITE}./scripts/run-with-halfstack.sh python -m ai.backend.gateway.server --service-port=8081 --debug${NC}"
 echo " "
 echo "${BLUE}[NOTE]${NC} How to run Backend.AI agent:"
-echo "> cd ${INSTALL_PATH}/backend.ai-agent"
-echo "> ./scripts/run-with-halfstack.sh python -m ai.backend.agent.server --scratch-root=`pwd`/scratches --debug --idle-timeout 30"
+echo "> ${WHITE}cd ${INSTALL_PATH}/backend.ai-agent${NC}"
+echo "> ${WHITE}./scripts/run-with-halfstack.sh python -m ai.backend.agent.server --scratch-root=`pwd`/scratches --debug --idle-timeout 30${NC}"
 echo " "
 echo "${BLUE}[NOTE]${NC} How to run your first code:"
-echo "> cd ${INSTALL_PATH}/backend.ai-client-py"
-echo "> backend.ai run python -c \"print('Hello World!')\""
+echo "> ${WHITE}cd ${INSTALL_PATH}/backend.ai-client-py${NC}"
+echo "> ${WHITE}backend.ai run python -c \"print('Hello World!')\"${NC}"
 echo " "
 echo "${BLUE}[NOTE]${NC} type 'backend.ai' for more commands."
 echo " "
-echo "${GREEN}Development environment prepared.${NC}"
+echo "${GREEN}Development environment is now ready.${NC}"
+echo " "
+echo "${BLUE}[NOTE]${NC} Your environment ID is ${YELLOW}${ENV_ID}${NC}."
+echo "  * When using docker-compose, do:"
+echo "    > ${WHITE}cd ${INSTALL_PATH}/backend.ai-manager; {$NC}"
+echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml ...${NC}"
+echo "  * To delete this development environment, run:"
+echo "    > ${WHITE}./delete-dev.sh ${ENV_ID}${NC}"
 echo " "
