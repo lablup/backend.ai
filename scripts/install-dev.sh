@@ -17,6 +17,8 @@ echo " "
 echo "${LGREEN}Backend.AI one-line installer for developers"
 echo " "
 
+ENV_ID=$(LC_CTYPE=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 8)
+
 # Check prerequistics
 if ! type "docker" > /dev/null; then
     echo " "
@@ -35,8 +37,8 @@ INSTALL_PATH=${PWD}
 # Install postgresql, etcd packages via  docker
 git clone https://github.com/lablup/backend.ai
 cd backend.ai
-docker-compose -f docker-compose.halfstack.yml up -d
-docker ps # You should see three containers here.
+docker-compose -f docker-compose.halfstack.yml -p "${ENV_ID}" up -d
+docker ps | grep "${ENV_ID}"   # You should see three containers here.
 
 # install pyenv
 if ! type "pyenv" > /dev/null; then

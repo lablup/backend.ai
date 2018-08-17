@@ -3,7 +3,6 @@ version: "3"
 services:
 
   backendai-half-db:
-    container_name: backendai-half-db
     image: postgres:9.6-alpine
     networks:
       - half
@@ -14,7 +13,6 @@ services:
       - POSTGRES_DB=backend
 
   backendai-half-redis:
-    container_name: backendai-half-redis
     image: redis:latest
     networks:
       - half
@@ -22,7 +20,6 @@ services:
       - "8110:6379"
 
   backendai-half-etcd:
-    container_name: backendai-half-etcd
     image: quay.io/coreos/etcd:v3.2.15
     volumes:
       - /tmp/backend.ai/etcd-data:/etcd-data
