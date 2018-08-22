@@ -22,7 +22,7 @@ jobs:
         - pip install -U pip setuptools
         - pip install -r requirements-ci.txt
       script:
-        - python -m flake8 ai/backend
+        - python -m flake8 src tests
         - python -m pytest tests
       after_success:
         - codecov
