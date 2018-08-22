@@ -77,7 +77,7 @@ services:
 
   backendai-etcd:
     container_name: backendai-local-etcd
-    image: quay.io/coreos/etcd:v3.2.15
+    image: quay.io/coreos/etcd:v3.3.9
     volumes:
       - ".\\tmp\\etcd-data:/etcd-data:rw"
     networks:
