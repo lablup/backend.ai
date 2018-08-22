@@ -3,7 +3,7 @@ Backend.AI
 
 [![PyPI release version](https://badge.fury.io/py/backend.ai.svg)](https://pypi.org/project/backend.ai/)
 ![Supported Python versions](https://img.shields.io/pypi/pyversions/backend.ai.svg)
-[![Gitter](https://badges.gitter.im/lablup/backend.ai.svg)](https://gitter.im/lablup/backend.ai?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Gitter](https://badges.gitter.im/lablup/backend.ai.svg)](https://gitter.im/lablup/backend.ai)
 
 Backend.AI is a streamlined backend API server that hosts heterogeneous
 programming languages and popular AI frameworks.
