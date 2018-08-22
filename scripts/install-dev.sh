@@ -124,14 +124,17 @@ fi
 show_info "Install packages on virtual environments..."
 cd "${INSTALL_PATH}/backend.ai-manager"
 pyenv local "venv-${ENV_ID}-manager"
+pip install -U -q pip setuptools
 pip install -U -r requirements-dev.txt
 
 cd "${INSTALL_PATH}/backend.ai-agent"
 pyenv local "venv-${ENV_ID}-agent"
+pip install -U -q pip setuptools
 pip install -U -r requirements-dev.txt
 
 cd "${INSTALL_PATH}/backend.ai-common"
 pyenv local "venv-${ENV_ID}-common"
+pip install -U -q pip setuptools
 pip install -U -r requirements-dev.txt
 
 # Make symlink to current backend.ai-common source code from other modules
@@ -173,6 +176,7 @@ cd "${INSTALL_PATH}"
 git clone https://github.com/lablup/backend.ai-client-py
 cd "${INSTALL_PATH}/backend.ai-client-py"
 pyenv local "venv-${ENV_ID}-client"
+pip install -U -q pip setuptools
 pip install -U -r requirements-dev.txt
 
 show_info "Downloading Python kernel images for Backend.AI..."
