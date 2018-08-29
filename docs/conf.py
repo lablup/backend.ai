@@ -15,6 +15,10 @@
 
 import sys
 import os
+import recommonmark
+from recommonmark.transform import AutoStructify
+from recommonmark.parser import CommonMarkParser
+
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -39,7 +43,7 @@ templates_path = ['_templates']
 # You can specify multiple suffix as a list of string:
 # source_suffix = ['.rst', '.md']
 source_parsers = {
-    '.md': 'recommonmark.parser.CommonMarkParser',
+    '.md': CommonMarkParser,
 }
 source_suffix = ['.rst', '.md']
 
@@ -301,3 +305,12 @@ texinfo_documents = [
 
 def setup(app):
     app.add_stylesheet('custom.css')
+
+    # Markdown formatting
+    app.add_config_value('recommonmark_config', {
+            'enable_auto_toc_tree': True,
+            'enable_auto_doc_ref': True,
+            'enable_eval_rst': True,
+            'auto_toc_tree_section': 'Contents',
+            }, True)
+    app.add_transform(AutoStructify)
