@@ -308,7 +308,7 @@ def setup(app):
 
     # Markdown formatting
     app.add_config_value('recommonmark_config', {
-            'enable_auto_toc_tree': True,
+            #'enable_auto_toc_tree': True,
             'enable_auto_doc_ref': True,
             'enable_eval_rst': True,
             'auto_toc_tree_section': 'Contents',
