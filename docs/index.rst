@@ -93,6 +93,14 @@ Table of Contents
    gsg/overview
    gsg/clientlib
 
+.. _install:
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Installation
+
+   install/overview
+
 .. _common_api:
 
 .. toctree::
