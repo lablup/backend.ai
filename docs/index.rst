@@ -100,6 +100,11 @@ Table of Contents
    :caption: Installation
 
    install/overview
+   install/demo-setup
+   install/install-on-premise
+   install/install-on-clouds
+   install/install-manager
+   install/install-agent
 
 .. _common_api:
 
@@ -143,6 +148,7 @@ Table of Contents
    :maxdepth: 1
    :caption: Developer Manuals
 
+   install/development-setup
    dev/repl
 
 
