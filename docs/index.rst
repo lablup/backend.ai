@@ -46,7 +46,7 @@ vs. Orchestration Frameworks
 
    * - Amazon ECS, Kubernetes
      - Long-running service daemons
-     - Laod balancing, fault tolerance, incremental deployment
+     - Load balancing, fault tolerance, incremental deployment
 
    * - **Backend.AI**
      - Stateful compute sessions
