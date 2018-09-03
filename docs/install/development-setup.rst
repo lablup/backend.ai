@@ -21,24 +21,19 @@ Prepare containers for external daemons
 First install an appropriate version of Docker (later than 2017.03 version) and docker-compose (later than 1.21).
 Check out the [[Install Docker]] guide.
 
+.. note::
+   In this guide, ``$WORKSPACE`` means the absolute path to an arbitrary working directory in your system.
 
-.. raw:: html
+   To copy-and-paste commands in this guide, set ``WORKSPACE`` environment variable.
 
-   <table><tr><td>:bulb:</td><td>
-   In this guide, <code>$WORKSPACE</code> means the absolute path to an arbitrary working directory in your system.<br>
-   To copy-and-paste commands in this guide, set <code>WORKSPACE</code> environment variable.<br>
    The directory structure would look like after finishing this guide:
-   <ul>
-   <li><code>$WORKSPACE</code>
-     <ul><li><code>backend.ai</code>
-         <li><code>backend.ai-manager</code>
-         <li><code>backend.ai-agent</code>
-         <li><code>backend.ai-common</code>
-         <li><code>backend.ai-client-py</code>
-     </ul>
-   </ul>
-   </td></tr></table>
 
+   * ``$WORKSPACE``
+      * backend.ai
+      * backend.ai-manager
+      * backend.ai-agent
+      * backend.ai-common
+      * backend.ai-client-py
 
 .. code-block:: console
 
@@ -96,11 +91,8 @@ Clone the Backend.AI source codes.
 Inside each directory, install the sources as editable packages.
 
 
-.. raw:: html
-
-   <table><tr><td>:bulb:</td><td>
+.. note::
    Editable packages makes Python to apply any changes of the source code in git clones immediately when importing the installed packages.
-   </td></tr></table>
 
 
 .. code-block:: console
