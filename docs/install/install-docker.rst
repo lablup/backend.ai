@@ -10,7 +10,7 @@ Install Docker
    :alt: asciicast
 
 
-For platform-specific instructions, please consult `the official documentation <https://docs.docker.com/engine/installation/>`_.
+For platform-specific instructions, please consult `the docker official documentation <https://docs.docker.com/engine/installation/>`_.
 
 Alternative way of docker installation on Linux (Ubuntu, CentOS, ...)
 
