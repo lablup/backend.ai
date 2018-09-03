@@ -11,17 +11,27 @@ Guide variables
 ⚠️ Prepare the values of the following variables before working with this page and replace their occurrences with the values when you follow the guide.
 
 
-.. raw:: html
 
-   <table>
-   <tr><td><code>{NS}</code></td><td>The etcd namespace</td></tr>
-   <tr><td><code>{ETCDADDR}</code></td><td>The etcd cluster address (<code>{ETCDHOST}:{ETCDPORT}</code>, <code>localhost:8120</code> for development setup)</td></tr>
-   <tr><td><code>{DBADDR}</code></td><td>The PostgreSQL server address (<code>{DBHOST}:{DBPORT}</code>, <code>localhost:8100</code> for development setup)</td></tr>
-   <tr><td><code>{DBUSER}</code></td><td>The database username (e.g., <code>postgres</code> for development setup)</td></tr>
-   <tr><td><code>{DBPASS}</code></td><td>The database password (e.g., <code>develove</code> for development setup)</td></tr>
-   <tr><td><code>{STRGMOUNT}</code></td><td>The path to a directory that the manager and all agents share together (e.g., a network-shared storage mountpoint). Note that the path must be same across all the nodes that run the manager and agents.<br><br>
-   Development setup: Use an arbitrary empty directory where Docker containers can also mount as volumes — e.g., <a href="https://docs.docker.com/docker-for-mac/#file-sharing">Docker for Mac requires explicit configuration for mountable parent folders.</a></td></tr>
-   </table>
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - Name
+     - Description
+   * - ``{NS}``
+     - The etcd namespace
+   * - ``{ETCDADDR}``
+     - The etcd cluster address (``{ETCDHOST}``:``{ETCDPORT}``, ``localhost:8120`` for development setup)
+   * - ``{DBADDR}``
+     - The PostgreSQL server address (``{DBHOST}``:``{DBPORT}``, ``localhost:8100`` for development setup)
+   * - ``{DBUSER}``
+     - The database username (e.g., ``postgres`` for development setup)
+   * - ``{DBPASS}``
+     - The database password (e.g., ``develove`` for development setup)
+   * - ``{STRGMOUNT}``
+     - The path to a directory that the manager and all agents share together (e.g., a network-shared storage mountpoint). Note that the path must be same across all the nodes that run the manager and agents.
+       
+       Development setup: Use an arbitrary empty directory where Docker containers can also mount as volumes — e.g., `Docker for Mac requires explicit configuration for mountable parent folders. <https://docs.docker.com/docker-for-mac/#file-sharing>`_
 
 
 Load initial etcd data

@@ -67,7 +67,9 @@ Install Python via pyenv
 ------------------------
 
 Install Python 3.6 latest version.\ :raw-html-m2r:`<br>`
-**NOTE:** Currently Python 3.7 is not supported yet.
+
+.. warning::
+   Currently Python 3.7 is not supported yet.
 
 .. code-block:: console
 
@@ -98,12 +100,9 @@ Activate the virtualenv when your shell goes into a directory
    $ pyenv local myvenv
 
 
-.. raw:: html
-
-   <table><tr><td>💡</td><td>
+.. note::
 
    `pyenv local` creates a hidden `.python-version` file at each directory specifying the Python version/virtualenv recongnized by pyenv.
    Any pyenv-enabled shells will automagically activate/deactivate this version/virtualenv when going in/out such directories.
 
-   </td></tr></table>
 

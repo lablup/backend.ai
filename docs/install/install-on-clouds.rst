@@ -19,13 +19,13 @@ Install on Clouds
    * 1x cloud file system (e.g., AWS EFS, Azure FileShare)
    * All should be in the same virtual private network.
 
-#. :doc:`Install Manager <install/install-manager>`
+#. :doc:`Install Manager </install/install-manager>`
 
    * After done, create an image of this instance as a backup.
 
-#. :doc:`Install Agent <install/install-agent>`
+#. :doc:`Install Agent </install/install-agent>`
 
 
    * After done, create an image of this instance for ease of manual/autoamtic scaling.
 
-#. :doc:`Configure Autoscaling <install/configure-autoscaling>`
+#. :doc:`Configure Autoscaling </install/configure-autoscaling>`

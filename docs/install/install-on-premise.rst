@@ -21,5 +21,5 @@ Install on Premise
 
    * Depending on the cluster size, different service daemons may run on the same physical server.
 
-#. :doc:`Install Manager <install/install-manager>`
-#. :doc:`Install Agent <install/install-agent>`
+#. :doc:`Install Manager </install/install-manager>`
+#. :doc:`Install Agent </install/install-agent>`

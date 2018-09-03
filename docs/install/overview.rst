@@ -10,17 +10,16 @@ Server Installation Guides
 * :doc:`Development Setup </install/development-setup>` – How to install all components as editable packages on your PC
 * :doc:`Demo Setup </install/demo-setup>` – ``docker-compose up -d`` and that's all!
 
-Shared Guides
--------------
+Supplemental Guides
+-------------------
 
-* :doc:`Install Docker </install/install-docker>` – 
-* :doc:`Install Python via pyenv </install/install-python-via-pyenv>` –
-* :doc:`Install Monitoring and Logging Tools </install/install-monitoring-and-logging-tools>` – 
-* :doc:`Prepare Databases for Manager </install/prepare-database-for-manager>` – 
-* :doc:`Install CUDA </install/install-cuda>` – 
+* :doc:`Install Docker </install/install-docker>` – How to install docker
+* :doc:`Install Python via pyenv </install/install-python-via-pyenv>` – Install pyenv to install multiple Python versions side-by-side
+* :doc:`Install Monitoring and Logging Tools </install/install-monitoring-and-logging-tools>` – Add third-party monitoring and logging tools (optional)
+* :doc:`Prepare Databases for Manager </install/prepare-database-for-manager>` – Prepare database for complex manager managements and tasks
+* :doc:`Install CUDA </install/install-cuda>` – Install CUDA to use Nvidia GPUs
 
 Developer Guides
 ----------------
 
 * :doc:`Version Management and Upgrades </install/version-management-and-upgrades>`
-
