@@ -19,7 +19,7 @@ Prepare containers for external daemons
 ---------------------------------------
 
 First install an appropriate version of Docker (later than 2017.03 version) and docker-compose (later than 1.21).
-Check out the [[Install Docker]] guide.
+Check out the :doc:`Install Docker </install/install-docker>` guide.
 
 .. note::
    In this guide, ``$WORKSPACE`` means the absolute path to an arbitrary working directory in your system.
@@ -56,7 +56,8 @@ to prevent conflicts with other application development environments.
 Prepare Python 3.6+
 -------------------
 
-Check out [[Install Python via pyenv]] for instructions.\ :raw-html-m2r:`<br>`
+Check out :doc:`Install Python via pyenv <install-python-via-pyenv>` for instructions.
+
 Create the following virtualenvs: ``venv-manager``\ , ``venv-agent``\ , ``venv-common``\ , and ``venv-client``.
 
 
@@ -134,7 +135,7 @@ You should install backend.ai-common dependencies into ``venv-manager`` and ``ve
 Initialize databases and load fixtures
 --------------------------------------
 
-Check out the [[Prepare Databases for Manager]] guide.
+Check out the :doc:`Prepare Databases for Manager </install/prepare-database-for-manager>` guide.
 
 Prepare Kernel Images
 ---------------------
