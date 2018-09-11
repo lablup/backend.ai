@@ -25,6 +25,7 @@ services:
       - BACKEND_SERVICE_PORT=8081
       - BACKEND_ADVERTISED_MANAGER_HOST=backendai-manager
     volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:rw"
       - "./docker/manager/init.sh:/app/init.sh:ro"
       - "./tmp/scratches:/tmp/scratches"
       - "./tmp/vfolders:/tmp/vfolders"

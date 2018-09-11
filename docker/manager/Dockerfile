@@ -11,6 +11,7 @@ RUN curl https://raw.githubusercontent.com/eficode/wait-for/master/wait-for --ou
     chmod +x /usr/local/bin/wait-for
 RUN apt-get install -y postgresql-client
 RUN git clone -b ${branch} --single-branch https://github.com/lablup/backend.ai-manager --depth 50 /app && \
+    pip install -U pip setuptools && \
     pip install \
         --no-cache-dir \
         -e "git+https://github.com/lablup/backend.ai-common@${branch}#egg=backend.ai-common" \
