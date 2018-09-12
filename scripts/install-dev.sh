@@ -105,12 +105,12 @@ pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
 # Clone source codes
 show_info "Cloning backend.ai source codes..."
 cd "${INSTALL_PATH}"
-git clone https://github.com/lablup/backend.ai-manager
-git clone https://github.com/lablup/backend.ai-agent
-git clone https://github.com/lablup/backend.ai-common
+git clone https://github.com/lablup/backend.ai-manager manager
+git clone https://github.com/lablup/backend.ai-agent agent
+git clone https://github.com/lablup/backend.ai-common common
 
 # Setup virtual environments
-cd "${INSTALL_PATH}/backend.ai-manager"
+cd "${INSTALL_PATH}/manager"
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
     if [ $(python -c "from ctypes.util import find_library;print(find_library('snappy'))") = "None" ]; then
         show_error "You need snappy library to install backend.ai components."
@@ -122,35 +122,24 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
 fi
 
 show_info "Install packages on virtual environments..."
-cd "${INSTALL_PATH}/backend.ai-manager"
+cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
 pip install -U -q pip setuptools
-pip install -U -r requirements-dev.txt
+pip install -U -e ../common -r requirements-dev.txt
 
-cd "${INSTALL_PATH}/backend.ai-agent"
+cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
 pip install -U -q pip setuptools
-pip install -U -r requirements-dev.txt
+pip install -U -e ../common -r requirements-dev.txt
 
-cd "${INSTALL_PATH}/backend.ai-common"
+cd "${INSTALL_PATH}/common"
 pyenv local "venv-${ENV_ID}-common"
 pip install -U -q pip setuptools
 pip install -U -r requirements-dev.txt
 
-# Make symlink to current backend.ai-common source code from other modules
-show_info "Linking package dependency between sources..."
-
-cd "$(pyenv prefix venv-${ENV_ID}-manager)/src"
-mv backend.ai-common backend.ai-common-backup
-ln -s "${INSTALL_PATH}/backend.ai-common" backend.ai-common
-
-cd "$(pyenv prefix venv-${ENV_ID}-agent)/src"
-mv backend.ai-common backend.ai-common-backup
-ln -s "${INSTALL_PATH}/backend.ai-common" backend.ai-common
-
 # Manager DB setup
 show_info "Configuring kernel images..."
-cd "${INSTALL_PATH}/backend.ai-manager"
+cd "${INSTALL_PATH}/manager"
 cp sample-configs/image-metadata.yml image-metadata.yml
 cp sample-configs/image-aliases.yml image-aliases.yml
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd update-images -f image-metadata.yml
@@ -160,12 +149,12 @@ cp sample-configs/image-aliases.yml image-aliases.yml
 show_info "Setting up virtual folder..."
 mkdir -p "${INSTALL_PATH}/vfolder/azure-shard01"  # TODO: fix
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_vfroot "${INSTALL_PATH}/vfolder"
-cd "${INSTALL_PATH}/backend.ai-agent"
+cd "${INSTALL_PATH}/agent"
 mkdir -p scratches
 
 # DB schema
 show_info "Setting up databases..."
-cd "${INSTALL_PATH}/backend.ai-manager"
+cd "${INSTALL_PATH}/manager"
 cp alembic.ini.sample alembic.ini
 python -m ai.backend.manager.cli schema oneshot head
 python -m ai.backend.manager.cli --db-addr=localhost:8100 --db-user=postgres --db-password=develove --db-name=backend fixture populate example_keypair
@@ -173,8 +162,8 @@ python -m ai.backend.manager.cli --db-addr=localhost:8100 --db-user=postgres --d
 show_info "Installing Python client SDK/CLI source..."
 cd "${INSTALL_PATH}"
 # Install python client package
-git clone https://github.com/lablup/backend.ai-client-py
-cd "${INSTALL_PATH}/backend.ai-client-py"
+git clone https://github.com/lablup/backend.ai-client-py client-py
+cd "${INSTALL_PATH}/client-py"
 pyenv local "venv-${ENV_ID}-client"
 pip install -U -q pip setuptools
 pip install -U -r requirements-dev.txt
@@ -194,20 +183,20 @@ echo " "
 echo "Please add these environment variables to your shell configuration files."
 show_important_note "You should change your default admin API keypairs for production environment!"
 show_note "How to run Backend.AI manager:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/backend.ai-manager${NC}"
+echo "> ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
 echo "> ${WHITE}./scripts/run-with-halfstack.sh python -m ai.backend.gateway.server --service-port=8081 --debug${NC}"
 show_note "How to run Backend.AI agent:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/backend.ai-agent${NC}"
+echo "> ${WHITE}cd ${INSTALL_PATH}/agent${NC}"
 echo "> ${WHITE}./scripts/run-with-halfstack.sh python -m ai.backend.agent.server --scratch-root=`pwd`/scratches --debug --idle-timeout 30${NC}"
 show_note "How to run your first code:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/backend.ai-client-py${NC}"
+echo "> ${WHITE}cd ${INSTALL_PATH}/client-py${NC}"
 echo "> ${WHITE}backend.ai --help${NC}"
 echo "> ${WHITE}backend.ai run python -c \"print('Hello World!')\"${NC}"
 echo " "
 echo "${GREEN}Development environment is now ready.${NC}"
 show_note "Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 echo "  * When using docker-compose, do:"
-echo "    > ${WHITE}cd ${INSTALL_PATH}/backend.ai-manager${NC}"
+echo "    > ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
 echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml ...${NC}"
 echo "  * To delete this development environment, run:"
 echo "    > ${WHITE}./delete-dev.sh ${ENV_ID}${NC}"
