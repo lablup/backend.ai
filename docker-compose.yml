@@ -68,6 +68,8 @@ services:
     environment:
       - POSTGRES_PASSWORD=develove
       - POSTGRES_DB=backend
+    volumes:
+      - "./tmp/backend.ai/postgres-data:/var/lib/postgresql/data:rw"
 
   backendai-redis:
     container_name: backendai-local-redis

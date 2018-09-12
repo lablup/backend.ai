@@ -59,6 +59,8 @@ services:
     depends_on:
       - backendai-etcd
       - backendai-manager
+    volumes:
+      - ".\\tmp\\backend.ai\\postgres-data:/var/lib/postgresql/data:rw"
 
   backendai-db:
     container_name: backendai-local-db
