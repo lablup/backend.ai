@@ -58,6 +58,13 @@ launching the gateway and agent.  It also displays a unique random key called
 "environment ID" to distinguish a particular execution of this script so that
 repeated execution does not corrupt your existing setups.
 
+By default, the script pulls the docker images for our standard Python kernel and
+TensorFlow CPU-only kernel.  To try out other images, you have to pull them
+manually afterwards.
+
+The script provides a set of command-line options.  Check out them using ``-h``
+/ ``--help`` option.
+
 .. note::
 
    To install multiple instances of development environments using this script,
@@ -71,19 +78,18 @@ repeated execution does not corrupt your existing setups.
    Please do not forget to specify ``-p <ENVID>`` option to ``docker-compose``
    commands to distinguish different environments.
 
-By default, the script pulls the docker images for our standard Python kernel and
-TensorFlow CPU-only kernel.  To try out other images, you have to pull them
-manually afterwards.
-
 Resetting the environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: console
 
-   $ bai-meta/scripts/delete-dev.sh <ENVID>
+   $ bai-meta/scripts/delete-dev.sh --env <ENVID>
 
 This will purge all docker resources related to the given environment ID and
 the ``backend.ai-dev`` directory under the current working directory.
+
+The script provides a set of command-line options.  Check out them using ``-h``
+/ ``--help`` option.
 
 .. warning::
 
