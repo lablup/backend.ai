@@ -85,6 +85,10 @@ Resetting the environment
 
    $ bai-meta/scripts/delete-dev.sh --env <ENVID>
 
+.. note::
+
+   The script may ask your root password in the middle to run sudo in Linux.
+
 This will purge all docker resources related to the given environment ID and
 the ``backend.ai-dev`` directory under the current working directory.
 

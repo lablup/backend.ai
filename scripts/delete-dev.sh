@@ -86,7 +86,7 @@ fi
 
 if [ "$REMOVE_SOURCE" = "yes" ]; then
   echo "Removing cloned source files..."
-  rm -rf "${INSTALL_PATH}"
+  sudo rm -rf "${INSTALL_PATH}"
 else
   echo "Skipped removal of cloned source files."
 fi
