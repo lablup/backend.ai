@@ -42,13 +42,19 @@ Running the script
 
 .. note::
 
-   The script may ask your root password to run sudo in Linux.
+   The script may ask your root password in the middle to run sudo in Linux.
 
 This installs a set of Backend.AI server-side components in the
 ``backend.ai-dev`` directory under the current working directory.
 
+Inside the directory, there are ``manager``, ``agent``, ``common`` and a few
+other auxiliary directories.  You can directly modify the source codes inside
+them and re-launch the gateway and agent.  The ``common`` directory is shared
+by ``manager`` and ``agent`` so just editing sources there takes effects in the
+next launches of the gateway and agent.
+
 At the end of execution, the script will show several command examples about
-launching the gateway and agent.  There is a unique random key called
+launching the gateway and agent.  It also displays a unique random key called
 "environment ID" to distinguish a particular execution of this script so that
 repeated execution does not corrupt your existing setups.
 
@@ -62,8 +68,10 @@ repeated execution does not corrupt your existing setups.
    at the same time because docker container in different environments use the
    same TCP ports of the host system.  Use ``docker-compose`` command to stop
    the current environment and start another to switch between environments.
+   Please do not forget to specify ``-p <ENVID>`` option to ``docker-compose``
+   commands to distinguish different environments.
 
-By default, it pulls the docker images for our standard Python kernel and
+By default, the script pulls the docker images for our standard Python kernel and
 TensorFlow CPU-only kernel.  To try out other images, you have to pull them
 manually afterwards.
 
