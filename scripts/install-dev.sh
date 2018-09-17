@@ -169,14 +169,14 @@ cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
 pip install -U -q pip setuptools
 pip install -U -e ../common -r requirements-dev.txt
-if [[ "$OSTYPE" == "linux-gnu" ]]; then
-  sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
-fi
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
 pip install -U -q pip setuptools
 pip install -U -e ../common -r requirements-dev.txt
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
+fi
 
 cd "${INSTALL_PATH}/common"
 pyenv local "venv-${ENV_ID}-common"
@@ -219,8 +219,7 @@ docker pull lablup/kernel-python:3.6-debian
 docker pull lablup/kernel-python-tensorflow:1.7-py36
 
 cd "${INSTALL_PATH}"
-echo " "
-echo "${GREEN}Installation finished.${NC}"
+show_info "Installation finished."
 show_note "Default API keypair configuration for test / develop:"
 echo "> ${WHITE}export BACKEND_ENDPOINT=http://127.0.0.1:8081/${NC}"
 echo "> ${WHITE}export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE${NC}"
