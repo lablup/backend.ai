@@ -1,6 +1,56 @@
 #! /bin/bash
 
-# Pre-setup
+readlinkf() {
+  python -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
+}
+
+usage() {
+  echo "Backend.AI Development Setup - Auto-installer Tool"
+  echo "=================================================="
+  echo ""
+  echo "Usage: $0 [OPTIONS]"
+  echo ""
+  echo "OPTIONS            DESCRIPTION"
+  echo "  -h, --help       Show this help"
+  echo "  --python-version Set the Python version to install via pyenv"
+  echo "                   (default: 3.6.6)"
+  echo "  --install-path   Set the target directory"
+  echo "                   (default: ./backend.ai-dev)"
+  echo "  --server-branch  The branch of git clones for server components"
+  echo "                   (default: master)"
+  echo "  --client-branch  The branch of git clones for client components"
+  echo "                   (default: master)"
+}
+
+ROOT_PATH=$(pwd)
+PYTHON_VERSION="3.6.6"
+SERVER_BRANCH="master"
+CLIENT_BRANCH="master"
+INSTALL_PATH="./backend.ai-dev"
+
+while [ $# -gt 0 ]; do
+  case $1 in
+    -h | --help)        usage; exit 1 ;;
+    --python-version)   PYTHON_VERSION=$2; shift ;;
+    --python-version=*) PYTHON_VERSION="${1#*=}" ;;
+    --install-path)     INSTALL_PATH=$2; shift ;;
+    --install-path=*)   INSTALL_PATH="${1#*=}" ;;
+    --server-branch)    SERVER_BRANCH=$2; shift ;;
+    --server-branch=*)  SERVER_BRANCH="${1#*=}" ;;
+    --client-branch)    CLIENT_BRANCH=$2; shift ;;
+    --client-branch=*)  CLIENT_BRANCH="${1#*=}" ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Run '$0 --help' for usage."
+      exit 1
+  esac
+  shift
+done
+INSTALL_PATH=$(readlinkf "$INSTALL_PATH")
+
+# Set "echo -e" as default
+shopt -s xpg_echo
+
 RED="\033[0;91m"
 GREEN="\033[0;92m"
 YELLOW="\033[0;93m"
@@ -13,15 +63,6 @@ LBLUE="\033[1;34m"
 LWHITE="\033[1;37m"
 LG="\033[0;37m"
 NC="\033[0m"
-
-# TODO: get from command arguments
-
-PYTHON_VERSION="3.6.6"
-ROOT_PATH=$(pwd)
-INSTALL_PATH="$(pwd)/backend.ai-dev"
-
-# Set "echo -e" as default
-shopt -s xpg_echo
 
 show_error() {
   echo " "
@@ -42,6 +83,8 @@ show_important_note() {
   echo " "
   echo "${LRED}[NOTE]${NC} $1"
 }
+
+# TODO: check if CUDA runtime is available?
 
 
 # BEGIN!
@@ -69,14 +112,15 @@ show_info "Creating backend.ai-dev directory..."
 mkdir -p "${INSTALL_PATH}"
 cd "${INSTALL_PATH}"
 
-# Install postgresql, etcd packages via  docker
-git clone https://github.com/lablup/backend.ai
+# Install postgresql, etcd packages via docker
+git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
 cd backend.ai
 docker-compose -f docker-compose.halfstack.yml -p "${ENV_ID}" up -d
 docker ps | grep "${ENV_ID}"   # You should see three containers here.
 
 # install pyenv
 if ! type "pyenv" > /dev/null; then
+  # TODO: ask if install pyenv
   show_info "Installing pyenv..."
   git clone https://github.com/pyenv/pyenv.git "${HOME}/.pyenv"
   git clone https://github.com/pyenv/pyenv-virtualenv.git "${HOME}/.pyenv/plugins/pyenv-virtualenv"
@@ -105,9 +149,9 @@ pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
 # Clone source codes
 show_info "Cloning backend.ai source codes..."
 cd "${INSTALL_PATH}"
-git clone https://github.com/lablup/backend.ai-manager manager
-git clone https://github.com/lablup/backend.ai-agent agent
-git clone https://github.com/lablup/backend.ai-common common
+git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manager manager
+git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
+git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
 
 # Setup virtual environments
 cd "${INSTALL_PATH}/manager"
@@ -115,7 +159,6 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
     if [ $(python -c "from ctypes.util import find_library;print(find_library('snappy'))") = "None" ]; then
         show_error "You need snappy library to install backend.ai components."
         show_info "Install libsnappy-dev (Debian-likes), or libsnappy-devel (RHEL-likes) system package depending on your environment."
-        cd ${ROOT_PATH}
         exit 1
     fi
     # NOTE: python-snappy 0.5.3 or later supports binary wheels on macOS.
@@ -162,7 +205,7 @@ python -m ai.backend.manager.cli --db-addr=localhost:8100 --db-user=postgres --d
 show_info "Installing Python client SDK/CLI source..."
 cd "${INSTALL_PATH}"
 # Install python client package
-git clone https://github.com/lablup/backend.ai-client-py client-py
+git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
 cd "${INSTALL_PATH}/client-py"
 pyenv local "venv-${ENV_ID}-client"
 pip install -U -q pip setuptools
