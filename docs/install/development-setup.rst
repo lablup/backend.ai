@@ -26,8 +26,11 @@ Install the followings accordingly to your host operating system.
 
 * `docker-compose <https://docs.docker.com/compose/install/>`_
 
-* Correct locale configurations to prevent unexpected errors
-  (e.g., resolve mismatches of locales between your terminal client and the remote host)
+.. note::
+
+   In some cases, locale conflicts between the terminal client and the remote host
+   may cause encoding errors when installing Backend.AI components due to Unicode characters
+   in README files.  Please keep correct locale configurations to prevent such errors.
 
 Running the script
 ~~~~~~~~~~~~~~~~~~
@@ -36,6 +39,10 @@ Running the script
 
    $ git clone https://github.com/lablup/backend.ai bai-meta
    $ bai-meta/scripts/install-dev.sh
+
+.. note::
+
+   The script may ask your root password to run sudo in Linux.
 
 This installs a set of Backend.AI server-side components in the
 ``backend.ai-dev`` directory under the current working directory.
