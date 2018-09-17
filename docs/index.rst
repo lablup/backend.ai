@@ -97,14 +97,11 @@ Table of Contents
 
 .. toctree::
    :maxdepth: 1
-   :caption: Installation
+   :caption: Cluster Installation
 
    install/overview
    install/demo-setup
-   install/install-on-premise
-   install/install-on-clouds
-   install/install-manager
-   install/install-agent
+   install/development-setup
 
 .. _common_api:
 

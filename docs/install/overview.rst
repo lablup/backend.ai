@@ -1,8 +1,13 @@
+Overview
+========
 
 Welcome to the Backend.AI Installation!
 
+Guides
+------
+
 Server Installation Guides
---------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * :doc:`Server Concepts </install/server-concepts>` – Key concepts to know before diving into the installation process
 * :doc:`Install on Clouds </install/install-on-clouds>` – How to install a working cluster on public IaaS clouds
@@ -11,7 +16,7 @@ Server Installation Guides
 * :doc:`Demo Setup </install/demo-setup>` – ``docker-compose up -d`` and that's all!
 
 Supplemental Guides
--------------------
+~~~~~~~~~~~~~~~~~~~
 
 * :doc:`Install Docker </install/install-docker>` – How to install docker
 * :doc:`Install Python via pyenv </install/install-python-via-pyenv>` – Install pyenv to install multiple Python versions side-by-side
@@ -20,6 +25,6 @@ Supplemental Guides
 * :doc:`Install CUDA </install/install-cuda>` – Install CUDA to use Nvidia GPUs
 
 Developer Guides
-----------------
+~~~~~~~~~~~~~~~~
 
 * :doc:`Version Management and Upgrades </install/version-management-and-upgrades>`
