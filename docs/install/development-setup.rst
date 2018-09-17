@@ -45,6 +45,17 @@ launching the gateway and agent.  There is a unique random key called
 "environment ID" to distinguish a particular execution of this script so that
 repeated execution does not corrupt your existing setups.
 
+.. note::
+
+   To install multiple instances of development environments using this script,
+   you need to run the script at different working directories because
+   the ``backend.ai-dev`` directory name is fixed.
+
+   Also, you cannot run multiple gateways and agents from different environments
+   at the same time because docker container in different environments use the
+   same TCP ports of the host system.  Use ``docker-compose`` command to stop
+   the current environment and start another to switch between environments.
+
 By default, it pulls the docker images for our standard Python kernel and
 TensorFlow CPU-only kernel.  To try out other images, you have to pull them
 manually afterwards.
