@@ -29,7 +29,7 @@ usage() {
   echo ""
   echo "${BLUE}OPTIONS${NC}"
   echo "  ${LWHITE}-h, --help${NC}           Show this help and exit"
-  echo "  ${LWHITE}-e, --env${NC}            Set the target environment ID (required)"
+  echo "  ${LWHITE}-e, --env ENVID${NC}      Set the target environment ID (required)"
   echo "  ${LWHITE}--install-path PATH${NC}  Set the target directory when installed in a"
   echo "                       non-default locatin (default: ./backend.ai-dev)"
   echo "  ${LWHITE}--skip-venvs${NC}         Skip removal of virtualenvs (default: false)"
