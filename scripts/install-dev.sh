@@ -1,25 +1,46 @@
 #! /bin/bash
 
+# Set "echo -e" as default
+shopt -s xpg_echo
+
+RED="\033[0;91m"
+GREEN="\033[0;92m"
+YELLOW="\033[0;93m"
+BLUE="\033[0;94m"
+CYAN="\033[0;96m"
+WHITE="\033[0;97m"
+LRED="\033[1;31m"
+LGREEN="\033[1;32m"
+LYELLOW="\033[1;33m"
+LBLUE="\033[1;34m"
+LCYAN="\033[1;36m"
+LWHITE="\033[1;37m"
+LG="\033[0;37m"
+NC="\033[0m"
+
 readlinkf() {
   python -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
 
 usage() {
-  echo "Backend.AI Development Setup - Auto-installer Tool"
-  echo "=================================================="
+  echo "${GREEN}Backend.AI Development Setup${NC}: ${CYAN}Auto-installer Tool${NC}"
   echo ""
-  echo "Usage: $0 [OPTIONS]"
+  echo "Usage: $0 ${BLUE}[OPTIONS]${NC}"
   echo ""
-  echo "OPTIONS            DESCRIPTION"
-  echo "  -h, --help       Show this help"
-  echo "  --python-version Set the Python version to install via pyenv"
-  echo "                   (default: 3.6.6)"
-  echo "  --install-path   Set the target directory"
-  echo "                   (default: ./backend.ai-dev)"
-  echo "  --server-branch  The branch of git clones for server components"
-  echo "                   (default: master)"
-  echo "  --client-branch  The branch of git clones for client components"
-  echo "                   (default: master)"
+  echo "${BLUE}OPTIONS:${NC}"
+  echo "  ${LWHITE}-h, --help${NC}           Show this help message and exit"
+  echo "  ${LWHITE}--python-version VERSION${NC}"
+  echo "                       Set the Python version to install via pyenv"
+  echo "                       (default: 3.6.6)"
+  echo "  ${LWHITE}--install-path PATH${NC}  Set the target directory"
+  echo "                       (default: ./backend.ai-dev)"
+  echo "  ${LWHITE}--server-branch NAME${NC}"
+  echo "                       The branch of git clones for server components"
+  echo "                       (default: master)"
+  echo "  ${LWHITE}--client-branch NAME${NC}"
+  echo "                       The branch of git clones for client components"
+  echo "                       (default: master)"
+  echo "  ${LWHITE}--enable-cuda${NC}        Install CUDA accelerator plugin (default: false)"
 }
 
 ROOT_PATH=$(pwd)
@@ -27,6 +48,7 @@ PYTHON_VERSION="3.6.6"
 SERVER_BRANCH="master"
 CLIENT_BRANCH="master"
 INSTALL_PATH="./backend.ai-dev"
+ENABLE_GPU=0
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -39,6 +61,7 @@ while [ $# -gt 0 ]; do
     --server-branch=*)  SERVER_BRANCH="${1#*=}" ;;
     --client-branch)    CLIENT_BRANCH=$2; shift ;;
     --client-branch=*)  CLIENT_BRANCH="${1#*=}" ;;
+    --enable-cuda)      ENABLE_CUDA=1 ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -47,22 +70,6 @@ while [ $# -gt 0 ]; do
   shift
 done
 INSTALL_PATH=$(readlinkf "$INSTALL_PATH")
-
-# Set "echo -e" as default
-shopt -s xpg_echo
-
-RED="\033[0;91m"
-GREEN="\033[0;92m"
-YELLOW="\033[0;93m"
-BLUE="\033[0;94m"
-WHITE="\033[0;97m"
-LRED="\033[1;31m"
-LGREEN="\033[1;32m"
-LYELLOW="\033[1;33m"
-LBLUE="\033[1;34m"
-LWHITE="\033[1;37m"
-LG="\033[0;37m"
-NC="\033[0m"
 
 show_error() {
   echo " "
