@@ -217,8 +217,8 @@ if ! type "pyenv" > /dev/null; then
       eval "$pyenv_init_script"
     fi
   done
-  pyenv
   set +e
+  pyenv
 fi
 
 # Install Python and pyenv virtualenvs
