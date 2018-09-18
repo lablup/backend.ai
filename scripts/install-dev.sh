@@ -43,6 +43,50 @@ usage() {
   echo "  ${LWHITE}--enable-cuda${NC}        Install CUDA accelerator plugin (default: false)"
 }
 
+show_error() {
+  echo " "
+  echo "${RED}[ERROR]${NC} ${LRED}$1${NC}"
+}
+
+show_info() {
+  echo " "
+  echo "${BLUE}[INFO]${NC} ${GREEN}$1${NC}"
+}
+
+show_note() {
+  echo " "
+  echo "${BLUE}[NOTE]${NC} $1"
+}
+
+show_important_note() {
+  echo " "
+  echo "${LRED}[NOTE]${NC} $1"
+}
+
+if [ $(id -u) = "0" ]; then
+  sudo=''
+else
+  sudo='sudo'
+fi
+
+# Detect distribution
+KNOWN_DISTRO="(Debian|Ubuntu|RedHat|CentOS|openSUSE|Amazon|Arista|SUSE)"
+DISTRO=$(lsb_release -d 2>/dev/null | grep -Eo $KNOWN_DISTRO  || grep -Eo $KNOWN_DISTRO /etc/issue 2>/dev/null || uname -s)
+
+if [ $DISTRO = "Darwin" ]; then
+  DISTRO="Darwin"
+elif [ -f /etc/debian_version -o "$DISTRO" == "Debian" -o "$DISTRO" == "Ubuntu" ]; then
+  DISTRO="Debian"
+elif [ -f /etc/redhat-release -o "$DISTRO" == "RedHat" -o "$DISTRO" == "CentOS" -o "$DISTRO" == "Amazon" ]; then
+  DISTRO="RedHat"
+elif [ -f /etc/system-release -o "$DISTRO" == "Amazon" ]; then
+  DISTRO="RedHat"
+else
+  show_error "Sorry, your host OS distribution is not supported by this script."
+  show_info "Please send us a pull request or file an issue to support your environment!"
+  exit 1
+fi
+
 ROOT_PATH=$(pwd)
 PYTHON_VERSION="3.6.6"
 SERVER_BRANCH="master"
@@ -71,28 +115,64 @@ while [ $# -gt 0 ]; do
 done
 INSTALL_PATH=$(readlinkf "$INSTALL_PATH")
 
-show_error() {
-  echo " "
-  echo "${RED}[ERROR]${NC} ${LRED}$1${NC}"
+install_script_deps() {
+  case $DISTRO in
+  Debian)
+    $sudo apt-get update
+    $sudo apt-get install -y git
+    ;;
+  RedHat)
+    $sudo yum clean expire-cache  # next yum invocation will update package metadata cache
+    $sudo yum install -y git
+    ;;
+  Darwin)
+    if ! type "brew" > /dev/null; then
+      show_error "brew is not available!"
+      show_info "Sorry, we only support auto-install on macOS using Homebrew. Please install it and try again."
+      exit 1
+    fi
+    brew update
+    # Having Homebrew means that the user already has git.
+    ;;
+  esac
 }
 
-show_info() {
-  echo " "
-  echo "${BLUE}[INFO]${NC} ${GREEN}$1${NC}"
+install_pybuild_deps() {
+  case $DISTRO in
+  Debian)
+    $sudo apt-get install -y libssl-dev libreadline-dev libgdbm-dev zlib1g-dev libbz2-dev libsqlite3-dev libffi-dev
+    ;;
+  RedHat)
+    $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel libsqlite-devel libffi-devel
+    ;;
+  Darwin)
+    brew bundle --file=- <<"EOS"
+brew "openssl"
+brew "sqlite3"
+brew "readline"
+brew "zlib"
+brew "gdbm"
+brew "tcl-tk"
+EOS
+    ;;
+  esac
 }
 
-show_note() {
-  echo " "
-  echo "${BLUE}[NOTE]${NC} $1"
+install_system_pkg() {
+  # accepts three args: RedHat-style name, Debian-style name, and Homebrew-style name
+  case $DISTRO in
+  Debian)
+    $sudo yum install -y $1
+    ;;
+  RedHat)
+    $sudo apt-get install -y $2
+    ;;
+  Darwin)
+    brew bundle --file=- <<EOS
+brew "$3"
+EOS
+  esac
 }
-
-show_important_note() {
-  echo " "
-  echo "${LRED}[NOTE]${NC} $1"
-}
-
-# TODO: check if CUDA runtime is available?
-
 
 # BEGIN!
 
@@ -102,7 +182,8 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 # NOTE: docker-compose enforces lower-cased project names
 ENV_ID=$(LC_CTYPE=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
 
-# Check prerequistics
+# Check prerequisites
+show_info "Checking prerequisites and script dependencies..."
 if ! type "docker" > /dev/null; then
   show_error "docker is not available!"
   show_info "Install the latest version of docker and try again."
@@ -113,45 +194,71 @@ if ! type "docker-compose" > /dev/null; then
   show_info "Install the latest version of docker-compose and try again."
   exit 1
 fi
+install_script_deps
 
-# Make directories
-show_info "Creating backend.ai-dev directory..."
-mkdir -p "${INSTALL_PATH}"
-cd "${INSTALL_PATH}"
-
-# Install postgresql, etcd packages via docker
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
-cd backend.ai
-docker-compose -f docker-compose.halfstack.yml -p "${ENV_ID}" up -d
-docker ps | grep "${ENV_ID}"   # You should see three containers here.
-
-# install pyenv
+# Install pyenv
+read -r -d '' pyenv_init_script <<"EOS"
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+EOS
 if ! type "pyenv" > /dev/null; then
   # TODO: ask if install pyenv
   show_info "Installing pyenv..."
+  set -e
   git clone https://github.com/pyenv/pyenv.git "${HOME}/.pyenv"
   git clone https://github.com/pyenv/pyenv-virtualenv.git "${HOME}/.pyenv/plugins/pyenv-virtualenv"
   for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
   do
     if [ -e "${HOME}/.${PROFILE_FILE}" ]
     then
-      echo 'export PYENV_ROOT="$HOME/.pyenv"' >> "${HOME}/.${PROFILE_FILE}"
-      echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> "${HOME}/.${PROFILE_FILE}"
-      echo 'eval "$(pyenv init -)"' >> "${HOME}/.${PROFILE_FILE}"
-      echo 'eval "$(pyenv virtualenv-init -)"' >> ""${HOME}/.${PROFILE_FILE}
-      exec "$SHELL" -l
+      echo "$pyenv_init_script" >> "${HOME}/.${PROFILE_FILE}"
+      eval "$pyenv_init_script"
     fi
   done
   pyenv
+  set +e
 fi
 
-# Install python to pyenv environment
+# Install Python and pyenv virtualenvs
+show_info "Checking and installing Python dependencies..."
+install_pybuild_deps
+
+show_info "Installing Python..."
+if [ "$DSTRO" = "Darwin" ]; then
+  export PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcl-tk"
+  export CFLAGS="-I$(brew --prefix openssl)/include -I$(brew --prefix sqlite3)/include -I$(brew --prefix readline)/include -I$(brew --prefix zlib)/include -I$(brew --prefix gdbm)/include -I$(brew --prefix tcl-tk)/include"
+  export LDFLAGS="-L$(brew --prefix openssl)/lib -L$(brew --prefix sqlite3)/lib -L$(brew --prefix readline)/lib -L$(brew --prefix zlib)/lib -L$(brew --prefix gdbm)/lib -L$(brew --prefix tcl-tk)/lib"
+fi
+if [ -z "$(pyenv versions | grep -E "^[[:space:]]*${PYTHON_VERSION}$")" ]; then
+  pyenv install "${PYTHON_VERSION}"
+else
+  echo "${PYTHON_VERSION} is already installed."
+fi
+if [ "$DSTRO" = "Darwin" ]; then
+  unset PYTHON_CONFIGURE_OPTS
+  unset CFLAGS
+  unset LDFLAGS
+fi
+
 show_info "Creating virtualenv on pyenv..."
-pyenv install -s "${PYTHON_VERSION}"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-manager"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-agent"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-common"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
+
+# Make directories
+show_info "Creating the install directory..."
+mkdir -p "${INSTALL_PATH}"
+cd "${INSTALL_PATH}"
+
+# Install postgresql, etcd packages via docker
+show_info "Launching the docker-compose \"halfstack\"..."
+git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
+cd backend.ai
+docker-compose -f docker-compose.halfstack.yml -p "${ENV_ID}" up -d
+docker ps | grep "${ENV_ID}"   # You should see three containers here.
 
 # Clone source codes
 show_info "Cloning backend.ai source codes..."
@@ -160,20 +267,16 @@ git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manag
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
 
-# Setup virtual environments
-cd "${INSTALL_PATH}/manager"
-if [[ "$OSTYPE" == "linux-gnu" ]]; then
-    if [ $(python -c "from ctypes.util import find_library;print(find_library('snappy'))") = "None" ]; then
-        show_error "You need snappy library to install backend.ai components."
-        show_info "Install libsnappy-dev (Debian-likes), or libsnappy-devel (RHEL-likes) system package depending on your environment."
-        exit 1
-    fi
-    # NOTE: python-snappy 0.5.3 or later supports binary wheels on macOS.
-fi
-
 show_info "Install packages on virtual environments..."
 cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
+pip download python-snappy
+pkgfile=$(ls | grep snappy)
+if [[ $pkgfile =~ .*\.tar.gz ]]; then
+  # source build is required!
+  install_system_pkg "libsnappy-devel" "libsnappy-dev" "snappy"
+fi
+rm -f $pkgfile
 pip install -U -q pip setuptools
 pip install -U -e ../common -r requirements-dev.txt
 
@@ -182,7 +285,7 @@ pyenv local "venv-${ENV_ID}-agent"
 pip install -U -q pip setuptools
 pip install -U -e ../common -r requirements-dev.txt
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
-  sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
+  $sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
 fi
 
 cd "${INSTALL_PATH}/common"
