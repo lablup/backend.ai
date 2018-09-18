@@ -184,17 +184,17 @@ ENV_ID=$(LC_CTYPE=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
 
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
+install_script_deps
 if ! type "docker" > /dev/null; then
   show_error "docker is not available!"
-  show_info "Install the latest version of docker and try again."
+  show_info "Please install the latest version of docker and try again."
   exit 1
 fi
 if ! type "docker-compose" > /dev/null; then
   show_error "docker-compose is not available!"
-  show_info "Install the latest version of docker-compose and try again."
+  show_info "Please install the latest version of docker-compose and try again."
   exit 1
 fi
-install_script_deps
 
 # Install pyenv
 read -r -d '' pyenv_init_script <<"EOS"
