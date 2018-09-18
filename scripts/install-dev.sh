@@ -86,6 +86,12 @@ else
   show_info "Please send us a pull request or file an issue to support your environment!"
   exit 1
 fi
+if ! type "python" > /dev/null; then
+  # Ensure "readlinkf" is working...
+  show_error "python (for bootstrapping) is not available!"
+  show_info "This script assumes Python 2.7+ is already available on your system."
+  exit 1
+fi
 
 ROOT_PATH=$(pwd)
 PYTHON_VERSION="3.6.6"
