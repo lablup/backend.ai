@@ -46,13 +46,13 @@ REMOVE_SOURCE=1
 while [ $# -gt 0 ]; do
   case $1 in
     -h | --help)           usage; exit 1 ;;
+    -e | --env)            ENV_ID=$2; shift ;;
+    --env=*)               ENV_ID="${1#*=}" ;;
     --install-path)        INSTALL_PATH=$2; shift ;;
     --install-path=*)      INSTALL_PATH="${1#*=}" ;;
     --skip-venvs)          REMOVE_VENVS=0 ;;
     --skip-containers)     REMOVE_CONTAINERS=0 ;;
     --skip-source)         REMOVE_SOURCE=0 ;;
-    -e | --env)            ENV_ID=$2; shift ;;
-    --env=*)               ENV_ID="${1#*=}" ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
