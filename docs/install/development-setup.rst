@@ -32,13 +32,25 @@ Install the followings accordingly to your host operating system.
    may cause encoding errors when installing Backend.AI components due to Unicode characters
    in README files.  Please keep correct locale configurations to prevent such errors.
 
+.. warning::
+
+   In macOS, Homebrew offers its own pyenv and pyenv-virtualenv packages but we *do
+   not* recommend using them!  Updating those packages and cleaning up via
+   Homebrew will break your virtual environments as each version uses different
+   physical directories.
+
+   Our installer script will try to install pyenv automatically if not installed,
+   but we *do* recommend installing them by yourself as it may interfere with your
+   shell configurations.
+
 Running the script
 ~~~~~~~~~~~~~~~~~~
 
 .. code-block:: console
 
-   $ git clone https://github.com/lablup/backend.ai bai-meta
-   $ bai-meta/scripts/install-dev.sh
+   $ wget https://raw.githubusercontent.com/lablup/backend.ai/master/scripts/install-dev.sh
+   $ chmod +x ./install-dev.sh
+   $ ./install-dev.sh
 
 .. note::
 
@@ -83,7 +95,9 @@ Resetting the environment
 
 .. code-block:: console
 
-   $ bai-meta/scripts/delete-dev.sh --env <ENVID>
+   $ wget https://raw.githubusercontent.com/lablup/backend.ai/master/scripts/delete-dev.sh
+   $ chmod +x ./delete-dev.sh
+   $ ./delete-dev.sh --env <ENVID>
 
 .. note::
 
