@@ -232,7 +232,7 @@ show_info "Checking and installing Python dependencies..."
 install_pybuild_deps
 
 show_info "Installing Python..."
-if [ "$DSTRO" = "Darwin" ]; then
+if [ "$DISTRO" = "Darwin" ]; then
   export PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcl-tk"
   export CFLAGS="-I$(brew --prefix openssl)/include -I$(brew --prefix sqlite3)/include -I$(brew --prefix readline)/include -I$(brew --prefix zlib)/include -I$(brew --prefix gdbm)/include -I$(brew --prefix tcl-tk)/include"
   export LDFLAGS="-L$(brew --prefix openssl)/lib -L$(brew --prefix sqlite3)/lib -L$(brew --prefix readline)/lib -L$(brew --prefix zlib)/lib -L$(brew --prefix gdbm)/lib -L$(brew --prefix tcl-tk)/lib"
@@ -242,7 +242,7 @@ if [ -z "$(pyenv versions | grep -E "^[[:space:]]*${PYTHON_VERSION}$")" ]; then
 else
   echo "${PYTHON_VERSION} is already installed."
 fi
-if [ "$DSTRO" = "Darwin" ]; then
+if [ "$DISTRO" = "Darwin" ]; then
   unset PYTHON_CONFIGURE_OPTS
   unset CFLAGS
   unset LDFLAGS
@@ -273,16 +273,20 @@ git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manag
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
 
+check_snappy() {
+  pip download python-snappy
+  local pkgfile=$(ls | grep snappy)
+  if [[ $pkgfile =~ .*\.tar.gz ]]; then
+    # source build is required!
+    install_system_pkg "libsnappy-devel" "libsnappy-dev" "snappy"
+  fi
+  rm -f $pkgfile
+}
+
 show_info "Install packages on virtual environments..."
 cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
-pip download python-snappy
-pkgfile=$(ls | grep snappy)
-if [[ $pkgfile =~ .*\.tar.gz ]]; then
-  # source build is required!
-  install_system_pkg "libsnappy-devel" "libsnappy-dev" "snappy"
-fi
-rm -f $pkgfile
+check_snappy
 pip install -U -q pip setuptools
 pip install -U -e ../common -r requirements-dev.txt
 
