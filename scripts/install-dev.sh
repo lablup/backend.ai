@@ -22,6 +22,10 @@ readlinkf() {
   python -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
 
+trim() {
+  echo "$1" | sed -e 's/^[[:space:]]*//g' -e 's/[[:space:]]*$//g'
+}
+
 usage() {
   echo "${GREEN}Backend.AI Development Setup${NC}: ${CYAN}Auto-installer Tool${NC}"
   echo ""
@@ -364,6 +368,12 @@ if [ $ENABLE_CUDA -eq 1 ]; then
   docker pull lablup/kernel-python-tensorflow:1.7-py36-gpu
 fi
 
+DELETE_OPTS=''
+if [ ! "$INSTALL_PATH" = $(readlinkf "./backend.ai-dev") ]; then
+  DELETE_OPTS+=" --install-path=${INSTALL_PATH}"
+fi
+DELETE_OPTS=$(trim "$DELETE_OPTS")
+
 cd "${INSTALL_PATH}"
 show_info "Installation finished."
 show_note "Default API keypair configuration for test / develop:"
@@ -390,5 +400,5 @@ echo "  * When using docker-compose, do:"
 echo "    > ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
 echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml ...${NC}"
 echo "  * To delete this development environment, run:"
-echo "    > ${WHITE}$(dirname $0)/delete-dev.sh --env ${ENV_ID}${NC}"
+echo "    > ${WHITE}$(dirname $0)/delete-dev.sh --env ${ENV_ID} ${DELETE_OPTS}${NC}"
 echo " "
