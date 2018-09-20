@@ -40,7 +40,13 @@ usage() {
   echo "  ${LWHITE}--client-branch NAME${NC}"
   echo "                       The branch of git clones for client components"
   echo "                       (default: master)"
-  echo "  ${LWHITE}--enable-cuda${NC}        Install CUDA accelerator plugin (default: false)"
+  echo "  ${LWHITE}--enable-cuda${NC}        Install CUDA accelerator plugin and pull a"
+  echo "                       TenosrFlow CUDA kernel for testing/demo."
+  echo "                       (default: false)"
+  echo "  ${LWHITE}--cuda-branch NAME${NC}"
+  echo "                       The branch of git clone for the CUDA accelerator "
+  echo "                       plugin; only valid if ${LWHITE}--enable-cuda${NC} is specified."
+  echo "                       (default: master)"
 }
 
 show_error() {
@@ -98,7 +104,8 @@ PYTHON_VERSION="3.6.6"
 SERVER_BRANCH="master"
 CLIENT_BRANCH="master"
 INSTALL_PATH="./backend.ai-dev"
-ENABLE_GPU=0
+ENABLE_CUDA=0
+CUDA_BRANCH="master"
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -112,6 +119,8 @@ while [ $# -gt 0 ]; do
     --client-branch)    CLIENT_BRANCH=$2; shift ;;
     --client-branch=*)  CLIENT_BRANCH="${1#*=}" ;;
     --enable-cuda)      ENABLE_CUDA=1 ;;
+    --cuda-branch)      CUDA_BRANCH=$2; shift ;;
+    --cuda-branch=*)    CUDA_BRANCH="${1#*=}" ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -272,6 +281,9 @@ cd "${INSTALL_PATH}"
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manager manager
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
+if [ $ENABLE_CUDA -eq 1 ]; then
+  git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
+fi
 
 check_snappy() {
   pip download python-snappy
@@ -296,6 +308,11 @@ pip install -U -q pip setuptools
 pip install -U -e ../common -r requirements-dev.txt
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   $sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
+fi
+if [ $ENABLE_CUDA -eq 1 ]; then
+  cd "${INSTALL_PATH}/accel-cuda"
+  pyenv local "venv-${ENV_ID}-agent"  # share the agent's venv
+  pip install -U -e .
 fi
 
 cd "${INSTALL_PATH}/common"
