@@ -25,15 +25,21 @@ readlinkf() {
 usage() {
   echo "${GREEN}Backend.AI Development Setup${NC}: ${CYAN}Auto-removal Tool${NC}"
   echo ""
-  echo "Usage: $0 ${BLUE}[OPTIONS]${NC}"
+  echo "${LWHITE}USAGE${NC}"
+  echo "  $0 ${LWHITE}[OPTIONS]${NC}"
   echo ""
-  echo "${BLUE}OPTIONS${NC}"
+  echo "${LWHITE}OPTIONS${NC}"
   echo "  ${LWHITE}-h, --help${NC}           Show this help and exit"
+  echo ""
   echo "  ${LWHITE}-e, --env ENVID${NC}      Set the target environment ID (required)"
+  echo ""
   echo "  ${LWHITE}--install-path PATH${NC}  Set the target directory when installed in a"
   echo "                       non-default locatin (default: ./backend.ai-dev)"
+  echo ""
   echo "  ${LWHITE}--skip-venvs${NC}         Skip removal of virtualenvs (default: false)"
+  echo ""
   echo "  ${LWHITE}--skip-containers${NC}    Skip removal of docker resources (default: false)"
+  echo ""
   echo "  ${LWHITE}--skip-source${NC}        Skip removal of the install path (default: false)"
 }
 
