@@ -187,10 +187,10 @@ install_system_pkg() {
   # accepts three args: RedHat-style name, Debian-style name, and Homebrew-style name
   case $DISTRO in
   Debian)
-    $sudo yum install -y $1
+    $sudo apt-get install -y $1
     ;;
   RedHat)
-    $sudo apt-get install -y $2
+    $sudo yum install -y $2
     ;;
   Darwin)
     brew bundle --file=- <<EOS
