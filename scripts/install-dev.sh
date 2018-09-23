@@ -424,7 +424,7 @@ echo "${GREEN}Development environment is now ready.${NC}"
 show_note "Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 echo "  * When using docker-compose, do:"
 echo "    > ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
-if ! -z "$docker_sudo"; then
+if [ ! -z "$docker_sudo" ]; then
   echo "    > ${WHITE}${docker_sudo} docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml ...${NC}"
 else
   echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml ...${NC}"
