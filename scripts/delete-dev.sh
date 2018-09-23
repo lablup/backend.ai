@@ -19,7 +19,7 @@ LG="\033[0;37m"
 NC="\033[0m"
 
 readlinkf() {
-  python -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
+  $bpython -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
 
 usage() {
@@ -42,6 +42,43 @@ usage() {
   echo ""
   echo "  ${LWHITE}--skip-source${NC}        Skip removal of the install path (default: false)"
 }
+
+has_python() {
+  "$1" -c '' >/dev/null 2>&1
+  if [ "$?" -eq 127 ]; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  if [ $(id -u) = "0" ]; then
+    docker_sudo=''
+  else
+    docker_sudo='sudo'
+  fi
+else
+  docker_sudo=''
+fi
+if [ $(id -u) = "0" ]; then
+  sudo=''
+else
+  sudo='sudo'
+fi
+
+if [ $(has_python "python") -eq 1 ]; then
+  bpython=$(which "python")
+elif [ $(has_python "python3") -eq 1 ]; then
+  bpython=$(which "python3")
+elif [ $(has_python "python2") -eq 1 ]; then
+  bpython=$(which "python2")
+else
+  # Ensure "readlinkf" is working...
+  show_error "python (for bootstrapping) is not available!"
+  show_info "This script assumes Python 2.7+/3+ is already available on your system."
+  exit 1
+fi
 
 ENV_ID=""
 INSTALL_PATH="./backend.ai-dev"
@@ -85,14 +122,14 @@ fi
 if [ $REMOVE_CONTAINERS -eq 1 ]; then
   echo "Removing Docker containers..."
   cd "${INSTALL_PATH}/backend.ai"
-  docker-compose -p "${ENV_ID}" -f docker-compose.halfstack.yml down
+  $docker_sudo docker-compose -p "${ENV_ID}" -f docker-compose.halfstack.yml down
 else
   echo "Skipped removal of Docker containers."
 fi
 
 if [ $REMOVE_SOURCE -eq 1 ]; then
   echo "Removing cloned source files..."
-  sudo rm -rf "${INSTALL_PATH}"
+  $sudo rm -rf "${INSTALL_PATH}"
 else
   echo "Skipped removal of cloned source files."
 fi
