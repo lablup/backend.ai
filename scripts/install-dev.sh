@@ -208,7 +208,7 @@ EOS
 }
 
 install_system_pkg() {
-  # accepts three args: RedHat-style name, Debian-style name, and Homebrew-style name
+  # accepts three args: Debian-style name, RedHat-style name, and Homebrew-style name
   case $DISTRO in
   Debian)
     $sudo apt-get install -y $1
@@ -326,7 +326,7 @@ check_snappy() {
   local pkgfile=$(ls | grep snappy)
   if [[ $pkgfile =~ .*\.tar.gz ]]; then
     # source build is required!
-    install_system_pkg "libsnappy-devel" "libsnappy-dev" "snappy"
+    install_system_pkg "libsnappy-dev" "libsnappy-devel" "snappy"
   fi
   rm -f $pkgfile
 }
