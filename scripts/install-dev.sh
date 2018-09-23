@@ -19,7 +19,7 @@ LG="\033[0;37m"
 NC="\033[0m"
 
 readlinkf() {
-  python -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
+  $bpython -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
 
 trim() {
@@ -79,6 +79,24 @@ show_important_note() {
   echo "${LRED}[NOTE]${NC} $1"
 }
 
+has_python() {
+  "$1" -c '' >/dev/null 2>&1
+  if [ "$?" -eq 127 ]; then
+    echo 0
+  else
+    echo 1
+  fi
+}
+
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  if [ $(id -u) = "0" ]; then
+    docker_sudo=''
+  else
+    docker_sudo='sudo'
+  fi
+else
+  docker_sudo=''
+fi
 if [ $(id -u) = "0" ]; then
   sudo=''
 else
@@ -102,10 +120,16 @@ else
   show_info "Please send us a pull request or file an issue to support your environment!"
   exit 1
 fi
-if ! type "python" > /dev/null; then
+if [ $(has_python "python") -eq 1 ]; then
+  bpython=$(which "python")
+elif [ $(has_python "python3") -eq 1 ]; then
+  bpython=$(which "python3")
+elif [ $(has_python "python2") -eq 1 ]; then
+  bpython=$(which "python2")
+else
   # Ensure "readlinkf" is working...
   show_error "python (for bootstrapping) is not available!"
-  show_info "This script assumes Python 2.7+ is already available on your system."
+  show_info "This script assumes Python 2.7+/3+ is already available on your system."
   exit 1
 fi
 
@@ -151,7 +175,7 @@ install_script_deps() {
     $sudo yum install -y git
     ;;
   Darwin)
-    if ! type "brew" > /dev/null; then
+    if ! type "brew" >/dev/null 2>&1; then
       show_error "brew is not available!"
       show_info "Sorry, we only support auto-install on macOS using Homebrew. Please install it and try again."
       exit 1
@@ -210,14 +234,16 @@ ENV_ID=$(LC_CTYPE=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-if ! type "docker" > /dev/null; then
+if ! type "docker" >/dev/null 2>&1; then
   show_error "docker is not available!"
   show_info "Please install the latest version of docker and try again."
+  show_info "Visit https://docs.docker.com/install/ for instructions."
   exit 1
 fi
-if ! type "docker-compose" > /dev/null; then
+if ! type "docker-compose" >/dev/null 2>&1; then
   show_error "docker-compose is not available!"
   show_info "Please install the latest version of docker-compose and try again."
+  show_info "Visit https://docs.docker.com/compose/install/ for instructions."
   exit 1
 fi
 
@@ -228,7 +254,7 @@ export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOS
-if ! type "pyenv" > /dev/null; then
+if ! type "pyenv" >/dev/null 2>&1; then
   # TODO: ask if install pyenv
   show_info "Installing pyenv..."
   set -e
@@ -282,8 +308,8 @@ cd "${INSTALL_PATH}"
 show_info "Launching the docker-compose \"halfstack\"..."
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
 cd backend.ai
-docker-compose -f docker-compose.halfstack.yml -p "${ENV_ID}" up -d
-docker ps | grep "${ENV_ID}"   # You should see three containers here.
+$docker_sudo docker-compose -f docker-compose.halfstack.yml -p "${ENV_ID}" up -d
+$docker_sudo docker ps | grep "${ENV_ID}"   # You should see three containers here.
 
 # Clone source codes
 show_info "Cloning backend.ai source codes..."
@@ -362,10 +388,10 @@ pip install -U -q pip setuptools
 pip install -U -r requirements-dev.txt
 
 show_info "Downloading Python kernel images for Backend.AI..."
-docker pull lablup/kernel-python:3.6-debian
-docker pull lablup/kernel-python-tensorflow:1.7-py36
+$docker_sudo docker pull lablup/kernel-python:3.6-debian
+$docker_sudo docker pull lablup/kernel-python-tensorflow:1.7-py36
 if [ $ENABLE_CUDA -eq 1 ]; then
-  docker pull lablup/kernel-python-tensorflow:1.7-py36-gpu
+  $docker_sudo docker pull lablup/kernel-python-tensorflow:1.7-py36-gpu
 fi
 
 DELETE_OPTS=''
@@ -398,7 +424,11 @@ echo "${GREEN}Development environment is now ready.${NC}"
 show_note "Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 echo "  * When using docker-compose, do:"
 echo "    > ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
-echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml ...${NC}"
+if ! -z "$docker_sudo"; then
+  echo "    > ${WHITE}${docker_sudo} docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml ...${NC}"
+else
+  echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml ...${NC}"
+fi
 echo "  * To delete this development environment, run:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh --env ${ENV_ID} ${DELETE_OPTS}${NC}"
 echo " "
