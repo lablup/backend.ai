@@ -6,7 +6,7 @@ import aiojobs
 DOCKER_HUB_URL = 'https://hub.docker.com/v2/repositories/lablup/?page_size=100'
 AUTH_TOKEN_URL = 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:{0}:pull'
 TAG_LIST_URL = 'https://registry-1.docker.io/v2/{0}/tags/list'
-REGISTRY_URL = 'https://registry-1.docker.io/v2/{0}/manifests/{1}'
+DIGEST_URL = 'https://registry-1.docker.io/v2/{0}/manifests/{1}'
 
 
 async def fetch(url, sess, is_json=False, headers=None):
@@ -48,24 +48,44 @@ async def get_all_tags(image_name, sess, token):
     return result['tags']
 
 
-async def list_all_tags_for_image(image_name, sess):
+async def get_digest(image_name, tag, sess, token):
+    result = await fetch(DIGEST_URL.format(image_name, tag),
+                         sess,
+                         is_json=True,
+                         headers={'Authorization': f'Bearer {token}',
+                                  'Accept': 'application/vnd.docker.distribution.manifest.v2+json'})
+    return result['config']['digest']
+
+
+async def get_image_detail(image_name, sess):
     token = await get_auth_token(image_name, sess)
     tags = await get_all_tags(image_name, sess, token)
-    return [f'{image_name}:{tag}' for tag in tags]
+    digests = await asyncio.gather(*[get_digest(image_name, tag, sess, token)
+                                     for tag in tags])
+    # return [f'{image_name}:{tag}' for tag in tags]
+    return {'imageName': image_name,
+            'tagAndDigests': [(tag, digest)
+                              for tag, digest in zip(tags, digests)]}
+
+
+def print_image_details(image_details):
+    print_format = '%-40s %-30s %32s'
+    for image_detail in image_details:
+        image_name = image_detail['imageName']
+        tag_digest_pairs = image_detail['tagAndDigests']
+        for tag, digest in tag_digest_pairs:
+            print(print_format % (image_name, tag, digest))
 
 
 async def list_all_public_images():
     scheduler = await aiojobs.create_scheduler()
     async with aiohttp.ClientSession() as sess:
         image_names = await get_all_image_names(sess)
-        jobs = await asyncio.gather(*[scheduler.spawn(list_all_tags_for_image(image_name, sess))
+        jobs = await asyncio.gather(*[scheduler.spawn(get_image_detail(image_name, sess))
                                       for image_name in image_names])
-        images_with_tags = await asyncio.gather(*[job.wait()
-                                                  for job in jobs])
-        all_image_names = [image_with_tag
-                           for image_with_tags in images_with_tags
-                           for image_with_tag in image_with_tags]
-        print(all_image_names)
+        image_details = await asyncio.gather(*[job.wait()
+                                               for job in jobs])
+        print_image_details(image_details)
 
         await scheduler.close()
 
