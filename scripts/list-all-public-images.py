@@ -1,6 +1,7 @@
 import asyncio
 import aiohttp
 import aiojobs
+from collections import namedtuple
 
 
 DOCKER_HUB_URL = 'https://hub.docker.com/v2/repositories/lablup/?page_size=100'
@@ -9,7 +10,10 @@ TAG_LIST_URL = 'https://registry-1.docker.io/v2/{0}/tags/list'
 DIGEST_URL = 'https://registry-1.docker.io/v2/{0}/manifests/{1}'
 
 
-async def fetch(url, sess, is_json=False, headers=None):
+ImageDetail = namedtuple('ImageDetail', ['name', 'tag_digest_pairs'])
+
+
+async def fetch(url, sess, is_json=True, headers=None):
     if not headers:
         headers = {}
     async with sess.get(url, headers=headers) as resp:
@@ -22,15 +26,13 @@ async def fetch(url, sess, is_json=False, headers=None):
 
 async def get_all_image_names(sess):
     result = await fetch(DOCKER_HUB_URL,
-                         sess,
-                         is_json=True)
+                         sess)
     return [f'lablup/{image["name"]}' for image in result['results']]
 
 
 async def get_auth_token(image_name, sess):
     result = await fetch(AUTH_TOKEN_URL.format(image_name),
-                         sess,
-                         is_json=True)
+                         sess)
     return result['token']
 
 
@@ -38,7 +40,6 @@ async def get_all_tags(image_name, sess, token):
     try:
         result = await fetch(TAG_LIST_URL.format(image_name),
                              sess,
-                             is_json=True,
                              headers={'Authorization': f'Bearer {token}'})
     except AssertionError as e:
         if f'{e}' == '404':
@@ -51,7 +52,6 @@ async def get_all_tags(image_name, sess, token):
 async def get_digest(image_name, tag, sess, token):
     result = await fetch(DIGEST_URL.format(image_name, tag),
                          sess,
-                         is_json=True,
                          headers={'Authorization': f'Bearer {token}',
                                   'Accept': 'application/vnd.docker.distribution.manifest.v2+json'})
     return result['config']['digest']
@@ -62,19 +62,17 @@ async def get_image_detail(image_name, sess):
     tags = await get_all_tags(image_name, sess, token)
     digests = await asyncio.gather(*[get_digest(image_name, tag, sess, token)
                                      for tag in tags])
-    # return [f'{image_name}:{tag}' for tag in tags]
-    return {'imageName': image_name,
-            'tagAndDigests': [(tag, digest)
-                              for tag, digest in zip(tags, digests)]}
+    return ImageDetail(image_name,
+                       [(tag, digest) for tag, digest in zip(tags, digests)])
 
 
 def print_image_details(image_details):
-    print_format = '%-40s %-30s %32s'
+    print_format = '{0:40s} {1:30s} {2:32s}'
+    print(print_format.format('Image', 'Tag', 'Digest'))
     for image_detail in image_details:
-        image_name = image_detail['imageName']
-        tag_digest_pairs = image_detail['tagAndDigests']
+        image_name, tag_digest_pairs = image_detail
         for tag, digest in tag_digest_pairs:
-            print(print_format % (image_name, tag, digest))
+            print(print_format.format(image_name, tag, digest))
 
 
 async def list_all_public_images():
