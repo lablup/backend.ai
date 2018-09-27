@@ -5,7 +5,10 @@ from collections import namedtuple
 
 
 DOCKER_HUB_URL = 'https://hub.docker.com/v2/repositories/lablup/?page_size=100'
-AUTH_TOKEN_URL = 'https://auth.docker.io/token?service=registry.docker.io&scope=repository:{0}:pull'
+AUTH_TOKEN_URL = (
+    'https://auth.docker.io/token'
+    '?service=registry.docker.io&scope=repository:{0}:pull'
+)
 TAG_LIST_URL = 'https://registry-1.docker.io/v2/{0}/tags/list'
 DIGEST_URL = 'https://registry-1.docker.io/v2/{0}/manifests/{1}'
 
@@ -50,10 +53,12 @@ async def get_all_tags(image_name, sess, token):
 
 
 async def get_digest(image_name, tag, sess, token):
-    result = await fetch(DIGEST_URL.format(image_name, tag),
-                         sess,
-                         headers={'Authorization': f'Bearer {token}',
-                                  'Accept': 'application/vnd.docker.distribution.manifest.v2+json'})
+    result = await fetch(
+        DIGEST_URL.format(image_name, tag),
+        sess,
+        headers={'Authorization': f'Bearer {token}',
+                 'Accept': 'application/vnd.docker.distribution.manifest.v2+json'}
+    )
     return result['config']['digest']
 
 
@@ -79,8 +84,10 @@ async def list_all_public_images():
     scheduler = await aiojobs.create_scheduler()
     async with aiohttp.ClientSession() as sess:
         image_names = await get_all_image_names(sess)
-        jobs = await asyncio.gather(*[scheduler.spawn(get_image_detail(image_name, sess))
-                                      for image_name in image_names])
+        jobs = await asyncio.gather(
+            *[scheduler.spawn(get_image_detail(image_name, sess))
+              for image_name in image_names]
+        )
         image_details = await asyncio.gather(*[job.wait()
                                                for job in jobs])
         print_image_details(image_details)
