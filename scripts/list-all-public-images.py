@@ -20,7 +20,7 @@ async def fetch(url, sess, is_json=True, headers=None):
     if not headers:
         headers = {}
     async with sess.get(url, headers=headers) as resp:
-        assert resp.status == 200, resp.status
+        resp.raise_for_status()
         if is_json:
             return await resp.json()
         else:
@@ -44,8 +44,8 @@ async def get_all_tags(image_name, sess, token):
         result = await fetch(TAG_LIST_URL.format(image_name),
                              sess,
                              headers={'Authorization': f'Bearer {token}'})
-    except AssertionError as e:
-        if f'{e}' == '404':
+    except aiohttp.ClientResponseError as e:
+        if e.status == 404:
             return []
         else:
             raise e
