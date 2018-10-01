@@ -1,7 +1,9 @@
 import asyncio
+from collections import namedtuple
+import operator
+
 import aiohttp
 import aiojobs
-from collections import namedtuple
 
 
 DOCKER_HUB_URL = 'https://hub.docker.com/v2/repositories/lablup/?page_size=100'
@@ -27,10 +29,11 @@ async def fetch(url, sess, is_json=True, headers=None):
             return await resp.text()
 
 
-async def get_all_image_names(sess):
+async def get_all_image_summaries(sess):
     result = await fetch(DOCKER_HUB_URL,
                          sess)
-    return [f'lablup/{image["name"]}' for image in result['results']]
+    return [(f'lablup/{image["name"]}', image['last_updated'])
+            for image in result['results']]
 
 
 async def get_auth_token(image_name, sess):
@@ -71,26 +74,32 @@ async def get_image_detail(image_name, sess):
                        [(tag, digest) for tag, digest in zip(tags, digests)])
 
 
-def print_image_details(image_details):
-    print_format = '{0:40s} {1:30s} {2:32s}'
-    print(print_format.format('Image', 'Tag', 'Digest'))
-    for image_detail in image_details:
-        image_name, tag_digest_pairs = image_detail
-        for tag, digest in tag_digest_pairs:
-            print(print_format.format(image_name, tag, digest))
-
-
 async def list_all_public_images():
     scheduler = await aiojobs.create_scheduler()
+    image_filter = lambda name: (
+        name.startswith('lablup/kernel-') and 'base' not in name
+    )
     async with aiohttp.ClientSession() as sess:
-        image_names = await get_all_image_names(sess)
+        image_summaries = await get_all_image_summaries(sess)
         jobs = await asyncio.gather(
             *[scheduler.spawn(get_image_detail(image_name, sess))
-              for image_name in image_names]
+              for image_name, _ in image_summaries
+              if image_filter(image_name)]
         )
         image_details = await asyncio.gather(*[job.wait()
                                                for job in jobs])
-        print_image_details(image_details)
+        table = []
+        for image_detail, image_summary in zip(image_details, image_summaries):
+            image_name, tag_digest_pairs = image_detail
+            last_updated = image_summary[1][:19]
+            for tag, digest in tag_digest_pairs:
+                table.append((image_name, last_updated, tag, digest))
+        table.sort(key=operator.itemgetter(1), reverse=True)
+
+        print_format = '{0:40s} {1:20s} {2:30s} {3:32s}'
+        print(print_format.format('Image', 'Last Updated', 'Tag', 'Digest'))
+        for row in table:
+            print(print_format.format(*row))
 
         await scheduler.close()
 
