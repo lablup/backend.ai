@@ -26,7 +26,7 @@ Please contact us (contact-at-lablup-com) for commercial consulting and more
 licensing details/options about individual use-cases.
 
 For details about server installation and configuration, please visit [our
-wiki](https://github.com/lablup/backend.ai/wiki).
+documentation](http://docs.backend.ai).
 
 ### Manager with API Gateway
 
@@ -36,13 +36,15 @@ It also monitors and scales the cluster of multiple agents (a few tens to hundre
 * Package namespace: `ai.backend.gateway` and `ai.backend.manager`
 * https://github.com/lablup/backend.ai-manager
 
-### Agent
+### Agent and its plugins
 
 It manages individual server instances and launches/destroys Docker containers where REPL daemons (kernels) run.
 Each agent on a new EC2 instance self-registers itself to the instance registry via heartbeats.
 
-* Package namespace: `ai.backend.agent`
 * https://github.com/lablup/backend.ai-agent
+  * Package namespace: `ai.backend.agent`
+* https://github.com/lablup/backend.ai-accelerator-cuda
+  * Package namespace: `ai.backend.acceelrator.cuda`
 
 ### Kernels
 
