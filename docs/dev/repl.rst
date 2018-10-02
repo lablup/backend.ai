@@ -125,7 +125,7 @@ Writing PTY Mode Kernels
 ------------------------
 
 If you want to allow users to have real-time interactions with your kernel using web-based terminals, you should implement the PTY mode as well.
-A good example is `our "git" kernel <https://github.com/lablup/sorna-repl/blob/master/git/run.py>`_.
+A good example is `our "git" kernel runner <https://github.com/lablup/backend.ai-kernel-runner/blob/master/src/ai/backend/kernel/git/__init__.py>`_.
 
 The key concept is separation of the "outer" daemon and the "inner" target program (e.g., a shell).
 The outer daemon should wrap the inner program inside a pseudo-tty.
@@ -150,5 +150,5 @@ A best practice (not mandatory but recommended) for PTY mode kernels is to autom
 Writing Custom Jail Policies
 ----------------------------
 
-Implement `the jail policy interface <https://github.com/lablup/sorna-repl/blob/master/jail/policy/interfaces.go>`_ in Go and ebmed it inside your jail build.
+Implement `the jail policy interface <https://github.com/lablup/backend.ai-jail>`_ in Go and ebmed it inside your jail build.
 Please give a look to existing jail policies as good references.

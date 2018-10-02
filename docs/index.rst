@@ -46,7 +46,7 @@ vs. Orchestration Frameworks
 
    * - Amazon ECS, Kubernetes
      - Long-running service daemons
-     - Laod balancing, fault tolerance, incremental deployment
+     - Load balancing, fault tolerance, incremental deployment
 
    * - **Backend.AI**
      - Stateful compute sessions
@@ -93,6 +93,16 @@ Table of Contents
    gsg/overview
    gsg/clientlib
 
+.. _install:
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Cluster Installation
+
+   install/overview
+   install/demo-setup
+   install/development-setup
+
 .. _common_api:
 
 .. toctree::
@@ -135,6 +145,7 @@ Table of Contents
    :maxdepth: 1
    :caption: Developer Manuals
 
+   install/development-setup
    dev/repl
 
 

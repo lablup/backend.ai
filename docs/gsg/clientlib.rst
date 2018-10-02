@@ -17,16 +17,16 @@ We recommend to create a virtual environment for isolated, unobtrusive installat
 
 .. code-block:: shell
 
-   $ python3 -m venv venv-sorna
-   $ source venv-sorna/bin/activate
-   (venv-sorna) $
+   $ python3 -m venv venv-backend-ai
+   $ source venv-backend-ai/bin/activate
+   (venv-backend-ai) $
 
 Then install the client library from PyPI.
 
 .. code-block:: shell
 
-   (venv-sorna) $ pip install -U pip wheel setuptools
-   (venv-sorna) $ pip install sorna-client
+   (venv-backend-ai) $ pip install -U pip wheel setuptools
+   (venv-backend-ai) $ pip install sorna-client
 
 Configuration
 -------------
@@ -35,8 +35,8 @@ Set your API keypair as environment variables:
 
 .. code-block:: shell
 
-   (venv-sorna) $ export SORNA_ACCESS_KEY=AKIA...
-   (venv-sorna) $ export SORNA_SECRET_KEY=...
+   (venv-backend-ai) $ export BACKEND_ACCESS_KEY=AKIA...
+   (venv-backend-ai) $ export BACKEND_SECRET_KEY=...
 
 The run Python in the virtual environment and check if your credentials are valid:
 

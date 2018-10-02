@@ -15,6 +15,7 @@
 
 import sys
 import os
+
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -38,7 +39,7 @@ templates_path = ['_templates']
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
 # source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+source_suffix = ['.rst']
 
 # The encoding of source files.
 #source_encoding = 'utf-8-sig'
@@ -48,7 +49,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Backend.AI'
-copyright = '2016-2017, Lablup Inc'
+copyright = '2016-2018, Lablup Inc'
 author = 'DevOps Team'
 
 # The version info for the project you're documenting, acts as replacement for
