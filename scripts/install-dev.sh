@@ -366,8 +366,9 @@ cp sample-configs/image-aliases.yml image-aliases.yml
 
 # Virtual folder setup
 show_info "Setting up virtual folder..."
-mkdir -p "${INSTALL_PATH}/vfolder/azure-shard01"  # TODO: fix
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_vfroot "${INSTALL_PATH}/vfolder"
+mkdir -p "${INSTALL_PATH}/vfolder/local"
+./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
+./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
 cd "${INSTALL_PATH}/agent"
 mkdir -p scratches
 
