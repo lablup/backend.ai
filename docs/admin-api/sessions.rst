@@ -30,6 +30,7 @@ Query Schema
      io_read_bytes: Int
      io_write_bytes: Int
      lang: String
+     tag: String
      workers(status: String): [ComputeWorker]
    }
 

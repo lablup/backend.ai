@@ -30,6 +30,12 @@ Parameters
      - The kernel runtime type, usually in the form of the language name and its version tag connected with a colon.
        (e.g., ``"python:latest"``)
 
+   * - ``tag``
+     - ``str``
+     - An optional per-session, user-provided tag for administrators to keep track of additional information of each session,
+       such as which sessions are from which users.
+
+
    * - ``clientSessionToken``
      - ``str``
      - Client-provided session token which can contain ASCII alphabets, numbers, and hyphens in the middle.
@@ -48,6 +54,7 @@ Example:
 
    {
      "lang": "python:3.6",
+     "tag": "example-tag",
      "clientSessionToken": "EXAMPLE:STRING",
      "config": {
        "clusterSize": 1,
