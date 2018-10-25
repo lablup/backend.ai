@@ -218,7 +218,7 @@ Execution Result Object
    * - ``status``
      - ``enum[str]``
 
-     - One of ``"continued"``, ``"waiting-input"``, ``"finished"``, or ``"build-finished"``.
+     - One of ``"continued"``, ``"waiting-input"``, ``"finished"``, ``"build-finished"``, or ``"exec-timeout"``.
        See more details at :ref:`code-execution-model`.
 
    * - ``exitCode``
@@ -256,6 +256,32 @@ Execution Result Object
      - An object containing extra display options.  If there is no options indicated by the kernel, this field is ``null``.
        When ``result.status`` is ``"waiting-input"``, it has a boolean field ``is_password`` so that you could use
        different types of text boxes for user inputs.
+
+   * - ``files``
+     - ``list`` of :ref:`execution-result-file-object`
+
+     - A list of details of created files during the code execution.
+
+.. _execution-result-file-object:
+
+Execution Result File Object
+----------------------------
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+
+   * - ``name``
+     - ``str``
+     - The name of a created file after execution.
+
+   * - ``url``
+     - ``str``
+     - The URL of a create file uploaded to AWS S3.
 
 .. _container-stats-object:
 

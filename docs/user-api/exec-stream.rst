@@ -7,7 +7,7 @@ The streaming mode provides a direct web-based terminal access to kernel contain
 Terminal Emulation
 ------------------
 
-* URI: ``/v2/stream/kernel/:id/pty``
+* URI: ``/stream/kernel/:id/pty``
 * Method: GET upgraded to WebSockets
 
 This endpoint provides a duplex continuous stream of JSON objects via the native WebSocket.
@@ -131,7 +131,7 @@ Server-side errors
 Executing Snippet via WebSocket
 -------------------------------
 
-* URI: ``/v2/stream/kernel/:id/ws``
+* URI: ``/stream/kernel/:id/ws``
 * Method: GET upgraded to WebSockets
 
 This API function is read-only --- meaning that you cannot send any data to this URI.
