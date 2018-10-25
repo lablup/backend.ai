@@ -359,6 +359,30 @@ Creation Config Object
        The value is capped by the per-kernel image limit.
        Additional charges may apply on the public API service.
 
+.. _vfolder-list-item-object:
+
+Virtual Folder List Item Object
+-------------------------------
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+   * - ``name``
+     - ``str``
+     - The human readable name set when created.
+   * - ``id``
+     - ``slug``
+     - The unique ID of the folder.
+   * - ``is_owner``
+     - ``bool``
+     - Indicates if the requested user is the owner of this folder.
+   * - ``permission``
+     - ``str``
+     - The requested user's permission for this folder.
+
 .. _vfolder-item-object:
 
 Virtual Folder Item Object
@@ -376,20 +400,53 @@ Virtual Folder Item Object
      - The human readable name set when created.
    * - ``id``
      - ``slug``
-     - The unique ID of the folder. Use this when making API requests referring this folder.
+     - The unique ID of the folder.
    * - ``linked``
      - ``bool``
      - Indicates if this folder is linked to an external service. (enterprise edition only)
-   * - ``usedSize``
-     - ``int`` (MiB)
-     - The sum of the size of files in this folder.
    * - ``numFiles``
      - ``int``
      - The number of files in this folder.
-   * - ``maxSize``
-     - ``int`` (MiB)
-     - The maximum size of this folder.
+   * - ``is_owner``
+     - ``bool``
+     - Indicates if the requested user is the owner of this folder.
+   * - ``permission``
+     - ``str``
+     - The requested user's permission for this folder.
    * - ``created``
      - ``datetime``
      - The date and time when the folder is created.
 
+.. _vfolder-invitation-object:
+
+Virtual Folder Invitation Object
+--------------------------------
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+   * - ``id``
+     - ``slug``
+     - The unique ID of the invitation. Use this when making API requests referring this invitation.
+   * - ``inviter``
+     - ``str``
+     - The inviter name of the invitation.
+   * - ``permission``
+     - ``str``
+     - The permission to give to invited user.
+   * - ``state``
+     - ``string``
+     - The current state of the invitation.
+   * - ``numFiles``
+     - ``int``
+     - The number of files in this folder.
+   * - ``vfolder_id``
+     - ``slug``
+     - The unique ID of the vfolder to which the permission will be applied if accepted.
+   * - ``created_at``
+     - ``datetime``
+     - The date and time when the folder is created.
