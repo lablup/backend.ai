@@ -6,7 +6,7 @@ Here are the API calls to create and manage compute sessions.
 Creating Kernel Session
 -----------------------
 
-* URI: ``/v2/kernel/`` (``/v2/kernel/create`` also works for legacy)
+* URI: ``/kernel`` (``/kernel/create`` also works for legacy)
 * Method: ``POST``
 
 Creates a kernel session if there is no existing (running) kernel with the same ``clientSessionToken``.
@@ -105,7 +105,7 @@ Example:
 Getting Kernel Information
 --------------------------
 
-* URI: ``/v2/kernel/:id``
+* URI: ``/kernel/:id``
 * Method: ``GET``
 
 Retrieves information about a kernel session.
@@ -144,18 +144,30 @@ Response
    :widths: 15 5 80
    :header-rows: 1
 
-   * - Fields
+   * - Key
      - Type
-     - Values
-   * - ``item``
-     - ``object``
-     - :ref:`session-item-object`.
+     - Description
+   * - ``lang``
+     - ``str``
+     - The kernel's programming language
+   * - ``age``
+     - ``int`` (msec)
+     - The time elapsed since the kernel has started.
+   * - ``memoryLimit``
+     - ``int`` (KiB)
+     - The memory limit of the kernel in KiB.
+   * - ``numQueriesExecuted``
+     - ``int``
+     - The number of times the kernel has been accessed.
+   * - ``cpuCreditUsed``
+     - ``int`` (msec)
+     - The total time the kernel was running.
 
 
 Destroying Kernel Session
 -------------------------
 
-* URI: ``/v2/kernel/:id``
+* URI: ``/kernel/:id``
 * Method: ``DELETE``
 
 Terminates a kernel session.
@@ -188,11 +200,22 @@ Response
    * - 404 Not Found
      - There is no such kernel.
 
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+   * - ``stats``
+     - ``object``
+     - The :ref:`container-stats-object` of the kernel when deleted.
+
 
 Restarting Kernel Session
 -------------------------
 
-* URI: ``/v2/kernel/:id``
+* URI: ``/kernel/:id``
 * Method: ``PATCH``
 
 Restarts a kernel session.

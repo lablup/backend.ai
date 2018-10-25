@@ -257,11 +257,10 @@ Execution Result Object
        When ``result.status`` is ``"waiting-input"``, it has a boolean field ``is_password`` so that you could use
        different types of text boxes for user inputs.
 
+.. _container-stats-object:
 
-.. _session-item-object:
-
-Kernel Session Item Object
---------------------------
+Container Stats Object
+----------------------
 
 .. list-table::
    :widths: 15 5 80
@@ -270,42 +269,33 @@ Kernel Session Item Object
    * - Key
      - Type
      - Description
-   * - ``id``
-     - ``slug``
-     - The kernel session ID.
-   * - ``type``
-     - ``str``
-     - The kernel type (typically the name of runtime or programming lanauge).
-   * - ``status``
-     - ``enum[str]``
-     - One of ``"preparing"``, ``"building``", ``"running"``, ``"restarting"``, ``"resizing"``, ``"success"``, ``"error"``, ``"terminating"``, ``"suspended"``.
-   * - ``statusInfo``
-     - ``str``
-     - An optional message related to the current status. (e.g., error information)
-   * - ``age``
+   * - ``cpu_used``
      - ``int`` (msec)
-     - The time elapsed since the kernel has started.
-   * - ``execTime``
-     - ``int`` (msec)
-     - The time taken for execution. Excludes the time taken for being suspended, restarting, and resizing.
-   * - ``numQueriesExecuted``
-     - ``int``
-     - The total number of queries executed after start-up.
-   * - ``memoryUsed``
-     - ``int`` (MiB)
-     - The amount of memory currently used (sum of all resident-set size across instances). It may show a stale value.
-   * - ``cpuUtil``
-     - ``int`` (%)
-     - The current CPU utilization (sum of all used cores across instances, hence may exceed 100%). It may show a stale value.
-
-       .. versionchanged:: v3.20170615
-
-          This had been separated into multiple credit-based fields, but that was never implemented properly.
-          We has changed it to represent more intuitive value.
-
-   * - ``config``
-     - ``object``
-     - :ref:`creation-config-object` specified when created.
+     - The total time the kernel was running.
+   * - ``mem_max_bytes``
+     - ``int`` (Byte)
+     - The maximum memory usage.
+   * - ``mem_cur_bytes``
+     - ``int`` (Byte)
+     - The current memory usage.
+   * - ``net_rx_bytes``
+     - ``int`` (Byte)
+     - The total amount of received data through network.
+   * - ``net_tx_bytes``
+     - ``int`` (Byte)
+     - The total amount of transmitted data through network.
+   * - ``io_read_bytes``
+     - ``int`` (Byte)
+     - The total amount of received data from IO.
+   * - ``io_write_bytes``
+     - ``int`` (Byte)
+     - The total amount of transmitted data to IO.
+   * - ``io_max_scratch_size``
+     - ``int`` (Byte)
+     - Currently not used field.
+   * - ``io_write_bytes``
+     - ``int`` (Byte)
+     - Currently not used field.
 
 .. _creation-config-object:
 
