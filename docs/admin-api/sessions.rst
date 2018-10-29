@@ -12,6 +12,7 @@ Query Schema
    type ComputeSession {
      sess_id: String
      id: UUID
+     role: String
      status: String
      status_info: String
      created_at: DateTime
@@ -23,8 +24,8 @@ Query Schema
      gpu_slot: Int
      num_queries: Int
      cpu_used: Int
-     max_mem_bytes: Int
-     cur_mem_bytes: Int
+     mem_max_bytes: Int
+     mem_cur_bytes: Int
      net_rx_bytes: Int
      net_tx_bytes: Int
      io_read_bytes: Int
@@ -36,6 +37,7 @@ Query Schema
    type ComputeWorker {
      sess_id: String
      id: UUID
+     role: String
      status: String
      status_info: String
      created_at: DateTime
@@ -47,8 +49,8 @@ Query Schema
      gpu_slot: Int
      num_queries: Int
      cpu_used: Int
-     max_mem_bytes: Int
-     cur_mem_bytes: Int
+     mem_max_bytes: Int
+     mem_cur_bytes: Int
      net_rx_bytes: Int
      net_tx_bytes: Int
      io_read_bytes: Int
