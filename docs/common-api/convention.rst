@@ -93,6 +93,10 @@ Therefore, all API query URLs are prefixed with the major revision, such as ``/v
 Minor releases may introduce new parameters and response fields but no URL changes.
 Accessing unsupported major revision returns HTTP 404 Not Found.
 
+.. versionchanged:: v3.20170615
+   Version prefix in API queries are deprecated. (Yet still supported currently)
+   For example, now users should call ``/kernel/create`` rather than ``/v2/kernel/create``.
+
 A client must specify the API version in the HTTP request header named ``X-BackendAI-Version``.
 To check the latest minor release date of a specific major revision, try a GET query to the URL with only the major revision part (e.g., ``/v2``).
 The API server will return a JSON string in the response body containing the full version.
