@@ -2,4 +2,4 @@
 This is a meta-package which contains nothing yet.
 '''
 
-__version__ = '1.5.0a1'
+__version__ = '18.12.0a1'
