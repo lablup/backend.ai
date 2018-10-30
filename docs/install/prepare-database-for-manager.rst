@@ -83,7 +83,7 @@ Set the default storage mount for virtual folders
 
    $ BACKEND_NAMESPACE={NS} BACKEND_ETCD_ADDR={ETCDADDR} \
    > python -m ai.backend.manager.cli etcd put \
-   >        volumes/_vfroot {STRGMOUNT}
+   >        volumes/_mount {STRGMOUNT}
 
 Database Setup
 --------------
