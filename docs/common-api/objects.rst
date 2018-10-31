@@ -218,13 +218,14 @@ Execution Result Object
    * - ``status``
      - ``enum[str]``
 
-     - One of ``"continued"``, ``"waiting-input"``, ``"finished"``, ``"build-finished"``, or ``"exec-timeout"``.
+     - One of ``"continued"``, ``"waiting-input"``, ``"finished"``, ``"clean-finished"``, ``"build-finished"``,
+       or ``"exec-timeout"``.
        See more details at :ref:`code-execution-model`.
 
    * - ``exitCode``
      - ``int | null``
      - The exit code of the last process.
-       This field has a valid value only when the ``status`` is ``"finished"`` or ``"build-finished"``.
+       This field has a valid value only when the ``status`` is ``"finished"``, ``"clean-finished"`` or ``"build-finished"``.
        Otherwise it is set to ``null``.
 
        For batch-mode kernels and query-mode kernels *without* global context support,
