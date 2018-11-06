@@ -229,7 +229,7 @@ echo " "
 echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 
 # NOTE: docker-compose enforces lower-cased project names
-ENV_ID=$(LC_CTYPE=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
+ENV_ID=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
 
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
