@@ -4,7 +4,7 @@ Code Execution (Query Mode)
 Executing Snippet
 -----------------
 
-* URI: ``/v2/kernel/:id``
+* URI: ``/kernel/:id``
 * Method: ``POST``
 
 Executes a snippet of user code using the specified kernel session.
@@ -44,7 +44,7 @@ Parameters
 .. code-block:: json
 
    {
-     "type": "query",
+     "mode": "query",
      "code": "print('Hello, world!')",
      "runId": "5facbf2f2697c1b7"
    }
@@ -252,7 +252,7 @@ You should make another API query with the ``code`` field filled with the user i
 Auto-completion
 ---------------
 
-* URI: ``/v2/kernel/:id/complete``
+* URI: ``/kernel/:id/complete``
 * Method: ``POST``
 
 Parameters
@@ -342,7 +342,7 @@ Response
 Interrupt
 ---------
 
-* URI: ``/v2/kernel/:id/interrupt``
+* URI: ``/kernel/:id/interrupt``
 * Method: ``POST``
 
 Parameters

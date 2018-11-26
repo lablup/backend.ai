@@ -218,13 +218,14 @@ Execution Result Object
    * - ``status``
      - ``enum[str]``
 
-     - One of ``"continued"``, ``"waiting-input"``, ``"finished"``, or ``"build-finished"``.
+     - One of ``"continued"``, ``"waiting-input"``, ``"finished"``, ``"clean-finished"``, ``"build-finished"``,
+       or ``"exec-timeout"``.
        See more details at :ref:`code-execution-model`.
 
    * - ``exitCode``
      - ``int | null``
      - The exit code of the last process.
-       This field has a valid value only when the ``status`` is ``"finished"`` or ``"build-finished"``.
+       This field has a valid value only when the ``status`` is ``"finished"``, ``"clean-finished"`` or ``"build-finished"``.
        Otherwise it is set to ``null``.
 
        For batch-mode kernels and query-mode kernels *without* global context support,
@@ -257,11 +258,15 @@ Execution Result Object
        When ``result.status`` is ``"waiting-input"``, it has a boolean field ``is_password`` so that you could use
        different types of text boxes for user inputs.
 
+   * - ``files``
+     - ``list`` of :ref:`execution-result-file-object`
 
-.. _session-item-object:
+     - A list of details of created files during the code execution.
 
-Kernel Session Item Object
---------------------------
+.. _execution-result-file-object:
+
+Execution Result File Object
+----------------------------
 
 .. list-table::
    :widths: 15 5 80
@@ -270,42 +275,54 @@ Kernel Session Item Object
    * - Key
      - Type
      - Description
-   * - ``id``
-     - ``slug``
-     - The kernel session ID.
-   * - ``type``
+
+   * - ``name``
      - ``str``
-     - The kernel type (typically the name of runtime or programming lanauge).
-   * - ``status``
-     - ``enum[str]``
-     - One of ``"preparing"``, ``"building``", ``"running"``, ``"restarting"``, ``"resizing"``, ``"success"``, ``"error"``, ``"terminating"``, ``"suspended"``.
-   * - ``statusInfo``
+     - The name of a created file after execution.
+
+   * - ``url``
      - ``str``
-     - An optional message related to the current status. (e.g., error information)
-   * - ``age``
+     - The URL of a create file uploaded to AWS S3.
+
+.. _container-stats-object:
+
+Container Stats Object
+----------------------
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+   * - ``cpu_used``
      - ``int`` (msec)
-     - The time elapsed since the kernel has started.
-   * - ``execTime``
-     - ``int`` (msec)
-     - The time taken for execution. Excludes the time taken for being suspended, restarting, and resizing.
-   * - ``numQueriesExecuted``
-     - ``int``
-     - The total number of queries executed after start-up.
-   * - ``memoryUsed``
-     - ``int`` (MiB)
-     - The amount of memory currently used (sum of all resident-set size across instances). It may show a stale value.
-   * - ``cpuUtil``
-     - ``int`` (%)
-     - The current CPU utilization (sum of all used cores across instances, hence may exceed 100%). It may show a stale value.
-
-       .. versionchanged:: v3.20170615
-
-          This had been separated into multiple credit-based fields, but that was never implemented properly.
-          We has changed it to represent more intuitive value.
-
-   * - ``config``
-     - ``object``
-     - :ref:`creation-config-object` specified when created.
+     - The total time the kernel was running.
+   * - ``mem_max_bytes``
+     - ``int`` (Byte)
+     - The maximum memory usage.
+   * - ``mem_cur_bytes``
+     - ``int`` (Byte)
+     - The current memory usage.
+   * - ``net_rx_bytes``
+     - ``int`` (Byte)
+     - The total amount of received data through network.
+   * - ``net_tx_bytes``
+     - ``int`` (Byte)
+     - The total amount of transmitted data through network.
+   * - ``io_read_bytes``
+     - ``int`` (Byte)
+     - The total amount of received data from IO.
+   * - ``io_write_bytes``
+     - ``int`` (Byte)
+     - The total amount of transmitted data to IO.
+   * - ``io_max_scratch_size``
+     - ``int`` (Byte)
+     - Currently not used field.
+   * - ``io_write_bytes``
+     - ``int`` (Byte)
+     - Currently not used field.
 
 .. _creation-config-object:
 
@@ -359,6 +376,30 @@ Creation Config Object
        The value is capped by the per-kernel image limit.
        Additional charges may apply on the public API service.
 
+.. _vfolder-list-item-object:
+
+Virtual Folder List Item Object
+-------------------------------
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+   * - ``name``
+     - ``str``
+     - The human readable name set when created.
+   * - ``id``
+     - ``slug``
+     - The unique ID of the folder.
+   * - ``is_owner``
+     - ``bool``
+     - Indicates if the requested user is the owner of this folder.
+   * - ``permission``
+     - ``str``
+     - The requested user's permission for this folder.
+
 .. _vfolder-item-object:
 
 Virtual Folder Item Object
@@ -376,20 +417,53 @@ Virtual Folder Item Object
      - The human readable name set when created.
    * - ``id``
      - ``slug``
-     - The unique ID of the folder. Use this when making API requests referring this folder.
+     - The unique ID of the folder.
    * - ``linked``
      - ``bool``
      - Indicates if this folder is linked to an external service. (enterprise edition only)
-   * - ``usedSize``
-     - ``int`` (MiB)
-     - The sum of the size of files in this folder.
    * - ``numFiles``
      - ``int``
      - The number of files in this folder.
-   * - ``maxSize``
-     - ``int`` (MiB)
-     - The maximum size of this folder.
+   * - ``is_owner``
+     - ``bool``
+     - Indicates if the requested user is the owner of this folder.
+   * - ``permission``
+     - ``str``
+     - The requested user's permission for this folder.
    * - ``created``
      - ``datetime``
      - The date and time when the folder is created.
 
+.. _vfolder-invitation-object:
+
+Virtual Folder Invitation Object
+--------------------------------
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+   * - ``id``
+     - ``slug``
+     - The unique ID of the invitation. Use this when making API requests referring this invitation.
+   * - ``inviter``
+     - ``str``
+     - The inviter name of the invitation.
+   * - ``permission``
+     - ``str``
+     - The permission to give to invited user.
+   * - ``state``
+     - ``string``
+     - The current state of the invitation.
+   * - ``numFiles``
+     - ``int``
+     - The number of files in this folder.
+   * - ``vfolder_id``
+     - ``slug``
+     - The unique ID of the vfolder to which the permission will be applied if accepted.
+   * - ``created_at``
+     - ``datetime``
+     - The date and time when the folder is created.

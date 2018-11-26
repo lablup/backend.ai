@@ -8,7 +8,7 @@ In this mode, you first upload files in prior to execution.
 Uploading files
 ---------------
 
-* URI: ``/v2/kernel/:id/upload``
+* URI: ``/kernel/:id/upload``
 * Method: ``POST``
 
 Parameters
@@ -52,9 +52,8 @@ Response
 
    * - HTTP Status Code
      - Description
-   * - 200 OK
-     - The kernel has responded with the execution result.
-       The response body contains a JSON object as described below.
+   * - 204 OK
+     - Success.
    * - 400 Bad Request
      - Returned when one of the uploaded file exeeds the size limit or there are too many files.
 
@@ -62,7 +61,7 @@ Response
 Executing with Build Step
 -------------------------
 
-* URI: ``/v2/kernel/:id``
+* URI: ``/kernel/:id``
 * Method: ``POST``
 
 Parameters
@@ -98,7 +97,7 @@ Example:
 .. code-block:: json
 
    {
-     "type": "batch",
+     "mode": "batch",
      "options": "{batch-execution-query-object}",
      "runId": "af9185c5fb0eacb2"
    }
@@ -136,7 +135,7 @@ of the code, there is a need to identify what files actually are in the current
 session. In this case, use this API to get the list of files of your compute
 sesison.
 
-* URI: ``/v2/kernel/:id/files``
+* URI: ``/kernel/:id/files``
 * Method: ``GET``
 
 Parameters
@@ -182,6 +181,9 @@ Response
    * - ``folder_path``
      - ``str``
      - Absolute path inside kernel session.
+   * - ``errors``
+     - ``str``
+     - Any errors occurred during scanning the specified path.
 
 
 Downloading Files
@@ -192,7 +194,7 @@ Download files from your compute session.
 The response contents are multiparts with tarfile binaries. Post-processing,
 such as unpacking and save them, should be handled by the client.
 
-* URI: ``/v2/kernel/:id/download``
+* URI: ``/kernel/:id/download``
 * Method: ``GET``
 
 Parameters
@@ -211,6 +213,7 @@ Parameters
    * - ``files``
      - ``list`` of ``str``
      - File paths inside the virtual folder to download.
+       (maximum 5 files at once)
 
 Response
 """"""""

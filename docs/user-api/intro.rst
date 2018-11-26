@@ -45,9 +45,10 @@ If ``status`` is ``"finished"``, the client should stop.
 If ``status`` is ``"continued"``, the client should make another **execute** API call with the ``code`` field set to an empty string and the ``mode`` field set to ``"continue"``.
 Continuation happens when the user code runs longer than a few seconds to allow the client to show its progress, or when it requires extra step to finish the run cycle.
 
-If ``status`` is ``"build-finished"`` (this happens at the batch-mode only), the client should make the same continuation call.
-All outputs prior to this status return are from the build program and all future outputs are from the executed program built.
-Note that even when the ``exitCode`` value is non-zero (failed), the client must continue once again to complete the run cycle.
+If ``status`` is ``"clean-finished"`` or ``"build-finished"`` (this happens at the batch-mode only), the client should make the same continuation call.
+Since cleanup is performed before every build, the client will always receive ``"build-finished"`` after ``"clean-finished"`` status.
+All outputs prior to ``"build-finished"`` status return are from the build program and all future outputs are from the executed program built.
+Note that even when the ``exitCode`` value is non-zero (failed), the client must continue to complete the run cycle.
 
 If ``status`` is ``"waiting-input"``, you should make another **execute** API call with the ``code`` field set to the user-input text and the ``mode`` field set to ``"input"``.
 This happens when the user code calls interactive ``input()`` functions.
