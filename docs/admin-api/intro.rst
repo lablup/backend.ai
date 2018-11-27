@@ -27,7 +27,7 @@ The Admin API uses a single GraphQL endpoint for both queries and mutations.
 
 .. code-block:: text
 
-   https://api.sorna.io/v3/admin/graphql
+   https://api.backend.ai/v3/admin/graphql
 
 For more information about GraphQL concepts and syntax, please visit the following site(s):
 
