@@ -26,22 +26,22 @@ A kernel is a Docker image with the following format:
 
    * Required Labels
 
-     * ``io.sorna.maxcores``: *N* (the number of CPU cores recommended for this kernel)
-     * ``io.sorna.maxmem``: *M* (the memory size in a human-readable bytes recommended for this kernel, ``128m`` (128 MBytes) for example)
-     * ``io.sorna.timeout``: *T* (the maximum seconds allowed to execute a single query)
+     * ``ai.backend.maxcores``: *N* (the number of CPU cores recommended for this kernel)
+     * ``ai.backend.maxmem``: *M* (the memory size in a human-readable bytes recommended for this kernel, ``128m`` (128 MBytes) for example)
+     * ``ai.backend.timeout``: *T* (the maximum seconds allowed to execute a single query)
      * Above limits are used as default settings by Backend.AI Agent, but the agents may enforce lower limits due to the service policy.  Backend.AI Gateway may refer these information for load balancing and scheduling.
-     * ``io.sorna.mode``: ``query``, ``pty``, or ``query+pty``
+     * ``ai.backend.mode``: ``query``, ``pty``, or ``query+pty``
 
    * Optional Labels
 
-     * ``io.sorna.envs.corecount``: a comma-separated string of environment variable names which will be set to the number of assigned CPU cores by the agent. (e.g., ``JULIA_CPU_CORES``, ``OPENBLAS_NUM_THREADS``)
-     * ``io.sorna.nvidia.enabled``: ``yes`` or ``no`` (if yes, Backend.AI Agent attaches an NVIDIA CUDA GPU device with a driver volume. You must use `nvidia-docker images <https://github.com/NVIDIA/nvidia-docker>`_ as base of your Dockerfile.)
-     * ``io.sorna.extra_volumes``: a comma-separated string of extra volume mounts (volume name and path inside container separated by a colon), such as deep learning sample data sets (e.g., ``sample-data:/home/work/samples,extra-data:/home/work/extra``).
+     * ``ai.backend.envs.corecount``: a comma-separated string of environment variable names which will be set to the number of assigned CPU cores by the agent. (e.g., ``JULIA_CPU_CORES``, ``OPENBLAS_NUM_THREADS``)
+     * ``ai.backend.nvidia.enabled``: ``yes`` or ``no`` (if yes, Backend.AI Agent attaches an NVIDIA CUDA GPU device with a driver volume. You must use `nvidia-docker images <https://github.com/NVIDIA/nvidia-docker>`_ as base of your Dockerfile.)
+     * ``ai.backend.extra_volumes``: a comma-separated string of extra volume mounts (volume name and path inside container separated by a colon), such as deep learning sample data sets (e.g., ``sample-data:/home/work/samples,extra-data:/home/work/extra``).
        Note that we allow only read-only mounts.
        The available list of extra volumes depends on your Backend.AI Agent setup; there is no standard or predefined ones.
        If you want to add a new one, use ``docker volume`` commands.
        When designated volumes do not exist in the agent's host, the agent silently skips mounting them.
-     * ``io.sorna.features``: a comma-separated string keywords indicating available features of this kernel.
+     * ``ai.backend.features``: a comma-separated string keywords indicating available features of this kernel.
 
        .. list-table::
           :widths: 25 75
@@ -61,12 +61,12 @@ A kernel is a Docker image with the following format:
  * The main program that implements the query mode and/or the PTY mode (see below).
 
    * We strongly recommend to create a normal user instead of using root for the main program.
-   * The main program should be wrapped with `jail <https://github.com/lablup/sorna-repl/tree/master/bin>`_, like:
+   * The main program should be wrapped with `jail <https://github.com/lablup/backend.ai-kernels/blob/master/base/Dockerfile.jail>`_, like:
 
      .. code-block:: sh
 
          #! /bin/bash
-         exec /home/sorna/jail default `which lua` /home/sorna/run.lua
+         exec /home/backend.ai/jail default `which lua` /home/backend.ai/run.lua
 
      The first argument to jail is the policy name and the second and laters are the absolute path of the main program with its arguments.
      To customize the jail policy, :ref:`see below <custom-jail-policy>`.
