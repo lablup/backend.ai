@@ -36,15 +36,24 @@ It also monitors and scales the cluster of multiple agents (a few tens to hundre
 * Package namespace: `ai.backend.gateway` and `ai.backend.manager`
 * https://github.com/lablup/backend.ai-manager
 
-### Agent and its plugins
+### Agent
 
 It manages individual server instances and launches/destroys Docker containers where REPL daemons (kernels) run.
 Each agent on a new EC2 instance self-registers itself to the instance registry via heartbeats.
 
 * https://github.com/lablup/backend.ai-agent
   * Package namespace: `ai.backend.agent`
-* https://github.com/lablup/backend.ai-accelerator-cuda
+* https://github.com/lablup/backend.ai-accelerator-cuda (CUDA accelerator plugin)
   * Package namespace: `ai.backend.acceelrator.cuda`
+
+### Server-side common plugins (for both manager and agents)
+
+* https://github.com/lablup/backend.ai-stats-monitor
+  - Statistics collector based on the Datadog API
+  - Package namespace: `ai.backend.monitor.stats`
+* https://github.com/lablup/backend.ai-error-monitor
+  - Exception collector based on the Sentry API
+  - Package namespace: `ai.backend.monitor.error`
 
 ### Kernels
 
