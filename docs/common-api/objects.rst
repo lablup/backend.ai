@@ -152,6 +152,19 @@ Batch Execution Query Object
        performs the build step and ``options.buildLog`` is assumed to be
        ``true`` (the given value is ignored).
 
+   * - ``clean``
+     - ``str``
+
+     - The bash command to clean the intermediate files produced during the build phase.
+       The clean step comes *before* the build step if specified so that the build step
+       can (re)start fresh.
+
+       If the field is not present, an empty string, or ``null``, it skips the clean step.
+
+       Unlike the build and exec command, the default for ``"*"`` is do-nothing
+       to prevent deletion of other files unrelated to the build by bugs or
+       mistakes.
+
 .. note::
 
    A client can distinguish whether the current output is from the build phase
