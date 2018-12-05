@@ -6,7 +6,7 @@
 Backend.AI Documentation
 ========================
 
-**Latest API version: v3.20170615** (beta)
+**Latest API version: v4.20181215**
 
 Backend.AI is a hassle-free backend for AI programming and service.
 It runs arbitrary user codes safely in resource-constrained environments, using Docker and our own sandbox wrapper.
