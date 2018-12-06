@@ -22,8 +22,8 @@ Service Proxy
 
 * URI
 
-  - ``/stream/kernel/:id/wsprxy?service=:service``
-  - ``/stream/kernel/:id/tcpprxy?service=:service``
+  - ``/stream/kernel/:id/wsproxy?service=:service``
+  - ``/stream/kernel/:id/tcpproxy?service=:service``
 
 * Method: GET upgraded to WebSockets
 
