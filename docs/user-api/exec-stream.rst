@@ -9,7 +9,7 @@ Code Execution
 * URI: ``/stream/kernel/:id/execute``
 * Method: GET upgraded to WebSockets
 
-This is a real-time streaming version of :doc:`exec-batch` and :doc`exec-query` which uses
+This is a real-time streaming version of :doc:`exec-batch` and :doc:`exec-query` which uses
 long polling via HTTP.
 
 (under consturction)
@@ -17,8 +17,8 @@ long polling via HTTP.
 .. versionadded:: v4.20181215
 
 
-Service Proxies
----------------
+Service Proxy
+-------------
 
 * URI
 
@@ -27,7 +27,7 @@ Service Proxies
 
 * Method: GET upgraded to WebSockets
 
-Service proxy API allows clients to directly connect to service daemons running *inside*
+The service proxy API allows clients to directly connect to service daemons running *inside*
 compute sessions, such as Jupyter and TensorBoard.
 
 (under consturction)
