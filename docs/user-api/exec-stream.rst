@@ -14,6 +14,9 @@ long polling via HTTP.
 
 (under consturction)
 
+.. versionadded:: v4.20181215
+
+
 Service Proxies
 ---------------
 
@@ -26,6 +29,8 @@ Service proxy API allows clients to directly connect to service daemons running 
 compute sessions, such as Jupyter and TensorBoard.
 
 (under consturction)
+
+.. versionadded:: v4.20181215
 
 
 Terminal Emulation
