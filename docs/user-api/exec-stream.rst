@@ -4,6 +4,30 @@ Code Exectuion and Monitoring (Streaming Mode)
 The streaming mode provides a direct web-based terminal access to kernel containers.
 
 
+Code Execution
+--------------
+* URI: ``/stream/kernel/:id/execute``
+* Method: GET upgraded to WebSockets
+
+This is a real-time streaming version of :doc:`exec-batch` and :doc`exec-query` which uses
+long polling via HTTP.
+
+(under consturction)
+
+Service Proxies
+---------------
+
+* URI
+  - ``/stream/kernel/:id/wsprxy?service=:service``
+  - ``/stream/kernel/:id/tcpprxy?service=:service``
+* Method: GET upgraded to WebSockets
+
+Service proxy API allows clients to directly connect to service daemons running *inside*
+compute sessions, such as Jupyter and TensorBoard.
+
+(under consturction)
+
+
 Terminal Emulation
 ------------------
 
