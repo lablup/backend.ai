@@ -16,17 +16,22 @@ the official command-line interface tools.
 Javascript
 ----------
 
-This is the most extensively supported client programming language, including
-the official command-line interface tools.
+The Javascript SDK is for writing client apps on both NodeJS and web browsers.
+It is also used for our Atom/VSCode plugins.
 
 * :doc:`Documentation for Backend.AI Client SDK for Javascript <client-js:index>` (under construction)
-* `Source repository for Backend.AI Client SDK for JAvascript <https://github.com/lablup/backend.ai-client-js>`_
+* `Source repository for Backend.AI Client SDK for Javascript <https://github.com/lablup/backend.ai-client-js>`_
+
+Java
+----
+
+The Java SDK is used for implementing our IntelliJ/PyCharm plugins.
+
+* :doc:`Documentation for Backend.AI Client SDK for Java <client-java:index>` (under construction)
+* `Source repository for Backend.AI Client SDK for Java <https://github.com/lablup/backend.ai-client-java>`_
 
 PHP
 ---
-
-This is the most extensively supported client programming language, including
-the official command-line interface tools.
 
 * :doc:`Documentation for Backend.AI Client SDK for PHP <client-js:index>` (under construction)
 * `Source repository for Backend.AI Client SDK for PHP <https://github.com/lablup/backend.ai-client-php>`_ (under construction)
