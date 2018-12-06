@@ -1,5 +1,5 @@
-Code Exectuion and Monitoring (Streaming Mode)
-==============================================
+Streaming
+=========
 
 The streaming mode provides a direct web-based terminal access to kernel containers.
 
@@ -173,13 +173,15 @@ Server-side errors
    }
 
 
-Executing Snippet via WebSocket
--------------------------------
+Event Monitoring
+----------------
 
-* URI: ``/stream/kernel/:id/ws``
+* URI: ``/stream/kernel/:id/events``
 * Method: GET upgraded to WebSockets
 
-This API function is read-only --- meaning that you cannot send any data to this URI.
+Provides a continuous line-by-line JSON stream of lifecycle, code execution,
+and proxy related events from a compute session.  This API function is
+read-only --- meaning that you cannot send any data to this URI.
 
 .. warning::
 
@@ -189,6 +191,10 @@ This API function is read-only --- meaning that you cannot send any data to this
 
    There is timeout enforced in the server-side but you may need to adjust
    defaults in your client-side WebSocket library.
+
+.. versionchanged:: v4.20181215
+
+   Renamed the URI to ``events``.
 
 
 Parameters
