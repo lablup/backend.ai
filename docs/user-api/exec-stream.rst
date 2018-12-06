@@ -38,7 +38,7 @@ Service Proxy (TCP)
 * Method: GET upgraded to WebSockets
 
 This is the TCP version of service proxy, so that client users can connect to native services
-running inside compute session, such as SSH.
+running inside compute sessions, such as SSH.
 
 (under construction)
 
@@ -63,7 +63,7 @@ across different browsers.
 
 .. versionchanged:: v4.20181215
 
-   ``service`` query parameter.
+   Added the ``service`` query parameter.
 
 Parameters
 """"""""""
