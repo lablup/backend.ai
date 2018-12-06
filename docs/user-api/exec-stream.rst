@@ -12,25 +12,35 @@ Code Execution
 This is a real-time streaming version of :doc:`exec-batch` and :doc:`exec-query` which uses
 long polling via HTTP.
 
-(under consturction)
+(under construction)
 
 .. versionadded:: v4.20181215
 
 
-Service Proxy
--------------
+Service Proxy (HTTP)
+--------------------
 
-* URI
-
-  - ``/stream/kernel/:id/wsproxy?service=:service``
-  - ``/stream/kernel/:id/tcpproxy?service=:service``
-
+* URI: ``/stream/kernel/:id/httpproxy?service=:service``
 * Method: GET upgraded to WebSockets
 
 The service proxy API allows clients to directly connect to service daemons running *inside*
 compute sessions, such as Jupyter and TensorBoard.
 
-(under consturction)
+(under construction)
+
+.. versionadded:: v4.20181215
+
+
+Service Proxy (TCP)
+-------------------
+
+* URI: ``/stream/kernel/:id/tcpproxy?service=:service``
+* Method: GET upgraded to WebSockets
+
+This is the TCP version of service proxy, so that client users can connect to native services
+running inside compute session, such as SSH.
+
+(under construction)
 
 .. versionadded:: v4.20181215
 
@@ -38,7 +48,7 @@ compute sessions, such as Jupyter and TensorBoard.
 Terminal Emulation
 ------------------
 
-* URI: ``/stream/kernel/:id/pty``
+* URI: ``/stream/kernel/:id/pty?service=:service``
 * Method: GET upgraded to WebSockets
 
 This endpoint provides a duplex continuous stream of JSON objects via the native WebSocket.
@@ -50,6 +60,10 @@ across different browsers.
 
    We do *not* provide any legacy WebSocket emulation interfaces such as socket.io or SockJS.
    You need to set up your own proxy if you want to support legacy browser users.
+
+.. versionchanged:: v4.20181215
+
+   ``service`` query parameter.
 
 Parameters
 """"""""""
