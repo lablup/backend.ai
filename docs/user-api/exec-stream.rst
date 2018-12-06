@@ -179,9 +179,9 @@ Event Monitoring
 * URI: ``/stream/kernel/:id/events``
 * Method: GET upgraded to WebSockets
 
-Provides a continuous line-by-line JSON stream of lifecycle, code execution,
-and proxy related events from a compute session.  This API function is
-read-only --- meaning that you cannot send any data to this URI.
+Provides a continuous message-by-message JSON object stream of lifecycle, code
+execution, and proxy related events from a compute session.  This API function
+is read-only --- meaning that you cannot send any data to this URI.
 
 .. warning::
 
