@@ -21,8 +21,10 @@ Service Proxies
 ---------------
 
 * URI
+
   - ``/stream/kernel/:id/wsprxy?service=:service``
   - ``/stream/kernel/:id/tcpprxy?service=:service``
+
 * Method: GET upgraded to WebSockets
 
 Service proxy API allows clients to directly connect to service daemons running *inside*
