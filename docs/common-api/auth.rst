@@ -4,8 +4,13 @@ Authentication
 Access Tokens and Secret Key
 ----------------------------
 
-To make requests to the API server, a client needs to get a pair of an access token and a secret key as sepcified in :doc:`/gsg/registration`.
-The server uses access tokens to identify each client and secret keys to verify integrity of API requests as well as to authenticate clients.
+To make requests to the API server, a client needs to have a pair of an API
+access key and a secret key.  You may get one from `our cloud service
+<https://cloud.backend.ai>`_ or from the administrator of your Backend.AI
+cluster.
+
+The server uses the API keys to identify each client and secret keys to verify
+integrity of API requests as well as to authenticate clients.
 
 .. warning::
 

@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Backend.AI Documentation
-========================
+Backend.AI API Documentation
+============================
 
 **Latest API version: v4.20181215**
 

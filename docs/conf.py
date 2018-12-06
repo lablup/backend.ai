@@ -31,7 +31,9 @@ on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = []
+extensions = [
+    'sphinx.ext.intersphinx',
+]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -48,9 +50,9 @@ source_suffix = ['.rst']
 master_doc = 'index'
 
 # General information about the project.
-project = 'Backend.AI'
-copyright = '2016-2018, Lablup Inc'
-author = 'DevOps Team'
+project = 'Backend.AI API Documentation'
+copyright = '2016-2018, Lablup Inc.'
+author = 'Lablup Inc.'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -106,6 +108,11 @@ pygments_style = 'sphinx'
 todo_include_todos = False
 
 numfig = True
+
+intersphinx_mapping = {
+    'client-py':
+        ('https://docs.client-py.backend.ai/en/latest/', None),
+}
 
 
 # -- Options for HTML output ----------------------------------------------
@@ -236,7 +243,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'BackendAIDoc.tex', 'Backend.AI Documentation',
+    (master_doc, 'BackendAIDoc.tex', 'Backend.AI API Documentation',
      'Joongi Kim', 'manual'),
 ]
 
@@ -266,7 +273,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'backend.ai', 'Backend.AI Documentation',
+    (master_doc, 'backend.ai', 'Backend.AI API Documentation',
      [author], 1)
 ]
 
@@ -280,7 +287,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'Backend.AI', 'Backend.AI Documentation',
+    (master_doc, 'Backend.AI', 'Backend.AI API Documentation',
      author, 'Backend.AI', 'Backend.AI is a hassle-free backend for AI programming and service.',
      'Miscellaneous'),
 ]
