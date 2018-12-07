@@ -1,14 +1,14 @@
 Client SDK Libraries and Tools
 ==============================
 
-We provide an official client SDKs that abstracts the low-level HTTP REST APIs
-via a function-based interface for popular programming languages.
+We provide official client SDKs for popular programming languages that abstract
+the low-level REST/GraphQL APIs via functional and object-oriented interfaces.
 
 Python
 ------
 
-This is the most extensively supported client programming language, including
-the official command-line interface tools.
+Python is the most extensively supported client programming language.
+The SDK also includes the official command-line interface.
 
 * :doc:`Documentation for Backend.AI Client SDK for Python <client-py:index>`
 * `Source repository for Backend.AI Client SDK for Python <https://github.com/lablup/backend.ai-client-py>`_
