@@ -96,7 +96,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 #show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = None
+pygments_style = 'tango'
 
 highlight_language = 'python3'
 
