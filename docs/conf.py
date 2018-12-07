@@ -221,7 +221,7 @@ html_static_path = ['_static']
 #html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'BackendAIDoc'
+htmlhelp_basename = 'BackendAIAPIDoc'
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -244,7 +244,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'BackendAIDoc.tex', 'Backend.AI API Documentation',
-     'Joongi Kim', 'manual'),
+     author, 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
@@ -288,8 +288,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, 'Backend.AI', 'Backend.AI API Documentation',
-     author, 'Backend.AI', 'Backend.AI is a hassle-free backend for AI programming and service.',
-     'Miscellaneous'),
+     author, 'Backend.AI', 'Backend.AI is a hassle-free backend for AI programming and service.', 'Miscellaneous'),
 ]
 
 # Documents to append as an appendix to all manuals.
@@ -303,6 +302,3 @@ texinfo_documents = [
 
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 #texinfo_no_detailmenu = False
-
-def setup(app):
-    app.add_stylesheet('custom.css')
