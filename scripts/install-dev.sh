@@ -37,7 +37,7 @@ usage() {
   echo ""
   echo "  ${LWHITE}--python-version VERSION${NC}"
   echo "                       Set the Python version to install via pyenv"
-  echo "                       (default: 3.6.6)"
+  echo "                       (default: 3.6.7)"
   echo ""
   echo "  ${LWHITE}--install-path PATH${NC}  Set the target directory"
   echo "                       (default: ./backend.ai-dev)"
