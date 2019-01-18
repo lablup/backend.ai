@@ -15,7 +15,7 @@ services:
       - "./tmp/backend.ai-halfstack/postgres-data:/var/lib/postgresql/data:rw"
 
   backendai-half-redis:
-    image: redis:latest
+    image: redis:5-alpine
     networks:
       - half
     ports:
