@@ -261,9 +261,6 @@ fi
 if ! type "docker-compose" >/dev/null 2>&1; then
     show_error "docker-compose is not available!"
     install_docker-compose
-    show_info "Please install the latest version of docker-compose and try again."
-    show_info "Visit https://docs.docker.com/compose/install/ for instructions."
-    exit 1
 fi
 
 # Install pyenv
