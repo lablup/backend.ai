@@ -238,6 +238,7 @@ install_docker-compose() {
       show_info "Visit https://docs.docker.com/compose/install/ for instructions."
       exit 1
       ;;
+    esac
 }
 	
 # BEGIN!
