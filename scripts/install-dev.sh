@@ -255,9 +255,22 @@ show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 if ! type "docker" >/dev/null 2>&1; then
   show_error "docker is not available!"
-  show_info "Please install the latest version of docker and try again."
-  show_info "Visit https://docs.docker.com/install/ for instructions."
-  exit 1
+  case $DISTRO in 
+  Debian)
+      sudo curl -fsSL https://get.docker.io | bash
+      sudo usermod -G docker $(whoami)
+      ;;
+  RedHat)
+      sudo curl -fsSL https://get.docker.io | bash
+      sudo usermod -aG docker $(whoami)
+      ;;
+  Darwin)
+     show_info "Please install the latest version of docker and try again."
+     show_info "Visit https://docs.docker.com/install/ for instructions."
+     show_info "Docer Desktop(MAC) can download from https://download.docker.com/mac/stable/Docker.dmg"
+     exit 1
+      ;;
+  esac
 fi
 if ! type "docker-compose" >/dev/null 2>&1; then
     show_error "docker-compose is not available!"
@@ -275,8 +288,9 @@ if ! type "pyenv" >/dev/null 2>&1; then
   # TODO: ask if install pyenv
   show_info "Installing pyenv..."
   set -e
-  git clone https://github.com/pyenv/pyenv.git "${HOME}/.pyenv"
-  git clone https://github.com/pyenv/pyenv-virtualenv.git "${HOME}/.pyenv/plugins/pyenv-virtualenv"
+  curl https://pyenv.run | sh
+#  git clone https://github.com/pyenv/pyenv.git "${HOME}/.pyenv"
+#  git clone https://github.com/pyenv/pyenv-virtualenv.git "${HOME}/.pyenv/plugins/pyenv-virtualenv"
   for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
   do
     if [ -e "${HOME}/.${PROFILE_FILE}" ]
