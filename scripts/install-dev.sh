@@ -224,6 +224,7 @@ EOS
 }
 
 install_docker-compose() {
+    show_info "Install docker-compose"
     case $DISTRO in
     Debian)
       sudo curl -L "https://github.com/docker/compose/releases/download/1.23.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -366,6 +367,8 @@ if [ $ENABLE_CUDA -eq 1 ]; then
   pyenv local "venv-${ENV_ID}-agent"  # share the agent's venv
   pip install -U -e .
 fi
+python -m ai.backend.agent.kernel build-krunner-env ubuntu16.04
+python -m ai.backend.agent.kernel build-krunner-env alpine3.8
 
 cd "${INSTALL_PATH}/common"
 pyenv local "venv-${ENV_ID}-common"
