@@ -423,10 +423,12 @@ pip install -U -q pip setuptools
 pip install -U -r requirements-dev.txt
 
 show_info "Downloading Python kernel images for Backend.AI..."
-$docker_sudo docker pull lablup/kernel-python:3.6-ubuntu18.04
-$docker_sudo docker pull lablup/kernel-python-tensorflow:1.12-py36
+$docker_sudo docker pull lablup/python:3.6-ubuntu18.04
+$docker_sudo docker pull lablup/python-tensorflow:1.12-py36
+$docker_sudo docker pull lablup/python-pytorch:1.0-py36
 if [ $ENABLE_CUDA -eq 1 ]; then
-  $docker_sudo docker pull lablup/kernel-python-tensorflow:1.12-py36-cuda9
+    $docker_sudo docker pull lablup/python-tensorflow:1.12-py36-cuda9
+    $docker_sudo docker pull lablup/python-pytorch:1.0-py36-cuda10
 fi
 
 DELETE_OPTS=''
