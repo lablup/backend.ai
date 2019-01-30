@@ -430,9 +430,9 @@ $docker_sudo docker pull lablup/python-pytorch:1.0-py36
 if [ $ENABLE_CUDA -eq 1 ]; then
     $docker_sudo docker pull lablup/python-tensorflow:1.12-py36-cuda9
     $docker_sudo docker pull lablup/python-pytorch:1.0-py36-cuda10
-    $docker_sudo docker push lablup/ngc-digits:18.12-tensorflow
-    $docker_sudo docker push lablup/ngc-pytorch:18.12.1-py3
-    $docker_sudo docker push lablup/ngc-tensorflow:18.12-py3
+    $docker_sudo docker pull lablup/ngc-digits:18.12-tensorflow
+    $docker_sudo docker pull lablup/ngc-pytorch:18.12.1-py3
+    $docker_sudo docker pull lablup/ngc-tensorflow:18.12-py3
 fi
 
 DELETE_OPTS=''
