@@ -164,6 +164,15 @@ while [ $# -gt 0 ]; do
 done
 INSTALL_PATH=$(readlinkf "$INSTALL_PATH")
 
+install_brew() {
+    case $DISTRO in
+	Darwin)
+	    if ! type "brew" > /dev/null 2>&1; then
+	        show_info "try to support auto-install on macOS using Homebrew."
+		/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+	    fi
+    esac
+}
 install_script_deps() {
   case $DISTRO in
   Debian)
@@ -178,7 +187,7 @@ install_script_deps() {
     if ! type "brew" >/dev/null 2>&1; then
       show_error "brew is not available!"
       show_info "Sorry, we only support auto-install on macOS using Homebrew. Please install it and try again."
-      exit 1
+      install_brew
     fi
     brew update
     # Having Homebrew means that the user already has git.
@@ -289,8 +298,6 @@ if ! type "pyenv" >/dev/null 2>&1; then
   show_info "Installing pyenv..."
   set -e
   curl https://pyenv.run | sh
-#  git clone https://github.com/pyenv/pyenv.git "${HOME}/.pyenv"
-#  git clone https://github.com/pyenv/pyenv-virtualenv.git "${HOME}/.pyenv/plugins/pyenv-virtualenv"
   for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
   do
     if [ -e "${HOME}/.${PROFILE_FILE}" ]
