@@ -250,7 +250,7 @@ install_docker-compose() {
       ;;
     esac
 }
-	
+
 # BEGIN!
 
 echo " "
@@ -264,7 +264,7 @@ show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 if ! type "docker" >/dev/null 2>&1; then
   show_error "docker is not available!"
-  case $DISTRO in 
+  case $DISTRO in
   Debian)
       sudo curl -fsSL https://get.docker.io | bash
       sudo usermod -G docker $(whoami)
@@ -396,13 +396,11 @@ pyenv local "venv-${ENV_ID}-common"
 pip install -U -q pip setuptools
 pip install -U -r requirements-dev.txt
 
-# Manager DB setup
-show_info "Configuring kernel images..."
-cd "${INSTALL_PATH}/manager"
-cp sample-configs/image-metadata.yml image-metadata.yml
-cp sample-configs/image-aliases.yml image-aliases.yml
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd update-images -f image-metadata.yml
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd update-aliases -f image-aliases.yml
+# Docker registry setup
+show_info "Configuring the Lablup's official Docker registry..."
+./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io "https://registry-1.docker.io"
+./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io/username "lablup"
+./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd rescan-images
 
 # Virtual folder setup
 show_info "Setting up virtual folder..."
