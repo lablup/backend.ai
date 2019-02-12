@@ -427,7 +427,8 @@ pyenv local "venv-${ENV_ID}-client"
 pip install -U -q pip setuptools
 pip install -U -r requirements-dev.txt
 
-show_info "Downloading Python kernel images for Backend.AI..."
+show_info "Pre-pulling frequently used kernel images..."
+echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
 $docker_sudo docker pull lablup/python:2.7-ubuntu18.04
 $docker_sudo docker pull lablup/python:3.6-ubuntu18.04
 $docker_sudo docker pull lablup/python-tensorflow:1.12-py36
