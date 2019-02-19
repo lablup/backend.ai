@@ -267,7 +267,7 @@ if ! type "docker" >/dev/null 2>&1; then
   case $DISTRO in
   Debian)
       sudo curl -fsSL https://get.docker.io | bash
-      sudo usermod -G docker $(whoami)
+      sudo usermod -aG docker $(whoami)
       ;;
   RedHat)
       sudo curl -fsSL https://get.docker.io | bash
