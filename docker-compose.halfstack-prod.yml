@@ -22,7 +22,7 @@ services:
       - "6379:6379"
 
   backendai-half-etcd:
-    image: quay.io/coreos/etcd:v3.3.9
+    image: quay.io/coreos/etcd:v3.3.12
     volumes:
       - "./data/etcd:/etcd-data:rw"
     networks:
