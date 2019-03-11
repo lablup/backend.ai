@@ -211,6 +211,7 @@ brew "readline"
 brew "zlib"
 brew "gdbm"
 brew "tcl-tk"
+brew "snappy"
 EOS
     ;;
   esac
