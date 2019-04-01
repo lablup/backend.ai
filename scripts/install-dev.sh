@@ -399,6 +399,7 @@ pip install -U -r requirements-dev.txt
 
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
+cd "${INSTALL_PATH}/manager"
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io "https://registry-1.docker.io"
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io/username "lablup"
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd rescan-images
@@ -406,6 +407,7 @@ show_info "Configuring the Lablup's official Docker registry..."
 # Virtual folder setup
 show_info "Setting up virtual folder..."
 mkdir -p "${INSTALL_PATH}/vfolder/local"
+cd "${INSTALL_PATH}/manager"
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
 cd "${INSTALL_PATH}/agent"
