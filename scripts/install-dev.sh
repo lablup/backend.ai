@@ -418,8 +418,12 @@ show_info "Setting up databases..."
 cd "${INSTALL_PATH}/manager"
 cp alembic.ini.sample alembic.ini
 python -m ai.backend.manager.cli schema oneshot head
-python -m ai.backend.manager.cli --db-addr=localhost:8100 --db-user=postgres --db-password=develove --db-name=backend \
-       fixture populate sample-configs/example-keypairs.json
+python -m ai.backend.manager.cli \
+        --db-addr=localhost:8100 \
+        --db-user=postgres \
+        --db-password=develove \
+        --db-name=backend \
+        fixture populate sample-configs/example-keypairs.json
 
 show_info "Installing Python client SDK/CLI source..."
 cd "${INSTALL_PATH}"
@@ -434,14 +438,14 @@ show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
 $docker_sudo docker pull lablup/python:2.7-ubuntu18.04
 $docker_sudo docker pull lablup/python:3.6-ubuntu18.04
-$docker_sudo docker pull lablup/python-tensorflow:1.12-py36
+$docker_sudo docker pull lablup/python-tensorflow:1.13-py36
 $docker_sudo docker pull lablup/python-pytorch:1.0-py36
 if [ $ENABLE_CUDA -eq 1 ]; then
-    $docker_sudo docker pull lablup/python-tensorflow:1.12-py36-cuda9
+    $docker_sudo docker pull lablup/python-tensorflow:1.13-py36-cuda9
     $docker_sudo docker pull lablup/python-pytorch:1.0-py36-cuda10
-    $docker_sudo docker pull lablup/ngc-digits:18.12-tensorflow
-    $docker_sudo docker pull lablup/ngc-pytorch:18.12.1-py3
-    $docker_sudo docker pull lablup/ngc-tensorflow:18.12-py3
+    $docker_sudo docker pull lablup/ngc-digits:19.02-tensorflow
+    $docker_sudo docker pull lablup/ngc-pytorch:19.02-py3
+    $docker_sudo docker pull lablup/ngc-tensorflow:19.02-py3
 fi
 
 DELETE_OPTS=''
