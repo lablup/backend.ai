@@ -121,7 +121,7 @@ Example:
 Creating a Virtual Folder
 -------------------------
 
-* URI: ``/folders/create``
+* URI: ``/folders``
 * Method: ``POST``
 
 Creates a virtual folder associated with the current API key.
