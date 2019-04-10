@@ -34,16 +34,7 @@ Returns the list of virtual folders created by the current keypair.
 Parameters
 """"""""""
 
-.. list-table::
-   :widths: 15 5 80
-   :header-rows: 1
-
-   * - Parameter
-     - Type
-     - Description
-   * - ``paging``
-     - ``object``
-     - :ref:`paging-query-object`.
+None.
 
 Response
 """"""""
@@ -64,12 +55,67 @@ Response
    * - Fields
      - Type
      - Values
-   * - ``paging``
-     - ``object``
-     - :ref:`paging-info-object`.
-   * - ``items``
+   * - ``(root)``
      - ``list[object]``
      - A list of :ref:`vfolder-list-item-object`.
+
+Example:
+
+.. code-block:: json
+
+   [
+     { "name": "mydata", "id": "5da5f8e163dd4b86826d6b4db2b7b71a", "...": "..." },
+     { "name": "sample01", "id": "0ecfab9e608c478f98d1734b02a54774", "...": "..." },
+   ]
+
+
+Listing Virtual Folder Hosts
+----------------------------
+
+Returns the list of available host names where the current keypair can create new virtual folders.
+
+* URI: ``/folders/_/hosts``
+* Method: ``GET``
+
+Parameters
+""""""""""
+
+None.
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``default``
+     - ``str``
+     - The default virtual folder host.
+   * - ``allowed``
+     - ``list[str]``
+     - The list of available virtual folder hosts.
+
+Example:
+
+.. code-block:: json
+
+   {
+     "default": "nfs1",
+     "allowed": ["nfs1", "nfs2", "cephfs1"]
+   }
 
 
 Creating a Virtual Folder
@@ -94,13 +140,17 @@ Parameters
    * - ``name``
      - ``str``
      - The human-readable name of the virtual folder.
+   * - ``host``
+     - ``str``
+     - (optional) The name of the virtual folder host.
 
 Example:
 
 .. code-block:: json
 
    {
-     "name": "My Data"
+     "name": "My Data",
+     "host": "nfs1"
    }
 
 
@@ -135,6 +185,9 @@ Response
    * - ``name``
      - ``str``
      - The human-readable name of the created virtual folder.
+   * - ``host``
+     - ``str``
+     - The name of the virtual folder host where the new folder is created.
 
 
 Example:
@@ -142,8 +195,9 @@ Example:
 .. code-block:: json
 
    {
-     "id": "oyU2WOYRYmjCGuKoSkiJ7H2rlN4",
-     "name": "My Data"
+     "id": "aef1691db3354020986d6498340df13c",
+     "name": "My Data",
+     "host": "nfs1"
    }
 
 
@@ -193,7 +247,7 @@ Response
    * - Fields
      - Type
      - Values
-   * - ``item``
+   * - ``(root)``
      - ``object``
      - :ref:`vfolder-item-object`.
 
@@ -291,8 +345,8 @@ Response
      - Type
      - Values
    * - ``files``
-     - ``str``
-     - Stringified json containing list of files.
+     - ``list[object]``
+     - List of :ref:`vfolder-file-object`
 
 
 Uploading Files to Virtual Folder
@@ -392,14 +446,58 @@ Response
        to write into folder.
 
 
-Downloading Files from Virtual Folder
--------------------------------------
+Downloading Single File from Virtual Folder
+-------------------------------------------
+
+Download a single file from a virtual folder associated with the current keypair.
+This API does not perform any encoding or compression but just outputs the raw
+file content as the response body, for simpler client-side implementation.
+
+* URI: ``/folders/:name/download_single``
+* Method: ``GET``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:name``
+     - ``str``
+     - The human-readable name of the virtual folder.
+   * - ``file``
+     - ``str``
+     - A file path inside the virtual folder to download.
+
+Response
+""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+   * - 404 Not Found
+     - File not found or you may not have proper permission
+       to access the folder.
+
+
+Downloading Multiple Files from Virtual Folder
+----------------------------------------------
 
 Download files from a virtual folder associated with the current keypair.
 
 The response contents are streamed as gzipped binaries
-(``Content-Encoding: gzip``). Post-processing, such as reading by chunk or
-unpacking the binaries, should be handled by the client.
+(``Content-Encoding: gzip``) in a multi-part message format.
+Clients may detect the total download size using ``X-TOTAL-PAYLOADS-LENGTH``
+(all upper case) HTTP header of the response in prior to reading/parsing the
+response body.
 
 * URI: ``/folders/:name/download``
 * Method: ``GET``
@@ -418,7 +516,7 @@ Parameters
      - ``str``
      - The human-readable name of the virtual folder.
    * - ``files``
-     - ``list`` of ``str``
+     - ``list[str]``
      - File paths inside the virtual folder to download.
 
 Response
@@ -461,7 +559,7 @@ Parameters
      - ``str``
      - The human-readable name of the virtual folder.
    * - ``files``
-     - ``list`` of ``str``
+     - ``list[str]``
      - File paths inside the virtual folder to delete.
    * - ``recursive``
      - ``bool``
@@ -548,7 +646,7 @@ Parameters
      - ``str``
      - The permission to grant to invitee.
    * - ``user_ids``
-     - ``list`` of ``slug``
+     - ``list[slug]``
      - A list of user IDs to invite.
 
 Response

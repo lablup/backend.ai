@@ -406,12 +406,17 @@ Virtual Folder List Item Object
    * - ``id``
      - ``slug``
      - The unique ID of the folder.
+   * - ``host``
+     - ``str``
+     - The host name where this folder is located.
    * - ``is_owner``
      - ``bool``
      - Indicates if the requested user is the owner of this folder.
    * - ``permission``
-     - ``str``
-     - The requested user's permission for this folder.
+     - ``enum``
+     - The requested user's permission for this folder. (One of "ro", "rw", and
+       "wd" which represents read-only, read-write, and write-delete
+       respectively. Currently "rw" and "wd" has no difference.)
 
 .. _vfolder-item-object:
 
@@ -431,21 +436,52 @@ Virtual Folder Item Object
    * - ``id``
      - ``slug``
      - The unique ID of the folder.
-   * - ``linked``
-     - ``bool``
-     - Indicates if this folder is linked to an external service. (enterprise edition only)
-   * - ``numFiles``
-     - ``int``
-     - The number of files in this folder.
+   * - ``host``
+     - ``str``
+     - The host name where this folder is located.
    * - ``is_owner``
      - ``bool``
      - Indicates if the requested user is the owner of this folder.
+   * - ``num_files``
+     - ``int``
+     - The number of files in this folder.
    * - ``permission``
-     - ``str``
+     - ``enum``
      - The requested user's permission for this folder.
    * - ``created``
      - ``datetime``
      - The date and time when the folder is created.
+
+.. _vfolder-file-object:
+
+Virtual Folder File Object
+--------------------------
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+   * - ``filename``
+     - ``str``
+     - The filename.
+   * - ``mode``
+     - ``int``
+     - The file's mode (permission) bits as an integer.
+   * - ``size``
+     - ``int``
+     - The file's size.
+   * - ``ctime``
+     - ``int``
+     - The timestamp when the file is created.
+   * - ``mtime``
+     - ``int``
+     - The timestamp when the file is last modified.
+   * - ``atime``
+     - ``int``
+     - The timestamp when the file is last accessed.
 
 .. _vfolder-invitation-object:
 
@@ -469,14 +505,8 @@ Virtual Folder Invitation Object
      - ``str``
      - The permission to give to invited user.
    * - ``state``
-     - ``string``
+     - ``str``
      - The current state of the invitation.
-   * - ``numFiles``
-     - ``int``
-     - The number of files in this folder.
    * - ``vfolder_id``
      - ``slug``
      - The unique ID of the vfolder to which the permission will be applied if accepted.
-   * - ``created_at``
-     - ``datetime``
-     - The date and time when the folder is created.
