@@ -55,7 +55,7 @@ Response
    * - Fields
      - Type
      - Values
-   * - ``(root)``
+   * - (root)
      - ``list[object]``
      - A list of :ref:`vfolder-list-item-object`.
 
@@ -247,7 +247,7 @@ Response
    * - Fields
      - Type
      - Values
-   * - ``(root)``
+   * - (root)
      - ``object``
      - :ref:`vfolder-item-object`.
 
@@ -349,8 +349,8 @@ Response
      - List of :ref:`vfolder-file-object`
 
 
-Uploading Files to Virtual Folder
----------------------------------
+Uploading Multiple Files to Virtual Folder
+------------------------------------------
 
 Upload local files to a virtual folder associated with current keypair.
 
@@ -374,11 +374,11 @@ Parameters
    * - ``:name``
      - ``str``
      - The human-readable name of the virtual folder.
-   * - Request content
-     - ``list`` of ``aiohttp.web.FileField_``
-     - List of file objects to upload.
-
-.. _aiohttp.web.FileField: https://docs.aiohttp.org/en/stable/web_reference.html#aiohttp.web.FileField
+   * - (body)
+     - ``multipart``
+     - A multi-part encoded file data which is composed of multiple occurrences
+       of ``src`` field.  Each part must contain a valid filename and the content
+       type is always assumed as ``application/octet-stream``.
 
 Response
 """"""""
@@ -487,6 +487,17 @@ Response
      - File not found or you may not have proper permission
        to access the folder.
 
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - (body)
+     - ``bytes``
+     - The content of file.
+
 
 Downloading Multiple Files from Virtual Folder
 ----------------------------------------------
@@ -532,6 +543,17 @@ Response
    * - 404 Not Found
      - File not found or you may not have proper permission
        to access the folder.
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - (body)
+     - ``multipart``
+     - The gzipped content of files in the mixed multipart format.
 
 
 Deleting Files in Virtual Folder
