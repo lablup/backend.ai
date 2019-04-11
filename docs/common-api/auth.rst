@@ -31,6 +31,15 @@ Common Structure of API Requests
      - Values
    * - Method
      - ``GET`` / ``REPORT`` / ``POST`` / ``PUT`` / ``PATCH`` / ``DELETE``
+   * - Query String
+     - If your access key has the administrator privilege, your client may
+       optionally specify other user's access key as the ``owner_access_key``
+       parameter of the URL query string (in addition to other API-specific
+       ones if any) to change the scope of access key applied to access and
+       manipulation of keypair-specific resources such as kernels and vfolders.
+
+       .. versionadded:: v4.20190315
+
    * - ``Content-Type``
      - Always should be ``application/json``
    * - ``Authorization``

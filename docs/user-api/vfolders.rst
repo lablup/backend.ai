@@ -74,6 +74,8 @@ Listing Virtual Folder Hosts
 
 Returns the list of available host names where the current keypair can create new virtual folders.
 
+.. versionadded:: v4.20190315
+
 * URI: ``/folders/_/hosts``
 * Method: ``GET``
 
@@ -116,7 +118,6 @@ Example:
      "default": "nfs1",
      "allowed": ["nfs1", "nfs2", "cephfs1"]
    }
-
 
 Creating a Virtual Folder
 -------------------------
@@ -453,6 +454,8 @@ Download a single file from a virtual folder associated with the current keypair
 This API does not perform any encoding or compression but just outputs the raw
 file content as the response body, for simpler client-side implementation.
 
+.. versionadded:: v4.20190315
+
 * URI: ``/folders/:name/download_single``
 * Method: ``GET``
 
@@ -497,7 +500,6 @@ Response
    * - (body)
      - ``bytes``
      - The content of file.
-
 
 Downloading Multiple Files from Virtual Folder
 ----------------------------------------------
