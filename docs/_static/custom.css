@@ -3,6 +3,22 @@
     white-space: normal;
 }
 
+.wy-table-responsive th p {
+    margin-bottom: 0 !important;
+}
+
+.wy-table-responsive td div[class^='highlight'] {
+    margin-bottom: 0 !important;
+}
+
+.admonition .highlight-text {
+    margin-bottom: 12px !important;
+}
+
+.wy-table-responsive td .admonition {
+    margin-bottom: 0 !important;
+}
+
 .wy-table-responsive {
     margin-bottom: 24px;
     max-width: 100%;
