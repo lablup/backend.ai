@@ -46,6 +46,7 @@ Response
      - ``list[object]``
      - The list of :ref:`resource-preset-object`
 
+
 Checking Allocatability of Resource Presets
 -------------------------------------------
 

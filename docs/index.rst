@@ -6,80 +6,12 @@
 Backend.AI API Documentation
 ============================
 
-**Latest API version: v4.20181215**
+**Latest API version: v4.20190315**
 
 Backend.AI is a hassle-free backend for AI programming and service.
 It runs arbitrary user codes safely in resource-constrained environments, using Docker and our own sandbox wrapper.
 
 Backend.AI supports various programming languages and runtimes, such as Python 2/3, R, PHP, C/C++, Java, Javascript, Julia, Octave, Haskell, Lua and NodeJS, as well as AI-oriented libraries such as TensorFlow, Keras, Caffe, and MXNet.
-
-FAQ
----
-
-vs. Notebooks
-~~~~~~~~~~~~~
-
-.. list-table::
-   :header-rows: 1
-
-   * - Product
-     - Role
-     - Problem and Solution
-
-   * - Apache Zeppelin, Jupyter Notebook
-     - Notebook-style document + code *front-ends*
-     - Insecure host resource sharing
-
-   * - **Backend.AI**
-     - Pluggable *back-end* to any front-ends
-     - Built for multi-tenancy: scalable and better isolation
-
-vs. Orchestration Frameworks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. list-table::
-   :header-rows: 1
-
-   * - Product
-     - Target
-     - Value
-
-   * - Amazon ECS, Kubernetes
-     - Long-running service daemons
-     - Load balancing, fault tolerance, incremental deployment
-
-   * - **Backend.AI**
-     - Stateful compute sessions
-     - Low-cost high-density computation
-
-   * - Amazon Lambda
-     - Stateless, light-weight functions
-     - Serverless, zero-management
-
-vs. Big-data and AI Frameworks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. list-table::
-   :header-rows: 1
-
-   * - Product
-     - Role
-     - Problem and Solution
-
-   * - TensorFlow, Apache Spark, Apache Hive
-     - Computation runtime
-     - Difficult to install, configure, and operate
-
-   * - Amazon ML, Azure ML, GCP ML
-     - Managed MLaaS
-     - Still complicated for scientists, too restrictive for engineers
-
-   * - **Backend.AI**
-     - Host of computation runtimes
-     - Pre-configured, versioned, reproducible, customizable (open-source)
-
-
-(All product names and trade-marks are the properties of their respective owners.)
 
 Table of Contents
 -----------------
@@ -91,17 +23,17 @@ Table of Contents
    :caption: User Manuals
 
    gsg/overview
+   gsg/faq
    gsg/clientlib
 
 .. _install:
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Cluster Installation
 
-   install/overview
-   install/demo-setup
-   install/development-setup
+   install/guides
+   install/supplementary
 
 .. _common_api:
 
