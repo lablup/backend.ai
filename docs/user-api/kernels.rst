@@ -67,10 +67,7 @@ Example:
        "environ": {
          "MYCONFIG": "XXX",
        },
-       "mounts": [
-         "mydata",
-         "mypkgs:.local/lib/python3.6/site-packages"
-       ],
+       "mounts": ["mydata", "mypkgs"],
        "resources": {
          "cpu": "2",
          "mem": "4g",

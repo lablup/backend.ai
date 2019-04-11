@@ -468,6 +468,29 @@ Resource Slot Object
        For "bytes" slots, its interpretation and representation follows that of
        the ``mem`` field.
 
+.. _resource-preset-object:
+
+Resource Preset Object
+----------------------
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+
+   * - ``name``
+     - ``str``
+     - The name of this preset.
+
+   * - ``resource_slots``
+     - :ref:`resource-slot-object`
+     - The pre-configured combination of resource slots.
+       If it contains slot types that are not currently used/activated in the cluster,
+       they will be removed when returned via ``/resource/*`` REST APIs.
+
 .. _vfolder-list-item-object:
 
 Virtual Folder List Item Object

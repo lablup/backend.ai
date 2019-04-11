@@ -126,6 +126,7 @@ Table of Contents
    user-api/exec-query
    user-api/exec-batch
    user-api/vfolders
+   user-api/resource-presets
 
 .. _admin_api:
 

@@ -211,8 +211,8 @@ Parameters
      - ``slug``
      - The kernel ID.
    * - ``files``
-     - ``list`` of ``str``
-     - File paths inside the virtual folder to download.
+     - ``list[str]``
+     - File paths inside the kernel container to download.
        (maximum 5 files at once)
 
 Response
