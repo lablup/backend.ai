@@ -371,11 +371,19 @@ Creation Config Object
      - ``int``
      - The number of instances bundled for this session.
 
+   * - ``resources``
+     - :ref:`resource-slot-object`
+     - The resource slot specification for each container in this session.
+
+       .. versionadded:: v4.20190315
+
    * - ``instanceMemory``
      - ``int`` (MiB)
      - The maximum memory allowed per instance.
        The value is capped by the per-kernel image limit.
        Additional charges may apply on the public API service.
+
+       .. deprecated:: v4.20190315
 
    * - ``instanceCores``
      - ``int``
@@ -383,11 +391,82 @@ Creation Config Object
        The value is capped by the per-kernel image limit.
        Additional charges may apply on the public API service.
 
+       .. deprecated:: v4.20190315
+
    * - ``instanceGPUs``
      - ``float``
      - The fraction of GPU devices (1.0 means a whole device).
        The value is capped by the per-kernel image limit.
        Additional charges may apply on the public API service.
+
+       .. deprecated:: v4.20190315
+
+.. _resource-slot-object:
+
+Resource Slot Object
+--------------------
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+
+   * - ``cpu``
+     - ``str | int``
+     - The number of CPU cores.
+
+   * - ``mem``
+     - ``str | int``
+     - The amount of main memory in bytes.
+       When the slot object is used as an input to an API,
+       it may be represented as binary numbers using the binary scale suffixes
+       such as *k*, *m*, *g*, *t*, *p*, *e*, *z*, and *y*, e.g., "512m", "512M",
+       "512MiB", "64g", "64G", "64GiB", etc.
+       When the slot object is used as an output of an API, this field is
+       **always** represented in the unscaled number of bytes as strings.
+
+       .. warning::
+
+          When parsing this field as JSON, you must check whether your JSON
+          library or the programming language supports large integers.
+          For instance, most modern Javascript engines support up to
+          :math:`2^{53}-1` (8 PiB -- 1) which is often defined as the
+          ``Number.MAX_SAFE_INTEGER`` constant.
+          Otherwise you need to use a third-party big number calculation
+          library.  To prevent unexpected side-effects, Backend.AI always
+          returns this field as a string.
+
+   * - ``cuda.device``
+     - ``str | int``
+     - The number of CUDA devices.
+       Only available when the server is configured to use the CUDA agent plugin.
+
+   * - ``cuda.shares``
+     - ``str``
+     - The virtual share of CUDA devices represented as fractional decimals.
+       Only available when the server is configured to use the CUDA agent plugin
+       with the fractional allocation mode (enterprise edition only).
+
+   * - ``tpu.device``
+     - ``str | int``
+     - The number of TPU devices.
+       Only available when the server is configured to use the TPU agent plugin
+       (cloud edition only).
+
+   * - (others)
+     - ``str``
+     - More resource slot types may be available depending on the server configuration
+       and agent plugins.
+       There are two types for an arbitrary slot: "count" (the default) and "bytes".
+
+       For "count" slots, you may put arbitrary positive real number there,
+       but fractions may be truncated depending on the plugin implementation.
+
+       For "bytes" slots, its interpretation and representation follows that of
+       the ``mem`` field.
 
 .. _vfolder-list-item-object:
 
