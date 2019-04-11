@@ -25,40 +25,45 @@ Parameters
      - Type
      - Description
 
-   * - ``lang``
+   * - ``image``
      - ``str``
-     - The kernel runtime type, usually in the form of the language name and its version tag connected with a colon.
-       (e.g., ``"python:latest"``)
+     - The kernel runtime type in the form of the Docker image name and tag.
+       For legacy, the API also recognizes the ``lang`` field when ``image`` is not present.
 
-   * - ``tag``
-     - ``str``
-     - An optional per-session, user-provided tag for administrators to keep track of additional information of each session,
-       such as which sessions are from which users.
-
+       .. versionchanged:: v4.20190315
 
    * - ``clientSessionToken``
-     - ``str``
-     - Client-provided session token which can contain ASCII alphabets, numbers, and hyphens in the middle.
+     - ``slug``
+     - A client-provided session token, which must be unique among the
+       currently non-terminated sessions owned by the requesting access key.
+       Clients may reuse the token if the previous session with the same token has
+       been terminated.
+
+       It may contain ASCII alphabets, numbers, and hyphens in the middle.
        The length must be between 4 to 64 characters inclusively.
        It is useful for aliasing the session with a human-friendly name.
-       There can exist only one running session with the same token at a time, but you can reuse the same token if previous session has been terminated.
 
    * - ``config``
      - ``object``
-     - An optional :ref:`creation-config-object` to specify extra kernel
-       configuration.
+     - (optional) A :ref:`creation-config-object` to specify kernel
+       configuration including resource requirements.
+       If not given, the kernel is created with the minimum required resource slots
+       defined by the target image.
+
+   * - ``tag``
+     - ``str``
+     - (optional) A per-session, user-provided tag for administrators to keep track of additional information of each session,
+       such as which sessions are from which users.
 
 Example:
 
 .. code-block:: json
 
    {
-     "lang": "python:3.6",
-     "tag": "example-tag",
-     "clientSessionToken": "EXAMPLE:STRING",
+     "image": "python:3.6-ubuntu18.04",
+     "clientSessionToken": "mysession-01",
      "config": {
        "clusterSize": 1,
-       "instanceMemory": 51240,
        "environ": {
          "MYCONFIG": "XXX",
        },
@@ -71,7 +76,8 @@ Example:
          "mem": "4g",
          "cuda.devices": "1",
        }
-     }
+     },
+     "tag": "example-tag"
    }
 
 
