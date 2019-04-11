@@ -5,6 +5,8 @@ Resource presets provide a simple storage for pre-configured resource slots
 and a dynamic checker for allocatability of given presets before actually
 calling the kernel creation API.
 
+To add/modify/delete resource presets, you need to use the admin GraphQL API.
+
 .. versionadded:: v4.20190315
 
 
