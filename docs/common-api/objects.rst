@@ -252,17 +252,9 @@ Execution Result Object
        A negative value (which cannot happen with normal process termination) indicates a Backend.AI-side error.
 
    * - ``console``
-     - .. code-block:: text
+     - ``list[object]``
 
-          list[
-            tuple[
-              enum[str], *
-            ]
-          ]
-
-     - Contains a list of console output items.
-       Each item is a pair of the item type (``enum[str]``) and its value (``*``).
-       See more details at :ref:`handling-console-output`.
+     - A list of :ref:`console-item-object`.
 
    * - ``options``
      - ``object``
@@ -272,9 +264,32 @@ Execution Result Object
        different types of text boxes for user inputs.
 
    * - ``files``
-     - ``list`` of :ref:`execution-result-file-object`
+     - ``list[object]``
 
-     - A list of details of created files during the code execution.
+     - A list of :ref:`execution-result-file-object` that represents files
+       generated in ``/home/work/.output`` directory of the
+       container during the code execution .
+
+.. _console-item-object:
+
+Console Item Object
+-------------------
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+
+   * - (root)
+     - ``[enum, *]``
+     - A tuple of the item type and the item content.
+       The type may be ``"stdout"``, ``"stderr"``, and others.
+
+       See more details at :ref:`handling-console-output`.
+
 
 .. _execution-result-file-object:
 
