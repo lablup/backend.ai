@@ -7,7 +7,10 @@ Key Concepts
 
 Here we describe what the core components of Backend.AI do and why/how we use 3rd-party components.
 
-:raw-html-m2r:`<img src="https://raw.githubusercontent.com/wiki/lablup/backend.ai/images/server-architecture.svg?sanitize=true" alt="Server architecture diagram">`
+.. _server-arch-diagram:
+.. figure:: server-architecture.svg
+
+   The diagram of a typical multi-node Backend.AI server architecture
 
 The above diagram shows a brief Backend.AI server-side architecture where the components are what you need to install and configure.
 

@@ -4,7 +4,6 @@ Guides
 .. toctree::
    :maxdepth: 1
 
-   server-concepts
    install-on-clouds
    install-on-premise
    development-setup
