@@ -22,6 +22,7 @@ Table of Contents
    :maxdepth: 1
    :caption: User Manuals
 
+   gsg/key-concepts
    gsg/overview
    gsg/faq
    gsg/clientlib
