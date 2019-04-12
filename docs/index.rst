@@ -8,10 +8,10 @@ Backend.AI API Documentation
 
 **Latest API version: v4.20190315**
 
-Backend.AI is a hassle-free backend for AI programming and service.
+Backend.AI is a hassle-free backend for AI model development and deployment.
 It runs arbitrary user codes safely in resource-constrained environments, using Docker and our own sandbox wrapper.
 
-Backend.AI supports various programming languages and runtimes, such as Python 2/3, R, PHP, C/C++, Java, Javascript, Julia, Octave, Haskell, Lua and NodeJS, as well as AI-oriented libraries such as TensorFlow, Keras, Caffe, and MXNet.
+It hosts various programming languages and runtimes, such as Python 2/3, R, PHP, C/C++, Java, Javascript, Julia, Octave, Haskell, Lua and NodeJS, as well as AI-oriented libraries such as TensorFlow, Keras, Caffe, and MXNet.
 
 Table of Contents
 -----------------
