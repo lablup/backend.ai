@@ -1,5 +1,5 @@
-Guides
-======
+Quickstart Guides
+=================
 
 .. toctree::
    :maxdepth: 1

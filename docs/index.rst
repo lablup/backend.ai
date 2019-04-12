@@ -16,16 +16,15 @@ Backend.AI supports various programming languages and runtimes, such as Python 2
 Table of Contents
 -----------------
 
-.. _gsg:
+.. _concepts:
 
 .. toctree::
-   :maxdepth: 1
-   :caption: User Manuals
+   :maxdepth: 2
+   :caption: Concepts
 
-   gsg/key-concepts
-   gsg/overview
-   gsg/faq
-   gsg/clientlib
+   concepts/key-concepts
+   concepts/api-overview
+   concepts/faq
 
 .. _install:
 
@@ -35,6 +34,14 @@ Table of Contents
 
    install/guides
    install/supplementary
+
+.. _clients:
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Client SDK
+
+   client/index
 
 .. _common_api:
 

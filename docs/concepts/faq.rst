@@ -1,8 +1,7 @@
 FAQ
 ===
 
-vs. Notebooks
--------------
+.. rubric:: vs. Notebooks
 
 .. list-table::
    :header-rows: 1
@@ -12,15 +11,14 @@ vs. Notebooks
      - Problem and Solution
 
    * - Apache Zeppelin, Jupyter Notebook
-     - Notebook-style document + code *front-ends*
+     - Notebook-style document + code *frontends*
      - Insecure host resource sharing
 
    * - **Backend.AI**
-     - Pluggable *back-end* to any front-ends
+     - Pluggable *backend* to any frontends
      - Built for multi-tenancy: scalable and better isolation
 
-vs. Orchestration Frameworks
-----------------------------
+.. rubric:: vs. Orchestration Frameworks
 
 .. list-table::
    :header-rows: 1
@@ -37,12 +35,11 @@ vs. Orchestration Frameworks
      - Stateful compute sessions
      - Low-cost high-density computation
 
-   * - Amazon Lambda
+   * - Amazon Lambda, Azure Functions
      - Stateless, light-weight functions
      - Serverless, zero-management
 
-vs. Big-data and AI Frameworks
-------------------------------
+.. rubric:: vs. Big-data and AI Frameworks
 
 .. list-table::
    :header-rows: 1
