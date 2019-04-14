@@ -16,12 +16,15 @@ Prerequisites
 
 For a standard installation:
 
-* Ubuntu 16.04+ or CentOS 7.4+
-* sudo with access to the package manager (apt or yum)
+* Ubuntu 16.04+ / CentOS 7.4+ / macOS 10.12+
+
+  - For Linux: ``sudo`` with access to the package manager (``apt-get`` or ``yum``)
+  - For macOS: `homebrew <https://brew.sh>`_
+
 * bash
 * git
 
-To enable CUDA:
+To enable CUDA (only supported in Ubuntu or CentOS):
 
 * CUDA 9.0 or later (with compatible NVIDIA driver)
 * nvidia-docker 1.0 or 2.0

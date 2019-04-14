@@ -8,7 +8,7 @@ Prerequisites
 
 For a standard installation:
 
-* Ubuntu 16.04+ or CentOS 7.4+
+* Ubuntu 16.04+ / CentOS 7.4+
 * sudo
 * bash
 * git
