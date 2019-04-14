@@ -21,7 +21,7 @@ For a standard installation:
 * bash
 * git
 
-To enable CUDA,
+To enable CUDA:
 
 * CUDA 9.0 or later (with compatible NVIDIA driver)
 * nvidia-docker 1.0 or 2.0
