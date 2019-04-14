@@ -1,8 +1,7 @@
+One-line Demo Setup
+===================
 
-Demo Setup
-==========
-
-`This meta-repository <https://github.com/lablup/backend.ai>`_ provides a docker-compose configuration to fire up a single-node Backend.AI cluster running on your PC (http://localhost:8081).  
+`This meta-repository <https://github.com/lablup/backend.ai>`_ provides a docker-compose configuration to fire up a single-node Backend.AI cluster running on your PC (http://localhost:8081).
 
 Prerequisites
 -------------
