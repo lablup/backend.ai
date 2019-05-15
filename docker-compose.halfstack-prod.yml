@@ -10,7 +10,7 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_PASSWORD=develove
+      - POSTGRES_PASSWORD=DB_PASSWORD
       - POSTGRES_DB=backend
     volumes:
       - "./data/postgres:/var/lib/postgresql/data:rw"
@@ -21,6 +21,7 @@ services:
       - half
     ports:
       - "6379:6379"
+    command: redis-server --requirepass REDIS_PASSWORD
 
   backendai-half-etcd:
     image: quay.io/coreos/etcd:v3.3.12
