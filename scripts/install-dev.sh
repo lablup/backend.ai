@@ -472,7 +472,7 @@ echo "> ${WHITE}./scripts/run-with-halfstack.sh python -m ai.backend.agent.serve
 show_note "How to run your first code:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/client-py${NC}"
 echo "> ${WHITE}backend.ai --help${NC}"
-echo "> ${WHITE}backend.ai run python -c \"print('Hello World!')\"${NC}"
+echo "> ${WHITE}backend.ai run python -c \"print('Hello World\\!')\"${NC}"
 echo " "
 echo "${GREEN}Development environment is now ready.${NC}"
 show_note "Your environment ID is ${YELLOW}${ENV_ID}${NC}."
