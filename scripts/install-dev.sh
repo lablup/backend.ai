@@ -478,11 +478,11 @@ echo " "
 echo "${GREEN}Development environment is now ready.${NC}"
 show_note "Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 echo "  * When using docker-compose, do:"
-echo "    > ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
+echo "    > ${WHITE}cd ${INSTALL_PATH}/backend.ai${NC}"
 if [ ! -z "$docker_sudo" ]; then
-  echo "    > ${WHITE}${docker_sudo} docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml ...${NC}"
+  echo "    > ${WHITE}${docker_sudo} docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml up -d ...${NC}"
 else
-  echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml ...${NC}"
+  echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml up -d ...${NC}"
 fi
 echo "  * To delete this development environment, run:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh --env ${ENV_ID} ${DELETE_OPTS}${NC}"
