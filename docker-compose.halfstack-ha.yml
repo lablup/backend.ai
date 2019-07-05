@@ -1,4 +1,4 @@
-version: "3"
+version: "2.4"
 
 services:
 
@@ -15,12 +15,80 @@ services:
     volumes:
       - "./tmp/backend.ai-halfstack-ha/postgres-data:/var/lib/postgresql/data:rw"
 
-  backendai-half-redis:
+  # Initial master is node01.
+  backendai-half-redis-node01:
     image: redis:5-alpine
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-develove}
+      --masterauth ${REDIS_PASSWORD:-develove}
+      --min-slaves-to-write 1
+      --min-slaves-max-lag 10
     networks:
       - half
-    ports:
-      - "8210:6379"
+    cpu_count: 1
+
+  backendai-half-redis-sentinel01:
+    build:
+      context: .
+      dockerfile: redis-sentinel.dockerfile
+      cache_from:
+        - redis:5-alpine
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
+    networks:
+      - half
+    cpu_count: 1
+
+  backendai-half-redis-node02:
+    image: redis:5-alpine
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-develove}
+      --masterauth ${REDIS_PASSWORD:-develove}
+      --slaveof backendai-half-redis-node01 6379
+      --min-slaves-to-write 1
+      --min-slaves-max-lag 10
+    networks:
+      - half
+    cpu_count: 1
+
+  backendai-half-redis-sentinel02:
+    build:
+      context: .
+      dockerfile: redis-sentinel.dockerfile
+      cache_from:
+        - redis:5-alpine
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
+    networks:
+      - half
+    cpu_count: 1
+
+  backendai-half-redis-node03:
+    image: redis:5-alpine
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-develove}
+      --masterauth ${REDIS_PASSWORD:-develove}
+      --slaveof backendai-half-redis-node01 6379
+      --min-slaves-to-write 1
+      --min-slaves-max-lag 10
+    networks:
+      - half
+    cpu_count: 1
+
+  backendai-half-redis-sentinel03:
+    build:
+      context: .
+      dockerfile: redis-sentinel.dockerfile
+      cache_from:
+        - redis:5-alpine
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
+    networks:
+      - half
+    cpu_count: 1
 
   backendai-half-etcd-proxy:
     image: quay.io/coreos/etcd:v3.3.13
