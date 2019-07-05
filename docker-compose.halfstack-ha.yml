@@ -1,0 +1,116 @@
+version: "3"
+
+services:
+
+  backendai-half-db:
+    image: postgres:9.6-alpine
+    command: postgres -c 'max_connections=256'
+    networks:
+      - half
+    ports:
+      - "8200:5432"
+    environment:
+      - POSTGRES_PASSWORD=develove
+      - POSTGRES_DB=backend
+    volumes:
+      - "./tmp/backend.ai-halfstack-ha/postgres-data:/var/lib/postgresql/data:rw"
+
+  backendai-half-redis:
+    image: redis:5-alpine
+    networks:
+      - half
+    ports:
+      - "8210:6379"
+
+  backendai-half-etcd-proxy:
+    image: quay.io/coreos/etcd:v3.3.13
+    depends_on:
+      - "backendai-half-etcd-node01"
+      - "backendai-half-etcd-node02"
+      - "backendai-half-etcd-node03"
+    networks:
+      - half
+    ports:
+      - "8220:2379"
+    environment:
+      - ENDPOINTS=backendai-half-etcd-node01:2379,backendai-half-etcd-node02:2379,backendai-half-etcd-node03:2379
+    command: >
+      sh -c
+      "/usr/local/bin/etcd grpc-proxy start
+      --endpoints=$${ENDPOINTS}
+      --listen-addr=0.0.0.0:2379"
+
+  backendai-half-etcd-node01:
+    image: quay.io/coreos/etcd:v3.3.13
+    volumes:
+      - "./tmp/backend.ai-halfstack-ha/etcd01-data:/etcd-data:rw"
+    networks:
+      - half
+    environment:
+      - MYSELF=backendai-half-etcd-node01
+      - CLUSTER=etcd-node01=http://backendai-half-etcd-node01:2380,etcd-node02=http://backendai-half-etcd-node02:2380,etcd-node03=http://backendai-half-etcd-node03:2380
+      - TOKEN=backendai-etcd-token
+      - STATE=new
+    command: >
+      sh -c
+      "/usr/local/bin/etcd
+      --name etcd-node01
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --advertise-client-urls http://$${MYSELF}:2379
+      --initial-advertise-peer-urls http://$${MYSELF}:2380
+      --initial-cluster $${CLUSTER}
+      --initial-cluster-token $${TOKEN}
+      --initial-cluster-state $${STATE}"
+
+  backendai-half-etcd-node02:
+    image: quay.io/coreos/etcd:v3.3.13
+    volumes:
+      - "./tmp/backend.ai-halfstack-ha/etcd02-data:/etcd-data:rw"
+    networks:
+      - half
+    environment:
+      - MYSELF=backendai-half-etcd-node02
+      - CLUSTER=etcd-node01=http://backendai-half-etcd-node01:2380,etcd-node02=http://backendai-half-etcd-node02:2380,etcd-node03=http://backendai-half-etcd-node03:2380
+      - TOKEN=backendai-etcd-token
+      - STATE=new
+    command: >
+      sh -c
+      "/usr/local/bin/etcd
+      --name etcd-node02
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --advertise-client-urls http://$${MYSELF}:2379
+      --initial-advertise-peer-urls http://$${MYSELF}:2380
+      --initial-cluster $${CLUSTER}
+      --initial-cluster-token $${TOKEN}
+      --initial-cluster-state $${STATE}"
+
+  backendai-half-etcd-node03:
+    image: quay.io/coreos/etcd:v3.3.13
+    volumes:
+      - "./tmp/backend.ai-halfstack-ha/etcd03-data:/etcd-data:rw"
+    networks:
+      - half
+    environment:
+      - MYSELF=backendai-half-etcd-node03
+      - CLUSTER=etcd-node01=http://backendai-half-etcd-node01:2380,etcd-node02=http://backendai-half-etcd-node02:2380,etcd-node03=http://backendai-half-etcd-node03:2380
+      - TOKEN=backendai-etcd-token
+      - STATE=new
+    command: >
+      sh -c
+      "/usr/local/bin/etcd
+      --name etcd-node03
+      --data-dir /etcd-data
+      --listen-client-urls http://0.0.0.0:2379
+      --listen-peer-urls http://0.0.0.0:2380
+      --advertise-client-urls http://$${MYSELF}:2379
+      --initial-advertise-peer-urls http://$${MYSELF}:2380
+      --initial-cluster $${CLUSTER}
+      --initial-cluster-token $${TOKEN}
+      --initial-cluster-state $${STATE}"
+
+networks:
+  half:
