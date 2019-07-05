@@ -10,10 +10,25 @@ services:
     ports:
       - "8200:5432"
     environment:
-      - POSTGRES_PASSWORD=develove
-      - POSTGRES_DB=backend
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-develove}
+      - POSTGRES_DB=${POSTGRES_DBNAME:-backend}
     volumes:
       - "./tmp/backend.ai-halfstack-ha/postgres-data:/var/lib/postgresql/data:rw"
+
+  backendai-half-redis-proxy:
+    image: haproxy:2.0-alpine
+    depends_on:
+      - "backendai-half-redis-node01"
+      - "backendai-half-redis-node02"
+      - "backendai-half-redis-node03"
+    volumes:
+      - ./configs/redis/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
+    ports:
+      - "8210:6379"
+    networks:
+      - half
 
   # Initial master is node01.
   backendai-half-redis-node01:
