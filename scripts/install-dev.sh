@@ -439,14 +439,14 @@ show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
 $docker_sudo docker pull lablup/python:2.7-ubuntu18.04
 $docker_sudo docker pull lablup/python:3.6-ubuntu18.04
-$docker_sudo docker pull lablup/python-tensorflow:1.13-py36
-$docker_sudo docker pull lablup/python-pytorch:1.0-py36
+$docker_sudo docker pull lablup/python-tensorflow:1.14-py36
+$docker_sudo docker pull lablup/python-pytorch:1.1-py36
 if [ $ENABLE_CUDA -eq 1 ]; then
-    $docker_sudo docker pull lablup/python-tensorflow:1.13-py36-cuda9
-    $docker_sudo docker pull lablup/python-pytorch:1.0-py36-cuda10
-    $docker_sudo docker pull lablup/ngc-digits:19.02-tensorflow
-    $docker_sudo docker pull lablup/ngc-pytorch:19.02-py3
-    $docker_sudo docker pull lablup/ngc-tensorflow:19.02-py3
+    $docker_sudo docker pull lablup/python-tensorflow:1.14-py36-cuda9
+    $docker_sudo docker pull lablup/python-pytorch:1.1-py36-cuda10
+    $docker_sudo docker pull lablup/ngc-digits:19.05-tensorflow
+    $docker_sudo docker pull lablup/ngc-pytorch:19.05-py3
+    $docker_sudo docker pull lablup/ngc-tensorflow:19.05-py3
 fi
 
 DELETE_OPTS=''
