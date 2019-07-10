@@ -13,7 +13,7 @@ services:
       - POSTGRES_PASSWORD=develove
       - POSTGRES_DB=backend
     volumes:
-      - "./tmp/backend.ai-halfstack/postgres-data:/var/lib/postgresql/data:rw"
+      - "./tmp/backend.ai-halfstack/${DATADIR_PREFIX:-.}/postgres-data:/var/lib/postgresql/data:rw"
 
   backendai-half-redis:
     image: redis:5-alpine
@@ -25,7 +25,7 @@ services:
   backendai-half-etcd:
     image: quay.io/coreos/etcd:v3.3.12
     volumes:
-      - "./tmp/backend.ai-halfstack/etcd-data:/etcd-data:rw"
+      - "./tmp/backend.ai-halfstack/${DATADIR_PREFIX:-.}/etcd-data:/etcd-data:rw"
     networks:
       - half
     ports:
