@@ -118,6 +118,32 @@ The enterprise edition offers the following additional properties:
      - The string representation of money amount as decimals.
        The currency is fixed to USD. (default: ``"50.00"``)
 
+.. _service-port-object:
+
+Service Port Object
+-------------------
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+   * - ``name``
+     - ``slug``
+     - The name of service provided by the container.
+       See also: :ref:`exec-stream`
+   * - ``protocol``
+     - ``str``
+     - The type of network protocol used by the container service.
+   * - ``container_port``
+     - ``int``
+     - The port number used by the container service.
+   * - ``host_port``
+     - ``int``
+     - The port number exposed to the host and the network.
+
 .. _batch-execution-query-object:
 
 Batch Execution Query Object

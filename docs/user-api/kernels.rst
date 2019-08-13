@@ -3,6 +3,8 @@ Kernel Management
 
 Here are the API calls to create and manage compute sessions.
 
+.. _create-session-api:
+
 Creating Kernel Session
 -----------------------
 
@@ -102,6 +104,9 @@ Response
    * - ``kernelId``
      - ``slug``
      - The kernel ID used for later API calls.
+   * - ``servicePorts``
+     - ``list[object]``
+     - The list of :ref:`service-port-object`
    * - ``created``
      - ``bool``
      - True if the kernel is freshly created.

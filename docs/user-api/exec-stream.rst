@@ -1,3 +1,5 @@
+.. _exec-stream:
+
 Streaming
 =========
 
@@ -26,9 +28,28 @@ Service Proxy (HTTP)
 The service proxy API allows clients to directly connect to service daemons running *inside*
 compute sessions, such as Jupyter and TensorBoard.
 
-(under construction)
+The service name should be taken from the list of :ref:`service port objects
+<service-port-object>` returned by :ref:`the session creation API
+<create-session-api>`.
 
 .. versionadded:: v4.20181215
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:id``
+     - ``slug``
+     - The session ID.
+   * - ``:service``
+     - ``slug``
+     - The service name to connect.
 
 
 Service Proxy (TCP)
@@ -40,9 +61,28 @@ Service Proxy (TCP)
 This is the TCP version of service proxy, so that client users can connect to native services
 running inside compute sessions, such as SSH.
 
-(under construction)
+The service name should be taken from the list of :ref:`service port objects
+<service-port-object>` returned by :ref:`the session creation API
+<create-session-api>`.
 
 .. versionadded:: v4.20181215
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:id``
+     - ``slug``
+     - The session ID.
+   * - ``:service``
+     - ``slug``
+     - The service name to connect.
 
 
 Terminal Emulation
@@ -55,6 +95,10 @@ This endpoint provides a duplex continuous stream of JSON objects via the native
 Although WebSocket supports binary streams, we currently rely on TEXT messages only
 conveying JSON payloads to avoid quirks in typed array support in Javascript
 across different browsers.
+
+The service name should be taken from the list of :ref:`service port objects
+<service-port-object>` returned by :ref:`the session creation API
+<create-session-api>`.
 
 .. note::
 
@@ -77,7 +121,10 @@ Parameters
      - Description
    * - ``:id``
      - ``slug``
-     - The kernel ID.
+     - The session ID.
+   * - ``:service``
+     - ``slug``
+     - The service name to connect.
 
 Client-to-Server Protocol
 """""""""""""""""""""""""
