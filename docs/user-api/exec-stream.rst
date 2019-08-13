@@ -24,7 +24,7 @@ long polling via HTTP.
 Service Ports (aka Service Proxies)
 ===================================
 
-The service ports provides WebSocket-based authenticated and encrypted tunnels
+The service ports API provides WebSocket-based authenticated and encrypted tunnels
 to network-facing services ("container services") provided by the kernel container.
 
 All TCP traffic to a container service could be sent to a WebSocket connection
@@ -40,6 +40,7 @@ kernel container signals the kernel runner daemon in the container to start the
 designated service.  It shortly waits for the in-container port opening and
 then delivers the first packet to the service.  After initialization, all
 WebSocket payloads are delivered back and forth just like normal TCP packets.
+Note that the WebSocket message type must be ``BINARY``.
 
 .. note:: Currently non-TCP (e.g., UDP) services are not supported.
 
