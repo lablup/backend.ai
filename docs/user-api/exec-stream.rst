@@ -1,9 +1,9 @@
 .. _exec-stream:
 
-Streaming
-=========
+Streaming Execution
+===================
 
-The streaming mode provides a direct web-based terminal access to kernel containers.
+The streaming mode provides a lightweight and interactive method to connect with the kernel containers.
 
 
 Code Execution
@@ -17,6 +17,31 @@ long polling via HTTP.
 (under construction)
 
 .. versionadded:: v4.20181215
+
+
+.. _service-ports:
+
+Service Ports (aka Service Proxies)
+===================================
+
+The service ports provides WebSocket-based authenticated and encrypted tunnels
+to network-facing services ("container services") provided by the kernel container.
+
+All TCP traffic to a container service could be sent to a WebSocket connection
+to the following API endpoints.  A single WebSocket connection corresponds to a
+single TCP connection to the service, and there may be multiple concurrent
+WebSocket connections to represent multiple TCP connections to the service.
+It is the client's responsibility to accept arbitrary TCP connections from
+users (e.g., web browsers) with proper authorization for multi-user setups and
+wrap those as WebSocket connections to the following APIs.
+
+When the first connection is initiated, the Backend.AI Agent running the designated
+kernel container signals the kernel runner daemon in the container to start the
+designated service.  It shortly waits for the in-container port opening and
+then delivers the first packet to the service.  After initialization, all
+WebSocket payloads are delivered back and forth just like normal TCP packets.
+
+.. note:: Currently non-TCP (e.g., UDP) services are not supported.
 
 
 Service Proxy (HTTP)

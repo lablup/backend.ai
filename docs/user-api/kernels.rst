@@ -106,7 +106,7 @@ Response
      - The kernel ID used for later API calls.
    * - ``servicePorts``
      - ``list[object]``
-     - The list of :ref:`service-port-object`
+     - The list of :ref:`service-port-object`.
    * - ``created``
      - ``bool``
      - True if the kernel is freshly created.
@@ -118,6 +118,10 @@ Example:
 
    {
      "kernelId": "TSSJT2Z4SnmQhxjWMnJljg",
+     "servicePorts": [
+       { "name": "jupyter", "protocol": "http", "container_port": 8080, "host_port": 30720 },
+       { "name": "tensorboard", "protocol": "http", "container_port": 6006, "host_port": 30721 }
+     ],
      "created": true
    }
 

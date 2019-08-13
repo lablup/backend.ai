@@ -133,7 +133,7 @@ Service Port Object
    * - ``name``
      - ``slug``
      - The name of service provided by the container.
-       See also: :ref:`exec-stream`
+       See also: :ref:`service-ports`
    * - ``protocol``
      - ``str``
      - The type of network protocol used by the container service.
