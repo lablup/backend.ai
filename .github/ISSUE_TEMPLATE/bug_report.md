@@ -31,15 +31,17 @@ Just take a screenshot in your clipboard or copy a picture file and paste it her
 
 **Client:**
  - OS: [e.g. macOS 10.14, Windows 10 (1903)]
- - App version: [e.g. 19.08.3]
- - Browser version: [e.g. Chrome 76, Safari, Edge]
- - Python version: [e.g. 3.7.4]
+ - App version: [e.g. 19.08.3] (if you are using a GUI client app)
+ - Browser version: [e.g. Chrome 76, Safari, Edge] (if you are using a GUI web console)
+ - Python version: [e.g. 3.7.4] (if you are using the Python SDK)
+ - NodeJS version: [e.g. 12.0] (if you are using the Javascript SDK)
 
 **Server:**
  - OS: [e.g. Ubuntu 18.04, CentOS 7.6, macOS 10.14]
    - Output of `uname -a`: [e.g. `Linux node01 4.15.0-54-generic #58-Ubuntu SMP Mon Jun 24 10:55:24 UTC 2019 x86_64 x86_64 x86_64 GNU/Linux`]
  - Backend.AI version: [e.g. 19.09.0]
  - Python version: [e.g. 3.6.8]
+ - Installation method: [e.g. on-premise, using cloud.backend.ai service, used scripts/install-dev.sh]
 
 **Additional context**
 Add any other context about the problem here.
