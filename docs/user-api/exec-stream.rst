@@ -89,7 +89,7 @@ Parameters
      - Description
    * - ``:id``
      - ``slug``
-     - The session ID.
+     - The kernel ID.
    * - ``:service``
      - ``slug``
      - The service name to connect.
@@ -122,7 +122,7 @@ Parameters
      - Description
    * - ``:id``
      - ``slug``
-     - The session ID.
+     - The kernel ID.
    * - ``:service``
      - ``slug``
      - The service name to connect.
@@ -164,7 +164,7 @@ Parameters
      - Description
    * - ``:id``
      - ``slug``
-     - The session ID.
+     - The kernel ID.
    * - ``:service``
      - ``slug``
      - The service name to connect.
