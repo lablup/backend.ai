@@ -137,12 +137,6 @@ Service Port Object
    * - ``protocol``
      - ``str``
      - The type of network protocol used by the container service.
-   * - ``container_port``
-     - ``int``
-     - The port number used by the container service.
-   * - ``host_port``
-     - ``int``
-     - The port number exposed to the host and the network.
 
 .. _batch-execution-query-object:
 

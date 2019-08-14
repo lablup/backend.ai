@@ -120,8 +120,8 @@ Example:
    {
      "kernelId": "mysession-01",
      "servicePorts": [
-       { "name": "jupyter", "protocol": "http", "container_port": 8080, "host_port": 30720 },
-       { "name": "tensorboard", "protocol": "http", "container_port": 6006, "host_port": 30721 }
+       {"name": "jupyter", "protocol": "http"},
+       {"name": "tensorboard", "protocol": "http"}
      ],
      "created": true
    }
