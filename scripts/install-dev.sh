@@ -402,7 +402,7 @@ show_info "Configuring the Lablup's official Docker registry..."
 cd "${INSTALL_PATH}/manager"
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io "https://registry-1.docker.io"
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io/username "lablup"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd rescan-images
+./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd rescan-images index.docker.io
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd alias python python:3.6-ubuntu18.04
 
 # Virtual folder setup
