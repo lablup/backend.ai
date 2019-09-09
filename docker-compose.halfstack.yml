@@ -4,7 +4,7 @@ services:
 
   backendai-half-db:
     image: postgres:9.6-alpine
-    restart: always
+    restart: unless-stopped
     command: postgres -c 'max_connections=256'
     networks:
       - half
@@ -18,7 +18,7 @@ services:
 
   backendai-half-redis:
     image: redis:5-alpine
-    restart: always
+    restart: unless-stopped
     networks:
       - half
     ports:
@@ -26,7 +26,7 @@ services:
 
   backendai-half-etcd:
     image: quay.io/coreos/etcd:v3.3.12
-    restart: always
+    restart: unless-stopped
     volumes:
       - "./tmp/backend.ai-halfstack/${DATADIR_PREFIX:-.}/etcd-data:/etcd-data:rw"
     networks:
