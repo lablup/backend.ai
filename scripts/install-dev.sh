@@ -418,6 +418,17 @@ pyenv local "venv-${ENV_ID}-common"
 pip install -U -q pip setuptools
 pip install -U -r requirements-dev.txt
 
+# Copy default configurations
+show_info "Copy default configuration files to manager / agent root..."
+cd "${INSTALL_PATH}/manager"
+pyenv local "venv-${ENV_ID}-manager"
+cp config/halfstack.toml ./manager.toml
+cp config/halfstack.alembic.ini ./alembic.ini
+
+cd "${INSTALL_PATH}/agent"
+pyenv local "venv-${ENV_ID}-agent"
+cp config/halfstack.toml ./agent.toml
+
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
 cd "${INSTALL_PATH}/manager"
