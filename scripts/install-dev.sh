@@ -198,7 +198,7 @@ install_script_deps() {
 install_pybuild_deps() {
   case $DISTRO in
   Debian)
-    $sudo apt-get install -y libssl-dev libreadline-dev libgdbm-dev zlib1g-dev libbz2-dev libsqlite3-dev libffi-dev
+    $sudo apt-get install -y libssl-dev libreadline-dev libgdbm-dev zlib1g-dev libbz2-dev libsqlite3-dev libffi-dev 
     ;;
   RedHat)
     $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel libsqlite-devel libffi-devel
@@ -215,6 +215,24 @@ brew "snappy"
 EOS
     ;;
   esac
+}
+
+install_git_lfs() {
+  case $DISTRO in
+  Debian)
+    $sudo apt-get install -y git-lfs
+    ;;
+  RedHat)
+    curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | $sudo bash
+    $sudo yum install -y git-lfs
+    ;;
+  Darwin)
+    brew bundle --file=- <<"EOS"
+brew "git-lfs"
+EOS
+    ;;
+  esac
+  git lfs install
 }
 
 install_system_pkg() {
@@ -314,6 +332,9 @@ fi
 # Install Python and pyenv virtualenvs
 show_info "Checking and installing Python dependencies..."
 install_pybuild_deps
+
+show_info "Checking and installing git lfs support..."
+install_git_lfs
 
 show_info "Installing Python..."
 if [ "$DISTRO" = "Darwin" ]; then
