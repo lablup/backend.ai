@@ -424,6 +424,7 @@ cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
 cp config/halfstack.toml ./manager.toml
 cp config/halfstack.alembic.ini ./alembic.ini
+python -m ai.backend.manager.cli etcd put config/redis/addr 127.0.0.1:8110
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
