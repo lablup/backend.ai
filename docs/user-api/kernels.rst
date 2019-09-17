@@ -101,6 +101,11 @@ Example:
    {
      "image": "python:3.6-ubuntu18.04",
      "clientSessionToken": "mysession-01",
+     "enqueueOnly": false,
+     "maxWaitSeconds": 0,
+     "reuseIfExists": true,
+     "domain": "default",
+     "group": "default",
      "config": {
        "clusterSize": 1,
        "environ": {
@@ -126,8 +131,12 @@ Response
 
    * - HTTP Status Code
      - Description
+   * - 200 OK
+     - The kernel is already running and you are okay to reuse it.
    * - 201 Created
      - The kernel is successfully created.
+   * - 401 Invalid API parameters
+     - There are invalid or malformed values in the API parameters.
    * - 406 Not acceptable
      - The requested resource limits exceed the server's own limits.
 
@@ -170,6 +179,7 @@ Example:
 
    {
      "kernelId": "mysession-01",
+     "status": "RUNNING",
      "servicePorts": [
        {"name": "jupyter", "protocol": "http"},
        {"name": "tensorboard", "protocol": "http"}
