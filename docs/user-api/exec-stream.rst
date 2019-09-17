@@ -9,7 +9,7 @@ The streaming mode provides a lightweight and interactive method to connect with
 Code Execution
 --------------
 * URI: ``/stream/kernel/:id/execute``
-* Method: GET upgraded to WebSockets
+* Method: ``GET`` upgraded to WebSockets
 
 This is a real-time streaming version of :doc:`exec-batch` and :doc:`exec-query` which uses
 long polling via HTTP.
@@ -65,8 +65,8 @@ IP address (though the port numbers are included in :ref:`service port objects
 Service Proxy (HTTP)
 --------------------
 
-* URI: ``/stream/kernel/:id/httpproxy?service=:service``
-* Method: GET upgraded to WebSockets
+* URI: ``/stream/kernel/:id/httpproxy?app=:service``
+* Method: ``GET`` upgraded to WebSockets
 
 The service proxy API allows clients to directly connect to service daemons running *inside*
 compute sessions, such as Jupyter and TensorBoard.
@@ -98,8 +98,8 @@ Parameters
 Service Proxy (TCP)
 -------------------
 
-* URI: ``/stream/kernel/:id/tcpproxy?service=:service``
-* Method: GET upgraded to WebSockets
+* URI: ``/stream/kernel/:id/tcpproxy?app=:service``
+* Method: ``GET`` upgraded to WebSockets
 
 This is the TCP version of service proxy, so that client users can connect to native services
 running inside compute sessions, such as SSH.
@@ -131,8 +131,8 @@ Parameters
 Terminal Emulation
 ------------------
 
-* URI: ``/stream/kernel/:id/pty?service=:service``
-* Method: GET upgraded to WebSockets
+* URI: ``/stream/kernel/:id/pty?app=:service``
+* Method: ``GET`` upgraded to WebSockets
 
 This endpoint provides a duplex continuous stream of JSON objects via the native WebSocket.
 Although WebSocket supports binary streams, we currently rely on TEXT messages only
@@ -264,27 +264,22 @@ Server-side errors
 
 
 Event Monitoring
-----------------
+================
 
-* URI: ``/stream/kernel/:id/events``
-* Method: GET upgraded to WebSockets
+Kernel Lifecycle Events
+-----------------------
 
-Provides a continuous message-by-message JSON object stream of lifecycle, code
-execution, and proxy related events from a compute session.  This API function
-is read-only --- meaning that you cannot send any data to this URI.
+* URI: ``/stream/kernel/_/events``
+* Method: ``GET``
 
-.. warning::
+Provides a continuous message-by-message JSON object stream of kernel lifecycles.
+It uses `HTML5 Server-Sent Events (SSE) <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events>`_.
+Browser-based clients may use `the EventSource API <https://developer.mozilla.org/en-US/docs/Web/API/EventSource>`_
+for convenience.
 
-   This API is not implemented yet.
+.. versionadded:: v4.20190615
 
-.. note::
-
-   There is timeout enforced in the server-side but you may need to adjust
-   defaults in your client-side WebSocket library.
-
-.. versionchanged:: v4.20181215
-
-   Renamed the URI to ``events``.
+   First properly implemented in this version, deprecating prior unimplemented interfaces.
 
 
 Parameters
@@ -297,33 +292,87 @@ Parameters
    * - Parameter
      - Type
      - Description
-   * - ``:id``
+   * - ``kernelId``
      - ``slug``
-     - The kernel ID.
+     - The kernel ID to monitor the lifecycle events.
+       If set ``"*"``, the API will stream events from all kernels visible to the client
+       depending on the client's role and permissions.
+   * - ``group``
+     - ``str``
+     - The group name to filter the lifecycle events.
+       If set ``"*"``, the API will stream events from all kernels visible to the client
+       depending on the client's role and permissions.
 
 Responses
 """""""""
 
+The response is a continuous stream of UTF-8 text lines following the ``text/event-stream`` format.
+Each event is composed of the event type and data, where the data part is encoded as JSON.
+
+Possible event names (more events may be added in the future):
+
 .. list-table::
-   :widths: 20 80
+   :widths: 15 85
+   :header-rows: 1
+
+   * - Event Name
+     - Description
+   * - ``kernel-preparing``
+     - The session is just scheduled from the job queue and got an agent resource allocation.
+   * - ``kernel-pulling``
+     - The session begins pulling the kernel image (usually from a Docker registry) to the scheduled agent.
+   * - ``kernel-creating``
+     - The session is being created as containers (or other entities in different agent backends).
+   * - ``kernel-started``
+     - The session becomes ready to execute codes.
+   * - ``kernel-terminated``
+     - The session has terminated.
+
+When using the EventSource API, you should add event listeners as follows:
+
+.. code-block:: javascript
+
+   const sse = new EventSource('/stream/kernel/_/events', {
+     withCredentials: true,
+   });
+   sse.addEventListener('kernel-started', (e) => {
+     console.log('kerenl-started', JSON.parse(e.data));
+   });
+
+.. note::
+
+   The EventSource API must be used with the session-based authentication mode
+   (when the endpoint is a console-server) which uses the browser cookies.
+   Otherwise, you need to manually implement the event stream parser using the
+   standard fetch API running against the manager server.
+
+The event data contains a JSON string like this (more fields may be added in the future):
+
+.. list-table::
+   :widths: 15 85
    :header-rows: 1
 
    * - Field Name
-     - Value
-   * - ``name``
-     - The name of an event as a string. May be one of:
-       ``"terminated"``, ``"restarted"``
+     - Description
+   * - ``sessionId``
+     - The source session ID.
+   * - ``ownerAccessKey``
+     - The access key who owns the session.
    * - ``reason``
-     - The reason for the event as a canonicalized string
-       such as ``"out-of-memory"``, ``"bad-action"``, and ``"execution-timeout"``.
-
-Example:
+     - A short string that describes why the event happened.
+       This may be ``null`` or an empty string.
+   * - ``result``
+     - Only present for ``kernel-terminated`` events.
+       Only meaningful for batch-type sessions.
+       Either one of: ``"UNDEFINED"``, ``"SUCCESS"``, ``"FAILURE"``
 
 .. code-block:: json
 
    {
-     "name": "terminated",
-     "reason": "execution-timeout"
+     "sessionId": "mysession-01",
+     "ownerAccessKey": "MYACCESSKEY",
+     "reason": "self-terminated",
+     "result": "SUCCESS"
    }
 
 
