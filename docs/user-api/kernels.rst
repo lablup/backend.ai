@@ -11,10 +11,7 @@ Creating Kernel Session
 * URI: ``/kernel`` (``/kernel/create`` also works for legacy)
 * Method: ``POST``
 
-Creates a kernel session if there is no existing (running) kernel with the same ``clientSessionToken``.
-If there is an existing session and it has the same ``lang``, no new session is created but the API returns successfully.
-In this case, ``config`` options are *ignored* and the ``created`` field in the response is set ``false`` (otherwise it's ``true``).
-If there is an existing session but with a different ``lang``, then the API server returns an error.
+Creates a new kernel session or returns an existing session, depending on the parameters.
 
 Parameters
 """"""""""
@@ -65,7 +62,9 @@ Parameters
      - ``bool``
      - *(optional)* If set true, the API returns *without* creating a new session if a session
        with the same ID and the same image already exists and not terminated.
-       Otherwise, the manager returns an error: "kernel already exists".
+       In this case ``config`` options are *ignored*.
+       If set false but a session with the same ID and image exists, the
+       manager returns an error: "kernel already exists".
        (default: ``true``)
 
        .. versionadded:: v4.20190615
@@ -157,6 +156,9 @@ Response
        In other cases, it may be either ``"RUNNING"`` (normal case),
        ``"ERROR"``, or even ``"TERMINATED"`` depending on what happens during
        session startup.
+
+       .. versionadded:: v4.20190615
+
    * - ``servicePorts``
      - ``list[object]``
      - The list of :ref:`service-port-object`.
@@ -167,6 +169,8 @@ Response
 
           In most cases the service ports are same to what specified in the image metadata, but the agent
           may add shared services for all kernels.
+
+       .. versionchanged:: v4.20190615
 
    * - ``created``
      - ``bool``
