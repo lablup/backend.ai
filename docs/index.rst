@@ -62,9 +62,11 @@ Table of Contents
 
    user-api/intro
    user-api/kernels
+   user-api/service-ports
    user-api/exec-stream
    user-api/exec-query
    user-api/exec-batch
+   user-api/events
    user-api/vfolders
    user-api/resource-presets
 
