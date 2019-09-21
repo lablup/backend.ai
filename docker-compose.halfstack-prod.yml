@@ -30,7 +30,7 @@ services:
     mem_limit: "2g"
 
   backendai-half-etcd:
-    image: quay.io/coreos/etcd:v3.3.12
+    image: quay.io/coreos/etcd:v3.4.1
     restart: unless-stopped
     volumes:
       - "./data/etcd:/etcd-data:rw"

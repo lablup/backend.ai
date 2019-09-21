@@ -25,7 +25,7 @@ services:
       - "8110:6379"
 
   backendai-half-etcd:
-    image: quay.io/coreos/etcd:v3.3.12
+    image: quay.io/coreos/etcd:v3.4.1
     restart: unless-stopped
     volumes:
       - "./tmp/backend.ai-halfstack/${DATADIR_PREFIX:-.}/etcd-data:/etcd-data:rw"

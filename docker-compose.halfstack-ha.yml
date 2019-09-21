@@ -106,7 +106,7 @@ services:
     cpu_count: 1
 
   backendai-half-etcd-proxy:
-    image: quay.io/coreos/etcd:v3.3.13
+    image: quay.io/coreos/etcd:v3.4.1
     depends_on:
       - "backendai-half-etcd-node01"
       - "backendai-half-etcd-node02"
@@ -124,7 +124,7 @@ services:
       --listen-addr=0.0.0.0:2379"
 
   backendai-half-etcd-node01:
-    image: quay.io/coreos/etcd:v3.3.13
+    image: quay.io/coreos/etcd:v3.4.1
     volumes:
       - "./tmp/backend.ai-halfstack-ha/etcd01-data:/etcd-data:rw"
     networks:
@@ -148,7 +148,7 @@ services:
       --initial-cluster-state $${STATE}"
 
   backendai-half-etcd-node02:
-    image: quay.io/coreos/etcd:v3.3.13
+    image: quay.io/coreos/etcd:v3.4.1
     volumes:
       - "./tmp/backend.ai-halfstack-ha/etcd02-data:/etcd-data:rw"
     networks:
@@ -172,7 +172,7 @@ services:
       --initial-cluster-state $${STATE}"
 
   backendai-half-etcd-node03:
-    image: quay.io/coreos/etcd:v3.3.13
+    image: quay.io/coreos/etcd:v3.4.1
     volumes:
       - "./tmp/backend.ai-halfstack-ha/etcd03-data:/etcd-data:rw"
     networks:

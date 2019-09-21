@@ -79,7 +79,7 @@ services:
 
   backendai-etcd:
     container_name: backendai-local-etcd
-    image: quay.io/coreos/etcd:v3.3.9
+    image: quay.io/coreos/etcd:v3.4.1
     volumes:
       - "./tmp/backend.ai/etcd-data:/etcd-data:rw"
     networks:
