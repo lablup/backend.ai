@@ -3,7 +3,7 @@ version: "2.4"
 services:
 
   backendai-half-db:
-    image: postgres:9.6-alpine
+    image: postgres:9.6.15-alpine
     restart: unless-stopped
     command: postgres -c 'max_connections=256'
     networks:
@@ -17,7 +17,7 @@ services:
       - "./tmp/backend.ai-halfstack/${DATADIR_PREFIX:-.}/postgres-data:/var/lib/postgresql/data:rw"
 
   backendai-half-redis:
-    image: redis:5-alpine
+    image: redis:5.0.5-alpine
     restart: unless-stopped
     networks:
       - half

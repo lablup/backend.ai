@@ -62,7 +62,7 @@ services:
 
   backendai-db:
     container_name: backendai-local-db
-    image: postgres:9.6-alpine
+    image: postgres:9.6.15-alpine
     networks:
       - full
     environment:
@@ -73,7 +73,7 @@ services:
 
   backendai-redis:
     container_name: backendai-local-redis
-    image: redis:latest
+    image: redis:5.0.5-alpine
     networks:
       - full
 
