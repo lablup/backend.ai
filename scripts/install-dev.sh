@@ -64,6 +64,11 @@ show_error() {
   echo "${RED}[ERROR]${NC} ${LRED}$1${NC}"
 }
 
+show_warning() {
+  echo " "
+  echo "${YELLOW}[ERROR]${NC} ${LYELLOW}$1${NC}"
+}
+
 show_info() {
   echo " "
   echo "${BLUE}[INFO]${NC} ${GREEN}$1${NC}"
@@ -253,22 +258,46 @@ EOS
   esac
 }
 
+install_docker() {
+  show_info "Install docker"
+  case $DISTRO in
+  Debian)
+    sudo curl -fsSL https://get.docker.io | bash
+    sudo usermod -aG docker $(whoami)
+    ;;
+  RedHat)
+    sudo curl -fsSL https://get.docker.io | bash
+    sudo usermod -aG docker $(whoami)
+    ;;
+  Darwin)
+    show_info "Please install the latest version of docker and try again."
+    show_info "It should have been installed with Docker Desktop for Mac or Docker Toolbox."
+    show_info " - Instructions: https://docs.docker.com/install/"
+    show_info"  - Download: https://download.docker.com/mac/stable/Docker.dmg"
+    exit 1
+    ;;
+  esac
+}
+
 install_docker_compose() {
-    show_info "Install docker-compose"
-    case $DISTRO in
-    Debian)
-      sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-      sudo chmod +x /usr/local/bin/docker-compose
-      ;;
-    RedHat)
-      sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-      sudo chmod +x /usr/local/bin/docker-compose
-      ;;
-    Darwin)
-      show_info "docker-compose is not available. It should have been installed along with Docker Desktop for Mac or Docker Toolbox."
-      exit 1
-      ;;
-    esac
+  show_info "Install docker-compose"
+  case $DISTRO in
+  Debian)
+    sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
+    ;;
+  RedHat)
+    sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
+    ;;
+  Darwin)
+    show_info "Please install the latest version of docker-compose and try again."
+    show_info "It should have been installed with Docker Desktop for Mac or Docker Toolbox."
+    show_info " - Instructions: https://docs.docker.com/compose/install/"
+    show_info"  - Download: https://download.docker.com/mac/stable/Docker.dmg"
+    exit 1
+    ;;
+  esac
 }
 
 # BEGIN!
@@ -284,27 +313,12 @@ show_note "Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 if ! type "docker" >/dev/null 2>&1; then
-  show_error "docker is not available!"
-  case $DISTRO in
-  Debian)
-      sudo curl -fsSL https://get.docker.io | bash
-      sudo usermod -aG docker $(whoami)
-      ;;
-  RedHat)
-      sudo curl -fsSL https://get.docker.io | bash
-      sudo usermod -aG docker $(whoami)
-      ;;
-  Darwin)
-     show_info "Please install the latest version of docker and try again."
-     show_info "Visit https://docs.docker.com/install/ for instructions."
-     show_info "Docer Desktop(MAC) can download from https://download.docker.com/mac/stable/Docker.dmg"
-     exit 1
-      ;;
-  esac
+  show_warning "docker is not available; trying to install it automatically..."
+  install_docker
 fi
 if ! type "docker-compose" >/dev/null 2>&1; then
-    show_error "docker-compose is not available!"
-    install_docker_compose
+  show_warning "docker-compose is not available; trying to install it automatically..."
+  install_docker_compose
 fi
 
 # Install pyenv
