@@ -198,7 +198,7 @@ install_script_deps() {
 install_pybuild_deps() {
   case $DISTRO in
   Debian)
-    $sudo apt-get install -y libssl-dev libreadline-dev libgdbm-dev zlib1g-dev libbz2-dev libsqlite3-dev libffi-dev 
+    $sudo apt-get install -y libssl-dev libreadline-dev libgdbm-dev zlib1g-dev libbz2-dev libsqlite3-dev libffi-dev
     ;;
   RedHat)
     $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel libsqlite-devel libffi-devel
@@ -495,10 +495,10 @@ echo "Please add these environment variables to your shell configuration files."
 show_important_note "You should change your default admin API keypairs for production environment!"
 show_note "How to run Backend.AI manager:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
-echo "> ${WHITE}./scripts/run-with-halfstack.sh python -m ai.backend.gateway.server --service-port=8081 --debug${NC}"
+echo "> ${WHITE}python -m ai.backend.gateway.server --debug${NC}"
 show_note "How to run Backend.AI agent:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/agent${NC}"
-echo "> ${WHITE}./scripts/run-with-halfstack.sh python -m ai.backend.agent.server --scratch-root=\$(pwd)/scratches --debug${NC}"
+echo "> ${WHITE}python -m ai.backend.agent.server --debug${NC}"
 show_note "How to run your first code:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/client-py${NC}"
 echo "> ${WHITE}backend.ai --help${NC}"
