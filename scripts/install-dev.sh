@@ -138,23 +138,25 @@ PYTHON_VERSION="3.6.9"
 SERVER_BRANCH="master"
 CLIENT_BRANCH="master"
 INSTALL_PATH="./backend.ai-dev"
+DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
 CUDA_BRANCH="master"
 
 while [ $# -gt 0 ]; do
   case $1 in
-    -h | --help)        usage; exit 1 ;;
-    --python-version)   PYTHON_VERSION=$2; shift ;;
-    --python-version=*) PYTHON_VERSION="${1#*=}" ;;
-    --install-path)     INSTALL_PATH=$2; shift ;;
-    --install-path=*)   INSTALL_PATH="${1#*=}" ;;
-    --server-branch)    SERVER_BRANCH=$2; shift ;;
-    --server-branch=*)  SERVER_BRANCH="${1#*=}" ;;
-    --client-branch)    CLIENT_BRANCH=$2; shift ;;
-    --client-branch=*)  CLIENT_BRANCH="${1#*=}" ;;
-    --enable-cuda)      ENABLE_CUDA=1 ;;
-    --cuda-branch)      CUDA_BRANCH=$2; shift ;;
-    --cuda-branch=*)    CUDA_BRANCH="${1#*=}" ;;
+    -h | --help)           usage; exit 1 ;;
+    --python-version)      PYTHON_VERSION=$2; shift ;;
+    --python-version=*)    PYTHON_VERSION="${1#*=}" ;;
+    --install-path)        INSTALL_PATH=$2; shift ;;
+    --install-path=*)      INSTALL_PATH="${1#*=}" ;;
+    --server-branch)       SERVER_BRANCH=$2; shift ;;
+    --server-branch=*)     SERVER_BRANCH="${1#*=}" ;;
+    --client-branch)       CLIENT_BRANCH=$2; shift ;;
+    --client-branch=*)     CLIENT_BRANCH="${1#*=}" ;;
+    --enable-cuda)         ENABLE_CUDA=1 ;;
+    --download-big-images) DOWNLOAD_BIG_IMAGES=1 ;;
+    --cuda-branch)         CUDA_BRANCH=$2; shift ;;
+    --cuda-branch=*)       CUDA_BRANCH="${1#*=}" ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -435,7 +437,7 @@ show_info "Configuring the Lablup's official Docker registry..."
 cd "${INSTALL_PATH}/manager"
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io "https://registry-1.docker.io"
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io/username "lablup"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd rescan-images
+./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd rescan-images index.docker.io
 ./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd alias python python:3.6-ubuntu18.04
 
 # Virtual folder setup
@@ -468,14 +470,16 @@ show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
 $docker_sudo docker pull lablup/python:2.7-ubuntu18.04
 $docker_sudo docker pull lablup/python:3.6-ubuntu18.04
-$docker_sudo docker pull lablup/python-tensorflow:1.14-py36
-$docker_sudo docker pull lablup/python-pytorch:1.1-py36
-if [ $ENABLE_CUDA -eq 1 ]; then
-    $docker_sudo docker pull lablup/python-tensorflow:1.14-py36-cuda9
-    $docker_sudo docker pull lablup/python-pytorch:1.1-py36-cuda10
-    $docker_sudo docker pull lablup/ngc-digits:19.05-tensorflow
-    $docker_sudo docker pull lablup/ngc-pytorch:19.05-py3
-    $docker_sudo docker pull lablup/ngc-tensorflow:19.05-py3
+if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
+  $docker_sudo docker pull lablup/python-tensorflow:1.14-py36
+  $docker_sudo docker pull lablup/python-pytorch:1.1-py36
+  if [ $ENABLE_CUDA -eq 1 ]; then
+      $docker_sudo docker pull lablup/python-tensorflow:1.14-py36-cuda9
+      $docker_sudo docker pull lablup/python-pytorch:1.1-py36-cuda10
+      $docker_sudo docker pull lablup/ngc-digits:19.05-tensorflow
+      $docker_sudo docker pull lablup/ngc-pytorch:19.05-py3
+      $docker_sudo docker pull lablup/ngc-tensorflow:19.05-py3
+  fi
 fi
 
 DELETE_OPTS=''
