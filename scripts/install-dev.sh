@@ -320,6 +320,20 @@ if ! type "docker-compose" >/dev/null 2>&1; then
   show_warning "docker-compose is not available; trying to install it automatically..."
   install_docker_compose
 fi
+if [ "$DISTRO" = "Darwin" ]; then
+  docker pull alpine:3.8 > /dev/null
+  docker run --rm -v "$HOME/.pyenv:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    # backend.ai-krunner-DISTRO pkgs are installed in pyenv's virtualenv,
+    # so ~/.pyenv must be mountable.
+    show_error "You must allow mount of '$HOME/.pyenv' in the File Sharing preference of the Docker Desktop app."
+  fi
+  docker run --rm -v "$INSTALL_PATH:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    show_error "You must allow mount of '$INSTALL_PATH' in the File Sharing preference of the Docker Desktop app."
+  fi
+fi
+exit 0
 
 # Install pyenv
 read -r -d '' pyenv_init_script <<"EOS"
