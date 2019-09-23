@@ -205,10 +205,10 @@ install_script_deps() {
 install_pybuild_deps() {
   case $DISTRO in
   Debian)
-    $sudo apt-get install -y libssl-dev libreadline-dev libgdbm-dev zlib1g-dev libbz2-dev libsqlite3-dev libffi-dev
+    $sudo apt-get install -y libssl-dev libreadline-dev libgdbm-dev zlib1g-dev libbz2-dev libsqlite3-dev libffi-dev liblzma-dev
     ;;
   RedHat)
-    $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel libsqlite-devel libffi-devel
+    $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel libsqlite-devel libffi-devel lzma-devel
     ;;
   Darwin)
     brew bundle --file=- <<"EOS"
@@ -216,6 +216,7 @@ brew "openssl"
 brew "sqlite3"
 brew "readline"
 brew "zlib"
+brew "xz"
 brew "gdbm"
 brew "tcl-tk"
 brew "snappy"
