@@ -279,6 +279,7 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 
 # NOTE: docker-compose enforces lower-cased project names
 ENV_ID=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
+show_note "Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
@@ -509,7 +510,7 @@ echo "> ${WHITE}backend.ai --help${NC}"
 echo "> ${WHITE}backend.ai run python -c \"print('Hello World\\!')\"${NC}"
 echo " "
 echo "${GREEN}Development environment is now ready.${NC}"
-show_note "Your environment ID is ${YELLOW}${ENV_ID}${NC}."
+show_note "Reminder: Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 echo "  * When using docker-compose, do:"
 echo "    > ${WHITE}cd ${INSTALL_PATH}/backend.ai${NC}"
 if [ ! -z "$docker_sudo" ]; then
