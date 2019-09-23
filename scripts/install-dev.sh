@@ -327,13 +327,14 @@ if [ "$DISTRO" = "Darwin" ]; then
     # backend.ai-krunner-DISTRO pkgs are installed in pyenv's virtualenv,
     # so ~/.pyenv must be mountable.
     show_error "You must allow mount of '$HOME/.pyenv' in the File Sharing preference of the Docker Desktop app."
+    exit 1
   fi
   docker run --rm -v "$INSTALL_PATH:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
   if [ $? -ne 0 ]; then
     show_error "You must allow mount of '$INSTALL_PATH' in the File Sharing preference of the Docker Desktop app."
+    exit 1
   fi
 fi
-exit 0
 
 # Install pyenv
 read -r -d '' pyenv_init_script <<"EOS"
