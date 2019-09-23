@@ -338,10 +338,10 @@ if ! type "pyenv" >/dev/null 2>&1; then
     if [ -e "${HOME}/.${PROFILE_FILE}" ]
     then
       echo "$pyenv_init_script" >> "${HOME}/.${PROFILE_FILE}"
-      eval "$pyenv_init_script"
     fi
   done
   set +e
+  eval "$pyenv_init_script"  # apply directly to the current shell
   pyenv
 fi
 
