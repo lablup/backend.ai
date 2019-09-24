@@ -130,3 +130,9 @@ Integrations with IDEs and Editors
    * https://github.com/lablup/atom-live-code-runner
 * IntelliJ / PyCharm plugin
    * Coming soon!
+
+
+License
+-------
+
+Refer to [LICENSE file](https://github.com/lablup/backend.ai/blob/master/LICENSE).
