@@ -526,10 +526,44 @@ Resource Preset Object
        If it contains slot types that are not currently used/activated in the cluster,
        they will be removed when returned via ``/resource/*`` REST APIs.
 
+.. _vfolder-creation-result-object:
+
+Virtual Folder Creation Result Object
+-------------------------------------
+            'id': folder_id,
+            'name': params['name'],
+            'host': folder_host,
+            'user': user_uuid,
+            'group': group_uuid,
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Key
+     - Type
+     - Description
+   * - ``id``
+     - ``UUID``
+     - An internally used unique identifier of the created vfolder.
+       Currently it has no use in the client-side.
+   * - ``name``
+     - ``str``
+     - The name of created vfolder, as the client has given.
+   * - ``host``
+     - ``str``
+     - The host name where the vfolder is created.
+   * - ``user``
+     - ``UUID``
+     -
+   * - ``group``
+     - ``UUID``
+
 .. _vfolder-list-item-object:
 
 Virtual Folder List Item Object
 -------------------------------
+
 .. list-table::
    :widths: 15 5 80
    :header-rows: 1
@@ -548,12 +582,30 @@ Virtual Folder List Item Object
      - The host name where this folder is located.
    * - ``is_owner``
      - ``bool``
-     - Indicates if the requested user is the owner of this folder.
+     - True if the client user is the owner of this folder.
+       False if the folder is shared from a group or another user.
    * - ``permission``
      - ``enum``
      - The requested user's permission for this folder. (One of "ro", "rw", and
        "wd" which represents read-only, read-write, and write-delete
        respectively. Currently "rw" and "wd" has no difference.)
+   * - ``user``
+     - ``enum``
+     - The user ID if the owner of this item is a user. Otherwise, ``null``.
+
+       .. versionadded:: v4.20190615
+
+   * - ``group``
+     - ``enum``
+     - The group ID if the owner of this item is a group. Otherwise, ``null``.
+
+       .. versionadded:: v4.20190615
+
+   * - ``type``
+     - ``enum``
+     - The owner type of vfolder. One of "user" or "group".
+
+       .. versionadded:: v4.20190615
 
 .. _vfolder-item-object:
 
@@ -571,23 +623,44 @@ Virtual Folder Item Object
      - ``str``
      - The human readable name set when created.
    * - ``id``
-     - ``slug``
+     - ``UUID``
      - The unique ID of the folder.
    * - ``host``
      - ``str``
      - The host name where this folder is located.
    * - ``is_owner``
      - ``bool``
-     - Indicates if the requested user is the owner of this folder.
+     - True if the client user is the owner of this folder.
+       False if the folder is shared from a group or another user.
    * - ``num_files``
      - ``int``
      - The number of files in this folder.
    * - ``permission``
      - ``enum``
      - The requested user's permission for this folder.
-   * - ``created``
+   * - ``created_at``
      - ``datetime``
      - The date and time when the folder is created.
+   * - ``last_used``
+     - ``datetime``
+     - The date adn time when the folder is last used.
+   * - ``user``
+     - ``enum``
+     - The user ID if the owner of this item is a user. Otherwise, ``null``.
+
+       .. versionadded:: v4.20190615
+
+   * - ``group``
+     - ``enum``
+     - The group ID if the owner of this item is a group. Otherwise, ``null``.
+
+       .. versionadded:: v4.20190615
+
+   * - ``type``
+     - ``enum``
+     - The owner type of vfolder. One of "user" or "group".
+
+       .. versionadded:: v4.20190615
 
 .. _vfolder-file-object:
 
@@ -633,17 +706,44 @@ Virtual Folder Invitation Object
      - Type
      - Description
    * - ``id``
-     - ``slug``
+     - ``UUID``
      - The unique ID of the invitation. Use this when making API requests referring this invitation.
    * - ``inviter``
      - ``str``
-     - The inviter name of the invitation.
+     - The inviter's user ID (email) of the invitation.
    * - ``permission``
      - ``str``
-     - The permission to give to invited user.
+     - The permission that the invited user will have.
    * - ``state``
      - ``str``
      - The current state of the invitation.
    * - ``vfolder_id``
-     - ``slug``
-     - The unique ID of the vfolder to which the permission will be applied if accepted.
+     - ``UUID``
+     - The unique ID of the vfolder where the user is invited.
+   * - ``vfolder_name``
+     - ``str``
+     - The name of the vfolder where the user is invited.
+
+.. _vfolder-fstab-object:
+
+.. list-table::
+   :widths: 15, 5, 80
+   :header-row: 1
+   * - Key
+     - Type
+     - Description
+   * - ``content``
+     - ``str``
+     - The retrieved content (multi-line string) of fstab.
+   * - ``node``
+     - ``str``
+     - The node type, either "agent" or "manager.
+   * - ``node_id``
+     - ``str``
+     - The node's unique ID.
+
+
+
+                'content': content,
+                'node': 'manager',
+                'node_id': 'manager',
