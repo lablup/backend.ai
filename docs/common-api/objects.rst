@@ -591,10 +591,10 @@ Virtual Folder List Item Object
        respectively. Currently "rw" and "wd" has no difference.)
    * - ``user``
      - ``UUID``
-     - The user ID if the owner of this item is a user. Otherwise, ``null``.
+     - The user ID if the owner of this item is a user vfolder. Otherwise, ``null``.
    * - ``group``
      - ``UUID``
-     - The group ID if the owner of this item is a group. Otherwise, ``null``.
+     - The group ID if the owner of this item is a group vfolder. Otherwise, ``null``.
    * - ``type``
      - ``enum``
      - The owner type of vfolder. One of "user" or "group".
