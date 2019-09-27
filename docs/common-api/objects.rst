@@ -530,11 +530,6 @@ Resource Preset Object
 
 Virtual Folder Creation Result Object
 -------------------------------------
-            'id': folder_id,
-            'name': params['name'],
-            'host': folder_host,
-            'user': user_uuid,
-            'group': group_uuid,
 
 .. list-table::
    :widths: 15 5 80
@@ -555,9 +550,14 @@ Virtual Folder Creation Result Object
      - The host name where the vfolder is created.
    * - ``user``
      - ``UUID``
-     -
+     - The user who has the ownership of this vfolder.
    * - ``group``
      - ``UUID``
+     - The group who is the owner of this vfolder.
+
+.. versionadded:: v4.20190615
+
+   ``user`` and ``group`` fields.
 
 .. _vfolder-list-item-object:
 
@@ -590,22 +590,18 @@ Virtual Folder List Item Object
        "wd" which represents read-only, read-write, and write-delete
        respectively. Currently "rw" and "wd" has no difference.)
    * - ``user``
-     - ``enum``
+     - ``UUID``
      - The user ID if the owner of this item is a user. Otherwise, ``null``.
-
-       .. versionadded:: v4.20190615
-
    * - ``group``
-     - ``enum``
+     - ``UUID``
      - The group ID if the owner of this item is a group. Otherwise, ``null``.
-
-       .. versionadded:: v4.20190615
-
    * - ``type``
      - ``enum``
      - The owner type of vfolder. One of "user" or "group".
 
-       .. versionadded:: v4.20190615
+.. versionadded:: v4.20190615
+
+   ``user``, ``group``, and ``type`` fields.
 
 .. _vfolder-item-object:
 
@@ -645,22 +641,18 @@ Virtual Folder Item Object
      - ``datetime``
      - The date adn time when the folder is last used.
    * - ``user``
-     - ``enum``
+     - ``UUID``
      - The user ID if the owner of this item is a user. Otherwise, ``null``.
-
-       .. versionadded:: v4.20190615
-
    * - ``group``
-     - ``enum``
+     - ``UUID``
      - The group ID if the owner of this item is a group. Otherwise, ``null``.
-
-       .. versionadded:: v4.20190615
-
    * - ``type``
      - ``enum``
      - The owner type of vfolder. One of "user" or "group".
 
-       .. versionadded:: v4.20190615
+.. versionadded:: v4.20190615
+
+   ``user``, ``group``, and ``type`` fields.
 
 .. _vfolder-file-object:
 
@@ -742,8 +734,4 @@ Virtual Folder Invitation Object
      - ``str``
      - The node's unique ID.
 
-
-
-                'content': content,
-                'node': 'manager',
-                'node_id': 'manager',
+.. versionadded:: v4.20190615
