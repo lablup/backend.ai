@@ -29,7 +29,8 @@ Our branch naming lies between
 [GitFlow](https://danielkummer.github.io/git-flow-cheatsheet/index.html) (we use
 "feature/", "hostfix/" prefixed branch names)
 and [GitHub Flow](https://guides.github.com/introduction/flow/) (we don't use a
-separate "develop" branch and just use PRs)
+separate "develop" branch and just use PRs) to take advantages from both without
+complication that hurts agility.
 
 
 Documentation
