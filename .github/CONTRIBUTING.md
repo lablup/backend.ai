@@ -12,6 +12,26 @@ CLA](https://gist.github.com/achimnol/f53015b30af7b045fdd01c0cc3b18c96) like oth
 open source projects managed by Lablup Inc.
 
 
+Versioning Scheme
+-----------------
+
+Before you make a contribution, ensure that which branch is the target you want to
+conntribute to.
+Please take a look at [our versioning scheme
+document](https://docs.backend.ai/en/latest/install/version-management-and-upgrades.html#version-numbering)
+to understand how we name branches and tags.
+In short, we use "X.Y" in branch names for major releases, and "X.Y.Z" in tag names
+for minor patch releases.
+The master branch is for main development and it's the default recommended branch to
+make a feature branch.
+
+Our branch naming lies between
+[GitFlow](https://danielkummer.github.io/git-flow-cheatsheet/index.html) (we use
+"feature/", "hostfix/" prefixed branch names)
+and [GitHub Flow](https://guides.github.com/introduction/flow/) (we don't use a
+separate "develop" branch and just use PRs)
+
+
 Documentation
 -------------
 
@@ -124,11 +144,16 @@ the original repository to begin work with.  Otherwise, fork and create a featur
 branch in your GitHub account.
 The branch name should be prefixed with "feature/" and the rest should be hyphenated
 slugs (words and numbers).  You may append the related issue number ("#xxx"), but
-please include the issue number in the pull request's description instead.
+please include the issue number in the pull request's description instead, to avoid
+potential misbehavior of shell commands and tools which may treat "#" as the comment
+syntax.
 
 Since Backend.AI consists of many sub-projects in separate GitHub repositories,
-we recommend to pile an issue in the meta repository and mention it like
-"refs lablup/backend.ai#xxx" in all pull requests in individual sub-projects.
+it is often required to make multiple PRs to multiple repositories to resolve a
+single issue.
+To get an integrated view, we recommend to pile an issue in the meta repository and
+mention it like "refs lablup/backend.ai#xxx" in all related pull requests in
+individual sub-projects.
 
 Please keep the followings:
 
