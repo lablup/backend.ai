@@ -67,6 +67,32 @@ Send pull requests to add/modify documentation contents and fix typos.
 To distinguish documentation-related PRs easily, please prefix the PR title with
 "docs:" or apply the "docs" label.
 
+### Coding Style for Docs
+
+We wrap the sentences by 75 characters (configured via editorconfig) but always break
+the line after the end of sentences (periods).
+The purpose of this extra convention is to keep the translations in the sentence
+level instead of paragraphs.
+
+For example:
+```text
+This is the first long long ... long (75 chars here) long sentence.
+This is the second long long ... long (75 chars here) long sentence.
+```
+should be
+```text
+This is the first long long ... long
+long sentence.
+This is the second long long ... long
+long sentence.
+```
+but *NOT*
+```text
+This is the first long long long long ... long
+long sentence.  This is the second long ... long
+long ... long sentence.
+```
+
 
 Translation
 -----------
