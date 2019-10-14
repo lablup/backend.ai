@@ -1,0 +1,1809 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2019-10-14 21:43+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.7.0\n"
+
+#: ../../install/configure-autoscaling.rst:3
+msgid "Configure Autoscaling"
+msgstr ""
+
+#: ../../install/configure-autoscaling.rst:5
+msgid ""
+"Autoscaling strategies may vary cluster by cluster. Here we introduce a "
+"brief summary of high-level guides. (More details about configuring "
+"Backend.AI will follow soon.)"
+msgstr ""
+
+#: ../../install/configure-autoscaling.rst:10
+msgid "ASG (Auto-scaling Group)"
+msgstr ""
+
+#: ../../install/configure-autoscaling.rst:12
+msgid ""
+"AWS and other cloud providers offer auto-scaling groups so that they "
+"control the number of VM instances sharing the same base image within "
+"certain limits depending on the VMs' CPU utilization or other resource "
+"metrics. You could use this model for Backend.AI, but we recommend some "
+"customization due to the following reasons:"
+msgstr ""
+
+#: ../../install/configure-autoscaling.rst:16
+msgid ""
+"Backend.AI's kernels are allocated a fixed and isolated amount of "
+"resources even when they do not use that much. So simple resource "
+"metering may expose \"how busy\" the spawned kernels are but not \"how "
+"many\" kernels are spwned. In the perspective of Backend.AI's scheduler, "
+"the latter is much more important."
+msgstr ""
+
+#: ../../install/configure-autoscaling.rst:17
+msgid ""
+"Backend.AI tries to maintain low latency when spawning new compute "
+"sessions. This means that it requires to keep a small number of VM "
+"instances to be at a \"hot\" ready state -- maybe just running idle ones "
+"or stopped ones for fast booting. If the cloud provider supports such "
+"fine-grained control, it is best to use their options. We are currently "
+"under development of Backend.AI's own fine-grained scaling."
+msgstr ""
+
+#: ../../install/configure-autoscaling.rst:18
+msgid ""
+"The Backend.AI scheduler treats GPUs as the first-class citizen like CPU "
+"cores and main memory for its capacity planning. Traditional auto-scaling"
+" metrics often miss this, so you need to set up a custom metric using "
+"vendor-specific ways."
+msgstr ""
+
+#: ../../install/demo-setup.rst:2
+msgid "One-line Demo Setup"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:5 ../../install/demo-setup.rst:4
+msgid ""
+"`This meta-repository <https://github.com/lablup/backend.ai>`_ provides a"
+" docker-compose configuration to fire up a single-node Backend.AI cluster"
+" running on your PC (http://localhost:8081)."
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:8 ../../install/demo-setup.rst:7
+#: ../../install/development-setup.rst:19
+#: ../../install/install-from-package.rst:7
+#: ../../install/install-from-source.rst:15
+msgid "Prerequisites"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:11 ../../install/demo-setup.rst:10
+msgid ""
+"All: `install Docker 17.06 or later <https://docs.docker.com/install/>`_ "
+"with `docker-compose v1.21 or later "
+"<https://docs.docker.com/compose/install/>`_"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:12 ../../install/demo-setup.rst:11
+msgid ""
+"Linux users: change \"docker.for.mac.localhost\" in docker-compose.yml to"
+" \"172.17.0.1\""
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:53 ../../install/demo-setup.rst:14
+msgid "Notes"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:55 ../../install/demo-setup.rst:17
+msgid "This demo setup does *not* support GPUs."
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:58 ../../install/demo-setup.rst:20
+msgid "All you have to do"
+msgstr ""
+
+#: ../../install/demo-setup.rst:23
+msgid "Clone the repository"
+msgstr ""
+
+#: ../../install/demo-setup.rst:24
+msgid "Check out the prerequisites above"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:60 ../../install/demo-setup.rst:25
+msgid "``docker-compose up -d``"
+msgstr ""
+
+#: ../../install/demo-setup.rst:27
+msgid "For Windows, ``docker-compose -f docker-compose.win-demo.yml up -d``"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:62 ../../install/demo-setup.rst:29
+msgid "Pull some kernel images to try out"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:65 ../../install/demo-setup.rst:32
+msgid "Pulling kernel images"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:67 ../../install/demo-setup.rst:34
+msgid "Pull the images on your host Docker daemon like:"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:75 ../../install/demo-setup.rst:42
+msgid ""
+"By default this demo cluster already has metadata/alias information for "
+"`all publicly available Backend.AI kernels "
+"<https://github.com/lablup/backend.ai-kernels>`_\\ , so you don't have to"
+" manually register the pulled kernel information to the cluster but only "
+"have to *pull* those you want to try out."
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:78 ../../install/demo-setup.rst:45
+msgid "Using Clients"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:80 ../../install/demo-setup.rst:47
+msgid ""
+"To access this local cluster, set the following configurations to your "
+"favoriate Backend.AI client:"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:88 ../../install/demo-setup.rst:55
+msgid ""
+"With `our official Python client <http://pypi.python.org/pypi/backend.ai-"
+"client>`_\\ , you can do:"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:102 ../../install/demo-setup.rst:69
+msgid ""
+"WARNING: This demo configuration is highly insecure. DO NOT USE in "
+"production!"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:105 ../../install/demo-setup.rst:72
+msgid "FAQ"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:108 ../../install/demo-setup.rst:75
+msgid "When launching a kernel, it says \"Service Unavailable\"!"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:110 ../../install/demo-setup.rst:77
+msgid ""
+"Each image has different default resource requirements and your Docker "
+"daemon may have a too small amount of resources. For example, TensorFlow "
+"images require 8 GiB or more RAM for your Docker daemon."
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:111 ../../install/demo-setup.rst:78
+msgid ""
+"Or, you might have launched 30 kernel sessions already, which is the "
+"default limit for this demo setup."
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:113 ../../install/demo-setup.rst:80
+msgid "What does the \"dense\" tag mean in the TensorFlow kernel images?"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:115 ../../install/demo-setup.rst:82
+msgid ""
+"Images with \"dense\" tags are optimized for shared multi-tenancy "
+"environments. There is no difference in functionalities."
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:3
+msgid "Demo Setup"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:14
+msgid "intstall docker-ce at Centos 7.5"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:19
+msgid "install pre-requirement package"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:23
+msgid "install pyenv that support enviroment for Python"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:31
+msgid "install pyenv that support virtual enviroment for Python"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:37
+msgid "install python 3.6.x to run backend.ai"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:42
+msgid ""
+"install requirement packer of python and docker * Clone the repository * "
+"Check out the prerequisites above"
+msgstr ""
+
+#: ../../install/development-setup.rst:6
+msgid "Development Setup"
+msgstr ""
+
+#: ../../install/development-setup.rst:8
+msgid ""
+"Currently Backend.AI is developed and tested under only \\*NIX-compatible"
+" platforms (Linux or macOS)."
+msgstr ""
+
+#: ../../install/development-setup.rst:12
+msgid "Method 1: Automatic Installation"
+msgstr ""
+
+#: ../../install/development-setup.rst:14
+msgid ""
+"For the ease of on-boarding developer experience, we provide an automated"
+" script that installs all server-side components in editable states with "
+"just one command."
+msgstr ""
+
+#: ../../install/development-setup.rst:21
+msgid "Install the followings accordingly to your host operating system."
+msgstr ""
+
+#: ../../install/development-setup.rst:23
+msgid ""
+"`pyenv <https://github.com/pyenv/pyenv>`_ and `pyenv-virtualenv "
+"<https://github.com/pyenv/pyenv-virtualenv>`_"
+msgstr ""
+
+#: ../../install/development-setup.rst:25
+msgid "`docker <https://docs.docker.com/install/>`_"
+msgstr ""
+
+#: ../../install/development-setup.rst:27
+msgid "`docker-compose <https://docs.docker.com/compose/install/>`_"
+msgstr ""
+
+#: ../../install/development-setup.rst:31
+msgid ""
+"In some cases, locale conflicts between the terminal client and the "
+"remote host may cause encoding errors when installing Backend.AI "
+"components due to Unicode characters in README files.  Please keep "
+"correct locale configurations to prevent such errors."
+msgstr ""
+
+#: ../../install/development-setup.rst:37
+msgid ""
+"In macOS, Homebrew offers its own pyenv and pyenv-virtualenv packages but"
+" we *do not* recommend using them!  Updating those packages and cleaning "
+"up via Homebrew will break your virtual environments as each version uses"
+" different physical directories."
+msgstr ""
+
+#: ../../install/development-setup.rst:42
+msgid ""
+"Our installer script will try to install pyenv automatically if not "
+"installed, but we *do* recommend installing them by yourself as it may "
+"interfere with your shell configurations."
+msgstr ""
+
+#: ../../install/development-setup.rst:47
+msgid "Running the script"
+msgstr ""
+
+#: ../../install/development-setup.rst:57
+#: ../../install/development-setup.rst:104
+msgid "The script may ask your root password in the middle to run sudo in Linux."
+msgstr ""
+
+#: ../../install/development-setup.rst:59
+msgid ""
+"This installs a set of Backend.AI server-side components in the ``backend"
+".ai-dev`` directory under the current working directory."
+msgstr ""
+
+#: ../../install/development-setup.rst:62
+msgid ""
+"Inside the directory, there are ``manager``, ``agent``, ``common`` and a "
+"few other auxiliary directories.  You can directly modify the source "
+"codes inside them and re-launch the gateway and agent.  The ``common`` "
+"directory is shared by ``manager`` and ``agent`` so just editing sources "
+"there takes effects in the next launches of the gateway and agent."
+msgstr ""
+
+#: ../../install/development-setup.rst:68
+msgid ""
+"At the end of execution, the script will show several command examples "
+"about launching the gateway and agent.  It also displays a unique random "
+"key called \"environment ID\" to distinguish a particular execution of "
+"this script so that repeated execution does not corrupt your existing "
+"setups."
+msgstr ""
+
+#: ../../install/development-setup.rst:73
+msgid ""
+"By default, the script pulls the docker images for our standard Python "
+"kernel and TensorFlow CPU-only kernel.  To try out other images, you have"
+" to pull them manually afterwards."
+msgstr ""
+
+#: ../../install/development-setup.rst:77
+#: ../../install/development-setup.rst:109
+msgid ""
+"The script provides a set of command-line options.  Check out them using "
+"``-h`` / ``--help`` option."
+msgstr ""
+
+#: ../../install/development-setup.rst:82
+msgid ""
+"To install multiple instances of development environments using this "
+"script, you need to run the script at different working directories "
+"because the ``backend.ai-dev`` directory name is fixed."
+msgstr ""
+
+#: ../../install/development-setup.rst:86
+msgid ""
+"Also, you cannot run multiple gateways and agents from different "
+"environments at the same time because docker container in different "
+"environments use the same TCP ports of the host system.  Use ``docker-"
+"compose`` command to stop the current environment and start another to "
+"switch between environments. Please do not forget to specify ``-p "
+"<ENVID>`` option to ``docker-compose`` commands to distinguish different "
+"environments."
+msgstr ""
+
+#: ../../install/development-setup.rst:94
+msgid "Resetting the environment"
+msgstr ""
+
+#: ../../install/development-setup.rst:106
+msgid ""
+"This will purge all docker resources related to the given environment ID "
+"and the ``backend.ai-dev`` directory under the current working directory."
+msgstr ""
+
+#: ../../install/development-setup.rst:114
+msgid ""
+"Be aware that this script force-removes, without any warning, all "
+"contents of the ``backend.ai-dev`` directory, which may contain your own "
+"modifications that is not yet pushed to a remote git repository."
+msgstr ""
+
+#: ../../install/development-setup.rst:120
+msgid "Method 2: Manual Installation"
+msgstr ""
+
+#: ../../install/development-setup.rst:123
+msgid "Requirement packages"
+msgstr ""
+
+#: ../../install/development-setup.rst:125
+msgid "PostgreSQL: 9.6"
+msgstr ""
+
+#: ../../install/development-setup.rst:127
+msgid "etcd: v3.3.9"
+msgstr ""
+
+#: ../../install/development-setup.rst:129
+msgid "redis: latest"
+msgstr ""
+
+#: ../../install/development-setup.rst:132
+msgid "Prepare containers for external daemons"
+msgstr ""
+
+#: ../../install/development-setup.rst:134
+msgid ""
+"First install an appropriate version of Docker (later than 2017.03 "
+"version) and docker-compose (later than 1.21). Check out the "
+":doc:`Install Docker </install/install-docker>` guide."
+msgstr ""
+
+#: ../../install/development-setup.rst:138
+msgid ""
+"In this guide, ``$WORKSPACE`` means the absolute path to an arbitrary "
+"working directory in your system."
+msgstr ""
+
+#: ../../install/development-setup.rst:140
+msgid ""
+"To copy-and-paste commands in this guide, set ``WORKSPACE`` environment "
+"variable."
+msgstr ""
+
+#: ../../install/development-setup.rst:142
+msgid "The directory structure would look like after finishing this guide:"
+msgstr ""
+
+#: ../../install/development-setup.rst:148
+msgid "``$WORKSPACE``"
+msgstr ""
+
+#: ../../install/development-setup.rst:145
+msgid "backend.ai"
+msgstr ""
+
+#: ../../install/development-setup.rst:146
+msgid "backend.ai-manager"
+msgstr ""
+
+#: ../../install/development-setup.rst:147
+msgid "backend.ai-agent"
+msgstr ""
+
+#: ../../install/development-setup.rst:148
+msgid "backend.ai-common"
+msgstr ""
+
+#: ../../install/development-setup.rst:149
+msgid "backend.ai-client-py"
+msgstr ""
+
+#: ../../install/development-setup.rst:165
+msgid ""
+"This will create and start PostgreSQL, Redis, and a single-instance etcd "
+"containers. Note that PostgreSQL and Redis uses non-default ports by "
+"default (5442 and 6389 instead of 5432 and 6379) to prevent conflicts "
+"with other application development environments."
+msgstr ""
+
+#: ../../install/development-setup.rst:170 ../../install/install-agent.rst:87
+#: ../../install/install-manager.rst:87
+msgid "Prepare Python 3.6+"
+msgstr ""
+
+#: ../../install/development-setup.rst:172
+msgid ""
+"Check out :doc:`Install Python via pyenv <install-python-via-pyenv>` for "
+"instructions."
+msgstr ""
+
+#: ../../install/development-setup.rst:174
+msgid ""
+"Create the following virtualenvs: ``venv-manager``, ``venv-agent``, "
+"``venv-common``, and ``venv-client``."
+msgstr ""
+
+#: ../../install/development-setup.rst:183
+msgid "Prepare dependent libraries"
+msgstr ""
+
+#: ../../install/development-setup.rst:185
+msgid ""
+"Install ``snappy`` (brew on macOS), ``libsnappy-dev`` (Debian-likes), or "
+"``libsnappy-devel`` (RHEL-likes) system package depending on your "
+"environment."
+msgstr ""
+
+#: ../../install/development-setup.rst:188
+msgid "Prepare server-side source clones"
+msgstr ""
+
+#: ../../install/development-setup.rst:196
+msgid "Clone the Backend.AI source codes."
+msgstr ""
+
+#: ../../install/development-setup.rst:205
+msgid "Inside each directory, install the sources as editable packages."
+msgstr ""
+
+#: ../../install/development-setup.rst:209
+msgid ""
+"Editable packages makes Python to apply any changes of the source code in"
+" git clones immediately when importing the installed packages."
+msgstr ""
+
+#: ../../install/development-setup.rst:231
+msgid ""
+"(Optional) Symlink backend.ai-common in the manager and agent directories"
+" to the cloned source"
+msgstr ""
+
+#: ../../install/development-setup.rst:233
+msgid ""
+"If you do this, your changes in the source code of the backend.ai-common "
+"directory will be reflected immediately to the manager and agent. You "
+"should install backend.ai-common dependencies into ``venv-manager`` and "
+"``venv-agent`` as well, but this is already done in the previous step."
+msgstr ""
+
+#: ../../install/development-setup.rst:249
+msgid "Initialize databases and load fixtures"
+msgstr ""
+
+#: ../../install/development-setup.rst:251
+msgid ""
+"Check out the :doc:`Prepare Databases for Manager </install/prepare-"
+"database-for-manager>` guide."
+msgstr ""
+
+#: ../../install/development-setup.rst:254 ../../install/install-agent.rst:176
+msgid "Prepare Kernel Images"
+msgstr ""
+
+#: ../../install/development-setup.rst:256
+msgid ""
+"You need to pull the kernel container images first to actually spawn "
+"compute sessions.\\ :raw-html-m2r:`<br>` The kernel images here must have"
+" the tags specified in image-metadata.yml file."
+msgstr ""
+
+#: ../../install/development-setup.rst:263 ../../install/install-agent.rst:189
+msgid ""
+"For the full list of publicly available kernels, `check out the kernels "
+"repository. <https://github.com/lablup/backend.ai-kernels>`_"
+msgstr ""
+
+#: ../../install/development-setup.rst:265
+msgid ""
+"**NOTE:** You need to restart your agent if you pull images after "
+"starting the agent."
+msgstr ""
+
+#: ../../install/development-setup.rst:268
+msgid "Setting Linux capabilities to Python (Linux-only)"
+msgstr ""
+
+#: ../../install/development-setup.rst:270
+msgid ""
+"To allow Backend.AI to collect sysfs/cgroup resource usage statistics, "
+"the Python executable must have the following Linux capabilities (to run "
+"without \"root\"): ``CAP_SYS_ADMIN``, ``CAP_SYS_PTRACE``, and "
+"``CAP_DAC_OVERRIDE``. You may use the following command to set them to "
+"the current virtualenv's Python executable."
+msgstr ""
+
+#: ../../install/development-setup.rst:278
+msgid "Running daemons from cloned sources"
+msgstr ""
+
+#: ../../install/development-setup.rst:285
+msgid ""
+"Note that through options, PostgreSQL and Redis ports set above for "
+"development environment are used. You may change other options to match "
+"your environment and personal configurations. (Check out ``-h`` / "
+"``--help``)"
+msgstr ""
+
+#: ../../install/development-setup.rst:293
+msgid ""
+"※ The role of ``run-with-halfstack.sh`` script is to set appropriate "
+"environment variables so that the manager/agent daemons use the halfstack"
+" docker containers."
+msgstr ""
+
+#: ../../install/development-setup.rst:296
+msgid "Prepare client-side source clones"
+msgstr ""
+
+#: ../../install/development-setup.rst:315
+msgid ""
+"Inside ``venv-client``\\ , now you can use the ``backend.ai`` command for"
+" testing and debugging."
+msgstr ""
+
+#: ../../install/development-setup.rst:319
+msgid "Verifying Installation"
+msgstr ""
+
+#: ../../install/development-setup.rst:321
+msgid ""
+"Write a shell script (e.g., ``env_local.sh``) like below to easily switch"
+" the API endpoint and credentials for testing:"
+msgstr ""
+
+#: ../../install/development-setup.rst:330
+msgid ""
+"Load this script (e.g., ``source env_local.sh``) before you run the "
+"client against your server-side installation."
+msgstr ""
+
+#: ../../install/development-setup.rst:332
+msgid ""
+"Now you can do ``backend.ai ps`` to confirm if there are no sessions "
+"running and run the hello-world:"
+msgstr ""
+
+#: ../../install/guides.rst:2
+msgid "Quickstart Guides"
+msgstr ""
+
+#: ../../install/install-agent.rst:6
+msgid "Install Agent"
+msgstr ""
+
+#: ../../install/install-agent.rst:8
+msgid ""
+"We assume that your system is configured with a sudoable admin user named"
+" ``devops``. Your Backend.AI manager should be already set up and "
+"running."
+msgstr ""
+
+#: ../../install/install-agent.rst:12 ../../install/install-manager.rst:12
+#: ../../install/install-monitoring-and-logging-tools.rst:9
+#: ../../install/prepare-database-for-manager.rst:9
+msgid "Guide variables"
+msgstr ""
+
+#: ../../install/install-agent.rst:14
+#: ../../install/install-monitoring-and-logging-tools.rst:11
+#: ../../install/prepare-database-for-manager.rst:11
+msgid ""
+"⚠️ Prepare the values of the following variables before working with this"
+" page and replace their occurrences with the values when you follow the "
+"guide."
+msgstr ""
+
+#: ../../install/install-agent.rst:20 ../../install/install-agent.rst:36
+#: ../../install/install-manager.rst:19 ../../install/install-manager.rst:43
+#: ../../install/install-monitoring-and-logging-tools.rst:18
+#: ../../install/prepare-database-for-manager.rst:19
+msgid "Name"
+msgstr ""
+
+#: ../../install/install-agent.rst:21 ../../install/install-agent.rst:37
+#: ../../install/install-manager.rst:20 ../../install/install-manager.rst:44
+msgid "Meaning"
+msgstr ""
+
+#: ../../install/install-agent.rst:22 ../../install/install-manager.rst:21
+#: ../../install/prepare-database-for-manager.rst:21
+msgid "``{NS}``"
+msgstr ""
+
+#: ../../install/install-agent.rst:23 ../../install/install-manager.rst:22
+msgid "The etcd namespace (just create a unique string like domain names)"
+msgstr ""
+
+#: ../../install/install-agent.rst:24 ../../install/install-manager.rst:23
+#: ../../install/prepare-database-for-manager.rst:23
+msgid "``{ETCDADDR}``"
+msgstr ""
+
+#: ../../install/install-agent.rst:25 ../../install/install-manager.rst:24
+msgid ""
+"The etcd cluster address (\\ ``{ETCDHOST}:{ETCDPORT}``\\ , "
+"``localhost:2379`` for development setup)"
+msgstr ""
+
+#: ../../install/install-agent.rst:26 ../../install/install-manager.rst:33
+msgid "``{ENDPOINT}``"
+msgstr ""
+
+#: ../../install/install-agent.rst:27 ../../install/install-manager.rst:34
+msgid ""
+"The DNS hostname of the API server (depending on your environment, this "
+"may be either a publicly registered domain or a local private domain)"
+msgstr ""
+
+#: ../../install/install-agent.rst:31 ../../install/install-manager.rst:38
+msgid "Optional variables"
+msgstr ""
+
+#: ../../install/install-agent.rst:38 ../../install/install-manager.rst:45
+msgid "``{SSLCERT}``"
+msgstr ""
+
+#: ../../install/install-agent.rst:39 ../../install/install-manager.rst:46
+msgid "The path to your SSL certificate (bundled with CA chain certificates)"
+msgstr ""
+
+#: ../../install/install-agent.rst:40 ../../install/install-manager.rst:47
+msgid "``{SSLPKEY}``"
+msgstr ""
+
+#: ../../install/install-agent.rst:41 ../../install/install-manager.rst:48
+msgid "The path to your SSL private key"
+msgstr ""
+
+#: ../../install/install-agent.rst:42 ../../install/install-manager.rst:49
+msgid "``{S3AKEY}``"
+msgstr ""
+
+#: ../../install/install-agent.rst:43 ../../install/install-manager.rst:50
+msgid "The access key for AWS S3 or compatible services [#fn1]_"
+msgstr ""
+
+#: ../../install/install-agent.rst:44 ../../install/install-manager.rst:51
+msgid "``{S3SKEY}``"
+msgstr ""
+
+#: ../../install/install-agent.rst:45 ../../install/install-manager.rst:52
+msgid "The secret key for AWS S3 or compatible services"
+msgstr ""
+
+#: ../../install/install-agent.rst:46 ../../install/install-manager.rst:53
+#: ../../install/install-monitoring-and-logging-tools.rst:20
+msgid "``{DDAPIKEY}``"
+msgstr ""
+
+#: ../../install/install-agent.rst:47 ../../install/install-manager.rst:54
+msgid "The Datadog API key"
+msgstr ""
+
+#: ../../install/install-agent.rst:48 ../../install/install-manager.rst:55
+#: ../../install/install-monitoring-and-logging-tools.rst:22
+msgid "``{DDAPPKEY}``"
+msgstr ""
+
+#: ../../install/install-agent.rst:49 ../../install/install-manager.rst:56
+#: ../../install/install-monitoring-and-logging-tools.rst:23
+msgid "The Datadog application key"
+msgstr ""
+
+#: ../../install/install-agent.rst:50 ../../install/install-manager.rst:57
+#: ../../install/install-monitoring-and-logging-tools.rst:24
+msgid "``{SENTRYURL}``"
+msgstr ""
+
+#: ../../install/install-agent.rst:51 ../../install/install-manager.rst:58
+#: ../../install/install-monitoring-and-logging-tools.rst:25
+msgid "The private Sentry report URL"
+msgstr ""
+
+#: ../../install/install-agent.rst:54 ../../install/install-manager.rst:61
+msgid ""
+"AWS S3 is used to store the output files generated by the user code in "
+"kernels' ``/home/work/.output`` directory. If not specified, Backend.AI "
+"will just skip uploading generated files."
+msgstr ""
+
+#: ../../install/install-agent.rst:59 ../../install/install-manager.rst:64
+msgid "Install dependencies for daemonization"
+msgstr ""
+
+#: ../../install/install-agent.rst:62 ../../install/install-manager.rst:67
+#: ../../install/install-python-via-pyenv.rst:18
+msgid "Ubuntu"
+msgstr ""
+
+#: ../../install/install-agent.rst:70 ../../install/install-manager.rst:75
+msgid "Here are some optional but useful packages:"
+msgstr ""
+
+#: ../../install/install-agent.rst:77 ../../install/install-manager.rst:82
+#: ../../install/install-python-via-pyenv.rst:30
+msgid "CentOS / RHEL"
+msgstr ""
+
+#: ../../install/install-agent.rst:79 ../../install/install-manager.rst:84
+#: ../../install/install-python-via-pyenv.rst:32
+msgid "(TODO)"
+msgstr ""
+
+#: ../../install/install-agent.rst:82
+msgid "Prepare CUDA (if available)"
+msgstr ""
+
+#: ../../install/install-agent.rst:84
+msgid "Check out the [[Install CUDA]] guide."
+msgstr ""
+
+#: ../../install/install-agent.rst:89
+msgid ""
+"Check out [[Install Python via pyenv]] for instructions. Create a "
+"virtualenv named ``venv-agent``."
+msgstr ""
+
+#: ../../install/install-agent.rst:92
+msgid ""
+"**(Only in Linux)** To enable detailed resource statistics, give the "
+"Python executable to have ``CAP_SYS_ADMIN``\\ , ``CAP_SYS_PTRACE``\\ , "
+"and ``CAP_DAC_OVERRIDE`` capabilities."
+msgstr ""
+
+#: ../../install/install-agent.rst:99
+msgid "Install Backend.AI Agent as Package"
+msgstr ""
+
+#: ../../install/install-agent.rst:108
+msgid "Monitoring and Logging"
+msgstr ""
+
+#: ../../install/install-agent.rst:110 ../../install/install-manager.rst:190
+msgid "Check out the [[Install Monitoring and Logging Tools]] guide."
+msgstr ""
+
+#: ../../install/install-agent.rst:113 ../../install/install-manager.rst:193
+msgid "Configure supervisord"
+msgstr ""
+
+#: ../../install/install-agent.rst:178
+msgid ""
+"You need to pull the kernel container images first to actually spawn "
+"compute sessions. The name and tag pairs of images must be also specified"
+" in ``backend.ai-manager/sample-configs/image-metadata.yml`` file "
+"imported into etcd."
+msgstr ""
+
+#: ../../install/install-agent.rst:181
+msgid "Here are the pull commands for a few commonly used Python-based images:"
+msgstr ""
+
+#: ../../install/install-agent.rst:192 ../../install/install-manager.rst:273
+msgid "Finally, Run!"
+msgstr ""
+
+#: ../../install/install-cuda.rst:2
+msgid ""
+"On the clouds, we highly recommend using vendor-provided GPU-optimized "
+"instance types (e.g., p2/p3 series on AWS) and GPU-optimized virtual "
+"machine images which include ready-to-use CUDA drivers and "
+"configurations."
+msgstr ""
+
+#: ../../install/install-cuda.rst:4
+msgid ""
+"Since Backend.AI's kernel container images ship all the necessary "
+"libraries and 3rd-party computation packages, you may choose the light-"
+"weight \"base\" image (e.g., Amazon Deep Learning *Base* AMI) instead of "
+"full-featured images (e.g., Amazon Deep Learning Conda AMI)."
+msgstr ""
+
+#: ../../install/install-cuda.rst:7
+msgid "Manually install CUDA at on-premise GPU servers"
+msgstr ""
+
+#: ../../install/install-cuda.rst:9
+msgid ""
+"Please search for this topic on the Internet, as Linux distributions "
+"often provide their own driver packages and optimized method to install "
+"CUDA."
+msgstr ""
+
+#: ../../install/install-cuda.rst:11
+msgid ""
+"To download the driver and CUDA toolkit directly from NVIDIA, `visit here"
+" <https://developer.nvidia.com/cuda-downloads>`_."
+msgstr ""
+
+#: ../../install/install-cuda.rst:14
+msgid "Let Backend.AI to utilize GPUs"
+msgstr ""
+
+#: ../../install/install-cuda.rst:16
+msgid ""
+"If an agent server has properly configured nvidia-docker (ref: [[Install "
+"Docker]]) with working host-side drivers and the agent's Docker daemon "
+"has GPU-enabled kernel images, there is *nothing* to do special. "
+"Backend.AI tracks the GPU capacity just like CPU cores and RAM, and uses "
+"that information to schedule and assign GPU-enabled kernels."
+msgstr ""
+
+#: ../../install/install-docker.rst:5
+msgid "Install Docker"
+msgstr ""
+
+#: ../../install/install-docker.rst:13
+msgid ""
+"For platform-specific instructions, please consult `the docker official "
+"documentation <https://docs.docker.com/engine/installation/>`_."
+msgstr ""
+
+#: ../../install/install-docker.rst:15
+msgid "Alternative way of docker installation on Linux (Ubuntu, CentOS, ...)"
+msgstr ""
+
+#: ../../install/install-docker.rst:21
+msgid "type your password to install docker."
+msgstr ""
+
+#: ../../install/install-docker.rst:24
+msgid "Run docker commands without sudo (required)"
+msgstr ""
+
+#: ../../install/install-docker.rst:26
+msgid ""
+"By default, you need sudo to execute docker commands.\\ :raw-html-"
+"m2r:`<br>` To do so without sudo, add yourself to the system ``docker`` "
+"group."
+msgstr ""
+
+#: ../../install/install-docker.rst:33
+msgid "It will work after restarting your login session."
+msgstr ""
+
+#: ../../install/install-docker.rst:36
+msgid "Install docker-compose (only for development/single-server setup)"
+msgstr ""
+
+#: ../../install/install-docker.rst:38
+msgid ""
+"You need to install docker-compose separately.\\ :raw-html-m2r:`<br>` "
+"Check out `the official documentation "
+"<https://docs.docker.com/compose/install/>`_."
+msgstr ""
+
+#: ../../install/install-docker.rst:42
+msgid "Install nvidia-docker (only for GPU-enabled agents)"
+msgstr ""
+
+#: ../../install/install-docker.rst:44
+msgid ""
+"Check out `the official repository <https://github.com/NVIDIA/nvidia-"
+"docker>`_ for instructions."
+msgstr ""
+
+#: ../../install/install-from-package.rst:2
+msgid "Install from Package (Enterprise Edition)"
+msgstr ""
+
+#: ../../install/install-from-package.rst:4
+msgid ""
+"This is for enterprise customers who need self-contained prebuilt "
+"packages for private clusters."
+msgstr ""
+
+#: ../../install/install-from-package.rst:9
+#: ../../install/install-from-source.rst:17
+msgid "For a standard installation:"
+msgstr ""
+
+#: ../../install/install-from-package.rst:11
+msgid "Ubuntu 16.04+ / CentOS 7.4+"
+msgstr ""
+
+#: ../../install/install-from-package.rst:12
+msgid "sudo"
+msgstr ""
+
+#: ../../install/install-from-package.rst:13
+#: ../../install/install-from-source.rst:24
+msgid "bash"
+msgstr ""
+
+#: ../../install/install-from-package.rst:14
+#: ../../install/install-from-source.rst:25
+msgid "git"
+msgstr ""
+
+#: ../../install/install-from-package.rst:16
+msgid "To enable CUDA:"
+msgstr ""
+
+#: ../../install/install-from-package.rst:18
+#: ../../install/install-from-source.rst:29
+msgid "CUDA 9.0 or later (with compatible NVIDIA driver)"
+msgstr ""
+
+#: ../../install/install-from-package.rst:19
+#: ../../install/install-from-source.rst:30
+msgid "nvidia-docker 1.0 or 2.0"
+msgstr ""
+
+#: ../../install/install-from-package.rst:23
+#: ../../install/install-from-source.rst:34
+msgid "Running the Installer"
+msgstr ""
+
+#: ../../install/install-from-package.rst:27
+#: ../../install/install-from-source.rst:71
+#: ../../install/install-from-source.rst:132
+msgid "Verifying the Installation"
+msgstr ""
+
+#: ../../install/install-from-source.rst:2
+msgid "Install from Source"
+msgstr ""
+
+#: ../../install/install-from-source.rst:4
+msgid ""
+"This is the recommended way to install on most setups, for both "
+"development and production."
+msgstr ""
+
+#: ../../install/install-from-source.rst:8
+msgid ""
+"For production deployments, we also recommend pinning specific releases "
+"when cloning or updating source repositories."
+msgstr ""
+
+#: ../../install/install-from-source.rst:12
+msgid "Setting Up Manager and Agent (single node)"
+msgstr ""
+
+#: ../../install/install-from-source.rst:19
+msgid "Ubuntu 16.04+ / CentOS 7.4+ / macOS 10.12+"
+msgstr ""
+
+#: ../../install/install-from-source.rst:21
+msgid ""
+"For Linux: ``sudo`` with access to the package manager (``apt-get`` or "
+"``yum``)"
+msgstr ""
+
+#: ../../install/install-from-source.rst:22
+msgid ""
+"For macOS: `homebrew <https://brew.sh>`_ with the latest Xcode Command "
+"Line tools."
+msgstr ""
+
+#: ../../install/install-from-source.rst:27
+msgid "To enable CUDA (only supported in Ubuntu or CentOS):"
+msgstr ""
+
+#: ../../install/install-from-source.rst:36
+msgid ""
+"Clone `the meta repository <https://github.com/lablup/backend.ai>`_ "
+"first. For the best result, clone the branch of this repo that matches "
+"with the target server branch you want to install. Inside the cloned "
+"working copy, ``scripts/install-dev.sh`` is the automatic single-node "
+"installation script."
+msgstr ""
+
+#: ../../install/install-from-source.rst:40
+msgid "It provides the following options (check with ``--help``):"
+msgstr ""
+
+#: ../../install/install-from-source.rst:42
+msgid "``--python-version``: The Python version to install."
+msgstr ""
+
+#: ../../install/install-from-source.rst:43
+msgid ""
+"``--install-path``: The target directory where individual Backend.AI "
+"components are installed together as subdirectories."
+msgstr ""
+
+#: ../../install/install-from-source.rst:44
+msgid ""
+"``--server-branch``: The branch/tag used for the manager, agent, and "
+"common components."
+msgstr ""
+
+#: ../../install/install-from-source.rst:45
+msgid "``--client-branch``: The branch/tag used for the client-py component."
+msgstr ""
+
+#: ../../install/install-from-source.rst:46
+msgid ""
+"``--enable-cuda``: If specified, the installer will install the open-"
+"source version of CUDA plugin for the agent."
+msgstr ""
+
+#: ../../install/install-from-source.rst:47
+msgid "``--cuda-branch``: The branch/tag used for the CUDA plugin."
+msgstr ""
+
+#: ../../install/install-from-source.rst:49
+msgid ""
+"With default options, the script will install a source-based single-node "
+"Backend.AI cluster as follows:"
+msgstr ""
+
+#: ../../install/install-from-source.rst:51
+msgid ""
+"The installer tries to install pyenv, the designated Python version, "
+"docker-compose, and a few libraries (e.g., libsnappy) automatically after"
+" checking their availability.  If it encounters an error during "
+"installation, it will show manual instructions and stop."
+msgstr ""
+
+#: ../../install/install-from-source.rst:53
+msgid ""
+"It creates a set of Docker containers for Redis 5, PostgreSQL 9.6, and "
+"etcd 3.3 via docker-compose, with the default credentials: The Redis and "
+"etcd is configured without authentication and PostgreSQL uses "
+"``postgres`` / ``develove``. We call these containers as \"halfstack\"."
+msgstr ""
+
+#: ../../install/install-from-source.rst:56
+msgid ""
+"``./backend.ai-dev/{component}`` where components are manager, agent, "
+"common, client, and a few others, using separate virtualenvs. They are "
+"all installed as \"editable\" so modifying the cloned sources takes "
+"effects immediately."
+msgstr ""
+
+#: ../../install/install-from-source.rst:58
+msgid ""
+"For convenience, when ``cd``-ing into individual component directories, "
+"pyenv will activate the virtualenv automatically for supported shells. "
+"This is configured via ``pyenv local`` command during installation."
+msgstr ""
+
+#: ../../install/install-from-source.rst:60
+msgid ""
+"The default vfolder mount point is ``./backend.ai/vfolder`` and the "
+"default vfolder host is ``local``."
+msgstr ""
+
+#: ../../install/install-from-source.rst:61
+msgid ""
+"The installer automatically populates the example fixtures (in the "
+"``sample-configs`` directory of `the manager repository "
+"<https://github.com/lablup/backend.ai-manager>`_) for during the database"
+" initialization."
+msgstr ""
+
+#: ../../install/install-from-source.rst:63
+msgid ""
+"It automatically updates the list of available Backend.AI kernel images "
+"from the public Docker Hub. It also pulls a few frequently used images "
+"such as the base Python image."
+msgstr ""
+
+#: ../../install/install-from-source.rst:65
+msgid ""
+"The manager and agent are *NOT* daemonized. You must run them by running "
+"``scripts/run-with-halfstack.sh python -m ...`` inside each component's "
+"source clones. Those wrapper scripts configure environment variables "
+"suitable for the default halfstack containers."
+msgstr ""
+
+#: ../../install/install-from-source.rst:73
+msgid ""
+"Run the manager and agent as follows in their respective component "
+"directories:"
+msgstr ""
+
+#: ../../install/install-from-source.rst:75
+msgid "manager:"
+msgstr ""
+
+#: ../../install/install-from-source.rst:82
+msgid ""
+"By default, it listens on the localhost's 8080 port using the plain-text "
+"HTTP."
+msgstr ""
+
+#: ../../install/install-from-source.rst:84
+msgid "agent:"
+msgstr ""
+
+#: ../../install/install-from-source.rst:94
+msgid ""
+"The manager and agent may be executed without the root privilege on both "
+"Linux and macOS. In Linux, the installer sets extra capability bits to "
+"the Python executable so that the agent can manage cgroups and access the"
+" Docker daemon."
+msgstr ""
+
+#: ../../install/install-from-source.rst:98
+msgid ""
+"If all is well, they will say \"started\" or \"serving at ...\". You can "
+"also check their CLI options using ``--help`` option to change service IP"
+" and ports or enable the debug mode."
+msgstr ""
+
+#: ../../install/install-from-source.rst:101
+msgid ""
+"To run a \"hello world\" example, you first need to configure the client "
+"using the following script:"
+msgstr ""
+
+#: ../../install/install-from-source.rst:110
+msgid ""
+"And then run the following inside the client directory. If you see "
+"similar console logs, your installation is now working:"
+msgstr ""
+
+#: ../../install/install-from-source.rst:125
+msgid "Setting Up Additional Agents (multi-node)"
+msgstr ""
+
+#: ../../install/install-from-source.rst:128
+msgid "Updating Manager Configuration for Multi-Nodes"
+msgstr ""
+
+#: ../../install/install-manager.rst:6
+msgid "Install Manager"
+msgstr ""
+
+#: ../../install/install-manager.rst:8
+msgid ""
+"We assume that your system is configured with a sudoable admin user named"
+" ``devops``. Also, you should already have a running etcd cluster, "
+"PostgreSQL and Redis servers as guided in previous step guides."
+msgstr ""
+
+#: ../../install/install-manager.rst
+msgid "warning"
+msgstr ""
+
+#: ../../install/install-manager.rst:14
+msgid ""
+"Prepare the values of the following variables before working with this "
+"page and replace their occurrences with the values when you follow the "
+"guide."
+msgstr ""
+
+#: ../../install/install-manager.rst:25
+msgid "``{REDISADDR}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:26
+msgid ""
+"The Redis server address (\\ ``{REDISHOST}:{REDISPORT}``\\ , "
+"``localhost:6389`` for development setup)"
+msgstr ""
+
+#: ../../install/install-manager.rst:27
+#: ../../install/prepare-database-for-manager.rst:25
+msgid "``{DBADDR}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:28
+msgid ""
+"The PostgreSQL server address (\\ ``{DBHOST}:{DBPORT}``\\ , "
+"``localhost:5442`` for development setup)"
+msgstr ""
+
+#: ../../install/install-manager.rst:29
+#: ../../install/prepare-database-for-manager.rst:27
+msgid "``{DBUSER}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:30
+#: ../../install/prepare-database-for-manager.rst:28
+msgid "The database username (e.g., ``postgres`` for development setup)"
+msgstr ""
+
+#: ../../install/install-manager.rst:31
+#: ../../install/prepare-database-for-manager.rst:29
+msgid "``{DBPASS}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:32
+#: ../../install/prepare-database-for-manager.rst:30
+msgid "The database password (e.g., ``develove`` for development setup)"
+msgstr ""
+
+#: ../../install/install-manager.rst:89
+msgid ""
+"Check out :doc:`Install Python via pyenv </install/install-python-via-"
+"pyenv>` for instructions.\\ :raw-html-m2r:`<br>` Create a virtualenv "
+"named \"venv-manager\"."
+msgstr ""
+
+#: ../../install/install-manager.rst:93
+msgid "Install Backend.AI Manager from Source"
+msgstr ""
+
+#: ../../install/install-manager.rst:104
+msgid "Configure NGINX"
+msgstr ""
+
+#: ../../install/install-manager.rst:111
+msgid "(For testing) Without SSL"
+msgstr ""
+
+#: ../../install/install-manager.rst:146
+msgid "(For production) With SSL"
+msgstr ""
+
+#: ../../install/install-manager.rst:188
+msgid "Monitoring and Logging (optional)"
+msgstr ""
+
+#: ../../install/install-manager.rst:195
+msgid ""
+"supervisord eases the management of daemonization lifecycles of user-"
+"defined programs."
+msgstr ""
+
+#: ../../install/install-manager.rst:258
+msgid "Initialize database and load intial fixtures"
+msgstr ""
+
+#: ../../install/install-manager.rst:260
+msgid ""
+"See the :doc:`Prepare Databases for Manager </install/prepare-database-"
+"for-manager>` guide."
+msgstr ""
+
+#: ../../install/install-manager.rst:263
+msgid "Restart nginx"
+msgstr ""
+
+#: ../../install/install-monitoring-and-logging-tools.rst:3
+msgid "Install monitoring and logging tools"
+msgstr ""
+
+#: ../../install/install-monitoring-and-logging-tools.rst:5
+msgid ""
+"The Backend.AI can use several 3rd-party monitoring and logging services."
+" Using them is completely optional."
+msgstr ""
+
+#: ../../install/install-monitoring-and-logging-tools.rst:19
+#: ../../install/prepare-database-for-manager.rst:20
+msgid "Description"
+msgstr ""
+
+#: ../../install/install-monitoring-and-logging-tools.rst:21
+msgid ">The Datadog API key"
+msgstr ""
+
+#: ../../install/install-monitoring-and-logging-tools.rst:29
+msgid "Install Datadog agent"
+msgstr ""
+
+#: ../../install/install-monitoring-and-logging-tools.rst:31
+msgid ""
+"`Datadog <https://www.datadoghq.com>`_ is a 3rd-party service to monitor "
+"the server resource usage."
+msgstr ""
+
+#: ../../install/install-monitoring-and-logging-tools.rst:38
+msgid "Install Raven (Sentry client)"
+msgstr ""
+
+#: ../../install/install-monitoring-and-logging-tools.rst:40
+msgid ""
+"Raven is the official client package name of `Sentry "
+"<https://sentry.io>`_\\ , which reports detailed contextual information "
+"such as stack and package versions when an unhandled exception occurs."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:3
+msgid "Install on Clouds"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:6 ../../install/install-on-premise.rst:6
+msgid "Prepare the instances and databases."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:9 ../../install/install-on-premise.rst:8
+msgid "1x SSL certificate with a private key for your own domain (for production)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:10
+msgid "1x gateway instance (e.g., t2.xlarge on AWS)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:11
+msgid ""
+"1x agent instances (e.g., t2.medium / p2.xlarge on AWS -- for minimal "
+"testing)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:12
+msgid "1x PostgreSQL instance (e.g., AWS RDS)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:13
+msgid "1x Redis instance (e.g., AWS ElasticCache)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:14
+#: ../../install/install-on-premise.rst:13
+msgid "1x etcd cluster"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:16
+msgid ""
+"It is up to you whether to setup a HA-enabled multi-instance cluster or a"
+" single-instance cluster with storage backups."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:17
+#: ../../install/install-on-premise.rst:16
+msgid ""
+"Check out [[this page|Install etcd]] for details. If you install etcd on "
+"the same instance where the manager runs, you could try using docker-"
+"compose configuration in this meta-repository's code."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:19
+msgid "1x cloud file system (e.g., AWS EFS, Azure FileShare)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:20
+msgid "All should be in the same virtual private network."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:22
+#: ../../install/install-on-premise.rst:24
+msgid ":doc:`Install Manager </install/install-manager>`"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:24
+msgid "After done, create an image of this instance as a backup."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:26
+#: ../../install/install-on-premise.rst:25
+msgid ":doc:`Install Agent </install/install-agent>`"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:29
+msgid ""
+"After done, create an image of this instance for ease of manual/autoamtic"
+" scaling."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:31
+msgid ":doc:`Configure Autoscaling </install/configure-autoscaling>`"
+msgstr ""
+
+#: ../../install/install-on-premise.rst:3
+msgid "Install on Premise"
+msgstr ""
+
+#: ../../install/install-on-premise.rst:9
+msgid "1x gateway server"
+msgstr ""
+
+#: ../../install/install-on-premise.rst:10
+msgid "1x agent server"
+msgstr ""
+
+#: ../../install/install-on-premise.rst:11
+msgid "1x PostgreSQL server"
+msgstr ""
+
+#: ../../install/install-on-premise.rst:12
+msgid "1x Redis server"
+msgstr ""
+
+#: ../../install/install-on-premise.rst:15
+msgid ""
+"It is up to you whether to setup a HA-enabled multi-server cluster or a "
+"single-server cluster with backups."
+msgstr ""
+
+#: ../../install/install-on-premise.rst:18
+msgid "1x network-accessible storage server (NAS) with NFS/SMB mounts"
+msgstr ""
+
+#: ../../install/install-on-premise.rst:20
+msgid "All should be in the same private network (LAN)."
+msgstr ""
+
+#: ../../install/install-on-premise.rst:22
+msgid ""
+"Depending on the cluster size, different service daemons may run on the "
+"same physical server."
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:5
+msgid ""
+"We highly recommend `pyenv <https://github.com/pyenv/pyenv>`_ to install "
+"multiple Python versions side-by-side, which does not interfere with "
+"system-default Pythons."
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:15
+msgid "Install dependencies for building Python"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:35
+msgid "Install pyenv"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:37
+msgid ""
+"**NOTE:** Change ``~/.profile`` accroding to your shell/system (e.g., "
+"``~/.bashrc``\\ , ``~/.bash_profile``\\ , ``~/.zshrc``\\ , ...) -- "
+"whichever loaded at startup of your shell!"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:55
+msgid "Install pyenv's virtualenv plugin"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:67
+msgid "Install Python via pyenv"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:69
+msgid "Install Python 3.6 latest version.\\ :raw-html-m2r:`<br>`"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:72
+msgid "Currently Python 3.7 is not supported yet."
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:79
+msgid "Create a virtualenv using a specific Python version"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:81
+msgid "Change ``myvenv`` to specific names required in other guide pages."
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:88
+msgid "Activate the virtualenv for the current shell"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:95
+msgid "Activate the virtualenv when your shell goes into a directory"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:105
+msgid ""
+"`pyenv local` creates a hidden `.python-version` file at each directory "
+"specifying the Python version/virtualenv recongnized by pyenv. Any pyenv-"
+"enabled shells will automagically activate/deactivate this "
+"version/virtualenv when going in/out such directories."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:5
+msgid "Prepare Database for Manager"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:22
+msgid "The etcd namespace"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:24
+msgid ""
+"The etcd cluster address (``{ETCDHOST}``:``{ETCDPORT}``, "
+"``localhost:8120`` for development setup)"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:26
+msgid ""
+"The PostgreSQL server address (``{DBHOST}``:``{DBPORT}``, "
+"``localhost:8100`` for development setup)"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:31
+msgid "``{STRGMOUNT}``"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:32
+msgid ""
+"The path to a directory that the manager and all agents share together "
+"(e.g., a network-shared storage mountpoint). Note that the path must be "
+"same across all the nodes that run the manager and agents."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:34
+msgid ""
+"Development setup: Use an arbitrary empty directory where Docker "
+"containers can also mount as volumes — e.g., `Docker for Mac requires "
+"explicit configuration for mountable parent folders. "
+"<https://docs.docker.com/docker-for-mac/#file-sharing>`_"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:38
+msgid "Load initial etcd data"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:50
+msgid ""
+"Copy ``sample-configs/image-metadata.yml`` and ``sample-configs/image-"
+"aliases.yml`` and edit according to your setup."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:57
+msgid ""
+"By default you can pull the images listed in the sample via ``docker pull"
+" lablup/kernel-xxxx:tag``\\ (e.g. ``docker pull lablup/kernel-python-"
+"tensorflow:latest`` for the latest tensorflow) as they are hosted on the "
+"public Docker registry."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:60
+msgid "Load image registry metadata"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:62
+msgid ""
+"(Instead of manually specifying environment variables, you may use "
+"``scripts/run-with-halfstack.sh`` script in a development setup.)"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:71
+msgid "Load image aliases"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:80
+msgid "Set the default storage mount for virtual folders"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:89
+msgid "Database Setup"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:92
+msgid "Create a new database"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:94
+msgid "In docker-compose based configurations, you may skip this step."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:106
+msgid "Install database schema"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:108
+msgid ""
+"Backend.AI uses `alembic <http://alembic.zzzcomputing.com/en/latest/>`_ "
+"to manage database schema and its migration during version upgrades. "
+"First, localize the sample config:"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:115
+msgid ""
+"Modify the line where ``sqlalchemy.url`` is set. You may use the "
+"following shell command: (ensure that special characters in your password"
+" are properly escaped)"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:127
+#: ../../install/prepare-database-for-manager.rst:160
+msgid "example execution result"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:140
+msgid ""
+"NOTE: All sub-commands under \"schema\" uses alembic.ini to establish "
+"database connections."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:143
+msgid "Load initial fixtures"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:145
+msgid ""
+"Edit ``ai/backend/manager/models/fixtures.py`` so that you have a "
+"randomized admin keypair."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:147
+msgid ""
+":raw-html-m2r:`<span style=\"color:red\">**(TODO: automate "
+"here!)**</span>`"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:149
+msgid "Then pour it to the database:"
+msgstr ""
+
+#: ../../install/supplementary.rst:2
+msgid "Supplementary Guides"
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:6
+msgid "Version Numbering"
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:9
+msgid ""
+"Version numbering uses ``x.y.z`` format (where ``x``\\ , ``y``\\ , ``z`` "
+"are integers)."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:10
+msgid "Mostly, we follow `the semantic versioning scheme <https://semver.org/>`_."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:11
+msgid "``x.y`` is a release branch name."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:12
+msgid "``x.y.z`` is a release tag name."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:13
+msgid "When releasing ``x.y.0``\\ :"
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:15
+msgid ""
+"Create a new ``x.y`` branch, do all bugfix/hotfix there, and make "
+"``x.y.z`` releases there."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:16
+msgid ""
+"All fixes in the ``x.y`` branch must be merged back to ``master`` and "
+"``develop``."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:18
+msgid ""
+"Use ``git merge --no-ff --no-commit master`` to inspect the changes "
+"before commits."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:19
+msgid ""
+"When merging back, you would encounter merge conflicts on the version "
+"number (e.g., ``ai/backend/manager/__init__.py``\\ ) if you are doing it "
+"after releasing ``x.y.z`` patch builds: then resolve it by *preserving "
+"the version number of the ``master`` branch.* (\\ `example here "
+"<https://github.com/lablup/backend.ai-"
+"manager/commit/8a498ad4a24e4e074d683a3e2fc177647eb17a9a>`_\\ )"
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:20
+msgid ""
+"It is recommeded to use \"merge\" but you may use \"cherry-pick\" as "
+"well, to keep the history clean if ``master`` has deviated too much."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:22
+msgid "Change the version number of ``master`` to ``x.(y+1).0a1``"
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:23
+msgid ""
+"There is no strict rules about alpha/beta/rc builds yet. We will "
+"elaborate as we scale up.\\ :raw-html-m2r:`<br>` Once used, alpha "
+"versions will have ``aN`` suffixes, beta versions ``bN`` suffixes, and RC"
+" versions ``rcN`` suffixes where ``N`` is an integer."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:26
+msgid "New development should go on ``master`` and ``develop`` branches."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:28
+msgid ""
+"``master``\\ : commit here directly if your changes are a self-complete "
+"one as a single commit."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:29
+msgid "``develop``\\ : for long-running incomplete development."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:30
+msgid ""
+"Use both short-lived and long-running feature branches freely, but ensure"
+" there names differ from release branches and tags."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:32
+msgid ""
+"The major/minor (\\ ``x.y``\\ ) version of Backend.AI subprojects will go"
+" together to indicate compatibility.  Currently manager/agent/common "
+"versions progress this way, while client SDKs have their own version "
+"numbers and the API specification has a different ``vN.yyyymmdd`` version"
+" format."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:34
+msgid ""
+"``backend.ai-manager 1.2.p`` is guaranteed to be compatible with "
+"``backend.ai-agent 1.2.q`` (where ``p`` and ``q`` are same or different "
+"integers)"
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:35
+msgid ""
+"The client is guaranteed to be backward-compatible with the server they "
+"share the same API specification version."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:38
+msgid "Upgrading"
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:40
+msgid ""
+"You can upgrade the installed Python packages using ``pip install -U "
+"...`` command along with dependencies."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:42
+msgid ""
+"If you have cloned the stable version of source code from git, then pull "
+"and check out the next ``x.y`` release branch. It is recommended to re-"
+"run ``pip install -U -r requirements.txt`` as dependencies might be "
+"updated."
+msgstr ""
+
+#: ../../install/version-management-and-upgrades.rst:45
+msgid ""
+"For the manager, ensure that your database schema is up-to-date by "
+"running ``alembic upgrade head``. Also check if any manual etcd "
+"configuration scheme change is required, though we will try to keep it "
+"compatible and automatically upgrade when first executed."
+msgstr ""
+

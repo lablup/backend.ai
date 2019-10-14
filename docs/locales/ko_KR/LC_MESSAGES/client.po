@@ -1,0 +1,111 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2019-10-14 21:43+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.7.0\n"
+
+#: ../../client/index.rst:2
+msgid "Client SDK Libraries and Tools"
+msgstr ""
+
+#: ../../client/index.rst:4
+msgid ""
+"We provide official client SDKs for popular programming languages that "
+"abstract the low-level REST/GraphQL APIs via functional and object-"
+"oriented interfaces."
+msgstr ""
+
+#: ../../client/index.rst:8
+msgid "Python"
+msgstr ""
+
+#: ../../client/index.rst:10
+msgid ""
+"Python is the most extensively supported client programming language. The"
+" SDK also includes the official command-line interface."
+msgstr ""
+
+#: ../../client/index.rst:13
+msgid ""
+":doc:`Documentation for Backend.AI Client SDK for Python <client-"
+"py:index>`"
+msgstr ""
+
+#: ../../client/index.rst:14
+msgid ""
+"`Source repository for Backend.AI Client SDK for Python "
+"<https://github.com/lablup/backend.ai-client-py>`_"
+msgstr ""
+
+#: ../../client/index.rst:17
+msgid "Javascript"
+msgstr ""
+
+#: ../../client/index.rst:19
+msgid ""
+"The Javascript SDK is for writing client apps on both NodeJS and web "
+"browsers. It is also used for our Atom/VSCode plugins."
+msgstr ""
+
+#: ../../client/index.rst:22
+msgid ""
+":doc:`Documentation for Backend.AI Client SDK for Javascript <client-"
+"js:index>` (under construction)"
+msgstr ""
+
+#: ../../client/index.rst:23
+msgid ""
+"`Source repository for Backend.AI Client SDK for Javascript "
+"<https://github.com/lablup/backend.ai-client-js>`_"
+msgstr ""
+
+#: ../../client/index.rst:26
+msgid "Java"
+msgstr ""
+
+#: ../../client/index.rst:28
+msgid "The Java SDK is used for implementing our IntelliJ/PyCharm plugins."
+msgstr ""
+
+#: ../../client/index.rst:30
+msgid ""
+":doc:`Documentation for Backend.AI Client SDK for Java <client-"
+"java:index>` (under construction)"
+msgstr ""
+
+#: ../../client/index.rst:31
+msgid ""
+"`Source repository for Backend.AI Client SDK for Java "
+"<https://github.com/lablup/backend.ai-client-java>`_"
+msgstr ""
+
+#: ../../client/index.rst:34
+msgid "PHP"
+msgstr ""
+
+#: ../../client/index.rst:36
+msgid ""
+":doc:`Documentation for Backend.AI Client SDK for PHP <client-js:index>` "
+"(under construction)"
+msgstr ""
+
+#: ../../client/index.rst:37
+msgid ""
+"`Source repository for Backend.AI Client SDK for PHP "
+"<https://github.com/lablup/backend.ai-client-php>`_ (under construction)"
+msgstr ""
+

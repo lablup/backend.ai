@@ -1,0 +1,1702 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2019-10-14 21:43+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.7.0\n"
+
+#: ../../common-api/auth.rst:2
+msgid "Authentication"
+msgstr ""
+
+#: ../../common-api/auth.rst:5
+msgid "Access Tokens and Secret Key"
+msgstr ""
+
+#: ../../common-api/auth.rst:7
+msgid ""
+"To make requests to the API server, a client needs to have a pair of an "
+"API access key and a secret key.  You may get one from `our cloud service"
+" <https://cloud.backend.ai>`_ or from the administrator of your "
+"Backend.AI cluster."
+msgstr ""
+
+#: ../../common-api/auth.rst:12
+msgid ""
+"The server uses the API keys to identify each client and secret keys to "
+"verify integrity of API requests as well as to authenticate clients."
+msgstr ""
+
+#: ../../common-api/auth.rst:17
+msgid ""
+"For security reasons (to avoid exposition of your API access key and "
+"secret keys to arbitrary Internet users), we highly recommend to setup a "
+"server-side proxy to our API service if you are building a public-facing "
+"front-end service using Backend.AI."
+msgstr ""
+
+#: ../../common-api/auth.rst:21
+msgid ""
+"For local deployments, you may create a master dummy pair in the "
+"configuration (TODO)."
+msgstr ""
+
+#: ../../common-api/auth.rst:24
+msgid "Common Structure of API Requests"
+msgstr ""
+
+#: ../../common-api/auth.rst:30 ../../common-api/auth.rst:72
+#: ../../common-api/ratelimit.rst:18
+msgid "HTTP Headers"
+msgstr ""
+
+#: ../../common-api/auth.rst:31 ../../common-api/auth.rst:73
+#: ../../common-api/ratelimit.rst:19
+msgid "Values"
+msgstr ""
+
+#: ../../common-api/auth.rst:32
+msgid "Method"
+msgstr ""
+
+#: ../../common-api/auth.rst:33
+msgid "``GET`` / ``REPORT`` / ``POST`` / ``PUT`` / ``PATCH`` / ``DELETE``"
+msgstr ""
+
+#: ../../common-api/auth.rst:34
+msgid "Query String"
+msgstr ""
+
+#: ../../common-api/auth.rst:35
+msgid ""
+"If your access key has the administrator privilege, your client may "
+"optionally specify other user's access key as the ``owner_access_key`` "
+"parameter of the URL query string (in addition to other API-specific ones"
+" if any) to change the scope of access key applied to access and "
+"manipulation of keypair-specific resources such as kernels and vfolders."
+msgstr ""
+
+#: ../../common-api/auth.rst:43 ../../common-api/auth.rst:76
+msgid "``Content-Type``"
+msgstr ""
+
+#: ../../common-api/auth.rst:44
+msgid "Always should be ``application/json``"
+msgstr ""
+
+#: ../../common-api/auth.rst:45
+msgid "``Authorization``"
+msgstr ""
+
+#: ../../common-api/auth.rst:46
+msgid ""
+"Signature information generated as the section `Signing API Requests`_ "
+"describes."
+msgstr ""
+
+#: ../../common-api/auth.rst:47
+msgid "``Date``"
+msgstr ""
+
+#: ../../common-api/auth.rst:48
+msgid ""
+"The date/time of the request formatted in RFC 8022 or ISO 8601. If no "
+"timezone is specified, UTC is assumed. The deviation with the server-side"
+" clock must be within 15-minutes."
+msgstr ""
+
+#: ../../common-api/auth.rst:51
+msgid "``X-BackendAI-Date``"
+msgstr ""
+
+#: ../../common-api/auth.rst:52
+msgid "Same as ``Date``. May be omitted if ``Date`` is present."
+msgstr ""
+
+#: ../../common-api/auth.rst:53
+msgid "``X-BackendAI-Version``"
+msgstr ""
+
+#: ../../common-api/auth.rst:54
+msgid ""
+"``vX.yyymmdd`` where ``X`` is the major version and ``yyyymmdd`` is the "
+"minor release date of the specified API version. (e.g., 20160915)"
+msgstr ""
+
+#: ../../common-api/auth.rst:57
+msgid "``X-BackendAI-Client-Token``"
+msgstr ""
+
+#: ../../common-api/auth.rst:58
+msgid ""
+"An optional, client-generated random string to allow the server to "
+"distinguish repeated duplicate requests. It is important to keep "
+"idempotent semantics with multiple retries for intermittent failures. "
+"(Not implemented yet)"
+msgstr ""
+
+#: ../../common-api/auth.rst:61 ../../common-api/auth.rst:82
+msgid "Body"
+msgstr ""
+
+#: ../../common-api/auth.rst:62
+msgid "JSON-encoded request parameters"
+msgstr ""
+
+#: ../../common-api/auth.rst:66
+msgid "Common Structure of API Responses"
+msgstr ""
+
+#: ../../common-api/auth.rst:74
+msgid "Status code"
+msgstr ""
+
+#: ../../common-api/auth.rst:75
+msgid ""
+"API-specific HTTP-standard status codes. Responses commonly used "
+"throughout all APIs include 200, 201, 2014, 400, 401, 403, 404, 429, and "
+"500, but not limited to."
+msgstr ""
+
+#: ../../common-api/auth.rst:77
+msgid ""
+"``application/json`` and its variants (e.g., ``application/problem+json``"
+" for errors)"
+msgstr ""
+
+#: ../../common-api/auth.rst:78
+msgid "``Link``"
+msgstr ""
+
+#: ../../common-api/auth.rst:79
+msgid ""
+"Web link headers specified as in `RFC 5988 "
+"<https://tools.ietf.org/html/rfc5988>`_. Only optionally used when "
+"returning a collection of objects."
+msgstr ""
+
+#: ../../common-api/auth.rst:80
+msgid "``X-RateLimit-*``"
+msgstr ""
+
+#: ../../common-api/auth.rst:81
+msgid "The rate-limiting information (see :doc:`/common-api/ratelimit`)."
+msgstr ""
+
+#: ../../common-api/auth.rst:83
+msgid "JSON-encoded results"
+msgstr ""
+
+#: ../../common-api/auth.rst:87
+msgid "Signing API Requests"
+msgstr ""
+
+#: ../../common-api/auth.rst:89
+msgid ""
+"Each API request must be signed with a signature. First, the client "
+"should generate a signing key derived from its API secret key and a "
+"string to sign by canonicalizing the HTTP request."
+msgstr ""
+
+#: ../../common-api/auth.rst:93
+msgid "Generating a signing key"
+msgstr ""
+
+#: ../../common-api/auth.rst:95
+msgid ""
+"Here is a Python code that derives the signing key from the secret key. "
+"The key is nestedly signed against the current date (without time) and "
+"the API endpoint address."
+msgstr ""
+
+#: ../../common-api/auth.rst:116
+msgid "Generating a string to sign"
+msgstr ""
+
+#: ../../common-api/auth.rst:118
+msgid "The string to sign is generated from the following request-related values:"
+msgstr ""
+
+#: ../../common-api/auth.rst:120
+msgid "HTTP Method (uppercase)"
+msgstr ""
+
+#: ../../common-api/auth.rst:121
+msgid "URI including query strings"
+msgstr ""
+
+#: ../../common-api/auth.rst:122
+msgid ""
+"The value of ``Date`` (or ``X-BackendAI-Date`` if ``Date`` is not "
+"present) formatted in ISO 8601 (``YYYYmmddTHHMMSSZ``) using the UTC "
+"timezone."
+msgstr ""
+
+#: ../../common-api/auth.rst:123
+msgid "The canonicalized header/value pair of ``Host``"
+msgstr ""
+
+#: ../../common-api/auth.rst:124
+msgid "The canonicalized header/value pair of ``Content-Type``"
+msgstr ""
+
+#: ../../common-api/auth.rst:125
+msgid "The canonicalized header/value pair of ``X-BackendAI-Version``"
+msgstr ""
+
+#: ../../common-api/auth.rst:126
+msgid ""
+"The hex-encoded hash value of body as-is. The hash function must be same "
+"to the one given in the ``Authorization`` header (e.g., SHA256)."
+msgstr ""
+
+#: ../../common-api/auth.rst:128
+msgid ""
+"To generate a string to sign, the client should join the above values "
+"using the newline (``\"\\n\"``, ASCII 10) character. All non-ASCII "
+"strings must be encoded with UTF-8. To canonicalize a pair of HTTP "
+"header/value, first trim all leading/trailing whitespace characters "
+"(``\"\\n\"``, ``\"\\r\"``, ``\" \"``, ``\"\\t\"``; or ASCII 10, 13, 32, "
+"9) of its value, and join the lowercased header name and the value with a"
+" single colon (``\":\"``, ASCII 58) character."
+msgstr ""
+
+#: ../../common-api/auth.rst:132
+msgid ""
+"The success example in `Example Requests and Responses`_ makes a string "
+"to sign as follows (where the newlines are ``\"\\n\"``):"
+msgstr ""
+
+#: ../../common-api/auth.rst:144
+msgid ""
+"In this example, the hash value  ``e3b0c4...`` is generated from an empty"
+" string using the SHA256 hash function since there is no body for GET "
+"requests."
+msgstr ""
+
+#: ../../common-api/auth.rst:146
+msgid ""
+"Then, the client should calculate the signature using the derived signing"
+" key and the generated string with the hash function, as follows:"
+msgstr ""
+
+#: ../../common-api/auth.rst:159
+msgid "Attaching the signature"
+msgstr ""
+
+#: ../../common-api/auth.rst:161
+msgid ""
+"Finally, the client now should construct the following HTTP "
+"``Authorization`` header:"
+msgstr ""
+
+#: ../../common-api/auth.rst:169
+msgid "Example Requests and Responses"
+msgstr ""
+
+#: ../../common-api/auth.rst:171
+msgid "For the examples here, we use a dummy access key and secret key:"
+msgstr ""
+
+#: ../../common-api/auth.rst:173
+msgid "Example access key: ``AKIAIOSFODNN7EXAMPLE``"
+msgstr ""
+
+#: ../../common-api/auth.rst:174
+msgid "Example secret key: ``wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY``"
+msgstr ""
+
+#: ../../common-api/auth.rst:177
+msgid "Success example for checking the latest API version"
+msgstr ""
+
+#: ../../common-api/auth.rst:204
+msgid "Failure example with a missing authorization header"
+msgstr ""
+
+#: ../../common-api/convention.rst:2
+msgid "API and Document Conventions"
+msgstr ""
+
+#: ../../common-api/convention.rst:5
+msgid "HTTP Methods"
+msgstr ""
+
+#: ../../common-api/convention.rst:7
+msgid ""
+"We use the standard HTTP/1.1 methods (`RFC-2616 "
+"<https://tools.ietf.org/html/rfc2616>`_), such as ``GET``, ``POST``, "
+"``PUT``, ``PATCH`` and ``DELETE``, with some additions from WebDAV "
+"(`RFC-3253 <https://tools.ietf.org/html/rfc3253>`_) such as ``REPORT`` "
+"method to send JSON objects in request bodies with ``GET`` semantics."
+msgstr ""
+
+#: ../../common-api/convention.rst:9
+msgid ""
+"If your client runs under a restrictive environment that only allows a "
+"subset of above methods, you may use the universal ``POST`` method with "
+"an extra HTTP header like ``X-Method-Override: REPORT``, so that the "
+"Backend.AI gateway can recognize the intended HTTP method."
+msgstr ""
+
+#: ../../common-api/convention.rst:12
+msgid "Parameters in URI and JSON Request Body"
+msgstr ""
+
+#: ../../common-api/convention.rst:14
+msgid ""
+"The parameters with *colon prefixes* (e.g., ``:id``) are part of the URI "
+"path and must be encoded using a proper URI-compatible encoding schemes "
+"such as ``encodeURIComponent(value)`` in Javascript and "
+"``urllib.parse.quote(value, safe='~()*!.\\'')`` in Python 3+."
+msgstr ""
+
+#: ../../common-api/convention.rst:16
+msgid ""
+"Other parameters should be set as a key-value pair of the JSON object in "
+"the HTTP request body. The API server accepts both UTF-8 encoded bytes "
+"and standard-compliant Unicode-escaped strings in the body."
+msgstr ""
+
+#: ../../common-api/convention.rst:20
+msgid "HTTP Status Codes and JSON Response Body"
+msgstr ""
+
+#: ../../common-api/convention.rst:22
+msgid ""
+"The API responses always contain a root JSON object, regardless of "
+"success or failures."
+msgstr ""
+
+#: ../../common-api/convention.rst:24
+msgid ""
+"For successful responses (HTTP status 2xx), the root object has a varying"
+" set of key-value pairs depending on the API."
+msgstr ""
+
+#: ../../common-api/convention.rst:26
+msgid ""
+"For failures (HTTP status 4xx/5xx), the root object contains at least two"
+" keys: ``type`` which uniquely identifies the failure reason as an URI "
+"and ``title`` for human-readable error messages. Some failures may return"
+" extra structured information as additional key-value pairs. We use `RFC "
+"7807 <https://tools.ietf.org/html/rfc7807>`_-style problem detail "
+"description returned in JSON of the response body."
+msgstr ""
+
+#: ../../common-api/convention.rst:31
+msgid "JSON Field Notation"
+msgstr ""
+
+#: ../../common-api/convention.rst:33
+msgid ""
+"Dot-separated field names means a nested object. If the field name is a "
+"pure integer, it means a list item."
+msgstr ""
+
+#: ../../common-api/convention.rst:40
+msgid "Example"
+msgstr ""
+
+#: ../../common-api/convention.rst:41
+msgid "Meaning"
+msgstr ""
+
+#: ../../common-api/convention.rst:42
+msgid "``a``"
+msgstr ""
+
+#: ../../common-api/convention.rst:43
+msgid ""
+"The attribute ``a`` of the root object. (e.g., ``123`` at ``{\"a\": "
+"123}``)"
+msgstr ""
+
+#: ../../common-api/convention.rst:45
+msgid "``a.b``"
+msgstr ""
+
+#: ../../common-api/convention.rst:46
+msgid ""
+"The attribute ``b`` of the object ``a`` on the root. (e.g., ``456`` at "
+"``{\"a\": {\"b\": 456}}``)"
+msgstr ""
+
+#: ../../common-api/convention.rst:48
+msgid "``a.0``"
+msgstr ""
+
+#: ../../common-api/convention.rst:49
+msgid ""
+"An item in the list ``a`` on the root. ``0`` means an arbitrary array "
+"index, not the specific item at index zero. (e.g., any of ``13``, ``57``,"
+" ``24``, and ``68`` at ``{\"a\": [13, 57, 24, 68]}``)"
+msgstr ""
+
+#: ../../common-api/convention.rst:52
+msgid "``a.0.b``"
+msgstr ""
+
+#: ../../common-api/convention.rst:53
+msgid ""
+"The attribute ``b`` of an item in the list ``a`` on the root. (e.g., any "
+"of ``1``, ``2``, and ``3`` at ``{\"a\": [{\"b\": 1}, {\"b\": 2}, {\"b\": "
+"3}]}``)"
+msgstr ""
+
+#: ../../common-api/convention.rst:57
+msgid "JSON Value Types"
+msgstr ""
+
+#: ../../common-api/convention.rst:59
+msgid ""
+"This documentation uses a type annotation style similar to `Python's "
+"typing module <https://docs.python.org/3/library/typing.html>`_, but with"
+" minor intuitive differences such as lower-cased generic type names and "
+"wildcard as asterisk ``*`` instead of ``Any``."
+msgstr ""
+
+#: ../../common-api/convention.rst:61
+msgid ""
+"The common types are ``array`` (JSON array), ``object`` (JSON object), "
+"``int`` (integer-only subset of JSON number), ``str`` (JSON string), and "
+"``bool`` (JSON ``true`` or ``false``). ``tuple`` and ``list`` are aliases"
+" to ``array``. Optional values may be omitted or set to ``null``."
+msgstr ""
+
+#: ../../common-api/convention.rst:65
+msgid "We also define several custom types:"
+msgstr ""
+
+#: ../../common-api/convention.rst:71 ../../common-api/objects.rst:17
+#: ../../common-api/objects.rst:39 ../../common-api/objects.rst:58
+#: ../../common-api/objects.rst:83 ../../common-api/objects.rst:109
+#: ../../common-api/objects.rst:131 ../../common-api/objects.rst:151
+#: ../../common-api/objects.rst:242 ../../common-api/objects.rst:303
+#: ../../common-api/objects.rst:324 ../../common-api/objects.rst:345
+#: ../../common-api/objects.rst:385 ../../common-api/objects.rst:449
+#: ../../common-api/objects.rst:516 ../../common-api/objects.rst:539
+#: ../../common-api/objects.rst:572 ../../common-api/objects.rst:616
+#: ../../common-api/objects.rst:667 ../../common-api/objects.rst:698
+msgid "Type"
+msgstr ""
+
+#: ../../common-api/convention.rst:72 ../../common-api/objects.rst:18
+#: ../../common-api/objects.rst:40 ../../common-api/objects.rst:59
+#: ../../common-api/objects.rst:84 ../../common-api/objects.rst:110
+#: ../../common-api/objects.rst:132 ../../common-api/objects.rst:152
+#: ../../common-api/objects.rst:243 ../../common-api/objects.rst:304
+#: ../../common-api/objects.rst:325 ../../common-api/objects.rst:346
+#: ../../common-api/objects.rst:386 ../../common-api/objects.rst:450
+#: ../../common-api/objects.rst:517 ../../common-api/objects.rst:540
+#: ../../common-api/objects.rst:573 ../../common-api/objects.rst:617
+#: ../../common-api/objects.rst:668 ../../common-api/objects.rst:699
+msgid "Description"
+msgstr ""
+
+#: ../../common-api/convention.rst:73
+msgid "``decimal``"
+msgstr ""
+
+#: ../../common-api/convention.rst:74
+msgid ""
+"Fractional numbers represented as ``str`` not to loose precision. (e.g., "
+"to express money amounts)"
+msgstr ""
+
+#: ../../common-api/convention.rst:75 ../../common-api/objects.rst:61
+#: ../../common-api/objects.rst:134 ../../common-api/objects.rst:578
+msgid "``slug``"
+msgstr ""
+
+#: ../../common-api/convention.rst:76
+msgid ""
+"Similar to ``str``, but the values should contain only alpha-numeric "
+"characters, hyphens, and underscores. Also, hyphens and underscores "
+"should have at least one alphanumeric neighbor as well as cannot become "
+"the prefix or suffix."
+msgstr ""
+
+#: ../../common-api/convention.rst:78 ../../common-api/objects.rst:70
+#: ../../common-api/objects.rst:638 ../../common-api/objects.rst:641
+msgid "``datetime``"
+msgstr ""
+
+#: ../../common-api/convention.rst:79
+msgid ""
+"ISO-8601 timestamps in ``str``, e.g., ``\"YYY-mm-"
+"ddTHH:MM:SS.ffffff+HH:MM\"``. It may include an optional timezone "
+"information. If timezone is not included, the value is assumed to be UTC."
+" The sub-seconds parts has at most 6 digits (micro-seconds)."
+msgstr ""
+
+#: ../../common-api/convention.rst:82
+msgid "``enum[*]``"
+msgstr ""
+
+#: ../../common-api/convention.rst:83
+msgid ""
+"Only allows a fixed/predefined set of possible values in the given "
+"parametrized type."
+msgstr ""
+
+#: ../../common-api/convention.rst:86
+msgid "API Versioning"
+msgstr ""
+
+#: ../../common-api/convention.rst:88
+msgid ""
+"A version string of the Backend.AI API uses two parts: a major revision "
+"(prefixed with ``v``) and minor release dates after a dot following the "
+"major revision. For example, ``v23.20250101`` indicates a 23rd major "
+"revision with a minor release at January 1st in 2025."
+msgstr ""
+
+#: ../../common-api/convention.rst:91
+msgid ""
+"We keep backward compatibility between minor releases within the same "
+"major version. Therefore, all API query URLs are prefixed with the major "
+"revision, such as ``/v2/kernel/create``. Minor releases may introduce new"
+" parameters and response fields but no URL changes. Accessing unsupported"
+" major revision returns HTTP 404 Not Found."
+msgstr ""
+
+#: ../../common-api/convention.rst:96
+msgid ""
+"Version prefix in API queries are deprecated. (Yet still supported "
+"currently) For example, now users should call ``/kernel/create`` rather "
+"than ``/v2/kernel/create``."
+msgstr ""
+
+#: ../../common-api/convention.rst:100
+msgid ""
+"A client must specify the API version in the HTTP request header named "
+"``X-BackendAI-Version``. To check the latest minor release date of a "
+"specific major revision, try a GET query to the URL with only the major "
+"revision part (e.g., ``/v2``). The API server will return a JSON string "
+"in the response body containing the full version. When querying the API "
+"version, you do not have to specify the authorization header and the "
+"rate-limiting is enforced per the client IP address. Check out more "
+"details about :doc:`auth` and :doc:`ratelimit`."
+msgstr ""
+
+#: ../../common-api/convention.rst:106
+msgid "Example version check response body:"
+msgstr ""
+
+#: ../../common-api/objects.rst:2
+msgid "JSON Object References"
+msgstr ""
+
+#: ../../common-api/objects.rst:7
+msgid "Paging Query Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:9
+msgid ""
+"It describes how many items to fetch for object listing APIs. If "
+"``index`` exceeds the number of pages calculated by the server, an empty "
+"list is returned."
+msgstr ""
+
+#: ../../common-api/objects.rst:16 ../../common-api/objects.rst:38
+#: ../../common-api/objects.rst:57 ../../common-api/objects.rst:82
+#: ../../common-api/objects.rst:108 ../../common-api/objects.rst:130
+#: ../../common-api/objects.rst:150 ../../common-api/objects.rst:241
+#: ../../common-api/objects.rst:302 ../../common-api/objects.rst:323
+#: ../../common-api/objects.rst:344 ../../common-api/objects.rst:384
+#: ../../common-api/objects.rst:448 ../../common-api/objects.rst:515
+#: ../../common-api/objects.rst:538 ../../common-api/objects.rst:571
+#: ../../common-api/objects.rst:615 ../../common-api/objects.rst:666
+#: ../../common-api/objects.rst:697
+msgid "Key"
+msgstr ""
+
+#: ../../common-api/objects.rst:19 ../../common-api/objects.rst:675
+msgid "``size``"
+msgstr ""
+
+#: ../../common-api/objects.rst:20 ../../common-api/objects.rst:24
+#: ../../common-api/objects.rst:42 ../../common-api/objects.rst:45
+#: ../../common-api/objects.rst:67 ../../common-api/objects.rst:92
+#: ../../common-api/objects.rst:96 ../../common-api/objects.rst:406
+#: ../../common-api/objects.rst:424 ../../common-api/objects.rst:632
+#: ../../common-api/objects.rst:673 ../../common-api/objects.rst:676
+#: ../../common-api/objects.rst:679 ../../common-api/objects.rst:682
+#: ../../common-api/objects.rst:685
+msgid "``int``"
+msgstr ""
+
+#: ../../common-api/objects.rst:21
+msgid ""
+"The number of items per page. If set zero or this object is entirely "
+"omitted, all items are returned and ``index`` is ignored."
+msgstr ""
+
+#: ../../common-api/objects.rst:23
+msgid "``index``"
+msgstr ""
+
+#: ../../common-api/objects.rst:25
+msgid "The page number to show, zero-based."
+msgstr ""
+
+#: ../../common-api/objects.rst:30
+msgid "Paging Info Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:32
+msgid ""
+"It contains the paging information based on the paging query object in "
+"the request."
+msgstr ""
+
+#: ../../common-api/objects.rst:41
+msgid "``pages``"
+msgstr ""
+
+#: ../../common-api/objects.rst:43
+msgid "The number of total pages."
+msgstr ""
+
+#: ../../common-api/objects.rst:44
+msgid "``count``"
+msgstr ""
+
+#: ../../common-api/objects.rst:46
+msgid "The number of all items."
+msgstr ""
+
+#: ../../common-api/objects.rst:51
+msgid "KeyPair Item Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:60
+msgid "``accessKey``"
+msgstr ""
+
+#: ../../common-api/objects.rst:62
+msgid "The access key part."
+msgstr ""
+
+#: ../../common-api/objects.rst:63 ../../common-api/objects.rst:85
+msgid "``isActive``"
+msgstr ""
+
+#: ../../common-api/objects.rst:64 ../../common-api/objects.rst:86
+#: ../../common-api/objects.rst:112 ../../common-api/objects.rst:584
+#: ../../common-api/objects.rst:628
+msgid "``bool``"
+msgstr ""
+
+#: ../../common-api/objects.rst:65
+msgid "Indicates if the keypair is active or not."
+msgstr ""
+
+#: ../../common-api/objects.rst:66
+msgid "``totalQueries``"
+msgstr ""
+
+#: ../../common-api/objects.rst:68
+msgid "The number of queries done via this keypair. It may have a stale value."
+msgstr ""
+
+#: ../../common-api/objects.rst:69
+msgid "``created``"
+msgstr ""
+
+#: ../../common-api/objects.rst:71
+msgid "The timestamp when the keypair was created."
+msgstr ""
+
+#: ../../common-api/objects.rst:76
+msgid "KeyPair Properties Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:87
+msgid ""
+"Indicates if the keypair is activated or not. If not activated, all "
+"authentication using the keypair returns 401 Unauthorized. When changed "
+"from ``true`` to ``false``, existing running kernel sessions continue to "
+"run but any requests to create new kernel sessions are refused. (default:"
+" ``true``)"
+msgstr ""
+
+#: ../../common-api/objects.rst:91
+msgid "``concurrecy``"
+msgstr ""
+
+#: ../../common-api/objects.rst:93
+msgid ""
+"The maximum number of concurrent kernel sessions allowed for this "
+"keypair. (default: ``5``)"
+msgstr ""
+
+#: ../../common-api/objects.rst:95
+msgid "``ML.clusterSize``"
+msgstr ""
+
+#: ../../common-api/objects.rst:97
+msgid ""
+"Sets the number of instances clustered together when launching new "
+"machine learning kernel sessions. (default: ``1``)"
+msgstr ""
+
+#: ../../common-api/objects.rst:98
+msgid "``ML.instanceMemory``"
+msgstr ""
+
+#: ../../common-api/objects.rst:99 ../../common-api/objects.rst:416
+msgid "``int`` (MiB)"
+msgstr ""
+
+#: ../../common-api/objects.rst:100
+msgid ""
+"Sets the memory limit of each instance in the cluster launched for new "
+"machine learning kernel sessions. (default: ``8``)"
+msgstr ""
+
+#: ../../common-api/objects.rst:102
+msgid "The enterprise edition offers the following additional properties:"
+msgstr ""
+
+#: ../../common-api/objects.rst:111
+msgid "``cost.automatic``"
+msgstr ""
+
+#: ../../common-api/objects.rst:113
+msgid ""
+"If set ``true``, enables automatic cost optimization (BETA). With "
+"supported kernel types, it automatically suspends or resize the kernel "
+"sessions not to exceed the configured cost limit per day. (default: "
+"``false``)"
+msgstr ""
+
+#: ../../common-api/objects.rst:116
+msgid "``cost.dailyLimit``"
+msgstr ""
+
+#: ../../common-api/objects.rst:117 ../../common-api/objects.rst:138
+#: ../../common-api/objects.rst:154 ../../common-api/objects.rst:167
+#: ../../common-api/objects.rst:176 ../../common-api/objects.rst:246
+#: ../../common-api/objects.rst:328 ../../common-api/objects.rst:332
+#: ../../common-api/objects.rst:483 ../../common-api/objects.rst:495
+#: ../../common-api/objects.rst:520 ../../common-api/objects.rst:546
+#: ../../common-api/objects.rst:549 ../../common-api/objects.rst:575
+#: ../../common-api/objects.rst:581 ../../common-api/objects.rst:619
+#: ../../common-api/objects.rst:625 ../../common-api/objects.rst:670
+#: ../../common-api/objects.rst:704 ../../common-api/objects.rst:707
+#: ../../common-api/objects.rst:710 ../../common-api/objects.rst:716
+msgid "``str``"
+msgstr ""
+
+#: ../../common-api/objects.rst:118
+msgid ""
+"The string representation of money amount as decimals. The currency is "
+"fixed to USD. (default: ``\"50.00\"``)"
+msgstr ""
+
+#: ../../common-api/objects.rst:124
+msgid "Service Port Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:133 ../../common-api/objects.rst:327
+#: ../../common-api/objects.rst:519 ../../common-api/objects.rst:545
+#: ../../common-api/objects.rst:574 ../../common-api/objects.rst:618
+msgid "``name``"
+msgstr ""
+
+#: ../../common-api/objects.rst:135
+msgid ""
+"The name of service provided by the container. See also: :ref:`service-"
+"ports`"
+msgstr ""
+
+#: ../../common-api/objects.rst:137
+msgid "``protocol``"
+msgstr ""
+
+#: ../../common-api/objects.rst:139
+msgid "The type of network protocol used by the container service."
+msgstr ""
+
+#: ../../common-api/objects.rst:144
+msgid "Batch Execution Query Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:153
+msgid "``build``"
+msgstr ""
+
+#: ../../common-api/objects.rst:156
+msgid "The bash command to build the main program from the given uploaded files."
+msgstr ""
+
+#: ../../common-api/objects.rst:158
+msgid ""
+"If this field is not present, an empty string or ``null``, it skips the "
+"build step."
+msgstr ""
+
+#: ../../common-api/objects.rst:160
+msgid ""
+"If this field is a constant string ``\"*\"``, it will use a default build"
+" script provided by the kernel. For example, the C kernel's default "
+"Makefile adds all C source files under the working directory and copmiles"
+" them into ``./main`` executable, with commonly used C/link flags: "
+"``\"-pthread -lm -lrt -ldl\"``."
+msgstr ""
+
+#: ../../common-api/objects.rst:166
+msgid "``exec``"
+msgstr ""
+
+#: ../../common-api/objects.rst:169
+msgid "The bash command to execute the main program."
+msgstr ""
+
+#: ../../common-api/objects.rst:171
+msgid ""
+"If this is not present, an empty string, or ``null``, the server only "
+"performs the build step and ``options.buildLog`` is assumed to be "
+"``true`` (the given value is ignored)."
+msgstr ""
+
+#: ../../common-api/objects.rst:175
+msgid "``clean``"
+msgstr ""
+
+#: ../../common-api/objects.rst:178
+msgid ""
+"The bash command to clean the intermediate files produced during the "
+"build phase. The clean step comes *before* the build step if specified so"
+" that the build step can (re)start fresh."
+msgstr ""
+
+#: ../../common-api/objects.rst:182
+msgid ""
+"If the field is not present, an empty string, or ``null``, it skips the "
+"clean step."
+msgstr ""
+
+#: ../../common-api/objects.rst:184
+msgid ""
+"Unlike the build and exec command, the default for ``\"*\"`` is do-"
+"nothing to prevent deletion of other files unrelated to the build by bugs"
+" or mistakes."
+msgstr ""
+
+#: ../../common-api/objects.rst:190
+msgid ""
+"A client can distinguish whether the current output is from the build "
+"phase or the execution phase by whether it has received ``build-"
+"finished`` status or not."
+msgstr ""
+
+#: ../../common-api/objects.rst:196
+msgid ""
+"All shell commands are by default executed under ``/home/work``. The "
+"common environment is:"
+msgstr ""
+
+#: ../../common-api/objects.rst:207
+msgid "but individual kernels may have additional environment settings."
+msgstr ""
+
+#: ../../common-api/objects.rst:211
+msgid ""
+"The shell does NOT have access to sudo or the root privilege. Though, "
+"some kernels may allow installation of language-specific packages in the "
+"user directory."
+msgstr ""
+
+#: ../../common-api/objects.rst:215
+msgid ""
+"Also, your build script and the main program is executed inside "
+"Backend.AI Jail, meaning that some system calls are blocked by our "
+"policy. Since ``ptrace`` syscall is blocked, you cannot use native "
+"debuggers such as gdb."
+msgstr ""
+
+#: ../../common-api/objects.rst:220
+msgid "This limitation, however, is subject to change in the future."
+msgstr ""
+
+#: ../../common-api/objects.rst:222
+msgid "Example:"
+msgstr ""
+
+#: ../../common-api/objects.rst:235
+msgid "Execution Result Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:245
+msgid "``runId``"
+msgstr ""
+
+#: ../../common-api/objects.rst:247
+msgid ""
+"The user-provided run identifier. If the user has NOT provided it, this "
+"will be set by the API server upon the first execute API call. In that "
+"case, the client should use it for the subsequent execute API calls "
+"during the same run."
+msgstr ""
+
+#: ../../common-api/objects.rst:251
+msgid "``status``"
+msgstr ""
+
+#: ../../common-api/objects.rst:252
+msgid "``enum[str]``"
+msgstr ""
+
+#: ../../common-api/objects.rst:254
+msgid ""
+"One of ``\"continued\"``, ``\"waiting-input\"``, ``\"finished\"``, "
+"``\"clean-finished\"``, ``\"build-finished\"``, or ``\"exec-timeout\"``. "
+"See more details at :ref:`code-execution-model`."
+msgstr ""
+
+#: ../../common-api/objects.rst:258
+msgid "``exitCode``"
+msgstr ""
+
+#: ../../common-api/objects.rst:259
+msgid "``int | null``"
+msgstr ""
+
+#: ../../common-api/objects.rst:260
+msgid ""
+"The exit code of the last process. This field has a valid value only when"
+" the ``status`` is ``\"finished\"``, ``\"clean-finished\"`` or ``\"build-"
+"finished\"``. Otherwise it is set to ``null``."
+msgstr ""
+
+#: ../../common-api/objects.rst:264
+msgid ""
+"For batch-mode kernels and query-mode kernels *without* global context "
+"support, ``exitCode`` is the return code of the last executed child "
+"process in the kernel. In the execution step of a batch mode run, this is"
+" always 127 (a UNIX shell common practice for \"command not found\") when"
+" the build step has failed."
+msgstr ""
+
+#: ../../common-api/objects.rst:269
+msgid ""
+"For query-mode kernels with global context support, this value is always "
+"zero, regardless of whether the user code has caused an exception or not."
+msgstr ""
+
+#: ../../common-api/objects.rst:272
+msgid ""
+"A negative value (which cannot happen with normal process termination) "
+"indicates a Backend.AI-side error."
+msgstr ""
+
+#: ../../common-api/objects.rst:274
+msgid "``console``"
+msgstr ""
+
+#: ../../common-api/objects.rst:275 ../../common-api/objects.rst:287
+msgid "``list[object]``"
+msgstr ""
+
+#: ../../common-api/objects.rst:277
+msgid "A list of :ref:`console-item-object`."
+msgstr ""
+
+#: ../../common-api/objects.rst:279
+msgid "``options``"
+msgstr ""
+
+#: ../../common-api/objects.rst:280 ../../common-api/objects.rst:389
+msgid "``object``"
+msgstr ""
+
+#: ../../common-api/objects.rst:282
+msgid ""
+"An object containing extra display options.  If there is no options "
+"indicated by the kernel, this field is ``null``. When ``result.status`` "
+"is ``\"waiting-input\"``, it has a boolean field ``is_password`` so that "
+"you could use different types of text boxes for user inputs."
+msgstr ""
+
+#: ../../common-api/objects.rst:286
+msgid "``files``"
+msgstr ""
+
+#: ../../common-api/objects.rst:289
+msgid ""
+"A list of :ref:`execution-result-file-object` that represents files "
+"generated in ``/home/work/.output`` directory of the container during the"
+" code execution ."
+msgstr ""
+
+#: ../../common-api/objects.rst:296
+msgid "Console Item Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:306
+msgid "(root)"
+msgstr ""
+
+#: ../../common-api/objects.rst:307
+msgid "``[enum, *]``"
+msgstr ""
+
+#: ../../common-api/objects.rst:308
+msgid ""
+"A tuple of the item type and the item content. The type may be "
+"``\"stdout\"``, ``\"stderr\"``, and others."
+msgstr ""
+
+#: ../../common-api/objects.rst:311
+msgid "See more details at :ref:`handling-console-output`."
+msgstr ""
+
+#: ../../common-api/objects.rst:317
+msgid "Execution Result File Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:329
+msgid "The name of a created file after execution."
+msgstr ""
+
+#: ../../common-api/objects.rst:331
+msgid "``url``"
+msgstr ""
+
+#: ../../common-api/objects.rst:333
+msgid "The URL of a create file uploaded to AWS S3."
+msgstr ""
+
+#: ../../common-api/objects.rst:338
+msgid "Container Stats Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:347
+msgid "``cpu_used``"
+msgstr ""
+
+#: ../../common-api/objects.rst:348
+msgid "``int`` (msec)"
+msgstr ""
+
+#: ../../common-api/objects.rst:349
+msgid "The total time the kernel was running."
+msgstr ""
+
+#: ../../common-api/objects.rst:350
+msgid "``mem_max_bytes``"
+msgstr ""
+
+#: ../../common-api/objects.rst:351 ../../common-api/objects.rst:354
+#: ../../common-api/objects.rst:357 ../../common-api/objects.rst:360
+#: ../../common-api/objects.rst:363 ../../common-api/objects.rst:366
+#: ../../common-api/objects.rst:369 ../../common-api/objects.rst:372
+msgid "``int`` (Byte)"
+msgstr ""
+
+#: ../../common-api/objects.rst:352
+msgid "The maximum memory usage."
+msgstr ""
+
+#: ../../common-api/objects.rst:353
+msgid "``mem_cur_bytes``"
+msgstr ""
+
+#: ../../common-api/objects.rst:355
+msgid "The current memory usage."
+msgstr ""
+
+#: ../../common-api/objects.rst:356
+msgid "``net_rx_bytes``"
+msgstr ""
+
+#: ../../common-api/objects.rst:358
+msgid "The total amount of received data through network."
+msgstr ""
+
+#: ../../common-api/objects.rst:359
+msgid "``net_tx_bytes``"
+msgstr ""
+
+#: ../../common-api/objects.rst:361
+msgid "The total amount of transmitted data through network."
+msgstr ""
+
+#: ../../common-api/objects.rst:362
+msgid "``io_read_bytes``"
+msgstr ""
+
+#: ../../common-api/objects.rst:364
+msgid "The total amount of received data from IO."
+msgstr ""
+
+#: ../../common-api/objects.rst:365 ../../common-api/objects.rst:371
+msgid "``io_write_bytes``"
+msgstr ""
+
+#: ../../common-api/objects.rst:367
+msgid "The total amount of transmitted data to IO."
+msgstr ""
+
+#: ../../common-api/objects.rst:368
+msgid "``io_max_scratch_size``"
+msgstr ""
+
+#: ../../common-api/objects.rst:370 ../../common-api/objects.rst:373
+msgid "Currently not used field."
+msgstr ""
+
+#: ../../common-api/objects.rst:378
+msgid "Creation Config Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:388
+msgid "``environ``"
+msgstr ""
+
+#: ../../common-api/objects.rst:390
+msgid ""
+"A dictionary object specifying additional environment variables. The "
+"values must be strings."
+msgstr ""
+
+#: ../../common-api/objects.rst:393
+msgid "``mounts``"
+msgstr ""
+
+#: ../../common-api/objects.rst:394
+msgid "``list[str]``"
+msgstr ""
+
+#: ../../common-api/objects.rst:395
+msgid ""
+"An optional list of the name of virtual folders that belongs to the "
+"current API key. These virtual folders are mounted under ``/home/work``. "
+"For example, if the virtual folder name is ``abc``, you can access it on "
+"``/home/work/abc``."
+msgstr ""
+
+#: ../../common-api/objects.rst:400
+msgid ""
+"If the name contains a colon in the middle, the second part of the string"
+" indicates the alias location in the kernel's file system which is "
+"relative to ``/home/work``."
+msgstr ""
+
+#: ../../common-api/objects.rst:403
+msgid "You may mount up to 5 folders for each kernel session."
+msgstr ""
+
+#: ../../common-api/objects.rst:405
+msgid "``clusterSize``"
+msgstr ""
+
+#: ../../common-api/objects.rst:407
+msgid "The number of instances bundled for this session."
+msgstr ""
+
+#: ../../common-api/objects.rst:409
+msgid "``resources``"
+msgstr ""
+
+#: ../../common-api/objects.rst:410 ../../common-api/objects.rst:524
+msgid ":ref:`resource-slot-object`"
+msgstr ""
+
+#: ../../common-api/objects.rst:411
+msgid "The resource slot specification for each container in this session."
+msgstr ""
+
+#: ../../common-api/objects.rst:415
+msgid "``instanceMemory``"
+msgstr ""
+
+#: ../../common-api/objects.rst:417
+msgid ""
+"The maximum memory allowed per instance. The value is capped by the per-"
+"kernel image limit. Additional charges may apply on the public API "
+"service."
+msgstr ""
+
+#: ../../common-api/objects.rst:423
+msgid "``instanceCores``"
+msgstr ""
+
+#: ../../common-api/objects.rst:425
+msgid ""
+"The number of CPU cores. The value is capped by the per-kernel image "
+"limit. Additional charges may apply on the public API service."
+msgstr ""
+
+#: ../../common-api/objects.rst:431
+msgid "``instanceGPUs``"
+msgstr ""
+
+#: ../../common-api/objects.rst:432
+msgid "``float``"
+msgstr ""
+
+#: ../../common-api/objects.rst:433
+msgid ""
+"The fraction of GPU devices (1.0 means a whole device). The value is "
+"capped by the per-kernel image limit. Additional charges may apply on the"
+" public API service."
+msgstr ""
+
+#: ../../common-api/objects.rst:442
+msgid "Resource Slot Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:452
+msgid "``cpu``"
+msgstr ""
+
+#: ../../common-api/objects.rst:453 ../../common-api/objects.rst:457
+#: ../../common-api/objects.rst:478 ../../common-api/objects.rst:489
+msgid "``str | int``"
+msgstr ""
+
+#: ../../common-api/objects.rst:454
+msgid "The number of CPU cores."
+msgstr ""
+
+#: ../../common-api/objects.rst:456
+msgid "``mem``"
+msgstr ""
+
+#: ../../common-api/objects.rst:458
+msgid ""
+"The amount of main memory in bytes. When the slot object is used as an "
+"input to an API, it may be represented as binary numbers using the binary"
+" scale suffixes such as *k*, *m*, *g*, *t*, *p*, *e*, *z*, and *y*, e.g.,"
+" \"512m\", \"512M\", \"512MiB\", \"64g\", \"64G\", \"64GiB\", etc. When "
+"the slot object is used as an output of an API, this field is **always** "
+"represented in the unscaled number of bytes as strings."
+msgstr ""
+
+#: ../../common-api/objects.rst:468
+msgid ""
+"When parsing this field as JSON, you must check whether your JSON library"
+" or the programming language supports large integers. For instance, most "
+"modern Javascript engines support up to :math:`2^{53}-1` (8 PiB -- 1) "
+"which is often defined as the ``Number.MAX_SAFE_INTEGER`` constant. "
+"Otherwise you need to use a third-party big number calculation library.  "
+"To prevent unexpected side-effects, Backend.AI always returns this field "
+"as a string."
+msgstr ""
+
+#: ../../common-api/objects.rst:477
+msgid "``cuda.device``"
+msgstr ""
+
+#: ../../common-api/objects.rst:479
+msgid ""
+"The number of CUDA devices. Only available when the server is configured "
+"to use the CUDA agent plugin."
+msgstr ""
+
+#: ../../common-api/objects.rst:482
+msgid "``cuda.shares``"
+msgstr ""
+
+#: ../../common-api/objects.rst:484
+msgid ""
+"The virtual share of CUDA devices represented as fractional decimals. "
+"Only available when the server is configured to use the CUDA agent plugin"
+" with the fractional allocation mode (enterprise edition only)."
+msgstr ""
+
+#: ../../common-api/objects.rst:488
+msgid "``tpu.device``"
+msgstr ""
+
+#: ../../common-api/objects.rst:490
+msgid ""
+"The number of TPU devices. Only available when the server is configured "
+"to use the TPU agent plugin (cloud edition only)."
+msgstr ""
+
+#: ../../common-api/objects.rst:494
+msgid "(others)"
+msgstr ""
+
+#: ../../common-api/objects.rst:496
+msgid ""
+"More resource slot types may be available depending on the server "
+"configuration and agent plugins. There are two types for an arbitrary "
+"slot: \"count\" (the default) and \"bytes\"."
+msgstr ""
+
+#: ../../common-api/objects.rst:500
+msgid ""
+"For \"count\" slots, you may put arbitrary positive real number there, "
+"but fractions may be truncated depending on the plugin implementation."
+msgstr ""
+
+#: ../../common-api/objects.rst:503
+msgid ""
+"For \"bytes\" slots, its interpretation and representation follows that "
+"of the ``mem`` field."
+msgstr ""
+
+#: ../../common-api/objects.rst:509
+msgid "Resource Preset Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:521
+msgid "The name of this preset."
+msgstr ""
+
+#: ../../common-api/objects.rst:523
+msgid "``resource_slots``"
+msgstr ""
+
+#: ../../common-api/objects.rst:525
+msgid ""
+"The pre-configured combination of resource slots. If it contains slot "
+"types that are not currently used/activated in the cluster, they will be "
+"removed when returned via ``/resource/*`` REST APIs."
+msgstr ""
+
+#: ../../common-api/objects.rst:532
+msgid "Virtual Folder Creation Result Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:541 ../../common-api/objects.rst:577
+#: ../../common-api/objects.rst:621 ../../common-api/objects.rst:700
+msgid "``id``"
+msgstr ""
+
+#: ../../common-api/objects.rst:542 ../../common-api/objects.rst:552
+#: ../../common-api/objects.rst:555 ../../common-api/objects.rst:593
+#: ../../common-api/objects.rst:596 ../../common-api/objects.rst:622
+#: ../../common-api/objects.rst:644 ../../common-api/objects.rst:647
+#: ../../common-api/objects.rst:701 ../../common-api/objects.rst:713
+msgid "``UUID``"
+msgstr ""
+
+#: ../../common-api/objects.rst:543
+msgid ""
+"An internally used unique identifier of the created vfolder. Currently it"
+" has no use in the client-side."
+msgstr ""
+
+#: ../../common-api/objects.rst:547
+msgid "The name of created vfolder, as the client has given."
+msgstr ""
+
+#: ../../common-api/objects.rst:548 ../../common-api/objects.rst:580
+#: ../../common-api/objects.rst:624
+msgid "``host``"
+msgstr ""
+
+#: ../../common-api/objects.rst:550
+msgid "The host name where the vfolder is created."
+msgstr ""
+
+#: ../../common-api/objects.rst:551 ../../common-api/objects.rst:592
+#: ../../common-api/objects.rst:643
+msgid "``user``"
+msgstr ""
+
+#: ../../common-api/objects.rst:553
+msgid "The user who has the ownership of this vfolder."
+msgstr ""
+
+#: ../../common-api/objects.rst:554 ../../common-api/objects.rst:595
+#: ../../common-api/objects.rst:646
+msgid "``group``"
+msgstr ""
+
+#: ../../common-api/objects.rst:556
+msgid "The group who is the owner of this vfolder."
+msgstr ""
+
+#: ../../common-api/objects.rst:560
+msgid "``user`` and ``group`` fields."
+msgstr ""
+
+#: ../../common-api/objects.rst:565
+msgid "Virtual Folder List Item Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:576 ../../common-api/objects.rst:620
+msgid "The human readable name set when created."
+msgstr ""
+
+#: ../../common-api/objects.rst:579 ../../common-api/objects.rst:623
+msgid "The unique ID of the folder."
+msgstr ""
+
+#: ../../common-api/objects.rst:582 ../../common-api/objects.rst:626
+msgid "The host name where this folder is located."
+msgstr ""
+
+#: ../../common-api/objects.rst:583 ../../common-api/objects.rst:627
+msgid "``is_owner``"
+msgstr ""
+
+#: ../../common-api/objects.rst:585 ../../common-api/objects.rst:629
+msgid ""
+"True if the client user is the owner of this folder. False if the folder "
+"is shared from a group or another user."
+msgstr ""
+
+#: ../../common-api/objects.rst:587 ../../common-api/objects.rst:634
+#: ../../common-api/objects.rst:706
+msgid "``permission``"
+msgstr ""
+
+#: ../../common-api/objects.rst:588 ../../common-api/objects.rst:599
+#: ../../common-api/objects.rst:635 ../../common-api/objects.rst:650
+msgid "``enum``"
+msgstr ""
+
+#: ../../common-api/objects.rst:589
+msgid ""
+"The requested user's permission for this folder. (One of \"ro\", \"rw\", "
+"and \"wd\" which represents read-only, read-write, and write-delete "
+"respectively. Currently \"rw\" and \"wd\" has no difference.)"
+msgstr ""
+
+#: ../../common-api/objects.rst:594
+msgid ""
+"The user ID if the owner of this item is a user vfolder. Otherwise, "
+"``null``."
+msgstr ""
+
+#: ../../common-api/objects.rst:597
+msgid ""
+"The group ID if the owner of this item is a group vfolder. Otherwise, "
+"``null``."
+msgstr ""
+
+#: ../../common-api/objects.rst:598 ../../common-api/objects.rst:649
+msgid "``type``"
+msgstr ""
+
+#: ../../common-api/objects.rst:600 ../../common-api/objects.rst:651
+msgid "The owner type of vfolder. One of \"user\" or \"group\"."
+msgstr ""
+
+#: ../../common-api/objects.rst:604 ../../common-api/objects.rst:655
+msgid "``user``, ``group``, and ``type`` fields."
+msgstr ""
+
+#: ../../common-api/objects.rst:609
+msgid "Virtual Folder Item Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:631
+msgid "``num_files``"
+msgstr ""
+
+#: ../../common-api/objects.rst:633
+msgid "The number of files in this folder."
+msgstr ""
+
+#: ../../common-api/objects.rst:636
+msgid "The requested user's permission for this folder."
+msgstr ""
+
+#: ../../common-api/objects.rst:637
+msgid "``created_at``"
+msgstr ""
+
+#: ../../common-api/objects.rst:639
+msgid "The date and time when the folder is created."
+msgstr ""
+
+#: ../../common-api/objects.rst:640
+msgid "``last_used``"
+msgstr ""
+
+#: ../../common-api/objects.rst:642
+msgid "The date adn time when the folder is last used."
+msgstr ""
+
+#: ../../common-api/objects.rst:645
+msgid "The user ID if the owner of this item is a user. Otherwise, ``null``."
+msgstr ""
+
+#: ../../common-api/objects.rst:648
+msgid "The group ID if the owner of this item is a group. Otherwise, ``null``."
+msgstr ""
+
+#: ../../common-api/objects.rst:660
+msgid "Virtual Folder File Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:669
+msgid "``filename``"
+msgstr ""
+
+#: ../../common-api/objects.rst:671
+msgid "The filename."
+msgstr ""
+
+#: ../../common-api/objects.rst:672
+msgid "``mode``"
+msgstr ""
+
+#: ../../common-api/objects.rst:674
+msgid "The file's mode (permission) bits as an integer."
+msgstr ""
+
+#: ../../common-api/objects.rst:677
+msgid "The file's size."
+msgstr ""
+
+#: ../../common-api/objects.rst:678
+msgid "``ctime``"
+msgstr ""
+
+#: ../../common-api/objects.rst:680
+msgid "The timestamp when the file is created."
+msgstr ""
+
+#: ../../common-api/objects.rst:681
+msgid "``mtime``"
+msgstr ""
+
+#: ../../common-api/objects.rst:683
+msgid "The timestamp when the file is last modified."
+msgstr ""
+
+#: ../../common-api/objects.rst:684
+msgid "``atime``"
+msgstr ""
+
+#: ../../common-api/objects.rst:686
+msgid "The timestamp when the file is last accessed."
+msgstr ""
+
+#: ../../common-api/objects.rst:691
+msgid "Virtual Folder Invitation Object"
+msgstr ""
+
+#: ../../common-api/objects.rst:702
+msgid ""
+"The unique ID of the invitation. Use this when making API requests "
+"referring this invitation."
+msgstr ""
+
+#: ../../common-api/objects.rst:703
+msgid "``inviter``"
+msgstr ""
+
+#: ../../common-api/objects.rst:705
+msgid "The inviter's user ID (email) of the invitation."
+msgstr ""
+
+#: ../../common-api/objects.rst:708
+msgid "The permission that the invited user will have."
+msgstr ""
+
+#: ../../common-api/objects.rst:709
+msgid "``state``"
+msgstr ""
+
+#: ../../common-api/objects.rst:711
+msgid "The current state of the invitation."
+msgstr ""
+
+#: ../../common-api/objects.rst:712
+msgid "``vfolder_id``"
+msgstr ""
+
+#: ../../common-api/objects.rst:714
+msgid "The unique ID of the vfolder where the user is invited."
+msgstr ""
+
+#: ../../common-api/objects.rst:715
+msgid "``vfolder_name``"
+msgstr ""
+
+#: ../../common-api/objects.rst:717
+msgid "The name of the vfolder where the user is invited."
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:2
+msgid "Rate Limiting"
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:4
+msgid ""
+"The API server imposes a rate limit to prevent clients from overloading "
+"the server. The limit is applied to the last *N* minutes at ANY moment "
+"(*N* is 15 minutes by default)."
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:7
+msgid ""
+"For public non-authorized APIs such as version checks, the server uses "
+"the client's IP address seen by the server to impose rate limits. Due to "
+"this, please keep in mind that large-scale NAT-based deployments may "
+"encounter the rate limits sooner than expected. For authorized APIs, it "
+"uses the access key in the authorization header to impose rate limits. "
+"The rate limit includes both all successful and failed requests."
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:12
+msgid ""
+"Upon a valid request, the HTTP response contains the following header "
+"fields to help the clients flow-control their requests."
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:20
+msgid "``X-RateLimit-Limit``"
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:21
+msgid "The maximum allowed number of requests during the rate-limit window."
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:22
+msgid "``X-RateLimit-Remaining``"
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:23
+msgid "The number of further allowed requests left for the moment."
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:24
+msgid "``X-RateLimit-Window``"
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:25
+msgid ""
+"The constant value representing the window size in seconds. (e.g., 900 "
+"means 15 minutes)"
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:30
+msgid ""
+"Deprecated ``X-RateLimit-Reset`` and transitional ``X-Retry-After`` as we"
+" have implemented a rolling counter that measures last 15 minutes API "
+"call counts at any moment."
+msgstr ""
+
+#: ../../common-api/ratelimit.rst:32
+msgid ""
+"When the limit is exceeded, further API calls will get HTTP 429 \"Too "
+"Many Requests\". If the client seems to be DDoS-ing, the server may block"
+" the client forever without prior notice."
+msgstr ""
+
