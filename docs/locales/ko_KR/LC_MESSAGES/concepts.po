@@ -20,7 +20,7 @@ msgstr ""
 
 #: ../../concepts/api-overview.rst:2
 msgid "API Overview"
-msgstr ""
+msgstr "API 개괄"
 
 #: ../../concepts/api-overview.rst:4
 msgid "Backend.AI API v3 consists of two parts: User APIs and Admin APIs."
