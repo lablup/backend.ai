@@ -890,7 +890,7 @@ msgstr ""
 
 #: ../../install/install-docker.rst:15
 msgid "Alternative way of docker installation on Linux (Ubuntu, CentOS, ...)"
-msgstr ""
+msgstr "리눅스에서 docker 설치의 다른 방법(Ubuntu, CentOS, ...)"
 
 #: ../../install/install-docker.rst:21
 msgid "type your password to install docker."
