@@ -70,7 +70,7 @@ msgstr "GraphQL의 기본"
 msgid ""
 "The Admin API uses a single GraphQL endpoint for both queries and "
 "mutations."
-msgstr "관리자 API는 단일 GraphQL 엔드포인트를 쿼리와 뮤테이션 사용합니다."
+msgstr "관리자 API는 단일 GraphQL 엔드포인트를 쿼리와 뮤테이션에 사용합니다."
 
 #: ../../admin-api/intro.rst:32
 msgid ""
