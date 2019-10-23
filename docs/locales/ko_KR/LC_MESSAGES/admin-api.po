@@ -70,7 +70,7 @@ msgstr "GraphQL의 기본"
 msgid ""
 "The Admin API uses a single GraphQL endpoint for both queries and "
 "mutations."
-msgstr "관리자 API는 단일 GraphQL 엔드포인트를 쿼리와  사용합니다."
+msgstr "관리자 API는 단일 GraphQL 엔드포인트를 쿼리와 뮤테이션 사용합니다."
 
 #: ../../admin-api/intro.rst:32
 msgid ""
@@ -92,13 +92,13 @@ msgid ""
 "encoded body with an object containing two fields: ``query`` and "
 "``variables``, pretty much like other GraphQL server implementations."
 msgstr "클라이언트는 HTTP 메소드인 POST를 사용해야 합니다. 서버는 다른 GraphQL 서버 구현과 "
-"매우 유사한 ``쿼리``와 ``변수`` 두 가지 필드를 포함하는 JOSON 인코딩 본문을 허용합니다."
+"매우 유사한 ``쿼리``와 ``변수`` 두 가지 필드를 포함하는 JSON 인코딩 본문을 허용합니다."
 
 #: ../../admin-api/intro.rst:46
 msgid ""
 "Currently the API gateway does not support schema discovery which is "
 "often used by API development tools such as Insomnia and GraphiQL."
-msgstr "현재 API 게이트웨이는 Insomina와 GraphQL과 같은 API 개발 도구에서 "
+msgstr "현재 API 게이트웨이는 Insomina와 GraphiQL과 같은 API 개발 도구에서 "
 "자주 사용되는 스키마 검색을 지원하지 않습니다."
 
 #: ../../admin-api/intro.rst:51
