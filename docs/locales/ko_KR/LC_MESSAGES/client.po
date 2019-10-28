@@ -20,7 +20,7 @@ msgstr ""
 
 #: ../../client/index.rst:2
 msgid "Client SDK Libraries and Tools"
-msgstr "클라이언트 SDK 라이브러리와 툴"
+msgstr "클라이언트 SDK 라이브러리 및 도구"
 
 #: ../../client/index.rst:4
 msgid ""
