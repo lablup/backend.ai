@@ -24,7 +24,7 @@ msgstr "개요"
 
 #: ../../admin-api/intro.rst:4
 msgid "Backend.AI's Admin API is for developing in-house management consoles."
-msgstr "Backend.AI의 관지라 계정은 내부 관리 콘솔을 개발하는 것이 목적입니다."
+msgstr "Backend.AI의 관리자 계정은 내부 관리 콘솔을 개발하는 것이 목적입니다."
 
 #: ../../admin-api/intro.rst:6
 msgid "There are two modes of operation:"
@@ -34,7 +34,7 @@ msgstr "두 가지 모드의 작업이 있습니다."
 msgid ""
 "Full admin access: you can query all information of all users. It "
 "requires a privileged keypair."
-msgstr "전체 관리자 접근 : 모든 사용자에 대한 모든 정보를 질문할 수 있습니다. 이 방법은 권한있는 키 쌍을 필요로 합니다."
+msgstr "전체 관리자 접근 : 모든 사용자에 대한 모든 정보를 쿼리할 수 있습니다. 이 방법은 권한있는 키 쌍을 필요로 합니다."
 
 #: ../../admin-api/intro.rst:10
 msgid ""
@@ -148,7 +148,7 @@ msgstr "범용 고유 식별자 : ``문자열``로 표시되는 16진수 형식�
 msgid ""
 "``DateTime``: An ISO-8601 formatted date-time value represented as "
 "``String``"
-msgstr "``데이트타임`` : ``문자열``로 표시되는 ISO-8601 형식의 날짜-시간 값"
+msgstr "``DateTime`` : ``문자열``로 표시되는 ISO-8601 형식의 날짜-시간 값"
 
 #: ../../admin-api/intro.rst:76
 msgid "Authentication"
@@ -160,7 +160,7 @@ msgstr "관리자 API는 사용자 API와 같은 인증 방법을 공유한다."
 
 #: ../../admin-api/intro.rst:82
 msgid "Versioning"
-msgstr "버전"
+msgstr "버전관리"
 
 #: ../../admin-api/intro.rst:84
 msgid ""
@@ -225,12 +225,12 @@ msgstr "통계"
 
 #: ../../admin-api/vfolders.rst:2
 msgid "Virtual Folder Management"
-msgstr "가상 파일 관리"
+msgstr "가상 폴더 관리"
 
 #: ../../admin-api/vfolders.rst:36
 msgid ""
 "It shares the same ``VirtualFolder`` type, but you cannot use "
 "``access_key`` argument in the root query."
-msgstr "그것은 같은 ``가상파일`` 타입을 공유하지만 루트 쿼리에서 "
+msgstr "같은 ``가상파일`` 타입을 공유하지만 루트 쿼리에서 "
 "``access_key``인수를 사용할 수는 없습니다."
 
