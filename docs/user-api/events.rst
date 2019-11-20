@@ -59,15 +59,15 @@ Possible event names (more events may be added in the future):
 
    * - Event Name
      - Description
-   * - ``kernel-preparing``
+   * - ``kernel_preparing``
      - The session is just scheduled from the job queue and got an agent resource allocation.
-   * - ``kernel-pulling``
+   * - ``kernel_pulling``
      - The session begins pulling the kernel image (usually from a Docker registry) to the scheduled agent.
-   * - ``kernel-creating``
+   * - ``kernel_creating``
      - The session is being created as containers (or other entities in different agent backends).
-   * - ``kernel-started``
+   * - ``kernel_started``
      - The session becomes ready to execute codes.
-   * - ``kernel-terminated``
+   * - ``kernel_terminated``
      - The session has terminated.
 
 When using the EventSource API, you should add event listeners as follows:
