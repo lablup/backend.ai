@@ -38,11 +38,11 @@ It also monitors and scales the cluster of multiple agents (a few tens to hundre
 * https://github.com/lablup/backend.ai-manager
   * Package namespace: `ai.backend.gateway` and `ai.backend.manager`
   * Plugin interfaces
-    - `backendai-scheduler-v10`
-    - `backendai-hook-v10`
-    - `backendai-webapp-v10`
-    - `backendai-monitor-stats-v10`
-    - `backendai-monitor-error-v10`
+    - `backendai_scheduler_v10`
+    - `backendai_hook_v10`
+    - `backendai_webapp_v10`
+    - `backendai_monitor_stats_v10`
+    - `backendai_monitor_error_v10`
 
 ### Agent
 
@@ -54,9 +54,9 @@ heartbeats.
 * https://github.com/lablup/backend.ai-agent
   * Package namespace: `ai.backend.agent`
   * Plugin interfaces
-    - `backendai-accelerator-v12`
-    - `backendai-monitor-stats-v10`
-    - `backendai-monitor-error-v10`
+    - `backendai_accelerator_v12`
+    - `backendai_monitor_stats_v10`
+    - `backendai_monitor_error_v10`
 * https://github.com/lablup/backend.ai-accelerator-cuda (CUDA accelerator plugin)
   * Package namespace: `ai.backend.acceelrator.cuda`
 * https://github.com/lablup/backend.ai-accelerator-rocm (ROCM accelerator plugin)
