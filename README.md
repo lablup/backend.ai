@@ -5,10 +5,12 @@ Backend.AI
 ![Supported Python versions](https://img.shields.io/pypi/pyversions/backend.ai.svg)
 [![Gitter](https://badges.gitter.im/lablup/backend.ai.svg)](https://gitter.im/lablup/backend.ai)
 
-Backend.AI is a streamlined backend API server that hosts heterogeneous
-programming languages and popular AI frameworks.
-It manages the underlying computing resources for multi-tenant computation
-sessions where such sessions are spawned and executed instantly on demand.
+Backend.AI is a streamlined, container-based computing cluster orchestrator
+that hosts diverse programming languages and popular computing/ML frameworks,
+with pluggable heterogeneous accelerator support including CUDA and ROCM.
+It allocates and isolates the underlying computing resources for multi-tenant
+computation sessions on-demand or in batches with customizable job schedulers.
+All its functions are exposed as REST/GraphQL/WebSocket APIs.
 
 
 Server-side Components
