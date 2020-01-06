@@ -35,8 +35,14 @@ documentation](http://docs.backend.ai).
 It routes external API requests from front-end services to individual agents.
 It also monitors and scales the cluster of multiple agents (a few tens to hundreds).
 
-* Package namespace: `ai.backend.gateway` and `ai.backend.manager`
 * https://github.com/lablup/backend.ai-manager
+  * Package namespace: `ai.backend.gateway` and `ai.backend.manager`
+  * Plugin interfaces
+    - `backendai-scheduler-v10`
+    - `backendai-hook-v10`
+    - `backendai-webapp-v10`
+    - `backendai-monitor-stats-v10`
+    - `backendai-monitor-error-v10`
 
 ### Agent
 
@@ -47,6 +53,10 @@ heartbeats.
 
 * https://github.com/lablup/backend.ai-agent
   * Package namespace: `ai.backend.agent`
+  * Plugin interfaces
+    - `backendai-accelerator-v12`
+    - `backendai-monitor-stats-v10`
+    - `backendai-monitor-error-v10`
 * https://github.com/lablup/backend.ai-accelerator-cuda (CUDA accelerator plugin)
   * Package namespace: `ai.backend.acceelrator.cuda`
 * https://github.com/lablup/backend.ai-accelerator-rocm (ROCM accelerator plugin)
@@ -126,22 +136,40 @@ animated vector graphics)
   the Javascript part in the front-end.
 * https://github.com/lablup/backend.ai-media
 
+Interacting with computation sessions
+-------------------------------------
+
+Backend.AI provides websocket tunneling into individual computation sessions (containers),
+so that users can use their browsers and client CLI to access in-container applications directly
+in a secure way.
+
+* Jupyter Kernel: data scientists' favorite tool
+   * Most container sessions have intrinsic Jupyter and JupyterLab support.
+* Web-based terminal
+   * All container sessions have intrinsic ttyd support.
+* SSH
+   * All container sessions have intrinsic SSH/SFTP/SCP support with auto-generated per-user SSH keypair.
+     PyCharm and other IDEs can use on-demand sessions using SSH remote interpreters.
+* VSCode (coming soon)
+   * Most container sessions have intrinsic web-based VSCode support.
 
 Integrations with IDEs and Editors
 ----------------------------------
 
-* Jupyter Kernel: data scientists' favorite tool
-   * Package namespaces: `backend.ai-integration-jupyter`
-   * https://github.com/lablup/backend.ai-integration-jupyter
 * Visual Studio Code Extension
    * Search “Live Code Runner” among VSCode extensions.
    * https://github.com/lablup/vscode-live-code-runner
 * Atom Editor plugin
    * Search “Live Code Runner” among Atom plugins.
    * https://github.com/lablup/atom-live-code-runner
-* IntelliJ / PyCharm plugin
-   * Coming soon!
 
+Storage management
+------------------
+
+Backend.AI provides an abstraction layer on top of existing network-based storages
+(e.g., NFS/SMB), called vfolders (virtual folders).
+Each vfolder works like a cloud storage that can be mounted into any computation
+sessions and shared between users and user groups with differentiated privileges.
 
 License
 -------
