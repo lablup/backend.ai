@@ -17,7 +17,7 @@ You may also use social accounts for log-ins such as Twitter, Facebook, and GitH
 
 An API keypair is composed of a 20-characters access key (``AKIA...``) and a 40-characters secret key, in a similar form to AWS access keys.
 
-Currently, the service is BETA: it is free of charge but each user is limited to have only one keypair and have up to 5 concurrent kernel sessions for a given keypair.
+Currently, the service is BETA: it is free of charge but each user is limited to have only one keypair and have up to 5 concurrent sessions for a given keypair.
 Keep you eyes on further announcements for upgraded paid plans.
 
 Accessing Admin APIs

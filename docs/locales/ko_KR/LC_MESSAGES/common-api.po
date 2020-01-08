@@ -730,8 +730,8 @@ msgstr ""
 msgid ""
 "Indicates if the keypair is activated or not. If not activated, all "
 "authentication using the keypair returns 401 Unauthorized. When changed "
-"from ``true`` to ``false``, existing running kernel sessions continue to "
-"run but any requests to create new kernel sessions are refused. (default:"
+"from ``true`` to ``false``, existing running sessions continue to "
+"run but any requests to create new sessions are refused. (default:"
 " ``true``)"
 msgstr ""
 
@@ -741,7 +741,7 @@ msgstr ""
 
 #: ../../common-api/objects.rst:93
 msgid ""
-"The maximum number of concurrent kernel sessions allowed for this "
+"The maximum number of concurrent sessions allowed for this "
 "keypair. (default: ``5``)"
 msgstr ""
 
@@ -752,7 +752,7 @@ msgstr ""
 #: ../../common-api/objects.rst:97
 msgid ""
 "Sets the number of instances clustered together when launching new "
-"machine learning kernel sessions. (default: ``1``)"
+"machine learning sessions. (default: ``1``)"
 msgstr ""
 
 #: ../../common-api/objects.rst:98
@@ -766,7 +766,7 @@ msgstr ""
 #: ../../common-api/objects.rst:100
 msgid ""
 "Sets the memory limit of each instance in the cluster launched for new "
-"machine learning kernel sessions. (default: ``8``)"
+"machine learning sessions. (default: ``8``)"
 msgstr ""
 
 #: ../../common-api/objects.rst:102
@@ -1200,7 +1200,7 @@ msgid ""
 msgstr ""
 
 #: ../../common-api/objects.rst:403
-msgid "You may mount up to 5 folders for each kernel session."
+msgid "You may mount up to 5 folders for each session."
 msgstr ""
 
 #: ../../common-api/objects.rst:405

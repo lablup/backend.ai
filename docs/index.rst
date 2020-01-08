@@ -61,7 +61,7 @@ Table of Contents
    :caption: User API Reference
 
    user-api/intro
-   user-api/kernels
+   user-api/sessions
    user-api/service-ports
    user-api/exec-stream
    user-api/exec-query

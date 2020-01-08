@@ -366,7 +366,7 @@ msgstr ""
 
 #: ../../user-api/exec-batch.rst:17
 msgid ""
-"Upload files to the kernel session. You may upload multiple files at once"
+"Upload files to the session. You may upload multiple files at once"
 " using multi-part form-data encoding in the request body (RFC 1867/2388)."
 " The uploaded files are placed under ``/home/work`` directory (which is "
 "the home directory for all kernels by default), and existing files are "
@@ -610,7 +610,7 @@ msgstr ""
 
 #: ../../user-api/exec-batch.rst:133
 msgid ""
-"Once files are uploaded to the kernel session or generated during the "
+"Once files are uploaded to the session or generated during the "
 "execution of the code, there is a need to identify what files actually "
 "are in the current session. In this case, use this API to get the list of"
 " files of your compute sesison."
@@ -659,7 +659,7 @@ msgid "``folder_path``"
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:183
-msgid "Absolute path inside kernel session."
+msgid "Absolute path inside session."
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:184
@@ -711,8 +711,8 @@ msgstr ""
 
 #: ../../user-api/exec-query.rst:10
 msgid ""
-"Executes a snippet of user code using the specified kernel session. Each "
-"execution request to a same kernel session may have side-effects to "
+"Executes a snippet of user code using the specified session. Each "
+"execution request to a same session may have side-effects to "
 "subsequent executions. For instance, setting a global variable in a "
 "request and reading the variable in another request is completely legal. "
 "It is the job of the user (or the front-end) to gaurantee the correct "
@@ -745,7 +745,7 @@ msgstr ""
 #: ../../user-api/exec-query.rst:84
 msgid ""
 "If the user code tries to breach the system, causes crashs (e.g., "
-"segmentation fault), or runs too long (timeout), the kernel session is "
+"segmentation fault), or runs too long (timeout), the session is "
 "automatically terminated. In such cases, you will get incomplete console "
 "logs with ``\"finished\"`` status earlier than expected. Depending on "
 "situation, the ``result.stderr`` may also contain specific error "
@@ -1246,7 +1246,7 @@ msgid "Here are the API calls to create and manage compute sessions."
 msgstr ""
 
 #: ../../user-api/kernels.rst:9
-msgid "Creating Kernel Session"
+msgid "Creating Session"
 msgstr ""
 
 #: ../../user-api/kernels.rst:11
@@ -1255,7 +1255,7 @@ msgstr ""
 
 #: ../../user-api/kernels.rst:14
 msgid ""
-"Creates a new kernel session or returns an existing session, depending on"
+"Creates a new session or returns an existing session, depending on"
 " the parameters."
 msgstr ""
 
@@ -1458,7 +1458,7 @@ msgstr ""
 
 #: ../../user-api/kernels.rst:201
 msgid ""
-"Retrieves information about a kernel session. For performance reasons, "
+"Retrieves information about a session. For performance reasons, "
 "the returned information may not be real-time; usually they are updated "
 "every a few seconds in the server-side."
 msgstr ""
@@ -1525,7 +1525,7 @@ msgid "The total time the kernel was running."
 msgstr ""
 
 #: ../../user-api/kernels.rst:258
-msgid "Destroying Kernel Session"
+msgid "Destroying Session"
 msgstr ""
 
 #: ../../user-api/kernels.rst:261 ../../user-api/vfolders.rst:260
@@ -1534,7 +1534,7 @@ msgid "Method: ``DELETE``"
 msgstr ""
 
 #: ../../user-api/kernels.rst:263
-msgid "Terminates a kernel session."
+msgid "Terminates a session."
 msgstr ""
 
 #: ../../user-api/kernels.rst:289
@@ -1550,7 +1550,7 @@ msgid "The :ref:`container-stats-object` of the kernel when deleted."
 msgstr ""
 
 #: ../../user-api/kernels.rst:306
-msgid "Restarting Kernel Session"
+msgid "Restarting Session"
 msgstr ""
 
 #: ../../user-api/kernels.rst:309
@@ -1559,7 +1559,7 @@ msgstr ""
 
 #: ../../user-api/kernels.rst:311
 msgid ""
-"Restarts a kernel session. The idle time of the kernel will be reset, but"
+"Restarts a session. The idle time of the kernel will be reset, but"
 " other properties such as the age and CPU credit will continue to "
 "accumulate. All global states such as global variables and modules "
 "imports are also reset."
@@ -1788,12 +1788,12 @@ msgstr ""
 #: ../../user-api/vfolders.rst:4
 msgid ""
 "Virtual folders provide access to shared, persistent, and reused files "
-"across different kernel sessions."
+"across different sessions."
 msgstr ""
 
 #: ../../user-api/vfolders.rst:7
 msgid ""
-"You can mount virtual folders when creating new kernel sessions, and use "
+"You can mount virtual folders when creating new sessions, and use "
 "them like a plain directory on the local filesystem. Of course, "
 "reads/writes to virtual folder contents may have degraded performance "
 "compared to the main scratch directory (usually ``/home/work`` in most "

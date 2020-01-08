@@ -86,18 +86,18 @@ KeyPair Properties Object
      - ``bool``
      - Indicates if the keypair is activated or not.
        If not activated, all authentication using the keypair returns 401 Unauthorized.
-       When changed from ``true`` to ``false``, existing running kernel sessions continue to run but any requests to create new kernel sessions are refused.
+       When changed from ``true`` to ``false``, existing running sessions continue to run but any requests to create new sessions are refused.
        (default: ``true``)
    * - ``concurrecy``
      - ``int``
-     - The maximum number of concurrent kernel sessions allowed for this keypair.
+     - The maximum number of concurrent sessions allowed for this keypair.
        (default: ``5``)
    * - ``ML.clusterSize``
      - ``int``
-     - Sets the number of instances clustered together when launching new machine learning kernel sessions. (default: ``1``)
+     - Sets the number of instances clustered together when launching new machine learning sessions. (default: ``1``)
    * - ``ML.instanceMemory``
      - ``int`` (MiB)
-     - Sets the memory limit of each instance in the cluster launched for new machine learning kernel sessions. (default: ``8``)
+     - Sets the memory limit of each instance in the cluster launched for new machine learning sessions. (default: ``8``)
 
 The enterprise edition offers the following additional properties:
 
@@ -111,7 +111,7 @@ The enterprise edition offers the following additional properties:
    * - ``cost.automatic``
      - ``bool``
      - If set ``true``, enables automatic cost optimization (BETA).
-       With supported kernel types, it automatically suspends or resize the kernel sessions not to exceed the configured cost limit per day.
+       With supported kernel types, it automatically suspends or resize the sessions not to exceed the configured cost limit per day.
        (default: ``false``)
    * - ``cost.dailyLimit``
      - ``str``
@@ -400,7 +400,7 @@ Creation Config Object
        If the name contains a colon in the middle, the second part of the string indicates
        the alias location in the kernel's file system which is relative to ``/home/work``.
 
-       You may mount up to 5 folders for each kernel session.
+       You may mount up to 5 folders for each session.
 
    * - ``clusterSize``
      - ``int``
