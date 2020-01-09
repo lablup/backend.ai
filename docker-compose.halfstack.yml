@@ -44,6 +44,7 @@ services:
       --initial-cluster backendai-etcd=http://0.0.0.0:2380
       --initial-cluster-token backendai-etcd-token
       --initial-cluster-state new
+      --enable-v2=true
       --auto-compaction-retention 1
 
 networks:
