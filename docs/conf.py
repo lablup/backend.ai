@@ -52,7 +52,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Backend.AI API Documentation'
-copyright = '2016-2018, Lablup Inc.'
+copyright = '2015-2020, Lablup Inc.'
 author = 'Lablup Inc.'
 
 # The version info for the project you're documenting, acts as replacement for
