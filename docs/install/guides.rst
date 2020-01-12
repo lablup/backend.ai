@@ -23,6 +23,11 @@ Quickstart Guides
     * :doc:`Prepare Databases for Manager </install/prepare-database-for-manager>` – Prepare database for complex manager managements and tasks
     * :doc:`Install CUDA </install/install-cuda>` – Install CUDA to use Nvidia GPUs
 
+    User Guides
+    ~~~~~~~~~~~~~~~~
+
+    * :doc:`Install User Programs </install/install-user-programs>` – Install user programs / libraries on your environments
+
     Developer Guides
     ~~~~~~~~~~~~~~~~
 
