@@ -2,9 +2,9 @@ Virtual Folders
 ===============
 
 Virtual folders provide access to shared, persistent, and reused files across
-different kernel sessions.
+different sessions.
 
-You can mount virtual folders when creating new kernel sessions, and use them
+You can mount virtual folders when creating new sessions, and use them
 like a plain directory on the local filesystem.
 Of course, reads/writes to virtual folder contents may have degraded
 performance compared to the main scratch directory (usually ``/home/work`` in

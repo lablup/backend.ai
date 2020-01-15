@@ -8,13 +8,13 @@ In this mode, you first upload files in prior to execution.
 Uploading files
 ---------------
 
-* URI: ``/kernel/:id/upload``
+* URI: ``/session/:id/upload``
 * Method: ``POST``
 
 Parameters
 """"""""""
 
-Upload files to the kernel session.
+Upload files to the session.
 You may upload multiple files at once using multi-part form-data encoding in the request body (RFC 1867/2388).
 The uploaded files are placed under ``/home/work`` directory (which is the home directory for all kernels by default),
 and existing files are always overwritten.
@@ -61,7 +61,7 @@ Response
 Executing with Build Step
 -------------------------
 
-* URI: ``/kernel/:id``
+* URI: ``/session/:id``
 * Method: ``POST``
 
 Parameters
@@ -76,7 +76,7 @@ Parameters
      - Description
    * - ``:id``
      - ``slug``
-     - The kernel ID.
+     - The session ID.
    * - ``mode``
      - ``enum[str]``
      - A constant string ``"batch"``.
@@ -130,12 +130,12 @@ Response
 Listing Files
 -------------
 
-Once files are uploaded to the kernel session or generated during the execution
+Once files are uploaded to the session or generated during the execution
 of the code, there is a need to identify what files actually are in the current
 session. In this case, use this API to get the list of files of your compute
 sesison.
 
-* URI: ``/kernel/:id/files``
+* URI: ``/session/:id/files``
 * Method: ``GET``
 
 Parameters
@@ -150,7 +150,7 @@ Parameters
      - Description
    * - ``:id``
      - ``slug``
-     - The kernel ID.
+     - The session ID.
    * - ``path``
      - ``str``
      - Path inside the session (default: ``/home/work``).
@@ -180,7 +180,7 @@ Response
      - Stringified json containing list of files.
    * - ``folder_path``
      - ``str``
-     - Absolute path inside kernel session.
+     - Absolute path inside session.
    * - ``errors``
      - ``str``
      - Any errors occurred during scanning the specified path.
@@ -194,7 +194,7 @@ Download files from your compute session.
 The response contents are multiparts with tarfile binaries. Post-processing,
 such as unpacking and save them, should be handled by the client.
 
-* URI: ``/kernel/:id/download``
+* URI: ``/session/:id/download``
 * Method: ``GET``
 
 Parameters
@@ -209,7 +209,7 @@ Parameters
      - Description
    * - ``:id``
      - ``slug``
-     - The kernel ID.
+     - The session ID.
    * - ``files``
      - ``list[str]``
      - File paths inside the kernel container to download.

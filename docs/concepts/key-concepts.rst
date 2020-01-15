@@ -23,14 +23,14 @@ Manager and Agents
 :raw-html-m2r:`<span style="background-color:#fafafa;border:1px solid #ccc;display:inline-block;width:16px;height:16px;margin:0;padding:0;"></span>`
 
 Backend.AI manager is the central governor of the cluster.
-It accepts user requests, creates/destroys the kernels, and routes code execution requests to appropriate agents and kernels.
-It also collects the output of kernels and responds the users with them.
+It accepts user requests, creates/destroys the sessions, and routes code execution requests to appropriate agents and sessions.
+It also collects the output of sessions and responds the users with them.
 
 Backend.AI agent is a small daemon installed onto individual worker servers to control them.
-It manages and monitors the lifecycle of kernel containers, and also mediates the input/output of kernels.
-Each agent also reports the resource capacity and status of its server, so that the manager can assign new kernels on idle servers to load balance.
+It manages and monitors the lifecycle of kernel containers, and also mediates the input/output of sessions.
+Each agent also reports the resource capacity and status of its server, so that the manager can assign new sessions on idle servers to load balance.
 
-Kernels (aka Compute Sessions)
+Compute sessions and Kernels
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 :raw-html-m2r:`<span style="background-color:#c1e4f7;border:1px solid #ccc;display:inline-block;width:16px;height:16px;margin:0;padding:0;"></span>`
 :raw-html-m2r:`<span style="background-color:#e5f5ff;border:1px solid #ccc;display:inline-block;width:16px;height:16px;margin:0;padding:0;"></span>`

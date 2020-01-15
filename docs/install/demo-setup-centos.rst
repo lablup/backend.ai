@@ -108,7 +108,7 @@ FAQ
 * When launching a kernel, it says "Service Unavailable"!
 
   * Each image has different default resource requirements and your Docker daemon may have a too small amount of resources. For example, TensorFlow images require 8 GiB or more RAM for your Docker daemon.
-  * Or, you might have launched 30 kernel sessions already, which is the default limit for this demo setup.
+  * Or, you might have launched 30 sessions already, which is the default limit for this demo setup.
 
 * What does the "dense" tag mean in the TensorFlow kernel images?
 

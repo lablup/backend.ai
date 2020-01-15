@@ -188,7 +188,7 @@ msgstr ""
 
 #: ../../install/demo-setup-centos.rst:111 ../../install/demo-setup.rst:78
 msgid ""
-"Or, you might have launched 30 kernel sessions already, which is the "
+"Or, you might have launched 30 sessions already, which is the "
 "default limit for this demo setup."
 msgstr ""
 
