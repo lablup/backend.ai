@@ -27,11 +27,16 @@ make a feature branch.
 
 Our branch naming lies between
 [GitFlow](https://danielkummer.github.io/git-flow-cheatsheet/index.html) (we use
-"feature/", "hostfix/" prefixed branch names)
-and [GitHub Flow](https://guides.github.com/introduction/flow/) (we don't use a
+`feature/`, `hostfix/`, `maintenance/` prefixed branch names) and [GitHub Flow](https://guides.github.com/introduction/flow/) (we don't use a
 separate "develop" branch and just use PRs) to take advantages from both without
 complication that hurts agility.
 
+
+Issue Management
+----------------
+
+All issue must be created and triaged at [the meta repository](https://github.com/lablup/backend.ai).
+When there are pull requests related to the issue, they must refer the issue using `lablup/backend.ai#XXX` syntax.
 
 Documentation
 -------------
