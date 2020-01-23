@@ -26,17 +26,57 @@ The master branch is for main development and it's the default recommended branc
 make a feature branch.
 
 Our branch naming lies between
-[GitFlow](https://danielkummer.github.io/git-flow-cheatsheet/index.html) (we use
-`feature/`, `hostfix/`, `maintenance/` prefixed branch names) and [GitHub Flow](https://guides.github.com/introduction/flow/) (we don't use a
-separate "develop" branch and just use PRs) to take advantages from both without
-complication that hurts agility.
+[GitFlow](https://danielkummer.github.io/git-flow-cheatsheet/index.html)
+(we use `feature/`, `hotfix/`, `maintenance/` prefixed branch names) and
+[GitHub Flow](https://guides.github.com/introduction/flow/).
+We don't use a separate "develop" branch and just use PRs to take advantages
+from both without complication that hurts agility.
 
 
 Issue Management
 ----------------
 
-All issue must be created and triaged at [the meta repository](https://github.com/lablup/backend.ai).
-When there are pull requests related to the issue, they must refer the issue using `lablup/backend.ai#XXX` syntax.
+The recommended place to make issues is [the meta repository](https://github.com/lablup/backend.ai).
+
+We have two issue templates for bug reports and feature requests, but they are just guidelines.
+It is not mandatory to use the templates, but please try to provide self-sufficient
+information to track down your problems and/or ideas.
+It is the best to provide concrete steps or a self-contained code example to reproduce
+any problems.
+
+
+Pull Requests
+-------------
+
+For those who have "write" access to the repositories, create a feature branch inside
+the original repository to begin work with.  Otherwise, fork and create a feature
+branch in your GitHub account.
+The branch name should be prefixed with "feature/" and the rest should be hyphenated
+slugs (words and numbers).  You may append the related issue number ("#xxx"), but
+please include the issue number in the pull request's description instead, to avoid
+potential misbehavior of shell commands and tools which may treat "#" as the comment
+syntax.
+
+Since Backend.AI consists of many sub-projects in separate GitHub repositories,
+it is often required to make multiple PRs to multiple repositories to resolve a
+single issue.
+To get an integrated view, we recommend to pile an issue in the meta repository and
+mention it like "refs lablup/backend.ai#xxx" in all related pull requests in
+individual sub-projects.
+
+Please keep the followings:
+
+* Mandatory:
+  - The code's naming and styles must follow our flake8 and editorconfig settings,
+    with honors to existing codebase.  Please keep eyes on the lint/typecheck results
+    automatically generated for every push and pull request.
+  - The contributor must sign the CLA.
+* Highly recommended:
+  - Provide one or more test cases that yield different results before/after applying
+    the contribution.
+  - Include patches for documentation or attach a link to a follow-up PR to update
+    related documents.
+
 
 Documentation
 -------------
@@ -152,49 +192,3 @@ $ sphinx-intl build
 $ make -e SPHINXOPTS="-D language='xx'" html
 $ open _build/html/index.html
 ```
-
-
-Issue Reports
--------------
-
-The recommended place to make issues is [the meta
-repository](https://github.com/lablup/backend.ai).
-We have two issue templates for bug reports and feature requests, but they are just
-guidelines.
-
-It is not mandatory to use those templates, but please try to provide self-sufficient
-information to track down your problems and/or ideas.
-It is best to provide concrete steps or a self-contained example script to reproduce
-any problems.
-
-
-Pull Requests
--------------
-
-For those who have "write" access to the repositories, create a feature branch inside
-the original repository to begin work with.  Otherwise, fork and create a feature
-branch in your GitHub account.
-The branch name should be prefixed with "feature/" and the rest should be hyphenated
-slugs (words and numbers).  You may append the related issue number ("#xxx"), but
-please include the issue number in the pull request's description instead, to avoid
-potential misbehavior of shell commands and tools which may treat "#" as the comment
-syntax.
-
-Since Backend.AI consists of many sub-projects in separate GitHub repositories,
-it is often required to make multiple PRs to multiple repositories to resolve a
-single issue.
-To get an integrated view, we recommend to pile an issue in the meta repository and
-mention it like "refs lablup/backend.ai#xxx" in all related pull requests in
-individual sub-projects.
-
-Please keep the followings:
-
-* Mandatory:
-  - The code's naming and styles must follow our flake8 and editorconfig settings,
-    with honors to existing codebase.
-  - The contributor must sign the CLA.
-* Highly recommended:
-  - Provide one or more test cases that yield different results before/after applying
-    the contribution.
-  - Include patches for documentation or attach a link to a follow-up PR to update
-    related documents.
