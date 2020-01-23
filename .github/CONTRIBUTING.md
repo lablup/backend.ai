@@ -61,7 +61,7 @@ Since Backend.AI consists of many sub-projects in separate GitHub repositories,
 it is often required to make multiple PRs to multiple repositories to resolve a
 single issue.
 To get an integrated view, we recommend to pile an issue in the meta repository and
-mention it like "refs lablup/backend.ai#xxx" in all related pull requests in
+mention it like `refs lablup/backend.ai#xxx` in all related pull requests in
 individual sub-projects.
 
 Please keep the followings:
