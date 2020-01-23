@@ -435,12 +435,12 @@ cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
 check_snappy
 pip install -U -q pip setuptools
-pip install -U -e ../common -r requirements-dev.txt
+pip install -U -e ../common -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
 pip install -U -q pip setuptools
-pip install -U -e ../common -r requirements-dev.txt
+pip install -U -e ../common -r requirements/dev.txt
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   $sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
 fi
@@ -455,7 +455,7 @@ python -m ai.backend.agent.kernel build-krunner-env alpine3.8
 cd "${INSTALL_PATH}/common"
 pyenv local "venv-${ENV_ID}-common"
 pip install -U -q pip setuptools
-pip install -U -r requirements-dev.txt
+pip install -U -r requirements/dev.txt
 
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
