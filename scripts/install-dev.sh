@@ -472,17 +472,17 @@ cp config/halfstack.toml ./agent.toml
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
 cd "${INSTALL_PATH}/manager"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io "https://registry-1.docker.io"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io/username "lablup"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd rescan-images index.docker.io
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd alias python python:3.6-ubuntu18.04
+python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io "https://registry-1.docker.io"
+python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io/username "lablup"
+python -m ai.backend.manager.cli etcd rescan-images index.docker.io
+python -m ai.backend.manager.cli etcd alias python python:3.6-ubuntu18.04
 
 # Virtual folder setup
 show_info "Setting up virtual folder..."
 mkdir -p "${INSTALL_PATH}/vfolder/local"
 cd "${INSTALL_PATH}/manager"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
+python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
+python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
 cd "${INSTALL_PATH}/agent"
 mkdir -p scratches
 
@@ -501,7 +501,7 @@ git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-clien
 cd "${INSTALL_PATH}/client-py"
 pyenv local "venv-${ENV_ID}-client"
 pip install -U -q pip setuptools
-pip install -U -r requirements-dev.txt
+pip install -U -r requirements/dev.txt
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
