@@ -1,3 +1,4 @@
+dist: xenial
 language: python
 cache: pip
 
@@ -12,30 +13,29 @@ python:
 os:
   - linux
   # - osx  # not supported yet
+install:
+  - pip install -U pip setuptools
+  - pip install -U -r requirements/test.txt
+script:
+  - python -m pytest tests
 
 # other stages
 jobs:
   fast_finish: true
   include:
     - stage: test
-      install:
-        - pip install -U pip setuptools
-        - pip install -r requirements-ci.txt
-      script:
-        - python -m flake8 src tests
-        - python -m pytest tests
-      after_success:
-        - codecov
     - stage: deploy
       python: "3.6"
-      install: skip
+      install:
+        - pip install -U pip setuptools
+        - pip install -r requirements/build.txt
       script: skip
       deploy:
         on:
           tags: true
         provider: pypi
         distributions: sdist bdist_wheel
-        user: lablup
+        user: __token__
         password:
-          secure: "lwuiZWXrskBjlSkSfyUJUWa52HzRRv34VLIGLky0u4ihT5v7Ljc2XJgcxm6IXX/N4gBqEgUXhxm6IKI5GnnxOfDPFybRV5f8JKFcn9+YniDbGxSOv9+sJQWIDMherT997Mle3vb6JSDzJxCXupmEghnuaL+3RY0kqnUFQdJyq/vIHFL6z4nuxXJ0XGfa0Y+c8O0cEQDQsLXMay+Ln5MQ5TYFw6FRUW19sY4KvvXfs3Bzc/Cbch/TOZ5GrEJfPt0K7TWIkZlZOANKFh7aODv7sKKmn9R3w/ItmBcNcxL2sl5/HWPRsNu102K4dqAbffnvql3OlhwWemXSNLgR0Wv6RcATkyyJbj43/3fGGxsc+WhtyyMFZEpY4cnUlvT10HbS6HH0kDTi8bTaO7gYm0Cns+r8+cy4z/fBY8L4sygk2OCQXOWSNHyFzM/dkdYG8ZtYos9yFzNcWLTrZxTfv88zB5j/R2loUe4PLenC4ukzFwoLZOG9euQEK+vffOW0XP64zacJFNTEH8NVKeL4pi75bzNAnWY3cZ2D6fRll0Ka0e8lbB/uLKizmi6ZgNDSaRh8muSDrmppPxG2LFqb1PCrSbNkJMBK+dfOd+2Bi2b9Ab/KcKGB9ZtrpnDqdESRngJS617JGkOxleD028vn/o8quIAjPOtgOziZsyge2ONtmmA="
+          secure: "X/LvxqyDTxqsBVycjjz6aXQsiDgq6BlB29L+BvM+kkh7VoAeRkyKMlLV5l8i97u4gWfeCJvkUyY+5wodJ6Qn/0OJakLQgt9kLeNv6f4VM1sIeYlK/kjI04t8rDqqp1wUpickSg1iQ3xHcQOuruZT5JXh9af1w8TcMX3+59ous+0oJfdKKEsR/a/kU8F29G+TD3wLdomEAzKE07LcDoLYzn9HwMnozKITV0j//4NSVzaeG7/xMwYD7FMVBohpWmSNHKApyMAQzfbOxS7HV2fVQd3Hpxy2dikJ6quz5/Fc97UCSLaVQ4r+NFoRFOxr0au+T916bnK16H9gLIDGo70B15U7apCs1EiOemKKmDOLDgZleuWKVCwT3ylAMgvIsCJHb8+AMlcOY/Z/jGNS5nQ9KjRAbjz4+rYIarVbSQIHRvlsheMq0J1zOr1QYdIEXEixSLeadSf22+rcXtgsERrkNwoNqHnQnKdrUhEM7FpKVUBPs4igJPq2N2y9HtKqAfcDKMoCXXwpKUOwhxoWyFSa1te29H+vb4jzS7JFdaAT2Y4AN5BQeLDDmXlCGhC+NShy7mCPwQ6rZ1rH0XnasHsgLE8/jfZVCbTp0emWYx+Q9/3MrHxozZcdSIop2F/50tURe592d8TauiwmlWBZmLWpun4ul9B5SM5XemgMGHg1hV0="
         skip_upload_docs: true

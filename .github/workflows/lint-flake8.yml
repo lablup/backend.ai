@@ -1,0 +1,27 @@
+name: Lint with flake8
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.6
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.6
+    - name: Install dependencies
+      run: |
+        python -m pip install -U pip setuptools
+        python -m pip install -U -r requirements/lint.txt
+    - name: Lint with flake8
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
+          echo "(skipping matchers for pull request from local branches)"
+        else
+          echo "::add-matcher::.github/workflows/flake8-matcher.json"
+        fi
+        python -m flake8 src/ai/backend tests
