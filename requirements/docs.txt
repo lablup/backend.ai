@@ -1,4 +1,1 @@
-sphinx~=2.2
-sphinx-rtd-theme>=0.4.3
-pygments~=2.3
 -e .[docs]
