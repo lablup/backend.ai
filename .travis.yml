@@ -12,7 +12,8 @@ python:
   - "3.8"
 os:
   - linux
-  # - osx  # not supported yet
+
+# test stage actions
 install:
   - pip install -U pip setuptools
   - pip install -U -r requirements/test.txt
@@ -35,7 +36,7 @@ jobs:
           tags: true
         provider: pypi
         distributions: sdist bdist_wheel
-        user: __token__
+        upload_docs: false
+        username: __token__
         password:
           secure: "X/LvxqyDTxqsBVycjjz6aXQsiDgq6BlB29L+BvM+kkh7VoAeRkyKMlLV5l8i97u4gWfeCJvkUyY+5wodJ6Qn/0OJakLQgt9kLeNv6f4VM1sIeYlK/kjI04t8rDqqp1wUpickSg1iQ3xHcQOuruZT5JXh9af1w8TcMX3+59ous+0oJfdKKEsR/a/kU8F29G+TD3wLdomEAzKE07LcDoLYzn9HwMnozKITV0j//4NSVzaeG7/xMwYD7FMVBohpWmSNHKApyMAQzfbOxS7HV2fVQd3Hpxy2dikJ6quz5/Fc97UCSLaVQ4r+NFoRFOxr0au+T916bnK16H9gLIDGo70B15U7apCs1EiOemKKmDOLDgZleuWKVCwT3ylAMgvIsCJHb8+AMlcOY/Z/jGNS5nQ9KjRAbjz4+rYIarVbSQIHRvlsheMq0J1zOr1QYdIEXEixSLeadSf22+rcXtgsERrkNwoNqHnQnKdrUhEM7FpKVUBPs4igJPq2N2y9HtKqAfcDKMoCXXwpKUOwhxoWyFSa1te29H+vb4jzS7JFdaAT2Y4AN5BQeLDDmXlCGhC+NShy7mCPwQ6rZ1rH0XnasHsgLE8/jfZVCbTp0emWYx+Q9/3MrHxozZcdSIop2F/50tURe592d8TauiwmlWBZmLWpun4ul9B5SM5XemgMGHg1hV0="
-        skip_upload_docs: true
