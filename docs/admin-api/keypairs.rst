@@ -22,7 +22,7 @@ Query Schema
      compute_sessions(status: String): [ComputeSession]
    }
 
-   type root {
+   type Query {
      keypair(access_key: String): KeyPair
      keypairs(user_id: Int!, is_active: Boolean): [KeyPair]
    }
@@ -55,8 +55,7 @@ Mutation Schema
      msg: String
    }
 
-   type root {
-     ...
+   type Mutation {
      create_keypair(user_id: Int!, props: KeyPairInput!): CreateKeyPair
      modify_keypair(access_key: String!, props: KeyPairInput!): ModifyKeyPair
      delete_keypair(access_key: String!): DeleteKeyPair

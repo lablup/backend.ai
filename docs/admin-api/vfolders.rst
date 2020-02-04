@@ -18,7 +18,6 @@ Query Schema
      cur_size: Int
    }
 
-   type rootQuery {
-     ...
-     vfolders(access_key: String): List[VirtualFolder]
+   type Query {
+     vfolders(access_key: String): [VirtualFolder]
    }

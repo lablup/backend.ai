@@ -1,5 +1,5 @@
-KeyPair Management
-==================
+Image Management
+================
 
 Query Schema
 ------------
@@ -7,6 +7,27 @@ Query Schema
 .. code-block:: graphql
 
    type Image {
+     name: String
+     humanized_name: String
+     tag: String
+     registry: String
+     digest: String
+     labels: [KVPair]
+     aliases: [String]
+     size_bytes: BigInt
+     resource_limits: [ResourceLimit]
+     supported_accelerators: [String]
+     installed: Boolean
+     installed_agents: [String]
+   }
+
+   type Query {
+     image(reference: String!): Image
+
+     images(
+       is_installed: Boolean,
+       is_operation: Boolean,
+     ): [Image]
    }
 
 Mutation Schema
@@ -14,5 +35,24 @@ Mutation Schema
 
 .. code-block:: graphql
 
-   mutation RescanImages {
+   type RescanImages {
+     ok: Boolean
+     msg: String
+     task_id: String  # for future release
+   }
+
+   type AliasImage {
+     ok: Boolean
+     msg: String
+   }
+
+   type DealiasImage {
+     ok: Boolean
+     msg: String
+   }
+
+   type Mutation {
+     rescan_images(registry: String!): RescanImages
+     alias_image(alias: String!, target: String!): AliasImage
+     dealias_image(alias: String!): DealiasImage
    }

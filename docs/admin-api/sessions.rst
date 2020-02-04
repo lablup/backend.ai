@@ -37,13 +37,13 @@ Query Schema
      # resources
      scaling_group: String
      service_ports: JSON    # only available in master
-     mounts: List[String]   # shared by all kernels
+     mounts: [String]   # shared by all kernels
 
      # statistics
      num_queries: BigInt
 
      # owned kernels
-     containers: List[ComputeContainer]
+     containers: [ComputeContainer]
    }
 
    type ComputeContainer {
@@ -75,12 +75,10 @@ Query Schema
    }
 
    type root {
-     ...
-
-     compute_sessions(        # deprecated
+     compute_sessions(  # deprecated
        access_key: String,
        status: String,
-     ): List[ComputeSession]
+     ): [ComputeSession]
 
      compute_session_list(
        limit: Int!,

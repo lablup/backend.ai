@@ -55,6 +55,29 @@ All field names follow the underscore style, which is common in the Python world
 as our server-side framework uses Python.
 
 
+Common Object Types
+~~~~~~~~~~~~~~~~~~~
+
+``ResourceLimit`` represents a range (``min``, ``max``) of specific resource slot (``key``).
+
+.. code-block:: graphql
+
+   type ResourceLimit {
+     key: String
+     min: String
+     max: String
+   }
+
+``KVPair`` is used to represent a mapping data structure with arbitrary (runtime-determined) key-value pairs, in contrast to other data types in GraphQL which have a set of predefined static fields.
+
+.. code-block:: graphql
+
+   type KVPair {
+     key: String
+     value: String
+   }
+
+
 Pagination Convention
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -67,6 +90,7 @@ We use a pagination convention as described below:
 
    interface Item {
      id: UUID
+     # other fields are defined by concrete types
    }
 
    interface PaginatedList(
@@ -74,7 +98,7 @@ We use a pagination convention as described below:
      limit: Integer!,
    ) {
      total_count: Integer
-     items: List[Item]
+     items: [Item]
    }
 
 ``offset`` and ``limit`` are interpreted as SQL's offset and limit clauses.
