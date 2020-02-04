@@ -98,7 +98,7 @@ Query Example
    query(
      $limit: Int!,
      $offset: Int!,
-     $access_key: String,
+     $ak: String,
      $status: String,
    ) {
      compute_session_list(
@@ -118,6 +118,24 @@ Query Example
        }
      }
    }
+
+API Parameters
+~~~~~~~~~~~~~~
+
+.. code-block:: json
+
+   {
+     "query": "...",
+     "variables": {
+       "limit": 10,
+       "offset": 0,
+       "ak": "AKIA....",
+       "status": "RUNNING"
+     }
+   }
+
+API Response
+~~~~~~~~~~~~
 
 .. code-block:: json
 

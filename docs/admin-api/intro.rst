@@ -61,9 +61,28 @@ Pagination Convention
 GraphQL itself does not enforce how to pass pagination information when
 querying multiple objects of the same type.
 
-We use a de-facto standard pagination convention as described below:
+We use a pagination convention as described below:
 
-TODO
+.. code-block:: graphql
+
+   interface Item {
+     id: UUID
+   }
+
+   interface PaginatedList(
+     offset: Integer!,
+     limit: Integer!,
+   ) {
+     total_count: Integer
+     items: List[Item]
+   }
+
+``offset`` and ``limit`` are interpreted as SQL's offset and limit clauses.
+For the first page, set the offset to zero and the limit to the page size.
+The ``items`` field may contain from zero up to ``limit`` items.
+Use ``total_count`` field to determine how many pages are there.
+Fields that support pagination is suffixed with ``_list`` in our schema.
+
 
 Custom Scalar Types
 ~~~~~~~~~~~~~~~~~~~

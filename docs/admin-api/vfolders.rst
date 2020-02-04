@@ -1,13 +1,10 @@
 Virtual Folder Management
 =========================
 
-Full Admin
-----------
-
 Query Schema
-~~~~~~~~~~~~
+------------
 
-.. code-block:: text
+.. code-block:: graphql
 
    type VirtualFolder {
      id: UUID
@@ -23,21 +20,5 @@ Query Schema
 
    type rootQuery {
      ...
-     vfolders(access_key: String): [VirtualFolder]
-   }
-
-
-Restricted Owner Access
------------------------
-
-Query Schema
-~~~~~~~~~~~~
-
-It shares the same ``VirtualFolder`` type, but you cannot use ``access_key`` argument in the root query.
-
-.. code-block:: text
-
-   type root {
-     ...
-     vfolders(): [VirtualFolder]
+     vfolders(access_key: String): List[VirtualFolder]
    }

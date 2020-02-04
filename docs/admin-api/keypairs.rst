@@ -4,7 +4,7 @@ KeyPair Management
 Query Schema
 ------------
 
-.. code-block:: text
+.. code-block:: graphql
 
    type KeyPair {
      access_key: String
@@ -23,7 +23,6 @@ Query Schema
    }
 
    type root {
-     ...
      keypair(access_key: String): KeyPair
      keypairs(user_id: Int!, is_active: Boolean): [KeyPair]
    }
@@ -31,7 +30,7 @@ Query Schema
 Mutation Schema
 ---------------
 
-.. code-block:: text
+.. code-block:: graphql
 
    input KeyPairInput {
      is_active: Boolean

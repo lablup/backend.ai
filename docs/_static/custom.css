@@ -15,6 +15,10 @@
     margin-bottom: 12px !important;
 }
 
+.rst-content .highlight .nc {
+    font-weight: bold;
+}
+
 .rst-content .wy-table-responsive td .admonition {
     margin-bottom: 0 !important;
 }

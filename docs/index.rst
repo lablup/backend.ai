@@ -77,10 +77,10 @@ Table of Contents
    :caption: Admin API Reference
 
    admin-api/intro
-   admin-api/keypairs
+   admin-api/images
    admin-api/sessions
    admin-api/vfolders
-   admin-api/stats
+   admin-api/keypairs
 
 .. _dev:
 
