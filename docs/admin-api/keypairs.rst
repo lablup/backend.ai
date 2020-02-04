@@ -1,11 +1,8 @@
 KeyPair Management
 ==================
 
-Full Admin
-----------
-
 Query Schema
-~~~~~~~~~~~~
+------------
 
 .. code-block:: text
 
@@ -32,7 +29,7 @@ Query Schema
    }
 
 Mutation Schema
-~~~~~~~~~~~~~~~
+---------------
 
 .. code-block:: text
 
@@ -65,26 +62,3 @@ Mutation Schema
      modify_keypair(access_key: String!, props: KeyPairInput!): ModifyKeyPair
      delete_keypair(access_key: String!): DeleteKeyPair
    }
-
-
-Restricted Owner Access
------------------------
-
-Query Schema
-~~~~~~~~~~~~
-
-It shares the same ``KeyPair`` type, but you cannot use ``user_id`` argument in the root query
-because the client can only query the keypair that is being used to make this API query.
-Also the returned value is always a single object.
-
-.. code-block:: text
-
-   type root {
-     ...
-     keypair(): KeyPair!
-   }
-
-Mutation Schema
-~~~~~~~~~~~~~~~
-
-There is no mutations available.
