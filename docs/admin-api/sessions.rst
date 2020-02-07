@@ -74,7 +74,7 @@ Query Schema
      last_stat: JSON
    }
 
-   type root {
+   type Query {
      compute_sessions(  # deprecated
        access_key: String,
        status: String,

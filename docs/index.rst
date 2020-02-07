@@ -81,6 +81,7 @@ Table of Contents
    admin-api/sessions
    admin-api/vfolders
    admin-api/keypairs
+   admin-api/resource-presets
 
 .. _dev:
 

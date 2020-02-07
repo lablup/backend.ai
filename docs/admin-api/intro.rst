@@ -18,7 +18,7 @@ There are two modes of operation:
 
    To test and debug with the Admin API easily, try the proxy mode of `the official Python client <https://pypi.python.org/pypi/backend.ai-client>`_.
    It provides an insecure (non-SSL, non-authenticated) local HTTP proxy where all the required authorization headers are attached from the client configuration.
-   Using this you do not have to add any custom header configurations to your favorite API development tools.
+   Using this you do not have to add any custom header configurations to your favorite API development tools such as `GraphiQL <https://github.com/graphql/graphiql>`_.
 
 Basics of GraphQL
 -----------------
@@ -27,7 +27,7 @@ The Admin API uses a single GraphQL endpoint for both queries and mutations.
 
 .. code-block:: text
 
-   https://api.backend.ai/v3/admin/graphql
+   https://api.backend.ai/admin/graphql
 
 For more information about GraphQL concepts and syntax, please visit the following site(s):
 
@@ -59,6 +59,7 @@ Common Object Types
 ~~~~~~~~~~~~~~~~~~~
 
 ``ResourceLimit`` represents a range (``min``, ``max``) of specific resource slot (``key``).
+The ``max`` value may be the string constant "Infinity" if not specified.
 
 .. code-block:: graphql
 
