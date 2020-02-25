@@ -375,7 +375,7 @@ if [ "$DISTRO" = "Darwin" ]; then
   export LDFLAGS="-L$(brew --prefix openssl)/lib -L$(brew --prefix sqlite3)/lib -L$(brew --prefix readline)/lib -L$(brew --prefix zlib)/lib -L$(brew --prefix gdbm)/lib -L$(brew --prefix tcl-tk)/lib -L$(brew --prefix xz)/lib"
 fi
 if [ -z "$(pyenv versions | grep -E "^[[:space:]]*${PYTHON_VERSION//./\\.}$")" ]; then
-  pyenv install "${PYTHON_VERSION}"
+  pyenv install --skip-existing "${PYTHON_VERSION}"
   if [ $? -ne 0 ]; then
     show_error "Installing the Python version ${PYTHON_VERSION} via pyenv has failed."
     show_note "${PYTHON_VERSION} is not supported by your current installation of pyenv."
