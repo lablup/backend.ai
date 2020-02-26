@@ -141,8 +141,8 @@ fi
 
 ROOT_PATH=$(pwd)
 PYTHON_VERSION="3.6.10"
-SERVER_BRANCH="master"
-CLIENT_BRANCH="master"
+SERVER_BRANCH="19.09"
+CLIENT_BRANCH="19.09"
 INSTALL_PATH="./backend.ai-dev"
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
@@ -478,7 +478,7 @@ pip install -U -e ../common -r requirements/dev.txt
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
 pip install -U -q pip setuptools
-pip install -U -e ../common -r requirements-dev.txt
+pip install -U -e ../common -r requirements/dev.txt
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   $sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
 fi
@@ -491,7 +491,7 @@ fi
 cd "${INSTALL_PATH}/common"
 pyenv local "venv-${ENV_ID}-common"
 pip install -U -q pip setuptools
-pip install -U -r requirements-dev.txt
+pip install -U -r requirements/dev.txt
 
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
@@ -537,7 +537,7 @@ git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-clien
 cd "${INSTALL_PATH}/client-py"
 pyenv local "venv-${ENV_ID}-client"
 pip install -U -q pip setuptools
-pip install -U -r requirements-dev.txt
+pip install -U -r requirements/dev.txt
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
