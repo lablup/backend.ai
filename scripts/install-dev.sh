@@ -306,13 +306,13 @@ install_python() {
   if [ -z "$(pyenv versions | grep -E "^\\*?[[:space:]]+${PYTHON_VERSION//./\\.}([[:blank:]]+.*)?$")" ]; then
     if [ "$DISTRO" = "Darwin" ]; then
       export PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcl-tk"
-      local _prefix_openssl=$(brew --prefix openssl)
-      local _prefix_sqlite3=$(brew --prefix sqlite3)
-      local _prefix_readline=$(brew --prefix readline)
-      local _prefix_zlib=$(brew --prefix zlib)
-      local _prefix_gdbm=$(brew --prefix gdbm)
-      local _prefix_tcltk=$(brew --prefix tcl-tk)
-      local _prefix_xz=$(brew --prefix xz)
+      local _prefix_openssl="$(brew --prefix openssl)"
+      local _prefix_sqlite3="$(brew --prefix sqlite3)"
+      local _prefix_readline="$(brew --prefix readline)"
+      local _prefix_zlib="$(brew --prefix zlib)"
+      local _prefix_gdbm="$(brew --prefix gdbm)"
+      local _prefix_tcltk="$(brew --prefix tcl-tk)"
+      local _prefix_xz="$(brew --prefix xz)"
       export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include"
       export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib"
     fi
@@ -335,7 +335,7 @@ install_python() {
 
 check_python() {
   pyenv shell "${PYTHON_VERSION}"
-  _pyprefix=$(python -c 'import sys; print(sys.prefix, end="")')
+  local _pyprefix=$(python -c 'import sys; print(sys.prefix, end="")')
   python -c 'import ssl' > /dev/null 2>&1 /dev/null
   if [ $? -ne 0 ]; then
     show_error "Your Python (prefix: ${_pyprefix}) is missing SSL support. Please reinstall or rebuild it."
@@ -472,8 +472,8 @@ check_snappy() {
 show_info "Install packages on virtual environments..."
 cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
-check_snappy
 pip install -U -q pip setuptools
+check_snappy
 pip install -U -e ../common -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/agent"
@@ -488,8 +488,6 @@ if [ $ENABLE_CUDA -eq 1 ]; then
   pyenv local "venv-${ENV_ID}-agent"  # share the agent's venv
   pip install -U -e .
 fi
-python -m ai.backend.agent.kernel build-krunner-env ubuntu16.04
-python -m ai.backend.agent.kernel build-krunner-env alpine3.8
 
 cd "${INSTALL_PATH}/common"
 pyenv local "venv-${ENV_ID}-common"
