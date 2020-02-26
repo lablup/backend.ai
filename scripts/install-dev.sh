@@ -140,7 +140,7 @@ else
 fi
 
 ROOT_PATH=$(pwd)
-PYTHON_VERSION="3.8.1"
+PYTHON_VERSION="3.8.2"
 SERVER_BRANCH="master"
 CLIENT_BRANCH="master"
 INSTALL_PATH="./backend.ai-dev"
