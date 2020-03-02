@@ -212,15 +212,11 @@ install_pybuild_deps() {
     $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel libsqlite-devel libffi-devel lzma-devel
     ;;
   Darwin)
-    brew bundle --file=- <<"EOS"
-brew "openssl"
-brew "sqlite3"
-brew "readline"
-brew "zlib"
-brew "xz"
-brew "gdbm"
-brew "tcl-tk"
-brew "snappy"
+    brew install openssl
+    brew install readline
+    brew install zlib xz
+    brew install sqlite3 gdbm
+    brew install tcl-tk
 EOS
     ;;
   esac
@@ -236,9 +232,7 @@ install_git_lfs() {
     $sudo yum install -y git-lfs
     ;;
   Darwin)
-    brew bundle --file=- <<"EOS"
-brew "git-lfs"
-EOS
+    brew install git-lfs
     ;;
   esac
   git lfs install
@@ -254,9 +248,7 @@ install_system_pkg() {
     $sudo yum install -y $2
     ;;
   Darwin)
-    brew bundle --file=- <<EOS
-brew "$3"
-EOS
+    brew install $3
   esac
 }
 
