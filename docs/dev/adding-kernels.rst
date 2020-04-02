@@ -28,6 +28,12 @@ All dirty jobs like volume deployment, its content updates, and mounting for new
 Since the customized Python build and binary utilities need to be built for specific Linux distributions, we only support Docker images built on top of Alpine 3.8+, CentOS 7+, and Ubuntu 16.04+ base images.
 Note that these three base distributions practically cover all commonly available Docker images.
 
+Image Prerequisites
+~~~~~~~~~~~~~~~~~~~
+
+Currently Python does not officially support static-linking OpenSSL it depends on until `bpo-38794 <https://bugs.python.org/issue38794>`_ is resolved.
+Therefore, All Docker images to be used as Backend.AI kernel images should have its own OpenSSL system packages, such as ``libssl`` or ``openssl`` depending on the distributions.
+
 
 Service Ports
 -------------
