@@ -258,7 +258,7 @@ Example: An Ubuntu-based Kernel
     RUN apt-get install ...
 
     # Backend.AI specifics
-    COPY policy.yml /etc/backend.ai/jail/policy.yml
+    RUN apt-get install libssl
     LABEL ai.backend.kernelspec=1 \
           ai.backend.resource.min.cpu=1 \
           ai.backend.resource.min.mem=256m \
@@ -267,7 +267,9 @@ Example: An Ubuntu-based Kernel
           ai.backend.base-distro="ubuntu16.04" \
           ai.backend.runtime-type="python" \
           ai.backend.runtime-path="/usr/local/bin/python" \
-          ai.backend.service-ports="ipython:pty:3000,jupyter:http:8080"
+          ai.backend.service-ports="jupyter:http:8080"
+    COPY service-defs/*.json /etc/backend.ai/service-defs/
+    COPY policy.yml /etc/backend.ai/jail/policy.yml
 
 
 Implementation details
