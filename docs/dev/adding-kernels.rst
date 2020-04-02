@@ -18,11 +18,12 @@ The kernel runner provides runtime-specific implementations for various code exe
 It also manages the process lifecycles of service-port processess.
 
 To decouple the development and update cycles for Docker images and the Backend.AI Agent, we don't install the kernel runner inside images.
-Instead, Backend.AI Agent mounts a special volume as ``/opt/backend.ai`` inside containers.
+Instead, Backend.AI Agent mounts a special "krunner" volume as ``/opt/backend.ai`` inside containers.
 This volume includes a customized static build of Python.
 The kernel runner daemon package is mounted as one of the site packages of this Python distribution as well.
 The agent also uses ``/opt/kernel`` as the directory for mounting other self-contained single-binary utilties.
 This way, image authors do not have to bother with installing Python and Backend.AI specific software.
+All dirty jobs like volume deployment, its content updates, and mounting for new containers are automatically managed by Backend.AI Agent.
 
 Since the customized Python build and binary utilities need to be built for specific Linux distributions, we only support Docker images built on top of Alpine 3.8+, CentOS 7+, and Ubuntu 16.04+ base images.
 Note that these three base distributions practically cover all commonly available Docker images.
@@ -32,8 +33,11 @@ Service Ports
 -------------
 
 As of Backend.AI v19.03, *service ports* are our preferred way to run computation workloads inside Backend.AI kernels.
-Backend.AI provides SSH and ttyd as intrinsic services for all kernels.
-Image authors may define their own service ports using service definition JSON files installed at ``/etc/backend.ai/service-defs`` in their images.
+It provides tunneled access to Jupyter Notebooks and other daemons running in containers.
+
+As of Backend.AI v19.09, Backend.AI provides SSH (including SFTP and SCP) and ttyd (web-based xterm shell) as intrinsic services for all kernels.
+
+As of Backend.AI v20.03, image authors may define their own service ports using service definition JSON files installed at ``/etc/backend.ai/service-defs`` in their images.
 
 **(TODO: service-def syntax and interpretation)**
 
@@ -52,11 +56,8 @@ Any Docker image based on Alpine 3.8+, CentOS 7+, and Ubuntu 16.04+ become a Bac
   * ``ai.backend.features``: A list of constant strings indicating which Backend.AI kernel features are available for the kernel.
 
     - **batch**: Can execute user programs passed as files.
-
     - **query**: Can execute user programs passed as code snippets while keeping the context across multiple executions.
-
     - **uid-match**: As of 19.03, this must be specified always.
-
     - **user-input**: The query/batch mode supports interactive user inputs.
 
   * ``ai.backend.resource.min.*``: The minimum amount of resource to launch this kernel.
