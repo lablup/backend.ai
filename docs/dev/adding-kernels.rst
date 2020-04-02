@@ -180,7 +180,7 @@ Available prestart actions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A prestart action is composed of two mandatory fields ``action`` and ``args`` (see the table below), and an optional field ``ref``.
-The ``ref`` field defines a variable that can be referenced in later parts of the service definition file where the arguments are marked as "template-enabled".
+The ``ref`` field defines a variable that stores the result of the action and can be referenced in later parts of the service definition file where the arguments are marked as "template-enabled".
 
 .. list-table::
    :widths: 20 60 20
