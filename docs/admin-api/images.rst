@@ -41,6 +41,12 @@ Mutation Schema
      task_id: String
    }
 
+   type PreloadImage {
+     ok: Boolean
+     msg: String
+     task_id: String
+   }
+
    type ForgetImage {
      ok: Boolean
      msg: String
@@ -59,6 +65,9 @@ Mutation Schema
 
    type Mutation {
      rescan_images(registry: String!): RescanImages
+     preload_image(reference: String!, target_agents: String!): PreloadImage
+     unload_image(reference: String!, target_agents: String!): UnloadImage
+     forget_image(reference: String!): ForgetImage
      alias_image(alias: String!, target: String!): AliasImage
      dealias_image(alias: String!): DealiasImage
    }
