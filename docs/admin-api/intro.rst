@@ -114,6 +114,7 @@ Custom Scalar Types
 
 * ``UUID``: A hexademically formatted (8-4-4-4-12 alphanumeric characters connected via single hyphens) UUID values represented as ``String``
 * ``DateTime``: An ISO-8601 formatted date-time value represented as ``String``
+* ``JSON``: It contains a stringified JSON value, whereas the whole query result is already a JSON object.  A client must parse the value *again* to get an object representation.
 
 
 Authentication

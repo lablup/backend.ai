@@ -1,8 +1,13 @@
 Compute Session Monitoring
 ==========================
 
+Compute sessions are composed of one or more containers, while interactions with sessions only occur with the *master* container when using REST APIs.
+The GraphQL API allows users and admins to check details of sessions and their belonging containers.
+
 Query Schema
 ------------
+
+``ComputeSession`` provides information about the whole session, including user-requested parameters when creating sessions.
 
 .. code-block:: graphql
 
@@ -46,6 +51,29 @@ Query Schema
      containers: [ComputeContainer]
    }
 
+The sessions may be queried one by one using ``compute_sesssion`` field on the root query schema,
+or as a paginated list using ``compute_session_list``.
+
+.. code-block:: graphql
+
+   type Query {
+     compute_session(
+       id: UUID!,
+     ): ComputeSession
+
+     compute_session_list(
+       limit: Int!,
+       offset: Int!,
+       access_key: String,
+       status: String,
+     ): PaginatedList[ComputeSession]
+   }
+
+``ComputeContainer`` provides information about individual containers that belongs to the given session.
+Note that the client must assume that ``id`` is different from ``container_id``, because agents may be configured to use non-Docker backends.
+
+.. code-block:: graphql
+
    type ComputeContainer {
      # identity
      id: UUID
@@ -74,18 +102,20 @@ Query Schema
      last_stat: JSON
    }
 
-   type Query {
-     compute_sessions(  # deprecated
-       access_key: String,
-       status: String,
-     ): [ComputeSession]
+In the same way, the containers may be queried one by one using ``compute_container`` field on the root query schema, or as a paginated list using ``compute_container_list`` for a single session.
 
-     compute_session_list(
+.. code-block:: graphql
+
+   type Query {
+     compute_container(
+       id: UUID!,
+     ): ComputeContainer
+
+     compute_container_list(
        limit: Int!,
        offset: Int!,
-       access_key: String,
-       status: String,
-     ): PaginatedList[ComputeSession]
+       session_id: UUID!,
+     ): PaginatedList[ComputeContainer]
    }
 
 Query Example
