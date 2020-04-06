@@ -17,6 +17,7 @@ LCYAN="\033[1;36m"
 LWHITE="\033[1;37m"
 LG="\033[0;37m"
 NC="\033[0m"
+REWRITELN="\033[A\r\033[K"
 
 readlinkf() {
   $bpython -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
@@ -139,7 +140,7 @@ else
 fi
 
 ROOT_PATH=$(pwd)
-PYTHON_VERSION="3.8.1"
+PYTHON_VERSION="3.8.2"
 SERVER_BRANCH="master"
 CLIENT_BRANCH="master"
 INSTALL_PATH="./backend.ai-dev"
@@ -211,15 +212,11 @@ install_pybuild_deps() {
     $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel libsqlite-devel libffi-devel lzma-devel
     ;;
   Darwin)
-    brew bundle --file=- <<"EOS"
-brew "openssl"
-brew "sqlite3"
-brew "readline"
-brew "zlib"
-brew "xz"
-brew "gdbm"
-brew "tcl-tk"
-brew "snappy"
+    brew install openssl
+    brew install readline
+    brew install zlib xz
+    brew install sqlite3 gdbm
+    brew install tcl-tk
 EOS
     ;;
   esac
@@ -235,9 +232,7 @@ install_git_lfs() {
     $sudo yum install -y git-lfs
     ;;
   Darwin)
-    brew bundle --file=- <<"EOS"
-brew "git-lfs"
-EOS
+    brew install git-lfs
     ;;
   esac
   git lfs install
@@ -253,9 +248,7 @@ install_system_pkg() {
     $sudo yum install -y $2
     ;;
   Darwin)
-    brew bundle --file=- <<EOS
-brew "$3"
-EOS
+    brew install $3
   esac
 }
 
@@ -301,6 +294,57 @@ install_docker_compose() {
   esac
 }
 
+install_python() {
+  if [ -z "$(pyenv versions | grep -E "^\\*?[[:space:]]+${PYTHON_VERSION//./\\.}([[:blank:]]+.*)?$")" ]; then
+    if [ "$DISTRO" = "Darwin" ]; then
+      export PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcl-tk"
+      local _prefix_openssl="$(brew --prefix openssl)"
+      local _prefix_sqlite3="$(brew --prefix sqlite3)"
+      local _prefix_readline="$(brew --prefix readline)"
+      local _prefix_zlib="$(brew --prefix zlib)"
+      local _prefix_gdbm="$(brew --prefix gdbm)"
+      local _prefix_tcltk="$(brew --prefix tcl-tk)"
+      local _prefix_xz="$(brew --prefix xz)"
+      export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include"
+      export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib"
+    fi
+    pyenv install --skip-existing "${PYTHON_VERSION}"
+    if [ "$DISTRO" = "Darwin" ]; then
+      unset PYTHON_CONFIGURE_OPTS
+      unset CFLAGS
+      unset LDFLAGS
+    fi
+    if [ $? -ne 0 ]; then
+      show_error "Installing the Python version ${PYTHON_VERSION} via pyenv has failed."
+      show_note "${PYTHON_VERSION} is not supported by your current installation of pyenv."
+      show_note "Please update pyenv or lower PYTHON_VERSION in install-dev.sh script."
+      exit 1
+    fi
+  else
+    echo "${PYTHON_VERSION} is already installed."
+  fi
+}
+
+check_python() {
+  pyenv shell "${PYTHON_VERSION}"
+  local _pyprefix=$(python -c 'import sys; print(sys.prefix, end="")')
+  python -c 'import ssl' > /dev/null 2>&1 /dev/null
+  if [ $? -ne 0 ]; then
+    show_error "Your Python (prefix: ${_pyprefix}) is missing SSL support. Please reinstall or rebuild it."
+    exit 1
+  else
+    echo "SSL support: ok"
+  fi
+  python -c 'import lzma' > /dev/null 2>&1 /dev/null
+  if [ $? -ne 0 ]; then
+    show_error "Your Python (prefix: ${_pyprefix}) is missing LZMA (XZ) support. Please reinstall or rebuild it."
+    exit 1
+  else
+    echo "LZMA support: ok"
+  fi
+  pyenv shell --unset
+}
+
 # BEGIN!
 
 echo " "
@@ -322,6 +366,7 @@ if ! type "docker-compose" >/dev/null 2>&1; then
   install_docker_compose
 fi
 if [ "$DISTRO" = "Darwin" ]; then
+  echo "validating Docker Desktop mount permissions..."
   docker pull alpine:3.8 > /dev/null
   docker run --rm -v "$HOME/.pyenv:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
   if [ $? -ne 0 ]; then
@@ -335,6 +380,7 @@ if [ "$DISTRO" = "Darwin" ]; then
     show_error "You must allow mount of '$INSTALL_PATH' in the File Sharing preference of the Docker Desktop app."
     exit 1
   fi
+  echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
 fi
 
 # Install pyenv
@@ -357,8 +403,10 @@ if ! type "pyenv" >/dev/null 2>&1; then
     fi
   done
   set +e
-  eval "$pyenv_init_script"  # apply directly to the current shell
+  eval "$pyenv_init_script"
   pyenv
+else
+  eval "$pyenv_init_script"
 fi
 
 # Install Python and pyenv virtualenvs
@@ -369,27 +417,10 @@ show_info "Checking and installing git lfs support..."
 install_git_lfs
 
 show_info "Installing Python..."
-if [ "$DISTRO" = "Darwin" ]; then
-  export PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcl-tk"
-  export CFLAGS="-I$(brew --prefix openssl)/include -I$(brew --prefix sqlite3)/include -I$(brew --prefix readline)/include -I$(brew --prefix zlib)/include -I$(brew --prefix gdbm)/include -I$(brew --prefix tcl-tk)/include -I$(brew --prefix xz)/include"
-  export LDFLAGS="-L$(brew --prefix openssl)/lib -L$(brew --prefix sqlite3)/lib -L$(brew --prefix readline)/lib -L$(brew --prefix zlib)/lib -L$(brew --prefix gdbm)/lib -L$(brew --prefix tcl-tk)/lib -L$(brew --prefix xz)/lib"
-fi
-if [ -z "$(pyenv versions | grep -E "^[[:space:]]*${PYTHON_VERSION//./\\.}$")" ]; then
-  pyenv install "${PYTHON_VERSION}"
-  if [ $? -ne 0 ]; then
-    show_error "Installing the Python version ${PYTHON_VERSION} via pyenv has failed."
-    show_note "${PYTHON_VERSION} is not supported by your current installation of pyenv."
-    show_note "Please update pyenv or lower PYTHON_VERSION in install-dev.sh script."
-    exit 1
-  fi
-else
-  echo "${PYTHON_VERSION} is already installed."
-fi
-if [ "$DISTRO" = "Darwin" ]; then
-  unset PYTHON_CONFIGURE_OPTS
-  unset CFLAGS
-  unset LDFLAGS
-fi
+install_python
+
+show_info "Checking Python features..."
+check_python
 
 set -e
 show_info "Creating virtualenv on pyenv..."
@@ -433,8 +464,8 @@ check_snappy() {
 show_info "Install packages on virtual environments..."
 cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
-check_snappy
 pip install -U -q pip setuptools
+check_snappy
 pip install -U -e ../common -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/agent"
@@ -449,8 +480,6 @@ if [ $ENABLE_CUDA -eq 1 ]; then
   pyenv local "venv-${ENV_ID}-agent"  # share the agent's venv
   pip install -U -e .
 fi
-python -m ai.backend.agent.kernel build-krunner-env ubuntu16.04
-python -m ai.backend.agent.kernel build-krunner-env alpine3.8
 
 cd "${INSTALL_PATH}/common"
 pyenv local "venv-${ENV_ID}-common"

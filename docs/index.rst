@@ -90,7 +90,7 @@ Table of Contents
    :caption: Developer Manuals
 
    install/development-setup
-   dev/repl
+   dev/adding-kernels
 
 
 
