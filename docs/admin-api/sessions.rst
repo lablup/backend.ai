@@ -1,7 +1,7 @@
 Compute Session Monitoring
 ==========================
 
-Compute sessions are composed of one or more containers, while interactions with sessions only occur with the *master* container when using REST APIs.
+As of Backend.AI v20.03, compute sessions are composed of one or more containers, while interactions with sessions only occur with the *master* container when using REST APIs.
 The GraphQL API allows users and admins to check details of sessions and their belonging containers.
 
 Query Schema
@@ -47,7 +47,7 @@ Query Schema
      # statistics
      num_queries: BigInt
 
-     # owned kernels
+     # owned containers (aka kernels)
      containers: [ComputeContainer]
    }
 
