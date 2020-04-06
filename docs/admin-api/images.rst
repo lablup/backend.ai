@@ -21,14 +21,27 @@ Query Schema
      installed_agents: [String]
    }
 
+.. code-block:: graphql
+
    type Query {
      image(reference: String!): Image
 
      images(
        is_installed: Boolean,
        is_operation: Boolean,
+       scaling_group: String,
      ): [Image]
    }
+
+.. versionadded:: v5.20191215
+
+   ``scaling_group`` filter condition is added to the ``images`` root query field.
+
+.. versionchanged:: v5.20191215
+
+   ``images`` query returns the images currently usable by the requesting user,
+   checking the allowed scaling groups and whether agents in those scaling groups
+   have the image installed, unless the requesting user is not a super-admin.
 
 Mutation Schema
 ---------------
@@ -71,3 +84,7 @@ Mutation Schema
      alias_image(alias: String!, target: String!): AliasImage
      dealias_image(alias: String!): DealiasImage
    }
+
+.. versionadded:: v5.20191215
+
+   ``forget_image``, ``preload_image`` and ``unload_image`` are added to the root mutation.

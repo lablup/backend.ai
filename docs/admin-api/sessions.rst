@@ -4,6 +4,8 @@ Compute Session Monitoring
 As of Backend.AI v20.03, compute sessions are composed of one or more containers, while interactions with sessions only occur with the *master* container when using REST APIs.
 The GraphQL API allows users and admins to check details of sessions and their belonging containers.
 
+.. versionchanged:: v5.20191215
+
 Query Schema
 ------------
 
@@ -13,6 +15,7 @@ Query Schema
 
    type ComputeSession {
      # identity and type
+     id: UUID
      sess_id: String     # legacy alias to session_name
      sess_type: String   # legacy alias to session_type
      session_name: String
@@ -25,7 +28,7 @@ Query Schema
      group_name: String
      group_id: UUID
      user_email: String
-     user_uuid: UUID
+     user_id: UUID
      access_key: String
      created_user_email: String  # reserved for future release
      created_user_uuid: UUID     # reserved for future release
@@ -40,9 +43,11 @@ Query Schema
      result: String
 
      # resources
+     resource_opts: JSON
      scaling_group: String
      service_ports: JSON    # only available in master
-     mounts: [String]   # shared by all kernels
+     mounts: [String]       # shared by all kernels
+     occupied_slots: JSON   # sum of belonging containers
 
      # statistics
      num_queries: BigInt
@@ -64,7 +69,7 @@ or as a paginated list using ``compute_session_list``.
      compute_session_list(
        limit: Int!,
        offset: Int!,
-       access_key: String,
+       access_key: String,  # admins can query sessions of other users
        status: String,
      ): PaginatedList[ComputeSession]
    }
@@ -79,6 +84,7 @@ Note that the client must assume that ``id`` is different from ``container_id``,
      id: UUID
      role: String   # "master" is reserved, other values are defined by cluster templates
      hostname: String
+     session_id: UUID
 
      # image
      image: String
@@ -94,8 +100,9 @@ Note that the client must assume that ``id`` is different from ``container_id``,
      # resources
      agent: String   # only available for super-admins
      container_id: String
-     occupied_slots: JSON
      resource_opts: JSON
+     # mounts are same in all containers of the same session.
+     occupied_slots: JSON
 
      # statistics
      live_stat: JSON
@@ -115,6 +122,7 @@ In the same way, the containers may be queried one by one using ``compute_contai
        limit: Int!,
        offset: Int!,
        session_id: UUID!,
+       role: String,
      ): PaginatedList[ComputeContainer]
    }
 
@@ -149,6 +157,8 @@ Query Example
 
 API Parameters
 ~~~~~~~~~~~~~~
+
+Using the above GraphQL query, clients may send the following JSON object as the request:
 
 .. code-block:: json
 
