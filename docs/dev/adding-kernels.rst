@@ -210,6 +210,11 @@ The ``ref`` field defines a variable that stores the result of the action and ca
        * ``debug``: a boolean to lower the logging level to DEBUG (default is INFO)
      - None
 
+.. warning::
+
+   ``run_command`` action should return quickly, otherwise the session creation latency will be increased.
+   If you need to run a background process, you must use its own options to let it daemonize or wrap as a background shell command (``["/bin/sh", "-c", "... &"]``).
+
 Interpretation of URL template
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
