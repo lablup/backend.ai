@@ -114,7 +114,7 @@ numfig = True
 
 intersphinx_mapping = {
     'client-py':
-        ('https://docs.client-py.backend.ai/en/latest/', None),
+        ('https://client-py.docs.backend.ai/en/latest/', None),
 }
 
 
