@@ -720,7 +720,7 @@ Virtual Folder Invitation Object
 
 .. list-table::
    :widths: 15, 5, 80
-   :header-row: 1
+   :header-rows: 1
 
    * - Key
      - Type

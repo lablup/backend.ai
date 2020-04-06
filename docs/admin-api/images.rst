@@ -38,7 +38,13 @@ Mutation Schema
    type RescanImages {
      ok: Boolean
      msg: String
-     task_id: String  # for future release
+     task_id: String
+   }
+
+   type ForgetImage {
+     ok: Boolean
+     msg: String
+     task_id: String
    }
 
    type AliasImage {
