@@ -3,6 +3,8 @@
 Event Monitoring
 ================
 
+.. _session-lifecycle-events:
+
 Session Lifecycle Events
 ------------------------
 
@@ -118,7 +120,7 @@ The event data contains a JSON string like this (more fields may be added in the
    }
 
 
-.. _bgtask-progress:
+.. _bgtask-progress-events:
 
 Background Task Progress Events
 -------------------------------
@@ -196,7 +198,7 @@ The per-line JSON objects include the following fields:
        It may be ``null``.
        For example, it may contain the name of agent or scaling group being worked on for image preload/unload APIs.
 
-Check out :ref:`the event monitoring API <events>` for example client-side Javascript implementations to handle ``text/event-stream`` responses.
+Check out :ref:`the session lifecycle events API <session-lifecycle-events>` for example client-side Javascript implementations to handle ``text/event-stream`` responses.
 
 If you make the request for the tasks already finished, it may return either "404 Not Found" (the result is expired or the task ID is invalid) or a single event which is one of ``task_done``, ``task_fail``, or ``task_cancel`` followed by immediate  response disconnection.
 Currently, the results for finished tasks may be archived up to one day (24 hours).
