@@ -69,7 +69,6 @@ Table of Contents
    user-api/events
    user-api/vfolders
    user-api/resource-presets
-   user-api/background-task
 
 .. _admin_api:
 

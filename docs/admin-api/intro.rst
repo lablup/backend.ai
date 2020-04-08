@@ -127,5 +127,4 @@ Versioning
 ~~~~~~~~~~
 
 As we use GraphQL, there is no explicit versioning.
-You can use any version prefix in the endpoint URL, from ``v1`` to ``vN`` where
-``N`` is the latest major API version.
+Check out the descriptions for each API for its own version history.

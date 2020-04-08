@@ -4,7 +4,7 @@ Code Execution (Query Mode)
 Executing Snippet
 -----------------
 
-* URI: ``/kernel/:id``
+* URI: ``/session/:id``
 * Method: ``POST``
 
 Executes a snippet of user code using the specified session.
@@ -25,14 +25,14 @@ Parameters
      - Description
    * - ``:id``
      - ``slug``
-     - The kernel ID.
+     - The session ID.
    * - ``mode``
      - ``str``
      - A constant string ``"query"``.
    * - ``code``
      - ``str``
      - A string of user-written code.
-       All non-ASCII data must be encoded in UTF-8 or any format acceptable by the kernel.
+       All non-ASCII data must be encoded in UTF-8 or any format acceptable by the session.
    * - ``runId``
      - ``str``
      - A string of client-side unique identifier for this particular run.
@@ -60,7 +60,7 @@ Response
    * - HTTP Status Code
      - Description
    * - 200 OK
-     - The kernel has responded with the execution result.
+     - The session has responded with the execution result.
        The response body contains a JSON object as described below.
 
 .. list-table::
@@ -252,7 +252,7 @@ You should make another API query with the ``code`` field filled with the user i
 Auto-completion
 ---------------
 
-* URI: ``/kernel/:id/complete``
+* URI: ``/session/:id/complete``
 * Method: ``POST``
 
 Parameters
@@ -267,7 +267,7 @@ Parameters
      - Description
    * - ``:id``
      - ``slug``
-     - The kernel ID.
+     - The session ID.
    * - ``code``
      - ``str``
      - A string containing the code until the current cursor position.
@@ -308,7 +308,7 @@ Response
    * - HTTP Status Code
      - Description
    * - 200 OK
-     - The kernel has responded with the execution result.
+     - The session has responded with the execution result.
        The response body contains a JSON object as described below.
 
 .. list-table::
@@ -322,7 +322,7 @@ Response
      - ``list[str]``
 
      - An ordered list containing the possible auto-completion matches as strings.
-       This may be empty if the current kernel does not implement auto-completion
+       This may be empty if the current session does not implement auto-completion
        or no matches have been found.
 
        Selecting a match and merging it into the code text are up to the front-end
@@ -342,7 +342,7 @@ Response
 Interrupt
 ---------
 
-* URI: ``/kernel/:id/interrupt``
+* URI: ``/session/:id/interrupt``
 * Method: ``POST``
 
 Parameters
@@ -357,7 +357,7 @@ Parameters
      - Description
    * - ``:id``
      - ``slug``
-     - The kernel ID.
+     - The session ID.
 
 Response
 """"""""
@@ -369,5 +369,5 @@ Response
    * - HTTP Status Code
      - Description
    * - 204 No Content
-     - Sent the interrupt signal to the kernel.
+     - Sent the interrupt signal to the session.
        Note that this does *not* guarantee the effectiveness of the interruption.

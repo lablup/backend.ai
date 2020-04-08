@@ -106,8 +106,12 @@ The query parameter ``target_agents`` takes a special expression to indicate a s
 
 The mutations that returns ``task_id`` may take an arbitrarily long time to complete.
 This means that getting the response does not necessarily mean that the requested task is complete.
-To monitor the progress and actual completion, clients should use :doc:`the background task API <../user-api/background-task>` using the ``task_id`` value.
+To monitor the progress and actual completion, clients should use :ref:`the background task API <bgtask-progress>` using the ``task_id`` value.
 
 .. versionadded:: v5.20191215
 
    ``forget_image``, ``preload_image`` and ``unload_image`` are added to the root mutation.
+
+.. versionchanged:: v5.20191215
+
+   ``rescan_images`` now returns immediately and its completion must be monitored using the new background task API.

@@ -3,13 +3,13 @@
 Event Monitoring
 ================
 
-Kernel Lifecycle Events
------------------------
+Session Lifecycle Events
+------------------------
 
-* URI: ``/stream/kernel/_/events``
+* URI: ``/stream/session/_/events``
 * Method: ``GET``
 
-Provides a continuous message-by-message JSON object stream of kernel lifecycles.
+Provides a continuous message-by-message JSON object stream of session lifecycles.
 It uses `HTML5 Server-Sent Events (SSE) <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events>`_.
 Browser-based clients may use `the EventSource API <https://developer.mozilla.org/en-US/docs/Web/API/EventSource>`_
 for convenience.
@@ -32,7 +32,7 @@ Parameters
    * - ``sessionId``
      - ``slug``
      - The session ID to monitor the lifecycle events.
-       If set ``"*"``, the API will stream events from all kernels visible to the client
+       If set ``"*"``, the API will stream events from all sessions visible to the client
        depending on the client's role and permissions.
    * - ``ownerAccessKey``
      - ``str``
@@ -42,7 +42,7 @@ Parameters
    * - ``group``
      - ``str``
      - The group name to filter the lifecycle events.
-       If set ``"*"``, the API will stream events from all kernels visible to the client
+       If set ``"*"``, the API will stream events from all sessions visible to the client
        depending on the client's role and permissions.
 
 Responses
@@ -59,26 +59,26 @@ Possible event names (more events may be added in the future):
 
    * - Event Name
      - Description
-   * - ``kernel_preparing``
+   * - ``session_preparing``
      - The session is just scheduled from the job queue and got an agent resource allocation.
-   * - ``kernel_pulling``
-     - The session begins pulling the kernel image (usually from a Docker registry) to the scheduled agent.
-   * - ``kernel_creating``
+   * - ``session_pulling``
+     - The session begins pulling the session image (usually from a Docker registry) to the scheduled agent.
+   * - ``session_creating``
      - The session is being created as containers (or other entities in different agent backends).
-   * - ``kernel_started``
+   * - ``session_started``
      - The session becomes ready to execute codes.
-   * - ``kernel_terminated``
+   * - ``session_terminated``
      - The session has terminated.
 
 When using the EventSource API, you should add event listeners as follows:
 
 .. code-block:: javascript
 
-   const sse = new EventSource('/stream/kernel/_/events', {
+   const sse = new EventSource('/stream/session/_/events', {
      withCredentials: true,
    });
-   sse.addEventListener('kernel-started', (e) => {
-     console.log('kerenl-started', JSON.parse(e.data));
+   sse.addEventListener('session-started', (e) => {
+     console.log('session-started', JSON.parse(e.data));
    });
 
 .. note::
@@ -104,7 +104,7 @@ The event data contains a JSON string like this (more fields may be added in the
      - A short string that describes why the event happened.
        This may be ``null`` or an empty string.
    * - ``result``
-     - Only present for ``kernel-terminated`` events.
+     - Only present for ``session-terminated`` events.
        Only meaningful for batch-type sessions.
        Either one of: ``"UNDEFINED"``, ``"SUCCESS"``, ``"FAILURE"``
 
@@ -116,3 +116,87 @@ The event data contains a JSON string like this (more fields may be added in the
      "reason": "self-terminated",
      "result": "SUCCESS"
    }
+
+
+.. _bgtask-progress:
+
+Background Task Progress Events
+-------------------------------
+
+* URI: ``/stream/background-task``
+* Method: ``GET`` for server-side events
+
+.. versionadded:: v5.20191215
+
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``taskId``
+     - ``UUID``
+     - The background task ID to monitor the progress and completion.
+
+Responses
+"""""""""
+
+The response is a continuous stream of UTF-8 text lines following ``text/event-stream`` format.
+Each event is composed of the event type and data, where the data part is encoded as JSON.
+Possible event names (more events may be added in the future):
+
+.. list-table::
+   :widths: 15 85
+   :header-rows: 1
+
+   * - Event Name
+     - Description
+   * - ``task_update``
+     - Updates for the progress. This can be generated many times during the background task execution.
+   * - ``task_done``
+     - The background task is successfully completed.
+   * - ``tak_fail``
+     - The background task has failed.
+       Check the ``message`` field and/or query the error logs API for error details.
+   * - ``task_cancel``
+     - The background task is cancelled in the middle.
+       Usually this means that the server is being shutdown for maintenance.
+
+The per-line JSON objects include the following fields:
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Field Name
+     - Type
+     - Description
+   * - ``task_id``
+     - ``str``
+     - The background task ID.
+   * - ``current_progress``
+     - ``int``
+     - The current progress value.
+       Only meaningful for ``task_update`` events.
+       If ``total_progress`` is zero, this value should be ignored.
+   * - ``total_progress``
+     - ``int``
+     - The total progress count.
+       Only meaningful for ``task_update`` events.
+       The scale may be an arbitrary positive integer.
+       If the total count is not defined, this may be zero.
+   * - ``message``
+     - ``str``
+     - An optional human-readable message indicating what the task is doing.
+       It may be ``null``.
+       For example, it may contain the name of agent or scaling group being worked on for image preload/unload APIs.
+
+Check out :ref:`the event monitoring API <events>` for example client-side Javascript implementations to handle ``text/event-stream`` responses.
+
+If you make the request for the tasks already finished, it may return either "404 Not Found" (the result is expired or the task ID is invalid) or a single event which is one of ``task_done``, ``task_fail``, or ``task_cancel`` followed by immediate  response disconnection.
+Currently, the results for finished tasks may be archived up to one day (24 hours).
