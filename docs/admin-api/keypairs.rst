@@ -7,6 +7,7 @@ Query Schema
 .. code-block:: graphql
 
    type KeyPair {
+     user_id: String
      access_key: String
      secret_key: String
      is_active: Boolean
@@ -14,17 +15,18 @@ Query Schema
      resource_policy: String
      created_at: DateTime
      last_used: DateTime
-     concurrency_limit: Int
      concurrency_used: Int
      rate_limit: Int
      num_queries: Int
+     user: UUID
+     ssh_public_key: String
      vfolders: [VirtualFolder]
      compute_sessions(status: String): [ComputeSession]
    }
 
    type Query {
-     keypair(access_key: String): KeyPair
-     keypairs(user_id: Int!, is_active: Boolean): [KeyPair]
+     keypair(domain_name: String, access_key: String): KeyPair
+     keypairs(domain_name: String, email: String, is_active: Boolean): [KeyPair]
    }
 
 Mutation Schema
@@ -34,6 +36,14 @@ Mutation Schema
 
    input KeyPairInput {
      is_active: Boolean
+     resource_policy: String
+     concurrency_limit: Int
+     rate_limit: Int
+   }
+
+   input ModifyKeyPairInput {
+     is_active: Boolean
+     is_admin: Boolean
      resource_policy: String
      concurrency_limit: Int
      rate_limit: Int
@@ -56,7 +66,7 @@ Mutation Schema
    }
 
    type Mutation {
-     create_keypair(user_id: Int!, props: KeyPairInput!): CreateKeyPair
-     modify_keypair(access_key: String!, props: KeyPairInput!): ModifyKeyPair
+     create_keypair(props: KeyPairInput!, user_id: String!): CreateKeyPair
+     modify_keypair(access_key: String!, props: ModifyKeyPairInput!): ModifyKeyPair
      delete_keypair(access_key: String!): DeleteKeyPair
    }

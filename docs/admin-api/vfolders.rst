@@ -19,5 +19,12 @@ Query Schema
    }
 
    type Query {
-     vfolders(access_key: String): [VirtualFolder]
+     vfolder_list(limit: Int!,
+       offset: Int!,
+       order_key: String,
+       order_asc: Boolean,
+       domain_name: String,
+       group_id: String,
+       access_key: String,
+     ): PaginatedList[VirtualFolder]
    }

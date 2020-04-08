@@ -77,10 +77,16 @@ Table of Contents
    :caption: Admin API Reference
 
    admin-api/intro
+   admin-api/agents
+   admin-api/scaling-groups
+   admin-api/domains
+   admin-api/groups
+   admin-api/users
    admin-api/images
    admin-api/sessions
    admin-api/vfolders
    admin-api/keypairs
+   admin-api/keypair-resource-policies
    admin-api/resource-presets
 
 .. _dev:
