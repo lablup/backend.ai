@@ -82,8 +82,8 @@ Note that the client must assume that ``id`` is different from ``container_id``,
    type ComputeContainer {
      # identity
      id: UUID
-     role: String   # "master" is reserved, other values are defined by cluster templates
-     hostname: String
+     role: String      # "master" is reserved, other values are defined by cluster templates
+     hostname: String  # used by sibling containers in the same session
      session_id: UUID
 
      # image
@@ -98,7 +98,7 @@ Note that the client must assume that ``id`` is different from ``container_id``,
      terminated_at: DateTime
 
      # resources
-     agent: String   # only available for super-admins
+     agent: String           # super-admin only
      container_id: String
      resource_opts: JSON
      # mounts are same in all containers of the same session.
