@@ -6,7 +6,7 @@
 Backend.AI API Documentation
 ============================
 
-**Latest API version: v4.20190315**
+**Latest API version: v5.20191215**
 
 Backend.AI is a hassle-free backend for AI model development and deployment.
 It runs arbitrary user codes safely in resource-constrained environments, using Docker and our own sandbox wrapper.
