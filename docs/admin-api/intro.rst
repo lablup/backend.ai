@@ -97,6 +97,10 @@ We use a pagination convention as described below:
    interface PaginatedList(
      offset: Integer!,
      limit: Integer!,
+     # some concrete types define ordering customization fields:
+     #   order_key: String,
+     #   order_asc: Boolean,
+     # other optional filter condition may be added by concrete types
    ) {
      total_count: Integer
      items: [Item]

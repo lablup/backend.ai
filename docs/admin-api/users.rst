@@ -27,8 +27,9 @@ Query Schema
    }
 
    type Query {
-     keypair(domain_name: String, access_key: String): KeyPair
-     keypairs(domain_name: String, email: String, is_active: Boolean): [KeyPair]
+     user(domain_name: String, email: String): User
+     user_from_uuid(domain_name: String, user_id: String): User
+     users(domain_name: String, group_id: String, is_active: Boolean): [User]
    }
 
 Mutation Schema

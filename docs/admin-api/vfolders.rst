@@ -19,7 +19,8 @@ Query Schema
    }
 
    type Query {
-     vfolder_list(limit: Int!,
+     vfolder_list(
+       limit: Int!,
        offset: Int!,
        order_key: String,
        order_asc: Boolean,

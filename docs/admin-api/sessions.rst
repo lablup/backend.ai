@@ -69,7 +69,11 @@ or as a paginated list using ``compute_session_list``.
      compute_session_list(
        limit: Int!,
        offset: Int!,
-       access_key: String,  # admins can query sessions of other users
+       order_key: String,
+       order_asc: Boolean,
+       domain_name: String,  # super-admin can query sessions in any domain
+       group_id: String,     # domain-admins can query sessions in any group
+       access_key: String,   # admins can query sessions of other users
        status: String,
      ): PaginatedList[ComputeSession]
    }
