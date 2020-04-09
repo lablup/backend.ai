@@ -10,7 +10,7 @@ Query Schema
      name: String
      created_at: DateTime
      default_for_unspecified: String
-     total_resource_slots: JSONString
+     total_resource_slots: JSONString  # ResourceSlot
      max_concurrent_sessions: Int
      max_containers_per_session: Int
      idle_timeout: BigInt

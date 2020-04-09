@@ -14,7 +14,7 @@ Query Schema
      created_at: DateTime
      modified_at: DateTime
      domain_name: String
-     total_resource_slots: JSONString
+     total_resource_slots: JSONString  # ResourceSlot
      allowed_vfolder_hosts: [String]
      integration_id: String
      scaling_groups: [String]
@@ -34,7 +34,7 @@ Mutation Schema
      description: String
      is_active: Boolean
      domain_name: String!
-     total_resource_slots: JSONString
+     total_resource_slots: JSONString  # ResourceSlot
      allowed_vfolder_hosts: [String]
      integration_id: String
    }
@@ -44,7 +44,7 @@ Mutation Schema
      description: String
      is_active: Boolean
      domain_name: String
-     total_resource_slots: JSONString
+     total_resource_slots: JSONString  # ResourceSlot
      user_update_mode: String
      user_uuids: [String]
      allowed_vfolder_hosts: [String]

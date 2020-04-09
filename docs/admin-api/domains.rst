@@ -12,7 +12,7 @@ Query Schema
      is_active: Boolean
      created_at: DateTime
      modified_at: DateTime
-     total_resource_slots: JSONString
+     total_resource_slots: JSONString  # ResourceSlot
      allowed_vfolder_hosts: [String]
      allowed_docker_registries: [String]
      integration_id: String
@@ -32,7 +32,7 @@ Mutation Schema
    input DomainInput {
      description: String
      is_active: Boolean
-     total_resource_slots: JSONString
+     total_resource_slots: JSONString  # ResourceSlot
      allowed_vfolder_hosts: [String]
      allowed_docker_registries: [String]
      integration_id: String
@@ -42,7 +42,7 @@ Mutation Schema
      name: String
      description: String
      is_active: Boolean
-     total_resource_slots: JSONString
+     total_resource_slots: JSONString  # ResourceSlot
      allowed_vfolder_hosts: [String]
      allowed_docker_registries: [String]
      integration_id: String
