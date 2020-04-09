@@ -118,6 +118,9 @@ Custom Scalar Types
 
 * ``UUID``: A hexademically formatted (8-4-4-4-12 alphanumeric characters connected via single hyphens) UUID values represented as ``String``
 * ``DateTime``: An ISO-8601 formatted date-time value represented as ``String``
+* ``BigInt``: GraphQL's integer is officially 32-bits only,
+  so we define a "big integer" type which can represent from -9007199254740991 (-2\ :sup:`53`\ +1) to 9007199254740991 (2\ :sup:`53`\ -1) (or, ±(8 PiB - 1 byte).
+  This range is regarded as a "safe" (i.e., can be compared without loosing precision) integer range in most Javascript implementations which represent numbers in the IEEE-754 double (64-bit) format.
 * ``JSON``: It contains a stringified JSON value, whereas the whole query result is already a JSON object.  A client must parse the value *again* to get an object representation.
 
 
