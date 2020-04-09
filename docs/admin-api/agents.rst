@@ -12,8 +12,8 @@ Query Schema
      status_changed: DateTime
      region: String
      scaling_group: String
-     available_slots: JSONString
-     occupied_slots: JSONString
+     available_slots: JSONString  # ResourceSlot
+     occupied_slots: JSONString   # ResourceSlot
      addr: String
      first_contact: DateTime
      lost_at: DateTime
