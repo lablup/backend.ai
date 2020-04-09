@@ -121,7 +121,7 @@ Custom Scalar Types
 * ``BigInt``: GraphQL's integer is officially 32-bits only,
   so we define a "big integer" type which can represent from -9007199254740991 (-2\ :sup:`53`\ +1) to 9007199254740991 (2\ :sup:`53`\ -1) (or, ±(8 PiB - 1 byte).
   This range is regarded as a "safe" (i.e., can be compared without loosing precision) integer range in most Javascript implementations which represent numbers in the IEEE-754 double (64-bit) format.
-* ``JSON``: It contains a stringified JSON value, whereas the whole query result is already a JSON object.  A client must parse the value *again* to get an object representation.
+* ``JSONString``: It contains a stringified JSON value, whereas the whole query result is already a JSON object.  A client must parse the value *again* to get an object representation.
 
 
 Authentication

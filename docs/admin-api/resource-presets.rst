@@ -8,7 +8,7 @@ Query Schema
 
    type ResourcePreset {
      name: String
-     resource_slots: JSON
+     resource_slots: JSONString
    }
 
    type Query {
@@ -23,7 +23,7 @@ Mutation Schema
 .. code-block:: graphql
 
    input CreateResourcePresetInput {
-     resource_slots: JSON
+     resource_slots: JSONString
    }
 
    type CreateResourcePreset {
@@ -33,7 +33,7 @@ Mutation Schema
    }
 
    input ModifyResourcePresetInput {
-     resource_slots: JSON
+     resource_slots: JSONString
    }
 
    type ModifyResourcePreset {

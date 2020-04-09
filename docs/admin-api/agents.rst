@@ -20,6 +20,9 @@ Query Schema
      live_stat: JSONString
      version: String
      compute_plugins: JSONString
+     compute_containers(status: String): [ComputeContainer]
+
+     # legacy fields
      mem_slots: Int
      cpu_slots: Float
      gpu_slots: Float
@@ -30,7 +33,6 @@ Query Schema
      used_tpu_slots: Float
      cpu_cur_pct: Float
      mem_cur_bytes: Float
-     computations(status: String): [Computation]
    }
 
    type Query {

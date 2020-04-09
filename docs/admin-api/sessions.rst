@@ -43,11 +43,11 @@ Query Schema
      result: String
 
      # resources
-     resource_opts: JSON
+     resource_opts: JSONString
      scaling_group: String
-     service_ports: JSON    # only available in master
-     mounts: [String]       # shared by all kernels
-     occupied_slots: JSON   # sum of belonging containers
+     service_ports: JSONString   # only available in master
+     mounts: [String]            # shared by all kernels
+     occupied_slots: JSONString  # sum of belonging containers
 
      # statistics
      num_queries: BigInt
@@ -104,13 +104,13 @@ Note that the client must assume that ``id`` is different from ``container_id``,
      # resources
      agent: String           # super-admin only
      container_id: String
-     resource_opts: JSON
+     resource_opts: JSONString
      # mounts are same in all containers of the same session.
-     occupied_slots: JSON
+     occupied_slots: JSONString
 
      # statistics
-     live_stat: JSON
-     last_stat: JSON
+     live_stat: JSONString
+     last_stat: JSONString
    }
 
 In the same way, the containers may be queried one by one using ``compute_container`` field on the root query schema, or as a paginated list using ``compute_container_list`` for a single session.
