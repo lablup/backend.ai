@@ -158,14 +158,14 @@ Possible event names (more events may be added in the future):
 
    * - Event Name
      - Description
-   * - ``task_update``
+   * - ``task_updated``
      - Updates for the progress. This can be generated many times during the background task execution.
    * - ``task_done``
      - The background task is successfully completed.
-   * - ``tak_fail``
+   * - ``tak_failed``
      - The background task has failed.
        Check the ``message`` field and/or query the error logs API for error details.
-   * - ``task_cancel``
+   * - ``task_cancelled``
      - The background task is cancelled in the middle.
        Usually this means that the server is being shutdown for maintenance.
 
