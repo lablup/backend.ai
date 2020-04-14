@@ -56,7 +56,7 @@ Query Schema
      num_queries: BigInt
 
      # owned containers (aka kernels)
-     containers: [ComputeContainer]
+     containers: List[ComputeContainer]  # full list of owned containers
    }
 
 The sessions may be queried one by one using ``compute_sesssion`` field on the root query schema,
@@ -83,6 +83,12 @@ or as a paginated list using ``compute_session_list``.
 
 ``ComputeContainer`` provides information about individual containers that belongs to the given session.
 Note that the client must assume that ``id`` is different from ``container_id``, because agents may be configured to use non-Docker backends.
+
+.. note::
+
+   The container ID in the GraphQL queries and REST APIs are *different* from the actual Docker container ID.
+   The Docker container IDs can be queried using ``container_id`` field of ``ComputeContainer`` objects.
+   If the agents are configured to using non-Docker-based backends, then ``container_id`` may also be completely arbitrary identifiers.
 
 .. code-block:: graphql
 
@@ -120,13 +126,7 @@ In the same way, the containers may be queried one by one using ``compute_contai
 
 .. note::
 
-   The ID of the master container of each session is same to the session ID.
-
-.. note::
-
-   The container ID in the GraphQL queries and REST APIs are *different* from the actual Docker container ID.
-   The Docker container IDs can be queried using ``container_id`` field of ``ComputeContainer`` GQL objects.
-   If the agents are configured to using non-Docker-based backends, then ``container_id`` may also be completely arbitrary identifiers.
+   The container ID of the master container of each session is same to the session ID.
 
 .. code-block:: graphql
 
@@ -163,11 +163,17 @@ Query Example
        total_count
        items {
          id
-         session_name
-         session_type
+         name
+         type
          user_email
          status
          status_info
+         status_updated
+         containers {
+           id
+           role
+           agent
+         }
        }
      }
    }
@@ -200,11 +206,29 @@ API Response
        "items": [
          {
            "id": "12c45b55-ce3c-418d-9c58-223bbba307f1",
-           "session_name": "mysession",
-           "session_type": "interactive",
+           "name": "mysession",
+           "type": "interactive",
            "user_email": "user@lablup.com",
            "status": "RUNNING",
-           "status_info": null
+           "status_info": null,
+           "status_updated": "2020-02-16T15:47:28.997335+00:00",
+           "containers": [
+             {
+               "id": "12c45b55-ce3c-418d-9c58-223bbba307f1",
+               "role": "master",
+               "agent": "i-agent01"
+             },
+             {
+               "id": "12c45b55-ce3c-418d-9c58-223bbba307f2",
+               "role": "slave",
+               "agent": "i-agent02"
+             },
+             {
+               "id": "12c45b55-ce3c-418d-9c58-223bbba307f3",
+               "role": "slave",
+               "agent": "i-agent03"
+             }
+           ]
          }
        ]
      }
