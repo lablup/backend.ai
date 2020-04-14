@@ -16,12 +16,15 @@ Query Schema
    type ComputeSession {
      # identity and type
      id: UUID
-     sess_id: String     # legacy alias to session_name
-     sess_type: String   # legacy alias to session_type
-     session_name: String
-     session_type: String
+     name: String
+     type: String
      id: UUID
      tag: String
+
+     # image
+     image: String
+     registry: String
+     cluster_template: String  # reserved for future release
 
      # ownership
      domain_name: String
@@ -114,6 +117,16 @@ Note that the client must assume that ``id`` is different from ``container_id``,
    }
 
 In the same way, the containers may be queried one by one using ``compute_container`` field on the root query schema, or as a paginated list using ``compute_container_list`` for a single session.
+
+.. note::
+
+   The ID of the master container of each session is same to the session ID.
+
+.. note::
+
+   The container ID in the GraphQL queries and REST APIs are *different* from the actual Docker container ID.
+   The Docker container IDs can be queried using ``container_id`` field of ``ComputeContainer`` GQL objects.
+   If the agents are configured to using non-Docker-based backends, then ``container_id`` may also be completely arbitrary identifiers.
 
 .. code-block:: graphql
 
