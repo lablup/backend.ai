@@ -8,7 +8,7 @@ Event Monitoring
 Session Lifecycle Events
 ------------------------
 
-* URI: ``/stream/session/_/events``
+* URI: ``/events/session``
 * Method: ``GET``
 
 Provides a continuous message-by-message JSON object stream of session lifecycles.
@@ -19,6 +19,10 @@ for convenience.
 .. versionadded:: v4.20190615
 
    First properly implemented in this version, deprecating prior unimplemented interfaces.
+
+.. versionchanged:: v5.20191215
+
+   The URI is changed from ``/stream/session/_/events`` to ``/events/session``.
 
 
 Parameters
@@ -76,11 +80,11 @@ When using the EventSource API, you should add event listeners as follows:
 
 .. code-block:: javascript
 
-   const sse = new EventSource('/stream/session/_/events', {
+   const sse = new EventSource('/events/session', {
      withCredentials: true,
    });
-   sse.addEventListener('session-started', (e) => {
-     console.log('session-started', JSON.parse(e.data));
+   sse.addEventListener('session_started', (e) => {
+     console.log('session_started', JSON.parse(e.data));
    });
 
 .. note::
@@ -125,11 +129,10 @@ The event data contains a JSON string like this (more fields may be added in the
 Background Task Progress Events
 -------------------------------
 
-* URI: ``/stream/background-task``
+* URI: ``/events/background-task``
 * Method: ``GET`` for server-side events
 
 .. versionadded:: v5.20191215
-
 
 Parameters
 """"""""""
@@ -168,8 +171,12 @@ Possible event names (more events may be added in the future):
    * - ``task_cancelled``
      - The background task is cancelled in the middle.
        Usually this means that the server is being shutdown for maintenance.
+   * - ``server_close``
+     - This event indicates explicit server-initiated close of the event monitoring connection,
+       which is raised just after the background task is either done/failed/cancelled.
+       The client should not reconnect because there is nothing more to monitor about the given task.
 
-The per-line JSON objects include the following fields:
+The event data (per-line JSON objects) include the following fields:
 
 .. list-table::
    :widths: 15 5 80

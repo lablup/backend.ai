@@ -49,7 +49,7 @@ Query Schema
      resource_opts: JSONString
      scaling_group: String
      service_ports: JSONString   # only available in master
-     mounts: [String]            # shared by all kernels
+     mounts: List[String]            # shared by all kernels
      occupied_slots: JSONString  # ResourceSlot; sum of belonging containers
 
      # statistics
@@ -57,6 +57,9 @@ Query Schema
 
      # owned containers (aka kernels)
      containers: List[ComputeContainer]  # full list of owned containers
+
+     # pipeline relations
+     dependencies: List[ComputeSession]  # full list of dependency sessions
    }
 
 The sessions may be queried one by one using ``compute_sesssion`` field on the root query schema,
