@@ -9,6 +9,7 @@ Query Schema
    type ResourcePreset {
      name: String
      resource_slots: JSONString
+     shared_memory: BigInt
    }
 
    type Query {
@@ -24,6 +25,7 @@ Mutation Schema
 
    input CreateResourcePresetInput {
      resource_slots: JSONString
+     shared_memory: String
    }
 
    type CreateResourcePreset {
@@ -34,6 +36,7 @@ Mutation Schema
 
    input ModifyResourcePresetInput {
      resource_slots: JSONString
+     shared_memory: String
    }
 
    type ModifyResourcePreset {

@@ -526,6 +526,12 @@ Resource Preset Object
        If it contains slot types that are not currently used/activated in the cluster,
        they will be removed when returned via ``/resource/*`` REST APIs.
 
+   * - ``shared_memory``
+     - ``int`` (Byte)
+     - The pre-configured shared memory size.
+       Client can send humanized strings like '2g', '128m', '534773760', etc,
+       and they will be automatically converted into bytes.
+
 .. _vfolder-creation-result-object:
 
 Virtual Folder Creation Result Object
