@@ -456,7 +456,7 @@ check_snappy() {
   local pkgfile=$(ls | grep snappy)
   if [[ $pkgfile =~ .*\.tar.gz ]]; then
     # source build is required!
-    install_system_pkg "libsnappy-dev" "libsnappy-devel" "snappy"
+    install_system_pkg "libsnappy-dev" "snappy-devel" "snappy"
   fi
   rm -f $pkgfile
 }
