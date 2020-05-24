@@ -130,7 +130,11 @@ fi
 
 if [ $REMOVE_SOURCE -eq 1 ]; then
   echo "Removing cloned source files..."
-  $sudo rm -rf "${INSTALL_PATH}"
+  $sudo rm -rf "${INSTALL_PATH}/manager"
+  $sudo rm -rf "${INSTALL_PATH}/agent"
+  $sudo rm -rf "${INSTALL_PATH}/common"
+  $sudo rm -rf "${INSTALL_PATH}/client"
+  echo "Please remove ${INSTALL_PATH} by yourself."
 else
   echo "Skipped removal of cloned source files."
 fi
