@@ -36,9 +36,13 @@ usage() {
   echo "${LWHITE}OPTIONS${NC}"
   echo "  ${LWHITE}-h, --help${NC}           Show this help message and exit"
   echo ""
+  echo "  ${LWHITE}-e, --env ENVID${NC}"
+  echo "                       Manually override the environment ID to use"
+  echo "                       (default: random-generated)"
+  echo ""
   echo "  ${LWHITE}--python-version VERSION${NC}"
   echo "                       Set the Python version to install via pyenv"
-  echo "                       (default: 3.6.9)"
+  echo "                       (default: 3.6.10)"
   echo ""
   echo "  ${LWHITE}--install-path PATH${NC}  Set the target directory"
   echo "                       (default: ./backend.ai-dev)"
@@ -58,6 +62,26 @@ usage() {
   echo "  ${LWHITE}--cuda-branch NAME${NC}   The branch of git clone for the CUDA accelerator "
   echo "                       plugin; only valid if ${LWHITE}--enable-cuda${NC} is specified."
   echo "                       (default: master)"
+  echo ""
+  echo "  ${LWHITE}--postgres-port PORT${NC} The port to bind the PostgreSQL container service."
+  echo "                       (default: 8100)"
+  echo ""
+  echo "  ${LWHITE}--redis-port PORT${NC}    The port to bind the Redis container service."
+  echo "                       (default: 8110)"
+  echo ""
+  echo "  ${LWHITE}--etcd-port PORT${NC}     The port to bind the etcd container service."
+  echo "                       (default: 8120)"
+  echo ""
+  echo "  ${LWHITE}--manager-port PORT${NC}  The port to expose the manager API service."
+  echo "                       (default: 8081)"
+  echo ""
+  echo "  ${LWHITE}--agent-rpc-port PORT${NC}"
+  echo "                       The port for the manager-to-agent RPC calls."
+  echo "                       (default: 6001)"
+  echo ""
+  echo "  ${LWHITE}--agent-watcher-port PORT${NC}"
+  echo "                       The port for the agent's watcher service."
+  echo "                       (default: 6009)"
 }
 
 show_error() {
@@ -140,6 +164,7 @@ else
 fi
 
 ROOT_PATH=$(pwd)
+ENV_ID=""
 PYTHON_VERSION="3.6.10"
 SERVER_BRANCH="19.09"
 CLIENT_BRANCH="19.09"
@@ -147,10 +172,18 @@ INSTALL_PATH="./backend.ai-dev"
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
 CUDA_BRANCH="master"
+POSTGRES_PORT="8100"
+REDIS_PORT="8110"
+ETCD_PORT="8120"
+MANAGER_PORT="8081"
+AGENT_RPC_PORT="6001"
+AGENT_WATCHER_PORT="6009"
 
 while [ $# -gt 0 ]; do
   case $1 in
     -h | --help)           usage; exit 1 ;;
+    -e | --env)            ENV_ID=$2; shift ;;
+    --env=*)               ENV_ID="${1#*=}" ;;
     --python-version)      PYTHON_VERSION=$2; shift ;;
     --python-version=*)    PYTHON_VERSION="${1#*=}" ;;
     --install-path)        INSTALL_PATH=$2; shift ;;
@@ -163,6 +196,18 @@ while [ $# -gt 0 ]; do
     --download-big-images) DOWNLOAD_BIG_IMAGES=1 ;;
     --cuda-branch)         CUDA_BRANCH=$2; shift ;;
     --cuda-branch=*)       CUDA_BRANCH="${1#*=}" ;;
+    --postgres-port)       POSTGRES_PORT=$2; shift ;;
+    --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
+    --redis-port)          REDIS_PORT=$2; shift ;;
+    --redis-port=*)        REDIS_PORT="${1#*=}" ;;
+    --etcd-port)           ETCD_PORT=$2; shift ;;
+    --etcd-port=*)         ETCD_PORT="${1#*=}" ;;
+    --manager-port)         MANAGER_PORT=$2; shift ;;
+    --manager-port=*)       MANAGER_PORT="${1#*=}" ;;
+    --agent-rpc-port)       AGENT_RPC_PORT=$2; shift ;;
+    --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
+    --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
+    --agent-watcher-port=*) AGENT_WATCHER_PORT="${1#*=}" ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -351,7 +396,9 @@ echo " "
 echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 
 # NOTE: docker-compose enforces lower-cased project names
-ENV_ID=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
+if [ -z "${ENV_ID}" ]; then
+  ENV_ID=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
+fi
 show_note "Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 
 # Check prerequisites
@@ -437,7 +484,11 @@ cd "${INSTALL_PATH}"
 show_info "Launching the docker-compose \"halfstack\"..."
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
 cd backend.ai
-$docker_sudo docker-compose -f docker-compose.halfstack.yml -p "${ENV_ID}" up -d
+cp docker-compose.halfstack.yml "docker-compose.halfstack.${ENV_ID}.yml"
+sed -i'' "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.${ENV_ID}.yml"
+sed -i'' "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.${ENV_ID}.yml"
+sed -i'' "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.${ENV_ID}.yml"
+$docker_sudo docker-compose -f "docker-compose.halfstack.${ENV_ID}.yml" -p "${ENV_ID}" up -d
 $docker_sudo docker ps | grep "${ENV_ID}"   # You should see three containers here.
 
 # Clone source codes
@@ -490,34 +541,40 @@ show_info "Copy default configuration files to manager / agent root..."
 cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
 cp config/halfstack.toml ./manager.toml
+sed -i'' "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
+sed -i'' "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
+sed -i'' "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
 cp config/halfstack.alembic.ini ./alembic.ini
-python -m ai.backend.manager.cli etcd put config/redis/addr 127.0.0.1:8110
+sed -i'' "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
+python -m ai.backend.manager.cli etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
 cp config/halfstack.toml ./agent.toml
+sed -i'' "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
+sed -i'' "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
+sed -i'' "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
 cd "${INSTALL_PATH}/manager"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io "https://registry-1.docker.io"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io/username "lablup"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd rescan-images index.docker.io
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd alias python python:3.6-ubuntu18.04
+python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io "https://registry-1.docker.io"
+python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io/username "lablup"
+python -m ai.backend.manager.cli etcd rescan-images index.docker.io
+python -m ai.backend.manager.cli etcd alias python python:3.6-ubuntu18.04
 
 # Virtual folder setup
 show_info "Setting up virtual folder..."
 mkdir -p "${INSTALL_PATH}/vfolder/local"
 cd "${INSTALL_PATH}/manager"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
-./scripts/run-with-halfstack.sh python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
+python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
+python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
 cd "${INSTALL_PATH}/agent"
 mkdir -p scratches
 
 # DB schema
 show_info "Setting up databases..."
 cd "${INSTALL_PATH}/manager"
-cp alembic.ini.sample alembic.ini
 python -m ai.backend.manager.cli schema oneshot
 python -m ai.backend.manager.cli fixture populate sample-configs/example-keypairs.json
 python -m ai.backend.manager.cli fixture populate sample-configs/example-resource-presets.json
@@ -529,7 +586,7 @@ git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-clien
 cd "${INSTALL_PATH}/client-py"
 pyenv local "venv-${ENV_ID}-client"
 pip install -U -q pip setuptools
-pip install -U -r requirements/dev.txt
+pip install -U -r requirements-dev.txt
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
@@ -556,7 +613,7 @@ DELETE_OPTS=$(trim "$DELETE_OPTS")
 cd "${INSTALL_PATH}"
 show_info "Installation finished."
 show_note "Default API keypair configuration for test / develop:"
-echo "> ${WHITE}export BACKEND_ENDPOINT=http://127.0.0.1:8081/${NC}"
+echo "> ${WHITE}export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/${NC}"
 echo "> ${WHITE}export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE${NC}"
 echo "> ${WHITE}export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY${NC}"
 echo " "
@@ -578,9 +635,9 @@ show_note "Reminder: Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 echo "  * When using docker-compose, do:"
 echo "    > ${WHITE}cd ${INSTALL_PATH}/backend.ai${NC}"
 if [ ! -z "$docker_sudo" ]; then
-  echo "    > ${WHITE}${docker_sudo} docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml up -d ...${NC}"
+  echo "    > ${WHITE}${docker_sudo} docker-compose -p ${ENV_ID} -f docker-compose.halfstack.${ENV_ID}.yml up -d ...${NC}"
 else
-  echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml up -d ...${NC}"
+  echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.${ENV_ID}.yml up -d ...${NC}"
 fi
 echo "  * To delete this development environment, run:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh --env ${ENV_ID} ${DELETE_OPTS}${NC}"
