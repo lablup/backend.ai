@@ -604,7 +604,7 @@ DELETE_OPTS=$(trim "$DELETE_OPTS")
 cd "${INSTALL_PATH}"
 show_info "Installation finished."
 show_note "Default API keypair configuration for test / develop:"
-echo "> ${WHITE}export BACKEND_ENDPOINT=http://127.0.0.1:8081/${NC}"
+echo "> ${WHITE}export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/${NC}"
 echo "> ${WHITE}export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE${NC}"
 echo "> ${WHITE}export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY${NC}"
 echo " "
@@ -626,9 +626,9 @@ show_note "Reminder: Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 echo "  * When using docker-compose, do:"
 echo "    > ${WHITE}cd ${INSTALL_PATH}/backend.ai${NC}"
 if [ ! -z "$docker_sudo" ]; then
-  echo "    > ${WHITE}${docker_sudo} docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml up -d ...${NC}"
+  echo "    > ${WHITE}${docker_sudo} docker-compose -p ${ENV_ID} -f docker-compose.halfstack.${ENV_ID}.yml up -d ...${NC}"
 else
-  echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.yml up -d ...${NC}"
+  echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.${ENV_ID}.yml up -d ...${NC}"
 fi
 echo "  * To delete this development environment, run:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh --env ${ENV_ID} ${DELETE_OPTS}${NC}"
