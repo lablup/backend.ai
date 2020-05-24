@@ -36,6 +36,10 @@ usage() {
   echo "${LWHITE}OPTIONS${NC}"
   echo "  ${LWHITE}-h, --help${NC}           Show this help message and exit"
   echo ""
+  echo "  ${LWHITE}-e, --env ENVID${NC}"
+  echo "                       Manually override the environment ID to use"
+  echo "                       (default: random-generated)"
+  echo ""
   echo "  ${LWHITE}--python-version VERSION${NC}"
   echo "                       Set the Python version to install via pyenv"
   echo "                       (default: 3.6.10)"
@@ -160,6 +164,7 @@ else
 fi
 
 ROOT_PATH=$(pwd)
+ENV_ID=""
 PYTHON_VERSION="3.6.10"
 SERVER_BRANCH="19.09"
 CLIENT_BRANCH="19.09"
@@ -177,6 +182,8 @@ AGENT_WATCHER_PORT="6009"
 while [ $# -gt 0 ]; do
   case $1 in
     -h | --help)           usage; exit 1 ;;
+    -e | --env)            ENV_ID=$2; shift ;;
+    --env=*)               ENV_ID="${1#*=}" ;;
     --python-version)      PYTHON_VERSION=$2; shift ;;
     --python-version=*)    PYTHON_VERSION="${1#*=}" ;;
     --install-path)        INSTALL_PATH=$2; shift ;;
@@ -389,7 +396,9 @@ echo " "
 echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 
 # NOTE: docker-compose enforces lower-cased project names
-ENV_ID=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
+if [ -z "${ENV_ID}" ]; then
+  ENV_ID=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
+fi
 show_note "Your environment ID is ${YELLOW}${ENV_ID}${NC}."
 
 # Check prerequisites
@@ -536,6 +545,7 @@ sed -i'' "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
 sed -i'' "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
 sed -i'' "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
 cp config/halfstack.alembic.ini ./alembic.ini
+sed -i'' "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
 python -m ai.backend.manager.cli etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
 
 cd "${INSTALL_PATH}/agent"
@@ -565,7 +575,6 @@ mkdir -p scratches
 # DB schema
 show_info "Setting up databases..."
 cd "${INSTALL_PATH}/manager"
-cp alembic.ini.sample alembic.ini
 python -m ai.backend.manager.cli schema oneshot
 python -m ai.backend.manager.cli fixture populate sample-configs/example-keypairs.json
 python -m ai.backend.manager.cli fixture populate sample-configs/example-resource-presets.json
