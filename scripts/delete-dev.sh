@@ -122,7 +122,8 @@ fi
 if [ $REMOVE_CONTAINERS -eq 1 ]; then
   echo "Removing Docker containers..."
   cd "${INSTALL_PATH}/backend.ai"
-  $docker_sudo docker-compose -p "${ENV_ID}" -f docker-compose.halfstack.yml down
+  $docker_sudo docker-compose -p "${ENV_ID}" -f "docker-compose.halfstack.${ENV_ID}.yml" down
+  rm "docker-compose.halfstack.${ENV_ID}.yml"
 else
   echo "Skipped removal of Docker containers."
 fi
