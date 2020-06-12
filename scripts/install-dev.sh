@@ -587,7 +587,7 @@ git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-clien
 cd "${INSTALL_PATH}/client-py"
 pyenv local "venv-${ENV_ID}-client"
 pip install -U -q pip setuptools
-pip install -U -r requirements-dev.txt
+pip install -U -r requirements/dev.txt
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
