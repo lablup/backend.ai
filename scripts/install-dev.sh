@@ -23,6 +23,15 @@ readlinkf() {
   $bpython -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
 
+sed_inplace() {
+  # BSD sed and GNU sed implements the "-i" option differently.
+  case "$OSTYPE" in
+    darwin*) sed -i '' "$@" ;;
+    bsd*) sed -i '' "$@" ;;
+    *) sed -i "$@" ;;
+  esac
+}
+
 trim() {
   echo "$1" | sed -e 's/^[[:space:]]*//g' -e 's/[[:space:]]*$//g'
 }
@@ -262,7 +271,6 @@ install_pybuild_deps() {
     brew install zlib xz
     brew install sqlite3 gdbm
     brew install tcl-tk
-EOS
     ;;
   esac
 }
@@ -486,9 +494,9 @@ show_info "Launching the docker-compose \"halfstack\"..."
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
 cd backend.ai
 cp docker-compose.halfstack.yml "docker-compose.halfstack.${ENV_ID}.yml"
-sed -i'' "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.${ENV_ID}.yml"
-sed -i'' "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.${ENV_ID}.yml"
-sed -i'' "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.${ENV_ID}.yml"
+sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.${ENV_ID}.yml"
+sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.${ENV_ID}.yml"
+sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.${ENV_ID}.yml"
 $docker_sudo docker-compose -f "docker-compose.halfstack.${ENV_ID}.yml" -p "${ENV_ID}" up -d
 $docker_sudo docker ps | grep "${ENV_ID}"   # You should see three containers here.
 
@@ -542,19 +550,19 @@ show_info "Copy default configuration files to manager / agent root..."
 cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
 cp config/halfstack.toml ./manager.toml
-sed -i'' "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
-sed -i'' "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
-sed -i'' "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
+sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
+sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
+sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
 cp config/halfstack.alembic.ini ./alembic.ini
-sed -i'' "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
+sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
 python -m ai.backend.manager.cli etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
 cp config/halfstack.toml ./agent.toml
-sed -i'' "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
-sed -i'' "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
-sed -i'' "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
+sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
+sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
+sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
