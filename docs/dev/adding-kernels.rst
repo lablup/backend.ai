@@ -145,10 +145,10 @@ For example, a sample service definition file for "jupyter" service (hence its f
             "args": {
               "body": [
                 "c.NotebookApp.allow_root = True\n",
-                "c.NotebookApp.ip = \"0.0.0.0\"",
-                "c.NotebookApp.port = {ports[0]}",
-                "c.NotebookApp.token = \"\"",
-                "c.FileContentsManager.delete_to_trash = False"
+                "c.NotebookApp.ip = \"0.0.0.0\"\n",
+                "c.NotebookApp.port = {ports[0]}\n",
+                "c.NotebookApp.token = \"\"\n",
+                "c.FileContentsManager.delete_to_trash = False\n"
               ]
             },
             "ref": "jupyter_cfg"
