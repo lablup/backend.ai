@@ -642,7 +642,7 @@ msgstr ""
 
 #: ../../user-api/exec-batch.rst:169
 msgid "There is no such path."
-msgstr ""
+msgstr "경로가 존재하지 않습니다"
 
 #: ../../user-api/exec-batch.rst:178 ../../user-api/exec-batch.rst:213
 #: ../../user-api/vfolders.rst:348 ../../user-api/vfolders.rst:531
