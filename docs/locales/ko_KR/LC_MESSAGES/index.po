@@ -20,39 +20,39 @@ msgstr ""
 
 #: ../../index.rst:21
 msgid "Concepts"
-msgstr ""
+msgstr "컨셉"
 
 #: ../../index.rst:31
 msgid "Cluster Installation"
-msgstr ""
+msgstr "클러스터 설치"
 
 #: ../../index.rst:40
 msgid "Client SDK"
-msgstr ""
+msgstr "SDK 클라이언트"
 
 #: ../../index.rst:48
 msgid "API Common Reference"
-msgstr ""
+msgstr "API 공통 자료"
 
 #: ../../index.rst:59
 msgid "User API Reference"
-msgstr ""
+msgstr "사용자 API 자료"
 
 #: ../../index.rst:75
 msgid "Admin API Reference"
-msgstr ""
+msgstr "어드민 API 자료"
 
 #: ../../index.rst:87
 msgid "Developer Manuals"
-msgstr ""
+msgstr "개발자 자료"
 
 #: ../../index.rst:7
 msgid "Backend.AI API Documentation"
-msgstr ""
+msgstr "Backend.AI API 문서"
 
 #: ../../index.rst:9
 msgid "**Latest API version: v4.20190315**"
-msgstr ""
+msgstr "**최신 API 버전 : v4.20190315**"
 
 #: ../../index.rst:11
 msgid ""
