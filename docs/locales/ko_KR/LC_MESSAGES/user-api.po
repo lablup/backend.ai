@@ -20,11 +20,11 @@ msgstr ""
 
 #: ../../user-api/events.rst:4
 msgid "Event Monitoring"
-msgstr ""
+msgstr "이벤트 모니터링"
 
 #: ../../user-api/events.rst:7
 msgid "Kernel Lifecycle Events"
-msgstr ""
+msgstr "커널 라이프사이클 이벤트"
 
 #: ../../user-api/events.rst:9
 msgid "URI: ``/stream/kernel/_/events``"
@@ -150,7 +150,7 @@ msgstr ""
 
 #: ../../user-api/events.rst:32 ../../user-api/events.rst:99
 msgid "``sessionId``"
-msgstr ""
+msgstr "  "
 
 #: ../../user-api/events.rst:33 ../../user-api/exec-batch.rst:78
 #: ../../user-api/exec-batch.rst:152 ../../user-api/exec-batch.rst:211
