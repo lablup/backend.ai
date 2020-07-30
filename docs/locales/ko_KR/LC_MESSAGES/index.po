@@ -19,11 +19,11 @@ msgstr ""
 "Generated-By: Babel 2.7.0\n"
 
 #: ../../index.rst:21
-msgid "Concepts"
+msgid "개념"
 msgstr ""
 
 #: ../../index.rst:31
-msgid "Cluster Installation"
+msgid "클러스터 "
 msgstr ""
 
 #: ../../index.rst:40
