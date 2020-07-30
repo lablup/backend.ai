@@ -19,7 +19,7 @@ msgstr ""
 "Generated-By: Babel 2.7.0\n"
 
 #: ../../install/configure-autoscaling.rst:3
-msgid "Configure Autoscaling"
+msgid "자동 확장 구성"
 msgstr ""
 
 #: ../../install/configure-autoscaling.rst:5
