@@ -20,11 +20,11 @@ msgstr ""
 
 #: ../../dev/repl.rst:2
 msgid "Adding New REPL Kernels"
-msgstr ""
+msgstr "새로운 REPL 커널 추가"
 
 #: ../../dev/repl.rst:5
 msgid "Architecture Overview"
-msgstr ""
+msgstr "아키텍쳐 개요"
 
 #: ../../dev/repl.rst:7
 msgid ""
@@ -35,6 +35,8 @@ msgid ""
 " it automatically reconnects when the connection is lost due to network "
 "failures or packet losses, 3) it is one of the most universally supported"
 " networking library in various programming languages."
+msgstr "컨테이너 내부에서,"
+msgstr "각각의 "
 msgstr ""
 
 #: ../../dev/repl.rst:13
