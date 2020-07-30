@@ -20,11 +20,11 @@ msgstr ""
 
 #: ../../dev/repl.rst:2
 msgid "Adding New REPL Kernels"
-msgstr ""
+msgstr "새 REPL 커널 추가"
 
 #: ../../dev/repl.rst:5
 msgid "Architecture Overview"
-msgstr ""
+msgstr "아키텍처 개괄"
 
 #: ../../dev/repl.rst:7
 msgid ""
@@ -36,13 +36,20 @@ msgid ""
 "failures or packet losses, 3) it is one of the most universally supported"
 " networking library in various programming languages."
 msgstr ""
-
+"컨테이너 내부에서 각 커널은 TCP 기반 ZeroMQ 연결을 통해 사용자 코드 스니펫을 받아들이고 "
+"실행 결과를 회신하는 간단한 데몬 프로세스입니다. ZeroMQ를 사용하는 근거는 1) 메시지 기반으로 "
+"메시지 경계와 인코딩을 신경 쓸 필요가 없고, 2) 네트워크 장애나 패킷 손실로 연결이 끊기면 "
+"자동으로 다시 연결되고, 3) 다양한 프로그래밍 언어에서 가장 보편적으로 지원되는 네트워킹 "
+"라이브러리 중 하나이기 때문입니다."
 #: ../../dev/repl.rst:13
 msgid ""
 "A kernel should offer the *query mode* and/or the *PTY mode*. The TCP "
 "port 2001 is reserved for the query mode whereas 2002 and 2003 are "
 "reserved for the PTY mode (stdin and stdout combined with stderr)."
 msgstr ""
+"커널은 *query 모드* 및/또는 *PTY 모드*를 제공해야 합니다. TCP 포트 "
+"2001은 query모드로 예약된 반면 2002와 2003은 PTY 모드(stdin및 "
+"stdout과 stderr가 결합된)로 예약됩니다."
 
 #: ../../dev/repl.rst:17
 msgid "Ingredients of Kernel Images"
