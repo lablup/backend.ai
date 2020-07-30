@@ -20,7 +20,7 @@ msgstr ""
 
 #: ../../common-api/auth.rst:2
 msgid "Authentication"
-msgstr ""
+msgstr "인증"
 
 #: ../../common-api/auth.rst:5
 msgid "Access Tokens and Secret Key"
