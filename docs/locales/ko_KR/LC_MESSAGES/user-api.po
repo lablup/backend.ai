@@ -229,64 +229,72 @@ msgid ""
 "``text/event-stream`` format. Each event is composed of the event type "
 "and data, where the data part is encoded as JSON."
 msgstr ""
+"응답은 ``text/event-stream`` 포맷을 따르는 "
+"연속적인 여러 줄의 UTF-8 텍스트 스트림입니다. "
+"각 이벤트는 이벤트 타입과 데이터로 구성되어 있으며, "
+"데이터는 JSON 으로 인코딩 됩니다. "
 
 #: ../../user-api/events.rst:54
 msgid "Possible event names (more events may be added in the future):"
-msgstr ""
+msgstr "가능한 이벤트 명(추후 더 많은 이벤트가 추가될 수 있음)"
 
 #: ../../user-api/events.rst:60
 msgid "Event Name"
-msgstr ""
+msgstr "이벤트 명"
 
 #: ../../user-api/events.rst:62
 msgid "``kernel-preparing``"
-msgstr ""
+msgstr "커널-준비"
 
 #: ../../user-api/events.rst:63
 msgid ""
 "The session is just scheduled from the job queue and got an agent "
 "resource allocation."
-msgstr ""
+msgstr "세션이 방금 작업 큐에 스케쥴링 되었고, 에이전트로부터 자원 할당을 받았습니다."
 
 #: ../../user-api/events.rst:64
 msgid "``kernel-pulling``"
-msgstr ""
+msgstr "커널-가져오기"
 
 #: ../../user-api/events.rst:65
 msgid ""
 "The session begins pulling the kernel image (usually from a Docker "
 "registry) to the scheduled agent."
 msgstr ""
+"세션이 (대개 도커 레지스트리로부터 온) 커널 이미지를 "
+"예약된 에이전트로 가져오기 시작합니다."
 
 #: ../../user-api/events.rst:66
 msgid "``kernel-creating``"
-msgstr ""
+msgstr "커널-생성"
 
 #: ../../user-api/events.rst:67
 msgid ""
 "The session is being created as containers (or other entities in "
 "different agent backends)."
-msgstr ""
+msgstr "세션이 컨테이너 (또는 다른 에이전트 백엔드의 다른 객체로) 생성되는 중입니다."
 
 #: ../../user-api/events.rst:68
 msgid "``kernel-started``"
-msgstr ""
+msgstr "커널-시작됨"
 
 #: ../../user-api/events.rst:69
 msgid "The session becomes ready to execute codes."
-msgstr ""
+msgstr "세션에서 코드를 실행할 준비를 마쳤습니다."
 
 #: ../../user-api/events.rst:70
 msgid "``kernel-terminated``"
-msgstr ""
+msgstr "커널-종료"
 
 #: ../../user-api/events.rst:71
 msgid "The session has terminated."
-msgstr ""
+msgstr "세션이 종료되었습니다."
 
 #: ../../user-api/events.rst:73
 msgid "When using the EventSource API, you should add event listeners as follows:"
 msgstr ""
+"이벤트소스 API를 사용할 경우, "
+"다음을 따르는 이벤트 리스너를 추가해주십시오 : "
 
 #: ../../user-api/events.rst:86
 msgid ""
@@ -295,24 +303,28 @@ msgid ""
 "cookies. Otherwise, you need to manually implement the event stream "
 "parser using the standard fetch API running against the manager server."
 msgstr ""
+"이벤트소스 API는 (콘솔-서버가 종단점 일 때) 반드시 브라우저 쿠키를 사용하는 "
+"세션-기반 인증 모드여야 합니다. 다른 방식으로는 관리자 서버에 대해 실행되는 "
+"표준 fetch API를 사용해 이벤트 스트림 파서를 수동으로 구현해야 합니다."
 
 #: ../../user-api/events.rst:91
 msgid ""
 "The event data contains a JSON string like this (more fields may be added"
 " in the future):"
 msgstr ""
+"이벤트 데이터는 다음과 같은 JSON 문자열로 구성됩니다 (추후 더 많은 필드가 추가될 수 있음) : "
 
 #: ../../user-api/events.rst:97
 msgid "Field Name"
-msgstr ""
+msgstr "필드 명"
 
 #: ../../user-api/events.rst:100
 msgid "The source session ID."
-msgstr ""
+msgstr "소스 세션 아이디"
 
 #: ../../user-api/events.rst:102
 msgid "The access key who owns the session."
-msgstr ""
+msgstr "세션을 소유하고 있는 액세스 키"
 
 #: ../../user-api/events.rst:103
 msgid "``reason``"
