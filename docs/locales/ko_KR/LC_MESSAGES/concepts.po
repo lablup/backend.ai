@@ -61,7 +61,7 @@ msgstr ""
 
 #: ../../concepts/api-overview.rst:24
 msgid "Accessing Admin APIs"
-msgstr ""
+msgstr "관리자 API 접속하기"
 
 #: ../../concepts/api-overview.rst:26
 msgid "The admin APIs require a special keypair with the admin privilege:"
