@@ -56,29 +56,29 @@ msgstr ""
 
 #: ../../common-api/auth.rst:24
 msgid "Common Structure of API Requests"
-msgstr ""
+msgstr "API 요청의 일반적인 구조"
 
 #: ../../common-api/auth.rst:30 ../../common-api/auth.rst:72
 #: ../../common-api/ratelimit.rst:18
 msgid "HTTP Headers"
-msgstr ""
+msgstr "HTTP 헤더"
 
 #: ../../common-api/auth.rst:31 ../../common-api/auth.rst:73
 #: ../../common-api/ratelimit.rst:19
 msgid "Values"
-msgstr ""
+msgstr "값"
 
 #: ../../common-api/auth.rst:32
 msgid "Method"
-msgstr ""
+msgstr "메서드"
 
 #: ../../common-api/auth.rst:33
 msgid "``GET`` / ``REPORT`` / ``POST`` / ``PUT`` / ``PATCH`` / ``DELETE``"
-msgstr ""
+msgstr "``GET`` / ``REPORT`` / ``POST`` / ``PUT`` / ``PATCH`` / ``DELETE``"
 
 #: ../../common-api/auth.rst:34
 msgid "Query String"
-msgstr ""
+msgstr "쿼리스트링"
 
 #: ../../common-api/auth.rst:35
 msgid ""
@@ -91,15 +91,15 @@ msgstr ""
 
 #: ../../common-api/auth.rst:43 ../../common-api/auth.rst:76
 msgid "``Content-Type``"
-msgstr ""
+msgstr "``Content-Type``"
 
 #: ../../common-api/auth.rst:44
 msgid "Always should be ``application/json``"
-msgstr ""
+msgstr "항상 ``application/json``이어야 합니다"
 
 #: ../../common-api/auth.rst:45
 msgid "``Authorization``"
-msgstr ""
+msgstr "``Authorization``"
 
 #: ../../common-api/auth.rst:46
 msgid ""
@@ -109,7 +109,7 @@ msgstr ""
 
 #: ../../common-api/auth.rst:47
 msgid "``Date``"
-msgstr ""
+msgstr "``Date``"
 
 #: ../../common-api/auth.rst:48
 msgid ""
@@ -120,7 +120,7 @@ msgstr ""
 
 #: ../../common-api/auth.rst:51
 msgid "``X-BackendAI-Date``"
-msgstr ""
+msgstr "``X-BackendAI-Date``"
 
 #: ../../common-api/auth.rst:52
 msgid "Same as ``Date``. May be omitted if ``Date`` is present."
@@ -128,7 +128,7 @@ msgstr ""
 
 #: ../../common-api/auth.rst:53
 msgid "``X-BackendAI-Version``"
-msgstr ""
+msgstr "``X-BackendAI-Version``"
 
 #: ../../common-api/auth.rst:54
 msgid ""
@@ -138,7 +138,7 @@ msgstr ""
 
 #: ../../common-api/auth.rst:57
 msgid "``X-BackendAI-Client-Token``"
-msgstr ""
+msgstr "``X-BackendAI-Client-Token``"
 
 #: ../../common-api/auth.rst:58
 msgid ""
