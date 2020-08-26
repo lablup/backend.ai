@@ -98,6 +98,11 @@ show_error() {
   echo "${RED}[ERROR]${NC} ${LRED}$1${NC}"
 }
 
+show_check() {
+  echo " "
+  echo -n "${CYAN}[CHECK]${NC} $1"
+}
+
 show_warning() {
   echo " "
   echo "${YELLOW}[ERROR]${NC} ${LYELLOW}$1${NC}"
@@ -448,6 +453,16 @@ EOS
 if ! type "pyenv" >/dev/null 2>&1; then
   # TODO: ask if install pyenv
   show_info "Installing pyenv..."
+  if [ "$DISTRO" = "Darwin" ]; then
+    show_info "Cannot find pyenv command"
+    show_check "Do you agree to clear the .pyenv folder and install pyenv (Y/n)? "
+    read -n 1
+    if [[ $REPLY == [yY] ]]; then
+      brew uninstall pyenv-virtualenv > /dev/null 2>&1
+      brew uninstall pyenv > /dev/null 2>&1
+      rm -rf ${HOME}/.pyenv
+    fi
+  fi
   set -e
   curl https://pyenv.run | sh
   for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
