@@ -57,6 +57,7 @@ heartbeats.
     - `backendai_accelerator_v12`
     - `backendai_monitor_stats_v10`
     - `backendai_monitor_error_v10`
+    - `backendai_krunner_v10`
 * https://github.com/lablup/backend.ai-accelerator-cuda (CUDA accelerator plugin)
   * Package namespace: `ai.backend.acceelrator.cuda`
 * https://github.com/lablup/backend.ai-accelerator-rocm (ROCM accelerator plugin)

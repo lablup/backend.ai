@@ -122,14 +122,19 @@ fi
 if [ $REMOVE_CONTAINERS -eq 1 ]; then
   echo "Removing Docker containers..."
   cd "${INSTALL_PATH}/backend.ai"
-  $docker_sudo docker-compose -p "${ENV_ID}" -f docker-compose.halfstack.yml down
+  $docker_sudo docker-compose -p "${ENV_ID}" -f "docker-compose.halfstack.${ENV_ID}.yml" down
+  rm "docker-compose.halfstack.${ENV_ID}.yml"
 else
   echo "Skipped removal of Docker containers."
 fi
 
 if [ $REMOVE_SOURCE -eq 1 ]; then
   echo "Removing cloned source files..."
-  $sudo rm -rf "${INSTALL_PATH}"
+  $sudo rm -rf "${INSTALL_PATH}/manager"
+  $sudo rm -rf "${INSTALL_PATH}/agent"
+  $sudo rm -rf "${INSTALL_PATH}/common"
+  $sudo rm -rf "${INSTALL_PATH}/client"
+  echo "Please remove ${INSTALL_PATH} by yourself."
 else
   echo "Skipped removal of cloned source files."
 fi
