@@ -181,15 +181,21 @@ INSTALL_PATH="./backend.ai-dev"
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
 CUDA_BRANCH="master"
-POSTGRES_PORT="8100"
-REDIS_PORT="8110"
-ETCD_PORT="8120"
-MANAGER_PORT="8081"
-AGENT_RPC_PORT="6001"
-AGENT_WATCHER_PORT="6009"
-VFOLDER_REL_PATH = "vfolder/local"
-LOCAL_STORAGE_PROXY = "local"
-LOCAL_STORAGE_VOLUME = "volume1"
+# POSTGRES_PORT="8100"
+# REDIS_PORT="8110"
+# ETCD_PORT="8120"
+# MANAGER_PORT="8081"
+# AGENT_RPC_PORT="6001"
+# AGENT_WATCHER_PORT="6009"
+POSTGRES_PORT="8101"
+REDIS_PORT="8111"
+ETCD_PORT="8121"
+MANAGER_PORT="8082"
+AGENT_RPC_PORT="6002"
+AGENT_WATCHER_PORT="6010"
+VFOLDER_REL_PATH="vfolder/local"
+LOCAL_STORAGE_PROXY="local"
+LOCAL_STORAGE_VOLUME="volume1"
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -298,7 +304,7 @@ install_system_pkg() {
   # accepts three args: Debian-style name, RedHat-style name, and Homebrew-style name
   case $DISTRO in
   Debian)
-    $sudo apt-get install -y $1
+    $sudo apt-get install -y $1INSTALL_ABSOLUTE_PATH=$(cd ${INSTALL_PATH}; pwd)#
     ;;
   RedHat)
     $sudo yum install -y $2
@@ -510,7 +516,7 @@ cd "${INSTALL_PATH}"
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manager manager
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
-git clone --branch "${SERVER_BRANCH}" https://github.com:lablup/backend.ai-storage-proxy storage-proxy
+git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-storage-proxy storage-proxy
 if [ $ENABLE_CUDA -eq 1 ]; then
   git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
 fi
@@ -568,7 +574,7 @@ sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
 python -m ai.backend.manager.cli etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
 cp config/sample.volume.json ./volume.json
 sed_inplace "s/\"secret\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"/\"secret\": \"0000000000000000000000000000000000000000000\"/" ./volume.json
-sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\"/" ./volume.json
+sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./volume.json
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
@@ -580,8 +586,9 @@ sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 cd "${INSTALL_PATH}/storage-proxy"
 pyenv local "venv-${ENV_ID}-storage-proxy"
 cp config/sample.toml ./storage-proxy.toml
-sed_inplace "s/^path = .*$/path = \"${INSTALL_PATH}\/${VFOLDER_REL_PATH}\"/" ./storage-proxy.toml # replace paths of all volumes to local paths
+sed_inplace "s/^path = .*$/path = \"${INSTALL_PATH//\//\\/}\/${VFOLDER_REL_PATH//\//\\/}\"/" ./storage-proxy.toml # replace paths of all volumes to local paths
 echo -e "\n[volume.volume1]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml 
+sed_inplace "s/ssl-enabeld/ssl-enabled/" ./storage-proxy.toml # remove this line after fixing typo in config/sample.toml in backend.ai-storage-proxy repo
 
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
@@ -602,7 +609,10 @@ python -m ai.backend.manager.cli fixture populate sample-configs/example-resourc
 show_info "Setting up virtual folder..."
 mkdir -p "${INSTALL_PATH}/${VFOLDER_REL_PATH}"
 cd "${INSTALL_PATH}/manager"
-python -m ai.backend.manager.cli etcd put volumes "${INSTALL_PATH}/storage-proxy/volume.json"
+python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
+python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
+python -m ai.backend.manager.cli etcd put-json volumes "./volume.json"
+
 cd "${INSTALL_PATH}/agent"
 mkdir -p scratches
 psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"

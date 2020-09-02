@@ -115,6 +115,7 @@ if [ $REMOVE_VENVS -eq 1 ]; then
   pyenv uninstall -f "venv-${ENV_ID}-client"
   pyenv uninstall -f "venv-${ENV_ID}-common"
   pyenv uninstall -f "venv-${ENV_ID}-manager"
+  pyenv uninstall -f "venv-${ENV_ID}-storage-proxy"
 else
   echo "Skipped removal of Python virtual environments."
 fi
@@ -134,6 +135,7 @@ if [ $REMOVE_SOURCE -eq 1 ]; then
   $sudo rm -rf "${INSTALL_PATH}/agent"
   $sudo rm -rf "${INSTALL_PATH}/common"
   $sudo rm -rf "${INSTALL_PATH}/client"
+  $sudo rm -rf "${INSTALL_PATH}/storage-proxy"
   echo "Please remove ${INSTALL_PATH} by yourself."
 else
   echo "Skipped removal of cloned source files."
