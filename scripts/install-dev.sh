@@ -187,6 +187,9 @@ ETCD_PORT="8120"
 MANAGER_PORT="8081"
 AGENT_RPC_PORT="6001"
 AGENT_WATCHER_PORT="6009"
+VFOLDER_REL_PATH = "vfolder/local"
+LOCAL_STORAGE_PROXY = "local"
+LOCAL_STORAGE_VOLUME = "volume1"
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -483,6 +486,7 @@ pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-manager"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-agent"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-common"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
+pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-storage-proxy"
 
 # Make directories
 show_info "Creating the install directory..."
@@ -506,6 +510,7 @@ cd "${INSTALL_PATH}"
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manager manager
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
+git clone --branch "${SERVER_BRANCH}" https://github.com:lablup/backend.ai-storage-proxy storage-proxy
 if [ $ENABLE_CUDA -eq 1 ]; then
   git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
 fi
@@ -545,6 +550,11 @@ pyenv local "venv-${ENV_ID}-common"
 pip install -U -q pip setuptools
 pip install -U -r requirements/dev.txt
 
+cd "${INSTALL_PATH}/storage-proxy"
+pyenv local "venv-${ENV_ID}-storage-proxy"
+pip install -U -q pip setuptools
+pip install -U -r requirements/dev.txt
+
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
 cd "${INSTALL_PATH}/manager"
@@ -556,6 +566,9 @@ sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
 cp config/halfstack.alembic.ini ./alembic.ini
 sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
 python -m ai.backend.manager.cli etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
+cp config/sample.volume.json ./volume.json
+sed_inplace "s/\"secret\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"/\"secret\": \"0000000000000000000000000000000000000000000\"/" ./volume.json
+sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\"/" ./volume.json
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
@@ -563,6 +576,12 @@ cp config/halfstack.toml ./agent.toml
 sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
+
+cd "${INSTALL_PATH}/storage-proxy"
+pyenv local "venv-${ENV_ID}-storage-proxy"
+cp config/sample.toml ./storage-proxy.toml
+sed_inplace "s/^path = .*$/path = \"${INSTALL_PATH}\/${VFOLDER_REL_PATH}\"/" ./storage-proxy.toml # replace paths of all volumes to local paths
+echo -e "\n[volume.volume1]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml 
 
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
@@ -572,21 +591,24 @@ python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io
 python -m ai.backend.manager.cli etcd rescan-images index.docker.io
 python -m ai.backend.manager.cli etcd alias python python:3.6-ubuntu18.04
 
-# Virtual folder setup
-show_info "Setting up virtual folder..."
-mkdir -p "${INSTALL_PATH}/vfolder/local"
-cd "${INSTALL_PATH}/manager"
-python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
-python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
-cd "${INSTALL_PATH}/agent"
-mkdir -p scratches
-
 # DB schema
 show_info "Setting up databases..."
 cd "${INSTALL_PATH}/manager"
 python -m ai.backend.manager.cli schema oneshot
 python -m ai.backend.manager.cli fixture populate sample-configs/example-keypairs.json
 python -m ai.backend.manager.cli fixture populate sample-configs/example-resource-presets.json
+
+# Virtual folder setup
+show_info "Setting up virtual folder..."
+mkdir -p "${INSTALL_PATH}/${VFOLDER_REL_PATH}"
+cd "${INSTALL_PATH}/manager"
+python -m ai.backend.manager.cli etcd put volumes "${INSTALL_PATH}/storage-proxy/volume.json"
+cd "${INSTALL_PATH}/agent"
+mkdir -p scratches
+psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
+psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
+psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
+psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
 
 show_info "Installing Python client SDK/CLI source..."
 cd "${INSTALL_PATH}"
