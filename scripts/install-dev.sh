@@ -185,11 +185,9 @@ POSTGRES_PORT="8100"
 REDIS_PORT="8110"
 ETCD_PORT="8120"
 MANAGER_PORT="8081"
+CONSOLE_SERVER_PORT="8080"
 AGENT_RPC_PORT="6001"
 AGENT_WATCHER_PORT="6009"
-VFOLDER_REL_PATH="vfolder/local"
-LOCAL_STORAGE_PROXY="local"
-LOCAL_STORAGE_VOLUME="volume1"
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -216,6 +214,8 @@ while [ $# -gt 0 ]; do
     --etcd-port=*)         ETCD_PORT="${1#*=}" ;;
     --manager-port)         MANAGER_PORT=$2; shift ;;
     --manager-port=*)       MANAGER_PORT="${1#*=}" ;;
+    --console-server-port)         CONSOLE_SERVER_PORT=$2; shift ;;
+    --console-server-port=*)       CONSOLE_SERVER_PORT="${1#*=}" ;;
     --agent-rpc-port)       AGENT_RPC_PORT=$2; shift ;;
     --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
     --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
@@ -298,7 +298,7 @@ install_system_pkg() {
   # accepts three args: Debian-style name, RedHat-style name, and Homebrew-style name
   case $DISTRO in
   Debian)
-    $sudo apt-get install -y $1INSTALL_ABSOLUTE_PATH=$(cd ${INSTALL_PATH}; pwd)#
+    $sudo apt-get install -y $1
     ;;
   RedHat)
     $sudo yum install -y $2
@@ -486,7 +486,7 @@ pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-manager"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-agent"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-common"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
-pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-storage-proxy"
+pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-console-server"
 
 # Make directories
 show_info "Creating the install directory..."
@@ -510,7 +510,8 @@ cd "${INSTALL_PATH}"
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manager manager
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-storage-proxy storage-proxy
+git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-console-server console-server
+
 if [ $ENABLE_CUDA -eq 1 ]; then
   git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
 fi
@@ -550,8 +551,8 @@ pyenv local "venv-${ENV_ID}-common"
 pip install -U -q pip setuptools
 pip install -U -r requirements/dev.txt
 
-cd "${INSTALL_PATH}/storage-proxy"
-pyenv local "venv-${ENV_ID}-storage-proxy"
+cd "${INSTALL_PATH}/console-server"
+pyenv local "venv-${ENV_ID}-console-server"
 pip install -U -q pip setuptools
 pip install -U -r requirements/dev.txt
 
@@ -566,9 +567,6 @@ sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
 cp config/halfstack.alembic.ini ./alembic.ini
 sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
 python -m ai.backend.manager.cli etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
-cp config/sample.volume.json ./volume.json
-sed_inplace "s/\"secret\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"/\"secret\": \"0000000000000000000000000000000000000000000\"/" ./volume.json
-sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./volume.json
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
@@ -577,12 +575,12 @@ sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 
-cd "${INSTALL_PATH}/storage-proxy"
-pyenv local "venv-${ENV_ID}-storage-proxy"
-cp config/sample.toml ./storage-proxy.toml
-sed_inplace "s/^path = .*$/path = \"${INSTALL_PATH//\//\\/}\/${VFOLDER_REL_PATH//\//\\/}\"/" ./storage-proxy.toml # replace paths of all volumes to local paths
-echo -e "\n[volume.volume1]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml 
-sed_inplace "s/ssl-enabeld/ssl-enabled/" ./storage-proxy.toml # remove this line after fixing typo in config/sample.toml in backend.ai-storage-proxy repo
+cd "${INSTALL_PATH}/console-server"
+pyenv local "venv-${ENV_ID}-console-server"
+cp console-server.sample.conf ./console-server.conf
+sed_inplace "s/https:\/\/api.backend.ai/https:\/\/127.0.0.1:${CONSOLE_SERVER_PORT}/" ./console-server.conf
+sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./console-server.conf
+sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./console-server.conf
 
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
@@ -592,27 +590,21 @@ python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io
 python -m ai.backend.manager.cli etcd rescan-images index.docker.io
 python -m ai.backend.manager.cli etcd alias python python:3.6-ubuntu18.04
 
+# Virtual folder setup
+show_info "Setting up virtual folder..."
+mkdir -p "${INSTALL_PATH}/vfolder/local"
+cd "${INSTALL_PATH}/manager"
+python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
+python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
+cd "${INSTALL_PATH}/agent"
+mkdir -p scratches
+
 # DB schema
 show_info "Setting up databases..."
 cd "${INSTALL_PATH}/manager"
 python -m ai.backend.manager.cli schema oneshot
 python -m ai.backend.manager.cli fixture populate sample-configs/example-keypairs.json
 python -m ai.backend.manager.cli fixture populate sample-configs/example-resource-presets.json
-
-# Virtual folder setup
-show_info "Setting up virtual folder..."
-mkdir -p "${INSTALL_PATH}/${VFOLDER_REL_PATH}"
-cd "${INSTALL_PATH}/manager"
-python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
-python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
-python -m ai.backend.manager.cli etcd put-json volumes "./volume.json"
-
-cd "${INSTALL_PATH}/agent"
-mkdir -p scratches
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
 
 show_info "Installing Python client SDK/CLI source..."
 cd "${INSTALL_PATH}"
@@ -628,14 +620,13 @@ echo "NOTE: Other images will be downloaded from the docker registry when reques
 $docker_sudo docker pull lablup/python:2.7-ubuntu18.04
 $docker_sudo docker pull lablup/python:3.6-ubuntu18.04
 if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
-  $docker_sudo docker pull lablup/python-tensorflow:1.14-py36
-  $docker_sudo docker pull lablup/python-pytorch:1.1-py36
+  $docker_sudo docker pull lablup/python-tensorflow:2.3-py36-cuda10.1
+  $docker_sudo docker pull lablup/python-pytorch:1.6-py36-cuda10.1
   if [ $ENABLE_CUDA -eq 1 ]; then
-      $docker_sudo docker pull lablup/python-tensorflow:1.14-py36-cuda9
-      $docker_sudo docker pull lablup/python-pytorch:1.1-py36-cuda10
-      $docker_sudo docker pull lablup/ngc-digits:19.05-tensorflow
-      $docker_sudo docker pull lablup/ngc-pytorch:19.05-py3
-      $docker_sudo docker pull lablup/ngc-tensorflow:19.05-py3
+      $docker_sudo docker pull lablup/python-tensorflow:2.3-py36-cuda10.1
+      $docker_sudo docker pull lablup/python-pytorch:1.6-py36-cuda10.1
+      $docker_sudo docker pull lablup/ngc-pytorch:20.07-py3
+      $docker_sudo docker pull lablup/ngc-tensorflow:20.07-tf2-py3
   fi
 fi
 
@@ -652,6 +643,13 @@ echo "> ${WHITE}export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/${NC}"
 echo "> ${WHITE}export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE${NC}"
 echo "> ${WHITE}export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY${NC}"
 echo " "
+show_note "Default ID/Password configuration for test / develop:"
+echo "> ${WHITE}export BACKEND_ENDPOINT=http://127.0.0.1:${CONSOLE_SERVER_PORT}/${NC}"
+echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=session${NC}"
+echo "> ${WHITE}backend.ai login${NC}"
+echo "> ${WHITE}ID      : admiu@lablup.com${NC}"
+echo "> ${WHITE}Password: wJalrXUt${NC}"
+echo " "
 echo "Please add these environment variables to your shell configuration files."
 show_important_note "You should change your default admin API keypairs for production environment!"
 show_note "How to run Backend.AI manager:"
@@ -660,6 +658,9 @@ echo "> ${WHITE}python -m ai.backend.gateway.server --debug${NC}"
 show_note "How to run Backend.AI agent:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/agent${NC}"
 echo "> ${WHITE}python -m ai.backend.agent.server --debug${NC}"
+show_note "How to run Backend.AI console server (for ID/Password login):"
+echo "> ${WHITE}cd ${INSTALL_PATH}/console-server${NC}"
+echo "> ${WHITE}python -m ai.backend.console.server${NC}"
 show_note "How to run your first code:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/client-py${NC}"
 echo "> ${WHITE}backend.ai --help${NC}"

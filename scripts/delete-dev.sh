@@ -115,6 +115,7 @@ if [ $REMOVE_VENVS -eq 1 ]; then
   pyenv uninstall -f "venv-${ENV_ID}-client"
   pyenv uninstall -f "venv-${ENV_ID}-common"
   pyenv uninstall -f "venv-${ENV_ID}-manager"
+  pyenv uninstall -f "venv-${ENV_ID}-console-server"
   pyenv uninstall -f "venv-${ENV_ID}-storage-proxy"
 else
   echo "Skipped removal of Python virtual environments."
@@ -135,6 +136,7 @@ if [ $REMOVE_SOURCE -eq 1 ]; then
   $sudo rm -rf "${INSTALL_PATH}/agent"
   $sudo rm -rf "${INSTALL_PATH}/common"
   $sudo rm -rf "${INSTALL_PATH}/client-py"
+  $sudo rm -rf "${INSTALL_PATH}/console-server"
   $sudo rm -rf "${INSTALL_PATH}/storage-proxy"
   $sudo rm -rf "${INSTALL_PATH}/backend.ai"
   $sudo rm -rf "${INSTALL_PATH}/vfolder"
