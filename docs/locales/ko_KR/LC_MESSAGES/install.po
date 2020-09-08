@@ -20,7 +20,7 @@ msgstr ""
 
 #: ../../install/configure-autoscaling.rst:3
 msgid "Configure Autoscaling"
-msgstr ""
+msgstr "Autoscaling 구성"
 
 #: ../../install/configure-autoscaling.rst:5
 msgid ""
@@ -28,10 +28,12 @@ msgid ""
 "brief summary of high-level guides. (More details about configuring "
 "Backend.AI will follow soon.)"
 msgstr ""
+"Autoscaling 전략은 클러스터마다 다를 수 있습니다. 여기서는 고급 가이드에 대한 간략한 "
+"요약을 소개합니다. (Backend.AI 구성에 대한 자세한 내용은 곧 제공 될 것입니다.)"
 
 #: ../../install/configure-autoscaling.rst:10
 msgid "ASG (Auto-scaling Group)"
-msgstr ""
+msgstr "Autoscaling 그룹"
 
 #: ../../install/configure-autoscaling.rst:12
 msgid ""
@@ -41,6 +43,10 @@ msgid ""
 "metrics. You could use this model for Backend.AI, but we recommend some "
 "customization due to the following reasons:"
 msgstr ""
+"AWS 및 기타 클라우드 제공 업체는 Autoscaling 그룹을 제공하여 VM의 CPU 사용률 또는 기타 리소스 "
+"지표에 따라 특정 제한 내에서 동일한 기본 이미지를 공유하는 VM 인스턴스 수를 제어합니다."
+"이 모델을 Backend.AI에 사용할 수 있지만, 다음과 같은 이유로 커스터마이징을 권장합니다."
+
 
 #: ../../install/configure-autoscaling.rst:16
 msgid ""
