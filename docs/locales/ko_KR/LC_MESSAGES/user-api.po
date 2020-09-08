@@ -20,7 +20,7 @@ msgstr ""
 
 #: ../../user-api/events.rst:4
 msgid "Event Monitoring"
-msgstr ""
+msgstr "이벤트 모니터링"
 
 #: ../../user-api/events.rst:7
 msgid "Kernel Lifecycle Events"
