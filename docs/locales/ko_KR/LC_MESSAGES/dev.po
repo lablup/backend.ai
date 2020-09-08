@@ -59,7 +59,7 @@ msgstr ""
 
 #: ../../dev/repl.rst:19
 msgid "A kernel is a Docker image with the following format:"
-msgstr ""
+msgstr "커널은 다음 포맷을 따르는 도커 이미지입니다."
 
 #: ../../dev/repl.rst:21
 msgid "``Dockerfile``"
