@@ -9,14 +9,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2019-10-14 21:43+0900\n"
+"POT-Creation-Date: 2020-09-08 23:35+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.7.0\n"
+"Generated-By: Babel 2.8.0\n"
 
 #: ../../user-api/events.rst:4
 msgid "Event Monitoring"
@@ -31,8 +31,8 @@ msgid "URI: ``/stream/kernel/_/events``"
 msgstr ""
 
 #: ../../user-api/events.rst:10 ../../user-api/exec-batch.rst:139
-#: ../../user-api/exec-batch.rst:198 ../../user-api/kernels.rst:199
-#: ../../user-api/resource-presets.rst:19 ../../user-api/vfolders.rst:32
+#: ../../user-api/exec-batch.rst:198 ../../user-api/resource-presets.rst:19
+#: ../../user-api/sessions.rst:199 ../../user-api/vfolders.rst:32
 #: ../../user-api/vfolders.rst:80 ../../user-api/vfolders.rst:209
 #: ../../user-api/vfolders.rst:308 ../../user-api/vfolders.rst:460
 #: ../../user-api/vfolders.rst:516 ../../user-api/vfolders.rst:615
@@ -59,11 +59,11 @@ msgstr ""
 #: ../../user-api/exec-batch.rst:68 ../../user-api/exec-batch.rst:142
 #: ../../user-api/exec-batch.rst:201 ../../user-api/exec-query.rst:17
 #: ../../user-api/exec-query.rst:259 ../../user-api/exec-query.rst:349
-#: ../../user-api/exec-stream.rst:49 ../../user-api/kernels.rst:17
-#: ../../user-api/kernels.rst:206 ../../user-api/kernels.rst:266
-#: ../../user-api/kernels.rst:316 ../../user-api/resource-presets.rst:22
+#: ../../user-api/exec-stream.rst:49 ../../user-api/resource-presets.rst:22
 #: ../../user-api/resource-presets.rst:62 ../../user-api/service-ports.rst:58
-#: ../../user-api/service-ports.rst:91 ../../user-api/vfolders.rst:35
+#: ../../user-api/service-ports.rst:91 ../../user-api/sessions.rst:17
+#: ../../user-api/sessions.rst:206 ../../user-api/sessions.rst:266
+#: ../../user-api/sessions.rst:316 ../../user-api/vfolders.rst:35
 #: ../../user-api/vfolders.rst:83 ../../user-api/vfolders.rst:131
 #: ../../user-api/vfolders.rst:216 ../../user-api/vfolders.rst:275
 #: ../../user-api/vfolders.rst:311 ../../user-api/vfolders.rst:366
@@ -78,9 +78,9 @@ msgstr ""
 #: ../../user-api/exec-batch.rst:148 ../../user-api/exec-batch.rst:207
 #: ../../user-api/exec-query.rst:23 ../../user-api/exec-query.rst:265
 #: ../../user-api/exec-query.rst:355 ../../user-api/exec-stream.rst:55
-#: ../../user-api/kernels.rst:23 ../../user-api/kernels.rst:212
-#: ../../user-api/kernels.rst:272 ../../user-api/kernels.rst:322
 #: ../../user-api/service-ports.rst:64 ../../user-api/service-ports.rst:97
+#: ../../user-api/sessions.rst:23 ../../user-api/sessions.rst:212
+#: ../../user-api/sessions.rst:272 ../../user-api/sessions.rst:322
 #: ../../user-api/vfolders.rst:137 ../../user-api/vfolders.rst:222
 #: ../../user-api/vfolders.rst:281 ../../user-api/vfolders.rst:317
 #: ../../user-api/vfolders.rst:372 ../../user-api/vfolders.rst:422
@@ -96,23 +96,23 @@ msgstr ""
 #: ../../user-api/exec-query.rst:24 ../../user-api/exec-query.rst:71
 #: ../../user-api/exec-query.rst:266 ../../user-api/exec-query.rst:319
 #: ../../user-api/exec-query.rst:356 ../../user-api/exec-stream.rst:56
-#: ../../user-api/kernels.rst:24 ../../user-api/kernels.rst:147
-#: ../../user-api/kernels.rst:213 ../../user-api/kernels.rst:238
-#: ../../user-api/kernels.rst:273 ../../user-api/kernels.rst:298
-#: ../../user-api/kernels.rst:323 ../../user-api/resource-presets.rst:43
+#: ../../user-api/resource-presets.rst:43
 #: ../../user-api/resource-presets.rst:85 ../../user-api/service-ports.rst:65
-#: ../../user-api/service-ports.rst:98 ../../user-api/vfolders.rst:56
-#: ../../user-api/vfolders.rst:104 ../../user-api/vfolders.rst:138
-#: ../../user-api/vfolders.rst:181 ../../user-api/vfolders.rst:223
-#: ../../user-api/vfolders.rst:249 ../../user-api/vfolders.rst:318
-#: ../../user-api/vfolders.rst:346 ../../user-api/vfolders.rst:373
-#: ../../user-api/vfolders.rst:423 ../../user-api/vfolders.rst:470
-#: ../../user-api/vfolders.rst:498 ../../user-api/vfolders.rst:526
-#: ../../user-api/vfolders.rst:554 ../../user-api/vfolders.rst:580
-#: ../../user-api/vfolders.rst:639 ../../user-api/vfolders.rst:664
-#: ../../user-api/vfolders.rst:697 ../../user-api/vfolders.rst:720
-#: ../../user-api/vfolders.rst:751 ../../user-api/vfolders.rst:773
-#: ../../user-api/vfolders.rst:798
+#: ../../user-api/service-ports.rst:98 ../../user-api/sessions.rst:24
+#: ../../user-api/sessions.rst:147 ../../user-api/sessions.rst:213
+#: ../../user-api/sessions.rst:238 ../../user-api/sessions.rst:273
+#: ../../user-api/sessions.rst:298 ../../user-api/sessions.rst:323
+#: ../../user-api/vfolders.rst:56 ../../user-api/vfolders.rst:104
+#: ../../user-api/vfolders.rst:138 ../../user-api/vfolders.rst:181
+#: ../../user-api/vfolders.rst:223 ../../user-api/vfolders.rst:249
+#: ../../user-api/vfolders.rst:318 ../../user-api/vfolders.rst:346
+#: ../../user-api/vfolders.rst:373 ../../user-api/vfolders.rst:423
+#: ../../user-api/vfolders.rst:470 ../../user-api/vfolders.rst:498
+#: ../../user-api/vfolders.rst:526 ../../user-api/vfolders.rst:554
+#: ../../user-api/vfolders.rst:580 ../../user-api/vfolders.rst:639
+#: ../../user-api/vfolders.rst:664 ../../user-api/vfolders.rst:697
+#: ../../user-api/vfolders.rst:720 ../../user-api/vfolders.rst:751
+#: ../../user-api/vfolders.rst:773 ../../user-api/vfolders.rst:798
 msgid "Type"
 msgstr ""
 
@@ -124,14 +124,14 @@ msgstr ""
 #: ../../user-api/exec-query.rst:25 ../../user-api/exec-query.rst:61
 #: ../../user-api/exec-query.rst:267 ../../user-api/exec-query.rst:309
 #: ../../user-api/exec-query.rst:357 ../../user-api/exec-query.rst:370
-#: ../../user-api/exec-stream.rst:57 ../../user-api/kernels.rst:25
-#: ../../user-api/kernels.rst:132 ../../user-api/kernels.rst:214
-#: ../../user-api/kernels.rst:227 ../../user-api/kernels.rst:239
-#: ../../user-api/kernels.rst:274 ../../user-api/kernels.rst:287
-#: ../../user-api/kernels.rst:299 ../../user-api/kernels.rst:324
-#: ../../user-api/kernels.rst:337 ../../user-api/resource-presets.rst:34
+#: ../../user-api/exec-stream.rst:57 ../../user-api/resource-presets.rst:34
 #: ../../user-api/resource-presets.rst:74 ../../user-api/service-ports.rst:66
-#: ../../user-api/service-ports.rst:99 ../../user-api/vfolders.rst:47
+#: ../../user-api/service-ports.rst:99 ../../user-api/sessions.rst:25
+#: ../../user-api/sessions.rst:132 ../../user-api/sessions.rst:214
+#: ../../user-api/sessions.rst:227 ../../user-api/sessions.rst:239
+#: ../../user-api/sessions.rst:274 ../../user-api/sessions.rst:287
+#: ../../user-api/sessions.rst:299 ../../user-api/sessions.rst:324
+#: ../../user-api/sessions.rst:337 ../../user-api/vfolders.rst:47
 #: ../../user-api/vfolders.rst:95 ../../user-api/vfolders.rst:139
 #: ../../user-api/vfolders.rst:166 ../../user-api/vfolders.rst:224
 #: ../../user-api/vfolders.rst:237 ../../user-api/vfolders.rst:282
@@ -156,11 +156,11 @@ msgstr ""
 #: ../../user-api/exec-batch.rst:152 ../../user-api/exec-batch.rst:211
 #: ../../user-api/exec-query.rst:27 ../../user-api/exec-query.rst:269
 #: ../../user-api/exec-query.rst:359 ../../user-api/exec-stream.rst:59
-#: ../../user-api/exec-stream.rst:62 ../../user-api/kernels.rst:35
-#: ../../user-api/kernels.rst:150 ../../user-api/kernels.rst:216
-#: ../../user-api/kernels.rst:276 ../../user-api/kernels.rst:326
-#: ../../user-api/service-ports.rst:68 ../../user-api/service-ports.rst:71
-#: ../../user-api/service-ports.rst:101 ../../user-api/service-ports.rst:104
+#: ../../user-api/exec-stream.rst:62 ../../user-api/service-ports.rst:68
+#: ../../user-api/service-ports.rst:71 ../../user-api/service-ports.rst:101
+#: ../../user-api/service-ports.rst:104 ../../user-api/sessions.rst:35
+#: ../../user-api/sessions.rst:150 ../../user-api/sessions.rst:216
+#: ../../user-api/sessions.rst:276 ../../user-api/sessions.rst:326
 #: ../../user-api/vfolders.rst:184 ../../user-api/vfolders.rst:723
 #: ../../user-api/vfolders.rst:776
 msgid "``slug``"
@@ -184,9 +184,9 @@ msgstr ""
 #: ../../user-api/exec-query.rst:30 ../../user-api/exec-query.rst:33
 #: ../../user-api/exec-query.rst:37 ../../user-api/exec-query.rst:272
 #: ../../user-api/exec-query.rst:275 ../../user-api/exec-query.rst:278
-#: ../../user-api/kernels.rst:28 ../../user-api/kernels.rst:73
-#: ../../user-api/kernels.rst:79 ../../user-api/kernels.rst:92
-#: ../../user-api/kernels.rst:154 ../../user-api/kernels.rst:241
+#: ../../user-api/sessions.rst:28 ../../user-api/sessions.rst:73
+#: ../../user-api/sessions.rst:79 ../../user-api/sessions.rst:92
+#: ../../user-api/sessions.rst:154 ../../user-api/sessions.rst:241
 #: ../../user-api/vfolders.rst:107 ../../user-api/vfolders.rst:142
 #: ../../user-api/vfolders.rst:145 ../../user-api/vfolders.rst:187
 #: ../../user-api/vfolders.rst:190 ../../user-api/vfolders.rst:226
@@ -208,7 +208,7 @@ msgid ""
 "domain admin or a superadmin."
 msgstr ""
 
-#: ../../user-api/events.rst:42 ../../user-api/kernels.rst:72
+#: ../../user-api/events.rst:42 ../../user-api/sessions.rst:72
 msgid "``group``"
 msgstr ""
 
@@ -229,10 +229,8 @@ msgid ""
 "``text/event-stream`` format. Each event is composed of the event type "
 "and data, where the data part is encoded as JSON."
 msgstr ""
-"응답은 ``text/event-stream`` 포맷을 따르는 "
-"연속적인 여러 줄의 UTF-8 텍스트 스트림입니다. "
-"각 이벤트는 이벤트 타입과 데이터로 구성되어 있으며, "
-"데이터는 JSON 으로 인코딩 됩니다. "
+"응답은 ``text/event-stream`` 포맷을 따르는 연속적인 여러 줄의 UTF-8 텍스트 스트림입니다. 각 이벤트는 이벤트"
+" 타입과 데이터로 구성되어 있으며, 데이터는 JSON 으로 인코딩 됩니다. "
 
 #: ../../user-api/events.rst:54
 msgid "Possible event names (more events may be added in the future):"
@@ -243,7 +241,8 @@ msgid "Event Name"
 msgstr "이벤트 명"
 
 #: ../../user-api/events.rst:62
-msgid "``kernel-preparing``"
+#, fuzzy
+msgid "``kernel_preparing``"
 msgstr "커널-준비"
 
 #: ../../user-api/events.rst:63
@@ -253,19 +252,19 @@ msgid ""
 msgstr "세션이 방금 작업 큐에 스케쥴링 되었고, 에이전트로부터 자원 할당을 받았습니다."
 
 #: ../../user-api/events.rst:64
-msgid "``kernel-pulling``"
+#, fuzzy
+msgid "``kernel_pulling``"
 msgstr "커널-가져오기"
 
 #: ../../user-api/events.rst:65
 msgid ""
 "The session begins pulling the kernel image (usually from a Docker "
 "registry) to the scheduled agent."
-msgstr ""
-"세션이 (대개 도커 레지스트리로부터 온) 커널 이미지를 "
-"예약된 에이전트로 가져오기 시작합니다."
+msgstr "세션이 (대개 도커 레지스트리로부터 온) 커널 이미지를 예약된 에이전트로 가져오기 시작합니다."
 
 #: ../../user-api/events.rst:66
-msgid "``kernel-creating``"
+#, fuzzy
+msgid "``kernel_creating``"
 msgstr "커널-생성"
 
 #: ../../user-api/events.rst:67
@@ -275,7 +274,8 @@ msgid ""
 msgstr "세션이 컨테이너 (또는 다른 에이전트 백엔드의 다른 객체로) 생성되는 중입니다."
 
 #: ../../user-api/events.rst:68
-msgid "``kernel-started``"
+#, fuzzy
+msgid "``kernel_started``"
 msgstr "커널-시작됨"
 
 #: ../../user-api/events.rst:69
@@ -283,7 +283,8 @@ msgid "The session becomes ready to execute codes."
 msgstr "세션에서 코드를 실행할 준비를 마쳤습니다."
 
 #: ../../user-api/events.rst:70
-msgid "``kernel-terminated``"
+#, fuzzy
+msgid "``kernel_terminated``"
 msgstr "커널-종료"
 
 #: ../../user-api/events.rst:71
@@ -292,9 +293,7 @@ msgstr "세션이 종료되었습니다."
 
 #: ../../user-api/events.rst:73
 msgid "When using the EventSource API, you should add event listeners as follows:"
-msgstr ""
-"이벤트소스 API를 사용할 경우, "
-"다음을 따르는 이벤트 리스너를 추가해주십시오 : "
+msgstr "이벤트소스 API를 사용할 경우, 다음을 따르는 이벤트 리스너를 추가해주십시오 : "
 
 #: ../../user-api/events.rst:86
 msgid ""
@@ -303,16 +302,14 @@ msgid ""
 "cookies. Otherwise, you need to manually implement the event stream "
 "parser using the standard fetch API running against the manager server."
 msgstr ""
-"이벤트소스 API는 (콘솔-서버가 종단점 일 때) 반드시 브라우저 쿠키를 사용하는 "
-"세션-기반 인증 모드여야 합니다. 다른 방식으로는 관리자 서버에 대해 실행되는 "
-"표준 fetch API를 사용해 이벤트 스트림 파서를 수동으로 구현해야 합니다."
+"이벤트소스 API는 (콘솔-서버가 종단점 일 때) 반드시 브라우저 쿠키를 사용하는 세션-기반 인증 모드여야 합니다. 다른 방식으로는"
+" 관리자 서버에 대해 실행되는 표준 fetch API를 사용해 이벤트 스트림 파서를 수동으로 구현해야 합니다."
 
 #: ../../user-api/events.rst:91
 msgid ""
 "The event data contains a JSON string like this (more fields may be added"
 " in the future):"
-msgstr ""
-"이벤트 데이터는 다음과 같은 JSON 문자열로 구성됩니다 (추후 더 많은 필드가 추가될 수 있음) : "
+msgstr "이벤트 데이터는 다음과 같은 JSON 문자열로 구성됩니다 (추후 더 많은 필드가 추가될 수 있음) : "
 
 #: ../../user-api/events.rst:97
 msgid "Field Name"
@@ -364,13 +361,13 @@ msgid "Uploading files"
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:11
-msgid "URI: ``/kernel/:id/upload``"
+msgid "URI: ``/session/:id/upload``"
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:12 ../../user-api/exec-batch.rst:65
 #: ../../user-api/exec-query.rst:8 ../../user-api/exec-query.rst:256
-#: ../../user-api/exec-query.rst:346 ../../user-api/kernels.rst:12
-#: ../../user-api/resource-presets.rst:59 ../../user-api/vfolders.rst:126
+#: ../../user-api/exec-query.rst:346 ../../user-api/resource-presets.rst:59
+#: ../../user-api/sessions.rst:12 ../../user-api/vfolders.rst:126
 #: ../../user-api/vfolders.rst:359 ../../user-api/vfolders.rst:409
 #: ../../user-api/vfolders.rst:654 ../../user-api/vfolders.rst:710
 msgid "Method: ``POST``"
@@ -378,11 +375,11 @@ msgstr ""
 
 #: ../../user-api/exec-batch.rst:17
 msgid ""
-"Upload files to the session. You may upload multiple files at once"
-" using multi-part form-data encoding in the request body (RFC 1867/2388)."
-" The uploaded files are placed under ``/home/work`` directory (which is "
-"the home directory for all kernels by default), and existing files are "
-"always overwritten. If the filename has a directory part, non-existing "
+"Upload files to the session. You may upload multiple files at once using "
+"multi-part form-data encoding in the request body (RFC 1867/2388). The "
+"uploaded files are placed under ``/home/work`` directory (which is the "
+"home directory for all kernels by default), and existing files are always"
+" overwritten. If the filename has a directory part, non-existing "
 "directories will be auto-created. The path may be either absolute or "
 "relative, but only sub-directories under ``/home/work`` is allowed to be "
 "created."
@@ -427,10 +424,10 @@ msgstr ""
 #: ../../user-api/exec-batch.rst:47 ../../user-api/exec-batch.rst:106
 #: ../../user-api/exec-batch.rst:159 ../../user-api/exec-batch.rst:219
 #: ../../user-api/exec-query.rst:54 ../../user-api/exec-query.rst:302
-#: ../../user-api/exec-query.rst:363 ../../user-api/kernels.rst:125
-#: ../../user-api/kernels.rst:220 ../../user-api/kernels.rst:280
-#: ../../user-api/kernels.rst:330 ../../user-api/resource-presets.rst:27
-#: ../../user-api/resource-presets.rst:67 ../../user-api/vfolders.rst:40
+#: ../../user-api/exec-query.rst:363 ../../user-api/resource-presets.rst:27
+#: ../../user-api/resource-presets.rst:67 ../../user-api/sessions.rst:125
+#: ../../user-api/sessions.rst:220 ../../user-api/sessions.rst:280
+#: ../../user-api/sessions.rst:330 ../../user-api/vfolders.rst:40
 #: ../../user-api/vfolders.rst:88 ../../user-api/vfolders.rst:159
 #: ../../user-api/vfolders.rst:230 ../../user-api/vfolders.rst:287
 #: ../../user-api/vfolders.rst:328 ../../user-api/vfolders.rst:385
@@ -444,10 +441,10 @@ msgstr ""
 #: ../../user-api/exec-batch.rst:53 ../../user-api/exec-batch.rst:112
 #: ../../user-api/exec-batch.rst:164 ../../user-api/exec-batch.rst:224
 #: ../../user-api/exec-query.rst:60 ../../user-api/exec-query.rst:308
-#: ../../user-api/exec-query.rst:369 ../../user-api/kernels.rst:131
-#: ../../user-api/kernels.rst:226 ../../user-api/kernels.rst:286
-#: ../../user-api/kernels.rst:336 ../../user-api/resource-presets.rst:33
-#: ../../user-api/resource-presets.rst:73 ../../user-api/vfolders.rst:46
+#: ../../user-api/exec-query.rst:369 ../../user-api/resource-presets.rst:33
+#: ../../user-api/resource-presets.rst:73 ../../user-api/sessions.rst:131
+#: ../../user-api/sessions.rst:226 ../../user-api/sessions.rst:286
+#: ../../user-api/sessions.rst:336 ../../user-api/vfolders.rst:46
 #: ../../user-api/vfolders.rst:94 ../../user-api/vfolders.rst:165
 #: ../../user-api/vfolders.rst:236 ../../user-api/vfolders.rst:293
 #: ../../user-api/vfolders.rst:333 ../../user-api/vfolders.rst:390
@@ -490,29 +487,26 @@ msgstr ""
 msgid "Executing with Build Step"
 msgstr ""
 
-#: ../../user-api/exec-batch.rst:64 ../../user-api/exec-query.rst:7
-#: ../../user-api/kernels.rst:198 ../../user-api/kernels.rst:260
-#: ../../user-api/kernels.rst:308
-msgid "URI: ``/kernel/:id``"
+#: ../../user-api/exec-batch.rst:64 ../../user-api/sessions.rst:198
+#: ../../user-api/sessions.rst:260 ../../user-api/sessions.rst:308
+msgid "URI: ``/session/:id``"
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:77 ../../user-api/exec-batch.rst:151
 #: ../../user-api/exec-batch.rst:210 ../../user-api/exec-query.rst:26
 #: ../../user-api/exec-query.rst:268 ../../user-api/exec-query.rst:358
-#: ../../user-api/exec-stream.rst:58 ../../user-api/kernels.rst:215
-#: ../../user-api/kernels.rst:275 ../../user-api/kernels.rst:325
-#: ../../user-api/service-ports.rst:67 ../../user-api/service-ports.rst:100
+#: ../../user-api/exec-stream.rst:58 ../../user-api/service-ports.rst:67
+#: ../../user-api/service-ports.rst:100 ../../user-api/sessions.rst:215
+#: ../../user-api/sessions.rst:275 ../../user-api/sessions.rst:325
 msgid "``:id``"
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:79 ../../user-api/exec-batch.rst:153
-#: ../../user-api/exec-batch.rst:212 ../../user-api/exec-query.rst:28
-#: ../../user-api/exec-query.rst:270 ../../user-api/exec-query.rst:360
-#: ../../user-api/exec-stream.rst:60 ../../user-api/kernels.rst:217
-#: ../../user-api/kernels.rst:277 ../../user-api/kernels.rst:327
-#: ../../user-api/service-ports.rst:69 ../../user-api/service-ports.rst:102
-msgid "The kernel ID."
-msgstr ""
+#: ../../user-api/exec-batch.rst:212 ../../user-api/sessions.rst:217
+#: ../../user-api/sessions.rst:277 ../../user-api/sessions.rst:327
+#, fuzzy
+msgid "The session ID."
+msgstr "세션이 종료되었습니다."
 
 #: ../../user-api/exec-batch.rst:80 ../../user-api/exec-query.rst:29
 msgid "``mode``"
@@ -552,8 +546,8 @@ msgid "``options``"
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:92 ../../user-api/exec-batch.rst:126
-#: ../../user-api/exec-query.rst:74 ../../user-api/kernels.rst:85
-#: ../../user-api/kernels.rst:301 ../../user-api/vfolders.rst:252
+#: ../../user-api/exec-query.rst:74 ../../user-api/sessions.rst:85
+#: ../../user-api/sessions.rst:301 ../../user-api/vfolders.rst:252
 msgid "``object``"
 msgstr ""
 
@@ -561,8 +555,8 @@ msgstr ""
 msgid ":ref:`batch-execution-query-object`."
 msgstr ""
 
-#: ../../user-api/exec-batch.rst:95 ../../user-api/kernels.rst:96
-#: ../../user-api/kernels.rst:180 ../../user-api/vfolders.rst:62
+#: ../../user-api/exec-batch.rst:95 ../../user-api/sessions.rst:96
+#: ../../user-api/sessions.rst:180 ../../user-api/vfolders.rst:62
 #: ../../user-api/vfolders.rst:113 ../../user-api/vfolders.rst:148
 #: ../../user-api/vfolders.rst:194
 msgid "Example:"
@@ -570,9 +564,9 @@ msgstr ""
 
 #: ../../user-api/exec-batch.rst:114 ../../user-api/exec-batch.rst:166
 #: ../../user-api/exec-batch.rst:226 ../../user-api/exec-query.rst:62
-#: ../../user-api/exec-query.rst:310 ../../user-api/kernels.rst:133
-#: ../../user-api/kernels.rst:228 ../../user-api/resource-presets.rst:35
-#: ../../user-api/resource-presets.rst:75 ../../user-api/vfolders.rst:48
+#: ../../user-api/exec-query.rst:310 ../../user-api/resource-presets.rst:35
+#: ../../user-api/resource-presets.rst:75 ../../user-api/sessions.rst:133
+#: ../../user-api/sessions.rst:228 ../../user-api/vfolders.rst:48
 #: ../../user-api/vfolders.rst:96 ../../user-api/vfolders.rst:238
 #: ../../user-api/vfolders.rst:335 ../../user-api/vfolders.rst:487
 #: ../../user-api/vfolders.rst:543 ../../user-api/vfolders.rst:600
@@ -590,25 +584,27 @@ msgstr ""
 
 #: ../../user-api/exec-batch.rst:122 ../../user-api/exec-batch.rst:175
 #: ../../user-api/exec-query.rst:70 ../../user-api/exec-query.rst:318
-#: ../../user-api/kernels.rst:146 ../../user-api/resource-presets.rst:42
-#: ../../user-api/resource-presets.rst:84 ../../user-api/vfolders.rst:55
-#: ../../user-api/vfolders.rst:103 ../../user-api/vfolders.rst:180
-#: ../../user-api/vfolders.rst:248 ../../user-api/vfolders.rst:345
-#: ../../user-api/vfolders.rst:497 ../../user-api/vfolders.rst:553
-#: ../../user-api/vfolders.rst:638 ../../user-api/vfolders.rst:696
-#: ../../user-api/vfolders.rst:750 ../../user-api/vfolders.rst:797
+#: ../../user-api/resource-presets.rst:42
+#: ../../user-api/resource-presets.rst:84 ../../user-api/sessions.rst:146
+#: ../../user-api/vfolders.rst:55 ../../user-api/vfolders.rst:103
+#: ../../user-api/vfolders.rst:180 ../../user-api/vfolders.rst:248
+#: ../../user-api/vfolders.rst:345 ../../user-api/vfolders.rst:497
+#: ../../user-api/vfolders.rst:553 ../../user-api/vfolders.rst:638
+#: ../../user-api/vfolders.rst:696 ../../user-api/vfolders.rst:750
+#: ../../user-api/vfolders.rst:797
 msgid "Fields"
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:124 ../../user-api/exec-batch.rst:177
 #: ../../user-api/exec-query.rst:72 ../../user-api/exec-query.rst:320
-#: ../../user-api/kernels.rst:148 ../../user-api/resource-presets.rst:44
-#: ../../user-api/resource-presets.rst:86 ../../user-api/vfolders.rst:57
-#: ../../user-api/vfolders.rst:105 ../../user-api/vfolders.rst:182
-#: ../../user-api/vfolders.rst:250 ../../user-api/vfolders.rst:347
-#: ../../user-api/vfolders.rst:499 ../../user-api/vfolders.rst:555
-#: ../../user-api/vfolders.rst:640 ../../user-api/vfolders.rst:698
-#: ../../user-api/vfolders.rst:752 ../../user-api/vfolders.rst:799
+#: ../../user-api/resource-presets.rst:44
+#: ../../user-api/resource-presets.rst:86 ../../user-api/sessions.rst:148
+#: ../../user-api/vfolders.rst:57 ../../user-api/vfolders.rst:105
+#: ../../user-api/vfolders.rst:182 ../../user-api/vfolders.rst:250
+#: ../../user-api/vfolders.rst:347 ../../user-api/vfolders.rst:499
+#: ../../user-api/vfolders.rst:555 ../../user-api/vfolders.rst:640
+#: ../../user-api/vfolders.rst:698 ../../user-api/vfolders.rst:752
+#: ../../user-api/vfolders.rst:799
 msgid "Values"
 msgstr ""
 
@@ -622,14 +618,14 @@ msgstr ""
 
 #: ../../user-api/exec-batch.rst:133
 msgid ""
-"Once files are uploaded to the session or generated during the "
-"execution of the code, there is a need to identify what files actually "
-"are in the current session. In this case, use this API to get the list of"
-" files of your compute sesison."
+"Once files are uploaded to the session or generated during the execution "
+"of the code, there is a need to identify what files actually are in the "
+"current session. In this case, use this API to get the list of files of "
+"your compute sesison."
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:138
-msgid "URI: ``/kernel/:id/files``"
+msgid "URI: ``/session/:id/files``"
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:154 ../../user-api/vfolders.rst:323
@@ -641,8 +637,8 @@ msgstr ""
 msgid "Path inside the session (default: ``/home/work``)."
 msgstr ""
 
-#: ../../user-api/exec-batch.rst:168 ../../user-api/kernels.rst:230
-#: ../../user-api/kernels.rst:290 ../../user-api/kernels.rst:340
+#: ../../user-api/exec-batch.rst:168 ../../user-api/sessions.rst:230
+#: ../../user-api/sessions.rst:290 ../../user-api/sessions.rst:340
 #: ../../user-api/vfolders.rst:240 ../../user-api/vfolders.rst:297
 #: ../../user-api/vfolders.rst:337 ../../user-api/vfolders.rst:397
 #: ../../user-api/vfolders.rst:445 ../../user-api/vfolders.rst:489
@@ -698,7 +694,7 @@ msgid ""
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:197
-msgid "URI: ``/kernel/:id/download``"
+msgid "URI: ``/session/:id/download``"
 msgstr ""
 
 #: ../../user-api/exec-batch.rst:214 ../../user-api/exec-query.rst:322
@@ -721,15 +717,25 @@ msgstr ""
 msgid "Executing Snippet"
 msgstr ""
 
+#: ../../user-api/exec-query.rst:7
+msgid "URI: ``/kernel/:id``"
+msgstr ""
+
 #: ../../user-api/exec-query.rst:10
 msgid ""
 "Executes a snippet of user code using the specified session. Each "
-"execution request to a same session may have side-effects to "
-"subsequent executions. For instance, setting a global variable in a "
-"request and reading the variable in another request is completely legal. "
-"It is the job of the user (or the front-end) to gaurantee the correct "
-"execution order of multiple interdependent requests. When the kernel "
-"session is terminated or restarted, all such volatile states vanish."
+"execution request to a same session may have side-effects to subsequent "
+"executions. For instance, setting a global variable in a request and "
+"reading the variable in another request is completely legal. It is the "
+"job of the user (or the front-end) to gaurantee the correct execution "
+"order of multiple interdependent requests. When the session is terminated"
+" or restarted, all such volatile states vanish."
+msgstr ""
+
+#: ../../user-api/exec-query.rst:28 ../../user-api/exec-query.rst:270
+#: ../../user-api/exec-query.rst:360 ../../user-api/exec-stream.rst:60
+#: ../../user-api/service-ports.rst:69 ../../user-api/service-ports.rst:102
+msgid "The kernel ID."
 msgstr ""
 
 #: ../../user-api/exec-query.rst:31
@@ -843,7 +849,7 @@ msgid "``options.row``"
 msgstr ""
 
 #: ../../user-api/exec-query.rst:281 ../../user-api/exec-query.rst:284
-#: ../../user-api/kernels.rst:54 ../../user-api/kernels.rst:250
+#: ../../user-api/sessions.rst:54 ../../user-api/sessions.rst:250
 msgid "``int``"
 msgstr ""
 
@@ -882,8 +888,8 @@ msgstr ""
 msgid "URI: ``/kernel/:id/interrupt``"
 msgstr ""
 
-#: ../../user-api/exec-query.rst:371 ../../user-api/kernels.rst:288
-#: ../../user-api/kernels.rst:338 ../../user-api/vfolders.rst:295
+#: ../../user-api/exec-query.rst:371 ../../user-api/sessions.rst:288
+#: ../../user-api/sessions.rst:338 ../../user-api/vfolders.rst:295
 msgid "204 No Content"
 msgstr ""
 
@@ -1249,338 +1255,6 @@ msgid ""
 "every kernel runtime supports this rich logging facility."
 msgstr ""
 
-#: ../../user-api/kernels.rst:2
-msgid "Kernel Management"
-msgstr ""
-
-#: ../../user-api/kernels.rst:4
-msgid "Here are the API calls to create and manage compute sessions."
-msgstr ""
-
-#: ../../user-api/kernels.rst:9
-msgid "Creating Session"
-msgstr ""
-
-#: ../../user-api/kernels.rst:11
-msgid "URI: ``/kernel`` (``/kernel/create`` also works for legacy)"
-msgstr ""
-
-#: ../../user-api/kernels.rst:14
-msgid ""
-"Creates a new session or returns an existing session, depending on"
-" the parameters."
-msgstr ""
-
-#: ../../user-api/kernels.rst:27
-msgid "``image``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:29
-msgid ""
-"The kernel runtime type in the form of the Docker image name and tag. For"
-" legacy, the API also recognizes the ``lang`` field when ``image`` is not"
-" present."
-msgstr ""
-
-#: ../../user-api/kernels.rst:34
-msgid "``clientSessionToken``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:36
-msgid ""
-"A client-provided session token, which must be unique among the currently"
-" non-terminated sessions owned by the requesting access key. Clients may "
-"reuse the token if the previous session with the same token has been "
-"terminated."
-msgstr ""
-
-#: ../../user-api/kernels.rst:41
-msgid ""
-"It may contain ASCII alphabets, numbers, and hyphens in the middle. The "
-"length must be between 4 to 64 characters inclusively. It is useful for "
-"aliasing the session with a human-friendly name."
-msgstr ""
-
-#: ../../user-api/kernels.rst:45
-msgid "``enqueueOnly``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:46 ../../user-api/kernels.rst:62
-#: ../../user-api/kernels.rst:176 ../../user-api/vfolders.rst:589
-#: ../../user-api/vfolders.rst:726
-msgid "``bool``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:47
-msgid ""
-"*(optional)* If set true, the API returns immediately after queueing the "
-"session creation request to the scheduler. Otherwise, the manager will "
-"wait until the session gets started actually. (default: ``false``)"
-msgstr ""
-
-#: ../../user-api/kernels.rst:53
-msgid "``maxWaitSeconds``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:55
-msgid ""
-"*(optional)* Set the maximum duration to wait until the session starts "
-"after queued, in seconds.  If zero, the manager will wait indefinitely. "
-"(default: ``0``)"
-msgstr ""
-
-#: ../../user-api/kernels.rst:61
-msgid "``reuseIfExists``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:63
-msgid ""
-"*(optional)* If set true, the API returns *without* creating a new "
-"session if a session with the same ID and the same image already exists "
-"and not terminated. In this case ``config`` options are *ignored*. If set"
-" false but a session with the same ID and image exists, the manager "
-"returns an error: \"kernel already exists\". (default: ``true``)"
-msgstr ""
-
-#: ../../user-api/kernels.rst:74
-msgid ""
-"*(optional)* The name of a user group (aka \"project\") to launch the "
-"session within.  (default: ``\"default\"``)"
-msgstr ""
-
-#: ../../user-api/kernels.rst:78
-msgid "``domain``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:80
-msgid ""
-"*(optional)* The name of a domain to launch the session within  (default:"
-" ``\"default\"``)"
-msgstr ""
-
-#: ../../user-api/kernels.rst:84
-msgid "``config``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:86
-msgid ""
-"*(optional)* A :ref:`creation-config-object` to specify kernel "
-"configuration including resource requirements. If not given, the kernel "
-"is created with the minimum required resource slots defined by the target"
-" image."
-msgstr ""
-
-#: ../../user-api/kernels.rst:91
-msgid "``tag``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:93
-msgid ""
-"*(optional)* A per-session, user-provided tag for administrators to keep "
-"track of additional information of each session, such as which sessions "
-"are from which users."
-msgstr ""
-
-#: ../../user-api/kernels.rst:134
-msgid "The kernel is already running and you are okay to reuse it."
-msgstr ""
-
-#: ../../user-api/kernels.rst:135 ../../user-api/vfolders.rst:167
-#: ../../user-api/vfolders.rst:392 ../../user-api/vfolders.rst:441
-msgid "201 Created"
-msgstr ""
-
-#: ../../user-api/kernels.rst:136 ../../user-api/vfolders.rst:168
-msgid "The kernel is successfully created."
-msgstr ""
-
-#: ../../user-api/kernels.rst:137
-msgid "401 Invalid API parameters"
-msgstr ""
-
-#: ../../user-api/kernels.rst:138
-msgid "There are invalid or malformed values in the API parameters."
-msgstr ""
-
-#: ../../user-api/kernels.rst:139 ../../user-api/vfolders.rst:172
-msgid "406 Not acceptable"
-msgstr ""
-
-#: ../../user-api/kernels.rst:140
-msgid "The requested resource limits exceed the server's own limits."
-msgstr ""
-
-#: ../../user-api/kernels.rst:149
-msgid "``kernelId``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:151
-msgid ""
-"The session ID used for later API calls, which is same to the value of "
-"``clientSessionToken``. This will be random-generated by the server if "
-"``clientSessionToken`` is not provided."
-msgstr ""
-
-#: ../../user-api/kernels.rst:153
-msgid "``status``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:155
-msgid ""
-"The status of the created kernel. This is always ``\"PENDING\"`` if "
-"``enqueueOnly`` is set true. In other cases, it may be either "
-"``\"RUNNING\"`` (normal case), ``\"ERROR\"``, or even ``\"TERMINATED\"`` "
-"depending on what happens during session startup."
-msgstr ""
-
-#: ../../user-api/kernels.rst:162
-msgid "``servicePorts``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:163 ../../user-api/resource-presets.rst:46
-#: ../../user-api/resource-presets.rst:104 ../../user-api/vfolders.rst:59
-#: ../../user-api/vfolders.rst:349 ../../user-api/vfolders.rst:642
-msgid "``list[object]``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:164
-msgid ""
-"The list of :ref:`service-port-object`. This field becomes an empty list "
-"if ``enqueueOnly`` is set true, because the final service ports are "
-"determined when the session becomes ready after scheduling."
-msgstr ""
-
-#: ../../user-api/kernels.rst:170
-msgid ""
-"In most cases the service ports are same to what specified in the image "
-"metadata, but the agent may add shared services for all kernels."
-msgstr ""
-
-#: ../../user-api/kernels.rst:175
-msgid "``created``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:177
-msgid "True if the kernel is freshly created."
-msgstr ""
-
-#: ../../user-api/kernels.rst:196
-msgid "Getting Kernel Information"
-msgstr ""
-
-#: ../../user-api/kernels.rst:201
-msgid ""
-"Retrieves information about a session. For performance reasons, "
-"the returned information may not be real-time; usually they are updated "
-"every a few seconds in the server-side."
-msgstr ""
-
-#: ../../user-api/kernels.rst:229 ../../user-api/vfolders.rst:239
-msgid "The information is successfully returned."
-msgstr ""
-
-#: ../../user-api/kernels.rst:231 ../../user-api/kernels.rst:291
-#: ../../user-api/kernels.rst:341
-msgid "There is no such kernel."
-msgstr ""
-
-#: ../../user-api/kernels.rst:237 ../../user-api/kernels.rst:297
-msgid "Key"
-msgstr ""
-
-#: ../../user-api/kernels.rst:240
-msgid "``lang``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:242
-msgid "The kernel's programming language"
-msgstr ""
-
-#: ../../user-api/kernels.rst:243
-msgid "``age``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:244 ../../user-api/kernels.rst:253
-msgid "``int`` (msec)"
-msgstr ""
-
-#: ../../user-api/kernels.rst:245
-msgid "The time elapsed since the kernel has started."
-msgstr ""
-
-#: ../../user-api/kernels.rst:246
-msgid "``memoryLimit``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:247
-msgid "``int`` (KiB)"
-msgstr ""
-
-#: ../../user-api/kernels.rst:248
-msgid "The memory limit of the kernel in KiB."
-msgstr ""
-
-#: ../../user-api/kernels.rst:249
-msgid "``numQueriesExecuted``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:251
-msgid "The number of times the kernel has been accessed."
-msgstr ""
-
-#: ../../user-api/kernels.rst:252
-msgid "``cpuCreditUsed``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:254
-msgid "The total time the kernel was running."
-msgstr ""
-
-#: ../../user-api/kernels.rst:258
-msgid "Destroying Session"
-msgstr ""
-
-#: ../../user-api/kernels.rst:261 ../../user-api/vfolders.rst:260
-#: ../../user-api/vfolders.rst:570 ../../user-api/vfolders.rst:763
-msgid "Method: ``DELETE``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:263
-msgid "Terminates a session."
-msgstr ""
-
-#: ../../user-api/kernels.rst:289
-msgid "The kernel is successfully destroyed."
-msgstr ""
-
-#: ../../user-api/kernels.rst:300
-msgid "``stats``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:302
-msgid "The :ref:`container-stats-object` of the kernel when deleted."
-msgstr ""
-
-#: ../../user-api/kernels.rst:306
-msgid "Restarting Session"
-msgstr ""
-
-#: ../../user-api/kernels.rst:309
-msgid "Method: ``PATCH``"
-msgstr ""
-
-#: ../../user-api/kernels.rst:311
-msgid ""
-"Restarts a session. The idle time of the kernel will be reset, but"
-" other properties such as the age and CPU credit will continue to "
-"accumulate. All global states such as global variables and modules "
-"imports are also reset."
-msgstr ""
-
-#: ../../user-api/kernels.rst:339
-msgid "The kernel is successfully restarted."
-msgstr ""
-
 #: ../../user-api/resource-presets.rst:2
 msgid "Resource Presets"
 msgstr ""
@@ -1624,6 +1298,13 @@ msgstr ""
 #: ../../user-api/resource-presets.rst:45
 #: ../../user-api/resource-presets.rst:103
 msgid "``presets``"
+msgstr ""
+
+#: ../../user-api/resource-presets.rst:46
+#: ../../user-api/resource-presets.rst:104 ../../user-api/sessions.rst:163
+#: ../../user-api/vfolders.rst:59 ../../user-api/vfolders.rst:349
+#: ../../user-api/vfolders.rst:642
+msgid "``list[object]``"
 msgstr ""
 
 #: ../../user-api/resource-presets.rst:47
@@ -1793,6 +1474,335 @@ msgid ""
 "connect to native services running inside compute sessions, such as SSH."
 msgstr ""
 
+#: ../../user-api/sessions.rst:2
+msgid "Session Management"
+msgstr ""
+
+#: ../../user-api/sessions.rst:4
+msgid "Here are the API calls to create and manage compute sessions."
+msgstr ""
+
+#: ../../user-api/sessions.rst:9
+msgid "Creating Session"
+msgstr ""
+
+#: ../../user-api/sessions.rst:11
+msgid "URI: ``/session`` (``/session/create`` also works for legacy)"
+msgstr ""
+
+#: ../../user-api/sessions.rst:14
+msgid ""
+"Creates a new session or returns an existing session, depending on the "
+"parameters."
+msgstr ""
+
+#: ../../user-api/sessions.rst:27
+msgid "``image``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:29
+msgid ""
+"The kernel runtime type in the form of the Docker image name and tag. For"
+" legacy, the API also recognizes the ``lang`` field when ``image`` is not"
+" present."
+msgstr ""
+
+#: ../../user-api/sessions.rst:34
+msgid "``clientSessionToken``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:36
+msgid ""
+"A client-provided session token, which must be unique among the currently"
+" non-terminated sessions owned by the requesting access key. Clients may "
+"reuse the token if the previous session with the same token has been "
+"terminated."
+msgstr ""
+
+#: ../../user-api/sessions.rst:41
+msgid ""
+"It may contain ASCII alphabets, numbers, and hyphens in the middle. The "
+"length must be between 4 to 64 characters inclusively. It is useful for "
+"aliasing the session with a human-friendly name."
+msgstr ""
+
+#: ../../user-api/sessions.rst:45
+msgid "``enqueueOnly``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:46 ../../user-api/sessions.rst:62
+#: ../../user-api/sessions.rst:176 ../../user-api/vfolders.rst:589
+#: ../../user-api/vfolders.rst:726
+msgid "``bool``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:47
+msgid ""
+"*(optional)* If set true, the API returns immediately after queueing the "
+"session creation request to the scheduler. Otherwise, the manager will "
+"wait until the session gets started actually. (default: ``false``)"
+msgstr ""
+
+#: ../../user-api/sessions.rst:53
+msgid "``maxWaitSeconds``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:55
+msgid ""
+"*(optional)* Set the maximum duration to wait until the session starts "
+"after queued, in seconds.  If zero, the manager will wait indefinitely. "
+"(default: ``0``)"
+msgstr ""
+
+#: ../../user-api/sessions.rst:61
+msgid "``reuseIfExists``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:63
+msgid ""
+"*(optional)* If set true, the API returns *without* creating a new "
+"session if a session with the same ID and the same image already exists "
+"and not terminated. In this case ``config`` options are *ignored*. If set"
+" false but a session with the same ID and image exists, the manager "
+"returns an error: \"session already exists\". (default: ``true``)"
+msgstr ""
+
+#: ../../user-api/sessions.rst:74
+msgid ""
+"*(optional)* The name of a user group (aka \"project\") to launch the "
+"session within.  (default: ``\"default\"``)"
+msgstr ""
+
+#: ../../user-api/sessions.rst:78
+msgid "``domain``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:80
+msgid ""
+"*(optional)* The name of a domain to launch the session within  (default:"
+" ``\"default\"``)"
+msgstr ""
+
+#: ../../user-api/sessions.rst:84
+msgid "``config``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:86
+msgid ""
+"*(optional)* A :ref:`creation-config-object` to specify kernel "
+"configuration including resource requirements. If not given, the kernel "
+"is created with the minimum required resource slots defined by the target"
+" image."
+msgstr ""
+
+#: ../../user-api/sessions.rst:91
+msgid "``tag``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:93
+msgid ""
+"*(optional)* A per-session, user-provided tag for administrators to keep "
+"track of additional information of each session, such as which sessions "
+"are from which users."
+msgstr ""
+
+#: ../../user-api/sessions.rst:134
+msgid "The session is already running and you are okay to reuse it."
+msgstr ""
+
+#: ../../user-api/sessions.rst:135 ../../user-api/vfolders.rst:167
+#: ../../user-api/vfolders.rst:392 ../../user-api/vfolders.rst:441
+msgid "201 Created"
+msgstr ""
+
+#: ../../user-api/sessions.rst:136
+#, fuzzy
+msgid "The session is successfully created."
+msgstr "세션이 종료되었습니다."
+
+#: ../../user-api/sessions.rst:137
+msgid "401 Invalid API parameters"
+msgstr ""
+
+#: ../../user-api/sessions.rst:138
+msgid "There are invalid or malformed values in the API parameters."
+msgstr ""
+
+#: ../../user-api/sessions.rst:139 ../../user-api/vfolders.rst:172
+msgid "406 Not acceptable"
+msgstr ""
+
+#: ../../user-api/sessions.rst:140
+msgid "The requested resource limits exceed the server's own limits."
+msgstr ""
+
+#: ../../user-api/sessions.rst:149
+msgid "``sessId``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:151
+msgid ""
+"The session ID used for later API calls, which is same to the value of "
+"``clientSessionToken``. This will be random-generated by the server if "
+"``clientSessionToken`` is not provided."
+msgstr ""
+
+#: ../../user-api/sessions.rst:153
+msgid "``status``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:155
+msgid ""
+"The status of the created kernel. This is always ``\"PENDING\"`` if "
+"``enqueueOnly`` is set true. In other cases, it may be either "
+"``\"RUNNING\"`` (normal case), ``\"ERROR\"``, or even ``\"TERMINATED\"`` "
+"depending on what happens during session startup."
+msgstr ""
+
+#: ../../user-api/sessions.rst:162
+msgid "``servicePorts``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:164
+msgid ""
+"The list of :ref:`service-port-object`. This field becomes an empty list "
+"if ``enqueueOnly`` is set true, because the final service ports are "
+"determined when the session becomes ready after scheduling."
+msgstr ""
+
+#: ../../user-api/sessions.rst:170
+msgid ""
+"In most cases the service ports are same to what specified in the image "
+"metadata, but the agent may add shared services for all sessions."
+msgstr ""
+
+#: ../../user-api/sessions.rst:175
+msgid "``created``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:177
+#, fuzzy
+msgid "True if the session is freshly created."
+msgstr "세션이 종료되었습니다."
+
+#: ../../user-api/sessions.rst:196
+msgid "Getting Session Information"
+msgstr ""
+
+#: ../../user-api/sessions.rst:201
+msgid ""
+"Retrieves information about a session. For performance reasons, the "
+"returned information may not be real-time; usually they are updated every"
+" a few seconds in the server-side."
+msgstr ""
+
+#: ../../user-api/sessions.rst:229 ../../user-api/vfolders.rst:239
+msgid "The information is successfully returned."
+msgstr ""
+
+#: ../../user-api/sessions.rst:231 ../../user-api/sessions.rst:291
+#: ../../user-api/sessions.rst:341
+#, fuzzy
+msgid "There is no such session."
+msgstr "소스 세션 아이디"
+
+#: ../../user-api/sessions.rst:237 ../../user-api/sessions.rst:297
+msgid "Key"
+msgstr ""
+
+#: ../../user-api/sessions.rst:240
+msgid "``lang``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:242
+msgid "The kernel's programming language"
+msgstr ""
+
+#: ../../user-api/sessions.rst:243
+msgid "``age``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:244 ../../user-api/sessions.rst:253
+msgid "``int`` (msec)"
+msgstr ""
+
+#: ../../user-api/sessions.rst:245
+msgid "The time elapsed since the kernel has started."
+msgstr ""
+
+#: ../../user-api/sessions.rst:246
+msgid "``memoryLimit``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:247
+msgid "``int`` (KiB)"
+msgstr ""
+
+#: ../../user-api/sessions.rst:248
+msgid "The memory limit of the kernel in KiB."
+msgstr ""
+
+#: ../../user-api/sessions.rst:249
+msgid "``numQueriesExecuted``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:251
+msgid "The number of times the kernel has been accessed."
+msgstr ""
+
+#: ../../user-api/sessions.rst:252
+msgid "``cpuCreditUsed``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:254
+msgid "The total time the kernel was running."
+msgstr ""
+
+#: ../../user-api/sessions.rst:258
+msgid "Destroying Session"
+msgstr ""
+
+#: ../../user-api/sessions.rst:261 ../../user-api/vfolders.rst:260
+#: ../../user-api/vfolders.rst:570 ../../user-api/vfolders.rst:763
+msgid "Method: ``DELETE``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:263
+msgid "Terminates a session."
+msgstr ""
+
+#: ../../user-api/sessions.rst:289
+msgid "The session is successfully destroyed."
+msgstr ""
+
+#: ../../user-api/sessions.rst:300
+msgid "``stats``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:302
+msgid "The :ref:`container-stats-object` of the kernel when deleted."
+msgstr ""
+
+#: ../../user-api/sessions.rst:306
+msgid "Restarting Session"
+msgstr ""
+
+#: ../../user-api/sessions.rst:309
+msgid "Method: ``PATCH``"
+msgstr ""
+
+#: ../../user-api/sessions.rst:311
+msgid ""
+"Restarts a session. The idle time of the session will be reset, but other"
+" properties such as the age and CPU credit will continue to accumulate. "
+"All global states such as global variables and modules imports are also "
+"reset."
+msgstr ""
+
+#: ../../user-api/sessions.rst:339
+msgid "The session is successfully restarted."
+msgstr ""
+
 #: ../../user-api/vfolders.rst:2
 msgid "Virtual Folders"
 msgstr ""
@@ -1805,11 +1815,11 @@ msgstr ""
 
 #: ../../user-api/vfolders.rst:7
 msgid ""
-"You can mount virtual folders when creating new sessions, and use "
-"them like a plain directory on the local filesystem. Of course, "
-"reads/writes to virtual folder contents may have degraded performance "
-"compared to the main scratch directory (usually ``/home/work`` in most "
-"kernels) as internally it uses a networked file system."
+"You can mount virtual folders when creating new sessions, and use them "
+"like a plain directory on the local filesystem. Of course, reads/writes "
+"to virtual folder contents may have degraded performance compared to the "
+"main scratch directory (usually ``/home/work`` in most kernels) as "
+"internally it uses a networked file system."
 msgstr ""
 
 #: ../../user-api/vfolders.rst:13
@@ -1906,6 +1916,10 @@ msgstr ""
 
 #: ../../user-api/vfolders.rst:146
 msgid "(optional) The name of the virtual folder host."
+msgstr ""
+
+#: ../../user-api/vfolders.rst:168
+msgid "The kernel is successfully created."
 msgstr ""
 
 #: ../../user-api/vfolders.rst:170
@@ -2340,4 +2354,87 @@ msgstr ""
 #: ../../user-api/vfolders.rst:802
 msgid "Detail message for the invitation deletion."
 msgstr ""
+
+#~ msgid "URI: ``/kernel/:id/upload``"
+#~ msgstr ""
+
+#~ msgid "URI: ``/kernel/:id/files``"
+#~ msgstr ""
+
+#~ msgid "URI: ``/kernel/:id/download``"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Executes a snippet of user code "
+#~ "using the specified session. Each "
+#~ "execution request to a same session "
+#~ "may have side-effects to subsequent "
+#~ "executions. For instance, setting a "
+#~ "global variable in a request and "
+#~ "reading the variable in another request"
+#~ " is completely legal. It is the "
+#~ "job of the user (or the front-"
+#~ "end) to gaurantee the correct execution"
+#~ " order of multiple interdependent requests."
+#~ " When the kernel session is "
+#~ "terminated or restarted, all such "
+#~ "volatile states vanish."
+#~ msgstr ""
+
+#~ msgid "Kernel Management"
+#~ msgstr ""
+
+#~ msgid "URI: ``/kernel`` (``/kernel/create`` also works for legacy)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "*(optional)* If set true, the API "
+#~ "returns *without* creating a new session"
+#~ " if a session with the same ID"
+#~ " and the same image already exists"
+#~ " and not terminated. In this case "
+#~ "``config`` options are *ignored*. If set"
+#~ " false but a session with the "
+#~ "same ID and image exists, the "
+#~ "manager returns an error: \"kernel "
+#~ "already exists\". (default: ``true``)"
+#~ msgstr ""
+
+#~ msgid "The kernel is already running and you are okay to reuse it."
+#~ msgstr ""
+
+#~ msgid "``kernelId``"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "In most cases the service ports "
+#~ "are same to what specified in the"
+#~ " image metadata, but the agent may"
+#~ " add shared services for all kernels."
+#~ msgstr ""
+
+#~ msgid "True if the kernel is freshly created."
+#~ msgstr ""
+
+#~ msgid "Getting Kernel Information"
+#~ msgstr ""
+
+#~ msgid "There is no such kernel."
+#~ msgstr ""
+
+#~ msgid "The kernel is successfully destroyed."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Restarts a session. The idle time "
+#~ "of the kernel will be reset, but"
+#~ " other properties such as the age "
+#~ "and CPU credit will continue to "
+#~ "accumulate. All global states such as"
+#~ " global variables and modules imports "
+#~ "are also reset."
+#~ msgstr ""
+
+#~ msgid "The kernel is successfully restarted."
+#~ msgstr ""
 
