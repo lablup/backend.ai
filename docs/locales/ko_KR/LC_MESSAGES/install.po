@@ -20,7 +20,7 @@ msgstr ""
 
 #: ../../install/configure-autoscaling.rst:3
 msgid "Configure Autoscaling"
-msgstr "Autoscaling 구성"
+msgstr "자동 확장 구성"
 
 #: ../../install/configure-autoscaling.rst:5
 msgid ""
@@ -28,7 +28,7 @@ msgid ""
 "brief summary of high-level guides. (More details about configuring "
 "Backend.AI will follow soon.)"
 msgstr ""
-"Autoscaling 전략은 클러스터마다 다를 수 있습니다. 여기서는 고급 가이드에 대한 간략한 "
+"자동 확장 전략은 클러스터마다 다를 수 있습니다. 여기서는 고급 가이드에 대한 간략한 "
 "요약을 소개합니다. (Backend.AI 구성에 대한 자세한 내용은 곧 제공 될 것입니다.)"
 
 #: ../../install/configure-autoscaling.rst:10
