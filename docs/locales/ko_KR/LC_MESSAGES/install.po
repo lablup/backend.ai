@@ -9,14 +9,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2019-10-14 21:43+0900\n"
+"POT-Creation-Date: 2020-09-08 23:35+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.7.0\n"
+"Generated-By: Babel 2.8.0\n"
 
 #: ../../install/configure-autoscaling.rst:3
 msgid "Configure Autoscaling"
@@ -28,8 +28,8 @@ msgid ""
 "brief summary of high-level guides. (More details about configuring "
 "Backend.AI will follow soon.)"
 msgstr ""
-"자동 확장 전략은 클러스터마다 다를 수 있습니다. 여기서는 고급 가이드에 대한 간략한 "
-"요약을 소개합니다. (Backend.AI 구성에 대한 자세한 내용은 곧 제공 될 것입니다.)"
+"자동 확장 전략은 클러스터마다 다를 수 있습니다. 여기서는 고급 가이드에 대한 간략한 요약을 소개합니다. (Backend.AI "
+"구성에 대한 자세한 내용은 곧 제공 될 것입니다.)"
 
 #: ../../install/configure-autoscaling.rst:10
 msgid "ASG (Auto-scaling Group)"
@@ -43,10 +43,9 @@ msgid ""
 "metrics. You could use this model for Backend.AI, but we recommend some "
 "customization due to the following reasons:"
 msgstr ""
-"AWS 및 기타 클라우드 제공 업체는 Autoscaling 그룹을 제공하여 VM의 CPU 사용률 또는 기타 리소스 "
-"지표에 따라 특정 제한 내에서 동일한 기본 이미지를 공유하는 VM 인스턴스 수를 제어합니다."
-"이 모델을 Backend.AI에 사용할 수 있지만, 다음과 같은 이유로 커스터마이징을 권장합니다."
-
+"AWS 및 기타 클라우드 제공 업체는 Autoscaling 그룹을 제공하여 VM의 CPU 사용률 또는 기타 리소스 지표에 따라 특정"
+" 제한 내에서 동일한 기본 이미지를 공유하는 VM 인스턴스 수를 제어합니다.이 모델을 Backend.AI에 사용할 수 있지만, "
+"다음과 같은 이유로 커스터마이징을 권장합니다."
 
 #: ../../install/configure-autoscaling.rst:16
 msgid ""
@@ -194,8 +193,8 @@ msgstr ""
 
 #: ../../install/demo-setup-centos.rst:111 ../../install/demo-setup.rst:78
 msgid ""
-"Or, you might have launched 30 sessions already, which is the "
-"default limit for this demo setup."
+"Or, you might have launched 30 sessions already, which is the default "
+"limit for this demo setup."
 msgstr ""
 
 #: ../../install/demo-setup-centos.rst:113 ../../install/demo-setup.rst:80
@@ -1531,6 +1530,199 @@ msgid ""
 "specifying the Python version/virtualenv recongnized by pyenv. Any pyenv-"
 "enabled shells will automagically activate/deactivate this "
 "version/virtualenv when going in/out such directories."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:5
+msgid "Install User Programs"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:8
+msgid ""
+"Sometimes you need new programs or libraries that are not installed in "
+"your environment. If so, you can install the new program into your "
+"environment."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:10
+msgid ""
+"NOTE: Newly installed programs are not environment dependent. It is "
+"installed in the user directory."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:13
+msgid "Install packages with linuxbrew"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:15
+msgid ""
+"If you are a macOS user and a researcher or developer who occasionally "
+"installs unix programs, you may be familiar with `homebrew "
+"<https://brew.sh>`. You can install new programs using linuxbrew in "
+"Backend.AI."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:18
+msgid "Creating a user linuxbrew directory"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:20
+msgid ""
+"Directories that begin with a dot are automatically mounted when the "
+"session starts. Create a linuxbrew directory that will be automatically "
+"mounted so that programs you install with linuxbrew can be used in all "
+"sessions."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:22
+msgid "Create .linuxbrew in the Storage section."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:24
+#: ../../install/install-user-programs.rst:115
+msgid "With CLI:"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:30
+#: ../../install/install-user-programs.rst:123
+msgid "Let’s check if they are created correctly."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:36
+#: ../../install/install-user-programs.rst:129
+msgid "Also, you can create a directory using GUI console with same name."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:40
+msgid "Installing linuxbrew"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:43
+msgid ""
+"Start a new session for installation. Choose your environment and "
+"allocate the necessary resources. Generally, you don't need to allocate a"
+" lot of resources, but if you need to compile or install a GPU-dependent "
+"library, you need to adjust the resource allocation to your needs."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:45
+msgid "In general, 1 CPU / 4GB RAM is enough."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:53
+msgid "Testing linuxbrew"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:55
+msgid ""
+"Enter the brew command to verify that linuxbrew is installed. In general,"
+" to use ``linuxbrew`` you need to add the path where ``linuxbrew`` is "
+"installed to the PATH variable."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:57
+msgid ""
+"Enter the following command to temporarily add the path and verify that "
+"it is installed correctly."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:65
+msgid "Setting linuxbrew environment variables automatically"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:67
+msgid ""
+"To correctly reference the binaries and libraries installed by linuxbrew,"
+" add the configuration to ``.bashrc``. You can add settings from the "
+"settings tab."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:70
+#: ../../install/install-user-programs.rst:143
+msgid "Example: Installing and testing htop"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:72
+#: ../../install/install-user-programs.rst:145
+msgid ""
+"To test the program installation, let's install a program called "
+"``htop``. ``htop`` is a program that extends the top command, allowing "
+"you to monitor the running computing environment in a variety of ways."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:74
+#: ../../install/install-user-programs.rst:147
+msgid "Let's install it with the following command:"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:81
+#: ../../install/install-user-programs.rst:153
+msgid ""
+"If there are any libraries needed for the ``htop`` program, they will be "
+"installed automatically."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:83
+#: ../../install/install-user-programs.rst:155
+msgid "Now let's run:"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:90
+#: ../../install/install-user-programs.rst:161
+msgid "From the run screen, you can press q to return to the terminal."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:92
+msgid "1.6 Deleting the linuxbrew Environment"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:94
+msgid ""
+"To reset all programs installed with linuxbrew, just delete everything in"
+" the .linuxbrew directory."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:96
+msgid ""
+"Note: If you want to remove a program by selecting it, use the ``brew "
+"uninstall [PROGRAM_NAME]`` command."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:104
+msgid "Install packages with miniconda"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:106
+msgid ""
+"Some environments support miniconda. In this case, you can use `miniconda"
+" <https://docs.conda.io/projects/conda/en/latest/user-guide/install/>` to"
+" install the packages you want."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:109
+msgid "Creating a user miniconda-required directory"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:111
+msgid ""
+"Directories that begin with a dot are automatically mounted when the "
+"session starts. Create a ``.conda``, ``.continuum`` directory that will "
+"be automatically mounted so that programs you install with miniconda can "
+"be used in all sessions."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:113
+msgid "Create ``.conda``, ``.continuum`` in the Storage section."
+msgstr ""
+
+#: ../../install/install-user-programs.rst:133
+msgid "miniconda test"
+msgstr ""
+
+#: ../../install/install-user-programs.rst:135
+msgid ""
+"Make sure you have miniconda installed in your environment. Package "
+"installation using miniconda is only available if miniconda is "
+"preinstalled in your environment."
 msgstr ""
 
 #: ../../install/prepare-database-for-manager.rst:5
