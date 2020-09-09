@@ -28,7 +28,7 @@ msgstr "커널 라이프사이클 이벤트"
 
 #: ../../user-api/events.rst:9
 msgid "URI: ``/stream/kernel/_/events``"
-msgstr ""
+msgstr "URI: ``/stream/kernel/_/events``"
 
 #: ../../user-api/events.rst:10 ../../user-api/exec-batch.rst:139
 #: ../../user-api/exec-batch.rst:198 ../../user-api/resource-presets.rst:19
@@ -37,7 +37,7 @@ msgstr ""
 #: ../../user-api/vfolders.rst:308 ../../user-api/vfolders.rst:460
 #: ../../user-api/vfolders.rst:516 ../../user-api/vfolders.rst:615
 msgid "Method: ``GET``"
-msgstr ""
+msgstr "메소드 : ``GET``"
 
 #: ../../user-api/events.rst:12
 msgid ""
@@ -48,6 +48,11 @@ msgid ""
 "<https://developer.mozilla.org/en-US/docs/Web/API/EventSource>`_ for "
 "convenience."
 msgstr ""
+"커널 라이프사이클의 메시지별 JSON 객체 스트림을 지속적으로 제공합니다."
+"`HTML5 Server-Sent Events (SSE) <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events>`_"
+"를 사용합니다. 브라우저 기반의 클라이언트는 편의상 "
+"`the EventSource API <https://developer.mozilla.org/en-US/docs/Web/API/EventSource>`_ 를 "
+"사용할 수 있습니다."
 
 #: ../../user-api/events.rst:19
 msgid ""
@@ -75,7 +80,7 @@ msgstr ""
 #: ../../user-api/vfolders.rst:618 ../../user-api/vfolders.rst:657
 #: ../../user-api/vfolders.rst:713 ../../user-api/vfolders.rst:766
 msgid "Parameters"
-msgstr ""
+msgstr "매개변수들"
 
 #: ../../user-api/events.rst:29 ../../user-api/exec-batch.rst:74
 #: ../../user-api/exec-batch.rst:148 ../../user-api/exec-batch.rst:207
@@ -91,7 +96,7 @@ msgstr ""
 #: ../../user-api/vfolders.rst:579 ../../user-api/vfolders.rst:663
 #: ../../user-api/vfolders.rst:719 ../../user-api/vfolders.rst:772
 msgid "Parameter"
-msgstr ""
+msgstr "매개변수"
 
 #: ../../user-api/events.rst:30 ../../user-api/exec-batch.rst:75
 #: ../../user-api/exec-batch.rst:123 ../../user-api/exec-batch.rst:149
@@ -117,7 +122,7 @@ msgstr ""
 #: ../../user-api/vfolders.rst:720 ../../user-api/vfolders.rst:751
 #: ../../user-api/vfolders.rst:773 ../../user-api/vfolders.rst:798
 msgid "Type"
-msgstr ""
+msgstr "타입"
 
 #: ../../user-api/events.rst:31 ../../user-api/events.rst:61
 #: ../../user-api/events.rst:98 ../../user-api/exec-batch.rst:54
@@ -153,7 +158,7 @@ msgstr "설명"
 
 #: ../../user-api/events.rst:32 ../../user-api/events.rst:99
 msgid "``sessionId``"
-msgstr "  "
+msgstr "``sessionId``"
 
 #: ../../user-api/events.rst:33 ../../user-api/exec-batch.rst:78
 #: ../../user-api/exec-batch.rst:152 ../../user-api/exec-batch.rst:211
@@ -167,7 +172,7 @@ msgstr "  "
 #: ../../user-api/vfolders.rst:184 ../../user-api/vfolders.rst:723
 #: ../../user-api/vfolders.rst:776
 msgid "``slug``"
-msgstr ""
+msgstr "``slug``"
 
 #: ../../user-api/events.rst:34
 msgid ""
@@ -175,13 +180,13 @@ msgid ""
 " will stream events from all kernels visible to the client depending on "
 "the client's role and permissions."
 msgstr ""
-"라이프사이클 이벤트를 모니터링하기 위한 세션 ID. ``\"*`` 설정하면 "
-"클라이언트의 역할과 권한에 따라 API는 클라이언트에 보여지는 모든 커널에서 "
+"라이프사이클 이벤트를 모니터링하기 위한 세션 ID 입니다. ``\"*``로 설정하면, "
+"API는 클라이언트의 역할과 권한에 따라 클라이언트에 보여지는 모든 커널에서 "
 "이벤트를 스트리밍합니다."
 
 #: ../../user-api/events.rst:37 ../../user-api/events.rst:101
 msgid "``ownerAccessKey``"
-msgstr ""
+msgstr "``ownerAccessKey``"
 
 #: ../../user-api/events.rst:38 ../../user-api/events.rst:43
 #: ../../user-api/exec-batch.rst:84 ../../user-api/exec-batch.rst:87
@@ -204,7 +209,7 @@ msgstr ""
 #: ../../user-api/vfolders.rst:670 ../../user-api/vfolders.rst:754
 #: ../../user-api/vfolders.rst:801
 msgid "``str``"
-msgstr ""
+msgstr "``str``"
 
 #: ../../user-api/events.rst:39
 msgid ""
@@ -213,10 +218,12 @@ msgid ""
 "session instances. You can specify this only when the client is either a "
 "domain admin or a superadmin."
 msgstr ""
-
+"*(선택사항)* 다른 액세스 키(사용자)가 다른 세션 인스턴스에 대해 동일한 세션 아이디를 "
+"공유할 수 있기 때문에 지정된 세션 소유자의 접근 키 입니다. 도메인 소유자나 슈퍼관리자만이 "
+"이를 지정할 수 있습니다."
 #: ../../user-api/events.rst:42 ../../user-api/sessions.rst:72
 msgid "``group``"
-msgstr ""
+msgstr "``group``"
 
 #: ../../user-api/events.rst:44
 msgid ""
@@ -224,10 +231,13 @@ msgid ""
 "will stream events from all kernels visible to the client depending on "
 "the client's role and permissions."
 msgstr ""
+"라이프사이클 이벤트를 필터링할 그룹 이름입니다. ``\"*``로 설정하면, "
+"API는 클라이언트의 역할과 권한에 따라 클라이언트에 보여지는 모든 커널에서 "
+"이벤트를 스트리밍합니다."
 
 #: ../../user-api/events.rst:49
 msgid "Responses"
-msgstr ""
+msgstr "응답"
 
 #: ../../user-api/events.rst:51
 msgid ""
@@ -235,12 +245,12 @@ msgid ""
 "``text/event-stream`` format. Each event is composed of the event type "
 "and data, where the data part is encoded as JSON."
 msgstr ""
-"응답은 ``text/event-stream`` 포맷을 따르는 연속적인 여러 줄의 UTF-8 텍스트 스트림입니다. 각 이벤트는 이벤트"
-" 타입과 데이터로 구성되어 있으며, 데이터는 JSON 으로 인코딩 됩니다. "
+"응답은 ``text/event-stream`` 형식을 따르는 연속적인 여러 줄의 UTF-8 텍스트 스트림입니다. 각 이벤트는 이벤트 "
+"타입과 데이터로 구성되어 있으며, 데이터는 JSON 으로 인코딩 됩니다. "
 
 #: ../../user-api/events.rst:54
 msgid "Possible event names (more events may be added in the future):"
-msgstr "가능한 이벤트 명(추후 더 많은 이벤트가 추가될 수 있음)"
+msgstr "가능한 이벤트 명(추후 더 많은 이벤트가 추가될 수 있습니다)"
 
 #: ../../user-api/events.rst:60
 msgid "Event Name"
@@ -331,18 +341,20 @@ msgstr "세션을 소유하고 있는 액세스 키"
 
 #: ../../user-api/events.rst:103
 msgid "``reason``"
-msgstr ""
+msgstr "``reason``"
 
 #: ../../user-api/events.rst:104
 msgid ""
 "A short string that describes why the event happened. This may be "
 "``null`` or an empty string."
 msgstr ""
+"이 이벤트가 왜 발생했는지에 대한 짧은 문자열입니다. 이것은 "
+"``null``이거나 빈 문자열일 수 있습니다."
 
 #: ../../user-api/events.rst:106 ../../user-api/exec-batch.rst:125
 #: ../../user-api/exec-query.rst:73 ../../user-api/exec-query.rst:321
 msgid "``result``"
-msgstr ""
+msgstr "``result``"
 
 #: ../../user-api/events.rst:107
 msgid ""
@@ -350,10 +362,12 @@ msgid ""
 "type sessions. Either one of: ``\"UNDEFINED\"``, ``\"SUCCESS\"``, "
 "``\"FAILURE\"``"
 msgstr ""
+"``kernel-terminated`` 이벤트만을 위해 존재합니다. 배치-타입 세션에만 유의미합니다."
+"다음 중 하나:  ``\"UNDEFINED\"``, ``\"SUCCESS\"``, ``\"FAILURE\"``"
 
 #: ../../user-api/exec-batch.rst:2
 msgid "Code Execution (Batch Mode)"
-msgstr ""
+msgstr "코드 실행 (배치 모드)"
 
 #: ../../user-api/exec-batch.rst:4
 msgid ""
@@ -361,14 +375,16 @@ msgid ""
 "required for multi-module programs or compiled programming languages. In "
 "this mode, you first upload files in prior to execution."
 msgstr ""
+"일부 커널은 배치 모드를 제공하는데, 이것은 다중 모듈 프로그램이나 컴파일된 프로그래밍 언어에 필요한 "
+"명시적인 빌드 단계를 제공합니다. 이 모드에서는 실행 전에 먼저 파일을 업로드합니다."
 
 #: ../../user-api/exec-batch.rst:9
 msgid "Uploading files"
-msgstr ""
+msgstr "파일 업로드"
 
 #: ../../user-api/exec-batch.rst:11
 msgid "URI: ``/session/:id/upload``"
-msgstr ""
+msgstr "URI: ``/session/:id/upload``"
 
 #: ../../user-api/exec-batch.rst:12 ../../user-api/exec-batch.rst:65
 #: ../../user-api/exec-query.rst:8 ../../user-api/exec-query.rst:256
@@ -377,7 +393,7 @@ msgstr ""
 #: ../../user-api/vfolders.rst:359 ../../user-api/vfolders.rst:409
 #: ../../user-api/vfolders.rst:654 ../../user-api/vfolders.rst:710
 msgid "Method: ``POST``"
-msgstr ""
+msgstr "Method: ``POST``"
 
 #: ../../user-api/exec-batch.rst:17
 msgid ""
@@ -390,6 +406,11 @@ msgid ""
 "relative, but only sub-directories under ``/home/work`` is allowed to be "
 "created."
 msgstr ""
+"세션에 파일을 업로드 하십시오. 요청 본문 (RFC 1867/2388)에서 다중-파트 폼-데이터 인코딩을 사용하여 "
+"한번에 다중 파일들을 업로드 할 수 있습니다. 업로드된 파일들은 ``/home/work`` 디렉터리"
+"(기본적으로 모든 커널의 홈 디렉터리)하위에 위치하며, 기존 파일은 항상 덮어씁니다."
+"파일명에 디렉터리 부분이 있다면, 존재하지 않는 디렉터리가 자동-생성됩니다. 경로는 절대적이거나 "
+"상대적일 수 있지만, ``/home/work``하위에 하위-디렉터리들만 생성될 수 있습니다."
 
 #: ../../user-api/exec-batch.rst:26
 msgid ""
@@ -399,6 +420,10 @@ msgid ""
 "store and access larger, persistent, static data and library files for "
 "your codes."
 msgstr ""
+"이 API는 배치-모드 실행 전에 자주 변경되는 소스 파일을 업로드 하기 위한 것입니다."
+"커널이 종료되면 이 API를 통해 업로드된 모든 파일이 삭제됩니다. 코드를 위해 "
+:doc:`virtual folders </user-api/vfolders>`를 사용하여 더 크고, 영구적인, 정적 데이터 및 "
+"라이브러리 파일을 저장하고 액세스하십시오."
 
 #: ../../user-api/exec-batch.rst:33
 msgid ""
@@ -406,6 +431,9 @@ msgid ""
 "directly. However, you may copy/move the generated files to virtual "
 "folders in your build script or the main program for later uses."
 msgstr ""
+"이 API를 사용해서 탑재된 가상 폴더에 직접적으로 파일을 업로드할 수 없다."
+"그러나, 이 후 사용을 위해서 빌드 스크립트나 메인 프로그램 안의 가상폴더로 생성된 파일을 "
+"복사/이동할 수 있다."
 
 #: ../../user-api/exec-batch.rst:36
 msgid "There are several limits on this API:"
