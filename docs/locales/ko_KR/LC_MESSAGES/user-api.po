@@ -54,6 +54,9 @@ msgid ""
 "First properly implemented in this version, deprecating prior "
 "unimplemented interfaces."
 msgstr ""
+"이 버전에서 처음 적절하게 구현되었고 구현 되지 않았던 이전 "
+"인터페이스는 폐지됩니다."
+
 
 #: ../../user-api/events.rst:23 ../../user-api/exec-batch.rst:15
 #: ../../user-api/exec-batch.rst:68 ../../user-api/exec-batch.rst:142
@@ -146,7 +149,7 @@ msgstr ""
 #: ../../user-api/vfolders.rst:721 ../../user-api/vfolders.rst:737
 #: ../../user-api/vfolders.rst:774 ../../user-api/vfolders.rst:787
 msgid "Description"
-msgstr ""
+msgstr "설명"
 
 #: ../../user-api/events.rst:32 ../../user-api/events.rst:99
 msgid "``sessionId``"
@@ -172,6 +175,9 @@ msgid ""
 " will stream events from all kernels visible to the client depending on "
 "the client's role and permissions."
 msgstr ""
+"라이프사이클 이벤트를 모니터링하기 위한 세션 ID. ``\"*`` 설정하면 "
+"클라이언트의 역할과 권한에 따라 API는 클라이언트에 보여지는 모든 커널에서 "
+"이벤트를 스트리밍합니다."
 
 #: ../../user-api/events.rst:37 ../../user-api/events.rst:101
 msgid "``ownerAccessKey``"
