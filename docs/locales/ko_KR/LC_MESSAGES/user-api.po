@@ -422,7 +422,7 @@ msgid ""
 msgstr ""
 "이 API는 배치-모드 실행 전에 자주 변경되는 소스 파일을 업로드 하기 위한 것입니다."
 "커널이 종료되면 이 API를 통해 업로드된 모든 파일이 삭제됩니다. 코드를 위해 "
-:doc:`virtual folders </user-api/vfolders>`를 사용하여 더 크고, 영구적인, 정적 데이터 및 "
+":doc:`virtual folders </user-api/vfolders>`를 사용하여 더 크고, 영구적인, 정적 데이터 및 "
 "라이브러리 파일을 저장하고 액세스하십시오."
 
 #: ../../user-api/exec-batch.rst:33
