@@ -431,29 +431,29 @@ msgid ""
 "directly. However, you may copy/move the generated files to virtual "
 "folders in your build script or the main program for later uses."
 msgstr ""
-"이 API를 사용해서 탑재된 가상 폴더에 직접적으로 파일을 업로드할 수 없다."
+"이 API를 사용해서 탑재된 가상 폴더에 직접적으로 파일을 업로드할 수 없습니다."
 "그러나, 이 후 사용을 위해서 빌드 스크립트나 메인 프로그램 안의 가상폴더로 생성된 파일을 "
 "복사/이동할 수 있다."
 
 #: ../../user-api/exec-batch.rst:36
 msgid "There are several limits on this API:"
-msgstr ""
+msgstr "이 API에는 몇 가지 제한이 있습니다."
 
 #: ../../user-api/exec-batch.rst:41
 msgid "The maximum size of each file"
-msgstr ""
+msgstr "각 파일의 최대 사이즈"
 
 #: ../../user-api/exec-batch.rst:42
 msgid "1 MiB"
-msgstr ""
+msgstr "1 MiB"
 
 #: ../../user-api/exec-batch.rst:43
 msgid "The number of files per upload request"
-msgstr ""
+msgstr "업로드 요청당 파일 수"
 
 #: ../../user-api/exec-batch.rst:44
 msgid "20"
-msgstr ""
+msgstr "20"
 
 #: ../../user-api/exec-batch.rst:47 ../../user-api/exec-batch.rst:106
 #: ../../user-api/exec-batch.rst:159 ../../user-api/exec-batch.rst:219
@@ -470,7 +470,7 @@ msgstr ""
 #: ../../user-api/vfolders.rst:623 ../../user-api/vfolders.rst:677
 #: ../../user-api/vfolders.rst:730 ../../user-api/vfolders.rst:780
 msgid "Response"
-msgstr ""
+msgstr "응답"
 
 #: ../../user-api/exec-batch.rst:53 ../../user-api/exec-batch.rst:112
 #: ../../user-api/exec-batch.rst:164 ../../user-api/exec-batch.rst:224
@@ -487,11 +487,11 @@ msgstr ""
 #: ../../user-api/vfolders.rst:629 ../../user-api/vfolders.rst:683
 #: ../../user-api/vfolders.rst:736 ../../user-api/vfolders.rst:786
 msgid "HTTP Status Code"
-msgstr ""
+msgstr "HTTP Status Code"
 
 #: ../../user-api/exec-batch.rst:55
 msgid "204 OK"
-msgstr ""
+msgstr "204 OK"
 
 #: ../../user-api/exec-batch.rst:56 ../../user-api/exec-batch.rst:167
 #: ../../user-api/exec-batch.rst:227 ../../user-api/vfolders.rst:49
@@ -502,29 +502,31 @@ msgstr ""
 #: ../../user-api/vfolders.rst:686 ../../user-api/vfolders.rst:739
 #: ../../user-api/vfolders.rst:789
 msgid "Success."
-msgstr ""
+msgstr "성공."
 
 #: ../../user-api/exec-batch.rst:57 ../../user-api/vfolders.rst:169
 #: ../../user-api/vfolders.rst:394 ../../user-api/vfolders.rst:443
 #: ../../user-api/vfolders.rst:602 ../../user-api/vfolders.rst:687
 #: ../../user-api/vfolders.rst:740
 msgid "400 Bad Request"
-msgstr ""
+msgstr "400 Bad Request"
 
 #: ../../user-api/exec-batch.rst:58
 msgid ""
 "Returned when one of the uploaded file exeeds the size limit or there are"
 " too many files."
 msgstr ""
+"업로드된 파일 중 하나가 크기 제한을 초과하거나 파일이 너무 많을 때 반환됩니다."
+
 
 #: ../../user-api/exec-batch.rst:62
 msgid "Executing with Build Step"
-msgstr ""
+msgstr "빌드 단계를 사용하여 실행한다."
 
 #: ../../user-api/exec-batch.rst:64 ../../user-api/sessions.rst:198
 #: ../../user-api/sessions.rst:260 ../../user-api/sessions.rst:308
 msgid "URI: ``/session/:id``"
-msgstr ""
+msgstr "URI: ``/session/:id``"
 
 #: ../../user-api/exec-batch.rst:77 ../../user-api/exec-batch.rst:151
 #: ../../user-api/exec-batch.rst:210 ../../user-api/exec-query.rst:26
@@ -533,39 +535,39 @@ msgstr ""
 #: ../../user-api/service-ports.rst:100 ../../user-api/sessions.rst:215
 #: ../../user-api/sessions.rst:275 ../../user-api/sessions.rst:325
 msgid "``:id``"
-msgstr ""
+msgstr "``:id``"
 
 #: ../../user-api/exec-batch.rst:79 ../../user-api/exec-batch.rst:153
 #: ../../user-api/exec-batch.rst:212 ../../user-api/sessions.rst:217
 #: ../../user-api/sessions.rst:277 ../../user-api/sessions.rst:327
 #, fuzzy
 msgid "The session ID."
-msgstr "세션이 종료되었습니다."
+msgstr "세션 ID."
 
 #: ../../user-api/exec-batch.rst:80 ../../user-api/exec-query.rst:29
 msgid "``mode``"
-msgstr ""
+msgstr "``mode``"
 
 #: ../../user-api/exec-batch.rst:81
 msgid "``enum[str]``"
-msgstr ""
+msgstr "``enum[str]``"
 
 #: ../../user-api/exec-batch.rst:82
 msgid "A constant string ``\"batch\"``."
-msgstr ""
+msgstr "상수 문자열 ``\"batch\"``."
 
 #: ../../user-api/exec-batch.rst:83 ../../user-api/exec-query.rst:32
 #: ../../user-api/exec-query.rst:271
 msgid "``code``"
-msgstr ""
+msgstr "``code``"
 
 #: ../../user-api/exec-batch.rst:85
 msgid "Must be an empty string ``\"\"``."
-msgstr ""
+msgstr "반드시 빈 문자열 ``\"\"``이어야 합니다."
 
 #: ../../user-api/exec-batch.rst:86 ../../user-api/exec-query.rst:36
 msgid "``runId``"
-msgstr ""
+msgstr "``runId``"
 
 #: ../../user-api/exec-batch.rst:88 ../../user-api/exec-query.rst:38
 msgid ""
@@ -574,27 +576,30 @@ msgid ""
 " If not given, the API server will assign a random one in the first "
 "response and the client must use it for the same run afterwards."
 msgstr ""
+"특정 실행을 위한 클라이언트측 고유 식별자 문자열 입니다. 해당 실행 개념에 대한 "
+"자세한 사항은 "ref"`code-execution-model`을 참조하십시오. 문자열이 주어지지 않는다면, API 서버가 "
+"첫 번째 응답에 임의로 하나를 할당할 것이고 클라이언트는 이후 같은 실행에서 이를 사용해야만 합니다."
 
 #: ../../user-api/exec-batch.rst:91
 msgid "``options``"
-msgstr ""
+msgstr "``options``"
 
 #: ../../user-api/exec-batch.rst:92 ../../user-api/exec-batch.rst:126
 #: ../../user-api/exec-query.rst:74 ../../user-api/sessions.rst:85
 #: ../../user-api/sessions.rst:301 ../../user-api/vfolders.rst:252
 msgid "``object``"
-msgstr ""
+msgstr "``object``"
 
 #: ../../user-api/exec-batch.rst:93
 msgid ":ref:`batch-execution-query-object`."
-msgstr ""
+msgstr ":ref:`batch-execution-query-object`."
 
 #: ../../user-api/exec-batch.rst:95 ../../user-api/sessions.rst:96
 #: ../../user-api/sessions.rst:180 ../../user-api/vfolders.rst:62
 #: ../../user-api/vfolders.rst:113 ../../user-api/vfolders.rst:148
 #: ../../user-api/vfolders.rst:194
 msgid "Example:"
-msgstr ""
+msgstr "예시:"
 
 #: ../../user-api/exec-batch.rst:114 ../../user-api/exec-batch.rst:166
 #: ../../user-api/exec-batch.rst:226 ../../user-api/exec-query.rst:62
@@ -607,7 +612,7 @@ msgstr ""
 #: ../../user-api/vfolders.rst:631 ../../user-api/vfolders.rst:685
 #: ../../user-api/vfolders.rst:738 ../../user-api/vfolders.rst:788
 msgid "200 OK"
-msgstr ""
+msgstr "200 OK"
 
 #: ../../user-api/exec-batch.rst:115 ../../user-api/exec-query.rst:63
 #: ../../user-api/exec-query.rst:311
@@ -615,6 +620,7 @@ msgid ""
 "The kernel has responded with the execution result. The response body "
 "contains a JSON object as described below."
 msgstr ""
+"커널이 실행 결과로 응답했습니다. 응답 본문에는 아래에 설명된 것처럼 JSON 객체가 포함되어 있습니다."
 
 #: ../../user-api/exec-batch.rst:122 ../../user-api/exec-batch.rst:175
 #: ../../user-api/exec-query.rst:70 ../../user-api/exec-query.rst:318
@@ -627,7 +633,7 @@ msgstr ""
 #: ../../user-api/vfolders.rst:696 ../../user-api/vfolders.rst:750
 #: ../../user-api/vfolders.rst:797
 msgid "Fields"
-msgstr ""
+msgstr "필드"
 
 #: ../../user-api/exec-batch.rst:124 ../../user-api/exec-batch.rst:177
 #: ../../user-api/exec-query.rst:72 ../../user-api/exec-query.rst:320
@@ -640,36 +646,38 @@ msgstr ""
 #: ../../user-api/vfolders.rst:698 ../../user-api/vfolders.rst:752
 #: ../../user-api/vfolders.rst:799
 msgid "Values"
-msgstr ""
+msgstr "값"
 
 #: ../../user-api/exec-batch.rst:127 ../../user-api/exec-query.rst:75
 msgid ":ref:`execution-result-object`."
-msgstr ""
+msgstr ":ref:`execution-result-object`."
 
 #: ../../user-api/exec-batch.rst:131
 msgid "Listing Files"
-msgstr ""
+msgstr "나열된 파일"
 
 #: ../../user-api/exec-batch.rst:133
 msgid ""
 "Once files are uploaded to the session or generated during the execution "
 "of the code, there is a need to identify what files actually are in the "
 "current session. In this case, use this API to get the list of files of "
-"your compute sesison."
+"your compute session."
 msgstr ""
+"코드를 실행하는 동안 파일이 세션에 업로드되거나 생성되면 현재 세션에 실제로 어떤 파일이 있는지 "
+"확인할 필요가 있다. 이 경우 이 API를 사용하여 컴퓨팅 세션의 파일의 목록을 가져오십시오." 
 
 #: ../../user-api/exec-batch.rst:138
 msgid "URI: ``/session/:id/files``"
-msgstr ""
+msgstr "URI: ``/session/:id/files``"
 
 #: ../../user-api/exec-batch.rst:154 ../../user-api/vfolders.rst:323
 #: ../../user-api/vfolders.rst:428
 msgid "``path``"
-msgstr ""
+msgstr "``path``"
 
 #: ../../user-api/exec-batch.rst:156
 msgid "Path inside the session (default: ``/home/work``)."
-msgstr ""
+msgstr "세션 내부 경로 (default: ``\home\work``)."
 
 #: ../../user-api/exec-batch.rst:168 ../../user-api/sessions.rst:230
 #: ../../user-api/sessions.rst:290 ../../user-api/sessions.rst:340
@@ -680,45 +688,45 @@ msgstr ""
 #: ../../user-api/vfolders.rst:689 ../../user-api/vfolders.rst:743
 #: ../../user-api/vfolders.rst:790
 msgid "404 Not Found"
-msgstr ""
+msgstr "404 Not Found"
 
 #: ../../user-api/exec-batch.rst:169
 msgid "There is no such path."
-msgstr ""
+msgstr "해당 경로가 존재하지 않습니다."
 
 #: ../../user-api/exec-batch.rst:178 ../../user-api/exec-batch.rst:213
 #: ../../user-api/vfolders.rst:348 ../../user-api/vfolders.rst:531
 #: ../../user-api/vfolders.rst:585
 msgid "``files``"
-msgstr ""
+msgstr "``files``"
 
 #: ../../user-api/exec-batch.rst:180
 msgid "Stringified json containing list of files."
-msgstr ""
+msgstr "파일 목록을 포함하는 문자열화된 json"
 
 #: ../../user-api/exec-batch.rst:181
 msgid "``folder_path``"
-msgstr ""
+msgstr "``folder_path``"
 
 #: ../../user-api/exec-batch.rst:183
 msgid "Absolute path inside session."
-msgstr ""
+msgstr "세션 내부의 절대 경로"
 
 #: ../../user-api/exec-batch.rst:184
 msgid "``errors``"
-msgstr ""
+msgstr "``errors``"
 
 #: ../../user-api/exec-batch.rst:186
 msgid "Any errors occurred during scanning the specified path."
-msgstr ""
+msgstr "지정된 경로를 스캔하는 동안 생성된 오류"
 
 #: ../../user-api/exec-batch.rst:190
 msgid "Downloading Files"
-msgstr ""
+msgstr "다운로드한 파일"
 
 #: ../../user-api/exec-batch.rst:192
 msgid "Download files from your compute session."
-msgstr ""
+msgstr "컴퓨팅 세션에서 파일을 다운로드 하십시오."
 
 #: ../../user-api/exec-batch.rst:194
 msgid ""
@@ -726,34 +734,36 @@ msgid ""
 "processing, such as unpacking and save them, should be handled by the "
 "client."
 msgstr ""
+"응답 내용은 tarfile binaries가 있는 멀티파트입니다. unpacking과 저장 같은 Post-processing은 "
+"클라이언트가 다뤄야만 합니다.
 
 #: ../../user-api/exec-batch.rst:197
 msgid "URI: ``/session/:id/download``"
-msgstr ""
+msgstr "URI: ``/session/:id/download``"
 
 #: ../../user-api/exec-batch.rst:214 ../../user-api/exec-query.rst:322
 #: ../../user-api/vfolders.rst:110 ../../user-api/vfolders.rst:532
 #: ../../user-api/vfolders.rst:586
 msgid "``list[str]``"
-msgstr ""
+msgstr "``list[str]``"
 
 #: ../../user-api/exec-batch.rst:215
 msgid ""
 "File paths inside the kernel container to download. (maximum 5 files at "
 "once)"
-msgstr ""
+msgstr "다운로드할 커널 컨테이너 내부 파일 경로 (한 번에 최대 5개의 파일)"
 
 #: ../../user-api/exec-query.rst:2
 msgid "Code Execution (Query Mode)"
-msgstr ""
+msgstr "코드 실행 (쿼리 모드)"
 
 #: ../../user-api/exec-query.rst:5
 msgid "Executing Snippet"
-msgstr ""
+msgstr "실행중인 스니펫"
 
 #: ../../user-api/exec-query.rst:7
 msgid "URI: ``/kernel/:id``"
-msgstr ""
+msgstr "URI: ``/kernel/:id``"
 
 #: ../../user-api/exec-query.rst:10
 msgid ""
@@ -761,31 +771,37 @@ msgid ""
 "execution request to a same session may have side-effects to subsequent "
 "executions. For instance, setting a global variable in a request and "
 "reading the variable in another request is completely legal. It is the "
-"job of the user (or the front-end) to gaurantee the correct execution "
+"job of the user (or the front-end) to guarantee the correct execution "
 "order of multiple interdependent requests. When the session is terminated"
 " or restarted, all such volatile states vanish."
 msgstr ""
+"지정된 세션을 사용해서 사용자 코드 스니펫을 실행합니다. 동일한 세션에 대한 각 실행 요청은 "
+"후속 실행 시 부작용을 일으킬 수 있습니다. 예를 들어, 요청에서 전역 변수를 설정하고 "
+"다른 요청에서 변수를 읽는 것은 완전히 합법적입니다. 복수의 상호 의존적 요청의 정확한 실행 순서를 "
+"보장하는 것은 사용자(혹은 front-end)의 일입니다. 세션이 종료되거나 다시 시작되면, 모든 휘발적 상태는 사라집니다."
 
 #: ../../user-api/exec-query.rst:28 ../../user-api/exec-query.rst:270
 #: ../../user-api/exec-query.rst:360 ../../user-api/exec-stream.rst:60
 #: ../../user-api/service-ports.rst:69 ../../user-api/service-ports.rst:102
 msgid "The kernel ID."
-msgstr ""
+msgstr "커널 ID"
 
 #: ../../user-api/exec-query.rst:31
 msgid "A constant string ``\"query\"``."
-msgstr ""
+msgstr "상수 문자열 ``\"query\"``."
 
 #: ../../user-api/exec-query.rst:34
 msgid ""
 "A string of user-written code. All non-ASCII data must be encoded in "
 "UTF-8 or any format acceptable by the kernel."
 msgstr ""
+"사용자가 쓴 코드 문자열입니다. 모든 non-ASCII 데이터는 반드시 UTF-8이나 커널에서 "
+"허용하는 다른 형식으로 인코딩되어야 합니다."
 
 #: ../../user-api/exec-query.rst:42 ../../user-api/exec-query.rst:287
 #: ../../user-api/exec-query.rst:331
 msgid "**Example:**"
-msgstr ""
+msgstr "**예시:**"
 
 #: ../../user-api/exec-query.rst:79
 msgid ""
@@ -793,6 +809,8 @@ msgid ""
 "successful execution. i.e., The failure of this API means that our API "
 "subsystem had errors, not the user codes."
 msgstr ""
+"사용자 코드가 예외를 제기해도, 이러한 쿼리들은 성공적인 실행으로 취급됩니다. 즉, "
+"이 API의 실패는 유저 코드가 아닌 우리의 API 하위 시스템에 오류가 있다는 것을 의미합니다."
 
 #: ../../user-api/exec-query.rst:84
 msgid ""
@@ -803,60 +821,68 @@ msgid ""
 "situation, the ``result.stderr`` may also contain specific error "
 "information."
 msgstr ""
+"만일 유저 코드가 시스템을 위반하려고 하거나, 충돌(e.g., "세그멘테이션 결함")을 일으키거나, "
+"너무 오래 실행(timeout)하면, 세션이 자동적으로 종료됩니다. 이러한 경우에, 예상보다 빠르게 "
+"``\"finishted\"`` 상태로 불완전한 콘솔 로그를 얻게 됩니다. 상황에 따라 ``result.stderr``에도 구체적인 "
+"에러 정보가 포함될 수 있습니다."
 
 #: ../../user-api/exec-query.rst:89
 msgid ""
 "Here we demonstrate a few example returns when various Python codes are "
 "executed."
 msgstr ""
+"우리는 다양한 Python 코드가 실행될 때 몇가지 예시 반환을 나타냅니다."
 
 #: ../../user-api/exec-query.rst:91
 msgid "**Example: Simple return.**"
-msgstr ""
+msgstr "**예시: 간단한 반환.**"
 
 #: ../../user-api/exec-query.rst:110
 msgid "**Example: Runtime error.**"
-msgstr ""
+msgstr "**예시: 런타임 에러.**"
 
 #: ../../user-api/exec-query.rst:132
 msgid "**Example: Multimedia output.**"
-msgstr ""
+msgstr "**예시: 멀티미디어 결과**"
 
 #: ../../user-api/exec-query.rst:134
 msgid ""
 "Media outputs are also mixed with other console outputs according to "
 "their execution order."
 msgstr ""
+"미디어 출력물은 실행 순서에 따라 다른 콘솔 출력물과도 혼합됩니다."
 
 #: ../../user-api/exec-query.rst:161
 msgid "**Example: Continuation results.**"
-msgstr ""
+msgstr "**예시: 지속적 결과**"
 
 #: ../../user-api/exec-query.rst:184
 msgid "Here you should make another API query with the empty ``code`` field."
-msgstr ""
+msgstr "당신은 빈 ``code``필드로 다른 API 쿼리를 만들어야 합니다."
 
 #: ../../user-api/exec-query.rst:199
 msgid "Again."
-msgstr ""
+msgstr "다시."
 
 #: ../../user-api/exec-query.rst:214
 msgid "**Example: User input.**"
-msgstr ""
+msgstr "**예시: 사용자 입력**"
 
 #: ../../user-api/exec-query.rst:237
 msgid ""
 "You should make another API query with the ``code`` field filled with the"
 " user input."
-msgstr ""
+msgstr "" 
+"당신은 사용자 입력으로 채워진 ``code`` 필드로 다른 API 쿼리를 "
+"만들어야 합니다."
 
 #: ../../user-api/exec-query.rst:253
 msgid "Auto-completion"
-msgstr ""
+msgstr "자동-완성"
 
 #: ../../user-api/exec-query.rst:255
 msgid "URI: ``/kernel/:id/complete``"
-msgstr ""
+msgstr "URI: ``/kernel/:id/complete``"
 
 #: ../../user-api/exec-query.rst:273
 msgid "A string containing the code until the current cursor position."
@@ -868,38 +894,38 @@ msgstr ""
 
 #: ../../user-api/exec-query.rst:276
 msgid "A string containing the code after the current cursor position."
-msgstr ""
+msgstr "현재 커서 위치까지 코드가 포함된 문자열."
 
 #: ../../user-api/exec-query.rst:277
 msgid "``options.line``"
-msgstr ""
+msgstr "``options.line``"
 
 #: ../../user-api/exec-query.rst:279
 msgid "A string containing the content of the current line."
-msgstr ""
+msgstr "현재 라인의 내용을 포함하는 문자열"
 
 #: ../../user-api/exec-query.rst:280
 msgid "``options.row``"
-msgstr ""
+msgstr "``options.row``"
 
 #: ../../user-api/exec-query.rst:281 ../../user-api/exec-query.rst:284
 #: ../../user-api/sessions.rst:54 ../../user-api/sessions.rst:250
 msgid "``int``"
-msgstr ""
+msgstr "``int``"
 
 #: ../../user-api/exec-query.rst:282
 msgid "An integer indicating the line number (0-based) of the cursor."
-msgstr ""
+msgstr "커서의 라인 번호(0-based)를 나타내는 정수"
 
 #: ../../user-api/exec-query.rst:283
 msgid "``options.col``"
-msgstr ""
+msgstr "``options.col``"
 
 #: ../../user-api/exec-query.rst:285
 msgid ""
 "An integer indicating the column number (0-based) in the current line of "
 "the cursor."
-msgstr ""
+msgstr "커서의 현재 라인에 있는 열 번호(0-based)를 나타내는 정수"
 
 #: ../../user-api/exec-query.rst:324
 msgid ""
@@ -907,72 +933,79 @@ msgid ""
 "strings. This may be empty if the current kernel does not implement auto-"
 "completion or no matches have been found."
 msgstr ""
+"자동-완성 가능성을 포함하는 주문 리스트가 문자열로 일치합니다. 현재 커널이 자동-완성을 "
+"시행하지 않거나 일치하는 항목이 발견되지 않을 경우 이는 비어있을 수 있습니다."
 
 #: ../../user-api/exec-query.rst:328
 msgid ""
 "Selecting a match and merging it into the code text are up to the front-"
 "end implementation."
 msgstr ""
+"일치를 선택하고 이를 코드 텍스트에 병합하는 것은 front-end 구현에 달려 있다."
 
 #: ../../user-api/exec-query.rst:343
 msgid "Interrupt"
-msgstr ""
+msgstr "인터럽트"
 
 #: ../../user-api/exec-query.rst:345
 msgid "URI: ``/kernel/:id/interrupt``"
-msgstr ""
+msgstr "URI: ``/kernel/:id/interrupt``"
 
 #: ../../user-api/exec-query.rst:371 ../../user-api/sessions.rst:288
 #: ../../user-api/sessions.rst:338 ../../user-api/vfolders.rst:295
 msgid "204 No Content"
-msgstr ""
+msgstr "204 내용 없음"
 
 #: ../../user-api/exec-query.rst:372
 msgid ""
 "Sent the interrupt signal to the kernel. Note that this does *not* "
 "guarantee the effectiveness of the interruption."
 msgstr ""
+"커널에 인터럽트 신호를 보냈습니다. 이것이 중단의 효과를 보장하지 *않는다는* 점에 유의하십시오."
 
 #: ../../user-api/exec-stream.rst:4
 msgid "Code Execution (Streaming)"
-msgstr ""
+msgstr "코드 실행(스트리밍)"
 
 #: ../../user-api/exec-stream.rst:6
 msgid ""
 "The streaming mode provides a lightweight and interactive method to "
 "connect with the kernel containers."
 msgstr ""
+"스트리밍 모드는 커널 컨테이너와 연결할 수 있는 가볍고 상호호환적인 방법을 제공합니다."
 
 #: ../../user-api/exec-stream.rst:10
 msgid "Code Execution"
-msgstr ""
+msgstr "코드 실행"
 
 #: ../../user-api/exec-stream.rst:11
 msgid "URI: ``/stream/kernel/:id/execute``"
-msgstr ""
+msgstr "URI: ``/stream/kernel/:id/execute``"
 
 #: ../../user-api/exec-stream.rst:12 ../../user-api/exec-stream.rst:28
 #: ../../user-api/service-ports.rst:46 ../../user-api/service-ports.rst:79
 msgid "Method: ``GET`` upgraded to WebSockets"
-msgstr ""
+msgstr "Method: ``GET`` Websocket으로 업그레이드"
 
 #: ../../user-api/exec-stream.rst:14
 msgid ""
 "This is a real-time streaming version of :doc:`exec-batch` and :doc"
 ":`exec-query` which uses long polling via HTTP."
 msgstr ""
+":HTTP를 통해 긴 폴링 방식을 사용하는 doc:`exec-batch`와 :doc:`exec-query`의 
+"실시간 스트리밍 버전이다."
 
 #: ../../user-api/exec-stream.rst:17
 msgid "(under construction)"
-msgstr ""
+msgstr "(구성 중)"
 
 #: ../../user-api/exec-stream.rst:25
 msgid "Terminal Emulation"
-msgstr ""
+msgstr "터미널 에뮬레이션"
 
 #: ../../user-api/exec-stream.rst:27
 msgid "URI: ``/stream/kernel/:id/pty?app=:service``"
-msgstr ""
+msgstr "URI: ``/stream/kernel/:id/pty?app=:service``"
 
 #: ../../user-api/exec-stream.rst:30
 msgid ""
@@ -981,6 +1014,10 @@ msgid ""
 "currently rely on TEXT messages only conveying JSON payloads to avoid "
 "quirks in typed array support in Javascript across different browsers."
 msgstr ""
+"이 엔드포인트는 네이티브 웹소켓을 통해 Json 객체의 이중 연속 스트림을 제공한다."
+"웹소켓은 바이너리 스트림을 지원하지만, 서로 다른 브라우저를 통한 Javascript의 "
+"타이핑된 배열 지원에서 이상한 점을 방지하기 위해 현재는 JSON 페이로드만 "
+"전달하는 TEXT 메시지에 의존하고 있다."
 
 #: ../../user-api/exec-stream.rst:35 ../../user-api/service-ports.rst:51
 #: ../../user-api/service-ports.rst:84
@@ -989,6 +1026,8 @@ msgid ""
 "objects <service-port-object>` returned by :ref:`the session creation API"
 " <create-session-api>`."
 msgstr ""
+"서비스 이름은 :ref:`the session creation API <create-session-api>`가 반환한 "
+":ref:`service port objects <service-port-object>`의 리스트에서 가져와야 합니다."
 
 #: ../../user-api/exec-stream.rst:41
 msgid ""
@@ -996,48 +1035,54 @@ msgid ""
 "socket.io or SockJS. You need to set up your own proxy if you want to "
 "support legacy browser users."
 msgstr ""
+"우리는 socket.io나 SockJS같은 기존 웹소켓 에뮬레이션 인터페이스를 제공하지 *않습니다.*"
+"기존 브라우저 사용자를 지원하려면 자신의 프록시를 설정해야 합니다."
 
 #: ../../user-api/exec-stream.rst:46
 msgid "Added the ``service`` query parameter."
-msgstr ""
+msgstr "``service`` 쿼리 매개변수를 추가하십시오."
 
 #: ../../user-api/exec-stream.rst:61 ../../user-api/service-ports.rst:70
 #: ../../user-api/service-ports.rst:103
 msgid "``:service``"
-msgstr ""
+msgstr "``:service``"
 
 #: ../../user-api/exec-stream.rst:63 ../../user-api/service-ports.rst:72
 #: ../../user-api/service-ports.rst:105
 msgid "The service name to connect."
-msgstr ""
+msgstr "연결할 서비스 명"
 
 #: ../../user-api/exec-stream.rst:66
 msgid "Client-to-Server Protocol"
-msgstr ""
+msgstr "클라이언트-대-서버 프로토콜"
 
 #: ../../user-api/exec-stream.rst:68
 msgid "The endpoint accepts the following four types of input messages."
-msgstr ""
+msgstr "엔드포인트에서 다음 네 가지 유형의 입력 메시지를 수락합니다."
 
 #: ../../user-api/exec-stream.rst:71
 msgid "Standard input stream"
-msgstr ""
+msgstr "표준 입력 스트림"
 
 #: ../../user-api/exec-stream.rst:73
 msgid ""
 "All ASCII (and UTF-8) inputs must be encoded as base64 strings. The "
 "characters may include control characters as well."
 msgstr ""
+"모든 ASCII (및 UTF-8) 입력은 반드시 base64 문자열로 인코딩되어야 합니다."
+"문자에는 제어 문자도 포함될 수 있습니다."
 
 #: ../../user-api/exec-stream.rst:84
 msgid "Terminal resize"
-msgstr ""
+msgstr "터미널 크기 조정"
 
 #: ../../user-api/exec-stream.rst:86
 msgid ""
 "Set the terminal size to the given number of rows and columns. You should"
 " calculate them by yourself."
 msgstr ""
+"터미널 크기를 주어진 행과 열 수로 설정하십시오. "
+"스스로 계산을 해야 합니다."
 
 #: ../../user-api/exec-stream.rst:89
 msgid ""
