@@ -1091,10 +1091,14 @@ msgid ""
 "the (monospace) font styles same to the terminal container element that "
 "contains only a single ASCII character."
 msgstr ""
+"예를 들어, 웹브라우저의 경우, ASCII 문자 하나만 포함된 터미널 컨테이너 요소와 동일한 "
+"(monospace) 글꼴 스타일을 이용해서, 임시로 생성된 보이지 않는 HTML 너비와 높이를 측정하여 "
+"간단한 계산을 할 수 있다."
+
 
 #: ../../user-api/exec-stream.rst:103
 msgid "Ping"
-msgstr ""
+msgstr "핑"
 
 #: ../../user-api/exec-stream.rst:105
 msgid ""
@@ -1102,10 +1106,12 @@ msgid ""
 "idle timeouts) by sending pings periodically while the user-side browser "
 "is open."
 msgstr ""
+"사용자측 브라우저가 열려있는 동안 주기적으로 ping을 전송하여 이 커널을 계속 유지하려면 "
+(유휴 시간 초과에 의한 자동-종료 방지)이 기능을 사용하십시오. 
 
 #: ../../user-api/exec-stream.rst:115
 msgid "Restart"
-msgstr ""
+msgstr "재시작"
 
 #: ../../user-api/exec-stream.rst:117
 msgid ""
@@ -1113,14 +1119,16 @@ msgid ""
 "and usage counts. Useful when your foreground terminal program does not "
 "respond for whatever reasons."
 msgstr ""
+"작업 디렉토리 및 사용 수에 영향을 주지 않고 커널을 다시 시작하려면 이것을 사용하십시오. "
+"어떤 이유로든 포그라운드 터미널이 응답하지 않을 때 유용합니다."
 
 #: ../../user-api/exec-stream.rst:128
 msgid "Server-to-Client Protocol"
-msgstr ""
+msgstr "서버-대-고객 프로토콜"
 
 #: ../../user-api/exec-stream.rst:131
 msgid "Standard output/error stream"
-msgstr ""
+msgstr "표준 결과/에러 스트림"
 
 #: ../../user-api/exec-stream.rst:133
 msgid ""
@@ -1130,6 +1138,11 @@ msgid ""
 "your kernel applies some special formatting to distinguish them (e.g., "
 "make all stderr otuputs red)."
 msgstr ""
+"터미널은 출력 장치이기 때문에 모든 stdout/stderr 출력은 실제 터미널에서 보는 것과 같이 "
+"하나의 스트림으로 통합됩니다. 이것은 당신의 커널이 이들을 구별하기 위해 특별한 포맷을 "
+"적용하지 않는 한(예시, 모든 stderr 출력을 빨갛게 해라) 클라이언트 측에서 stdout과 stderr을 "
+"구별할 수 없다는 것을 의미합니다."
+
 
 #: ../../user-api/exec-stream.rst:139
 msgid ""
