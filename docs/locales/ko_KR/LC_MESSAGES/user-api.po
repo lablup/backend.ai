@@ -1677,7 +1677,7 @@ msgstr ""
 
 #: ../../user-api/sessions.rst:84
 msgid "``config``"
-msgstr ""
+msgstr "``config``"
 
 #: ../../user-api/sessions.rst:86
 msgid ""
