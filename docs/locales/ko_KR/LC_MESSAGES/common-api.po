@@ -21,24 +21,32 @@ msgstr ""
 #: ../../common-api/auth.rst:2
 msgid "Authentication"
 msgstr ""
+msgstr "인증"
 
 #: ../../common-api/auth.rst:5
 msgid "Access Tokens and Secret Key"
 msgstr ""
+msgstr "액세스 토큰과 시크릿 키"
 
 #: ../../common-api/auth.rst:7
 msgid ""
-"To make requests to the API server, a client needs to have a pair of an "
-"API access key and a secret key.  You may get one from `our cloud service"
+"To make requests to the API server, a client needs to have a pair of an"
+"API access key and a secret key.  You may get one from `our cloud service."
 " <https://cloud.backend.ai>`_ or from the administrator of your "
-"Backend.AI cluster."
 msgstr ""
+"Backend.AI cluster."
+"API 서버에 요청을 하기 위해 필요한 한 쌍의"
+"API 액세스 키와 시크릿 키를 `우리의 클라우드 서비스` 에서 얻을 수 있습니다.
+"<https://cloud.backend.ai> 또는 당신의 관리자인"
+"Backend.AI 클러스터"
 
 #: ../../common-api/auth.rst:12
 msgid ""
 "The server uses the API keys to identify each client and secret keys to "
 "verify integrity of API requests as well as to authenticate clients."
 msgstr ""
+"서버는 API 키를 사용하여 각 클라이언트를 식별하고 시크릿 키를 사용하여"
+"API 요청의 무결성을 확인하고 클라이언트를 인증합니다."
 
 #: ../../common-api/auth.rst:17
 msgid ""
