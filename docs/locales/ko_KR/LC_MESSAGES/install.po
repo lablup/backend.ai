@@ -55,6 +55,9 @@ msgid ""
 "many\" kernels are spwned. In the perspective of Backend.AI's scheduler, "
 "the latter is much more important."
 msgstr ""
+"Backend.AI 의 커널은 그렇게 많이 사용하지 않더라도 고정되고 고립된 양의 리소스를 할당합니다. "
+"따라서 간단한 리소스 측정은 \"얼마나 많은 커널이 생성되었는지\" 가 아닌 \"생성된 커널의 사용량이 얼마나 많은지\" "
+"노출시킬 수 있습니다. Backend.AI의 스케줄러 관점에서는, 전자가 훨씬 더 중요합니다. "
 
 #: ../../install/configure-autoscaling.rst:17
 msgid ""
@@ -65,6 +68,11 @@ msgid ""
 "fine-grained control, it is best to use their options. We are currently "
 "under development of Backend.AI's own fine-grained scaling."
 msgstr ""
+"Backend.AI는 새로운 컴퓨팅 세션을 생성할때 낮은 지연 시간을 유지하려고 합니다. "
+"즉, 적은 수의 VM 인스턴스를 \"핫\" 준비 상태(--유휴 인스턴스를 실행 중이거나 빠른 부팅을 위해 "
+"중지된 인스턴스 일 수 있습니다)로 유지해야합니다. 만약 클라우드 제공자가 그러한 세밀한 조절을 제공한다면, "
+"해당 옵션을 사용하는 것이 가장 좋은 방법일 것입니다. 저희는 현재 Backend.AI의 고유한 세밀한 스케일링을 "
+"개발중에 있습니다. "
 
 #: ../../install/configure-autoscaling.rst:18
 msgid ""
@@ -73,6 +81,8 @@ msgid ""
 " metrics often miss this, so you need to set up a custom metric using "
 "vendor-specific ways."
 msgstr ""
+"Backend.AI 스케줄러는 용량 계획을 위해 GPU를 CPU 코어와 주 메모리와 같은 1급 객체로 취급합니다. "
+"기존의 자동 스케일링 메트릭은 종종 이를 놓치기 때문에 벤더별 방법으로 사용자 지정 메트릭을 설정해야 합니다. "
 
 #: ../../install/demo-setup.rst:2
 msgid "One-line Demo Setup"
