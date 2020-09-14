@@ -26,7 +26,7 @@ For a standard installation:
 
 To enable CUDA (only supported in Ubuntu or CentOS):
 
-* CUDA 9.0 or later (with compatible NVIDIA driver)
+* CUDA 8.0 or later (with compatible NVIDIA driver)
 * nvidia-docker 1.0 or 2.0
 
 
