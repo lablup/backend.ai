@@ -643,10 +643,11 @@ python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
 python -m ai.backend.manager.cli etcd put-json volumes "./volume.json"
 cd "${INSTALL_PATH}/agent"
 mkdir -p scratches
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
+POSTGRES_CONTAINER_ID=$(sudo docker ps | grep "${ENV_ID}_backendai-half-db_1" | awk '{print $1}')
+$docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
+$docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
+$docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
+$docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
 
 show_info "Installing Python client SDK/CLI source..."
 cd "${INSTALL_PATH}"
