@@ -44,7 +44,7 @@ msgstr "어드민 API 자료"
 
 #: ../../index.rst:87
 msgid "Developer Manuals"
-msgstr "개발자 자료"
+msgstr "개발자 매뉴얼"
 
 #: ../../index.rst:7
 msgid "Backend.AI API Documentation"
