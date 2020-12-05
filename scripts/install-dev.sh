@@ -500,7 +500,6 @@ pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-manager"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-agent"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-common"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
-pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-storage-proxy"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-console-server"
 
 # Make directories
@@ -525,7 +524,6 @@ cd "${INSTALL_PATH}"
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manager manager
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-storage-proxy storage-proxy
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-console-server console-server
 
 if [ $ENABLE_CUDA -eq 1 ]; then
@@ -567,11 +565,6 @@ pyenv local "venv-${ENV_ID}-common"
 pip install -U -q pip setuptools
 pip install -U -r requirements/dev.txt
 
-cd "${INSTALL_PATH}/storage-proxy"
-pyenv local "venv-${ENV_ID}-storage-proxy"
-pip install -U -q pip setuptools
-pip install -U -r requirements/dev.txt
-
 cd "${INSTALL_PATH}/console-server"
 pyenv local "venv-${ENV_ID}-console-server"
 pip install -U -q pip setuptools
@@ -598,18 +591,6 @@ cp config/halfstack.toml ./agent.toml
 sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
-
-cd "${INSTALL_PATH}/storage-proxy"
-pyenv local "venv-${ENV_ID}-storage-proxy"
-cp config/sample.toml ./storage-proxy.toml
-# comment out all non-vfs volumes
-sed_inplace "s/^\[volume\./# \[volume\./" ./storage-proxy.toml
-sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
-sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
-sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
-# add local vfs volume
-sed_inplace "s/^path = .*$/path = \"${INSTALL_PATH//\//\\/}\/${VFOLDER_REL_PATH//\//\\/}\"/" ./storage-proxy.toml # replace paths of all volumes to local paths
-echo "\n[volume.volume1]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
 cd "${INSTALL_PATH}/console-server"
 pyenv local "venv-${ENV_ID}-console-server"
@@ -706,9 +687,6 @@ echo "> ${WHITE}python -m ai.backend.gateway.server --debug${NC}"
 show_note "How to run Backend.AI agent:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/agent${NC}"
 echo "> ${WHITE}python -m ai.backend.agent.server --debug${NC}"
-show_note "How to run Backend.AI storage-proxy:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/storage-proxy${NC}"
-echo "> ${WHITE}python -m ai.backend.storage.server${NC}"
 show_note "How to run Backend.AI console server (for ID/Password login):"
 echo "> ${WHITE}cd ${INSTALL_PATH}/console-server${NC}"
 echo "> ${WHITE}python -m ai.backend.console.server${NC}"
