@@ -189,8 +189,6 @@ CUDA_BRANCH="master"
 # AGENT_RPC_PORT="6001"
 # AGENT_WATCHER_PORT="6009"
 # VFOLDER_REL_PATH="vfolder/local"
-# LOCAL_STORAGE_PROXY="local"
-# LOCAL_STORAGE_VOLUME="volume1"
 
 POSTGRES_PORT="8101"
 REDIS_PORT="8111"
@@ -200,8 +198,6 @@ CONSOLE_SERVER_PORT="8090"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
 VFOLDER_REL_PATH="vfolder/local"
-LOCAL_STORAGE_PROXY="local"
-LOCAL_STORAGE_VOLUME="volume1"
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -581,9 +577,6 @@ sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
 cp config/halfstack.alembic.ini ./alembic.ini
 sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
 python -m ai.backend.manager.cli etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
-cp config/sample.volume.json ./volume.json
-sed_inplace "s/\"secret\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"/\"secret\": \"0000000000000000000000000000000000000000000\"/" ./volume.json
-sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./volume.json
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
@@ -622,13 +615,8 @@ mkdir -p "${INSTALL_PATH}/${VFOLDER_REL_PATH}"
 cd "${INSTALL_PATH}/manager"
 python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
 python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
-python -m ai.backend.manager.cli etcd put-json volumes "./volume.json"
 cd "${INSTALL_PATH}/agent"
 mkdir -p scratches
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-psql postgres://postgres:develove@localhost:$POSTGRES_PORT/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
 
 show_info "Installing Python client SDK/CLI source..."
 cd "${INSTALL_PATH}"
