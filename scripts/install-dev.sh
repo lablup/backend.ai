@@ -609,7 +609,7 @@ sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
 sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
 # add local vfs volume
 sed_inplace "s/^path = .*$/path = \"${INSTALL_PATH//\//\\/}\/${VFOLDER_REL_PATH//\//\\/}\"/" ./storage-proxy.toml # replace paths of all volumes to local paths
-echo "\n[volume.volume1]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml 
+echo "\n[volume.volume1]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
 cd "${INSTALL_PATH}/console-server"
 pyenv local "venv-${ENV_ID}-console-server"
@@ -622,10 +622,11 @@ sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./console-server.c
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
 cd "${INSTALL_PATH}/manager"
-python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io "https://registry-1.docker.io"
-python -m ai.backend.manager.cli etcd put config/docker/registry/index.docker.io/username "lablup"
-python -m ai.backend.manager.cli etcd rescan-images index.docker.io
-python -m ai.backend.manager.cli etcd alias python python:3.6-ubuntu18.04
+python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
+python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/type "harbor2"
+python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community"
+python -m ai.backend.manager.cli etcd rescan-images cr.backend.ai
+python -m ai.backend.manager.cli etcd alias python cr.backend.ai/stable/python:3.8-ubuntu18.04
 
 # DB schema
 show_info "Setting up databases..."
@@ -670,17 +671,10 @@ echo "export BACKEND_ENDPOINT_TYPE=session" >> my-backend-ai-session.sh
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
-$docker_sudo docker pull lablup/python:2.7-ubuntu18.04
-$docker_sudo docker pull lablup/python:3.6-ubuntu18.04
+$docker_sudo docker pull cr.backend.ai/stable/python:3.8-ubuntu18.04
 if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
-  $docker_sudo docker pull lablup/python-tensorflow:2.3-py36-cuda10.1
-  $docker_sudo docker pull lablup/python-pytorch:1.6-py36-cuda10.1
-  if [ $ENABLE_CUDA -eq 1 ]; then
-      $docker_sudo docker pull lablup/python-tensorflow:2.3-py36-cuda10.1
-      $docker_sudo docker pull lablup/python-pytorch:1.6-py36-cuda10.1
-      $docker_sudo docker pull lablup/ngc-pytorch:20.07-py3
-      $docker_sudo docker pull lablup/ngc-tensorflow:20.07-tf2-py3
-  fi
+  $docker_sudo docker pull cr.backend.ai/stable/python-tensorflow:2.3-py36-cuda10.1
+  $docker_sudo docker pull cr.backend.ai/stable/python-pytorch:1.6-py36-cuda10.1
 fi
 
 DELETE_OPTS=''
