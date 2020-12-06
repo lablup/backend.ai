@@ -9,14 +9,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2019-10-14 21:43+0900\n"
+"POT-Creation-Date: 2020-09-08 23:35+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.7.0\n"
+"Generated-By: Babel 2.8.0\n"
 
 #: ../../concepts/api-overview.rst:2
 msgid "API Overview"
@@ -24,17 +24,19 @@ msgstr "API 개괄"
 
 #: ../../concepts/api-overview.rst:4
 msgid "Backend.AI API v3 consists of two parts: User APIs and Admin APIs."
-msgstr ""
+msgstr "Backend.AI API v3는 두 가지로 구성 되어있습니다: 사용자 API와 관리자 API."
 
 #: ../../concepts/api-overview.rst:8
 msgid ""
 "APIv3 breaks backward compatibility a lot, and we will primarily support "
 "v3 after June 2017. Please upgrade your clients immediately."
 msgstr ""
+"API v3는 하위 호환성이 많이 떨어져서 2017년 6월 이후로 주로 보충할 예정입니다."
+"클라이언트를 바로 업그레이드 시켜주시기 바랍니다."
 
 #: ../../concepts/api-overview.rst:12
 msgid "API KeyPair Registration"
-msgstr ""
+msgstr "API 키페어 생성"
 
 #: ../../concepts/api-overview.rst:14
 msgid ""
@@ -44,24 +46,32 @@ msgid ""
 "<https://cloud.backend.ai>`_ and generate a new API keypair. You may also"
 " use social accounts for log-ins such as Twitter, Facebook, and GitHub."
 msgstr ""
+"클라우드 버전의 Backend.AI API 서비스를 설치하면 개인 장비에 설치하는 것보다 훨씬 더 용이하고 나은 서비스로 이용할 수 있습니다."
+"'cloud.backend.ai <https://cloud.backend.ai>`에서 계정을 만들고 새 API 키페어를 생성하세요."
+"트위터, 페이스북, 깃허브와 같은 소셜 아이디로도 로그인할 수 있습니다."
 
 #: ../../concepts/api-overview.rst:18
 msgid ""
 "An API keypair is composed of a 20-characters access key (``AKIA...``) "
 "and a 40-characters secret key, in a similar form to AWS access keys."
 msgstr ""
+"API 키페어는 20 글자의 액세스 키(``AKIA...``)와 AWS액세스 키와 비슷한"
+"형태인 40 글자의 시크릿 키로 구성되어 있습니다."
 
 #: ../../concepts/api-overview.rst:20
 msgid ""
 "Currently, the service is BETA: it is free of charge but each user is "
-"limited to have only one keypair and have up to 5 concurrent kernel "
-"sessions for a given keypair. Keep you eyes on further announcements for "
-"upgraded paid plans."
+"limited to have only one keypair and have up to 5 concurrent sessions for"
+" a given keypair. Keep you eyes on further announcements for upgraded "
+"paid plans."
 msgstr ""
+"현재 서비스는 베타 버전입니다. 무료이지만 1인당 1개의 키페어와"
+"주어진 키페어에 따른 5개의 병렬 커널 세션을 가질 수 있게 됩니다."
+"정기 이용료에 대한 안내는 추후에 공지해드리겠습니다."
 
 #: ../../concepts/api-overview.rst:24
 msgid "Accessing Admin APIs"
-msgstr ""
+msgstr "관리자 API 접속하기"
 
 #: ../../concepts/api-overview.rst:26
 msgid "The admin APIs require a special keypair with the admin privilege:"
@@ -257,22 +267,22 @@ msgstr ""
 #: ../../concepts/key-concepts.rst:25
 msgid ""
 "Backend.AI manager is the central governor of the cluster. It accepts "
-"user requests, creates/destroys the kernels, and routes code execution "
-"requests to appropriate agents and kernels. It also collects the output "
-"of kernels and responds the users with them."
+"user requests, creates/destroys the sessions, and routes code execution "
+"requests to appropriate agents and sessions. It also collects the output "
+"of sessions and responds the users with them."
 msgstr ""
 
 #: ../../concepts/key-concepts.rst:29
 msgid ""
 "Backend.AI agent is a small daemon installed onto individual worker "
 "servers to control them. It manages and monitors the lifecycle of kernel "
-"containers, and also mediates the input/output of kernels. Each agent "
+"containers, and also mediates the input/output of sessions. Each agent "
 "also reports the resource capacity and status of its server, so that the "
-"manager can assign new kernels on idle servers to load balance."
+"manager can assign new sessions on idle servers to load balance."
 msgstr ""
 
 #: ../../concepts/key-concepts.rst:34
-msgid "Kernels (aka Compute Sessions)"
+msgid "Compute sessions and Kernels"
 msgstr ""
 
 #: ../../concepts/key-concepts.rst:35
@@ -417,4 +427,40 @@ msgstr ""
 #: ../../concepts/key-concepts.rst:88
 msgid "For a single-node setup, you may simply use an empty local directory."
 msgstr ""
+
+#~ msgid ""
+#~ "Currently, the service is BETA: it "
+#~ "is free of charge but each user"
+#~ " is limited to have only one "
+#~ "keypair and have up to 5 "
+#~ "concurrent kernel sessions for a given"
+#~ " keypair. Keep you eyes on further"
+#~ " announcements for upgraded paid plans."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Backend.AI manager is the central "
+#~ "governor of the cluster. It accepts "
+#~ "user requests, creates/destroys the kernels,"
+#~ " and routes code execution requests "
+#~ "to appropriate agents and kernels. It"
+#~ " also collects the output of kernels"
+#~ " and responds the users with them."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Backend.AI agent is a small daemon "
+#~ "installed onto individual worker servers "
+#~ "to control them. It manages and "
+#~ "monitors the lifecycle of kernel "
+#~ "containers, and also mediates the "
+#~ "input/output of kernels. Each agent also"
+#~ " reports the resource capacity and "
+#~ "status of its server, so that the"
+#~ " manager can assign new kernels on"
+#~ " idle servers to load balance."
+#~ msgstr ""
+
+#~ msgid "Kernels (aka Compute Sessions)"
+#~ msgstr ""
 
