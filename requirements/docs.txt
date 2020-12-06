@@ -1,1 +1,2 @@
+git+https://github.com/lablup/pygments-graphql-lexer
 -e .[docs]

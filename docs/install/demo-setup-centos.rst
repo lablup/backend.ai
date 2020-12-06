@@ -2,7 +2,7 @@
 Demo Setup
 ==========
 
-`This meta-repository <https://github.com/lablup/backend.ai>`_ provides a docker-compose configuration to fire up a single-node Backend.AI cluster running on your PC (http://localhost:8081).  
+`This meta-repository <https://github.com/lablup/backend.ai>`_ provides a docker-compose configuration to fire up a single-node Backend.AI cluster running on your PC (http://localhost:8081).
 
 Prerequisites
 -------------
@@ -12,43 +12,55 @@ Prerequisites
 * Linux users: change "docker.for.mac.localhost" in docker-compose.yml to "172.17.0.1"
 
 * intstall docker-ce at Centos 7.5
-.. code-block:: console  
-   $ sudo curl -fsSL https://get.docker.io | sh
-   $ sudo usermod -aG docker your-user
+
+  .. code-block:: console
+
+     $ sudo curl -fsSL https://get.docker.io | sh
+     $ sudo usermod -aG docker your-user
 
 * install pre-requirement package
-.. code-block:: console
-   $ sudo yum install gcc zlib-devel bzip2 bzip2-devel readline readline-devel sqlite sqlite-devel openssl openssl-devel git
+
+  .. code-block:: console
+
+     $ sudo yum install gcc zlib-devel bzip2 bzip2-devel readline readline-devel sqlite sqlite-devel openssl openssl-devel git
 
 * install pyenv that support enviroment for Python
-.. code-block:: console
-   $ git clone https://github.com/pyenv/pyenv.git ~/.pyenv
-   $ echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bash_profile
-   $ echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
-   $ source ~/.bash_profile
-   $ exec $SHELL -l
+
+  .. code-block:: console
+
+     $ git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+     $ echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bash_profile
+     $ echo 'eval "$(pyenv init -)"' >> ~/.bash_profile
+     $ source ~/.bash_profile
+     $ exec $SHELL -l
 
 * install pyenv that support virtual enviroment for Python
-.. code-block:: console
-   $ git clone https://github.com/yyuu/pyenv-virtualenv.git ~/.pyenv/plugins/pyenv-virtualenv
-   $ echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bash_profile
-   $ exec $SHELL -l
+
+  .. code-block:: console
+
+     $ git clone https://github.com/yyuu/pyenv-virtualenv.git ~/.pyenv/plugins/pyenv-virtualenv
+     $ echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bash_profile
+     $ exec $SHELL -l
 
 * install python 3.6.x to run backend.ai
-.. code-block:: console
-   $ pyenv install 3.6.7
-   $ pyenv virtualenv 3.6.7 backend.ai
+
+  .. code-block:: console
+
+     $ pyenv install 3.6.7
+     $ pyenv virtualenv 3.6.7 backend.ai
 
 * install requirement packer of python and docker
   * Clone the repository
-  * Check out the prerequisites above    
-.. code-block:: console
-   $ git clone https://github.com/lablup/backend.ai.git
-   $ cd backend.ai
-   $ pyenv local backend.ai
-   $ pip install -U pip setuptools
-   $ pip install docker-compose
-   
+  * Check out the prerequisites above
+
+  .. code-block:: console
+
+     $ git clone https://github.com/lablup/backend.ai.git
+     $ cd backend.ai
+     $ pyenv local backend.ai
+     $ pip install -U pip setuptools
+     $ pip install docker-compose
+
 Notes
 ^^^^^
 
