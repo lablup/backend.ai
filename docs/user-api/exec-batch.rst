@@ -1,7 +1,7 @@
 Code Execution (Batch Mode)
 ===========================
 
-Some kernels provide the batch mode, which offers an explicit build step
+Some sessions provide the batch mode, which offers an explicit build step
 required for multi-module programs or compiled programming languages.
 In this mode, you first upload files in prior to execution.
 
@@ -16,7 +16,7 @@ Parameters
 
 Upload files to the session.
 You may upload multiple files at once using multi-part form-data encoding in the request body (RFC 1867/2388).
-The uploaded files are placed under ``/home/work`` directory (which is the home directory for all kernels by default),
+The uploaded files are placed under ``/home/work`` directory (which is the home directory for all sessions by default),
 and existing files are always overwritten.
 If the filename has a directory part, non-existing directories will be auto-created.
 The path may be either absolute or relative, but only sub-directories under ``/home/work`` is allowed to be created.
@@ -24,7 +24,7 @@ The path may be either absolute or relative, but only sub-directories under ``/h
 .. hint::
 
    This API is for uploading frequently-changing source files in prior to batch-mode execution.
-   All files uploaded via this API is deleted when the kernel terminates.
+   All files uploaded via this API is deleted when the session terminates.
    Use :doc:`virtual folders </user-api/vfolders>` to store and access larger, persistent,
    static data and library files for your codes.
 
@@ -112,7 +112,7 @@ Response
    * - HTTP Status Code
      - Description
    * - 200 OK
-     - The kernel has responded with the execution result.
+     - The session has responded with the execution result.
        The response body contains a JSON object as described below.
 
 .. list-table::
@@ -212,7 +212,7 @@ Parameters
      - The session ID.
    * - ``files``
      - ``list[str]``
-     - File paths inside the kernel container to download.
+     - File paths inside the session container to download.
        (maximum 5 files at once)
 
 Response

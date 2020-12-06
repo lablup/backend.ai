@@ -3,12 +3,13 @@
 Code Execution (Streaming)
 ==========================
 
-The streaming mode provides a lightweight and interactive method to connect with the kernel containers.
+The streaming mode provides a lightweight and interactive method to connect with the session containers.
 
 
 Code Execution
 --------------
-* URI: ``/stream/kernel/:id/execute``
+
+* URI: ``/stream/session/:id/execute``
 * Method: ``GET`` upgraded to WebSockets
 
 This is a real-time streaming version of :doc:`exec-batch` and :doc:`exec-query` which uses
@@ -24,7 +25,7 @@ long polling via HTTP.
 Terminal Emulation
 ------------------
 
-* URI: ``/stream/kernel/:id/pty?app=:service``
+* URI: ``/stream/session/:id/pty?app=:service``
 * Method: ``GET`` upgraded to WebSockets
 
 This endpoint provides a duplex continuous stream of JSON objects via the native WebSocket.
@@ -57,7 +58,7 @@ Parameters
      - Description
    * - ``:id``
      - ``slug``
-     - The kernel ID.
+     - The session ID.
    * - ``:service``
      - ``slug``
      - The service name to connect.
@@ -102,7 +103,7 @@ only a single ASCII character.
 Ping
 ^^^^
 
-Use this to keep the kernel alive (preventing it from auto-terminated by idle timeouts)
+Use this to keep the session alive (preventing it from auto-terminated by idle timeouts)
 by sending pings periodically while the user-side browser is open.
 
 .. code-block:: json
@@ -114,7 +115,7 @@ by sending pings periodically while the user-side browser is open.
 Restart
 ^^^^^^^
 
-Use this to restart the kernel without affecting the working directory and usage counts.
+Use this to restart the session without affecting the working directory and usage counts.
 Useful when your foreground terminal program does not respond for whatever reasons.
 
 .. code-block:: json
@@ -133,7 +134,7 @@ Standard output/error stream
 Since the terminal is an output device, all stdout/stderr outputs are merged
 into a single stream as we see in real terminals.
 This means there is no way to distinguish stdout and stderr in the client-side,
-unless your kernel applies some special formatting to distinguish them (e.g.,
+unless your session applies some special formatting to distinguish them (e.g.,
 make all stderr otuputs red).
 
 The terminal output is compatible with xterm (including 256-color support).

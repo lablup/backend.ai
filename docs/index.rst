@@ -6,7 +6,7 @@
 Backend.AI API Documentation
 ============================
 
-**Latest API version: v4.20190315**
+**Latest API version: v5.20191215**
 
 Backend.AI is a hassle-free backend for AI model development and deployment.
 It runs arbitrary user codes safely in resource-constrained environments, using Docker and our own sandbox wrapper.
@@ -77,10 +77,17 @@ Table of Contents
    :caption: Admin API Reference
 
    admin-api/intro
-   admin-api/keypairs
+   admin-api/agents
+   admin-api/scaling-groups
+   admin-api/domains
+   admin-api/groups
+   admin-api/users
+   admin-api/images
    admin-api/sessions
    admin-api/vfolders
-   admin-api/stats
+   admin-api/keypairs
+   admin-api/keypair-resource-policies
+   admin-api/resource-presets
 
 .. _dev:
 

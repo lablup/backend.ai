@@ -145,10 +145,10 @@ For example, a sample service definition file for "jupyter" service (hence its f
             "args": {
               "body": [
                 "c.NotebookApp.allow_root = True\n",
-                "c.NotebookApp.ip = \"0.0.0.0\"",
-                "c.NotebookApp.port = {ports[0]}",
-                "c.NotebookApp.token = \"\"",
-                "c.FileContentsManager.delete_to_trash = False"
+                "c.NotebookApp.ip = \"0.0.0.0\"\n",
+                "c.NotebookApp.port = {ports[0]}\n",
+                "c.NotebookApp.token = \"\"\n",
+                "c.FileContentsManager.delete_to_trash = False\n"
               ]
             },
             "ref": "jupyter_cfg"
@@ -209,6 +209,11 @@ The ``ref`` field defines a variable that stores the result of the action and ca
      - * ``body``: a string to send as kernel log (template-enabled)
        * ``debug``: a boolean to lower the logging level to DEBUG (default is INFO)
      - None
+
+.. warning::
+
+   ``run_command`` action should return quickly, otherwise the session creation latency will be increased.
+   If you need to run a background process, you must use its own options to let it daemonize or wrap as a background shell command (``["/bin/sh", "-c", "... &"]``).
 
 Interpretation of URL template
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
