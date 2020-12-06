@@ -606,8 +606,8 @@ python -m ai.backend.manager.cli etcd alias python cr.backend.ai/stable/python:3
 show_info "Setting up databases..."
 cd "${INSTALL_PATH}/manager"
 python -m ai.backend.manager.cli schema oneshot
-python -m ai.backend.manager.cli fixture populate sample-configs/example-keypairs.json
-python -m ai.backend.manager.cli fixture populate sample-configs/example-resource-presets.json
+python -m ai.backend.manager.cli fixture populate fixtures/example-keypairs.json
+python -m ai.backend.manager.cli fixture populate fixtures/example-resource-presets.json
 
 # Virtual folder setup
 show_info "Setting up virtual folder..."
