@@ -61,7 +61,7 @@ This registry migration does not affect existing running sessions, though the Do
 
       $ backend.ai mgr etcd delete --prefix images  # remove all image metadata
       $ backend.ai mgr etcd delete --prefix config/docker/registry/index.docker.io  # remove docker hub config
-      $ backend.ai mgr etcd rescan-images  # recan from all registries
+      $ backend.ai mgr etcd rescan-images  # rescan from all registries
 
 7. Run ``docker rmi`` commands to clean up the pulled images in the agent nodes.
    (Automatic/managed removal of images will be implemented in the future versions of Backend.AI)
