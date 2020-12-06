@@ -55,13 +55,12 @@ This registry migration does not affect existing running sessions, though the Do
       UPDATE domains SET allowed_docker_registries = '{cr.backend.ai,...}' WHERE name = '...';
 
 5. Now you may start new sessions using the images from the new registry.
-6. After terminating all existing sessions using the images from the Docker Hub (i.e., images whose names start with ``lablup/`` prefix), remove the registry configuration in the manager CLI:
+6. After terminating all existing sessions using the old images from the Docker Hub (i.e., images whose names start with ``lablup/`` prefix), remove the image metadata and registry configuration using the manager CLI:
 
    .. code-block:: console
 
-      $ backend.ai mgr etcd delete --prefix images  # remove all image metadata
-      $ backend.ai mgr etcd delete --prefix config/docker/registry/index.docker.io  # remove docker hub config
-      $ backend.ai mgr etcd rescan-images  # rescan from all registries
+      $ backend.ai mgr etcd delete --prefix images/index.docker.io
+      $ backend.ai mgr etcd delete --prefix config/docker/registry/index.docker.io
 
 7. Run ``docker rmi`` commands to clean up the pulled images in the agent nodes.
    (Automatic/managed removal of images will be implemented in the future versions of Backend.AI)
