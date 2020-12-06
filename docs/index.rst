@@ -35,6 +35,15 @@ Table of Contents
    install/guides
    install/supplementary
 
+.. _migration:
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Migration Guides
+
+   migration/2003-to-2009
+   migration/docker-hub-to-backendai-cr
+
 .. _clients:
 
 .. toctree::
