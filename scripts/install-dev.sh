@@ -664,11 +664,13 @@ echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> my-backend-a
 echo "export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" >> my-backend-ai.sh
 echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> my-backend-ai.sh
 echo "export BACKEND_ENDPOINT_TYPE=api" >> my-backend-ai.sh
+chmod +x my-backend-ai.sh
 
 echo "export BACKEND_ENDPOINT=http://0.0.0.0:${CONSOLE_SERVER_PORT}" >> my-backend-ai-session.sh
 echo "export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" >> my-backend-ai-session.sh
 echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> my-backend-ai-session.sh
 echo "export BACKEND_ENDPOINT_TYPE=session" >> my-backend-ai-session.sh
+chmod +x my-backend-ai-session.sh
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
