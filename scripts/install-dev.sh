@@ -698,7 +698,7 @@ show_note "Default ID/Password configuration for test / develop (my-backend-ai-s
 echo "> ${WHITE}export BACKEND_ENDPOINT=http://0.0.0.0:${CONSOLE_SERVER_PORT}/${NC}"
 echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=session${NC}"
 echo "> ${WHITE}backend.ai login${NC}"
-echo "> ${WHITE}ID      : admiu@lablup.com${NC}"
+echo "> ${WHITE}ID      : admin@lablup.com${NC}"
 echo "> ${WHITE}Password: wJalrXUt${NC}"
 echo " "
 echo "These environment variables are added in my-backend-ai.sh and my-backend-ai-session.sh."
