@@ -56,6 +56,11 @@ services:
       --initial-cluster-state new
       --enable-v2=true
       --auto-compaction-retention 1
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 networks:
   half:
