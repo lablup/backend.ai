@@ -174,7 +174,7 @@ fi
 
 ROOT_PATH=$(pwd)
 ENV_ID=""
-PYTHON_VERSION="3.8.6"
+PYTHON_VERSION="3.9.1"
 SERVER_BRANCH="master"
 CLIENT_BRANCH="master"
 INSTALL_PATH="./backend.ai-dev"
@@ -375,15 +375,13 @@ install_python() {
       local _prefix_gdbm="$(brew --prefix gdbm)"
       local _prefix_tcltk="$(brew --prefix tcl-tk)"
       local _prefix_xz="$(brew --prefix xz)"
-      export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include"
-      export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib"
+      local _prefix_snappy="$(brew --prefix snappy)"
+      local _prefix_libffi="$(brew --prefix libffi)"
+      local _prefix_protobuf="$(brew --prefix protobuf)"
+      export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_snappy}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
+      export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_snappy}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
     fi
     pyenv install --skip-existing "${PYTHON_VERSION}"
-    if [ "$DISTRO" = "Darwin" ]; then
-      unset PYTHON_CONFIGURE_OPTS
-      unset CFLAGS
-      unset LDFLAGS
-    fi
     if [ $? -ne 0 ]; then
       show_error "Installing the Python version ${PYTHON_VERSION} via pyenv has failed."
       show_note "${PYTHON_VERSION} is not supported by your current installation of pyenv."
@@ -392,6 +390,21 @@ install_python() {
     fi
   else
     echo "${PYTHON_VERSION} is already installed."
+    if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
+      echo "Configuring additional build flags for local wheel builds for macOS on Apple Silicon ..."
+      local _prefix_openssl="$(brew --prefix openssl)"
+      local _prefix_sqlite3="$(brew --prefix sqlite3)"
+      local _prefix_readline="$(brew --prefix readline)"
+      local _prefix_zlib="$(brew --prefix zlib)"
+      local _prefix_gdbm="$(brew --prefix gdbm)"
+      local _prefix_tcltk="$(brew --prefix tcl-tk)"
+      local _prefix_xz="$(brew --prefix xz)"
+      local _prefix_snappy="$(brew --prefix snappy)"
+      local _prefix_libffi="$(brew --prefix libffi)"
+      local _prefix_protobuf="$(brew --prefix protobuf)"
+      export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_snappy}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
+      export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_snappy}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
+    fi
   fi
 }
 
@@ -545,13 +558,13 @@ check_snappy() {
 show_info "Install packages on virtual environments..."
 cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 check_snappy
 pip install -U -e ../common -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 pip install -U -e ../common -r requirements/dev.txt
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   $sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
@@ -564,17 +577,17 @@ fi
 
 cd "${INSTALL_PATH}/common"
 pyenv local "venv-${ENV_ID}-common"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 pip install -U -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/storage-proxy"
 pyenv local "venv-${ENV_ID}-storage-proxy"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 pip install -U -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/console-server"
 pyenv local "venv-${ENV_ID}-console-server"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 pip install -U -r requirements/dev.txt
 
 # Copy default configurations
