@@ -113,8 +113,8 @@ todo_include_todos = False
 numfig = True
 
 intersphinx_mapping = {
-    'client-py':
-        ('https://client-py.docs.backend.ai/en/latest/', None),
+    'python': ('https://docs.python.org/3/', None),
+    'client-py': ('https://client-py.docs.backend.ai/en/latest/', None),
 }
 
 
