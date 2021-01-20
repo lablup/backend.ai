@@ -7,7 +7,7 @@ What is GraphQL?
 Graphene Schema Objects
 -----------------------
 
-Writing resolvers
+Writing Resolvers
 -----------------
 
 Pagination
@@ -16,7 +16,7 @@ Pagination
 Batching database queries
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Writing mutations
+Writing Mutations
 -----------------
 
 Permissions and Authorization
