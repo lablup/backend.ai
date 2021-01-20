@@ -15,6 +15,11 @@ Backend.AI Manager has a small, minimal framework to directly execute long-runni
 The background tasks are wrapped as a separate asyncio task, separate to the API handler task implicitly created by aiohttp.
 The clients can query the task status with a reference ID via any manager instance, because the progress updates of a background task is propagated via :ref:`the event bus <event-bus>`.
 
+Example scenarios:
+
+* When a client invokes the container registry rescan API, the API handler creates a background task and return the task ID immediately.
+  The client keeps track of the progress and result of registry scanning via the background task API using the returned task ID.
+
 
 Writing BGTask-enabled API Handler
 ----------------------------------
@@ -22,7 +27,9 @@ Writing BGTask-enabled API Handler
 TODO
 
 
-Implementation Notes for Clients
+.. _bgtask-sse-api:
+
+The SSE API for Background Tasks
 --------------------------------
 
-TODO
+TOD
