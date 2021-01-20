@@ -104,6 +104,7 @@ Table of Contents
    :maxdepth: 1
    :caption: Developer Manuals
 
+   dev/index
    install/development-setup
    dev/adding-kernels
 
