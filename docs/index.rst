@@ -106,7 +106,6 @@ Table of Contents
 
    dev/index
    install/development-setup
-   dev/adding-kernels
 
 
 
