@@ -18,3 +18,6 @@ Batching database queries
 
 Writing mutations
 -----------------
+
+Permissions and Authorization
+-----------------------------
