@@ -10,5 +10,8 @@ Initialization and shutdown
 Cleanup Context
 ---------------
 
+API Parameter Validation
+------------------------
+
 Public Interfaces
 -----------------

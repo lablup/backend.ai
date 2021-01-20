@@ -5,13 +5,21 @@ Developer Manual
    :maxdepth: 2
    :caption: Manager Subsystems
 
-   subsys/gw-api
-   subsys/gql-api
-   subsys/models
-   subsys/bgtask
-   subsys/eventbus
-   subsys/scheduler
-   subsys/idle
+   manager/mps
+   manager/gw-api
+   manager/gql-api
+   manager/models
+   manager/bgtask
+   manager/eventbus
+   manager/scheduler
+   manager/idle
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Agent Subsystems
+
+   agent/backend
+   agent/statistics
 
 .. toctree::
    :maxdepth: 2
