@@ -1,2 +1,2 @@
-Writing Hook Plugins
-====================
+Hook Plugins
+============

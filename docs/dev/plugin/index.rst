@@ -5,5 +5,7 @@ Writing Plugins
 
    context
    hook
+   accelerator
    monitor
    watcher
+   webapp

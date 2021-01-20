@@ -1,4 +1,20 @@
 Event Bus
 =========
 
-TODO
+Concept
+-------
+
+Event Dispatcher
+----------------
+
+Subscriber
+~~~~~~~~~~
+
+Consumer
+~~~~~~~~
+
+Producing events
+----------------
+
+Synchronization
+---------------

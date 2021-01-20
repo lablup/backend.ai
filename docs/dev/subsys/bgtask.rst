@@ -1,4 +1,11 @@
 Background Task Framework
 =========================
 
-TODO
+Problems of Long-running API Handlers
+-------------------------------------
+
+Writing BGTask-enabled API Handler
+----------------------------------
+
+Implementation Notes for Clients
+--------------------------------

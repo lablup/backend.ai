@@ -1,2 +1,2 @@
-Writing Monitoring Plugins
-==========================
+Monitoring Plugins
+==================

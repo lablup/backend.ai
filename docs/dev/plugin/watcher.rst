@@ -1,2 +1,2 @@
-Writing Watcher Plugins
-=======================
+Watcher Plugins
+===============
