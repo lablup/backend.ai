@@ -20,5 +20,8 @@ Each process initializes its own event loop and an aiohttp application stack, wi
 To run multiple manager nodes, there should be a multiplexer in front of them, such as a load balancer or a reverse proxy.
 Since each API request is considered stateless and any necessary synchronization is done by the manager instances, the load balancer may spread out individual TCP connections, assuming that there is no dependency across different connections.
 
+The operator may add or remove the manager instances at any time, as long as at least one instance is available.
+Addition of instances does not affect existing connections but removal of instances may interrupt a portion of active connections handled by them.
+
 
 .. [1] `The SO_REUSEPORT socket option <https://lwn.net/Articles/542629/>`_
