@@ -4,11 +4,17 @@ Writing GraphQL API Modules
 What is GraphQL?
 ----------------
 
-Graphene
---------
+Graphene Schema Objects
+-----------------------
 
-Writing resolver methods
-~~~~~~~~~~~~~~~~~~~~~~~~
+Writing resolvers
+-----------------
+
+Pagination
+~~~~~~~~~~
 
 Batching database queries
 ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Writing mutations
+-----------------

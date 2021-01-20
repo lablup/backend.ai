@@ -10,6 +10,9 @@ Initialization and shutdown
 Cleanup Context
 ---------------
 
+Authentication
+--------------
+
 API Parameter Validation
 ------------------------
 
