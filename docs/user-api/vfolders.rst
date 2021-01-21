@@ -130,11 +130,10 @@ Creates a virtual folder associated with the current API key.
 Parameters
 """"""""""
 
+.. TODO: usage_mode, permission, quota, cloneable -> create func.
 .. list-table::
    :widths: 15 5 80
    :header-rows: 1
-
-.. TODO: usage_mode, permission, quota, cloneable -> create func.
 
    * - Parameter
      - Type
@@ -175,11 +174,11 @@ Response
      - You have exceeded internal limits of virtual folders.
        (e.g., the maximum number of folders you can have.)
 
+.. TODO: usage_mode, permission,creator, ownership_type, user, group, cloneable.
+
 .. list-table::
    :widths: 15 5 80
    :header-rows: 1
-
-.. TODO: usage_mode, permission,creator, ownership_type, user, group, cloneable.
 
    * - Fields
      - Type
@@ -245,14 +244,13 @@ Response
      - There is no such folder or you may not have proper permission
        to access the folder.
 
+.. TODO: name, id, host, numFiles, num_files, used_bytes,
+   created, created_at, last_used, user, group, type, is_owner,
+   permission, usage_mode, cloneable.
+
 .. list-table::
    :widths: 15 5 80
    :header-rows: 1
-
-..
-   TODO: name, id, host, numFiles, num_files, used_bytes,
-   created, created_at, last_used, user, group, type, is_owner,
-   permission, usage_mode, cloneable.
 
    * - Fields
      - Type
@@ -347,11 +345,11 @@ Response
      - There is no such path or you may not have proper permission
        to access the folder.
 
+.. TODO: items.
+
 .. list-table::
    :widths: 15 10 80
    :header-rows: 1
-
-.. TODO: items.
 
    * - Fields
      - Type
@@ -426,11 +424,11 @@ this API recursively creates parent directories if they does not exist.
 Parameters
 """"""""""
 
+.. TODO: parents, exist_ok.
+
 .. list-table::
    :widths: 15 10 80
    :header-rows: 1
-
-.. TODO: parents, exist_ok.
 
    * - Parameter
      - Type
