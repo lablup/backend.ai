@@ -1,5 +1,5 @@
 Session Management
-=================
+==================
 
 Here are the API calls to create and manage compute sessions.
 
@@ -15,6 +15,9 @@ Creates a new session or returns an existing session, depending on the parameter
 
 Parameters
 """"""""""
+
+.. TODO: template_id, session_id, name, type, startup_command, cluster_size,
+   cluster_mode, reuse, owner_access_key, bootstrap_script -> _create.
 
 .. list-table::
    :widths: 15 5 80
@@ -139,6 +142,8 @@ Response
    * - 406 Not acceptable
      - The requested resource limits exceed the server's own limits.
 
+.. TODO: sessionName.
+
 .. list-table::
    :widths: 15 5 80
    :header-rows: 1
@@ -230,6 +235,11 @@ Response
    * - 404 Not Found
      - There is no such session.
 
+.. TODO: domainName, groupId, userId, image, registry, tag,
+   containerId, occupiedSlots, occupiedShares, environ,
+   status, statusInfo, statusData,creationTime, terminationTime, lastStat
+   -> get_info.
+
 .. list-table::
    :widths: 15 5 80
    :header-rows: 1
@@ -264,6 +274,8 @@ Terminates a session.
 
 Parameters
 """"""""""
+
+.. TODO: forced -> destroy.
 
 .. list-table::
    :widths: 15 5 80
@@ -339,3 +351,17 @@ Response
      - The session is successfully restarted.
    * - 404 Not Found
      - There is no such session.
+
+.. TODO: web.Response를 반환하는 async 함수
+   Match Sessions -> match_session
+   Execute Session -> execute
+   Interrupt Session -> interrupt
+   Complete Session -> complete
+   Shutdown Service -> shutdown_service
+   Upload Files -> upload_files
+   Download Files -> download_files
+   Download Single -> download_single
+   List Files -> list_files
+   Get Container Logs -> get_container_logs.
+
+
