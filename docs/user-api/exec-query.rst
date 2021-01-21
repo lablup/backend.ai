@@ -16,6 +16,7 @@ When the session is terminated or restarted, all such volatile states vanish.
 Parameters
 """"""""""
 
+.. TODO: options -> execute.
 .. list-table::
    :widths: 15 5 80
    :header-rows: 1
