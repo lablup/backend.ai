@@ -354,14 +354,14 @@ Response
 
 .. TODO: web.Response를 반환하는 async 함수
    Match Sessions -> match_session
-   Execute Session -> execute
+   Execute Session -> execute (exec-batch.rst)
    Interrupt Session -> interrupt
    Complete Session -> complete
    Shutdown Service -> shutdown_service
    Upload Files -> upload_files
-   Download Files -> download_files
-   Download Single -> download_single
-   List Files -> list_files
+   Download Files -> download_files (exec-batch.rst)
+   Download Single -> download_single (exec-batch.rst)
+   List Files -> list_files (exec-batch.rst)
    Get Container Logs -> get_container_logs.
 
 
