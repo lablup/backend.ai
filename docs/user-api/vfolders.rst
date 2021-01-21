@@ -134,6 +134,8 @@ Parameters
    :widths: 15 5 80
    :header-rows: 1
 
+.. TODO: usage_mode, permission, quota, cloneable -> create func.
+
    * - Parameter
      - Type
      - Description
@@ -176,6 +178,8 @@ Response
 .. list-table::
    :widths: 15 5 80
    :header-rows: 1
+
+.. TODO: usage_mode, permission,creator, ownership_type, user, group, cloneable.
 
    * - Fields
      - Type
@@ -244,6 +248,11 @@ Response
 .. list-table::
    :widths: 15 5 80
    :header-rows: 1
+
+..
+   TODO: name, id, host, numFiles, num_files, used_bytes,
+   created, created_at, last_used, user, group, type, is_owner,
+   permission, usage_mode, cloneable.
 
    * - Fields
      - Type
@@ -342,6 +351,8 @@ Response
    :widths: 15 10 80
    :header-rows: 1
 
+.. TODO: items.
+
    * - Fields
      - Type
      - Values
@@ -418,6 +429,8 @@ Parameters
 .. list-table::
    :widths: 15 10 80
    :header-rows: 1
+
+.. TODO: parents, exist_ok.
 
    * - Parameter
      - Type
