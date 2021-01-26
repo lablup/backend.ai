@@ -42,7 +42,7 @@ The second condition applies only when the value of ``group`` is given explicitl
 If ``scaling_group`` is not ``null``, then only the agents in the given scaling group are checked for image availability instead of taking the union of all agents from the allowed scaling groups.
 
 If the requesting user is a super-admin, clients may set the filter conditions as they want.
-In this case, setting no conditions works like v19.09 and prior versions.
+If the filter conditions are not specified by the super-admin, clients work like v19.09 and prior versions
 
 .. versionadded:: v5.20191215
 
