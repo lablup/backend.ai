@@ -1,0 +1,396 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2020, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation v5.20191215\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-01-26 12:32+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.8.0\n"
+
+#: ../../admin-api/agents.rst:2
+msgid "Agent Monitoring"
+msgstr ""
+
+#: ../../admin-api/agents.rst:5 ../../admin-api/domains.rst:5
+#: ../../admin-api/groups.rst:5 ../../admin-api/images.rst:5
+#: ../../admin-api/keypair-resource-policies.rst:5
+#: ../../admin-api/keypairs.rst:5 ../../admin-api/resource-presets.rst:5
+#: ../../admin-api/scaling-groups.rst:5 ../../admin-api/sessions.rst:10
+#: ../../admin-api/users.rst:5 ../../admin-api/vfolders.rst:5
+msgid "Query Schema"
+msgstr ""
+
+#: ../../admin-api/domains.rst:2
+msgid "Domain Management"
+msgstr ""
+
+#: ../../admin-api/domains.rst:28 ../../admin-api/groups.rst:29
+#: ../../admin-api/images.rst:57
+#: ../../admin-api/keypair-resource-policies.rst:28
+#: ../../admin-api/keypairs.rst:33 ../../admin-api/resource-presets.rst:22
+#: ../../admin-api/scaling-groups.rst:29 ../../admin-api/users.rst:36
+msgid "Mutation Schema"
+msgstr ""
+
+#: ../../admin-api/groups.rst:2
+msgid "Group Management"
+msgstr ""
+
+#: ../../admin-api/images.rst:2
+msgid "Image Management"
+msgstr "이미지 관리"
+
+#: ../../admin-api/images.rst:38
+msgid ""
+"The image list is automatically filtered by: 1) the allowed docker "
+"registries of the current user's domain, 2) whether at least one agent in"
+" the union of all agents from the allowed scaling groups for the current "
+"user's group has the image or not. The second condition applies only when"
+" the value of ``group`` is given explicitly. If ``scaling_group`` is not "
+"``null``, then only the agents in the given scaling group are checked for"
+" image availability instead of taking the union of all agents from the "
+"allowed scaling groups."
+msgstr "이미지 목록은 다음 두 조건을 모두 만족하는 경우를 자동으로 필터링하여 표시됩니다. 1) 현재 사용자가 속한 도메인에서 허용된 도커 레지스트리, 2) 현재 사용자가 속한 그룹에게 허용된 모든 스케일링 그룹의 에이전트 중 하나 이상의 에이전트가 해당 이미지를 가지고 있는 경우 (''group''의 값이 명시된 경우에만 적용됨). "
+"만약 ''scaling_group''이 ''null'' 이 아닌 경우, 허용된 모든 스케일링 그룹의 에이전트를 모두 확인하는 대신 해당 스케일링 그룹에 속한 에이전트만을 확인하여 이미지 유효성을 점검합니다."
+
+#: ../../admin-api/images.rst:44
+msgid ""
+"If the requesting user is a super-admin, clients may set the filter "
+"conditions as they want. In this case, setting no conditions works like "
+"v19.09 and prior versions."
+msgstr ""
+"수퍼어드민의 경우 필터 조건을 원하는대로 설정할 수 있습니다. 필터 조건을 따로 설정하지 않으면 v19.09 및 그 이전 버전처럼 작동합니다."
+
+#: ../../admin-api/images.rst:49
+msgid ""
+"``domain``, ``group``, and ``scaling_group`` filters are added to the "
+"``images`` root query field."
+msgstr "''domain'', ''group'', 그리고 ''scaling_group'' 필터가 ''image'' 의 루트 쿼리 필드에 추가되었습니다. "
+
+#: ../../admin-api/images.rst:53
+msgid ""
+"``images`` query returns the images currently usable by the requesting "
+"user as described above. Previously, it returned all etcd-registered "
+"images."
+msgstr "''images'' 쿼리는 위에서 설명한 바와 같이 요청하는 사용자가 현재 사용할 수 있는 이미지를 보여줍니다. 이전에는 모든 etcd 등록 이미지를 보여주었습니다."
+
+#: ../../admin-api/images.rst:103
+msgid "All these mutations are only allowed for super-admins."
+msgstr "뮤테이션은 수퍼어드민에게만 허용됩니다."
+
+#: ../../admin-api/images.rst:105
+msgid ""
+"The query parameter ``target_agents`` takes a special expression to "
+"indicate a set of agents."
+msgstr "쿼리 매개변수 ''target_agents''는 에이전트의 집합을 나타내기 위해 특수한 표현을 사용합니다."
+
+#: ../../admin-api/images.rst:107
+msgid ""
+"The mutations that returns ``task_id`` may take an arbitrarily long time "
+"to complete. This means that getting the response does not necessarily "
+"mean that the requested task is complete. To monitor the progress and "
+"actual completion, clients should use :ref:`the background task API "
+"<bgtask-progress-events>` using the ``task_id`` value."
+msgstr "''task_id''를 반환하는 뮤테이션은 완료되는데 긴 시간이 걸릴 수 있습니다. 즉, 응답을 받는다고 해서 요청한 작업이 완료되었다는 뜻은 아닙니다. 진행 상황과 실제 작업 완료를 확인하려면, 클라이언트는 ''task_id'' 값을 사용하여 :ref:'백그라운드 작업 API<bgtask-progress-events>'를 사용해야 합니다. "
+
+#: ../../admin-api/images.rst:113
+msgid ""
+"``forget_image``, ``preload_image`` and ``unload_image`` are added to the"
+" root mutation."
+msgstr "''forget_image'', ''preload_image'', 그리고 ''unload_image''가 루트 뮤테이션에 추가되었습니다."
+
+#: ../../admin-api/images.rst:117
+msgid ""
+"``rescan_images`` now returns immediately and its completion must be "
+"monitored using the new background task API."
+msgstr "이제 ''rescan_images''가 즉시 반환되며, ''rescan_image'' 완료는 새로운 백그라운드 작업 API를 사용하여 확인 해야합니다."
+
+#: ../../admin-api/intro.rst:2
+msgid "Introduction"
+msgstr "소개"
+
+#: ../../admin-api/intro.rst:4
+msgid "Backend.AI's Admin API is for developing in-house management consoles."
+msgstr "Backend.AI 어드민 API는 사내 관리 콘솔을 개발하기 위한 도구로, 다음과 같은 두 가지 작동 모드가 있습니다. "
+
+#: ../../admin-api/intro.rst:6
+msgid "There are two modes of operation:"
+msgstr ""
+
+#: ../../admin-api/intro.rst:8
+msgid ""
+"Full admin access: you can query all information of all users. It "
+"requires a privileged keypair."
+msgstr "전체 관리자 접근: 모든 사용자에 대한 모든 정보를 쿼리할 수 있습니다. 상응하는 (전체 관리자) 권한을 가진 키페어가 필요합니다. "
+
+#: ../../admin-api/intro.rst:10
+msgid ""
+"Restricted owner access: you can query only your own information. The "
+"server processes your request in this mode if you use your own plain "
+"keypair."
+msgstr "제한된 소유자 접근: 자신에 대한 정보만을 쿼리할 수 있습니다. 일반적인 키페어를 사용하는 경우, 기본적으로 제한된 소유자 접근 모드로 작동합니다. "
+
+#: ../../admin-api/intro.rst:15
+msgid "The Admin API *only* accepts authenticated requests."
+msgstr "어드민 API 는 오직 인증된 요청만을 수락합니다."
+
+#: ../../admin-api/intro.rst:19
+msgid ""
+"To test and debug with the Admin API easily, try the proxy mode of `the "
+"official Python client <https://pypi.python.org/pypi/backend.ai-"
+"client>`_. It provides an insecure (non-SSL, non-authenticated) local "
+"HTTP proxy where all the required authorization headers are attached from"
+" the client configuration. Using this you do not have to add any custom "
+"header configurations to your favorite API development tools such as "
+"`GraphiQL <https://github.com/graphql/graphiql>`_."
+msgstr "어드민 API 로 쉽게 테스트와 디버깅을 하려면, '공식 파이썬 클라이언트<https://pypi.python.org/pypi/backend.ai-client>'_의 프록시 모드를 사용해 보세요. 프록시 모드는 안전하지 않은 (비SSL, 비인증) 로컬 HTTP 프록시를 제공하는데, 필요한 모든 인증 헤더가 클라이언트 구성에서 첨부됩니다. 프록시 모드를 사용하면 사용자는 'GraphiQL<https://github.com/graphql/graphiql>'_과 같이 자주 사용하는 API 개발 도구에 사용자 지정 헤더 구성을 추가할 필요가 없습니다. "
+
+#: ../../admin-api/intro.rst:24
+msgid "Basics of GraphQL"
+msgstr "GraphQL 기본"
+
+#: ../../admin-api/intro.rst:26
+msgid ""
+"The Admin API uses a single GraphQL endpoint for both queries and "
+"mutations."
+msgstr "어드민 API는 쿼리와 뮤테이션 모두에 단일 GraphQL 엔드포인트를 사용합니다. "
+
+#: ../../admin-api/intro.rst:32
+msgid ""
+"For more information about GraphQL concepts and syntax, please visit the "
+"following site(s):"
+msgstr "GraphQL의 개념과 문법에 관해서 더 알고 싶으면 아래 사이트를 방문하세요."
+
+#: ../../admin-api/intro.rst:34
+msgid "`GraphQL official website <http://graphql.org/>`_"
+msgstr "'GraphQL 공식 웹사이트 <http://graphql.org/>'_"
+
+#: ../../admin-api/intro.rst:38
+msgid "HTTP Request Convention"
+msgstr "HTTP 요청 규칙"
+
+#: ../../admin-api/intro.rst:40
+msgid ""
+"A client must use the ``POST`` HTTP method. The server accepts a JSON-"
+"encoded body with an object containing two fields: ``query`` and "
+"``variables``, pretty much like other GraphQL server implementations."
+msgstr "클라이언트는 ''POST'' HTTP 메소드를 사용해야 합니다. 다른 GraphQL 서버 구현과 마찬가지로, 서버는 ''query''와 ''variables'', 두 필드를 포함한 객체를 가진 JASON 인코딩된 바디를 받습니다."
+
+#: ../../admin-api/intro.rst:46
+msgid ""
+"Currently the API gateway does not support schema discovery which is "
+"often used by API development tools such as Insomnia and GraphiQL."
+msgstr "현재 API 게이트웨이는 Insomnia나 GraphQL 같은 API 개발 도구에서 자주 사용되는 스키마 검색을 지원하지 않습니다."
+
+#: ../../admin-api/intro.rst:51
+msgid "Field Naming Convention"
+msgstr "필드 명명 규칙"
+
+#: ../../admin-api/intro.rst:53
+msgid ""
+"We do *NOT* automatically camel-case our field names. All field names "
+"follow the underscore style, which is common in the Python world as our "
+"server-side framework uses Python."
+msgstr "필드 이름이 카멜케이스 표기로 자동 변환되지 않습니다. 모든 필드 이름은 밑줄 스타일을 따릅니다. 서버 측 프레임워크가 파이썬을 사용하고 있고, 밑줄 스타일의 필드 명명 규칙은 파이썬에서 일반적으로 사용되기 때문입니다. "
+
+#: ../../admin-api/intro.rst:59
+msgid "Common Object Types"
+msgstr "공통 객체 유형"
+
+#: ../../admin-api/intro.rst:61
+msgid ""
+"``ResourceLimit`` represents a range (``min``, ``max``) of specific "
+"resource slot (``key``). The ``max`` value may be the string constant "
+"\"Infinity\" if not specified."
+msgstr "''ResourceLimit'' 는 특정 리소스 슬롯(''key'')의 범위(''min'', ''max'')를 나타냅니다. 최대값을 특정하지 않으면 문자열 상수 “infinity” 가 기본값입니다."
+
+#: ../../admin-api/intro.rst:72
+msgid ""
+"``KVPair`` is used to represent a mapping data structure with arbitrary "
+"(runtime-determined) key-value pairs, in contrast to other data types in "
+"GraphQL which have a set of predefined static fields."
+msgstr "''KVPair''는 런타임으로 정해진 임의의 키-값 쌍으로 매핑 데이터 구조를 나타냅니다. 사전 정의된 정적 필드 집합이 있는 GraphQL의 다른 데이터 유형과는 다릅니다. "
+
+#: ../../admin-api/intro.rst:83
+msgid "Pagination Convention"
+msgstr "페이지 매김 규칙"
+
+#: ../../admin-api/intro.rst:85
+msgid ""
+"GraphQL itself does not enforce how to pass pagination information when "
+"querying multiple objects of the same type."
+msgstr "GraphQL 규격 자체에서는 동일한 유형의 여러 객체를 쿼리할 때 어떻게 페이지 매김 정보를 전달할지 정해져 있지 않으므로, 아래의 규칙에 따라 페이지를 매깁니다. "
+
+#: ../../admin-api/intro.rst:88
+msgid "We use a pagination convention as described below:"
+msgstr ""
+
+#: ../../admin-api/intro.rst:109
+msgid ""
+"``offset`` and ``limit`` are interpreted as SQL's offset and limit "
+"clauses. For the first page, set the offset to zero and the limit to the "
+"page size. The ``items`` field may contain from zero up to ``limit`` "
+"items. Use ``total_count`` field to determine how many pages are there. "
+"Fields that support pagination is suffixed with ``_list`` in our schema."
+msgstr "''offset''과 ''limit''는 SQL의 offset과 limit 절로 해석됩니다. 첫 페이지에서는 offset을 0으로, limit을 페이지 크기로 맞춥니다. ''item'' 필드는 0에서 ''limit'' 개 사이의 항목을 가집니다. ''total_count'' 필드는 총 페이지 수를 정해줍니다. 페이지 매김을 지원하는 필드는 스키마에서 ''_list'' 접미사가 붙습니다. "
+
+#: ../../admin-api/intro.rst:117
+msgid "Custom Scalar Types"
+msgstr "사용자 지정 스칼라 유형"
+
+#: ../../admin-api/intro.rst:119
+msgid ""
+"``UUID``: A hexademically formatted (8-4-4-4-12 alphanumeric characters "
+"connected via single hyphens) UUID values represented as ``String``"
+msgstr "''UUID'': 16진수 형식의 문자 UUID 값으로, 단일 하이픈을 통해 연결된 8-4-4-4-12 영숫자 문자열로 표시됩니다."
+
+#: ../../admin-api/intro.rst:120
+msgid ""
+"``DateTime``: An ISO-8601 formatted date-time value represented as "
+"``String``"
+msgstr "''DataTime'': ISO-8601 형식의 날짜-시간 값으로, 문자열로 표시됩니다. "
+
+#: ../../admin-api/intro.rst:121
+msgid ""
+"``BigInt``: GraphQL's integer is officially 32-bits only, so we define a "
+"\"big integer\" type which can represent from -9007199254740991 (-2\\ "
+":sup:`53`\\ +1) to 9007199254740991 (2\\ :sup:`53`\\ -1) (or, ±(8 PiB - 1"
+" byte). This range is regarded as a \"safe\" (i.e., can be compared "
+"without loosing precision) integer range in most Javascript "
+"implementations which represent numbers in the IEEE-754 double (64-bit) "
+"format."
+msgstr "''BigInt'': GraphQL의 정수는 공식적으로 32 비트 전용이므로 -9007199254740991 (-2\\ "
+":sup:`53`\\ +1)에서 9007199254740991 (2\\ :sup:`53`\\ -1) (또는 ± (8 PiB-1 바이트))까지 나타낼 수 있는 \"큰 정수\" 유형을 정의합니다. 이 범위는 IEEE-754 double (64 비트) 형식의 숫자를 나타내는 대부분의 자바스크립트 구현에서 \"안전한\" (즉, 정밀도를 잃지 않고 비교할 수 있는) 정수 범위로 간주됩니다."
+
+#: ../../admin-api/intro.rst:124
+msgid ""
+"``JSONString``: It contains a stringified JSON value, whereas the whole "
+"query result is already a JSON object.  A client must parse the value "
+"*again* to get an object representation."
+msgstr "''JSONString'': 문자열화 된 JSON 값을 포함합니다. 전체 쿼리 결과는 이미 JSON 객체이므로, 클라이언트는 객체 표현을 얻기 위해 이 값을 *다시* 구문 분석해야 합니다."
+
+#: ../../admin-api/intro.rst:128
+msgid "Authentication"
+msgstr "인증"
+
+#: ../../admin-api/intro.rst:130
+msgid "The admin API shares the same authentication method of the user API."
+msgstr "어드민 API는 사용자 API와 동일한 인증 방법을 따릅니다."
+
+#: ../../admin-api/intro.rst:134
+msgid "Versioning"
+msgstr "버전 관리"
+
+#: ../../admin-api/intro.rst:136
+msgid ""
+"As we use GraphQL, there is no explicit versioning. Check out the "
+"descriptions for each API for its own version history."
+msgstr "GraphQL을 사용하므로 명시적인 버전 관리가 없습니다. 각 API의 버전 이력은 각각의 설명을 참고하세요."
+
+#: ../../admin-api/keypair-resource-policies.rst:2
+msgid "KeyPair Resource Policy Management"
+msgstr "키페어 자원 정책 관리"
+
+#: ../../admin-api/keypairs.rst:2
+msgid "KeyPair Management"
+msgstr "키페어 관리"
+
+#: ../../admin-api/resource-presets.rst:2
+msgid "Resource Preset Management"
+msgstr "자원 프리셋 관리"
+
+#: ../../admin-api/scaling-groups.rst:2
+msgid "Scaling Group Management"
+msgstr "스케일링 그룹 관리"
+
+#: ../../admin-api/sessions.rst:2
+msgid "Compute Session Monitoring"
+msgstr "연산 세션 모니터링"
+
+#: ../../admin-api/sessions.rst:4
+msgid ""
+"As of Backend.AI v20.03, compute sessions are composed of one or more "
+"containers, while interactions with sessions only occur with the *master*"
+" container when using REST APIs. The GraphQL API allows users and admins "
+"to check details of sessions and their belonging containers."
+msgstr "Backend.AI v20.03부터 연산 세션은 하나 이상의 컨테이너로 구성되지만, 세션과의 상호 작용은 REST API를 사용할 때 *마스터* 컨테이너에서만 발생합니다. GraphQL API를 사용하면 사용자와 어드민이 세션의 세부 정보와 해당 세션에 속한 컨테이너를 확인할 수 있습니다."
+
+#: ../../admin-api/sessions.rst:12
+msgid ""
+"``ComputeSession`` provides information about the whole session, "
+"including user-requested parameters when creating sessions."
+msgstr "''ComputeSession''은 세션을 생성할 때 사용자가 요청한 매개 변수 및 전체 세션에 대한 정보를 제공합니다."
+
+#: ../../admin-api/sessions.rst:65
+msgid ""
+"The sessions may be queried one by one using ``compute_sesssion`` field "
+"on the root query schema, or as a paginated list using "
+"``compute_session_list``."
+msgstr "루트 쿼리 스키마의 ''compute_session'' 필드를 이용해 세션을 하나씩 쿼리할 수도 있고, ''compute_session_list''를 이용해 페이지 매긴 목록으로 세션을 쿼리할 수도 있습니다."
+
+#: ../../admin-api/sessions.rst:87
+msgid ""
+"``ComputeContainer`` provides information about individual containers "
+"that belongs to the given session. Note that the client must assume that "
+"``id`` is different from ``container_id``, because agents may be "
+"configured to use non-Docker backends."
+msgstr "''ComputeContainer''는 주어진 세션에 속한 개별 컨테이너에 대한 정보를 제공합니다. 에이전트가 비 도커 백엔드를 사용하도록 구성될 수 있으므로, 클라이언트는 ''id''가 ''container_id''와 다르다고 가정해야 합니다."
+
+#: ../../admin-api/sessions.rst:92
+msgid ""
+"The container ID in the GraphQL queries and REST APIs are *different* "
+"from the actual Docker container ID. The Docker container IDs can be "
+"queried using ``container_id`` field of ``ComputeContainer`` objects. If "
+"the agents are configured to using non-Docker-based backends, then "
+"``container_id`` may also be completely arbitrary identifiers."
+msgstr "GraphQL 쿼리 및 REST API의 컨테이너 ID는 실제 도커 컨테이너 ID와 *다릅니다*. 도커 컨테이너 ID는 ''ComputeContainer'' 객체의 ''container_id'' 필드를 사용하여 쿼리 할 수 있습니다. 에이전트가 비 도커 기반 백엔드를 사용하도록 구성된 경우 ''container_id''는 완전히 임의의 식별자일 수도 있습니다."
+
+#: ../../admin-api/sessions.rst:128
+msgid ""
+"In the same way, the containers may be queried one by one using "
+"``compute_container`` field on the root query schema, or as a paginated "
+"list using ``compute_container_list`` for a single session."
+msgstr "마찬가지로, 루트 쿼리 스키마의 ''compute_container'' 필드를 이용해 컨테이너를 하나씩 쿼리할 수도 있고, ''compute_container_list''를 이용해 페이지 매긴 목록으로 단일 세션의 컨테이너를 쿼리할 수도 있습니다."
+
+#: ../../admin-api/sessions.rst:132
+msgid ""
+"The container ID of the master container of each session is same to the "
+"session ID."
+msgstr "각 세션의 마스터 컨테이너의 컨테이너 ID는 세션 ID와 동일합니다. "
+
+#: ../../admin-api/sessions.rst:150
+msgid "Query Example"
+msgstr "쿼리 예제"
+
+#: ../../admin-api/sessions.rst:185
+msgid "API Parameters"
+msgstr "API 매개변수"
+
+#: ../../admin-api/sessions.rst:187
+msgid ""
+"Using the above GraphQL query, clients may send the following JSON object"
+" as the request:"
+msgstr "상기한 GraphQL 쿼리를 이용하여, 클라이언트는 다음과 같은 JSON 객체를 요청으로 보낼 수 있습니다."
+
+#: ../../admin-api/sessions.rst:202
+msgid "API Response"
+msgstr "API 응답"
+
+#: ../../admin-api/users.rst:2
+msgid "User Management"
+msgstr "사용자 관리"
+
+#: ../../admin-api/vfolders.rst:2
+msgid "Virtual Folder Management"
+msgstr "가상 폴더 관리"
+
