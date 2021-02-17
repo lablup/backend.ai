@@ -15,15 +15,15 @@ The delivery of events is handled by the Redis service deployed in the Backend.A
 
 Example scenarios:
 
-* When an agent starts up and shuts down, it generates ``instance_started`` and ``instance_terminated`` events so that the manager can start/stop checking heartbeat intervals.
-  The heartbeats are also events named ``instance_heartbeat``.
+* When an agent starts up and shuts down, it generates ``AgentStarted`` and ``AgentTerminated`` events so that the manager can start/stop checking heartbeat intervals.
+  The heartbeats are also events named ``AgentHeartbeat``.
 
-* When an agent starts a container, it generates a ``kernel_started`` event.
-  Whenever a manager instance receives a ``kernel_started`` event, it checks whether all kernels that belong to the same cluster session have started or not. If so, it fires a ``session_started`` event.
+* When an agent starts a container, it generates a ``KernelStarted`` event.
+  Whenever a manager instance receives a ``KernelStarted`` event, it checks whether all kernels that belong to the same cluster session have started or not. If so, it fires a ``SessionStarted`` event.
 
 * A background task is executed in a specific manager instance, but the API requests to query background task status may be routed to any manager instance.
   Here the progress updates of background tasks must be visible by all manager instances.
-  So all manager instances set up subscribers for ``task_updated``, ``task_done``, ``task_cancelled``, and ``task_failed`` events and translates the stream of these events as :ref:`the background task SSE API <bgtask-sse-api>`.
+  So all manager instances set up subscribers for ``BgtaskUpdated``, ``BgtaskDone``, ``BgtaskCancelled``, and ``BgtaskFailed`` events and translates the stream of these events as :ref:`the background task SSE API <bgtask-sse-api>`.
 
 Event Dispatcher
 ----------------
