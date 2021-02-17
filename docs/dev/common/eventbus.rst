@@ -45,8 +45,8 @@ Only one manager instance receives the event message.
 Internally this is implemented using Redis lists, where the Redis daemon wakes up the clients (here, manager instances) blocked at the ``BLPOP`` command in a round-robin fashion.
 
 
-Producing events
-----------------
+Event Producer
+--------------
 
 Any manager instance or agent instance may produce event messages at any time.
 The event messages are msgpack-encoded object with the following fields:
