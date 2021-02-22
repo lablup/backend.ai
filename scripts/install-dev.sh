@@ -570,12 +570,12 @@ pip install -U -r requirements/dev.txt
 cd "${INSTALL_PATH}/storage-proxy"
 pyenv local "venv-${ENV_ID}-storage-proxy"
 pip install -U -q pip setuptools
-pip install -U -r requirements/dev.txt
+pip install -U -e ../common -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/console-server"
 pyenv local "venv-${ENV_ID}-console-server"
 pip install -U -q pip setuptools
-pip install -U -r requirements/dev.txt
+pip install -U -e ../common -r requirements/dev.txt
 
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
