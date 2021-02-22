@@ -527,6 +527,7 @@ git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-storage-proxy storage-proxy
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-console-server console-server
+git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
 
 if [ $ENABLE_CUDA -eq 1 ]; then
   git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
@@ -575,7 +576,7 @@ pip install -U -e ../common -r requirements/dev.txt
 cd "${INSTALL_PATH}/console-server"
 pyenv local "venv-${ENV_ID}-console-server"
 pip install -U -q pip setuptools
-pip install -U -e ../common -r requirements/dev.txt
+pip install -U -e ../client-py -r requirements/dev.txt
 
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
@@ -651,9 +652,7 @@ $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:dev
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
 
 show_info "Installing Python client SDK/CLI source..."
-cd "${INSTALL_PATH}"
 # Install python client package
-git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
 cd "${INSTALL_PATH}/client-py"
 pyenv local "venv-${ENV_ID}-client"
 pip install -U -q pip setuptools
