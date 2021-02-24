@@ -175,4 +175,4 @@ sessions and shared between users and user groups with differentiated privileges
 License
 -------
 
-Refer to [LICENSE file](https://github.com/lablup/backend.ai/blob/master/LICENSE).
+Refer to [LICENSE file](https://github.com/lablup/backend.ai/blob/main/LICENSE).

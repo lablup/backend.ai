@@ -88,9 +88,9 @@ Any Docker image based on Alpine 3.8+, CentOS 7+, and Ubuntu 16.04+ become a Bac
     (e.g., ``JULIA_CPU_CORES``, ``OPENBLAS_NUM_THREADS``)
 
 .. |ai.backend.kernel nslink| replace:: the ``ai.backend.kernels`` namespace.
-.. _ai.backend.kernel nslink: https://github.com/lablup/backend.ai-agent/tree/master/src/ai/backend/kernel
+.. _ai.backend.kernel nslink: https://github.com/lablup/backend.ai-agent/tree/main/src/ai/backend/kernel
 .. |ai.backend.kernel modlink| replace:: check out the ``lang_map`` variable at the ``ai.backend.kernels`` module code
-.. _ai.backend.kernel modlink: https://github.com/lablup/backend.ai-agent/blob/master/src/ai/backend/kernel/__init__.py
+.. _ai.backend.kernel modlink: https://github.com/lablup/backend.ai-agent/blob/main/src/ai/backend/kernel/__init__.py
 
 
 Service Ports
