@@ -174,7 +174,7 @@ fi
 
 ROOT_PATH=$(pwd)
 ENV_ID=""
-PYTHON_VERSION="3.8.6"
+PYTHON_VERSION="3.9.2"
 SERVER_BRANCH="main"
 CLIENT_BRANCH="main"
 INSTALL_PATH="./backend.ai-dev"
@@ -185,7 +185,7 @@ CUDA_BRANCH="main"
 # REDIS_PORT="8110"
 # ETCD_PORT="8120"
 # MANAGER_PORT="8081"
-# CONSOLE_SERVER_PORT="8080"
+# WEBSERVER_PORT="8080"
 # AGENT_RPC_PORT="6001"
 # AGENT_WATCHER_PORT="6009"
 # VFOLDER_REL_PATH="vfolder/local"
@@ -196,7 +196,7 @@ POSTGRES_PORT="8101"
 REDIS_PORT="8111"
 ETCD_PORT="8121"
 MANAGER_PORT="8091"
-CONSOLE_SERVER_PORT="8090"
+WEBSERVER_PORT="8090"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
 VFOLDER_REL_PATH="vfolder/local"
@@ -228,8 +228,8 @@ while [ $# -gt 0 ]; do
     --etcd-port=*)         ETCD_PORT="${1#*=}" ;;
     --manager-port)         MANAGER_PORT=$2; shift ;;
     --manager-port=*)       MANAGER_PORT="${1#*=}" ;;
-    --console-server-port)         CONSOLE_SERVER_PORT=$2; shift ;;
-    --console-server-port=*)       CONSOLE_SERVER_PORT="${1#*=}" ;;
+    --webserver-port)         WEBSERVER_PORT=$2; shift ;;
+    --webserver-port=*)       WEBSERVER_PORT="${1#*=}" ;;
     --agent-rpc-port)       AGENT_RPC_PORT=$2; shift ;;
     --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
     --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
@@ -501,7 +501,7 @@ pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-agent"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-common"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-storage-proxy"
-pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-console-server"
+pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-webserver"
 
 # Make directories
 show_info "Creating the install directory..."
@@ -526,7 +526,7 @@ git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manag
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-storage-proxy storage-proxy
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-console-server console-server
+git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-webserver webserver
 git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
 
 if [ $ENABLE_CUDA -eq 1 ]; then
@@ -573,8 +573,8 @@ pyenv local "venv-${ENV_ID}-storage-proxy"
 pip install -U -q pip setuptools
 pip install -U -e ../common -r requirements/dev.txt
 
-cd "${INSTALL_PATH}/console-server"
-pyenv local "venv-${ENV_ID}-console-server"
+cd "${INSTALL_PATH}/webserver"
+pyenv local "venv-${ENV_ID}-webserver"
 pip install -U -q pip setuptools
 pip install -U -e ../client-py -r requirements/dev.txt
 
@@ -612,13 +612,13 @@ sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
 sed_inplace "s/^path = .*$/path = \"${INSTALL_PATH//\//\\/}\/${VFOLDER_REL_PATH//\//\\/}\"/" ./storage-proxy.toml # replace paths of all volumes to local paths
 echo "\n[volume.volume1]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
-cd "${INSTALL_PATH}/console-server"
-pyenv local "venv-${ENV_ID}-console-server"
-cp console-server.sample.conf ./console-server.conf
-sed_inplace "s/^port = 8080$/port = ${CONSOLE_SERVER_PORT}/" ./console-server.conf
-sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./console-server.conf
-sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./console-server.conf
-sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./console-server.conf
+cd "${INSTALL_PATH}/webserver"
+pyenv local "venv-${ENV_ID}-webserver"
+cp webserver.sample.conf ./webserver.conf
+sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
+sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
+sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
+sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
 
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
@@ -665,7 +665,7 @@ echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> my-
 echo "export BACKEND_ENDPOINT_TYPE=api" >> my-backend-ai.sh
 chmod +x my-backend-ai.sh
 
-echo "export BACKEND_ENDPOINT=http://0.0.0.0:${CONSOLE_SERVER_PORT}" >> my-backend-ai-session.sh
+echo "export BACKEND_ENDPOINT=http://0.0.0.0:${WEBSERVER_PORT}" >> my-backend-ai-session.sh
 echo "export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" >> my-backend-ai-session.sh
 echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> my-backend-ai-session.sh
 echo "export BACKEND_ENDPOINT_TYPE=session" >> my-backend-ai-session.sh
@@ -694,7 +694,7 @@ echo "> ${WHITE}export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEK
 echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=api${NC}"
 echo " "
 show_note "Default ID/Password configuration for test / develop (my-backend-ai-session.sh):"
-echo "> ${WHITE}export BACKEND_ENDPOINT=http://0.0.0.0:${CONSOLE_SERVER_PORT}/${NC}"
+echo "> ${WHITE}export BACKEND_ENDPOINT=http://0.0.0.0:${WEBSERVER_PORT}/${NC}"
 echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=session${NC}"
 echo "> ${WHITE}backend.ai login${NC}"
 echo "> ${WHITE}ID      : admin@lablup.com${NC}"
@@ -711,9 +711,9 @@ echo "> ${WHITE}python -m ai.backend.agent.server --debug${NC}"
 show_note "How to run Backend.AI storage-proxy:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/storage-proxy${NC}"
 echo "> ${WHITE}python -m ai.backend.storage.server${NC}"
-show_note "How to run Backend.AI console server (for ID/Password login):"
-echo "> ${WHITE}cd ${INSTALL_PATH}/console-server${NC}"
-echo "> ${WHITE}python -m ai.backend.console.server${NC}"
+show_note "How to run Backend.AI web server (for ID/Password login):"
+echo "> ${WHITE}cd ${INSTALL_PATH}/webserver${NC}"
+echo "> ${WHITE}python -m ai.backend.web.server${NC}"
 show_note "How to run your first code:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/client-py${NC}"
 echo "> ${WHITE}backend.ai --help${NC}"
