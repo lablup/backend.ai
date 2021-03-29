@@ -3,7 +3,7 @@ version: "2.4"
 services:
 
   backendai-half-db:
-    image: postgres:12.3-alpine
+    image: postgres:13-alpine
     restart: unless-stopped
     command: postgres -c 'max_connections=256'
     networks:
