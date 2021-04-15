@@ -589,9 +589,10 @@ sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
 cp config/halfstack.alembic.ini ./alembic.ini
 sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
 python -m ai.backend.manager.cli etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
-cp config/sample.volume.json ./volume.json
-sed_inplace "s/\"secret\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"/\"secret\": \"0000000000000000000000000000000000000000000\"/" ./volume.json
-sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./volume.json
+cp config/sample.etcd.volumes.json ./dev.etcd.volumes.json
+MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
+sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
+sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
@@ -603,13 +604,15 @@ sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 cd "${INSTALL_PATH}/storage-proxy"
 pyenv local "venv-${ENV_ID}-storage-proxy"
 cp config/sample.toml ./storage-proxy.toml
-# comment out all non-vfs volumes
+STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
+sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
+sed_inplace "s/secret = \"some-secret-shared-with-manager\"/secret = \"${MANAGER_AUTH_KEY}\"/" ./storage-proxy.toml
+# comment out all sample volumes
 sed_inplace "s/^\[volume\./# \[volume\./" ./storage-proxy.toml
 sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
 sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
 sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
-# add local vfs volume
-sed_inplace "s/^path = .*$/path = \"${INSTALL_PATH//\//\\/}\/${VFOLDER_REL_PATH//\//\\/}\"/" ./storage-proxy.toml # replace paths of all volumes to local paths
+# add "volume1" vfs volume
 echo "\n[volume.volume1]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
 cd "${INSTALL_PATH}/webserver"
@@ -640,9 +643,7 @@ python -m ai.backend.manager.cli fixture populate fixtures/example-resource-pres
 show_info "Setting up virtual folder..."
 mkdir -p "${INSTALL_PATH}/${VFOLDER_REL_PATH}"
 cd "${INSTALL_PATH}/manager"
-python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
-python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
-python -m ai.backend.manager.cli etcd put-json volumes "./volume.json"
+python -m ai.backend.manager.cli etcd put-json volumes "./dev.etcd.volumes.json"
 cd "${INSTALL_PATH}/agent"
 mkdir -p scratches
 POSTGRES_CONTAINER_ID=$(sudo docker ps | grep "${ENV_ID}_backendai-half-db_1" | awk '{print $1}')
