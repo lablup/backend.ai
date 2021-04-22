@@ -705,7 +705,7 @@ echo "These environment variables are added in my-backend-ai.sh and my-backend-a
 show_important_note "You should change your default admin API keypairs for production environment!"
 show_note "How to run Backend.AI manager:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
-echo "> ${WHITE}python -m ai.backend.gateway.server --debug${NC}"
+echo "> ${WHITE}python -m ai.backend.manager.server --debug${NC}"
 show_note "How to run Backend.AI agent:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/agent${NC}"
 echo "> ${WHITE}python -m ai.backend.agent.server --debug${NC}"
