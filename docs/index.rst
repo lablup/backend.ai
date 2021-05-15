@@ -6,8 +6,8 @@
 .. toctree::
    :maxdepth: 2
 
-Asyncio high lvel UDP sockets
-=============================
+Asyncio high level UDP sockets
+==============================
 
 .. include:: ../README.rst
 

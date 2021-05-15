@@ -1,7 +1,7 @@
-Asyncio high lvel UDP sockets
-=============================
+Asyncio high level UDP sockets
+==============================
 
-Asyncio high lvel UDP sockets.
+Asyncio high level UDP sockets.
 
 Project homepage: https://github.com/eerimoq/asyncudp
 
