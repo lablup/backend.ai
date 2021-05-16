@@ -17,3 +17,7 @@ Functions and classes
 .. autofunction:: asyncudp.create_socket
 
 .. autoclass:: asyncudp.Socket
+
+   .. automethod:: asyncudp.Socket.close
+   .. automethod:: asyncudp.Socket.sendto
+   .. automethod:: asyncudp.Socket.recvfrom
