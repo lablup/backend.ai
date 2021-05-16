@@ -1,4 +1,5 @@
 import asyncio
+from .version import __version__
 
 
 class _SocketProtocol:
