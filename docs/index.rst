@@ -11,6 +11,50 @@ Asyncio high level UDP sockets
 
 .. include:: ../README.rst
 
+Examples
+========
+
+Client
+------
+
+.. code-block:: python
+
+   import asyncio
+   import asyncudp
+
+   async def main():
+       sock = await asyncudp.create_socket(remote_addr=('127.0.0.1', 9999))
+       sock.sendto(b'Hello!')
+       print(await sock.recvfrom())
+       sock.close()
+
+   asyncio.run(main())
+
+Server
+------
+
+.. code-block:: python
+
+   import asyncio
+   import asyncudp
+
+   async def main():
+       sock = await asyncudp.create_socket(local_addr=('127.0.0.1', 9999))
+
+       while True:
+           data, addr = await sock.recvfrom()
+
+           print(data, addr)
+
+           if data == b'exit':
+               break
+
+           sock.sendto(data, addr)
+
+       sock.close()
+
+   asyncio.run(main())
+
 Functions and classes
 =====================
 
