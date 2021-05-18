@@ -7,15 +7,8 @@ async def main():
 
     while True:
         data, addr = await sock.recvfrom()
-
         print(data, addr)
-
-        if data == b'exit':
-            break
-
         sock.sendto(data, addr)
-
-    sock.close()
 
 
 asyncio.run(main())
