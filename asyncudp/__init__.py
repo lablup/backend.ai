@@ -21,8 +21,8 @@ class _SocketProtocol:
 
 
 class Socket:
-    """A UDP socket. Use create_socket() to create an instance of this
-    class.
+    """A UDP socket. Use :func:`~asyncudp.create_socket()` to create an
+    instance of this class.
 
     """
 
@@ -38,8 +38,9 @@ class Socket:
         self._transport.close()
 
     def sendto(self, data, addr=None):
-        """Send given packet to given address. Sends to connected address if
-        address is None.
+        """Send given packet to given address ``addr``. Sends to
+        ``remote_addr`` given to the constructor if ``addr`` is
+        ``None``.
 
         >>> sock.sendto(b'Hi!')
 

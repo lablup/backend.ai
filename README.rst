@@ -12,4 +12,11 @@ Installation
 
 .. code-block:: python
 
-   pip install asyncudp
+   $ pip install asyncudp
+
+Test
+====
+
+.. code-block::
+
+   $ python3 -m unittest
