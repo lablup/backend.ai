@@ -69,3 +69,32 @@ class AsyncudpTest(unittest.TestCase):
         await asyncio.sleep(1.0)
         task.cancel()
         await event.wait()
+
+    def test_context(self):
+        asyncio.run(self.context())
+
+    async def context(self):
+        server_addr = ('127.0.0.1', 13000)
+        client_addr = ('127.0.0.1', 13001)
+
+        server = await asyncudp.create_socket(local_addr=server_addr)
+        client = await asyncudp.create_socket(local_addr=client_addr)
+
+        async with server, client:
+            client.sendto(b'local_addresses to server', server_addr)
+            data, addr = await server.recvfrom()
+
+            self.assertEqual(data, b'local_addresses to server')
+            self.assertEqual(addr, client_addr)
+
+            server.sendto(b'local_addresses to client', client_addr)
+            data, addr = await client.recvfrom()
+
+            self.assertEqual(data, b'local_addresses to client')
+            self.assertEqual(addr, server_addr)
+
+            self.assertEqual(server._transport.is_closing(), False)
+            self.assertEqual(client._transport.is_closing(), False)
+
+        self.assertEqual(server._transport.is_closing(), True)
+        self.assertEqual(client._transport.is_closing(), True)

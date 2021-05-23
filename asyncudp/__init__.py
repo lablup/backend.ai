@@ -57,6 +57,12 @@ class Socket:
 
         return await self._protocol.recvfrom()
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc_info):
+        self.close()
+
 
 async def create_socket(local_addr=None, remote_addr=None):
     """Create a UDP socket with given local and remote addresses.
