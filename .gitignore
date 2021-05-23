@@ -67,3 +67,6 @@ target/
 
 # IntelliJ IDEA
 .idea/
+
+# pyenv
+.python-version
