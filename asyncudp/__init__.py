@@ -1,11 +1,12 @@
 import asyncio
+
 from .version import __version__
 
 
 class _SocketProtocol:
 
-    def __init__(self):
-        self._packets = asyncio.Queue()
+    def __init__(self, queue_max_size=0):
+        self._packets = asyncio.Queue(queue_max_size)
 
     def connection_made(self, transport):
         pass
@@ -58,7 +59,7 @@ class Socket:
         return await self._protocol.recvfrom()
 
 
-async def create_socket(local_addr=None, remote_addr=None):
+async def create_socket(local_addr=None, remote_addr=None, *, queue_max_size=0):
     """Create a UDP socket with given local and remote addresses.
 
     >>> sock = await asyncudp.create_socket(local_addr=('127.0.0.1', 9999))
@@ -67,7 +68,7 @@ async def create_socket(local_addr=None, remote_addr=None):
 
     loop = asyncio.get_running_loop()
     transport, protocol = await loop.create_datagram_endpoint(
-        _SocketProtocol,
+        lambda: _SocketProtocol(queue_max_size),
         local_addr=local_addr,
         remote_addr=remote_addr)
 
