@@ -433,9 +433,15 @@ if ! type "docker" >/dev/null 2>&1; then
   show_warning "docker is not available; trying to install it automatically..."
   install_docker
 fi
-if ! type "docker-compose" >/dev/null 2>&1; then
-  show_warning "docker-compose is not available; trying to install it automatically..."
-  install_docker_compose
+docker compose version >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  DOCKER_COMPOSE="docker compose"
+else
+  if ! type "docker-compose" >/dev/null 2>&1; then
+    show_warning "docker-compose is not available; trying to install it automatically..."
+    install_docker_compose
+  fi
+  DOCKER_COMPOSE="docker-compose"
 fi
 if [ "$DISTRO" = "Darwin" ]; then
   echo "validating Docker Desktop mount permissions..."
@@ -509,14 +515,16 @@ mkdir -p "${INSTALL_PATH}"
 cd "${INSTALL_PATH}"
 
 # Install postgresql, etcd packages via docker
-show_info "Launching the docker-compose \"halfstack\"..."
+show_info "Launching the docker compose \"halfstack\"..."
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
 cd backend.ai
-cp docker-compose.halfstack-2103.yml "docker-compose.halfstack.${ENV_ID}.yml"
+cp docker-compose.halfstack-2109.yml "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.${ENV_ID}.yml"
-$docker_sudo docker-compose -f "docker-compose.halfstack.${ENV_ID}.yml" -p "${ENV_ID}" up -d
+mkdir -p tmp/backend.ai-halfstack/postgres-data
+mkdir -p tmp/backend.ai-halfstack/etcd-data
+$docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.${ENV_ID}.yml" -p "${ENV_ID}" up -d
 $docker_sudo docker ps | grep "${ENV_ID}"   # You should see three containers here.
 
 # Clone source codes
