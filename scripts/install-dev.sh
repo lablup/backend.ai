@@ -522,6 +522,8 @@ cp docker-compose.halfstack-2109.yml "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.${ENV_ID}.yml"
+mkdir -p tmp/backend.ai-halfstack/postgres-data
+mkdir -p tmp/backend.ai-halfstack/etcd-data
 $docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.${ENV_ID}.yml" -p "${ENV_ID}" up -d
 $docker_sudo docker ps | grep "${ENV_ID}"   # You should see three containers here.
 
