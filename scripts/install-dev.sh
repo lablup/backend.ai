@@ -554,13 +554,13 @@ check_snappy() {
 show_info "Install packages on virtual environments..."
 cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 check_snappy
 pip install -U -e ../common -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 pip install -U -e ../common -r requirements/dev.txt
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   $sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
@@ -573,17 +573,17 @@ fi
 
 cd "${INSTALL_PATH}/common"
 pyenv local "venv-${ENV_ID}-common"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 pip install -U -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/storage-proxy"
 pyenv local "venv-${ENV_ID}-storage-proxy"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 pip install -U -e ../common -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/webserver"
 pyenv local "venv-${ENV_ID}-webserver"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 pip install -U -e ../client-py -r requirements/dev.txt
 
 # Copy default configurations
@@ -664,7 +664,7 @@ show_info "Installing Python client SDK/CLI source..."
 # Install python client package
 cd "${INSTALL_PATH}/client-py"
 pyenv local "venv-${ENV_ID}-client"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 pip install -U -r requirements/dev.txt
 
 # Client backend endpoint configuration shell script
