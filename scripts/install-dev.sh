@@ -175,8 +175,8 @@ fi
 ROOT_PATH=$(pwd)
 ENV_ID=""
 PYTHON_VERSION="3.8.8"
-SERVER_BRANCH="main"
-CLIENT_BRANCH="main"
+SERVER_BRANCH="20.09"
+CLIENT_BRANCH="20.09"
 INSTALL_PATH="./backend.ai-dev"
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
@@ -326,12 +326,13 @@ install_docker() {
   show_info "Install docker"
   case $DISTRO in
   Debian)
-    sudo curl -fsSL https://get.docker.io | bash
-    sudo usermod -aG docker $(whoami)
+    $sudo apt-get install -y lxcfs
+    $sudo curl -fsSL https://get.docker.io | bash
+    $sudo usermod -aG docker $(whoami)
     ;;
   RedHat)
-    sudo curl -fsSL https://get.docker.io | bash
-    sudo usermod -aG docker $(whoami)
+    $sudo curl -fsSL https://get.docker.io | bash
+    $sudo usermod -aG docker $(whoami)
     ;;
   Darwin)
     show_info "Please install the latest version of docker and try again."
@@ -347,12 +348,12 @@ install_docker_compose() {
   show_info "Install docker-compose"
   case $DISTRO in
   Debian)
-    sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
+    $sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    $sudo chmod +x /usr/local/bin/docker-compose
     ;;
   RedHat)
-    sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
+    $sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    $sudo chmod +x /usr/local/bin/docker-compose
     ;;
   Darwin)
     show_info "Please install the latest version of docker-compose and try again."
@@ -512,7 +513,7 @@ cd "${INSTALL_PATH}"
 show_info "Launching the docker-compose \"halfstack\"..."
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
 cd backend.ai
-cp docker-compose.halfstack.yml "docker-compose.halfstack.${ENV_ID}.yml"
+cp "docker-compose.halfstack-${SERVER_BRANCH//.}.yml" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.${ENV_ID}.yml"
