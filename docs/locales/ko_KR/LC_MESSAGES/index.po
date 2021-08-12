@@ -71,7 +71,7 @@ msgstr ""
 
 #: ../../index.rst:17
 msgid "Table of Contents"
-msgstr ""
+msgstr "목차"
 
 #: ../../index.rst:97
 msgid "Indices and tables"
