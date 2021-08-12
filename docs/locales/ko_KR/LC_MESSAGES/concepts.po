@@ -65,8 +65,8 @@ msgid ""
 " a given keypair. Keep you eyes on further announcements for upgraded "
 "paid plans."
 msgstr ""
-"현재 서비스는 베타 버전입니다. 무료이지만 1인당 1개의 키페어와"
-"주어진 키페어에 따른 5개의 병렬 커널 세션을 가질 수 있게 됩니다."
+"현재 서비스는 베타 버전입니다."
+"무료이지만 1인당 1개의 키페어와 주어진 키페어에 따른 5개의 병렬 커널 세션을 가질 수 있게 됩니다."
 "정기 이용료에 대한 안내는 추후에 공지해드리겠습니다."
 
 #: ../../concepts/api-overview.rst:24
@@ -75,7 +75,7 @@ msgstr "관리자 API 접속하기"
 
 #: ../../concepts/api-overview.rst:26
 msgid "The admin APIs require a special keypair with the admin privilege:"
-msgstr ""
+msgstr "관리자 API는 관리자 권한의 특별한 키 쌍을 요구합니다."
 
 #: ../../concepts/api-overview.rst:28
 msgid ""
@@ -84,6 +84,9 @@ msgid ""
 "already available via our management console at `cloud.backend.ai "
 "<https://cloud.backend.ai>`_."
 msgstr ""
+"공용 클라우드 서비스 (``api.backend.ai``)는 현재 최종 사용자에게 어떠한 관리자 권한을 제공하지 않습니다."
+"이미 `cloud.backend.ai <https://cloud.backend.ai>`에서 매니저 콘솔을 통해 충분히 기능을"
+"사용할 수 있기 때문입니다."
 
 #: ../../concepts/api-overview.rst:29
 msgid ""
