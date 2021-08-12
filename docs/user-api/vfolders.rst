@@ -13,14 +13,8 @@ most kernels) as internally it uses a networked file system.
 Also, you might share your virtual folders with other users by inviting them
 and granting them proper permission. Currently, there are three levels of
 permissions: read-only, read-write, read-write-delete. They are represented
-by short strings, ``'ro'``, ``'rw'``, ``'rd'``, respectively. The owner of a
+by short strings, ``'ro'``, ``'rw'``, ``'wd'``, respectively. The owner of a
 virtual folder have read-write-delete permission for the folder.
-
-.. note::
-
-   Currently the total size of a virtual folder is limited to 1 GiB and
-   the number of files is limited to 1,000 files during public beta, but these
-   limits are subject to change in the future.
 
 
 Listing Virtual Folders
@@ -34,7 +28,22 @@ Returns the list of virtual folders created by the current keypair.
 Parameters
 """"""""""
 
-None.
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``all``
+     - ``bool``
+     - (optional) If this parameter is ``True``, it returns all virtual folders,
+       including those that do not belong to the current user. Only available for
+       superadmin (default: ``False``).
+   * - ``group_id``
+     - ``UUID | str``
+     - (optional) If this parameter is set, it returns the virtual folders that
+       belong to the specified group. Have no effect in user-type virtual folders.
 
 Response
 """"""""
@@ -64,15 +73,36 @@ Example:
 .. code-block:: json
 
    [
-     { "name": "mydata", "id": "5da5f8e163dd4b86826d6b4db2b7b71a", "...": "..." },
-     { "name": "sample01", "id": "0ecfab9e608c478f98d1734b02a54774", "...": "..." },
+      {
+         "name": "myfolder",
+         "id": "b4b1b16c-d07f-4f1f-b60e-da9449aa60a6",
+         "host": "local:volume1",
+         "usage_mode": "general",
+         "created_at": "2020-11-28 13:30:30.912056+00",
+         "is_owner": "true",
+         "permission": "rw",
+         "user": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+         "group": null,
+         "creator": "admin@lablup.com",
+         "user_email": "admin@lablup.com",
+         "group_name": null,
+         "ownership_type": "user",
+         "unmanaged_path": null,
+         "cloneable": "false",
+         ...
+      },
+      {
+         "name": "otherfolder",
+         ...
+      }
    ]
 
 
 Listing Virtual Folder Hosts
 ----------------------------
 
-Returns the list of available host names where the current keypair can create new virtual folders.
+Returns the list of available host names where the current keypair can create
+new virtual folders.
 
 .. versionadded:: v4.20190315
 
@@ -115,9 +145,10 @@ Example:
 .. code-block:: json
 
    {
-     "default": "nfs1",
-     "allowed": ["nfs1", "nfs2", "cephfs1"]
+     "default": "seoul:nfs1",
+     "allowed": ["seoul:nfs1", "seoul:nfs2", "seoul:cephfs1"]
    }
+
 
 Creating a Virtual Folder
 -------------------------
@@ -144,6 +175,25 @@ Parameters
    * - ``host``
      - ``str``
      - (optional) The name of the virtual folder host.
+   * - ``usage_mode``
+     - ``str``
+     - (optional) The purpose of the virtual folder. Allowed values are
+       ``general``, ``model``, and ``data`` (default: ``general``).
+   * - ``permission``
+     - ``str``
+     - (optional) The default share permission of the virtual folder.
+       The owner of the virtual folder always have ``wd`` permission regardless of
+       this parameter. Allowed values are ``ro``, ``rw``, and ``wd``
+       (default: ``rw``).
+   * - ``group_id``
+     - ``UUID | str``
+     - (optional) If this parameter is set, it creates a group-type virtual folder.
+       If empty, it creates a user-type virtual folder.
+   * - ``quota``
+     - ``int``
+     - (optional) Set the quota of the virtual folder in bytes. Note, however,
+       that the quota is only supported under the xfs filesystems. Other filesystems
+       that do not support per-directory quota will ignore this parameter.
 
 Example:
 
@@ -151,9 +201,8 @@ Example:
 
    {
      "name": "My Data",
-     "host": "nfs1"
+     "host": "seoul:nfs1"
    }
-
 
 Response
 """"""""
@@ -198,7 +247,13 @@ Example:
    {
      "id": "aef1691db3354020986d6498340df13c",
      "name": "My Data",
-     "host": "nfs1"
+     "host": "nfs1",
+     "usage_mode": "general",
+     "permission": "rw",
+     "creator": "admin@lablup.com",
+     "ownership_type": "user",
+     "user": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+     "group": "",
    }
 
 
@@ -299,6 +354,48 @@ Response
        to delete the folder.
 
 
+Rename a Virtual Folder
+-----------------------
+
+* URI: ``/folders/:name/rename``
+* Method: ``POST``
+
+Rename a virtual folder associated with the current API key.
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+
+   * - ``:name``
+     - ``str``
+     - The human-readable name of the virtual folder.
+   * - ``new_name``
+     - ``str``
+     - New virtual folder name.
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 201 Created
+     - The folder is successfully renamed.
+   * - 404 Not Found
+     - There is no such folder or you may not have proper permission
+       to rename the folder.
+
+
 Listing Files in Virtual Folder
 ---------------------------------
 
@@ -350,12 +447,14 @@ Response
      - List of :ref:`vfolder-file-object`
 
 
-Uploading Multiple Files to Virtual Folder
-------------------------------------------
+Uploading a File to Virtual Folder
+----------------------------------
 
-Upload local files to a virtual folder associated with current keypair.
+Upload a local file to a virtual folder associated with the current keypair.
+Internally, the Manager will deligate the upload to a Backend.AI Storage-Proxy
+service. JSON web token is used for the authenticaiton of the request.
 
-* URI: ``/folders/:name/upload``
+* URI: ``/folders/:name/request-upload``
 * Method: ``POST``
 
 .. warning::
@@ -375,11 +474,12 @@ Parameters
    * - ``:name``
      - ``str``
      - The human-readable name of the virtual folder.
-   * - (body)
-     - ``multipart``
-     - A multi-part encoded file data which is composed of multiple occurrences
-       of ``src`` field.  Each part must contain a valid filename and the content
-       type is always assumed as ``application/octet-stream``.
+   * - ``path``
+     - ``str``
+     - Path of the local file to upload.
+   * - ``size``
+     - ``int``
+     - The total size of the local file to upload.
 
 Response
 """"""""
@@ -389,14 +489,23 @@ Response
 
    * - HTTP Status Code
      - Description
-   * - 201 Created
+   * - 200 OK
      - Success.
-   * - 400 Bad Request
-     - There already exists a file with duplicated name
-       that cannot be overwritten in the virtual folder.
-   * - 404 Not Found
-     - There is no such folder or you may not have proper permission
-       to write into folder.
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``token``
+     - ``str``
+     - JSON web token for the authentication of the upload session to
+       Storage-Proxy service.
+   * - ``url``
+     - ``str``
+     - Request url for a Storage-Proxy. Client should use this URL to upload the file.
 
 
 Creating New Directory in Virtual Folder
@@ -409,7 +518,7 @@ this API recursively creates parent directories if they does not exist.
 * Method: ``POST``
 
 .. warning::
-   If a directory with the same name already exists in the virtual folder, it will
+   If a directory with the same name already exists in the virtual folder, it may
    be overwritten without warning.
 
 Parameters
@@ -429,6 +538,13 @@ Parameters
      - ``str``
      - The relative path of a new folder to create
        inside the virtual folder.
+   * - ``parents``
+     - ``bool``
+     - If ``True``, the parent directories will be created if they do not exist.
+   * - ``exist_ok``
+     - ``bool``
+     - If a directory with the same name already exists,
+       overwrite it without an error.
 
 Response
 """"""""
@@ -447,17 +563,18 @@ Response
        to write into folder.
 
 
-Downloading Single File from Virtual Folder
--------------------------------------------
+Downloading a File or a Directory from a Virtual Folder
+-------------------------------------------------------
 
-Download a single file from a virtual folder associated with the current keypair.
-This API does not perform any encoding or compression but just outputs the raw
-file content as the response body, for simpler client-side implementation.
+Download a file or a directory from a virtual folder associated with the current
+keypair. Internally, the Manager will deligate the download to a Backend.AI
+Storage-Proxy service. JSON web token is used for the authenticaiton of the
+request.
 
 .. versionadded:: v4.20190315
 
-* URI: ``/folders/:name/download_single``
-* Method: ``GET``
+* URI: ``/folders/:name/request-download``
+* Method: ``POST``
 
 Parameters
 """"""""""
@@ -472,9 +589,13 @@ Parameters
    * - ``:name``
      - ``str``
      - The human-readable name of the virtual folder.
-   * - ``file``
+   * - ``path``
      - ``str``
-     - A file path inside the virtual folder to download.
+     - The path to a file or a directory inside the virtual folder to download.
+   * - ``archive``
+     - ``bool``
+     - If this parameter is ``True`` and ``path`` is a directory, the directory
+       will be archived into a zip file on the fly (default: ``False``).
 
 Response
 """"""""
@@ -497,65 +618,14 @@ Response
    * - Fields
      - Type
      - Values
-   * - (body)
-     - ``bytes``
-     - The content of file.
-
-Downloading Multiple Files from Virtual Folder
-----------------------------------------------
-
-Download files from a virtual folder associated with the current keypair.
-
-The response contents are streamed as gzipped binaries
-(``Content-Encoding: gzip``) in a multi-part message format.
-Clients may detect the total download size using ``X-TOTAL-PAYLOADS-LENGTH``
-(all upper case) HTTP header of the response in prior to reading/parsing the
-response body.
-
-* URI: ``/folders/:name/download``
-* Method: ``GET``
-
-Parameters
-""""""""""
-
-.. list-table::
-   :widths: 15 10 80
-   :header-rows: 1
-
-   * - Parameter
-     - Type
-     - Description
-   * - ``:name``
+   * - ``token``
      - ``str``
-     - The human-readable name of the virtual folder.
-   * - ``files``
-     - ``list[str]``
-     - File paths inside the virtual folder to download.
-
-Response
-""""""""
-
-.. list-table::
-   :header-rows: 1
-
-   * - HTTP Status Code
-     - Description
-   * - 200 OK
-     - Success.
-   * - 404 Not Found
-     - File not found or you may not have proper permission
-       to access the folder.
-
-.. list-table::
-   :widths: 15 10 80
-   :header-rows: 1
-
-   * - Fields
-     - Type
-     - Values
-   * - (body)
-     - ``multipart``
-     - The gzipped content of files in the mixed multipart format.
+     - JSON web token for the authentication of the download session to
+       Storage-Proxy service.
+   * - ``url``
+     - ``str``
+     - Request url for a Storage-Proxy.
+       Client should use this URL to download the file.
 
 
 Deleting Files in Virtual Folder
@@ -566,7 +636,7 @@ This deletes files inside a virtual folder.
 .. warning::
    There is NO way to get back the files once this API is invoked.
 
-* URI: ``/folders/:name/delete_files``
+* URI: ``/folders/:name/delete-files``
 * Method: ``DELETE``
 
 Parameters
@@ -606,10 +676,58 @@ Response
        to delete the file in the folder.
 
 
+Rename a File in Virtual Folder
+-------------------------------
+
+Rename a file inside a virtual folder.
+
+* URI: ``/folders/:name/rename-file``
+* Method: ``POST``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:name``
+     - ``str``
+     - The human-readable name of the virtual folder.
+   * - ``target_path``
+     - ``str``
+     - The relative path of target file or directory.
+   * - ``new_name``
+     - ``str``
+     - The new name of the file or directory.
+   * - ``is_dir``
+     - ``bool``
+     - Flag that indicates the ``target_path`` is a directory or not.
+
+Response
+""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+   * - 400 Bad Request
+     - You tried to rename a directory without setting is_dir option as True.
+   * - 404 Not Found
+     - There is no such folder or you may not have proper permission
+       to rename the file in the folder.
+
 Listing Invitations for Virtual Folder
 --------------------------------------
 
-Returns the list of pending invitations that requested user received.
+Returns the list of pending invitations that the requested user received.
+This will display the invitations sent to me by other users.
 
 * URI: ``/folders/invitations/list``
 * Method: ``GET``
@@ -669,9 +787,9 @@ Parameters
    * - ``perm``
      - ``str``
      - The permission to grant to invitee.
-   * - ``user_ids``
+   * - ``emails``
      - ``list[slug]``
-     - A list of user IDs to invite.
+     - A list of user emails to invite.
 
 Response
 """"""""
@@ -698,7 +816,7 @@ Response
      - Values
    * - ``invited_ids``
      - ``list[slug]``
-     - A list of invited user IDs.
+     - A list of invited user emails.
 
 
 Accepting an Invitation
@@ -722,9 +840,6 @@ Parameters
    * - ``inv_id``
      - ``slug``
      - The unique invitation ID.
-   * - ``inv_ak``
-     - ``bool``
-     - The access key of invitee.
 
 Response
 """"""""
@@ -743,16 +858,6 @@ Response
    * - 404 Not Found
      - There is no such invitation.
 
-.. list-table::
-   :widths: 15 5 80
-   :header-rows: 1
-
-   * - Fields
-     - Type
-     - Values
-   * - ``msg``
-     - ``str``
-     - Detail message for the invitation acceptance.
 
 Rejecting an Invitation
 -----------------------
@@ -800,3 +905,492 @@ Response
    * - ``msg``
      - ``str``
      - Detail message for the invitation deletion.
+
+
+Listing Sent Invitations
+------------------------
+
+Returns the list of virtual folder invitations the requested user sent.
+This does not include the invitations those are already accepted or rejected.
+
+* URI: ``/folders/invitations/list-sent``
+* Method: ``GET``
+
+Parameters
+""""""""""
+
+This API does not need any parameter.
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``invitations``
+     - ``list[object]``
+     - A list of :ref:`vfolder-invitation-object`.
+
+
+Updating an Invitation
+----------------------
+
+Update the permission of an already-sent, but not accepted or rejected, invitation.
+
+* URI: ``/folders/invitations/update/:inv_id``
+* Method: ``POST``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:inv_id``
+     - ``str``
+     - The unique invitation ID.
+   * - ``perm``
+     - ``str``
+     - The permission to grant to invitee.
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+   * - 400 Bad Request
+     - No permission is given.
+   * - 404 Not Found
+     - There is no invitation.
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``msg``
+     - ``str``
+     - An update message string.
+
+
+Leave an Shared Virtual Folder
+------------------------------
+
+Leave a shared virtual folder.
+
+Cannot leave a group vfolder or a vfolder that the requesting user owns.
+
+* URI: ``/folders/:name/leave``
+* Method: ``POST``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:name``
+     - ``str``
+     - The human-readable name of the virtual folder.
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+   * - 404 Not Found
+     - There is no virtual folder.
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``msg``
+     - ``str``
+     - A result message string.
+
+
+Listing Users Share Virtual Folders
+-----------------------------------
+
+Returns the list of users who shares requester's virtual folders.
+
+* URI: ``/folders/_/shared``
+* Method: ``GET``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``vfolder_id``
+     - ``str``
+     - (Optional) The unique virtual folder ID to list shared users. If not
+       specified, all users who shares any virtual folders the requester created.
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``shared``
+     - ``list[object]``
+     - A list of information about shared users.
+
+Example:
+
+.. code-block:: json
+
+   [
+      {
+         "vfolder_id": "aef1691db3354020986d6498340df13c",
+         "vfolder_name": "My Data",
+         "shared_by": "admin@lablup.com",
+         "shared-to": {
+            "uuid": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "email": "user@lablup.com"
+         },
+         "perm": "ro"
+      },
+      {
+         ...
+      }
+   ]
+
+
+Updating the permission of a shared virtual folder
+--------------------------------------------------
+
+Update the permission of a user for a shared virtual folder.
+
+* URI: ``/folders/_/shared``
+* Method: ``POST``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``vfolder``
+     - ``UUID``
+     - The unique virtual folder ID.
+   * - ``user``
+     - ``UUID``
+     - The unique user ID.
+   * - ``perm``
+     - ``str``
+     - The permission to update for the ``user`` on ``vfolder``.
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+   * - 400 Bad Request
+     - No permission or user is given.
+   * - 404 Not Found
+     - There is no virtual folder.
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``msg``
+     - ``str``
+     - An update message string.
+
+
+Share a Group Virtual Folder to an Individual Users
+---------------------------------------------------
+
+Share a group virtual folder to users with overriding permission.
+
+This will create vfolder_permission(s) relation directly without creating
+invitation(s). Only group virtual folders are allowed to be shared directly.
+
+This API can be useful when you want to share a group virtual folder to every
+group members with read-only permission, but allows some users read-write
+permission.
+
+NOTE: This API is only available for group virtual folders.
+
+* URI: ``/folders/:name/share``
+* Method: ``POST``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:name``
+     - ``str``
+     - The human-readable name of the virtual folder.
+   * - ``permission``
+     - ``str``
+     - Overriding permission to share the group virtual folder.
+   * - ``emails``
+     - ``list[str]``
+     - A list of user emails to share.
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 201 Created
+     - Success.
+   * - 400 Bad Request
+     - No permission or email is given.
+   * - 404 Not Found
+     - There is no virtual folder.
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``shared_emails``
+     - ``list[str]``
+     - A list of user emails those are succesfully shared the virtual folder.
+
+
+Unshare a Group Virtual Folder from Users
+-----------------------------------------
+
+Unshare a group virtual folder from users.
+
+NOTE: This API is only available for group virtual folders.
+
+* URI: ``/folders/:name/unshare``
+* Method: ``DELETE``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:name``
+     - ``str``
+     - The human-readable name of the virtual folder.
+   * - ``emails``
+     - ``list[str]``
+     - A list of user emails to unshare.
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+   * - 400 Bad Request
+     - No email is given.
+   * - 404 Not Found
+     - There is no virtual folder.
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``unshared_emails``
+     - ``list[str]``
+     - A list of user emails those are succesfully unshared the virtual folder.
+
+
+Clone a Virtual Folder
+----------------------
+
+Clone a virtual folder.
+
+* URI: ``/folders/:name/clone``
+* Method: ``POST``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:name``
+     - ``str``
+     - The human-readable name of the virtual folder.
+   * - ``cloneable``
+     - ``bool``
+     - If ``True``, cloned virtual folder will be cloneable again.
+   * - ``target_name``
+     - ``str``
+     - The name of the new virtual folder.
+   * - ``target_host``
+     - ``str``
+     - The targe host volume of the new virtual folder.
+   * - ``usage_mode``
+     - ``str``
+     - (optional) The purpose of the new virtual folder. Allowed values are
+       ``general``, ``model``, and ``data`` (default: ``general``).
+   * - ``permission``
+     - ``str``
+     - (optional) The default share permission of the new virtual folder.
+       The owner of the virtual folder always have ``wd`` permission regardless of
+       this parameter. Allowed values are ``ro``, ``rw``, and ``wd``
+       (default: ``rw``).
+
+Response
+""""""""
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+   * - 400 Bad Request
+     - No target name, target host, or no permission.
+   * - 403 Forbidden
+     - The source virtual folder is not permitted to be cloned.
+   * - 404 Not Found
+     - There is no virtual folder.
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - ``unshared_emails``
+     - ``list[str]``
+     - A list of user emails those are succesfully unshared the virtual folder.
+
+.. list-table::
+   :widths: 15 5 80
+   :header-rows: 1
+
+   * - Fields
+     - Type
+     - Values
+   * - (root)
+     - ``list[object]``
+     - :ref:`vfolder-list-item-object`.
+
+Example:
+
+.. code-block:: json
+
+   {
+      "name": "my cloned folder",
+      "id": "b4b1b16c-d07f-4f1f-b60e-da9449aa60a6",
+      "host": "local:volume1",
+      "usage_mode": "general",
+      "created_at": "2020-11-28 13:30:30.912056+00",
+      "is_owner": "true",
+      "permission": "rw",
+      "user": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+      "group": null,
+      "creator": "admin@lablup.com",
+      "user_email": "admin@lablup.com",
+      "group_name": null,
+      "ownership_type": "user",
+      "unmanaged_path": null,
+      "cloneable": "false",
+      ...
+   },
