@@ -89,11 +89,6 @@ Example:
          "ownership_type": "user",
          "unmanaged_path": null,
          "cloneable": "false",
-         ...
-      },
-      {
-         "name": "otherfolder",
-         ...
       }
    ]
 
@@ -1108,9 +1103,6 @@ Example:
             "email": "user@lablup.com"
          },
          "perm": "ro"
-      },
-      {
-         ...
       }
    ]
 
@@ -1391,6 +1383,5 @@ Example:
       "group_name": null,
       "ownership_type": "user",
       "unmanaged_path": null,
-      "cloneable": "false",
-      ...
-   },
+      "cloneable": "false"
+   }
