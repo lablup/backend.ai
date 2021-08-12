@@ -1156,7 +1156,7 @@ msgstr ""
 
 #: ../../user-api/intro.rst:2
 msgid "Introduction"
-msgstr ""
+msgstr "개요"
 
 #: ../../user-api/intro.rst:4
 msgid ""
