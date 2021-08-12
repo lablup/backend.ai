@@ -93,6 +93,7 @@ msgid ""
 "On-premise installation: You will get an auto-generated admin keypair "
 "during installation."
 msgstr ""
+"온프레미스 설치: 설치 중에 자동 생성된 키 쌍을 받게 됩니다."
 
 #: ../../concepts/faq.rst:2
 msgid "FAQ"
