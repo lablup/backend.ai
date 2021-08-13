@@ -126,7 +126,7 @@ msgstr "``X-BackendAI-Date``"
 
 #: ../../common-api/auth.rst:52
 msgid "Same as ``Date``. May be omitted if ``Date`` is present."
-msgstr ""
+msgstr "'Date'와 동일합니다. 만약 'Date' 항목이 있다면 생략됩니다."
 
 #: ../../common-api/auth.rst:53
 msgid "``X-BackendAI-Version``"
