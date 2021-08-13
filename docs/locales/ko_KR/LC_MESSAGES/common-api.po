@@ -411,7 +411,7 @@ msgstr ""
 
 #: ../../common-api/convention.rst:40
 msgid "Example"
-msgstr ""
+msgstr "예"
 
 #: ../../common-api/convention.rst:41
 msgid "Meaning"
