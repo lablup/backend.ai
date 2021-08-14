@@ -94,6 +94,9 @@ msgid ""
 " docker-compose configuration to fire up a single-node Backend.AI cluster"
 " running on your PC (http://localhost:8081)."
 msgstr ""
+"`이 메타 리포지토리 <https://github.com/lablup/backend.ai>`_ 는 "
+"단일 노드 Backend.AI 클러스터를 시작하기 위한 docker-compose 구성을 제공합니다. "
+"PC에서 실행 중입니다 (http://localhost:8081). "
 
 #: ../../install/demo-setup-centos.rst:8 ../../install/demo-setup.rst:7
 #: ../../install/development-setup.rst:19
