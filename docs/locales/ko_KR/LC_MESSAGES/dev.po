@@ -43,7 +43,7 @@ msgstr ""
 
 #: ../../dev/adding-kernels.rst:11
 msgid "Create a Dockerfile that does:"
-msgstr ""
+msgstr "다음을 수행하는 Dockerfile을 만듭니다:"
 
 #: ../../dev/adding-kernels.rst:13
 msgid ""
