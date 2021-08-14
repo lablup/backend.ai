@@ -47,7 +47,7 @@ msgid ""
 " use social accounts for log-ins such as Twitter, Facebook, and GitHub."
 msgstr ""
 "클라우드 버전의 Backend.AI API 서비스를 설치하면 개인 장비에 설치하는 것보다 훨씬 더 용이하고 나은 서비스로 이용할 수 있습니다."
-"'cloud.backend.ai <https://cloud.backend.ai>`에서 계정을 만들고 새 API 키페어를 생성하세요."
+"`cloud.backend.ai <https://cloud.backend.ai>`_ 에서 계정을 만들고 새 API 키페어를 생성하세요."
 "트위터, 페이스북, 깃허브와 같은 소셜 아이디로도 로그인할 수 있습니다."
 
 #: ../../concepts/api-overview.rst:18
@@ -85,7 +85,7 @@ msgid ""
 "<https://cloud.backend.ai>`_."
 msgstr ""
 "공용 클라우드 서비스 (``api.backend.ai``)는 현재 최종 사용자에게 어떠한 관리자 권한을 제공하지 않습니다."
-"이미 `cloud.backend.ai <https://cloud.backend.ai>`에서 매니저 콘솔을 통해 충분히 기능을"
+"이미 `cloud.backend.ai <https://cloud.backend.ai>`_ 에서 매니저 콘솔을 통해 충분히 기능을"
 "사용할 수 있기 때문입니다."
 
 #: ../../concepts/api-overview.rst:29
