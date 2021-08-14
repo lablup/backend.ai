@@ -149,6 +149,8 @@ msgid ""
 "idempotent semantics with multiple retries for intermittent failures. "
 "(Not implemented yet)"
 msgstr ""
+"선택 사항: 반복된 중복 요청을 서버가 구별할 수 있게 하는 클라이언트 생성 랜덤 문자열입니다."
+"간헐적 장애에 대해 여러 번 재시도하여 등속적 의미론을 유지하는 것이 중요합니다. (구현 중)"
 
 #: ../../common-api/auth.rst:61 ../../common-api/auth.rst:82
 msgid "Body"
