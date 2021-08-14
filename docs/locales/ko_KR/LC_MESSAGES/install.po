@@ -100,7 +100,7 @@ msgstr ""
 #: ../../install/install-from-package.rst:7
 #: ../../install/install-from-source.rst:15
 msgid "Prerequisites"
-msgstr ""
+msgstr "선행필수사항"
 
 #: ../../install/demo-setup-centos.rst:11 ../../install/demo-setup.rst:10
 msgid ""
@@ -114,6 +114,8 @@ msgid ""
 "Linux users: change \"docker.for.mac.localhost\" in docker-compose.yml to"
 " \"172.17.0.1\""
 msgstr ""
+"리눅스 유저의 경우 docker-compose.yml 내 \"docker.for.mac.localhost\" 를 "
+" \"172.17.0.1\" 로 변경해 주세요"
 
 #: ../../install/demo-setup-centos.rst:53 ../../install/demo-setup.rst:14
 msgid "Notes"
@@ -121,7 +123,7 @@ msgstr ""
 
 #: ../../install/demo-setup-centos.rst:55 ../../install/demo-setup.rst:17
 msgid "This demo setup does *not* support GPUs."
-msgstr ""
+msgstr "이 데모는 GPU를 지원하지 *않습니다*!"
 
 #: ../../install/demo-setup-centos.rst:58 ../../install/demo-setup.rst:20
 msgid "All you have to do"
@@ -129,11 +131,11 @@ msgstr ""
 
 #: ../../install/demo-setup.rst:23
 msgid "Clone the repository"
-msgstr ""
+msgstr "이 저장소를 클론하세요"
 
 #: ../../install/demo-setup.rst:24
 msgid "Check out the prerequisites above"
-msgstr ""
+msgstr "위 요구사항을 확인해주세요"
 
 #: ../../install/demo-setup-centos.rst:60 ../../install/demo-setup.rst:25
 msgid "``docker-compose up -d``"
@@ -141,7 +143,7 @@ msgstr ""
 
 #: ../../install/demo-setup.rst:27
 msgid "For Windows, ``docker-compose -f docker-compose.win-demo.yml up -d``"
-msgstr ""
+msgstr "윈도우 유저의 경우 ``docker-compose -f docker-compose.win-demo.yml up -d``를 입력하세요"
 
 #: ../../install/demo-setup-centos.rst:62 ../../install/demo-setup.rst:29
 msgid "Pull some kernel images to try out"
@@ -166,7 +168,7 @@ msgstr ""
 
 #: ../../install/demo-setup-centos.rst:78 ../../install/demo-setup.rst:45
 msgid "Using Clients"
-msgstr ""
+msgstr "Clients 사용중"
 
 #: ../../install/demo-setup-centos.rst:80 ../../install/demo-setup.rst:47
 msgid ""
@@ -185,14 +187,16 @@ msgid ""
 "WARNING: This demo configuration is highly insecure. DO NOT USE in "
 "production!"
 msgstr ""
+"경고: 이 데모 구성은 보안에 매우 취약합니다."
+"*실제 서비스환경에서 사용하지 마십시오*"
 
 #: ../../install/demo-setup-centos.rst:105 ../../install/demo-setup.rst:72
 msgid "FAQ"
-msgstr ""
+msgstr "FAQ"
 
 #: ../../install/demo-setup-centos.rst:108 ../../install/demo-setup.rst:75
 msgid "When launching a kernel, it says \"Service Unavailable\"!"
-msgstr ""
+msgstr "kenel을 실행할 때, \"Service Unavailable\"! 가 표시됩니다"
 
 #: ../../install/demo-setup-centos.rst:110 ../../install/demo-setup.rst:77
 msgid ""
@@ -206,10 +210,12 @@ msgid ""
 "Or, you might have launched 30 sessions already, which is the default "
 "limit for this demo setup."
 msgstr ""
+"또는, 유저의 session이 이미 30개를 넘은것 같습니다."
+"이 데모를 설치할 때 session 개수 제한은 30개입니다."
 
 #: ../../install/demo-setup-centos.rst:113 ../../install/demo-setup.rst:80
 msgid "What does the \"dense\" tag mean in the TensorFlow kernel images?"
-msgstr ""
+msgstr "Tensorflow 커널 이미지에서 \"dense\"는 뭘 의미하시는 건가요?"
 
 #: ../../install/demo-setup-centos.rst:115 ../../install/demo-setup.rst:82
 msgid ""
@@ -219,27 +225,27 @@ msgstr ""
 
 #: ../../install/demo-setup-centos.rst:3
 msgid "Demo Setup"
-msgstr ""
+msgstr "데모설치"
 
 #: ../../install/demo-setup-centos.rst:14
 msgid "intstall docker-ce at Centos 7.5"
-msgstr ""
+msgstr "Centos 7.5버전 용 docker-ce 설치"
 
 #: ../../install/demo-setup-centos.rst:19
 msgid "install pre-requirement package"
-msgstr ""
+msgstr "선행 필수 패키지 설치"
 
 #: ../../install/demo-setup-centos.rst:23
 msgid "install pyenv that support enviroment for Python"
-msgstr ""
+msgstr "Python환경을 위한 pyenv 설치"
 
 #: ../../install/demo-setup-centos.rst:31
 msgid "install pyenv that support virtual enviroment for Python"
-msgstr ""
+msgstr "Python 가상환경을 위한 pyenv 설치"
 
 #: ../../install/demo-setup-centos.rst:37
 msgid "install python 3.6.x to run backend.ai"
-msgstr ""
+msgstr "backend.ai 실행을 위한 Python 3.6.x 버전 설치"
 
 #: ../../install/demo-setup-centos.rst:42
 msgid ""
@@ -249,17 +255,19 @@ msgstr ""
 
 #: ../../install/development-setup.rst:6
 msgid "Development Setup"
-msgstr ""
+msgstr "개발환경 설치"
 
 #: ../../install/development-setup.rst:8
 msgid ""
 "Currently Backend.AI is developed and tested under only \\*NIX-compatible"
 " platforms (Linux or macOS)."
 msgstr ""
+"현재 Backend.Ai는 *NIX계열(Linux 혹은 MacOS)상에서 개발 및 테스트 되고 있습니다."
+""
 
 #: ../../install/development-setup.rst:12
 msgid "Method 1: Automatic Installation"
-msgstr ""
+msgstr "Mothod 1: 자동 설치"
 
 #: ../../install/development-setup.rst:14
 msgid ""
@@ -270,7 +278,7 @@ msgstr ""
 
 #: ../../install/development-setup.rst:21
 msgid "Install the followings accordingly to your host operating system."
-msgstr ""
+msgstr "사용자 OS에 맞는 설치방법을 확인 후 진행해주세요."
 
 #: ../../install/development-setup.rst:23
 msgid ""
@@ -308,21 +316,26 @@ msgid ""
 "installed, but we *do* recommend installing them by yourself as it may "
 "interfere with your shell configurations."
 msgstr ""
+"Pyenv가 설치되어잇지 않다면, 자동설치 Scripts가 pyenv를 자동으로 설치하니다."
+"하지만, 가능하다면 직접 Shell configutations를 통해서 설치하는것을"
+" *권장* 합니다"
 
 #: ../../install/development-setup.rst:47
 msgid "Running the script"
-msgstr ""
+msgstr "Script 실행 중"
 
 #: ../../install/development-setup.rst:57
 #: ../../install/development-setup.rst:104
 msgid "The script may ask your root password in the middle to run sudo in Linux."
-msgstr ""
+msgstr "스크립트 실행 중 sudo권한을 위해 password를 물어볼 수 있습니다.(Linux의경우)"
 
 #: ../../install/development-setup.rst:59
 msgid ""
 "This installs a set of Backend.AI server-side components in the ``backend"
 ".ai-dev`` directory under the current working directory."
 msgstr ""
+"이 설치Process는 Backend.AI의 서버환경을 현재 Directory의 ``backend.ai-dev``"
+"폴더 안에 구축해줍니다."
 
 #: ../../install/development-setup.rst:62
 msgid ""
@@ -332,6 +345,11 @@ msgid ""
 "directory is shared by ``manager`` and ``agent`` so just editing sources "
 "there takes effects in the next launches of the gateway and agent."
 msgstr ""
+"backend.ai-dev 폴더 안에는 ``manager``, ``agent``, ``common`` 및 기타"
+"폴더들이 있습니다. 직접 source codes를 수정하고, gateway 와 agent를 재 실행 "
+"할 수 있습니다. ``common`` directory는 ``manager``, ``agent``가 공유하기 때문에"
+"source codes를 수정할 경우 다음 gateway와 agent 실행 시 변경사항이 반영됩니다."
+""
 
 #: ../../install/development-setup.rst:68
 msgid ""
@@ -355,6 +373,8 @@ msgid ""
 "The script provides a set of command-line options.  Check out them using "
 "``-h`` / ``--help`` option."
 msgstr ""
+"이 script는 몇가지 옵션을 제공합니다. ``-h`` / ``--help``를 사용해서 "
+"옵션을 확인하세요"
 
 #: ../../install/development-setup.rst:82
 msgid ""
@@ -376,13 +396,15 @@ msgstr ""
 
 #: ../../install/development-setup.rst:94
 msgid "Resetting the environment"
-msgstr ""
+msgstr "환경 재설정 중"
 
 #: ../../install/development-setup.rst:106
 msgid ""
 "This will purge all docker resources related to the given environment ID "
 "and the ``backend.ai-dev`` directory under the current working directory."
 msgstr ""
+"이 과정은 environment ID와 관련된 모든 docker 리소스를 삭제합니다."
+"그리고 현재 directory의 ``backend.ai-dev`` 또한 영향을 받습니다."
 
 #: ../../install/development-setup.rst:114
 msgid ""
@@ -390,14 +412,17 @@ msgid ""
 "contents of the ``backend.ai-dev`` directory, which may contain your own "
 "modifications that is not yet pushed to a remote git repository."
 msgstr ""
+"*주의*이 script는 경고 없이 force-removes가 진행됩니다. backend.ai-dev 내의"
+"변경사항이 있을경우, git 원격저장소에 psuh를 진행 한 뒤 "
+"script를 실행하시기 바랍니다."
 
 #: ../../install/development-setup.rst:120
 msgid "Method 2: Manual Installation"
-msgstr ""
+msgstr "Method 2: 수동 설치"
 
 #: ../../install/development-setup.rst:123
 msgid "Requirement packages"
-msgstr ""
+msgstr "필요한 패키지"
 
 #: ../../install/development-setup.rst:125
 msgid "PostgreSQL: 9.6"
