@@ -166,7 +166,7 @@ msgstr ""
 
 #: ../../common-api/auth.rst:74
 msgid "Status code"
-msgstr ""
+msgstr "상태코드"
 
 #: ../../common-api/auth.rst:75
 msgid ""
