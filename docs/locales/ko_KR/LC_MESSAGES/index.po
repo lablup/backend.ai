@@ -24,7 +24,7 @@ msgstr ""
 
 #: ../../index.rst:31
 msgid "Cluster Installation"
-msgstr ""
+msgstr "클러스터 설치"
 
 #: ../../index.rst:40
 msgid "Client SDK"
