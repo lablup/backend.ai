@@ -72,7 +72,7 @@ Common Structure of API Responses
    * - HTTP Headers
      - Values
    * - Status code
-     - API-specific HTTP-standard status codes. Responses commonly used throughout all APIs include 200, 201, 2014, 400, 401, 403, 404, 429, and 500, but not limited to.
+     - API-specific HTTP-standard status codes. Responses commonly used throughout all APIs include 200, 201, 204, 400, 401, 403, 404, 429, and 500, but not limited to.
    * - ``Content-Type``
      - ``application/json`` and its variants (e.g., ``application/problem+json`` for errors)
    * - ``Link``
