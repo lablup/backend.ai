@@ -421,9 +421,8 @@ msgid ""
 "contents of the ``backend.ai-dev`` directory, which may contain your own "
 "modifications that is not yet pushed to a remote git repository."
 msgstr ""
-"*주의*이 script는 경고 없이 force-removes가 진행됩니다. backend.ai-dev 내의"
-"변경사항이 있을경우, git 원격저장소에 psuh를 진행 한 뒤 "
-"script를 실행하시기 바랍니다."
+"이 스크립트는 ``backend.ai-dev`` 디렉토리의 모든 내용을 경고 없이 강제로 제거합니다. "
+"여기에는 아직 원격 git 저장소로 푸시되지 않은 수정 사항이 포함될 수 있습니다."
 
 #: ../../install/development-setup.rst:120
 msgid "Method 2: Manual Installation"
