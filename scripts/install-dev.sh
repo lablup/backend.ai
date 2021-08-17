@@ -70,6 +70,8 @@ usage() {
   echo ""
   echo "  ${LWHITE}--cuda-branch NAME${NC}   The branch of git clone for the CUDA accelerator "
   echo "                       plugin; only valid if ${LWHITE}--enable-cuda${NC} is specified."
+  echo "                       If set \"mock\", it will install the mockup version plugin so that"
+  echo "                       you may develop and test CUDA integration features without real GPUs."
   echo "                       (default: main)"
   echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC} The port to bind the PostgreSQL container service."
@@ -539,7 +541,12 @@ git clone --branch "${SERVER_BRANCH}" --recurse-submodules https://github.com/la
 git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
 
 if [ $ENABLE_CUDA -eq 1 ]; then
-  git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
+  if [ "$CUDA_BRANCH" == "mock" ]; then
+    git clone https://github.com/lablup/backend.ai-accelerator-cuda-mock accel-cuda
+    cp accel-cuda/configs/sample-mig.toml agent/cuda-mock.toml
+  else
+    git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
+  fi
 fi
 
 check_snappy() {
