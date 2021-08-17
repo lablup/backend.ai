@@ -24,7 +24,7 @@ msgstr "인증"
 
 #: ../../common-api/auth.rst:5
 msgid "Access Tokens and Secret Key"
-msgstr "엑세스토큰과 시크릿키"
+msgstr "엑세스 토큰과 비밀 키"
 
 #: ../../common-api/auth.rst:7
 msgid ""
@@ -33,14 +33,16 @@ msgid ""
 " <https://cloud.backend.ai>`_ or from the administrator of your "
 "Backend.AI cluster."
 msgstr ""
-"API서버에 요청하려면, 클라이언트에서는 API 엑세스 키와 시크릿키가 쌍으로 필요합니다`저희 클라우드 서비스 "
-"<https://cloud.backend.ai>`나 Backend.Ai 클러스터의관리자에서 해당 키를 확인할 수 있습니다."
+"API서버에 요청하려면, 클라이언트에서는 API 엑세스 키와 비밀 키가 쌍으로 필요합니다. `저희 클라우드 서비스 "
+"<https://cloud.backend.ai>`_ 나 Backend.Ai 클러스터의 관리자에서 해당 키를 확인할 수 있습니다."
 
 #: ../../common-api/auth.rst:12
 msgid ""
 "The server uses the API keys to identify each client and secret keys to "
 "verify integrity of API requests as well as to authenticate clients."
 msgstr ""
+"서버는 각 클라이언트를 식별하기 위해 API 키를 사용하며, "
+"클라이언트를 인증하고 API 요청의 무결성을 검증하기 위해 비밀 키를 사용합니다."
 
 #: ../../common-api/auth.rst:17
 msgid ""
@@ -49,12 +51,15 @@ msgid ""
 "server-side proxy to our API service if you are building a public-facing "
 "front-end service using Backend.AI."
 msgstr ""
+"API 액세스 키와 비밀 키가 외부로 유출되는 것을 막기 위한 보안 조치로, Backend.AI 를 활용해 공개된 "
+"프론트엔드 서비스를 설계할 때는 가급적 API 서비스를 위한 서버사이드 프록시를 사용하는 것을 권장합니다."
 
 #: ../../common-api/auth.rst:21
 msgid ""
 "For local deployments, you may create a master dummy pair in the "
 "configuration (TODO)."
 msgstr ""
+"로컬 배포의 경우, 환경 설정에 마스터 더미 쌍을 만들 수 있습니다. (TODO)"
 
 #: ../../common-api/auth.rst:24
 msgid "Common Structure of API Requests"
@@ -119,6 +124,9 @@ msgid ""
 "timezone is specified, UTC is assumed. The deviation with the server-side"
 " clock must be within 15-minutes."
 msgstr ""
+"요청의 날짜, 시간은 RFC 8022나 ISO 8601의 형식입니다. 만약 특별한 "
+"시간대가 명시되지 않았다면, UTC로 가정합니다. 서버의 시간과 요청의 시간의 "
+"차이는 15분 이내여야 합니다."
 
 #: ../../common-api/auth.rst:51
 msgid "``X-BackendAI-Date``"
@@ -126,7 +134,7 @@ msgstr "``X-BackendAI-Date``"
 
 #: ../../common-api/auth.rst:52
 msgid "Same as ``Date``. May be omitted if ``Date`` is present."
-msgstr "'Date'와 동일합니다. 만약 'Date' 항목이 있다면 생략됩니다."
+msgstr "``Date``와 동일합니다. 만약 ``Date`` 항목이 있다면 생략됩니다."
 
 #: ../../common-api/auth.rst:53
 msgid "``X-BackendAI-Version``"
@@ -137,6 +145,8 @@ msgid ""
 "``vX.yyymmdd`` where ``X`` is the major version and ``yyyymmdd`` is the "
 "minor release date of the specified API version. (e.g., 20160915)"
 msgstr ""
+"``vX.yyymmdd`` 에서 ``X``는 주 버전이고 ``yyyymmdd``는 특정 API 버전의 마이너 "
+"릴리스 날짜입니다. (예: 20160914)"
 
 #: ../../common-api/auth.rst:57
 msgid "``X-BackendAI-Client-Token``"
@@ -149,39 +159,45 @@ msgid ""
 "idempotent semantics with multiple retries for intermittent failures. "
 "(Not implemented yet)"
 msgstr ""
+"선택 사항: 반복된 중복 요청을 서버가 구별할 수 있게 하는 클라이언트 생성 랜덤 문자열입니다."
+"간헐적 장애에 대해 여러 번 재시도하여 등속적 의미론을 유지하는 것이 중요합니다. (구현 중)"
 
 #: ../../common-api/auth.rst:61 ../../common-api/auth.rst:82
 msgid "Body"
-msgstr ""
+msgstr "Body"
 
 #: ../../common-api/auth.rst:62
 msgid "JSON-encoded request parameters"
-msgstr ""
+msgstr "JSON 인코딩 요청 매개 변수"
 
 #: ../../common-api/auth.rst:66
 msgid "Common Structure of API Responses"
-msgstr ""
+msgstr "API 응답들의 일반적인 구조"
 
 #: ../../common-api/auth.rst:74
 msgid "Status code"
-msgstr ""
+msgstr "상태 코드"
 
 #: ../../common-api/auth.rst:75
 msgid ""
 "API-specific HTTP-standard status codes. Responses commonly used "
-"throughout all APIs include 200, 201, 2014, 400, 401, 403, 404, 429, and "
+"throughout all APIs include 200, 201, 204, 400, 401, 403, 404, 429, and "
 "500, but not limited to."
 msgstr ""
+"API에 대한 HTTP 표준 상태 코드입니다. 모든 API에서 일반적으로 사용되는 "
+"응답에는 200, 201, 204, 400, 401, 403, 404, 429, 그리고 500이 포함되지만 "
+"이에 국한되지 않습니다."
 
 #: ../../common-api/auth.rst:77
 msgid ""
 "``application/json`` and its variants (e.g., ``application/problem+json``"
 " for errors)"
 msgstr ""
+"``application/json`` 및 변형 (예: ``application/problem+json`` - 오류)"
 
 #: ../../common-api/auth.rst:78
 msgid "``Link``"
-msgstr ""
+msgstr "``Link``"
 
 #: ../../common-api/auth.rst:79
 msgid ""
@@ -192,19 +208,19 @@ msgstr ""
 
 #: ../../common-api/auth.rst:80
 msgid "``X-RateLimit-*``"
-msgstr ""
+msgstr "``X-RateLimit-*``"
 
 #: ../../common-api/auth.rst:81
 msgid "The rate-limiting information (see :doc:`/common-api/ratelimit`)."
-msgstr ""
+msgstr "속도 제한 정보 (:doc:`/common-api/ratelimit` 참조)"
 
 #: ../../common-api/auth.rst:83
 msgid "JSON-encoded results"
-msgstr ""
+msgstr "JSON 인코딩 결과"
 
 #: ../../common-api/auth.rst:87
 msgid "Signing API Requests"
-msgstr ""
+msgstr "API 요청 서명"
 
 #: ../../common-api/auth.rst:89
 msgid ""
@@ -212,10 +228,13 @@ msgid ""
 "should generate a signing key derived from its API secret key and a "
 "string to sign by canonicalizing the HTTP request."
 msgstr ""
+"각각의 API 요청은 시그니처를 통해 서명되어야 합니다. 먼저, 클라이언트는 "
+"API 비밀 키에서 파생된 서명 키와 HTTP 요청을 정규화하여 얻을 수 있는 "
+"서명할 문자열을 생성해야 합니다."
 
 #: ../../common-api/auth.rst:93
 msgid "Generating a signing key"
-msgstr ""
+msgstr "서명 키 생성하기"
 
 #: ../../common-api/auth.rst:95
 msgid ""
@@ -223,22 +242,24 @@ msgid ""
 "The key is nestedly signed against the current date (without time) and "
 "the API endpoint address."
 msgstr ""
+"다음은 비밀 키에서 서명 키를 생성하는 Python 코드 입니다. 키는 현재 날짜 "
+"(시간 제외) 및 API 엔드포인트 주소에 대해 중첩 서명 됩니다."
 
 #: ../../common-api/auth.rst:116
 msgid "Generating a string to sign"
-msgstr ""
+msgstr "서명할 문자열 생성하기"
 
 #: ../../common-api/auth.rst:118
 msgid "The string to sign is generated from the following request-related values:"
-msgstr ""
+msgstr "서명할 문자열은 다음과 같은 요청 정보 값에 의해 생성됩니다."
 
 #: ../../common-api/auth.rst:120
 msgid "HTTP Method (uppercase)"
-msgstr ""
+msgstr "HTTP 메서드 (대문자)"
 
 #: ../../common-api/auth.rst:121
 msgid "URI including query strings"
-msgstr ""
+msgstr "쿼리스트링을 포함한 URI"
 
 #: ../../common-api/auth.rst:122
 msgid ""
@@ -246,24 +267,29 @@ msgid ""
 "present) formatted in ISO 8601 (``YYYYmmddTHHMMSSZ``) using the UTC "
 "timezone."
 msgstr ""
+"UTC 시간대를 활용하고 ISO 8601 형식으로 구성된 (``YYYYmmddTHHMMSSZ``) "
+"``Date`` 의 값 (단, 요청에서 ``Date`` 가 주어지지 않았다면, "
+"``X-BackendAI-Date`` 를 사용함.)"
 
 #: ../../common-api/auth.rst:123
 msgid "The canonicalized header/value pair of ``Host``"
-msgstr ""
+msgstr "정규화 된 ``Host`` 의 헤더/값 쌍"
 
 #: ../../common-api/auth.rst:124
 msgid "The canonicalized header/value pair of ``Content-Type``"
-msgstr ""
+msgstr "정규화 된 ``Content-Type`` 의 헤더/값 쌍"
 
 #: ../../common-api/auth.rst:125
 msgid "The canonicalized header/value pair of ``X-BackendAI-Version``"
-msgstr ""
+msgstr "정규화 된 ``X-BackendAI-Version`` 의 헤더/값 쌍"
 
 #: ../../common-api/auth.rst:126
 msgid ""
 "The hex-encoded hash value of body as-is. The hash function must be same "
 "to the one given in the ``Authorization`` header (e.g., SHA256)."
 msgstr ""
+"body 전체를 hex로 인코딩한 hash 값. 사용한 hash 함수는 반드시 "
+"``Authorization`` 헤더에 명시된 함수와 동일해야 합니다. (e.g., SHA256)."
 
 #: ../../common-api/auth.rst:128
 msgid ""
@@ -275,12 +301,21 @@ msgid ""
 "9) of its value, and join the lowercased header name and the value with a"
 " single colon (``\":\"``, ASCII 58) character."
 msgstr ""
+"서명할 문자열을 생성하기 위해, 클라이언트는 위의 값들을 newline 문자열 "
+"(``\"\\n\"``, ASCII 10) 을 활용하여 합쳐야 합니다. 모든 non-ASCII 문자열은 "
+"반드시 UTF-8 형식으로 인코딩 되어야 합니다. HTTP 헤더/값 쌍을 정규화 하기 위해선, "
+"먼저 맨 앞이나 맨 뒤에 붙어있는 공백 문자열 (``\"\\n\"``, ``\"\\r\"``, "
+"``\" \"``, ``\"\\t\"``; 또는 ASCII 10, 13, 32, 9) 을 제거해야 하며, "
+"소문자로 변경된 헤더의 이름과 값을 콜론 (``\":\"``, ASCII 58) 문자열을 통해 "
+"연결해야 합니다."
 
 #: ../../common-api/auth.rst:132
 msgid ""
 "The success example in `Example Requests and Responses`_ makes a string "
 "to sign as follows (where the newlines are ``\"\\n\"``):"
 msgstr ""
+"`요청과 응답 예시` 에 적힌 예시는 다음과 같은 방식으로 서명할 문자열을 "
+"생성 하였습니다."
 
 #: ../../common-api/auth.rst:144
 msgid ""
@@ -288,46 +323,52 @@ msgid ""
 " string using the SHA256 hash function since there is no body for GET "
 "requests."
 msgstr ""
+"이 예시에서, 해시 값 ``e3b0c4...``는 GET 요청에 대한 본문이 없으므로 SHA256 해시 함수를"
+"사용하여 빈 문자열에서 생성됩니다."
 
 #: ../../common-api/auth.rst:146
 msgid ""
 "Then, the client should calculate the signature using the derived signing"
 " key and the generated string with the hash function, as follows:"
 msgstr ""
+"그리고, 클라이언트는 서명 키와 hash 함수로 부터 생성된 문자열을 활용해 "
+"다음과 같이 시그니쳐를 계산해야 합니다."
 
 #: ../../common-api/auth.rst:159
 msgid "Attaching the signature"
-msgstr ""
+msgstr "시그니쳐 삽입"
 
 #: ../../common-api/auth.rst:161
 msgid ""
 "Finally, the client now should construct the following HTTP "
 "``Authorization`` header:"
 msgstr ""
+"마지막으로, 클라이언트는 이제 ``Authorization`` HTTP 헤더를 "
+"구성해야 합니다."
 
 #: ../../common-api/auth.rst:169
 msgid "Example Requests and Responses"
-msgstr ""
+msgstr "요청과 응답 예시"
 
 #: ../../common-api/auth.rst:171
 msgid "For the examples here, we use a dummy access key and secret key:"
-msgstr ""
+msgstr "이 예시에서, 우리는 다음과 같은 더미 엑세스 키와 비밀 키를 사용할 것입니다."
 
 #: ../../common-api/auth.rst:173
 msgid "Example access key: ``AKIAIOSFODNN7EXAMPLE``"
-msgstr ""
+msgstr "엑세스 키 예시: ``AKIAIOSFODNN7EXAMPLE``"
 
 #: ../../common-api/auth.rst:174
 msgid "Example secret key: ``wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY``"
-msgstr ""
+msgstr "비밀 키 예시: ``wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY``"
 
 #: ../../common-api/auth.rst:177
 msgid "Success example for checking the latest API version"
-msgstr ""
+msgstr "최신 API 버전을 확인하는 예시"
 
 #: ../../common-api/auth.rst:204
 msgid "Failure example with a missing authorization header"
-msgstr ""
+msgstr "authorization 헤더를 포함하지 않아 발생하는 실패 예시"
 
 #: ../../common-api/convention.rst:2
 msgid "API and Document Conventions"
