@@ -1,6 +1,7 @@
 #! /bin/bash
 
-if [ -e "/workspaces/manager"] then 
+if [ -e "/workspaces/manager"] 
+then 
   exit 0
 fi
 
