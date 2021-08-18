@@ -5,7 +5,7 @@ then
   exit 0
 fi
 
-GITHUB_TOKEN=${$CUSTOM_GITHUB_TOKEN:-$GITHUB_TOKEN}
+GITHUB_TOKEN=${CUSTOM_GITHUB_TOKEN:-$GITHUB_TOKEN}
 for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
 do
   if [ -e "${HOME}/.${PROFILE_FILE}" ]
