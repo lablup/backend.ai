@@ -58,11 +58,11 @@ usage() {
   echo ""
   echo "  ${LWHITE}--server-branch NAME${NC}"
   echo "                       The branch of git clones for server components"
-  echo "                       (default: master)"
+  echo "                       (default: 20.09)"
   echo ""
   echo "  ${LWHITE}--client-branch NAME${NC}"
   echo "                       The branch of git clones for client components"
-  echo "                       (default: master)"
+  echo "                       (default: 20.09)"
   echo ""
   echo "  ${LWHITE}--enable-cuda${NC}        Install CUDA accelerator plugin and pull a"
   echo "                       TenosrFlow CUDA kernel for testing/demo."
@@ -70,7 +70,10 @@ usage() {
   echo ""
   echo "  ${LWHITE}--cuda-branch NAME${NC}   The branch of git clone for the CUDA accelerator "
   echo "                       plugin; only valid if ${LWHITE}--enable-cuda${NC} is specified."
-  echo "                       (default: master)"
+  echo "                       If set as ${LWHITE}\"mock\"${NC}, it will install the mockup version "
+  echo "                       plugin so that you may develop and test CUDA integration "
+  echo "                       features without real GPUs."
+  echo "                       (default: main)"
   echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC} The port to bind the PostgreSQL container service."
   echo "                       (default: 8100)"
@@ -180,7 +183,7 @@ CLIENT_BRANCH="20.09"
 INSTALL_PATH="./backend.ai-dev"
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
-CUDA_BRANCH="master"
+CUDA_BRANCH="main"
 # POSTGRES_PORT="8100"
 # REDIS_PORT="8110"
 # ETCD_PORT="8120"
@@ -531,7 +534,12 @@ git clone --branch "${SERVER_BRANCH}" --recurse-submodules https://github.com/la
 git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
 
 if [ $ENABLE_CUDA -eq 1 ]; then
-  git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
+  if [ "$CUDA_BRANCH" == "mock" ]; then
+    git clone https://github.com/lablup/backend.ai-accelerator-cuda-mock accel-cuda
+    cp accel-cuda/configs/sample-mig.toml agent/cuda-mock.toml
+  else
+    git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
+  fi
 fi
 
 check_snappy() {
