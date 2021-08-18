@@ -467,6 +467,8 @@ read -r -d '' pyenv_init_script <<"EOS"
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init --path)"
+eval "$(pyenv init -)"
+eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOS
 if ! type "pyenv" >/dev/null 2>&1; then
@@ -517,7 +519,7 @@ cd "${INSTALL_PATH}"
 
 # Install postgresql, etcd packages via docker
 show_info "Launching the docker compose \"halfstack\"..."
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
+
 cd backend.ai
 cp "docker-compose.halfstack-${SERVER_BRANCH//.}.yml" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.${ENV_ID}.yml"
