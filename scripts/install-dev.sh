@@ -463,6 +463,10 @@ if [ "$DISTRO" = "Darwin" ]; then
     exit 1
   fi
   echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
+
+  export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
+  export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
+  echo "set grpcio wheel build variables."
 fi
 
 # Install pyenv
