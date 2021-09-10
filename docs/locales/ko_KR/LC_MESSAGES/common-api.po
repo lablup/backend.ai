@@ -160,7 +160,8 @@ msgid ""
 "(Not implemented yet)"
 msgstr ""
 "선택 사항: 반복된 중복 요청을 서버가 구별할 수 있게 하는 클라이언트 생성 랜덤 문자열입니다."
-"간헐적 장애에 대해 여러 번 재시도하여 등속적 의미론을 유지하는 것이 중요합니다. (구현 중)"
+"때때로 나타나는 장애에 대해 여러 번 재시도하여 멱등성을 유지하는 것이 중요합니다. (구현 중)"
+"*멱등성 : 연산을 여러 번 적용하더라도 결과가 달라지지 않는 성질"
 
 #: ../../common-api/auth.rst:61 ../../common-api/auth.rst:82
 msgid "Body"
@@ -242,7 +243,7 @@ msgid ""
 "The key is nestedly signed against the current date (without time) and "
 "the API endpoint address."
 msgstr ""
-"다음은 비밀 키에서 서명 키를 생성하는 Python 코드 입니다. 키는 현재 날짜 "
+"다음은 비밀 키로부터 파생된 서명 키를 생성하는 Python 코드 입니다. 키는 현재 날짜 "
 "(시간 제외) 및 API 엔드포인트 주소에 대해 중첩 서명 됩니다."
 
 #: ../../common-api/auth.rst:116
