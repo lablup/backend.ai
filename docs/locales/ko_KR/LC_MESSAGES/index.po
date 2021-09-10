@@ -60,9 +60,9 @@ msgid ""
 "deployment. It runs arbitrary user codes safely in resource-constrained "
 "environments, using Docker and our own sandbox wrapper."
 msgstr ""
-"Backend.AI는 AI 모델 개발 및 배포를 위한 '불편하지 않은' 백엔드 입니다. "
-"Backend.AI는 Docker나 자체적인 샌드박스 래퍼 같은 자원 제한적인 환경에서 "
-"특정 코드를 동작 시킵니다."
+"Backend.AI는 AI 모델 개발 및 배포를 위한 사용자가 하기 힘든 작업을 대신하는 백엔드 플랫폼입니다. "
+"Backend.AI는 Docker나 자체 구현된 샌드박스 래퍼를 사용함으로써 "
+"제한된 자원 환경에서 사용자의 코드를 안전하게 실행시킵니다."
 
 #: ../../index.rst:14
 msgid ""
