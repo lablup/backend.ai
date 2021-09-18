@@ -130,7 +130,7 @@ msgstr "이 데모는 GPU를 지원하지 *않습니다*."
 
 #: ../../install/demo-setup-centos.rst:58 ../../install/demo-setup.rst:20
 msgid "All you have to do"
-msgstr "당신이 해야 하는 것"
+msgstr "당신이 해야 할 일"
 
 #: ../../install/demo-setup.rst:23
 msgid "Clone the repository"
@@ -386,7 +386,7 @@ msgid ""
 "``-h`` / ``--help`` option."
 msgstr ""
 "이 script는 몇가지 옵션을 제공합니다. ``-h`` / ``--help``를 사용해서 "
-"옵션을 확인하세요"
+"옵션을 확인하세요."
 
 #: ../../install/development-setup.rst:82
 msgid ""
