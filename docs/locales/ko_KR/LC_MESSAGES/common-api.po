@@ -229,7 +229,7 @@ msgid ""
 "should generate a signing key derived from its API secret key and a "
 "string to sign by canonicalizing the HTTP request."
 msgstr ""
-"각각의 API 요청은 시그니처를 통해 서명되어야 합니다. 먼저, 클라이언트는 "
+"각각의 API 요청은 서명과 함께 등록되어야 합니다. 먼저, 클라이언트는 "
 "API 비밀 키에서 파생된 서명 키와 HTTP 요청을 정규화하여 얻을 수 있는 "
 "서명할 문자열을 생성해야 합니다."
 
