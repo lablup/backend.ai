@@ -337,7 +337,7 @@ msgstr ""
 
 #: ../../common-api/auth.rst:159
 msgid "Attaching the signature"
-msgstr "시그니쳐 삽입"
+msgstr "서명 작성"
 
 #: ../../common-api/auth.rst:161
 msgid ""
