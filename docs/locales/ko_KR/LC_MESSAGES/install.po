@@ -199,7 +199,7 @@ msgstr "FAQ"
 
 #: ../../install/demo-setup-centos.rst:108 ../../install/demo-setup.rst:75
 msgid "When launching a kernel, it says \"Service Unavailable\"!"
-msgstr "kenel을 실행할 때, \"Service Unavailable\"! 가 표시됩니다"
+msgstr "kernel을 실행할 때, \"Service Unavailable\"! 가 표시됩니다"
 
 #: ../../install/demo-setup-centos.rst:110 ../../install/demo-setup.rst:77
 msgid ""
