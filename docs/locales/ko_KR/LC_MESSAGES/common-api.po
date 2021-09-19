@@ -244,7 +244,7 @@ msgid ""
 "the API endpoint address."
 msgstr ""
 "다음은 비밀 키로부터 파생된 서명 키를 생성하는 Python 코드 입니다. 키는 현재 날짜 "
-"(시간 제외) 및 API 엔드포인트 주소에 대해 중첩 서명 됩니다."
+"(시간 제외) 및 API 엔드포인트 주소에 대해 중첩되어 생성됩니다."
 
 #: ../../common-api/auth.rst:116
 msgid "Generating a string to sign"
