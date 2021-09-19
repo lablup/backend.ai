@@ -84,7 +84,7 @@ msgid ""
 "already available via our management console at `cloud.backend.ai "
 "<https://cloud.backend.ai>`_."
 msgstr ""
-"공용 클라우드 서비스 (``api.backend.ai``)는 현재 최종 사용자에게 어떠한 관리자 권한을 제공하지 않습니다."
+"공용 클라우드 서비스 (``api.backend.ai``)는 현재 사용자에게 어떠한 관리자 권한을 제공하지 않습니다."
 "이미 `cloud.backend.ai <https://cloud.backend.ai>`_ 에서 매니저 콘솔을 통해 충분히 기능을"
 "사용할 수 있기 때문입니다."
 
