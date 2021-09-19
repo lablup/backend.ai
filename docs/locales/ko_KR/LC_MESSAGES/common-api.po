@@ -159,7 +159,7 @@ msgid ""
 "idempotent semantics with multiple retries for intermittent failures. "
 "(Not implemented yet)"
 msgstr ""
-"선택 사항: 반복된 중복 요청을 서버가 구별할 수 있게 하는 클라이언트 생성 랜덤 문자열입니다."
+"선택 사항: 반복된 요청을 서버가 구별할 수 있게 하는 클라이언트 생성 랜덤 문자열입니다."
 "때때로 나타나는 장애에 대해 여러 번 재시도하여 멱등성을 유지하는 것이 중요합니다. (구현 중)"
 "*멱등성 : 연산을 여러 번 적용하더라도 결과가 달라지지 않는 성질"
 
