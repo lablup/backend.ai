@@ -86,7 +86,7 @@ msgstr ""
 
 #: ../../install/demo-setup.rst:2
 msgid "One-line Demo Setup"
-msgstr "한 줄 데모 설정"
+msgstr "한 줄로 데모 설정하기"
 
 #: ../../install/demo-setup-centos.rst:5 ../../install/demo-setup.rst:4
 msgid ""
