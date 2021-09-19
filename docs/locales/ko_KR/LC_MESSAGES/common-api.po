@@ -260,7 +260,7 @@ msgstr "HTTP 메서드 (대문자)"
 
 #: ../../common-api/auth.rst:121
 msgid "URI including query strings"
-msgstr "쿼리스트링을 포함한 URI"
+msgstr "쿼리스트링을 포함하는 URI"
 
 #: ../../common-api/auth.rst:122
 msgid ""
