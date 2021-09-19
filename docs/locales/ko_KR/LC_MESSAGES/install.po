@@ -103,7 +103,7 @@ msgstr ""
 #: ../../install/install-from-package.rst:7
 #: ../../install/install-from-source.rst:15
 msgid "Prerequisites"
-msgstr "선행 필수사항"
+msgstr "필수 선행 사항"
 
 #: ../../install/demo-setup-centos.rst:11 ../../install/demo-setup.rst:10
 msgid ""
