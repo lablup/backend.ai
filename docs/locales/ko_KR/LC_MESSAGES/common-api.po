@@ -333,7 +333,7 @@ msgid ""
 " key and the generated string with the hash function, as follows:"
 msgstr ""
 "그리고, 클라이언트는 서명 키와 hash 함수로 부터 생성된 문자열을 활용해 "
-"다음과 같이 시그니쳐를 계산해야 합니다."
+"다음과 같이 서명해야 합니다."
 
 #: ../../common-api/auth.rst:159
 msgid "Attaching the signature"
