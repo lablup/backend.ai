@@ -408,7 +408,7 @@ msgstr ""
 
 #: ../../install/development-setup.rst:94
 msgid "Resetting the environment"
-msgstr "환경 재설정 중"
+msgstr "환경 다시 설정하기"
 
 #: ../../install/development-setup.rst:106
 msgid ""
