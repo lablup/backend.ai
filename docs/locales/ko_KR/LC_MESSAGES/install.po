@@ -353,14 +353,14 @@ msgstr ""
 msgid ""
 "Inside the directory, there are ``manager``, ``agent``, ``common`` and a "
 "few other auxiliary directories.  You can directly modify the source "
-"codes inside them and re-launch the gateway and agent.  The ``common`` "
+"codes inside them and re-launch the manager and agent.  The ``common`` "
 "directory is shared by ``manager`` and ``agent`` so just editing sources "
-"there takes effects in the next launches of the gateway and agent."
+"there takes effects in the next launches of the manager and agent."
 msgstr ""
 "backend.ai-dev 폴더 안에는 ``manager``, ``agent``, ``common`` 및 기타 "
-"폴더들이 있습니다. 직접 소스 코드를 수정하고, gateway와 agent를 재실행 할 수 있습니다. "
+"폴더들이 있습니다. 직접 소스 코드를 수정하고, manager와 agent를 다시 실행 할 수 있습니다. "
 "``common`` 디렉토리는 ``manager``와 ``agent``가 공유하기 때문에 소스 코드를 수정하면 "
-"다음 gateway와 agent 실행 시 변경사항이 반영됩니다."
+"다음 manager와 agent 실행 시 변경사항이 반영됩니다."
 
 
 #: ../../install/development-setup.rst:68
