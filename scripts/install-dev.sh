@@ -127,6 +127,11 @@ has_python() {
   fi
 }
 
+
+info_to_md(){
+    sed 's/\x1b\[[0-9;]*m//g' | tee -a "INSTALL-INFO.md"
+}
+
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   if [ $(id -u) = "0" ]; then
     docker_sudo=''
@@ -696,48 +701,50 @@ fi
 DELETE_OPTS=$(trim "$DELETE_OPTS")
 
 cd "${INSTALL_PATH}"
-show_info "Installation finished."
-show_note "Default API keypair configuration for test / develop (my-backend-ai.sh):"
-echo "> ${WHITE}export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/${NC}"
-echo "> ${WHITE}export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE${NC}"
-echo "> ${WHITE}export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY${NC}"
-echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=api${NC}"
+cd "backend.ai"
+touch "INSTALL-INFO.md"
+show_info "Installation finished." | info_to_md
+show_note "Default API keypair configuration for test / develop (my-backend-ai.sh):" | info_to_md
+echo "> ${WHITE}export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/${NC}" | info_to_md
+echo "> ${WHITE}export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE${NC}" | info_to_md
+echo "> ${WHITE}export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY${NC}" | info_to_md
+echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=api${NC}" | info_to_md
 echo " "
-show_note "Default ID/Password configuration for test / develop (my-backend-ai-session.sh):"
-echo "> ${WHITE}export BACKEND_ENDPOINT=http://0.0.0.0:${WEBSERVER_PORT}/${NC}"
-echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=session${NC}"
-echo "> ${WHITE}backend.ai login${NC}"
-echo "> ${WHITE}ID      : admin@lablup.com${NC}"
-echo "> ${WHITE}Password: wJalrXUt${NC}"
+show_note "Default ID/Password configuration for test / develop (my-backend-ai-session.sh):"  | info_to_md
+echo "> ${WHITE}export BACKEND_ENDPOINT=http://0.0.0.0:${WEBSERVER_PORT}/${NC}" | info_to_md
+echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=session${NC}" | info_to_md
+echo "> ${WHITE}backend.ai login${NC}" | info_to_md
+echo "> ${WHITE}ID      : admin@lablup.com${NC}" | info_to_md
+echo "> ${WHITE}Password: wJalrXUt${NC}" | info_to_md
 echo " "
-echo "These environment variables are added in my-backend-ai.sh and my-backend-ai-session.sh."
-show_important_note "You should change your default admin API keypairs for production environment!"
-show_note "How to run Backend.AI manager:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
-echo "> ${WHITE}python -m ai.backend.manager.server --debug${NC}"
-show_note "How to run Backend.AI agent:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/agent${NC}"
-echo "> ${WHITE}python -m ai.backend.agent.server --debug${NC}"
-show_note "How to run Backend.AI storage-proxy:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/storage-proxy${NC}"
-echo "> ${WHITE}python -m ai.backend.storage.server${NC}"
-show_note "How to run Backend.AI web server (for ID/Password login):"
-echo "> ${WHITE}cd ${INSTALL_PATH}/webserver${NC}"
-echo "> ${WHITE}python -m ai.backend.web.server${NC}"
-show_note "How to run your first code:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/client-py${NC}"
-echo "> ${WHITE}backend.ai --help${NC}"
-echo "> ${WHITE}backend.ai run python -c \"print('Hello World\\!')\"${NC}"
-echo " "
-echo "${GREEN}Development environment is now ready.${NC}"
-show_note "Reminder: Your environment ID is ${YELLOW}${ENV_ID}${NC}."
-echo "  * When using docker-compose, do:"
-echo "    > ${WHITE}cd ${INSTALL_PATH}/backend.ai${NC}"
+echo "These environment variables are added in my-backend-ai.sh and my-backend-ai-session.sh."  | info_to_md
+show_important_note "You should change your default admin API keypairs for production environment!"  | info_to_md
+show_note "How to run Backend.AI manager:"  | info_to_md
+echo "> ${WHITE}cd ${INSTALL_PATH}/manager${NC}" | info_to_md
+echo "> ${WHITE}python -m ai.backend.manager.server --debug${NC}" | info_to_md
+show_note "How to run Backend.AI agent:"  | info_to_md
+echo "> ${WHITE}cd ${INSTALL_PATH}/agent${NC}" | info_to_md
+echo "> ${WHITE}python -m ai.backend.agent.server --debug${NC}" | info_to_md
+show_note "How to run Backend.AI storage-proxy:"  | info_to_md
+echo "> ${WHITE}cd ${INSTALL_PATH}/storage-proxy${NC}" | info_to_md
+echo "> ${WHITE}python -m ai.backend.storage.server${NC}" | info_to_md
+show_note "How to run Backend.AI web server (for ID/Password login):"  | info_to_md
+echo "> ${WHITE}cd ${INSTALL_PATH}/webserver${NC}" | info_to_md
+echo "> ${WHITE}python -m ai.backend.web.server${NC}" | info_to_md
+show_note "How to run your first code:"  | info_to_md
+echo "> ${WHITE}cd ${INSTALL_PATH}/client-py${NC}" | info_to_md
+echo "> ${WHITE}backend.ai --help${NC}" | info_to_md
+echo "> ${WHITE}backend.ai run python -c \"print('Hello World\\!')\"${NC}" | info_to_md
+echo " "  | info_to_md
+echo "${GREEN}Development environment is now ready.${NC}"  | info_to_md
+show_note "Reminder: Your environment ID is ${YELLOW}${ENV_ID}${NC}."  | info_to_md
+echo "  * When using docker-compose, do:"  | info_to_md
+echo "    > ${WHITE}cd ${INSTALL_PATH}/backend.ai${NC}" | info_to_md
 if [ ! -z "$docker_sudo" ]; then
-  echo "    > ${WHITE}${docker_sudo} docker-compose -p ${ENV_ID} -f docker-compose.halfstack.${ENV_ID}.yml up -d ...${NC}"
+    echo "    > ${WHITE}${docker_sudo} docker-compose -p ${ENV_ID} -f docker-compose.halfstack.${ENV_ID}.yml up -d ...${NC}" | info_to_md
 else
-  echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.${ENV_ID}.yml up -d ...${NC}"
+    echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.${ENV_ID}.yml up -d ...${NC}" | info_to_md
 fi
-echo "  * To delete this development environment, run:"
-echo "    > ${WHITE}$(dirname $0)/delete-dev.sh --env ${ENV_ID} ${DELETE_OPTS}${NC}"
-echo " "
+echo "  * To delete this development environment, run:"  | info_to_md
+echo "    > ${WHITE}$(dirname $0)/delete-dev.sh --env ${ENV_ID} ${DELETE_OPTS}${NC}" | info_to_md
+echo " " | info_to_md
