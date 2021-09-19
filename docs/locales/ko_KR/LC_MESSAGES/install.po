@@ -271,7 +271,7 @@ msgstr ""
 
 #: ../../install/development-setup.rst:12
 msgid "Method 1: Automatic Installation"
-msgstr "Mothod 1: 자동 설치"
+msgstr "Method 1 자동 설치"
 
 #: ../../install/development-setup.rst:14
 msgid ""
