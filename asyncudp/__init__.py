@@ -57,6 +57,15 @@ class Socket:
 
         return await self._protocol.recvfrom()
 
+    def getsockname(self):
+        """Get bound infomation.
+
+        >>> local_address, local_port = sock.getsockname()
+
+        """
+
+        return self._transport.get_extra_info('sockname')
+
     async def __aenter__(self):
         return self
 

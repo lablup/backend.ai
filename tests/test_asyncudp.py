@@ -31,6 +31,17 @@ class AsyncudpTest(unittest.TestCase):
         server.close()
         client.close()
 
+    def test_getsockname(self):
+        asyncio.run(self.getsockname())
+
+    async def getsockname(self):
+        addr = ('127.0.0.1', 0)
+        socket = await asyncudp.create_socket(local_addr=addr)
+        actual_addr, actual_port = socket.getsockname()
+        self.assertTrue(actual_port > 0)
+        self.assertEqual(actual_addr, '127.0.0.1')
+        socket.close()
+
     def test_remote_address(self):
         asyncio.run(self.remote_address())
 
