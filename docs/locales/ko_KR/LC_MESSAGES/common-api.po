@@ -63,7 +63,7 @@ msgstr ""
 
 #: ../../common-api/auth.rst:24
 msgid "Common Structure of API Requests"
-msgstr "API 요청의 일반적인 구조"
+msgstr "API 요청의 공통 구조"
 
 #: ../../common-api/auth.rst:30 ../../common-api/auth.rst:72
 #: ../../common-api/ratelimit.rst:18
@@ -173,7 +173,7 @@ msgstr "JSON 인코딩 요청 매개 변수"
 
 #: ../../common-api/auth.rst:66
 msgid "Common Structure of API Responses"
-msgstr "API 응답들의 일반적인 구조"
+msgstr "API 응답들의 공통 구조"
 
 #: ../../common-api/auth.rst:74
 msgid "Status code"
