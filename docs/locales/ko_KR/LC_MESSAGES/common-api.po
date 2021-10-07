@@ -33,8 +33,8 @@ msgid ""
 " <https://cloud.backend.ai>`_ or from the administrator of your "
 "Backend.AI cluster."
 msgstr ""
-"API 서버에 요청하려면, 클라이언트에서는 API 엑세스 키와 비밀 키가 쌍으로 필요합니다. `저희 클라우드 서비스 "
-"<https://cloud.backend.ai>`_ 나 Backend.Ai 클러스터의 관리자에서 해당 키를 확인할 수 있습니다."
+"API 서버에 요청하려면, 클라이언트에서는 API 엑세스 키와 비밀 키가 쌍으로 필요합니다. `클라우드 서비스 "
+"<https://cloud.backend.ai>`_ 나 Backend.AI 클러스터의 관리자에서 해당 키를 확인할 수 있습니다."
 
 #: ../../common-api/auth.rst:12
 msgid ""
@@ -59,11 +59,11 @@ msgid ""
 "For local deployments, you may create a master dummy pair in the "
 "configuration (TODO)."
 msgstr ""
-"로컬 배포의 경우, 환경 설정에 마스터 더미 쌍을 만들 수 있습니다. (TODO)"
+"로컬 배포의 경우, 환경 설정에 마스터 더미 데이터 쌍을 만들 수 있습니다. (TODO)"
 
 #: ../../common-api/auth.rst:24
 msgid "Common Structure of API Requests"
-msgstr "API 요청의 일반적인 구조"
+msgstr "API 요청의 공통 구조"
 
 #: ../../common-api/auth.rst:30 ../../common-api/auth.rst:72
 #: ../../common-api/ratelimit.rst:18
@@ -159,7 +159,7 @@ msgid ""
 "idempotent semantics with multiple retries for intermittent failures. "
 "(Not implemented yet)"
 msgstr ""
-"선택 사항: 반복된 중복 요청을 서버가 구별할 수 있게 하는 클라이언트 생성 랜덤 문자열입니다."
+"선택 사항: 반복된 요청을 서버가 구별할 수 있게 하는 클라이언트 생성 랜덤 문자열입니다."
 "때때로 나타나는 장애에 대해 여러 번 재시도하여 멱등성을 유지하는 것이 중요합니다. (구현 중)"
 "*멱등성 : 연산을 여러 번 적용하더라도 결과가 달라지지 않는 성질"
 
@@ -173,7 +173,7 @@ msgstr "JSON 인코딩 요청 매개 변수"
 
 #: ../../common-api/auth.rst:66
 msgid "Common Structure of API Responses"
-msgstr "API 응답들의 일반적인 구조"
+msgstr "API 응답들의 공통 구조"
 
 #: ../../common-api/auth.rst:74
 msgid "Status code"
@@ -229,7 +229,7 @@ msgid ""
 "should generate a signing key derived from its API secret key and a "
 "string to sign by canonicalizing the HTTP request."
 msgstr ""
-"각각의 API 요청은 시그니처를 통해 서명되어야 합니다. 먼저, 클라이언트는 "
+"각각의 API 요청은 서명과 함께 등록되어야 합니다. 먼저, 클라이언트는 "
 "API 비밀 키에서 파생된 서명 키와 HTTP 요청을 정규화하여 얻을 수 있는 "
 "서명할 문자열을 생성해야 합니다."
 
@@ -244,7 +244,7 @@ msgid ""
 "the API endpoint address."
 msgstr ""
 "다음은 비밀 키로부터 파생된 서명 키를 생성하는 Python 코드 입니다. 키는 현재 날짜 "
-"(시간 제외) 및 API 엔드포인트 주소에 대해 중첩 서명 됩니다."
+"(시간 제외) 및 API 엔드포인트 주소에 대해 중첩되어 생성됩니다."
 
 #: ../../common-api/auth.rst:116
 msgid "Generating a string to sign"
@@ -260,7 +260,7 @@ msgstr "HTTP 메서드 (대문자)"
 
 #: ../../common-api/auth.rst:121
 msgid "URI including query strings"
-msgstr "쿼리스트링을 포함한 URI"
+msgstr "쿼리스트링을 포함하는 URI"
 
 #: ../../common-api/auth.rst:122
 msgid ""
@@ -333,11 +333,11 @@ msgid ""
 " key and the generated string with the hash function, as follows:"
 msgstr ""
 "그리고, 클라이언트는 서명 키와 hash 함수로 부터 생성된 문자열을 활용해 "
-"다음과 같이 시그니쳐를 계산해야 합니다."
+"다음과 같이 서명해야 합니다."
 
 #: ../../common-api/auth.rst:159
 msgid "Attaching the signature"
-msgstr "시그니쳐 삽입"
+msgstr "서명 작성"
 
 #: ../../common-api/auth.rst:161
 msgid ""

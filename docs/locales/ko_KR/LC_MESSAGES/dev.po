@@ -25,7 +25,7 @@ msgstr "새 REPL 커널 추가"
 
 #: ../../dev/adding-kernels.rst:5
 msgid "Overview"
-msgstr "개괄"
+msgstr "둘러보기"
 
 #: ../../dev/adding-kernels.rst:7
 msgid ""

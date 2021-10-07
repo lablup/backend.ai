@@ -86,7 +86,7 @@ msgstr ""
 
 #: ../../install/demo-setup.rst:2
 msgid "One-line Demo Setup"
-msgstr "한 줄 데모 설정"
+msgstr "한 줄로 데모 설정하기"
 
 #: ../../install/demo-setup-centos.rst:5 ../../install/demo-setup.rst:4
 msgid ""
@@ -103,7 +103,7 @@ msgstr ""
 #: ../../install/install-from-package.rst:7
 #: ../../install/install-from-source.rst:15
 msgid "Prerequisites"
-msgstr "선행 필수사항"
+msgstr "필수 선행 사항"
 
 #: ../../install/demo-setup-centos.rst:11 ../../install/demo-setup.rst:10
 msgid ""
@@ -199,7 +199,7 @@ msgstr "FAQ"
 
 #: ../../install/demo-setup-centos.rst:108 ../../install/demo-setup.rst:75
 msgid "When launching a kernel, it says \"Service Unavailable\"!"
-msgstr "kenel을 실행할 때, \"Service Unavailable\"! 가 표시됩니다"
+msgstr "kernel을 실행할 때, \"Service Unavailable\"! 가 표시됩니다"
 
 #: ../../install/demo-setup-centos.rst:110 ../../install/demo-setup.rst:77
 msgid ""
@@ -271,7 +271,7 @@ msgstr ""
 
 #: ../../install/development-setup.rst:12
 msgid "Method 1: Automatic Installation"
-msgstr "Mothod 1: 자동 설치"
+msgstr "Method 1 자동 설치"
 
 #: ../../install/development-setup.rst:14
 msgid ""
@@ -307,9 +307,9 @@ msgid ""
 "components due to Unicode characters in README files.  Please keep "
 "correct locale configurations to prevent such errors."
 msgstr ""
-"경우에 따라 터미널 클라이언트와 원격 호스트 간의 locale 충돌은 Backend.AI 컴포넌트를 설치할 "
-"때 README 파일의 유니코드 문자로 인해 인코딩 오류가 발생할 수 있습니다. 이러한 오류를 방지하려면" 
-" 올바른 locale 환경설정을 하십시오."
+"상황에 따라 터미널 클라이언트와 원격 호스트 간의 로컬 충돌은 "
+"README 파일의 유니코드 문자로 인해 Backend.AI 컴포넌트를 설치할때 인코딩 오류가 발생할 수 있습니다. "
+"오류가 일어나지 않도록 방지하기 위해 올바른 로컬 환경 설정을 하세요."
 
 #: ../../install/development-setup.rst:37
 msgid ""
@@ -351,15 +351,15 @@ msgstr ""
 
 #: ../../install/development-setup.rst:62
 msgid ""
-"Inside the directory, there are ``manager``, ``agent``, ``common`` and a "
+"Inside the directory, there are ``gateway``, ``agent``, ``common`` and a "
 "few other auxiliary directories.  You can directly modify the source "
 "codes inside them and re-launch the gateway and agent.  The ``common`` "
-"directory is shared by ``manager`` and ``agent`` so just editing sources "
+"directory is shared by ``gateway`` and ``agent`` so just editing sources "
 "there takes effects in the next launches of the gateway and agent."
 msgstr ""
-"backend.ai-dev 폴더 안에는 ``manager``, ``agent``, ``common`` 및 기타 "
-"폴더들이 있습니다. 직접 소스 코드를 수정하고, gateway와 agent를 재실행 할 수 있습니다. "
-"``common`` 디렉토리는 ``manager``와 ``agent``가 공유하기 때문에 소스 코드를 수정하면 "
+"backend.ai-dev 폴더 안에는 ``gateway``, ``agent``, ``common`` 및 기타 "
+"폴더들이 있습니다. 직접 소스 코드를 수정하고, gateway와 agent를 다시 실행 할 수 있습니다. "
+"``common`` 디렉토리는 ``gateway``와 ``agent``가 공유하기 때문에 소스 코드를 수정하면 "
 "다음 gateway와 agent 실행 시 변경사항이 반영됩니다."
 
 
@@ -408,7 +408,7 @@ msgstr ""
 
 #: ../../install/development-setup.rst:94
 msgid "Resetting the environment"
-msgstr "환경 재설정 중"
+msgstr "환경 다시 설정하기"
 
 #: ../../install/development-setup.rst:106
 msgid ""
