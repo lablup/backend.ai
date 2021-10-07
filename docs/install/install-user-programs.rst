@@ -15,7 +15,7 @@ Install packages with linuxbrew
 If you are a macOS user and a researcher or developer who occasionally installs unix programs, you may be familiar with `homebrew <https://brew.sh>`. You can install new programs using linuxbrew in Backend.AI.
 
 Creating a user linuxbrew directory
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Directories that begin with a dot are automatically mounted when the session starts. Create a linuxbrew directory that will be automatically mounted so that programs you install with linuxbrew can be used in all sessions.
 
@@ -106,7 +106,7 @@ Install packages with miniconda
 Some environments support miniconda. In this case, you can use `miniconda <https://docs.conda.io/projects/conda/en/latest/user-guide/install/>` to install the packages you want.
 
 Creating a user miniconda-required directory
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Directories that begin with a dot are automatically mounted when the session starts. Create a ``.conda``, ``.continuum`` directory that will be automatically mounted so that programs you install with miniconda can be used in all sessions.
 
