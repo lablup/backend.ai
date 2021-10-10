@@ -249,7 +249,7 @@ msgstr "Python 가상환경을 위한 pyenv 설치"
 
 #: ../../install/demo-setup-centos.rst:37
 msgid "install python 3.6.x to run backend.ai"
-msgstr "Backend.ai 실행을 위한 Python 3.6.x 버전 설치"
+msgstr "Backend.AI 실행을 위한 Python 3.6.x 버전 설치"
 
 #: ../../install/demo-setup-centos.rst:42
 msgid ""
@@ -266,7 +266,7 @@ msgid ""
 "Currently Backend.AI is developed and tested under only \\*NIX-compatible"
 " platforms (Linux or macOS)."
 msgstr ""
-"현재 Backend.Ai는 \*NIX계열(Linux 혹은 MacOS)상에서 개발 및 테스트 되었습니다."
+"현재 Backend.AI는 \*NIX계열(Linux 혹은 MacOS)상에서 개발 및 테스트 되었습니다."
 ""
 
 #: ../../install/development-setup.rst:12
