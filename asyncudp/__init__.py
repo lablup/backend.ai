@@ -2,6 +2,10 @@ import asyncio
 from .version import __version__
 
 
+class ClosedError(Exception):
+    pass
+
+
 class _SocketProtocol:
 
     def __init__(self):
@@ -11,7 +15,7 @@ class _SocketProtocol:
         pass
 
     def connection_lost(self, transport):
-        pass
+        self._packets.put_nowait(None)
 
     def datagram_received(self, data, addr):
         self._packets.put_nowait((data, addr))
@@ -51,11 +55,19 @@ class Socket:
     async def recvfrom(self):
         """Receive a UDP packet.
 
+        Raises ClosedError on connection error, often by calling the
+        close() method from another task.
+
         >>> data, addr = sock.recvfrom()
 
         """
 
-        return await self._protocol.recvfrom()
+        packet = await self._protocol.recvfrom()
+
+        if packet is None:
+            raise ClosedError()
+
+        return packet
 
     def getsockname(self):
         """Get bound infomation.
