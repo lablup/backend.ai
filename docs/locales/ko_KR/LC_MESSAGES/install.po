@@ -476,27 +476,27 @@ msgstr ""
 
 #: ../../install/development-setup.rst:148
 msgid "``$WORKSPACE``"
-msgstr ""
+msgstr "``$WORKSPACE``"
 
 #: ../../install/development-setup.rst:145
 msgid "backend.ai"
-msgstr ""
+msgstr "backend.ai"
 
 #: ../../install/development-setup.rst:146
 msgid "backend.ai-manager"
-msgstr ""
+msgstr "backend.ai-manager"
 
 #: ../../install/development-setup.rst:147
 msgid "backend.ai-agent"
-msgstr ""
+msgstr "backend.ai-agent"
 
 #: ../../install/development-setup.rst:148
 msgid "backend.ai-common"
-msgstr ""
+msgstr "backend.ai-common"
 
 #: ../../install/development-setup.rst:149
 msgid "backend.ai-client-py"
-msgstr ""
+msgstr "backend.ai-client-py"
 
 #: ../../install/development-setup.rst:165
 msgid ""
