@@ -472,7 +472,7 @@ msgstr ""
 
 #: ../../install/development-setup.rst:142
 msgid "The directory structure would look like after finishing this guide:"
-msgstr ""
+msgstr "이 가이드를 완료한 후의 디렉토리 구조는 다음과 같습니다."
 
 #: ../../install/development-setup.rst:148
 msgid "``$WORKSPACE``"
