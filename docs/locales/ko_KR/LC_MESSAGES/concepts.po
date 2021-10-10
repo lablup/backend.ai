@@ -117,7 +117,7 @@ msgstr ""
 
 #: ../../concepts/faq.rst:13
 msgid "Apache Zeppelin, Jupyter Notebook"
-msgstr ""
+msgstr "Apache Zeppelin, Jupyter Notebook"
 
 #: ../../concepts/faq.rst:14
 msgid "Notebook-style document + code *frontends*"
@@ -130,7 +130,7 @@ msgstr ""
 #: ../../concepts/faq.rst:17 ../../concepts/faq.rst:34
 #: ../../concepts/faq.rst:59
 msgid "**Backend.AI**"
-msgstr ""
+msgstr "**Backend.AI**"
 
 #: ../../concepts/faq.rst:18
 msgid "Pluggable *backend* to any frontends"
@@ -154,7 +154,7 @@ msgstr ""
 
 #: ../../concepts/faq.rst:30
 msgid "Amazon ECS, Kubernetes"
-msgstr ""
+msgstr "Amazon ECS, Kubernetes"
 
 #: ../../concepts/faq.rst:31
 msgid "Long-running service daemons"
@@ -174,7 +174,7 @@ msgstr ""
 
 #: ../../concepts/faq.rst:38
 msgid "Amazon Lambda, Azure Functions"
-msgstr ""
+msgstr "Amazon Lambda, Azure Functions"
 
 #: ../../concepts/faq.rst:39
 msgid "Stateless, light-weight functions"
@@ -190,7 +190,7 @@ msgstr ""
 
 #: ../../concepts/faq.rst:51
 msgid "TensorFlow, Apache Spark, Apache Hive"
-msgstr ""
+msgstr "TensorFlow, Apache Spark, Apache Hive"
 
 #: ../../concepts/faq.rst:52
 msgid "Computation runtime"
@@ -202,7 +202,7 @@ msgstr ""
 
 #: ../../concepts/faq.rst:55
 msgid "Amazon ML, Azure ML, GCP ML"
-msgstr ""
+msgstr "Amazon ML, Azure ML, GCP ML"
 
 #: ../../concepts/faq.rst:56
 msgid "Managed MLaaS"
