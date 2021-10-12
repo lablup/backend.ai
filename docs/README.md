@@ -21,109 +21,12 @@ $ cd ~/meta/docs
 
 ### pyenv and pyenv-virtualenv installation
 
-#### MacOS version
+#### pyenv installation
+Please refer to the [README](https://github.com/pyenv/pyenv#installation) file in the official repository of [pyenv](https://github.com/pyenv/pyenv) and install it.
 
-Install [pyenv](https://github.com/pyenv/pyenv) using brew.
-
-```console
-$ brew install pyenv
-```
-
-Set `PYENV_ROOT`, add `pyenv` to `PATH` and execute shell run command file (`.zshrc` or `.bashrc` or etc.).   
-For now, we will use `.zshrc` as an example.
-
-```console
-$ echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
-$ echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
-$ eval '"(pyenv init --path)"' >> ~/.zshrc
-$ source ~/.zshrc
-```
-
-Install [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) using brew.   
-This is the actual command to create the environment using pyenv.
-
-```console
-$ brew install pyenv-virtualenv
-```
-
-Add `pyenv-virtualenv` to `PATH` and execute shell run command file (`.zshrc` or `.bashrc` or etc.).
-
-```console
-$ eval "$(pyenv virtualenv-init -)"
-```
-
-#### Linux (Ubuntu) version
-
-Install [pyenv](https://github.com/pyenv/pyenv) using `git clone`.   
-
-```console
-$ git clone https://github.com/pyenv/pyenv.git ~/.pyenv
-```
-
-SET `PYENV_ROOT`, add `pyenv` to `PATH` and add `pyenv-virtualenv` to `PATH`.
-Execute shell run command file (`.zshrc` or `.bashrc` or etc.).
-
-```console
-$ echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-$ echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-$ echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n eval "$(pyenv init --path)"\nfi' >> ~/.bashrc
-$ source ~/.bashrc
-```
-
-Restart the shell to enable pyenv
-
-```console
-$ exec $SHELL
-```
-
-Install [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) using `git clone`.   
-
-```console
-$ git clone https://github.com/pyenv/pyenv-virtualenv.git $(pyenv root)/plugins/pyenv-virtualenv
-```
-
-Add `pyenv virtualenv-init` to `$SHELL` to enable auto-activate of virtualenvs.
-
-```console
-$ echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
-```
-
-Restart the shell to enable pyenv-virtualenv
-
-```console
-$ exec $SHELL
-```
-
-### install certain version of pyenv
-
-There's no specific restriction about the version of python3 for building documentation of Backend.AI, but
-we recommend you to install the version higher than Python 3.8.
-
-> e.g. Install pyenv version: `3.9.6`
-
-```console
-$ pyenv install 3.9.6
-```
-
-### 
-
-### pyenv activate
-
-> 📌 NOTE: You need to create pyenv first, and then activate/deactivate it.
-
-Create a pyenv with version and a genuine name.
-For now, we can use `bai-doc`.
-
-```console
-$ pyenv virtualenv 3.9.6 bai-doc
-```
-
-Add current directory to automatically activate pyenv.
-
-```console
-$ cd ~/meta/docs
-$ pyenv local bai-doc
-```
+#### pyenv-virtualenv installation (optional)
+`pyenv-virtualenv` is a `pyenv` plugin. It's not mandatory to build the backend.ai documentation, but highly recommended.   
+To install it, please refer to the [README](https://github.com/pyenv/pyenv-virtualenv#installation) file in the official repository of [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv).
 
 ### sphinx installation
 
@@ -156,6 +59,7 @@ $ make gettext
 ```
 
 #### Make po(Portable Object) files using sphinx-intl
+
 > For now, we use Korean language as an example for translation.
 
 ```console
