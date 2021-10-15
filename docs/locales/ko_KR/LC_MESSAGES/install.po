@@ -249,7 +249,7 @@ msgstr "Python 가상환경을 위한 pyenv 설치"
 
 #: ../../install/demo-setup-centos.rst:37
 msgid "install python 3.6.x to run backend.ai"
-msgstr "Backend.ai 실행을 위한 Python 3.6.x 버전 설치"
+msgstr "Backend.AI 실행을 위한 Python 3.6.x 버전 설치"
 
 #: ../../install/demo-setup-centos.rst:42
 msgid ""
@@ -271,7 +271,7 @@ msgstr ""
 
 #: ../../install/development-setup.rst:12
 msgid "Method 1: Automatic Installation"
-msgstr "Method 1 자동 설치"
+msgstr "Method 1: 자동 설치"
 
 #: ../../install/development-setup.rst:14
 msgid ""
@@ -307,9 +307,9 @@ msgid ""
 "components due to Unicode characters in README files.  Please keep "
 "correct locale configurations to prevent such errors."
 msgstr ""
-"상황에 따라 터미널 클라이언트와 원격 호스트 간의 로컬 충돌은 "
-"README 파일의 유니코드 문자로 인해 Backend.AI 컴포넌트를 설치할때 인코딩 오류가 발생할 수 있습니다. "
-"오류가 일어나지 않도록 방지하기 위해 올바른 로컬 환경 설정을 하세요."
+"상황에 따라 터미널 클라이언트와 원격 호스트 사이에 locale 충돌이 발생할 수 있습니다. "
+"특히 Backend.AI 컴포넌트를 설치할 때에 README 파일의 유니코드 문자로 인해 이런 충돌이 발생할 수 있습니다. "
+"이런 오류를 미연에 방지하기 위해 올바른 locale 설정을 유지해주세요."
 
 #: ../../install/development-setup.rst:37
 msgid ""
@@ -339,7 +339,7 @@ msgstr "스크립트 실행"
 #: ../../install/development-setup.rst:57
 #: ../../install/development-setup.rst:104
 msgid "The script may ask your root password in the middle to run sudo in Linux."
-msgstr "스크립트 실행 중 sudo 권한을 위해 password를 물어볼 수 있습니다. (Linux의 경우)"
+msgstr "스크립트 실행 중 ``sudo`` 권한을 위해 password를 입력해야 할 수도 있습니다. (Linux의 경우)"
 
 #: ../../install/development-setup.rst:59
 msgid ""
