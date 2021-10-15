@@ -52,7 +52,7 @@ msgstr "Backend.AI API 문서"
 
 #: ../../index.rst:9
 msgid "**Latest API version: v4.20190315**"
-msgstr ""
+msgstr "**최신 API 버전: v4.20190315**"
 
 #: ../../index.rst:11
 msgid ""
