@@ -59,7 +59,7 @@ msgid ""
 "For local deployments, you may create a master dummy pair in the "
 "configuration (TODO)."
 msgstr ""
-"로컬 배포의 경우, 환경 설정에 마스터 더미 데이터 쌍을 만들 수 있습니다. (TODO)"
+"로컬 배포의 경우, 환경 설정에 마스터 더미 데이터(dummy data) 쌍을 만들 수 있습니다. (TODO)"
 
 #: ../../common-api/auth.rst:24
 msgid "Common Structure of API Requests"
