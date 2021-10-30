@@ -2,18 +2,19 @@
 
 Build guide for Backend.AI Documentation
 
-## Setup build environment
+
+## Setting up the build environment for docs
 
 > 📌 NOTE: You may need a sudo access for a certain command.
 
 ### clone docs in `lablup/backend.ai` project
-Download `lablup/backend.ai` project using `git clone` and rename it as `meta`.
+Download `lablup/backend.ai` project using `git clone` and rename the clone directory as `meta`.
 
 ```console
 $ cd ~
 $ git clone https://github.com/lablup/backend.ai meta
 ```
-Change current working directory to `docs` directory in meta directory, which you downloaded just now.
+Change the current working directory to `meta/docs`.
 
 ```console
 $ cd ~/meta/docs
@@ -22,13 +23,13 @@ $ cd ~/meta/docs
 ### pyenv and pyenv-virtualenv installation
 
 #### pyenv installation
-Please refer to the [README](https://github.com/pyenv/pyenv#installation) file in the official repository of [pyenv](https://github.com/pyenv/pyenv) and install it.
+Please refer to the [README](https://github.com/pyenv/pyenv#installation) of the official [pyenv](https://github.com/pyenv/pyenv) repository and install it.
 
 #### pyenv-virtualenv installation (optional)
-`pyenv-virtualenv` is a `pyenv` plugin. It's not mandatory to build the backend.ai documentation, but highly recommended.   
-To install it, please refer to the [README](https://github.com/pyenv/pyenv-virtualenv#installation) file in the official repository of [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv).
+`pyenv-virtualenv` is a `pyenv` plugin.  It is not mandatory to build the Backend.AI docs but highly recommended.   
+To install it, please refer to the [README](https://github.com/pyenv/pyenv-virtualenv#installation) of the official [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) repository.
 
-### sphinx installation
+### Sphinx installation
 
 Install [sphinx](https://www.sphinx-doc.org/en/master/) using [pip](https://pypi.org/project/pip/)
 
@@ -42,41 +43,46 @@ Install [sphinx-intl](https://github.com/sphinx-doc/sphinx-intl) using pip.
 
 ```console
 $ pip install sphinx-intl
-```ß
+```
 
-## Build documents
+
+## Building HTML document
+
 > 📌 NOTE: Please make sure pyenv installation completed and the activation has been enabled before building documents, and current working directory need to be root directory of `docs`.
 
-### Make Default html files
+### Make the html version
 ```console
 $ make html
 ```
 ### Translation
 
-#### Make pot(Portable Object Template) files
+#### Generate/update pot (Portable Object Template) files
 ```console
 $ make gettext
 ```
 
-#### Make po(Portable Object) files using sphinx-intl
+#### Build po (Portable Object) files using sphinx-intl
 
-> For now, we use Korean language as an example for translation.
+> In this guide, we use Korean as the target translation language.
 
 ```console
 $ sphinx-intl update -p _build/locale/ -l ko_KR
 ```
 
-#### Make html files with translated version
+#### Build HTML files with translated version
 
 ```console
 $ make -e SPHINXOPTS="-D language='ko'" html
 ```
 
-## 🚧 Build PDF document (WIP) 🚧
- Help wanted!   
-Looking for people to help with a short guide for building PDF document based on html files derived from sphinx.
+## 🚧 Building PDF document (WIP) 🚧
 
-## Advanced Setting
+> Help wanted!   
+
+We are looking for people to help with a short guide for building PDF document based on html files derived from sphinx.
+
+
+## Advanced Settings
 
 ### Managing the hierachy of toctree(Table of Contents) of documentation
 
