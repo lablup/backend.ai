@@ -15,6 +15,7 @@
 
 import sys
 import os
+
 import sphinx_rtd_theme
 
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
@@ -35,7 +36,7 @@ on_rtd = os.environ.get('READTHEDOCS') == 'True'
 extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
-	'sphinx_rtd_theme',
+    'sphinx_rtd_theme',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
