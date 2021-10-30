@@ -1,6 +1,6 @@
-# backend.ai Documentation
+# Backend.AI Documentation
 
-Build guide for Backend.AI Documentation
+Developer guide for Backend.AI documentation
 
 
 ## Setting up the build environment for docs
