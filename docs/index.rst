@@ -35,14 +35,6 @@ Table of Contents
    install/guides
    install/supplementary
    install/configure-autoscaling
-   install/demo-setup
-   install/demo-setup-centos
-   install/install-agent
-   install/install-manager
-   install/install-on-clouds
-   install/install-on-premise
-   install/install-user-programs
-   install/version-management-and-upgrades
 
 .. _migration:
 
