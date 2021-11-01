@@ -3,7 +3,7 @@ version: "2.4"
 services:
 
   backendai-half-db:
-    image: postgres:9.6.15-alpine
+    image: postgres:13.4-alpine
     restart: unless-stopped
     command: postgres -c 'max_connections=256'
     networks:
@@ -19,7 +19,7 @@ services:
     mem_limit: "2g"
 
   backendai-half-redis:
-    image: redis:5.0.5-alpine
+    image: redis:6.2.6-alpine
     restart: unless-stopped
     networks:
       - half
@@ -30,7 +30,7 @@ services:
     mem_limit: "2g"
 
   backendai-half-etcd:
-    image: quay.io/coreos/etcd:v3.4.1
+    image: quay.io/coreos/etcd:v3.5.1
     restart: unless-stopped
     volumes:
       - "./data/etcd:/etcd-data:rw"

@@ -34,6 +34,7 @@ Table of Contents
 
    install/guides
    install/supplementary
+   install/configure-autoscaling
 
 .. _migration:
 
