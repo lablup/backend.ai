@@ -606,6 +606,7 @@ show_info "Copy default configuration files to manager / agent root..."
 cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
 cp config/halfstack.toml ./manager.toml
+sed_inplace "s/num-proc = .*/num-proc = 1/" ./manager.toml
 sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
 sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
 sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
