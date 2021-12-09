@@ -177,7 +177,7 @@ fi
 
 ROOT_PATH=$(pwd)
 ENV_ID=""
-PYTHON_VERSION="3.9.5"
+PYTHON_VERSION="3.9.9"
 SERVER_BRANCH="main"
 CLIENT_BRANCH="main"
 INSTALL_PATH="./backend.ai-dev"
@@ -291,6 +291,11 @@ install_pybuild_deps() {
     brew install zlib xz
     brew install sqlite3 gdbm
     brew install tcl-tk
+    if [ "$(uname -p)" = "arm" ]; then
+      # On M1 Macs, psycopg2-binary tries to build itself and requires pg_config
+      # to access the postgresql include/library path information.
+      brew install postgresql
+    fi
     ;;
   esac
 }
@@ -383,11 +388,6 @@ install_python() {
       export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib"
     fi
     pyenv install --skip-existing "${PYTHON_VERSION}"
-    if [ "$DISTRO" = "Darwin" ]; then
-      unset PYTHON_CONFIGURE_OPTS
-      unset CFLAGS
-      unset LDFLAGS
-    fi
     if [ $? -ne 0 ]; then
       show_error "Installing the Python version ${PYTHON_VERSION} via pyenv has failed."
       show_note "${PYTHON_VERSION} is not supported by your current installation of pyenv."
@@ -396,6 +396,25 @@ install_python() {
     fi
   else
     echo "${PYTHON_VERSION} is already installed."
+  fi
+  if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
+    # Currently there are not many packages that provides prebuilt binaries for M1 Macs.
+    # Let's configure necessary env-vars to build them locally via bdist_wheel.
+    echo "Configuring additional build flags for local wheel builds for macOS on Apple Silicon ..."
+    local _prefix_openssl="$(brew --prefix openssl)"
+    local _prefix_sqlite3="$(brew --prefix sqlite3)"
+    local _prefix_readline="$(brew --prefix readline)"
+    local _prefix_zlib="$(brew --prefix zlib)"
+    local _prefix_gdbm="$(brew --prefix gdbm)"
+    local _prefix_tcltk="$(brew --prefix tcl-tk)"
+    local _prefix_xz="$(brew --prefix xz)"
+    local _prefix_snappy="$(brew --prefix snappy)"
+    local _prefix_libffi="$(brew --prefix libffi)"
+    local _prefix_protobuf="$(brew --prefix protobuf)"
+    export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_snappy}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
+    export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_snappy}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
+    export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
+    export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
   fi
 }
 
@@ -670,7 +689,7 @@ cd "${INSTALL_PATH}/manager"
 python -m ai.backend.manager.cli etcd put-json volumes "./dev.etcd.volumes.json"
 cd "${INSTALL_PATH}/agent"
 mkdir -p scratches
-POSTGRES_CONTAINER_ID=$(sudo docker ps | grep "${ENV_ID}-backendai-half-db-1" | awk '{print $1}')
+POSTGRES_CONTAINER_ID=$(sudo docker ps | grep "${ENV_ID}[-_]backendai-half-db[-_]1" | awk '{print $1}')
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
