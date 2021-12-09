@@ -51,18 +51,18 @@ usage() {
   echo ""
   echo "  ${LWHITE}--python-version VERSION${NC}"
   echo "                       Set the Python version to install via pyenv"
-  echo "                       (default: 3.8.3)"
+  echo "                       (default: 3.9.5)"
   echo ""
   echo "  ${LWHITE}--install-path PATH${NC}  Set the target directory"
   echo "                       (default: ./backend.ai-dev)"
   echo ""
   echo "  ${LWHITE}--server-branch NAME${NC}"
   echo "                       The branch of git clones for server components"
-  echo "                       (default: master)"
+  echo "                       (default: main)"
   echo ""
   echo "  ${LWHITE}--client-branch NAME${NC}"
   echo "                       The branch of git clones for client components"
-  echo "                       (default: master)"
+  echo "                       (default: main)"
   echo ""
   echo "  ${LWHITE}--enable-cuda${NC}        Install CUDA accelerator plugin and pull a"
   echo "                       TenosrFlow CUDA kernel for testing/demo."
@@ -70,7 +70,10 @@ usage() {
   echo ""
   echo "  ${LWHITE}--cuda-branch NAME${NC}   The branch of git clone for the CUDA accelerator "
   echo "                       plugin; only valid if ${LWHITE}--enable-cuda${NC} is specified."
-  echo "                       (default: master)"
+  echo "                       If set as ${LWHITE}\"mock\"${NC}, it will install the mockup version "
+  echo "                       plugin so that you may develop and test CUDA integration "
+  echo "                       features without real GPUs."
+  echo "                       (default: main)"
   echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC} The port to bind the PostgreSQL container service."
   echo "                       (default: 8100)"
@@ -174,18 +177,18 @@ fi
 
 ROOT_PATH=$(pwd)
 ENV_ID=""
-PYTHON_VERSION="3.9.1"
-SERVER_BRANCH="master"
-CLIENT_BRANCH="master"
+PYTHON_VERSION="3.9.9"
+SERVER_BRANCH="main"
+CLIENT_BRANCH="main"
 INSTALL_PATH="./backend.ai-dev"
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
-CUDA_BRANCH="master"
+CUDA_BRANCH="main"
 # POSTGRES_PORT="8100"
 # REDIS_PORT="8110"
 # ETCD_PORT="8120"
 # MANAGER_PORT="8081"
-# CONSOLE_SERVER_PORT="8080"
+# WEBSERVER_PORT="8080"
 # AGENT_RPC_PORT="6001"
 # AGENT_WATCHER_PORT="6009"
 # VFOLDER_REL_PATH="vfolder/local"
@@ -196,7 +199,7 @@ POSTGRES_PORT="8101"
 REDIS_PORT="8111"
 ETCD_PORT="8121"
 MANAGER_PORT="8091"
-CONSOLE_SERVER_PORT="8090"
+WEBSERVER_PORT="8090"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
 VFOLDER_REL_PATH="vfolder/local"
@@ -228,8 +231,8 @@ while [ $# -gt 0 ]; do
     --etcd-port=*)         ETCD_PORT="${1#*=}" ;;
     --manager-port)         MANAGER_PORT=$2; shift ;;
     --manager-port=*)       MANAGER_PORT="${1#*=}" ;;
-    --console-server-port)         CONSOLE_SERVER_PORT=$2; shift ;;
-    --console-server-port=*)       CONSOLE_SERVER_PORT="${1#*=}" ;;
+    --webserver-port)         WEBSERVER_PORT=$2; shift ;;
+    --webserver-port=*)       WEBSERVER_PORT="${1#*=}" ;;
     --agent-rpc-port)       AGENT_RPC_PORT=$2; shift ;;
     --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
     --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
@@ -331,12 +334,13 @@ install_docker() {
   show_info "Install docker"
   case $DISTRO in
   Debian)
-    sudo curl -fsSL https://get.docker.io | bash
-    sudo usermod -aG docker $(whoami)
+    $sudo apt-get install -y lxcfs
+    $sudo curl -fsSL https://get.docker.io | bash
+    $sudo usermod -aG docker $(whoami)
     ;;
   RedHat)
-    sudo curl -fsSL https://get.docker.io | bash
-    sudo usermod -aG docker $(whoami)
+    $sudo curl -fsSL https://get.docker.io | bash
+    $sudo usermod -aG docker $(whoami)
     ;;
   Darwin)
     show_info "Please install the latest version of docker and try again."
@@ -352,12 +356,12 @@ install_docker_compose() {
   show_info "Install docker-compose"
   case $DISTRO in
   Debian)
-    sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
+    $sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    $sudo chmod +x /usr/local/bin/docker-compose
     ;;
   RedHat)
-    sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    sudo chmod +x /usr/local/bin/docker-compose
+    $sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    $sudo chmod +x /usr/local/bin/docker-compose
     ;;
   Darwin)
     show_info "Please install the latest version of docker-compose and try again."
@@ -452,9 +456,15 @@ if ! type "docker" >/dev/null 2>&1; then
   show_warning "docker is not available; trying to install it automatically..."
   install_docker
 fi
-if ! type "docker-compose" >/dev/null 2>&1; then
-  show_warning "docker-compose is not available; trying to install it automatically..."
-  install_docker_compose
+docker compose version >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  DOCKER_COMPOSE="docker compose"
+else
+  if ! type "docker-compose" >/dev/null 2>&1; then
+    show_warning "docker-compose is not available; trying to install it automatically..."
+    install_docker_compose
+  fi
+  DOCKER_COMPOSE="docker-compose"
 fi
 if [ "$DISTRO" = "Darwin" ]; then
   echo "validating Docker Desktop mount permissions..."
@@ -472,12 +482,17 @@ if [ "$DISTRO" = "Darwin" ]; then
     exit 1
   fi
   echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
+
+  export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
+  export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
+  echo "set grpcio wheel build variables."
 fi
 
 # Install pyenv
 read -r -d '' pyenv_init_script <<"EOS"
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init --path)"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOS
@@ -520,7 +535,7 @@ pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-agent"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-common"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-storage-proxy"
-pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-console-server"
+pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-webserver"
 
 # Make directories
 show_info "Creating the install directory..."
@@ -528,14 +543,17 @@ mkdir -p "${INSTALL_PATH}"
 cd "${INSTALL_PATH}"
 
 # Install postgresql, etcd packages via docker
-show_info "Launching the docker-compose \"halfstack\"..."
+show_info "Launching the docker compose \"halfstack\"..."
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
+
 cd backend.ai
-cp docker-compose.halfstack.yml "docker-compose.halfstack.${ENV_ID}.yml"
+cp "docker-compose.halfstack-${SERVER_BRANCH//.}.yml" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.${ENV_ID}.yml"
-$docker_sudo docker-compose -f "docker-compose.halfstack.${ENV_ID}.yml" -p "${ENV_ID}" up -d
+mkdir -p tmp/backend.ai-halfstack/postgres-data
+mkdir -p tmp/backend.ai-halfstack/etcd-data
+$docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.${ENV_ID}.yml" -p "${ENV_ID}" up -d
 $docker_sudo docker ps | grep "${ENV_ID}"   # You should see three containers here.
 
 # Clone source codes
@@ -545,10 +563,16 @@ git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manag
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-storage-proxy storage-proxy
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-console-server console-server
+git clone --branch "${SERVER_BRANCH}" --recurse-submodules https://github.com/lablup/backend.ai-webserver webserver
+git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
 
 if [ $ENABLE_CUDA -eq 1 ]; then
-  git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
+  if [ "$CUDA_BRANCH" == "mock" ]; then
+    git clone https://github.com/lablup/backend.ai-accelerator-cuda-mock accel-cuda
+    cp accel-cuda/configs/sample-mig.toml agent/cuda-mock.toml
+  else
+    git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
+  fi
 fi
 
 check_snappy() {
@@ -589,27 +613,29 @@ pip install -U -r requirements/dev.txt
 cd "${INSTALL_PATH}/storage-proxy"
 pyenv local "venv-${ENV_ID}-storage-proxy"
 pip install -U -q pip setuptools wheel
-pip install -U -r requirements/dev.txt
+pip install -U -e ../common -r requirements/dev.txt
 
-cd "${INSTALL_PATH}/console-server"
-pyenv local "venv-${ENV_ID}-console-server"
+cd "${INSTALL_PATH}/webserver"
+pyenv local "venv-${ENV_ID}-webserver"
 pip install -U -q pip setuptools wheel
-pip install -U -r requirements/dev.txt
+pip install -U -e ../client-py -r requirements/dev.txt
 
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
 cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
 cp config/halfstack.toml ./manager.toml
+sed_inplace "s/num-proc = .*/num-proc = 1/" ./manager.toml
 sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
 sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
 sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
 cp config/halfstack.alembic.ini ./alembic.ini
 sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
 python -m ai.backend.manager.cli etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
-cp config/sample.volume.json ./volume.json
-sed_inplace "s/\"secret\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"/\"secret\": \"0000000000000000000000000000000000000000000\"/" ./volume.json
-sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./volume.json
+cp config/sample.etcd.volumes.json ./dev.etcd.volumes.json
+MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
+sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
+sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
@@ -621,22 +647,24 @@ sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 cd "${INSTALL_PATH}/storage-proxy"
 pyenv local "venv-${ENV_ID}-storage-proxy"
 cp config/sample.toml ./storage-proxy.toml
-# comment out all non-vfs volumes
+STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
+sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
+sed_inplace "s/secret = \"some-secret-shared-with-manager\"/secret = \"${MANAGER_AUTH_KEY}\"/" ./storage-proxy.toml
+# comment out all sample volumes
 sed_inplace "s/^\[volume\./# \[volume\./" ./storage-proxy.toml
 sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
 sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
 sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
-# add local vfs volume
-sed_inplace "s/^path = .*$/path = \"${INSTALL_PATH//\//\\/}\/${VFOLDER_REL_PATH//\//\\/}\"/" ./storage-proxy.toml # replace paths of all volumes to local paths
+# add "volume1" vfs volume
 echo "\n[volume.volume1]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
-cd "${INSTALL_PATH}/console-server"
-pyenv local "venv-${ENV_ID}-console-server"
-cp console-server.sample.conf ./console-server.conf
-sed_inplace "s/^port = 8080$/port = ${CONSOLE_SERVER_PORT}/" ./console-server.conf
-sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./console-server.conf
-sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./console-server.conf
-sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./console-server.conf
+cd "${INSTALL_PATH}/webserver"
+pyenv local "venv-${ENV_ID}-webserver"
+cp webserver.sample.conf ./webserver.conf
+sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
+sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
+sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
+sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
 
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
@@ -658,24 +686,20 @@ python -m ai.backend.manager.cli fixture populate fixtures/example-resource-pres
 show_info "Setting up virtual folder..."
 mkdir -p "${INSTALL_PATH}/${VFOLDER_REL_PATH}"
 cd "${INSTALL_PATH}/manager"
-python -m ai.backend.manager.cli etcd put volumes/_mount "${INSTALL_PATH}/vfolder"
-python -m ai.backend.manager.cli etcd put volumes/_default_host "local"
-python -m ai.backend.manager.cli etcd put-json volumes "./volume.json"
+python -m ai.backend.manager.cli etcd put-json volumes "./dev.etcd.volumes.json"
 cd "${INSTALL_PATH}/agent"
 mkdir -p scratches
-POSTGRES_CONTAINER_ID=$(sudo docker ps | grep "${ENV_ID}_backendai-half-db_1" | awk '{print $1}')
+POSTGRES_CONTAINER_ID=$(sudo docker ps | grep "${ENV_ID}-backendai-half-db-1" | awk '{print $1}')
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
 
 show_info "Installing Python client SDK/CLI source..."
-cd "${INSTALL_PATH}"
 # Install python client package
-git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
 cd "${INSTALL_PATH}/client-py"
 pyenv local "venv-${ENV_ID}-client"
-pip install -U -q pip setuptools
+pip install -U -q pip setuptools wheel
 pip install -U -r requirements/dev.txt
 
 # Client backend endpoint configuration shell script
@@ -685,7 +709,7 @@ echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> my-
 echo "export BACKEND_ENDPOINT_TYPE=api" >> my-backend-ai.sh
 chmod +x my-backend-ai.sh
 
-echo "export BACKEND_ENDPOINT=http://0.0.0.0:${CONSOLE_SERVER_PORT}" >> my-backend-ai-session.sh
+echo "export BACKEND_ENDPOINT=http://0.0.0.0:${WEBSERVER_PORT}" >> my-backend-ai-session.sh
 echo "export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" >> my-backend-ai-session.sh
 echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> my-backend-ai-session.sh
 echo "export BACKEND_ENDPOINT_TYPE=session" >> my-backend-ai-session.sh
@@ -714,7 +738,7 @@ echo "> ${WHITE}export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEK
 echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=api${NC}"
 echo " "
 show_note "Default ID/Password configuration for test / develop (my-backend-ai-session.sh):"
-echo "> ${WHITE}export BACKEND_ENDPOINT=http://0.0.0.0:${CONSOLE_SERVER_PORT}/${NC}"
+echo "> ${WHITE}export BACKEND_ENDPOINT=http://0.0.0.0:${WEBSERVER_PORT}/${NC}"
 echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=session${NC}"
 echo "> ${WHITE}backend.ai login${NC}"
 echo "> ${WHITE}ID      : admin@lablup.com${NC}"
@@ -724,16 +748,16 @@ echo "These environment variables are added in my-backend-ai.sh and my-backend-a
 show_important_note "You should change your default admin API keypairs for production environment!"
 show_note "How to run Backend.AI manager:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
-echo "> ${WHITE}python -m ai.backend.gateway.server --debug${NC}"
+echo "> ${WHITE}python -m ai.backend.manager.server --debug${NC}"
 show_note "How to run Backend.AI agent:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/agent${NC}"
 echo "> ${WHITE}python -m ai.backend.agent.server --debug${NC}"
 show_note "How to run Backend.AI storage-proxy:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/storage-proxy${NC}"
 echo "> ${WHITE}python -m ai.backend.storage.server${NC}"
-show_note "How to run Backend.AI console server (for ID/Password login):"
-echo "> ${WHITE}cd ${INSTALL_PATH}/console-server${NC}"
-echo "> ${WHITE}python -m ai.backend.console.server${NC}"
+show_note "How to run Backend.AI web server (for ID/Password login):"
+echo "> ${WHITE}cd ${INSTALL_PATH}/webserver${NC}"
+echo "> ${WHITE}python -m ai.backend.web.server${NC}"
 show_note "How to run your first code:"
 echo "> ${WHITE}cd ${INSTALL_PATH}/client-py${NC}"
 echo "> ${WHITE}backend.ai --help${NC}"

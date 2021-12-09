@@ -9,14 +9,17 @@ services:
     networks:
       - half
     ports:
-      - "5432:5432"
+      - "8100:5432"
     environment:
-      - POSTGRES_PASSWORD=DB_PASSWORD
+      - POSTGRES_PASSWORD=develove
       - POSTGRES_DB=backend
     volumes:
-      - "./data/postgres:/var/lib/postgresql/data:rw"
-    cpu_count: 4
-    mem_limit: "2g"
+      - "./tmp/backend.ai-halfstack/${DATADIR_PREFIX:-.}/postgres-data:/var/lib/postgresql/data:rw"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   backendai-half-redis:
     image: redis:6.2.6-alpine
@@ -24,20 +27,22 @@ services:
     networks:
       - half
     ports:
-      - "6379:6379"
-    command: redis-server --requirepass REDIS_PASSWORD
-    cpu_count: 1
-    mem_limit: "2g"
+      - "8110:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   backendai-half-etcd:
     image: quay.io/coreos/etcd:v3.5.1
     restart: unless-stopped
     volumes:
-      - "./data/etcd:/etcd-data:rw"
+      - "./tmp/backend.ai-halfstack/${DATADIR_PREFIX:-.}/etcd-data:/etcd-data:rw"
     networks:
       - half
     ports:
-      - "2379:2379"
+      - "8120:2379"
     command: >
       /usr/local/bin/etcd
       --name backendai-etcd
@@ -49,9 +54,13 @@ services:
       --initial-cluster backendai-etcd=http://0.0.0.0:2380
       --initial-cluster-token backendai-etcd-token
       --initial-cluster-state new
+      --enable-v2=true
       --auto-compaction-retention 1
-    cpu_count: 1
-    mem_limit: "1g"
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 networks:
   half:

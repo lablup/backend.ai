@@ -48,7 +48,7 @@ Running the script
 
 .. code-block:: console
 
-   $ wget https://raw.githubusercontent.com/lablup/backend.ai/master/scripts/install-dev.sh
+   $ wget https://raw.githubusercontent.com/lablup/backend.ai/main/scripts/install-dev.sh
    $ chmod +x ./install-dev.sh
    $ ./install-dev.sh
 
@@ -95,7 +95,7 @@ Resetting the environment
 
 .. code-block:: console
 
-   $ wget https://raw.githubusercontent.com/lablup/backend.ai/master/scripts/delete-dev.sh
+   $ wget https://raw.githubusercontent.com/lablup/backend.ai/main/scripts/delete-dev.sh
    $ chmod +x ./delete-dev.sh
    $ ./delete-dev.sh --env <ENVID>
 

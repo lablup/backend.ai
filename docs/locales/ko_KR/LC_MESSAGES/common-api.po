@@ -160,11 +160,11 @@ msgstr ""
 
 #: ../../common-api/auth.rst:66
 msgid "Common Structure of API Responses"
-msgstr ""
+msgstr "API 응답들의 흔한 구조"
 
 #: ../../common-api/auth.rst:74
 msgid "Status code"
-msgstr ""
+msgstr "상태 코드"
 
 #: ../../common-api/auth.rst:75
 msgid ""

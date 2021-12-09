@@ -60,6 +60,10 @@ heartbeats.
     - `backendai_krunner_v10`
 * https://github.com/lablup/backend.ai-accelerator-cuda (CUDA accelerator plugin)
   * Package namespace: `ai.backend.acceelrator.cuda`
+* https://github.com/lablup/backend.ai-accelerator-cuda-mock (CUDA mockup plugin)
+  * Package namespace: `ai.backend.acceelrator.cuda`
+  * This emulates the presence of CUDA devices without actual CUDA devices,
+    so that developers can work on CUDA integration without real GPUs.
 * https://github.com/lablup/backend.ai-accelerator-rocm (ROCM accelerator plugin)
   * Package namespace: `ai.backend.acceelrator.rocm`
 
@@ -175,4 +179,4 @@ sessions and shared between users and user groups with differentiated privileges
 License
 -------
 
-Refer to [LICENSE file](https://github.com/lablup/backend.ai/blob/master/LICENSE).
+Refer to [LICENSE file](https://github.com/lablup/backend.ai/blob/main/LICENSE).

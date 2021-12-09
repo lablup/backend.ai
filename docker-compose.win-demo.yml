@@ -7,7 +7,7 @@ services:
     build:
       context: docker/manager
       args:
-        branch: "master"
+        branch: "main"
     networks:
       - full
     ports:
@@ -39,7 +39,7 @@ services:
     build:
       context: docker/agent
       args:
-        branch: "master"
+        branch: "main"
     volumes:
       # Allow access to the host Docker server
       # WARNING: this is INSECURE in production deployment!
