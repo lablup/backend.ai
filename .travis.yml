@@ -9,7 +9,7 @@ stages:
 
 # build matrix for test stage
 python:
-  - "3.8"
+  - "3.9"
 os:
   - linux
 
@@ -26,7 +26,7 @@ jobs:
   include:
     - stage: test
     - stage: deploy
-      python: "3.8"
+      python: "3.9"
       install:
         - pip install -U pip setuptools
         - pip install -r requirements/build.txt
