@@ -684,17 +684,40 @@ pip install -U -q pip setuptools wheel
 pip install -U -r requirements/dev.txt
 
 # Client backend endpoint configuration shell script
-echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> my-backend-ai.sh
-echo "export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" >> my-backend-ai.sh
-echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> my-backend-ai.sh
-echo "export BACKEND_ENDPOINT_TYPE=api" >> my-backend-ai.sh
-chmod +x my-backend-ai.sh
-
-echo "export BACKEND_ENDPOINT=http://0.0.0.0:${WEBSERVER_PORT}" >> my-backend-ai-session.sh
-echo "export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" >> my-backend-ai-session.sh
-echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> my-backend-ai-session.sh
-echo "export BACKEND_ENDPOINT_TYPE=session" >> my-backend-ai-session.sh
-chmod +x my-backend-ai-session.sh
+CLIENT_ADMIN_CONF_FOR_API="env-local-admin-api.sh"
+CLIENT_ADMIN_CONF_FOR_SESSION="env-local-admin-session.sh"
+CLIENT_USER_CONF_FOR_API="env-local-user-api.sh"
+CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
+echo "# Directly access to the manager using API keypair (admin)" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "export BACKEND_ENDPOINT=http://0.0.0.0:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "echo 'username: admin@lablup.com'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "echo 'password: wJalrXUt'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+chmod +x "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "# Directly access to the manager using API keypair (user)" >> "${CLIENT_USER_CONF_FOR_API}"
+echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER_CONF_FOR_API}"
+echo "export BACKEND_ACCESS_KEY=" >> "${CLIENT_USER_CONF_FOR_API}"
+echo "export BACKEND_SECRET_KEY=" >> "${CLIENT_USER_CONF_FOR_API}"
+echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER_CONF_FOR_API}"
+chmod +x "${CLIENT_USER_CONF_FOR_API}"
+echo "# Indirectly access to the manager via the web server a using cookie-based login session (user)" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "export BACKEND_ENDPOINT=http://0.0.0.0:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "echo 'username: user@lablup.com'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "echo 'password: C8qnIo29'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
