@@ -67,6 +67,13 @@ else
   sudo='sudo'
 fi
 
+docker compose version >/dev/null 2>&1
+if [ $? -eq 0 ]; then
+  DOCKER_COMPOSE="docker compose"
+else
+  DOCKER_COMPOSE="docker-compose"
+fi
+
 if [ $(has_python "python") -eq 1 ]; then
   bpython=$(which "python")
 elif [ $(has_python "python3") -eq 1 ]; then
@@ -124,7 +131,7 @@ fi
 if [ $REMOVE_CONTAINERS -eq 1 ]; then
   echo "Removing Docker containers..."
   cd "${INSTALL_PATH}/backend.ai"
-  $docker_sudo docker-compose -p "${ENV_ID}" -f "docker-compose.halfstack.${ENV_ID}.yml" down
+  $docker_sudo $DOCKER_COMPOSE -p "${ENV_ID}" -f "docker-compose.halfstack.${ENV_ID}.yml" down
   rm "docker-compose.halfstack.${ENV_ID}.yml"
 else
   echo "Skipped removal of Docker containers."
