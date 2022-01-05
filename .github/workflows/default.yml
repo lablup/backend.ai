@@ -1,0 +1,121 @@
+name: default
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.9"
+    - name: Cache pip packages
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: lint-flake8-${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('setup.cfg') }}
+        restore-keys: |
+          lint-flake8-${{ runner.os }}-pip-${{ matrix.python-version }}
+          lint-flake8-${{ runner.os }}-pip-
+    - name: Install dependencies
+      env:
+        REQUIREMENTS_FILE: lint
+      run: |
+        python -m pip install -U pip setuptools wheel
+        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
+    - name: Lint with flake8
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
+          echo "(skipping matchers for pull request from local branches)"
+        else
+          echo "::add-matcher::.github/workflows/flake8-matcher.json"
+        fi
+        python -m flake8 src/ai/backend tests
+  
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.9"
+    - name: Cache pip packages
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: typecheck-mypy-${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('setup.cfg') }}
+        restore-keys: |
+          typecheck-mypy-${{ runner.os }}-pip-${{ matrix.python-version }}
+          typecheck-mypy-${{ runner.os }}-pip-
+    - name: Install dependencies
+      env:
+        REQUIREMENTS_FILE: typecheck
+      run: |
+        python -m pip install -U pip setuptools wheel
+        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
+    - name: Type check with mypy
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
+          echo "(skipping matchers for pull request from local branches)"
+        else
+          echo "::add-matcher::.github/workflows/mypy-matcher.json"
+        fi
+        python -m mypy --no-color-output src/ai/backend
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.9"
+    - name: Cache pip packages
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: typecheck-mypy-${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('setup.cfg') }}
+    - name: Install dependencies
+      env:
+        REQUIREMENTS_FILE: test
+      run: |
+        python -m pip install -U pip setuptools wheel
+        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
+    - name: Test with pytest
+      run: |
+        python -m pytest tests
+
+  deploy-to-pypi:
+    needs: [lint, typecheck, test]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.9"
+    - name: Cache pip packages
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: test-pytest-${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('setup.py') }}
+        restore-keys: |
+          test-pytest-${{ runner.os }}-pip-${{ matrix.python-version }}
+          test-pytest-${{ runner.os }}-pip-
+    - name: Install dependencies
+      env:
+        REQUIREMENTS_FILE: build
+      run: |
+        python -m pip install -U pip setuptools wheel
+        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
+    - name: Build and publish
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: |
+        python setup.py sdist bdist_wheel
+        twine upload dist/*
