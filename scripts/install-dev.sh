@@ -260,11 +260,11 @@ install_script_deps() {
   case $DISTRO in
   Debian)
     $sudo apt-get update
-    $sudo apt-get install -y git
+    $sudo apt-get install -y git jq
     ;;
   RedHat)
     $sudo yum clean expire-cache  # next yum invocation will update package metadata cache
-    $sudo yum install -y git
+    $sudo yum install -y git jq
     ;;
   Darwin)
     if ! type "brew" >/dev/null 2>&1; then
@@ -273,6 +273,7 @@ install_script_deps() {
       install_brew
     fi
     brew update
+    brew install jq
     # Having Homebrew means that the user already has git.
     ;;
   esac
@@ -710,8 +711,8 @@ CLIENT_ADMIN_CONF_FOR_API="env-local-admin-api.sh"
 CLIENT_ADMIN_CONF_FOR_SESSION="env-local-admin-session.sh"
 echo "# Directly access to the manager using API keypair (admin)" >> "${CLIENT_ADMIN_CONF_FOR_API}"
 echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-echo "export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "export BACKEND_ACCESS_KEY=$(cat ../manager/fixtures/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .access_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "export BACKEND_SECRET_KEY=$(cat ../manager/fixtures/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .secret_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
 echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_ADMIN_CONF_FOR_API}"
 chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
 echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
@@ -720,15 +721,15 @@ echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
 echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
 echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
 echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-echo "echo 'Username: admin@lablup.com'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-echo "echo 'Password: wJalrXUt'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "echo 'Username: $(cat ../manager/fixtures/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "echo 'Password: $(cat ../manager/fixtures/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
 chmod +x "${CLIENT_ADMIN_CONF_FOR_SESSION}"
 CLIENT_DOMAINADMIN_CONF_FOR_API="env-local-domainadmin-api.sh"
 CLIENT_DOMAINADMIN_CONF_FOR_SESSION="env-local-domainadmin-session.sh"
 echo "# Directly access to the manager using API keypair (admin)" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
 echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-echo "export BACKEND_ACCESS_KEY=AKIAHUKCHDEZGEXAMPLE" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-echo "export BACKEND_SECRET_KEY=cWbsM_vBB4CzTW7JdORRMx8SjGI3-wEXAMPLEKEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+echo "export BACKEND_ACCESS_KEY=$(cat ../manager/fixtures/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .access_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+echo "export BACKEND_SECRET_KEY=$(cat ../manager/fixtures/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .secret_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
 echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
 chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
 echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
@@ -737,15 +738,15 @@ echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
 echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
 echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
 echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-echo "echo 'Username: domain-admin@lablup.com'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-echo "echo 'Password: cWbsM_vB'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+echo "echo 'Username: $(cat ../manager/fixtures/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+echo "echo 'Password: $(cat ../manager/fixtures/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
 chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
 CLIENT_USER_CONF_FOR_API="env-local-user-api.sh"
 CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
 echo "# Directly access to the manager using API keypair (user)" >> "${CLIENT_USER_CONF_FOR_API}"
 echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER_CONF_FOR_API}"
-echo "export BACKEND_ACCESS_KEY=AKIANABBDUSEREXAMPLE" >> "${CLIENT_USER_CONF_FOR_API}"
-echo "export BACKEND_SECRET_KEY=C8qnIo29EZvXkPK_MXcuAakYTy4NYrxwmCEyNPlf" >> "${CLIENT_USER_CONF_FOR_API}"
+echo "export BACKEND_ACCESS_KEY=$(cat ../manager/fixtures/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .access_key')" >> "${CLIENT_USER_CONF_FOR_API}"
+echo "export BACKEND_SECRET_KEY=$(cat ../manager/fixtures/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .secret_key')" >> "${CLIENT_USER_CONF_FOR_API}"
 echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER_CONF_FOR_API}"
 chmod +x "${CLIENT_USER_CONF_FOR_API}"
 echo "# Indirectly access to the manager via the web server a using cookie-based login session (user)" >> "${CLIENT_USER_CONF_FOR_SESSION}"
@@ -754,8 +755,8 @@ echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-echo "echo 'Username: user@lablup.com'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-echo "echo 'Password: C8qnIo29'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "echo 'Username: $(cat ../manager/fixtures/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "echo 'Password: $(cat ../manager/fixtures/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 
 show_info "Pre-pulling frequently used kernel images..."
