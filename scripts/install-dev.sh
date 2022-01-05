@@ -204,6 +204,7 @@ AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
 VFOLDER_REL_PATH="vfolder/local"
 LOCAL_STORAGE_PROXY="local"
+# MUST be one of the real storage volumes
 LOCAL_STORAGE_VOLUME="volume1"
 
 while [ $# -gt 0 ]; do
@@ -622,8 +623,10 @@ sed_inplace "s/^\[volume\./# \[volume\./" ./storage-proxy.toml
 sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
 sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
 sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
-# add "volume1" vfs volume
-echo "\n[volume.volume1]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
+sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
+
+# add LOCAL_STORAGE_VOLUME vfs volume
+echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
 cd "${INSTALL_PATH}/webserver"
 pyenv local "venv-${ENV_ID}-webserver"
