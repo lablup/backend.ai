@@ -677,7 +677,11 @@ python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai "
 python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/type "harbor2"
 python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community"
 python -m ai.backend.manager.cli etcd rescan-images cr.backend.ai
-python -m ai.backend.manager.cli etcd alias python cr.backend.ai/stable/python:3.8-ubuntu18.04
+if [ "$(uname -p)" = "arm" ]; then
+  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.8-ubuntu20.04-arm64"
+else
+  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.8-ubuntu20.04"
+fi
 
 # DB schema
 show_info "Setting up databases..."
@@ -761,10 +765,14 @@ chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
-$docker_sudo docker pull cr.backend.ai/stable/python:3.8-ubuntu18.04
-if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
-  $docker_sudo docker pull cr.backend.ai/stable/python-tensorflow:2.3-py36-cuda10.1
-  $docker_sudo docker pull cr.backend.ai/stable/python-pytorch:1.6-py36-cuda10.1
+if [ "$(uname -p)" = "arm" ]; then
+  $docker_sudo docker pull "cr.backend.ai/stable/python:3.8-ubuntu20.04-arm64"
+else
+  $docker_sudo docker pull "cr.backend.ai/stable/python:3.8-ubuntu20.04"
+  if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
+    $docker_sudo docker pull "cr.backend.ai/stable/python-tensorflow:2.3-py36-cuda10.1"
+    $docker_sudo docker pull "cr.backend.ai/stable/python-pytorch:1.6-py36-cuda10.1"
+  fi
 fi
 
 DELETE_OPTS=''
