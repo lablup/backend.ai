@@ -538,6 +538,7 @@ pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-common"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-storage-proxy"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-webserver"
+pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-tester"
 
 # Make directories
 show_info "Creating the install directory..."
@@ -567,6 +568,7 @@ git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-commo
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-storage-proxy storage-proxy
 git clone --branch "${SERVER_BRANCH}" --recurse-submodules https://github.com/lablup/backend.ai-webserver webserver
 git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
+git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-test.git tester
 
 if [ $ENABLE_CUDA -eq 1 ]; then
   if [ "$CUDA_BRANCH" == "mock" ]; then
@@ -622,6 +624,11 @@ pyenv local "venv-${ENV_ID}-webserver"
 pip install -U -q pip setuptools wheel
 pip install -U -e ../client-py -r requirements/dev.txt
 
+cd "${INSTALL_PATH}/tester"
+pyenv local "venv-${ENV_ID}-tester"
+pip install -U -q pip setuptools wheel
+pip install -U -e ../client-py -r requirements/dev.txt
+
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
 cd "${INSTALL_PATH}/manager"
@@ -669,6 +676,10 @@ sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
 sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
 sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
+
+cd "${INSTALL_PATH}/tester"
+pyenv local "venv-${ENV_ID}-tester"
+cp sample-env-tester.sh ./env-tester.sh
 
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
@@ -762,6 +773,13 @@ echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_
 echo "echo 'Username: $(cat ../manager/fixtures/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 echo "echo 'Password: $(cat ../manager/fixtures/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
+
+# Update tester env script
+cd "${INSTALL_PATH}/tester"
+VENV_PATH="$(pyenv root)/versions/venv-${ENV_ID}-client"
+sed_inplace "s/export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client/export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}" ./env-tester.sh
+sed_inplace "s/export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh/export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_ADMIN_CONF_FOR_API}" ./env-tester.sh
+cd "${INSTALL_PATH}/client-py"
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
