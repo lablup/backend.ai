@@ -627,7 +627,7 @@ pip install -U -e ../client-py -r requirements/dev.txt
 cd "${INSTALL_PATH}/tester"
 pyenv local "venv-${ENV_ID}-tester"
 pip install -U -q pip setuptools wheel
-pip install -U -e ../client-py -r requirements/dev.txt
+pip install -U -r requirements/dev.txt
 
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
@@ -777,8 +777,8 @@ chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 # Update tester env script
 cd "${INSTALL_PATH}/tester"
 VENV_PATH="$(pyenv root)/versions/venv-${ENV_ID}-client"
-sed_inplace "s/export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client/export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}" ./env-tester.sh
-sed_inplace "s/export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh/export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_ADMIN_CONF_FOR_API}" ./env-tester.sh
+sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester.sh
+sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_ADMIN_CONF_FOR_API}@" ./env-tester.sh
 cd "${INSTALL_PATH}/client-py"
 
 show_info "Pre-pulling frequently used kernel images..."
