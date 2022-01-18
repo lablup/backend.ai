@@ -627,7 +627,7 @@ pip install -U -e ../client-py -r requirements/dev.txt
 cd "${INSTALL_PATH}/tester"
 pyenv local "venv-${ENV_ID}-tester"
 pip install -U -q pip setuptools wheel
-pip install -U -e ../client-py -r requirements/dev.txt
+pip install -U -r requirements/dev.txt
 
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
