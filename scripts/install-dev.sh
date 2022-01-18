@@ -679,7 +679,8 @@ sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
 
 cd "${INSTALL_PATH}/tester"
 pyenv local "venv-${ENV_ID}-tester"
-cp sample-env-tester.sh ./env-tester.sh
+cp sample-env-tester.sh ./env-tester-admin.sh
+cp sample-env-tester.sh ./env-tester-user.sh
 
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
@@ -777,8 +778,10 @@ chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 # Update tester env script
 cd "${INSTALL_PATH}/tester"
 VENV_PATH="$(pyenv root)/versions/venv-${ENV_ID}-client"
-sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester.sh
-sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_ADMIN_CONF_FOR_API}@" ./env-tester.sh
+sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-admin.sh
+sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_ADMIN_CONF_FOR_API}@" ./env-tester-admin.sh
+sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-user.sh
+sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_USER_CONF_FOR_API}@" ./env-tester-user.sh
 cd "${INSTALL_PATH}/client-py"
 
 show_info "Pre-pulling frequently used kernel images..."
