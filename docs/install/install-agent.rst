@@ -113,7 +113,7 @@ Configure supervisord
 ---------------------
 
 supervisord application config
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: console
 
@@ -128,7 +128,7 @@ supervisord application config
    command = /home/devops/run-agent.sh
 
 pyenv + venv initialization script for non-login shells
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: console
 
@@ -144,7 +144,7 @@ pyenv + venv initialization script for non-login shells
    pyenv shell venv-agent
 
 Prepare scratch directory (place for kernel containers' ``/home/work``\ )
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: console
 

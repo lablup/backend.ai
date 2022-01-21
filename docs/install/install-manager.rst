@@ -195,7 +195,7 @@ Configure supervisord
 supervisord eases the management of daemonization lifecycles of user-defined programs.
 
 supervisord application config
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: console
 
@@ -210,7 +210,7 @@ supervisord application config
    command = /home/devops/run-manager.sh
 
 pyenv + venv initialization script for non-login shells
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: console
 
@@ -226,7 +226,7 @@ pyenv + venv initialization script for non-login shells
    pyenv shell venv-manager
 
 The main program managed by supervisord
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: console
 
