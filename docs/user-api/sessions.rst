@@ -1,5 +1,5 @@
 Session Management
-=================
+==================
 
 Here are the API calls to create and manage compute sessions.
 
@@ -193,7 +193,7 @@ Example:
 
 
 Getting Session Information
---------------------------
+---------------------------
 
 * URI: ``/session/:id``
 * Method: ``GET``
