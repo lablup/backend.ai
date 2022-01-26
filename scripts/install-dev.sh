@@ -51,7 +51,7 @@ usage() {
   echo ""
   echo "  ${LWHITE}--python-version VERSION${NC}"
   echo "                       Set the Python version to install via pyenv"
-  echo "                       (default: 3.9.5)"
+  echo "                       (default: 3.9.10)"
   echo ""
   echo "  ${LWHITE}--install-path PATH${NC}  Set the target directory"
   echo "                       (default: ./backend.ai-dev)"
@@ -177,7 +177,7 @@ fi
 
 ROOT_PATH=$(pwd)
 ENV_ID=""
-PYTHON_VERSION="3.9.9"
+PYTHON_VERSION="3.9.10"
 SERVER_BRANCH="main"
 CLIENT_BRANCH="main"
 INSTALL_PATH="./backend.ai-dev"
