@@ -260,11 +260,11 @@ install_script_deps() {
   case $DISTRO in
   Debian)
     $sudo apt-get update
-    $sudo apt-get install -y git jq
+    $sudo apt-get install -y git jq gcc make
     ;;
   RedHat)
     $sudo yum clean expire-cache  # next yum invocation will update package metadata cache
-    $sudo yum install -y git jq
+    $sudo yum install -y git jq gcc make
     ;;
   Darwin)
     if ! type "brew" >/dev/null 2>&1; then
@@ -285,7 +285,7 @@ install_pybuild_deps() {
     $sudo apt-get install -y libssl-dev libreadline-dev libgdbm-dev zlib1g-dev libbz2-dev libsqlite3-dev libffi-dev liblzma-dev
     ;;
   RedHat)
-    $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel libsqlite-devel libffi-devel lzma-devel
+    $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel libsqlite-devel libffi-devel lzma-devel xz-devel
     ;;
   Darwin)
     brew install openssl
