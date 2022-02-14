@@ -677,11 +677,7 @@ python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai "
 python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/type "harbor2"
 python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community"
 python -m ai.backend.manager.cli etcd rescan-images cr.backend.ai
-if [ "$(uname -p)" = "arm" ]; then
-  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.8-ubuntu20.04-arm64"
-else
-  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.8-ubuntu20.04"
-fi
+python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04"
 
 # DB schema
 show_info "Setting up databases..."
