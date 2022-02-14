@@ -762,12 +762,12 @@ chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
 if [ "$(uname -p)" = "arm" ]; then
-  $docker_sudo docker pull "cr.backend.ai/stable/python:3.8-ubuntu20.04-arm64"
+  $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
 else
-  $docker_sudo docker pull "cr.backend.ai/stable/python:3.8-ubuntu20.04"
+  $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
   if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
-    $docker_sudo docker pull "cr.backend.ai/stable/python-tensorflow:2.3-py36-cuda10.1"
-    $docker_sudo docker pull "cr.backend.ai/stable/python-pytorch:1.6-py36-cuda10.1"
+    $docker_sudo docker pull "cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"
+    $docker_sudo docker pull "cr.backend.ai/stable/python-pytorch:1.8-py38-cuda11.1"
   fi
 fi
 
