@@ -343,6 +343,9 @@ install_docker() {
   RedHat)
     $sudo curl -fsSL https://get.docker.io | bash
     $sudo usermod -aG docker $(whoami)
+    $sudo chmod 666 /var/run/docker.sock
+    $sudo systemctl restart containerd.service
+    $sudo systemctl restart docker
     ;;
   Darwin)
     show_info "Please install the latest version of docker and try again."
@@ -458,6 +461,12 @@ if ! type "docker" >/dev/null 2>&1; then
   show_warning "docker is not available; trying to install it automatically..."
   install_docker
 fi
+if [ "$DISTRO" = "RedHat" ]; then
+  if ! type "$docker_sudo systemctl status docker" >/dev/null 2>&1; then
+    $docker_sudo systemctl start docker
+    $docker_sudo systemctl enable docker
+  fi
+fi
 docker compose version >/dev/null 2>&1
 if [ $? -eq 0 ]; then
   DOCKER_COMPOSE="docker compose"
@@ -467,6 +476,11 @@ else
     install_docker_compose
   fi
   DOCKER_COMPOSE="docker-compose"
+fi
+if [ "$DISTRO" = "RedHat" ]; then
+  if ! type "$docker_sudo docker-compose" >/dev/null 2>&1; then
+    $docker_sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+  fi
 fi
 if [ "$DISTRO" = "Darwin" ]; then
   echo "validating Docker Desktop mount permissions..."
