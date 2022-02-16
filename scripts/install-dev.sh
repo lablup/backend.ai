@@ -358,11 +358,11 @@ install_docker_compose() {
   show_info "Install docker-compose"
   case $DISTRO in
   Debian)
-    $sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    $sudo curl -L "https://github.com/docker/compose/releases/download/v2.2.3/docker-compose-$(uname -s | tr '[:upper:]' '[:lower:]' | sed -e 's/_.*//')-$(uname -m)" -o /usr/local/bin/docker-compose
     $sudo chmod +x /usr/local/bin/docker-compose
     ;;
   RedHat)
-    $sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    $sudo curl -L "https://github.com/docker/compose/releases/download/v2.2.3/docker-compose-$(uname -s | tr '[:upper:]' '[:lower:]' | sed -e 's/_.*//')-$(uname -m)" -o /usr/local/bin/docker-compose
     $sudo chmod +x /usr/local/bin/docker-compose
     ;;
   Darwin)
