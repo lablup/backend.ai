@@ -124,6 +124,7 @@ if [ $REMOVE_VENVS -eq 1 ]; then
   pyenv uninstall -f "venv-${ENV_ID}-manager"
   pyenv uninstall -f "venv-${ENV_ID}-webserver"
   pyenv uninstall -f "venv-${ENV_ID}-storage-proxy"
+  pyenv uninstall -f "venv-${ENV_ID}-tester"
 else
   echo "Skipped removal of Python virtual environments."
 fi
