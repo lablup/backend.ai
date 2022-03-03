@@ -118,12 +118,12 @@ INSTALL_PATH=$(readlinkf "$INSTALL_PATH")
 
 if [ $REMOVE_VENVS -eq 1 ]; then
   echo "Removing Python virtual environments..."
-  pyenv uninstall -f "venv-${ENV_ID}-agent"
-  pyenv uninstall -f "venv-${ENV_ID}-client"
-  pyenv uninstall -f "venv-${ENV_ID}-common"
-  pyenv uninstall -f "venv-${ENV_ID}-manager"
-  pyenv uninstall -f "venv-${ENV_ID}-webserver"
-  pyenv uninstall -f "venv-${ENV_ID}-storage-proxy"
+  cmd_output_arr=($(pyenv versions |  sed 's/ //g'  | grep  -E "^venv-${ENV_ID}-*"))
+  for i in "${cmd_output_arr[@]}"
+    do
+      echo "delete python virtual environment: ${i}"
+      pyenv uninstall -f "${i}"
+    done
 else
   echo "Skipped removal of Python virtual environments."
 fi
@@ -139,12 +139,12 @@ fi
 
 if [ $REMOVE_SOURCE -eq 1 ]; then
   echo "Removing cloned source files..."
-  $sudo rm -rf "${INSTALL_PATH}/manager"
-  $sudo rm -rf "${INSTALL_PATH}/agent"
-  $sudo rm -rf "${INSTALL_PATH}/common"
-  $sudo rm -rf "${INSTALL_PATH}/client-py"
-  $sudo rm -rf "${INSTALL_PATH}/webserver"
-  $sudo rm -rf "${INSTALL_PATH}/storage-proxy"
+  $sudo rm -rf "${INSTALL_PATH}/manager*"
+  $sudo rm -rf "${INSTALL_PATH}/agent*"
+  $sudo rm -rf "${INSTALL_PATH}/common*"
+  $sudo rm -rf "${INSTALL_PATH}/client-py*"
+  $sudo rm -rf "${INSTALL_PATH}/webserver*"
+  $sudo rm -rf "${INSTALL_PATH}/storage-proxy*"
   $sudo rm -rf "${INSTALL_PATH}/backend.ai"
   $sudo rm -rf "${INSTALL_PATH}/vfolder"
   $sudo rm -rf "${INSTALL_PATH}/accel-cuda"

@@ -19,6 +19,43 @@ LG="\033[0;37m"
 NC="\033[0m"
 REWRITELN="\033[A\r\033[K"
 
+ROOT_PATH=$(pwd)
+ENV_ID=""
+PYTHON_VERSION="3.9.10"
+SERVER_BRANCH="main"
+CLIENT_BRANCH="main"
+MANAGER_BRANCH=""
+AGENT_BRANCH=""
+STORAGE_BRANCH=""
+WEBSERVER_BRANCH=""
+CLIENT_PY_BRANCH=""
+INSTALL_PATH="./backend.ai-dev"
+DOWNLOAD_BIG_IMAGES=0
+ENABLE_CUDA=0
+CUDA_BRANCH="main"
+# POSTGRES_PORT="8100"
+# REDIS_PORT="8110"
+# ETCD_PORT="8120"
+# MANAGER_PORT="8081"
+# WEBSERVER_PORT="8080"
+# AGENT_RPC_PORT="6001"
+# AGENT_WATCHER_PORT="6009"
+# VFOLDER_REL_PATH="vfolder/local"
+# LOCAL_STORAGE_PROXY="local"
+# LOCAL_STORAGE_VOLUME="volume1"
+
+POSTGRES_PORT="8101"
+REDIS_PORT="8111"
+ETCD_PORT="8121"
+MANAGER_PORT="8091"
+WEBSERVER_PORT="8090"
+AGENT_RPC_PORT="6011"
+AGENT_WATCHER_PORT="6019"
+VFOLDER_REL_PATH="vfolder/local"
+LOCAL_STORAGE_PROXY="local"
+# MUST be one of the real storage volumes
+LOCAL_STORAGE_VOLUME="volume1"
+
 readlinkf() {
   $bpython -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
@@ -51,7 +88,7 @@ usage() {
   echo ""
   echo "  ${LWHITE}--python-version VERSION${NC}"
   echo "                       Set the Python version to install via pyenv"
-  echo "                       (default: 3.9.10)"
+  echo "                       (default: ${PYTHON_VERSION})"
   echo ""
   echo "  ${LWHITE}--install-path PATH${NC}  Set the target directory"
   echo "                       (default: ./backend.ai-dev)"
@@ -62,6 +99,36 @@ usage() {
   echo ""
   echo "  ${LWHITE}--client-branch NAME${NC}"
   echo "                       The branch of git clones for client components"
+  echo "                       (default: main)"
+  echo ""
+  echo "  ${LWHITE}--manager-branch NAME${NC}"
+  echo "                       The branch of git clones for backend.ai manager components"
+  echo "                       If you don't set server branch name, manager branch is setting 'main'"
+  echo "                       When manager component is set, following common branch is also cloned"
+  echo "                       (default: main)"
+  echo ""
+  echo "  ${LWHITE}--agent-branch NAME${NC}"
+  echo "                       The branch of git clones for backend.ai agent components"
+  echo "                       If you don't set server branch name, agent branch is setting 'main'"
+  echo "                       When agent component is set, following common branch is also cloned"
+  echo "                       (default: main)"
+  echo ""
+  echo "  ${LWHITE}--storage-branch NAME${NC}"
+  echo "                       The branch of git clones for backend.ai storage-proxy components"
+  echo "                       If you don't set server branch name, storage-proxy branch is setting 'main'"
+  echo "                       When storage-proxy branch component is set, following common branch is also cloned"
+  echo "                       (default: main)"
+  echo ""
+  echo "  ${LWHITE}--client-py-branch NAME${NC}"
+  echo "                       The branch of git clones for backend.ai client-py components"
+  echo "                       If you don't set server branch name, client-py branch is setting 'main'"
+  echo "                       When client-py branch component is set, following client-py branch is also cloned"
+  echo "                       (default: main)"
+  echo ""
+  echo "  ${LWHITE}--webserver-branch NAME${NC}"
+  echo "                       The branch of git clones for backend.ai webserver components"
+  echo "                       If you don't set server branch name, webserver branch is setting 'main'"
+  echo "                       When webserver branch component is set, following client-py branch is also cloned"
   echo "                       (default: main)"
   echo ""
   echo "  ${LWHITE}--enable-cuda${NC}        Install CUDA accelerator plugin and pull a"
@@ -175,38 +242,6 @@ else
   exit 1
 fi
 
-ROOT_PATH=$(pwd)
-ENV_ID=""
-PYTHON_VERSION="3.9.10"
-SERVER_BRANCH="main"
-CLIENT_BRANCH="main"
-INSTALL_PATH="./backend.ai-dev"
-DOWNLOAD_BIG_IMAGES=0
-ENABLE_CUDA=0
-CUDA_BRANCH="main"
-# POSTGRES_PORT="8100"
-# REDIS_PORT="8110"
-# ETCD_PORT="8120"
-# MANAGER_PORT="8081"
-# WEBSERVER_PORT="8080"
-# AGENT_RPC_PORT="6001"
-# AGENT_WATCHER_PORT="6009"
-# VFOLDER_REL_PATH="vfolder/local"
-# LOCAL_STORAGE_PROXY="local"
-# LOCAL_STORAGE_VOLUME="volume1"
-
-POSTGRES_PORT="8101"
-REDIS_PORT="8111"
-ETCD_PORT="8121"
-MANAGER_PORT="8091"
-WEBSERVER_PORT="8090"
-AGENT_RPC_PORT="6011"
-AGENT_WATCHER_PORT="6019"
-VFOLDER_REL_PATH="vfolder/local"
-LOCAL_STORAGE_PROXY="local"
-# MUST be one of the real storage volumes
-LOCAL_STORAGE_VOLUME="volume1"
-
 while [ $# -gt 0 ]; do
   case $1 in
     -h | --help)           usage; exit 1 ;;
@@ -220,6 +255,16 @@ while [ $# -gt 0 ]; do
     --server-branch=*)     SERVER_BRANCH="${1#*=}" ;;
     --client-branch)       CLIENT_BRANCH=$2; shift ;;
     --client-branch=*)     CLIENT_BRANCH="${1#*=}" ;;
+    --manager-branch)      MANAGER_BRANCH=$2; shift ;;
+    --manager-branch=*)    MANAGER_BRANCH="${1#*=}" ;;
+    --agent-branch)        AGENT_BRANCH=$2; shift ;;
+    --agent-branch=*)      AGENT_BRANCH="${1#*=}" ;;
+    --storage-branch)      STORAGE_BRANCH=$2; shift ;;
+    --storage-branch=*)    STORAGE_BRANCH="${1#*=}" ;;
+    --webserver-branch)    WEBSERVER_BRANCH=$2; shift ;;
+    --webserver-branch=*)  WEBSERVER_BRANCH="${1#*=}" ;;
+    --client-py-branch)    CLIENT_PY_BRANCH=$2; shift ;;
+    --client-py-branch=*)  CLIENT_PY_BRANCH="${1#*=}" ;;
     --enable-cuda)         ENABLE_CUDA=1 ;;
     --download-big-images) DOWNLOAD_BIG_IMAGES=1 ;;
     --cuda-branch)         CUDA_BRANCH=$2; shift ;;
@@ -245,6 +290,56 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+# check branch version exception
+if [ "$SERVER_BRANCH"="main" ]; then
+  if [ -n "$MANAGER_BRANCH" ] || [ -n "$AGENT_BRANCH" ] || [ -n "$STORAGE_BRANCH" ]; then
+    if [ -z "$MANAGER_BRANCH" ] || [ $MANAGER_BRANCH = "" ]; then
+      MANAGER_BRANCH="${SERVER_BRANCH}";
+    fi
+    if [ -z "$AGENT_BRANCH" ] || [ "$AGENT_BRANCH" = "" ]; then
+      AGENT_BRANCH="${SERVER_BRANCH}";
+    fi
+    if [ -z "$STORAGE_BRANCH" ] || [ "$STORAGE_BRANCH" = "" ]; then
+      STORAGE_BRANCH="${SERVER_BRANCH}";
+    fi
+    SERVER_BRANCH=""
+  fi
+else
+  if [ -n "${MANAGER_BRANCH}" ] && [ -n "${AGENT_BRANCH}" ] && [ -n "${STORAGE_BRANCH}" ] ; then
+    echo "Please, check server_branch 'main' "
+    exit 1
+  fi
+fi
+
+if [ "$CLIENT_BRANCH"="main" ]; then
+  if [ -n "$WEBSERVER_BRANCH" ] || [ -n "$CLIENT_PY_BRANCH" ]; then
+    if [ -z "$WEBSERVER_BRANCH" ] || [ $WEBSERVER_BRANCH = "" ]; then
+      WEBSERVER_BRANCH="${CLIENT_BRANCH}";
+    fi
+    if [ -z "$CLIENT_PY_BRANCH" ] || [ $CLIENT_PY_BRANCH = "" ]; then
+      CLIENT_PY_BRANCH="${CLIENT_BRANCH}";
+    fi
+    CLIENT_BRANCH=""
+  fi
+else 
+  if [ -n "${WEBSERVER_BRANCH}" ] && [ -n "${CLIENT_PY_BRANCH}" ] ; then
+    echo "Please, check client_branch 'main' "
+    exit 1
+  fi
+fi
+
+echo "====================================="
+echo "SERVER_BRANCH = ${SERVER_BRANCH}"
+echo "MANAGER_BRANCH = ${MANAGER_BRANCH}"
+echo "AGENT_BRANCH = ${AGENT_BRANCH}"
+echo "STORAGE_BRANCH = ${STORAGE_BRANCH}"
+echo "====================================="
+echo "CLIENT_BRANCH = ${CLIENT_BRANCH}"
+echo "WEBSERVER_BRANCH = ${WEBSERVER_BRANCH}"
+echo "CLIENT_PY_BRANCH = ${CLIENT_PY_BRANCH}"
+echo "====================================="
+
 INSTALL_PATH=$(readlinkf "$INSTALL_PATH")
 
 install_brew() {
@@ -534,11 +629,29 @@ set -e
 show_info "Creating virtualenv on pyenv..."
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-manager"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-agent"
-pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-common"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-storage-proxy"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-webserver"
 pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-tester"
+if [ -z "$SERVER_BRANCH" ] || [ $SERVER_BRANCH = "" ]; then
+  if [ "$MANAGER_BRANCH"!="main" ]; then
+    if [[ $(pyenv virtualenvs |  sed 's/ //g'  | grep venv-${ENV_ID}-manager-${MANAGER_BRANCH}-common) -eq 0 ]]; then
+      pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-manager-${MANAGER_BRANCH}-common"
+    fi
+  fi
+  if [ "$AGENT_BRANCH"!="main" ]; then
+    if [[ $(pyenv virtualenvs |  sed 's/ //g'  | grep venv-${ENV_ID}-agent-${MANAGER_BRANCH}-common) -eq 0 ]]; then
+      pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-agent-${AGENT_BRANCH}-common"
+    fi
+  fi
+  if [ "$STORAGE_BRANCH"!="main" ]; then
+    if [[ $(pyenv virtualenvs |  sed 's/ //g'  | grep venv-${ENV_ID}-storage-proxy-${MANAGER_BRANCH}-common) -eq 0 ]]; then
+      pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-storage-proxy-${STORAGE_BRANCH}-common"
+    fi
+  fi
+else
+  pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-common"
+fi
 
 # Make directories
 show_info "Creating the install directory..."
@@ -547,10 +660,18 @@ cd "${INSTALL_PATH}"
 
 # Install postgresql, etcd packages via docker
 show_info "Launching the docker compose \"halfstack\"..."
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
+if [ -z "$SERVER_BRANCH" ] || [ $SERVER_BRANCH = "" ]; then
+  git clone --branch "main" https://github.com/lablup/backend.ai
+else
+  git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
+fi
 
 cd backend.ai
-cp "docker-compose.halfstack-${SERVER_BRANCH//.}.yml" "docker-compose.halfstack.${ENV_ID}.yml"
+if [ -z "$SERVER_BRANCH" ] || [ $SERVER_BRANCH = "" ]; then
+  cp "docker-compose.halfstack-main.yml" "docker-compose.halfstack.${ENV_ID}.yml"
+else
+  cp "docker-compose.halfstack-${SERVER_BRANCH//.}.yml" "docker-compose.halfstack.${ENV_ID}.yml"
+fi
 sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.${ENV_ID}.yml"
 sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.${ENV_ID}.yml"
@@ -562,13 +683,45 @@ $docker_sudo docker ps | grep "${ENV_ID}"   # You should see three containers he
 # Clone source codes
 show_info "Cloning backend.ai source codes..."
 cd "${INSTALL_PATH}"
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manager manager
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-storage-proxy storage-proxy
-git clone --branch "${SERVER_BRANCH}" --recurse-submodules https://github.com/lablup/backend.ai-webserver webserver
-git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
-git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-test.git tester
+if [ -z "$SERVER_BRANCH" ] || [ $SERVER_BRANCH = "" ]; then
+  git clone --branch "${MANAGER_BRANCH}" https://github.com/lablup/backend.ai-manager manager
+  git clone --branch "${AGENT_BRANCH}" https://github.com/lablup/backend.ai-agent agent
+  git clone --branch "${STORAGE_BRANCH}" https://github.com/lablup/backend.ai-storage-proxy storage-proxy
+  git clone --branch "main" --recurse-submodules https://github.com/lablup/backend.ai-webserver webserver
+  git clone --branch "main" https://github.com/lablup/backend.ai-common common
+  if [ $MANAGER_BRANCH!="main" ]; then
+    git clone --branch "${MANAGER_BRANCH}" https://github.com/lablup/backend.ai-common manager-${MANAGER_BRANCH}-common
+  fi
+  if [ $AGENT_BRANCH!="main" ]; then
+    git clone --branch "${AGENT_BRANCH}" https://github.com/lablup/backend.ai-common agent-${AGENT_BRANCH}-common
+  fi
+  if [ $STORAGE_BRANCH!="main" ]; then
+    git clone --branch "${STORAGE_BRANCH}" https://github.com/lablup/backend.ai-common storage-${STORAGE_BRANCH}-common
+  fi
+else
+  git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manager manager
+  git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
+  git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
+  git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-storage-proxy storage-proxy
+  git clone --branch "${SERVER_BRANCH}" --recurse-submodules https://github.com/lablup/backend.ai-webserver webserver
+fi
+if [ -z "$CLIENT_BRANCH" ] || [ $CLIENT_BRANCH = "" ]; then
+  git clone --branch "${CLIENT_PY_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
+  git clone --branch "main" https://github.com/lablup/backend.ai-test.git tester
+  if [ "$WEBSERVER_BRANCH" != "main" ]; then
+    git clone --branch "${WEBSERVER_BRANCH}" --recurse-submodules https://github.com/lablup/backend.ai-webserver client-py-${WEBSERVER_BRANCH}-webserver
+  else
+    if [[ $(ls | grep webserver | wc -l) -eq 0 ]]; then
+      git clone --branch "main" --recurse-submodules https://github.com/lablup/backend.ai-webserver webserver
+    fi
+  fi
+else
+  git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
+  git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-test.git tester
+  if [[ $(ls | grep webserver | wc -l) -eq 0 ]]; then
+    git clone --branch "${CLIENT_BRANCH}" --recurse-submodules https://github.com/lablup/backend.ai-webserver webserver
+  fi
+fi
 
 if [ $ENABLE_CUDA -eq 1 ]; then
   if [ "$CUDA_BRANCH" == "mock" ]; then
@@ -594,12 +747,28 @@ cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
 pip install -U -q pip setuptools wheel
 check_snappy
-pip install -U -e ../common -r requirements/dev.txt
+if [ -z "$SERVER_BRANCH" ] || [ $SERVER_BRANCH = "" ]; then
+  if [ "$MANAGER_BRANCH"!="main" ]; then
+    pip install -U -e ../manager-${MANAGER_BRANCH}-common -r requirements/dev.txt
+  else
+    pip install -U -e ../common -r requirements/dev.txt
+  fi
+else
+  pip install -U -e ../common -r requirements/dev.txt
+fi
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
 pip install -U -q pip setuptools wheel
-pip install -U -e ../common -r requirements/dev.txt
+if [ -z "$SERVER_BRANCH" ] || [ $SERVER_BRANCH = "" ]; then
+  if [ "$AGENT_BRANCH"!="main" ]; then
+    pip install -U -e ../agent-${AGENT_BRANCH}-common -r requirements/dev.txt
+  else
+    pip install -U -e ../common -r requirements/dev.txt
+  fi
+else
+  pip install -U -e ../common -r requirements/dev.txt
+fi
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   $sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
 fi
@@ -609,20 +778,78 @@ if [ $ENABLE_CUDA -eq 1 ]; then
   pip install -U -e .
 fi
 
-cd "${INSTALL_PATH}/common"
-pyenv local "venv-${ENV_ID}-common"
-pip install -U -q pip setuptools wheel
-pip install -U -r requirements/dev.txt
+if [ -z "$SERVER_BRANCH" ] || [ $SERVER_BRANCH = "" ]; then
+  if [ "$MANAGER_BRANCH"!="main" ]; then
+    cd "${INSTALL_PATH}/manager-${MANAGER_BRANCH}-common"
+    pyenv local "venv-${ENV_ID}-manager-${MANAGER_BRANCH}-common"
+    pip install -U -q pip setuptools wheel
+    pip install -U -r requirements/dev.txt
+  else
+    cd "${INSTALL_PATH}/common"
+    pyenv local "venv-${ENV_ID}-common"
+    pip install -U -q pip setuptools wheel
+    pip install -U -r requirements/dev.txt
+  fi
+  if [ "$AGENT_BRANCH"!="main" ]; then
+    cd "${INSTALL_PATH}/agent-${AGENT_BRANCH}-common"
+    pyenv local "venv-${ENV_ID}-agent-${AGENT_BRANCH}-common"
+    pip install -U -q pip setuptools wheel
+    pip install -U -r requirements/dev.txt
+  else
+    cd "${INSTALL_PATH}/common"
+    pyenv local "venv-${ENV_ID}-common"
+    pip install -U -q pip setuptools wheel
+    pip install -U -r requirements/dev.txt
+  fi
+  if [ "$STORAGE_BRANCH"!="main" ]; then
+    cd "${INSTALL_PATH}/storage-${STORAGE_BRANCH}-common"
+    pyenv local "venv-${ENV_ID}-storage-proxy-${STORAGE_BRANCH}-common"
+    pip install -U -q pip setuptools wheel
+    pip install -U -r requirements/dev.txt
+  else
+    cd "${INSTALL_PATH}/common"
+    pyenv local "venv-${ENV_ID}-common"
+    pip install -U -q pip setuptools wheel
+    pip install -U -r requirements/dev.txt
+  fi
+else
+  cd "${INSTALL_PATH}/common"
+  pyenv local "venv-${ENV_ID}-common"
+  pip install -U -q pip setuptools wheel
+  pip install -U -r requirements/dev.txt
+fi
 
 cd "${INSTALL_PATH}/storage-proxy"
 pyenv local "venv-${ENV_ID}-storage-proxy"
 pip install -U -q pip setuptools wheel
-pip install -U -e ../common -r requirements/dev.txt
+if [ -z "$SERVER_BRANCH" ] || [ $SERVER_BRANCH = "" ]; then
+  if [ "$STORAGE_BRANCH"!="main" ]; then
+    pip install -U -e ../storage-${STORAGE_BRANCH}-common -r requirements/dev.txt
+  else
+    pip install -U -e ../common -r requirements/dev.txt
+  fi
+else
+  pip install -U -e ../common -r requirements/dev.txt
+fi
+if [ -z "$SERVER_BRANCH" ] || [ $SERVER_BRANCH = "" ]; then
 
-cd "${INSTALL_PATH}/webserver"
-pyenv local "venv-${ENV_ID}-webserver"
-pip install -U -q pip setuptools wheel
-pip install -U -e ../client-py -r requirements/dev.txt
+  if [ "${WEBSERVER_BRANCH}" != "main" ]; then
+    cd "${INSTALL_PATH}/client-py-${WEBSERVER_BRANCH}-webserver"
+    pyenv local "venv-${ENV_ID}-webserver"
+    pip install -U -q pip setuptools wheel
+    pip install -U -e ../client-py -r requirements/dev.txt
+  else
+    cd "${INSTALL_PATH}/webserver"
+    pyenv local "venv-${ENV_ID}-webserver"
+    pip install -U -q pip setuptools wheel
+    pip install -U -e ../client-py -r requirements/dev.txt
+  fi
+else 
+  cd "${INSTALL_PATH}/webserver"
+  pyenv local "venv-${ENV_ID}-webserver"
+  pip install -U -q pip setuptools wheel
+  pip install -U -e ../client-py -r requirements/dev.txt
+fi
 
 cd "${INSTALL_PATH}/tester"
 pyenv local "venv-${ENV_ID}-tester"
@@ -782,7 +1009,7 @@ cd "${INSTALL_PATH}/client-py"
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
-if [ "$(uname -p)" = "arm" ]; then
+if [ "$(uname -p)" = "arm" ]||[ "$(uname -p)" = "aarch64" ]; then
   $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
 else
   $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
