@@ -415,8 +415,6 @@ install_python() {
     local _prefix_protobuf="$(brew --prefix protobuf)"
     export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_snappy}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
     export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_snappy}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
-    export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
-    export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
   fi
 }
 
@@ -484,10 +482,6 @@ if [ "$DISTRO" = "Darwin" ]; then
     exit 1
   fi
   echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
-
-  export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
-  export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
-  echo "set grpcio wheel build variables."
 fi
 
 # Install pyenv
@@ -589,17 +583,35 @@ check_snappy() {
   rm -f $pkgfile
 }
 
+mkdir -p ./wheelhouse
+if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
+  show_info "Prebuild grpcio wheels for Apple Silicon..."
+  pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
+  pyenv shell tmp-grpcio-build
+  if [ $(python -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)') -eq 0 ]; then
+    # ref: https://github.com/grpc/grpc/issues/25082
+    export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
+    export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
+    echo "Set grpcio wheel build variables."
+  fi
+  pip install -U -q pip setuptools wheel
+  # ref: https://github.com/grpc/grpc/issues/28387
+  pip wheel -w ./wheelhouse --no-binary :all: grpcio grpcio-tools
+  pyenv shell --unset
+  pyenv uninstall tmp-grpcio-build
+fi
+
 show_info "Install packages on virtual environments..."
 cd "${INSTALL_PATH}/manager"
 pyenv local "venv-${ENV_ID}-manager"
 pip install -U -q pip setuptools wheel
 check_snappy
-pip install -U -e ../common -r requirements/dev.txt
+pip install -U --find-links=../wheelhouse -e ../common -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
 pip install -U -q pip setuptools wheel
-pip install -U -e ../common -r requirements/dev.txt
+pip install -U --find-links=../wheelhouse -e ../common -r requirements/dev.txt
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   $sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
 fi
@@ -612,22 +624,22 @@ fi
 cd "${INSTALL_PATH}/common"
 pyenv local "venv-${ENV_ID}-common"
 pip install -U -q pip setuptools wheel
-pip install -U -r requirements/dev.txt
+pip install -U --find-links=../wheelhouse -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/storage-proxy"
 pyenv local "venv-${ENV_ID}-storage-proxy"
 pip install -U -q pip setuptools wheel
-pip install -U -e ../common -r requirements/dev.txt
+pip install -U --find-links=../wheelhouse -e ../common -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/webserver"
 pyenv local "venv-${ENV_ID}-webserver"
 pip install -U -q pip setuptools wheel
-pip install -U -e ../client-py -r requirements/dev.txt
+pip install -U --find-links=../wheelhouse -e ../client-py -r requirements/dev.txt
 
 cd "${INSTALL_PATH}/tester"
 pyenv local "venv-${ENV_ID}-tester"
 pip install -U -q pip setuptools wheel
-pip install -U -r requirements/dev.txt
+pip install -U --find-links=../wheelhouse -r requirements/dev.txt
 
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
