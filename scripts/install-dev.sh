@@ -593,6 +593,9 @@ if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
     export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
     export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
     echo "Set grpcio wheel build variables."
+  else
+    unset GRPC_PYTHON_BUILD_SYSTEM_OPENSSL
+    unset GRPC_PYTHON_BUILD_SYSTEM_ZLIB
   fi
   pip install -U -q pip setuptools wheel
   # ref: https://github.com/grpc/grpc/issues/28387
