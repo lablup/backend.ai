@@ -558,6 +558,8 @@ if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
   pip wheel -w ./wheelhouse --no-binary :all: grpcio grpcio-tools
   pyenv shell --unset
   pyenv uninstall -f tmp-grpcio-build
+  echo "List of prebuilt wheels:"
+  ls -l ./wheelhouse
   # Currently there are not many packages that provides prebuilt binaries for M1 Macs.
   # Let's configure necessary env-vars to build them locally via bdist_wheel.
   echo "Configuring additional build flags for local wheel builds for macOS on Apple Silicon ..."
