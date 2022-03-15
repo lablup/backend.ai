@@ -595,11 +595,13 @@ pyenv local "venv-${ENV_ID}-manager"
 pip install -U -q pip setuptools wheel
 check_snappy
 pip install -U -e ../common -r requirements/dev.txt
+pip install --no-binary :all: grpcio --ignore-installed
 
 cd "${INSTALL_PATH}/agent"
 pyenv local "venv-${ENV_ID}-agent"
 pip install -U -q pip setuptools wheel
 pip install -U -e ../common -r requirements/dev.txt
+pip install --no-binary :all: grpcio --ignore-installed
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   $sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
 fi
@@ -613,11 +615,13 @@ cd "${INSTALL_PATH}/common"
 pyenv local "venv-${ENV_ID}-common"
 pip install -U -q pip setuptools wheel
 pip install -U -r requirements/dev.txt
+pip install --no-binary :all: grpcio --ignore-installed
 
 cd "${INSTALL_PATH}/storage-proxy"
 pyenv local "venv-${ENV_ID}-storage-proxy"
 pip install -U -q pip setuptools wheel
 pip install -U -e ../common -r requirements/dev.txt
+pip install --no-binary :all: grpcio --ignore-installed
 
 cd "${INSTALL_PATH}/webserver"
 pyenv local "venv-${ENV_ID}-webserver"
@@ -682,6 +686,13 @@ pyenv local "venv-${ENV_ID}-tester"
 cp sample-env-tester.sh ./env-tester-admin.sh
 cp sample-env-tester.sh ./env-tester-user.sh
 
+# DB schema
+show_info "Setting up databases..."
+cd "${INSTALL_PATH}/manager"
+python -m ai.backend.manager.cli schema oneshot
+python -m ai.backend.manager.cli fixture populate fixtures/example-keypairs.json
+python -m ai.backend.manager.cli fixture populate fixtures/example-resource-presets.json
+
 # Docker registry setup
 show_info "Configuring the Lablup's official Docker registry..."
 cd "${INSTALL_PATH}/manager"
@@ -689,14 +700,11 @@ python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai "
 python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/type "harbor2"
 python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community"
 python -m ai.backend.manager.cli etcd rescan-images cr.backend.ai
-python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04"
-
-# DB schema
-show_info "Setting up databases..."
-cd "${INSTALL_PATH}/manager"
-python -m ai.backend.manager.cli schema oneshot
-python -m ai.backend.manager.cli fixture populate fixtures/example-keypairs.json
-python -m ai.backend.manager.cli fixture populate fixtures/example-resource-presets.json
+if [ "$(uname -p)" = "arm" ]; then
+  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" aarch64
+else
+  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
+fi
 
 # Virtual folder setup
 show_info "Setting up virtual folder..."
