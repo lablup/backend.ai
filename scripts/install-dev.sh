@@ -701,9 +701,9 @@ python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/t
 python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community"
 python -m ai.backend.manager.cli etcd rescan-images cr.backend.ai
 if [ "$(uname -p)" = "arm" ]; then
-  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" aarch64
+  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.8-ubuntu20.04-arm64" aarch64
 else
-  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
+  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.8-ubuntu20.04" x86_64
 fi
 
 # Virtual folder setup
