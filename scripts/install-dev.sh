@@ -375,6 +375,21 @@ install_docker_compose() {
   esac
 }
 
+set_brew_python_build_flags() {
+  local _prefix_openssl="$(brew --prefix openssl)"
+  local _prefix_sqlite3="$(brew --prefix sqlite3)"
+  local _prefix_readline="$(brew --prefix readline)"
+  local _prefix_zlib="$(brew --prefix zlib)"
+  local _prefix_gdbm="$(brew --prefix gdbm)"
+  local _prefix_tcltk="$(brew --prefix tcl-tk)"
+  local _prefix_xz="$(brew --prefix xz)"
+  local _prefix_snappy="$(brew --prefix snappy)"
+  local _prefix_libffi="$(brew --prefix libffi)"
+  local _prefix_protobuf="$(brew --prefix protobuf)"
+  export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_snappy}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
+  export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_snappy}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
+}
+
 install_python() {
   if [ -z "$(pyenv versions | grep -E "^\\*?[[:space:]]+${PYTHON_VERSION//./\\.}([[:blank:]]+.*)?$")" ]; then
     if [ "$DISTRO" = "Darwin" ]; then
@@ -398,23 +413,6 @@ install_python() {
     fi
   else
     echo "${PYTHON_VERSION} is already installed."
-  fi
-  if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
-    # Currently there are not many packages that provides prebuilt binaries for M1 Macs.
-    # Let's configure necessary env-vars to build them locally via bdist_wheel.
-    echo "Configuring additional build flags for local wheel builds for macOS on Apple Silicon ..."
-    local _prefix_openssl="$(brew --prefix openssl)"
-    local _prefix_sqlite3="$(brew --prefix sqlite3)"
-    local _prefix_readline="$(brew --prefix readline)"
-    local _prefix_zlib="$(brew --prefix zlib)"
-    local _prefix_gdbm="$(brew --prefix gdbm)"
-    local _prefix_tcltk="$(brew --prefix tcl-tk)"
-    local _prefix_xz="$(brew --prefix xz)"
-    local _prefix_snappy="$(brew --prefix snappy)"
-    local _prefix_libffi="$(brew --prefix libffi)"
-    local _prefix_protobuf="$(brew --prefix protobuf)"
-    export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_snappy}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
-    export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_snappy}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
   fi
 }
 
@@ -539,6 +537,33 @@ show_info "Creating the install directory..."
 mkdir -p "${INSTALL_PATH}"
 cd "${INSTALL_PATH}"
 
+mkdir -p ./wheelhouse
+if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
+  show_info "Prebuild grpcio wheels for Apple Silicon..."
+  pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
+  pyenv shell tmp-grpcio-build
+  if [ $(python -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)') -eq 0 ]; then
+    # ref: https://github.com/grpc/grpc/issues/25082
+    export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
+    export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
+    echo "Set grpcio wheel build variables."
+  else
+    unset GRPC_PYTHON_BUILD_SYSTEM_OPENSSL
+    unset GRPC_PYTHON_BUILD_SYSTEM_ZLIB
+    unset CFLAGS
+    unset LDFLAGS
+  fi
+  pip install -U -q pip setuptools wheel
+  # ref: https://github.com/grpc/grpc/issues/28387
+  pip wheel -w ./wheelhouse --no-binary :all: grpcio grpcio-tools
+  pyenv shell --unset
+  pyenv uninstall -f tmp-grpcio-build
+  # Currently there are not many packages that provides prebuilt binaries for M1 Macs.
+  # Let's configure necessary env-vars to build them locally via bdist_wheel.
+  echo "Configuring additional build flags for local wheel builds for macOS on Apple Silicon ..."
+  set_brew_python_build_flags
+fi
+
 # Install postgresql, etcd packages via docker
 show_info "Launching the docker compose \"halfstack\"..."
 git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
@@ -582,27 +607,6 @@ check_snappy() {
   fi
   rm -f $pkgfile
 }
-
-mkdir -p ./wheelhouse
-if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
-  show_info "Prebuild grpcio wheels for Apple Silicon..."
-  pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
-  pyenv shell tmp-grpcio-build
-  if [ $(python -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)') -eq 0 ]; then
-    # ref: https://github.com/grpc/grpc/issues/25082
-    export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
-    export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
-    echo "Set grpcio wheel build variables."
-  else
-    unset GRPC_PYTHON_BUILD_SYSTEM_OPENSSL
-    unset GRPC_PYTHON_BUILD_SYSTEM_ZLIB
-  fi
-  pip install -U -q pip setuptools wheel
-  # ref: https://github.com/grpc/grpc/issues/28387
-  pip wheel -w ./wheelhouse --no-binary :all: grpcio grpcio-tools
-  pyenv shell --unset
-  pyenv uninstall tmp-grpcio-build
-fi
 
 show_info "Install packages on virtual environments..."
 cd "${INSTALL_PATH}/manager"
