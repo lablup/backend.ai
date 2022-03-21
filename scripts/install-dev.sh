@@ -51,7 +51,7 @@ usage() {
   echo ""
   echo "  ${LWHITE}--python-version VERSION${NC}"
   echo "                       Set the Python version to install via pyenv"
-  echo "                       (default: 3.9.10)"
+  echo "                       (default: 3.10.2)"
   echo ""
   echo "  ${LWHITE}--install-path PATH${NC}  Set the target directory"
   echo "                       (default: ./backend.ai-dev)"
@@ -542,7 +542,7 @@ if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
   show_info "Prebuild grpcio wheels for Apple Silicon..."
   pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
   pyenv shell tmp-grpcio-build
-  if [ $(python -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)') -eq 0 ]; then
+  if [ $(python -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)') -eq 1 ]; then
     # ref: https://github.com/grpc/grpc/issues/25082
     export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
     export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
