@@ -358,11 +358,11 @@ install_docker_compose() {
   show_info "Install docker-compose"
   case $DISTRO in
   Debian)
-    $sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    $sudo curl -L "https://github.com/docker/compose/releases/download/v2.2.3/docker-compose-$(uname -s | tr '[:upper:]' '[:lower:]' | sed -e 's/_.*//')-$(uname -m)" -o /usr/local/bin/docker-compose
     $sudo chmod +x /usr/local/bin/docker-compose
     ;;
   RedHat)
-    $sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    $sudo curl -L "https://github.com/docker/compose/releases/download/v2.2.3/docker-compose-$(uname -s | tr '[:upper:]' '[:lower:]' | sed -e 's/_.*//')-$(uname -m)" -o /usr/local/bin/docker-compose
     $sudo chmod +x /usr/local/bin/docker-compose
     ;;
   Darwin)
@@ -715,13 +715,17 @@ show_info "Configuring the Lablup's official image registry..."
 cd "${INSTALL_PATH}/manager"
 python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
 python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community"
+if [ "$(uname -p)" = "arm" ]; then
+  python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
+else
+  python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community"
+fi
 
 # Scan the container image registry
 show_info "Scanning the image registry..."
 python -m ai.backend.manager.cli etcd rescan-images cr.backend.ai
 if [ "$(uname -p)" = "arm" ]; then
-  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" aarch64
+  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
 else
   python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
 fi
