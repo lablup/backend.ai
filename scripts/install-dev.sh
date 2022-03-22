@@ -715,13 +715,17 @@ show_info "Configuring the Lablup's official image registry..."
 cd "${INSTALL_PATH}/manager"
 python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
 python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community"
+if [ "$(uname -p)" = "arm" ]; then
+  python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
+else
+  python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community"
+fi
 
 # Scan the container image registry
 show_info "Scanning the image registry..."
 python -m ai.backend.manager.cli etcd rescan-images cr.backend.ai
 if [ "$(uname -p)" = "arm" ]; then
-  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" aarch64
+  python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
 else
   python -m ai.backend.manager.cli etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
 fi
