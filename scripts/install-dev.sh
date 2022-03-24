@@ -260,7 +260,7 @@ install_script_deps() {
   case $DISTRO in
   Debian)
     $sudo apt-get update
-    $sudo apt-get install -y git jq gcc make
+    $sudo apt-get install -y git jq gcc make g++
     ;;
   RedHat)
     $sudo yum clean expire-cache  # next yum invocation will update package metadata cache
