@@ -351,7 +351,7 @@ install_docker() {
     show_info "Please install the latest version of docker and try again."
     show_info "It should have been installed with Docker Desktop for Mac or Docker Toolbox."
     show_info " - Instructions: https://docs.docker.com/install/"
-    show_info"  - Download: https://download.docker.com/mac/stable/Docker.dmg"
+    show_info " - Download: https://download.docker.com/mac/stable/Docker.dmg"
     exit 1
     ;;
   esac
@@ -372,7 +372,7 @@ install_docker_compose() {
     show_info "Please install the latest version of docker-compose and try again."
     show_info "It should have been installed with Docker Desktop for Mac or Docker Toolbox."
     show_info " - Instructions: https://docs.docker.com/compose/install/"
-    show_info"  - Download: https://download.docker.com/mac/stable/Docker.dmg"
+    show_info " - Download: https://download.docker.com/mac/stable/Docker.dmg"
     exit 1
     ;;
   esac
