@@ -177,7 +177,7 @@ fi
 
 ROOT_PATH=$(pwd)
 ENV_ID=""
-PYTHON_VERSION="3.10.2"
+PYTHON_VERSION="3.10.4"
 SERVER_BRANCH="main"
 CLIENT_BRANCH="main"
 INSTALL_PATH="./backend.ai-dev"
