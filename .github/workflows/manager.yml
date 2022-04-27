@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Sparse-checkout
-      uses: lablup/sparse-checkout
+      uses: lablup/sparse-checkout@v1
       with:
         patterns: |
           configs
@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Sparse-checkout
-      uses: lablup/sparse-checkout
+      uses: lablup/sparse-checkout@v1
       with:
         patterns: |
           configs
@@ -135,7 +135,7 @@ jobs:
           - 6379:6379
     steps:
     - name: Sparse-checkout
-      uses: lablup/sparse-checkout
+      uses: lablup/sparse-checkout@v1
       with:
         patterns: |
           configs
@@ -215,7 +215,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Sparse-checkout
-      uses: lablup/sparse-checkout
+      uses: lablup/sparse-checkout@v1
       with:
         patterns: |
           configs
