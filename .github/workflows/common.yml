@@ -6,7 +6,15 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/common
+          tests/common
     - name: Set up Python
       uses: actions/setup-python@v3
       with:
@@ -31,7 +39,15 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/common
+          tests/common
     - name: Set up Python
       uses: actions/setup-python@v3
       with:
@@ -57,7 +73,15 @@ jobs:
     runs-on: ubuntu-latest
     # runs-on: self-hosted
     steps:
-    - uses: actions/checkout@v2
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/common
+          tests/common
     - name: Set up Python
       uses: actions/setup-python@v3
       with:
@@ -135,7 +159,15 @@ jobs:
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/common
+          tests/common
     - name: Set up Python
       uses: actions/setup-python@v3
       with:

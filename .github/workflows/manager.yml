@@ -1,0 +1,265 @@
+name: default
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/manager
+          src/ai/backend/common
+          tests/manager
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+        cache: "pip"
+        cache-dependency-path: |
+          requirements/lint.txt
+          setup.cfg
+    - name: Install dependencies
+      env:
+        REQUIREMENTS_FILE: lint
+      run: |
+        sudo apt-get install libsnappy-dev
+        python -m pip install -U pip setuptools wheel
+        if [ -n "$GITHUB_HEAD_REF" ]; then
+          export GHBRANCH="${GITHUB_HEAD_REF#refs/heads/}"
+        else
+          export GHBRANCH="${GITHUB_REF#refs/heads/}"
+        fi
+        echo "HEAD: ${GHBRANCH} (${GITHUB_REF}, ${GITHUB_HEAD_REF})"
+        # Use the same branch (if exists) for the backend.ai-common and backend.ai-cli installation
+        set +e
+        git ls-remote --heads 'https://github.com/lablup/backend.ai-common' | grep -q "refs/heads/${GHBRANCH}"
+        if [ $? -eq 0 ]; then
+          sed -i "s%\(backend.ai-common\)@main%\1@${GHBRANCH}%" requirements/${REQUIREMENTS_FILE}.txt
+        fi
+        git ls-remote --heads 'https://github.com/lablup/backend.ai-cli' | grep -q "refs/heads/${GHBRANCH}"
+        if [ $? -eq 0 ]; then
+          sed -i "s%\(backend.ai-cli\)@main%\1@${GHBRANCH}%" requirements/${REQUIREMENTS_FILE}.txt
+        fi
+        set -e
+        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
+    - name: Lint with flake8
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
+          echo "(skipping matchers for pull request from local branches)"
+        else
+          echo "::add-matcher::.github/workflows/flake8-matcher.json"
+        fi
+        python -m flake8 src/ai/backend tests
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/manager
+          src/ai/backend/common
+          tests/manager
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+        cache: "pip"
+        cache-dependency-path: |
+          requirements/typecheck.txt
+          setup.cfg
+    - name: Install dependencies
+      env:
+        REQUIREMENTS_FILE: typecheck
+      run: |
+        sudo apt-get install libsnappy-dev
+        python -m pip install -U pip setuptools wheel
+        if [ -n "$GITHUB_HEAD_REF" ]; then
+          export GHBRANCH="${GITHUB_HEAD_REF#refs/heads/}"
+        else
+          export GHBRANCH="${GITHUB_REF#refs/heads/}"
+        fi
+        echo "HEAD: ${GHBRANCH} (${GITHUB_REF}, ${GITHUB_HEAD_REF})"
+        # Use the same branch (if exists) for the backend.ai-common and backend.ai-cli installation
+        set +e
+        git ls-remote --heads 'https://github.com/lablup/backend.ai-common' | grep -q "refs/heads/${GHBRANCH}"
+        if [ $? -eq 0 ]; then
+          sed -i "s%\(backend.ai-common\)@main%\1@${GHBRANCH}%" requirements/${REQUIREMENTS_FILE}.txt
+        fi
+        git ls-remote --heads 'https://github.com/lablup/backend.ai-cli' | grep -q "refs/heads/${GHBRANCH}"
+        if [ $? -eq 0 ]; then
+          sed -i "s%\(backend.ai-cli\)@main%\1@${GHBRANCH}%" requirements/${REQUIREMENTS_FILE}.txt
+        fi
+        set -e
+        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
+    - name: Type check with mypy
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
+          echo "(skipping matchers for pull request from local branches)"
+        else
+          echo "::add-matcher::.github/workflows/mypy-matcher.json"
+        fi
+        python -m mypy --no-color-output src/ai/backend tests
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:13.2-alpine
+        env:
+          POSTGRES_USER: lablup
+          POSTGRES_PASSWORD: develove
+          POSTGRES_DB: testing
+        volumes:
+          - ${{ github.workspace }}/scripts:/docker-entrypoint-initdb.d
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:6.2.6-alpine
+        ports:
+          - 6379:6379
+    steps:
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/manager
+          src/ai/backend/common
+          tests/manager
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: "~3.10.2"
+        cache: "pip"
+        cache-dependency-path: |
+          requirements/test.txt
+          setup.cfg
+    - name: Install dependencies
+      env:
+        REQUIREMENTS_FILE: test
+      run: |
+        sudo apt-get install libsnappy-dev
+        python -m pip install -U pip setuptools wheel
+        if [ -n "$GITHUB_HEAD_REF" ]; then
+          export GHBRANCH="${GITHUB_HEAD_REF#refs/heads/}"
+        else
+          export GHBRANCH="${GITHUB_REF#refs/heads/}"
+        fi
+        echo "HEAD: ${GHBRANCH} (${GITHUB_REF}, ${GITHUB_HEAD_REF})"
+        # Use the same branch (if exists) for the backend.ai-common and backend.ai-cli installation
+        set +e
+        git ls-remote --heads 'https://github.com/lablup/backend.ai-common' | grep -q "refs/heads/${GHBRANCH}"
+        if [ $? -eq 0 ]; then
+          sed -i "s%\(backend.ai-common\)@main%\1@${GHBRANCH}%" requirements/${REQUIREMENTS_FILE}.txt
+        fi
+        git ls-remote --heads 'https://github.com/lablup/backend.ai-cli' | grep -q "refs/heads/${GHBRANCH}"
+        if [ $? -eq 0 ]; then
+          sed -i "s%\(backend.ai-cli\)@main%\1@${GHBRANCH}%" requirements/${REQUIREMENTS_FILE}.txt
+        fi
+        set -e
+        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
+    - name: Prepare testing
+      run: |
+        mkdir -p ~/.config/backend.ai
+        cp config/ci.toml ~/.config/backend.ai/manager.toml
+        mkdir -p /tmp/scratches
+        mkdir -p /tmp/vfroot/local
+        # etcd
+        mkdir -p /tmp/etcd
+        docker run -d -p 2379:2379 -p 2380:2380 \
+          -v /tmp/etcd:/etcd-data \
+          --name backendai-etcd \
+          quay.io/coreos/etcd:v3.4.1 \
+          /usr/local/bin/etcd \
+          --name backendai-etcd \
+          --data-dir /etcd-data \
+          --listen-client-urls http://0.0.0.0:2379 \
+          --advertise-client-urls http://0.0.0.0:2379 \
+          --listen-peer-urls http://0.0.0.0:2380 \
+          --initial-advertise-peer-urls http://0.0.0.0:2380 \
+          --initial-cluster backendai-etcd=http://0.0.0.0:2380 \
+          --initial-cluster-token backendai-etcd-token \
+          --initial-cluster-state new \
+          --auto-compaction-retention 1
+        # pull minimal kernel images
+        docker pull lablup/lua:5.3-alpine3.8
+    - name: Test with pytest
+      run: |
+        python -m pytest -m 'not integration' -v --cov=src
+    - name: Clean up and upload coverage report
+      if: ${{ always() }}  # always run this step to publish test results when there are test failures
+      run: |
+        codecov
+
+  deploy-to-pypi:
+    needs: [lint, typecheck, test]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/manager
+          src/ai/backend/common
+          tests/manager
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+        cache: "pip"
+        cache-dependency-path: |
+          requirements/build.txt
+          setup.cfg
+    - name: Install dependencies
+      env:
+        REQUIREMENTS_FILE: build
+      run: |
+        sudo apt-get install libsnappy-dev
+        python -m pip install -U pip setuptools wheel
+        if [ -n "$GITHUB_HEAD_REF" ]; then
+          export GHBRANCH="${GITHUB_HEAD_REF#refs/heads/}"
+        else
+          export GHBRANCH="${GITHUB_REF#refs/heads/}"
+        fi
+        echo "HEAD: ${GHBRANCH} (${GITHUB_REF}, ${GITHUB_HEAD_REF})"
+        # Use the same branch (if exists) for the backend.ai-common and backend.ai-cli installation
+        set +e
+        git ls-remote --heads 'https://github.com/lablup/backend.ai-common' | grep -q "refs/heads/${GHBRANCH}"
+        if [ $? -eq 0 ]; then
+          sed -i "s%\(backend.ai-common\)@main%\1@${GHBRANCH}%" requirements/${REQUIREMENTS_FILE}.txt
+        fi
+        git ls-remote --heads 'https://github.com/lablup/backend.ai-cli' | grep -q "refs/heads/${GHBRANCH}"
+        if [ $? -eq 0 ]; then
+          sed -i "s%\(backend.ai-cli\)@main%\1@${GHBRANCH}%" requirements/${REQUIREMENTS_FILE}.txt
+        fi
+        set -e
+        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
+    - name: Build and publish
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: |
+        python setup.py sdist bdist_wheel
+        twine upload dist/*
