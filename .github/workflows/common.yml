@@ -13,6 +13,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/common
           tests/common
     - name: Set up Python
@@ -49,6 +50,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/common
           tests/common
     - name: Set up Python
@@ -86,6 +88,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/common
           tests/common
     - name: Set up Python
@@ -175,6 +178,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/common
           tests/common
     - name: Set up Python

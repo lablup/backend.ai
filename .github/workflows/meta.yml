@@ -13,6 +13,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/meta
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -54,6 +55,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/meta
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -95,6 +97,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/meta
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -130,6 +133,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/meta
     - name: Set up Python
       uses: actions/setup-python@v2

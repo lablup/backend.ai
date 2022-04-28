@@ -13,6 +13,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/manager
           src/ai/backend/common
           tests/manager
@@ -70,6 +71,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/manager
           src/ai/backend/common
           tests/manager
@@ -147,6 +149,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/manager
           src/ai/backend/common
           tests/manager
@@ -230,6 +233,7 @@ jobs:
           configs
           scripts
           packages
+          requirements
           src/ai/backend/manager
           src/ai/backend/common
           tests/manager
