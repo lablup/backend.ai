@@ -1,4 +1,4 @@
-name: default
+name: meta-default
 
 on: [push, pull_request]
 
@@ -6,11 +6,21 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/meta
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
         python-version: "3.9"
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py meta
     - name: Cache pip packages
       uses: actions/cache@v2
       with:
@@ -33,15 +43,25 @@ jobs:
           echo "::add-matcher::.github/workflows/flake8-matcher.json"
         fi
         python -m flake8 src/ai/backend tests
-  
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/meta
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
         python-version: "3.9"
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py meta
     - name: Cache pip packages
       uses: actions/cache@v2
       with:
@@ -68,11 +88,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/meta
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
         python-version: "3.9"
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py meta
     - name: Cache pip packages
       uses: actions/cache@v2
       with:
@@ -93,11 +123,21 @@ jobs:
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Sparse-checkout
+      uses: lablup/sparse-checkout@v1
+      with:
+        patterns: |
+          configs
+          scripts
+          packages
+          src/ai/backend/meta
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
         python-version: "3.9"
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py meta
     - name: Cache pip packages
       uses: actions/cache@v2
       with:

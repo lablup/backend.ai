@@ -5,7 +5,7 @@ from pathlib import Path
 
 def _copy_if_exists(src: Path, dst: Path) -> None:
     if src.exists():
-        shutil.copy(src, dst)
+        shutil.copyfile(src, dst)
 
 
 def populate_setup_cfg(pkg_name: str) -> None:
