@@ -23,6 +23,9 @@ jobs:
         cache-dependency-path: |
           setup.cfg
           requirements/lint.txt
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py common
     - name: Install dependencies
       run: |
         python -m pip install -U pip setuptools wheel
@@ -56,6 +59,9 @@ jobs:
         cache-dependency-path: |
           setup.cfg
           requirements/typecheck.txt
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py common
     - name: Install dependencies
       run: |
         python -m pip install -U pip setuptools wheel
@@ -90,6 +96,9 @@ jobs:
         cache-dependency-path: |
           setup.cfg
           requirements/test.txt
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py common
     - name: Get changed files
       id: changed-files
       uses: tj-actions/changed-files@v18.6
@@ -176,6 +185,9 @@ jobs:
         cache-dependency-path: |
           setup.cfg
           requirements/build.txt
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py common
     - name: Install dependencies
       env:
         REQUIREMENTS_FILE: build

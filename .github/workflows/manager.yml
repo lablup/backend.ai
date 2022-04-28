@@ -24,6 +24,9 @@ jobs:
         cache-dependency-path: |
           requirements/lint.txt
           setup.cfg
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py manager
     - name: Install dependencies
       env:
         REQUIREMENTS_FILE: lint
@@ -78,6 +81,9 @@ jobs:
         cache-dependency-path: |
           requirements/typecheck.txt
           setup.cfg
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py manager
     - name: Install dependencies
       env:
         REQUIREMENTS_FILE: typecheck
@@ -152,6 +158,9 @@ jobs:
         cache-dependency-path: |
           requirements/test.txt
           setup.cfg
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py manager
     - name: Install dependencies
       env:
         REQUIREMENTS_FILE: test
@@ -232,6 +241,9 @@ jobs:
         cache-dependency-path: |
           requirements/build.txt
           setup.cfg
+    - name: Specialize to package
+      run: |
+        python scripts/specialize.py manager
     - name: Install dependencies
       env:
         REQUIREMENTS_FILE: build
