@@ -1,8 +1,19 @@
 python_test_utils(
     name="test_utils",
+    sources=[
+        "**/__init__.py",
+        "**/conftest.py",
+        "redis/*.py",
+        "!redis/test_*.py",
+    ],
 )
 
 python_tests(
     name="tests",
-    # runtime_package_dependencies=["src/ai/backend/common:lib"],
+    dependencies=[
+        "src/ai/backend/common:lib",
+    ],
+    sources=[
+        "**/test_*.py",
+    ],
 )

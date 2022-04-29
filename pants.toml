@@ -22,5 +22,11 @@ extra_requirements.add = [
   "pytest-aiohttp>=1.0.4",
   "pytest-mock>=3.5.0",
 ]
-args = ["-v", "-m", "not integration"]
-lockfile = "tools/pytest_lockfile.txt"
+args = ["-v", "-m", "'not integration'"]
+lockfile = "tools/pytest.lock"
+
+[mypy]
+version = "mypy>=0.950"
+extra_requirements.add = [
+]
+lockfile = "tools/mypy.lock"
