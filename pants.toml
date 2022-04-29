@@ -1,0 +1,26 @@
+[GLOBAL]
+pants_version = "2.10.0"
+backend_packages = [
+  "pants.backend.python",
+  "pants.backend.python.lint.flake8",
+  "pants.backend.python.typecheck.mypy",
+]
+
+[anonymous-telemetry]
+enabled = false
+
+[source]
+root_patterns = ["src", "/"]
+
+[python]
+interpreter_constraints = ["CPython>=3.10"]
+
+[pytest]
+version = "pytest>=7.0"
+extra_requirements.add = [
+  "pytest-asyncio>=0.18",
+  "pytest-aiohttp>=1.0.4",
+  "pytest-mock>=3.5.0",
+]
+args = ["-v", "-m", "not integration"]
+lockfile = "tools/pytest_lockfile.txt"

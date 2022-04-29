@@ -97,3 +97,10 @@ ENV/
 .*.swp
 
 tmp/
+
+# Pants
+/.pants.d/
+/.pids
+/.pants.workdir.file_lock*
+/.pants.rc
+/pants-local
