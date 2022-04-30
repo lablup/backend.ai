@@ -17,5 +17,4 @@ python_distribution(
         version="22.09.0.dev0",
     ),
     generate_setup=True,
-    # wheel_config_settings={"--global-option": ["--universal", "false"]},
 )
