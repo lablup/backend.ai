@@ -48,7 +48,7 @@ setproctitle~=1.2.2
 tabulate~=0.8.9
 tblib~=1.7
 tenacity>=8.0
-toml>=0.10.2; python_version<=3.11
+toml>=0.10.2 ; python_version<='3.11'
 tomlkit~=0.8.0
 tqdm>=4.61
 trafaret~=2.1
