@@ -1,9 +1,11 @@
 [GLOBAL]
 pants_version = "2.10.0"
+pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
   "pants.backend.python",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.typecheck.mypy",
+  "setupgen",
 ]
 
 [anonymous-telemetry]

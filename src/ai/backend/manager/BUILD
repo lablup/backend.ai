@@ -6,6 +6,14 @@ python_sources(
     ],
 )
 
+pex_binary(
+    name="server",
+    dependencies=[
+        ":service",
+    ],
+    entry_point="server.py",
+)
+
 python_distribution(
     name="dist",
     dependencies=[
@@ -13,7 +21,8 @@ python_distribution(
     ],
     provides=python_artifact(
         name="backend.ai-manager",
-        version="22.09.0.dev0",
+        description="Backend.AI Manager",
+        license="LGPLv3",
     ),
     generate_setup=True,
 )

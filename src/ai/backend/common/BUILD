@@ -12,7 +12,8 @@ python_distribution(
     ],
     provides=python_artifact(
         name="backend.ai-common",
-        version="22.09.0.dev0",
+        description="Backend.AI commons library",
+        license="LGPLv3",
     ),
     generate_setup=True,
 )
