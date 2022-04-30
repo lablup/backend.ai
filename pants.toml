@@ -10,11 +10,19 @@ backend_packages = [
 enabled = false
 
 [source]
-root_patterns = ["src", "/"]
+root_patterns = ["src", "tests"]
 
 [python]
-resolve = true
+enable_resolves = true
+resolves = { python-default = "python.lock" }
 interpreter_constraints = ["CPython>=3.10"]
+
+[flake8]
+version = "flake8>=4.0"
+extra_requirements.add = [
+    "flake8-commas>=2.1",
+]
+lockfile = "tools/flake8.lock"
 
 [pytest]
 version = "pytest>=7.0"

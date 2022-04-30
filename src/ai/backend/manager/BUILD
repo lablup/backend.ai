@@ -3,7 +3,6 @@ python_sources(
     sources=["**/*.py"],
     dependencies=[
         "src/ai/backend/common:lib",
-        # "//:reqs",
     ],
 )
 
