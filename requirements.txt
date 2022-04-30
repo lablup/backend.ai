@@ -1,4 +1,7 @@
 pyzmq>=22.1.0
+aiodataloader-ng~=0.2.1
+aiodocker~=0.21.0
+aiofiles~=0.8.0
 aiohttp>=3.8.0
 aiohttp_sse>=2.0
 aiodns>=3.0

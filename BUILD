@@ -1,1 +1,4 @@
-python_requirements(name="reqs", source="requirements.txt")
+python_requirements(
+    name="reqs",
+    source="requirements.txt",
+)

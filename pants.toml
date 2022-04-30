@@ -13,6 +13,7 @@ enabled = false
 root_patterns = ["src", "/"]
 
 [python]
+resolve = true
 interpreter_constraints = ["CPython>=3.10"]
 
 [pytest]

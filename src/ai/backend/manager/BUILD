@@ -1,7 +1,21 @@
 python_sources(
     name="service",
+    sources=["**/*.py"],
     dependencies=[
         "src/ai/backend/common:lib",
+        "//:reqs",
     ],
-    sources=["**/*.py"],
+)
+
+python_distribution(
+    name="dist",
+    dependencies=[
+        ":service",
+    ],
+    provides=python_artifact(
+        name="backend.ai-manager",
+        version="22.09.0.dev0",
+    ),
+    generate_setup=True,
+    # wheel_config_settings={"--global-option": ["--universal", "false"]},
 )
