@@ -31,6 +31,6 @@ python_distribution(
 resources(
     name="resources",
     sources=[
-	"**/py.typed",
+        "**/py.typed",
     ],
 )

@@ -2,6 +2,7 @@ python_requirements(
     name="reqs",
     source="requirements.txt",
     module_mapping={
+	"aiodataloader-ng": ["aiodataloader"],
 	"attrs": ["attr", "attrs"],
 	"python-dateutil": ["dateutil"],
 	"python-json-logger": ["pythonjsonlogger"],
