@@ -3,6 +3,7 @@ python_sources(
     sources=["**/*.py"],
     dependencies=[
         "src/ai/backend/common:lib",
+        ":resources",
     ],
 )
 
@@ -25,4 +26,11 @@ python_distribution(
         license="LGPLv3",
     ),
     generate_setup=True,
+)
+
+resources(
+    name="resources",
+    sources=[
+	"**/py.typed",
+    ],
 )

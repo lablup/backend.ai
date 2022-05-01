@@ -71,6 +71,7 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
             "Documentation": "https://docs.backend.ai/",
             "Source": "https://github.com/lablup/backend.ai",
         },
+        author="Lablup Inc. and contributors",
         zip_safe=False,
     )
     conflicting_hardcoded_kwargs = set(kwargs.keys()).intersection(hardcoded_kwargs.keys())

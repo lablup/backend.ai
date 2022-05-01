@@ -2,6 +2,7 @@ python_sources(
     name="lib",
     sources=["**/*.py"],
     dependencies=[
+	":resources",
     ],
 )
 
@@ -16,4 +17,11 @@ python_distribution(
         license="LGPLv3",
     ),
     generate_setup=True,
+)
+
+resources(
+    name="resources",
+    sources=[
+	"**/py.typed",
+    ],
 )
