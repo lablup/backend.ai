@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from pants.backend.python.goals.setup_py import SetupKwargs, SetupKwargsRequest
+from pants.build_graph.address import Address
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
@@ -43,7 +46,7 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
     _digest_contents = await Get(
         DigestContents,
         PathGlobs(
-            [f"packages/{kwargs['name']}/README.md"],
+            [str(Path(request.target.address.spec_path) / "README.md")],
             description_of_origin="setupgen plugin",
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
         ),
