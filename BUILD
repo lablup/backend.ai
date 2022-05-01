@@ -4,6 +4,7 @@ python_requirements(
     module_mapping={
 	"attrs": ["attr", "attrs"],
 	"python-dateutil": ["dateutil"],
+	"python-json-logger": ["pythonjsonlogger"],
 	"python-snappy": ["snappy"],
 	"pyzmq": ["zmq"],
 	"typing-extensions": ["typing_extensions"],
