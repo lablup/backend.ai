@@ -1,0 +1,8 @@
+[flake8]
+# ref: http://pep8.readthedocs.io/en/latest/intro.html#error-codes
+ignore = E126,E127,E128,E129,E722,E731,E221,E241,E401,W504,N801,N802
+max-line-length = 125
+builtins = _
+exclude = .git,.cache,.idea,.egg,__pycache__,venv,build,docs,alembic,*.pyi
+
+# vim: ft=dosini
