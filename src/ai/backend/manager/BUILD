@@ -13,7 +13,6 @@ pex_binary(
         ":service",
     ],
     entry_point="server.py",
-    execution_mode="venv",
 )
 
 python_distribution(
