@@ -28,6 +28,11 @@ services:
       - half
     ports:
       - "8110:6379"
+    volumes:
+      - "./tmp/backend.ai-halfstack/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
+    command: >
+      redis-server
+      --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
