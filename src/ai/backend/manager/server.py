@@ -10,6 +10,7 @@ import os
 import pwd, grp
 import ssl
 import sys
+import time
 import traceback
 from typing import (
     Any,
@@ -690,6 +691,7 @@ async def server_main_logwrapper(
     pidx: int,
     _args: List[Any],
 ) -> AsyncIterator[None]:
+    print(f"worker-{pidx}: begin")
     setproctitle(f"backend.ai: manager worker-{pidx}")
     log_endpoint = _args[1]
     logger = Logger(_args[0]['logging'], is_master=False, log_endpoint=log_endpoint)
@@ -699,6 +701,8 @@ async def server_main_logwrapper(
                 yield
     except Exception:
         traceback.print_exc()
+    finally:
+        print(f"worker-{pidx}: exit")
 
 
 @click.group(invoke_without_command=True)
@@ -713,7 +717,6 @@ def main(ctx: click.Context, config_path: Path, debug: bool) -> None:
     """
 
     cfg = load_config(config_path, debug)
-    print(os.getpid(), os.getpgid(0), os.getsid(0))
 
     if ctx.invoked_subcommand is None:
         cfg['manager']['pid-file'].write_text(str(os.getpid()))
@@ -724,6 +727,7 @@ def main(ctx: click.Context, config_path: Path, debug: bool) -> None:
             logger = Logger(cfg['logging'], is_master=True, log_endpoint=log_endpoint)
             with logger:
                 ns = cfg['etcd']['namespace']
+                print("main: begin")
                 setproctitle(f"backend.ai: manager {ns}")
                 log.info('Backend.AI Manager {0}', __version__)
                 log.info('runtime: {0}', env_info())
@@ -742,6 +746,7 @@ def main(ctx: click.Context, config_path: Path, debug: bool) -> None:
                     )
                 finally:
                     log.info('terminated.')
+                    print(f"main: exit")
         finally:
             if cfg['manager']['pid-file'].is_file():
                 # check is_file() to prevent deleting /dev/null!

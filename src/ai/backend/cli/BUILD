@@ -1,8 +1,8 @@
 python_sources(
     name="lib",
     dependencies=[
-        "src/ai/backend/cli:lib",
         ":resources",
+        # ":dist",
     ],
     sources=["**/*.py"],
 )
@@ -13,16 +13,24 @@ python_distribution(
         ":lib",
     ],
     provides=python_artifact(
-        name="backend.ai-client",
-        description="Backend.AI Client SDK",
+        name="backend.ai-cli",
+        description="Backend.AI Command Line Interface Helper",
         license="MIT",
     ),
     entry_points={
-        'backendai_cli_v10': {
-            '_': 'ai.backend.client.cli.main:main',
+        'console_scripts': {
+            'backend.ai': 'ai.backend.cli.__main__:main',
         },
     },
     generate_setup=True,
+)
+
+pex_binary(
+    name="cli",
+    dependencies=[
+        ":lib",
+    ],
+    entry_point="ai.backend.cli.__main__:main",
 )
 
 resource(name="version", source="VERSION")
