@@ -713,6 +713,7 @@ def main(ctx: click.Context, config_path: Path, debug: bool) -> None:
     """
 
     cfg = load_config(config_path, debug)
+    print(os.getpid(), os.getpgid(0), os.getsid(0))
 
     if ctx.invoked_subcommand is None:
         cfg['manager']['pid-file'].write_text(str(os.getpid()))

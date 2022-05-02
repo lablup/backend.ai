@@ -13,6 +13,7 @@ pex_binary(
         ":service",
     ],
     entry_point="server.py",
+    execution_mode="venv",
 )
 
 python_distribution(
@@ -28,8 +29,13 @@ python_distribution(
     generate_setup=True,
 )
 
+resource(name="version", source="VERSION")
+
 resources(
     name="resources",
+    dependencies=[
+        ":version",
+    ],
     sources=[
         "**/py.typed",
     ],

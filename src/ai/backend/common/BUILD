@@ -19,8 +19,13 @@ python_distribution(
     generate_setup=True,
 )
 
+resource(name="version", source="VERSION")
+
 resources(
     name="resources",
+    dependencies=[
+        ":version",
+    ],
     sources=[
 	"**/py.typed",
     ],

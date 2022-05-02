@@ -1,5 +1,3 @@
-# from importlib.metadata import version
+from pathlib import Path
 
-# __version__ = version("backend.ai-manager")
-
-__version__ = '0.0.0.dev'
+__version__ = (Path(__file__).parent / 'VERSION').read_text().strip()
