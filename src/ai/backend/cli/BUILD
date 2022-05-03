@@ -2,7 +2,6 @@ python_sources(
     name="lib",
     dependencies=[
         ":resources",
-        # ":dist",
     ],
     sources=["**/*.py"],
 )
