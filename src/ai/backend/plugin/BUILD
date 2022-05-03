@@ -12,9 +12,9 @@ python_distribution(
         ":lib",
     ],
     provides=python_artifact(
-        name="backend.ai-common",
-        description="Backend.AI commons library",
-        license="LGPLv3",
+        name="backend.ai-plugin",
+        description="Backend.AI Plugin Subsystem",
+        license="MIT",
     ),
     generate_setup=True,
 )
