@@ -29,7 +29,6 @@ pex_binary(
     name="cli",
     dependencies=[
         ":lib",
-        ":dist",
     ],
     entry_point="ai.backend.cli.__main__:main",
 )
