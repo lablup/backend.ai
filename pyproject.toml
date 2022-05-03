@@ -38,7 +38,7 @@ underlines = ["", "", ""]
     name = "Miscellaneous"
     showcontent = true
 
-[tool.pytest]
+[tool.pytest.ini_options]
 testpaths = "tests"
 markers = [
     "integration: Test cases that spawn Dockerized kernel sessions",
