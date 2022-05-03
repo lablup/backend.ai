@@ -1,6 +1,7 @@
 python_sources(
     name="lib",
     dependencies=[
+        "scr/ai/backend/plugin:lib",
         ":resources",
     ],
     sources=["**/*.py"],
