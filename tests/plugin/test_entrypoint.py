@@ -45,12 +45,12 @@ def test_parse_build():
         f.flush()
         p = Path(f.name)
         items = [*extract_entrypoints_from_buildscript("backendai_cli_v10", p)]
-        assert (items[0].name, items[0].module_name, items[0].attrs) == ("mgr", "ai.backend.manager.cli.__main__", ("main", ))
-        assert (items[1].name, items[1].module_name, items[1].attrs) == ("mgr.start-server", "ai.backend.manager.server", ("main", ))
+        assert (items[0].name, items[0].module, items[0].attr) == ("mgr", "ai.backend.manager.cli.__main__", "main")
+        assert (items[1].name, items[1].module, items[1].attr) == ("mgr.start-server", "ai.backend.manager.server", "main")
         items = [*extract_entrypoints_from_buildscript("backendai_scheduler_v10", p)]
-        assert (items[0].name, items[0].module_name, items[0].attrs) == ("fifo", "ai.backend.manager.scheduler.fifo", ("FIFOSlotScheduler", ))
-        assert (items[1].name, items[1].module_name, items[1].attrs) == ("lifo", "ai.backend.manager.scheduler.fifo", ("LIFOSlotScheduler", ))
-        assert (items[2].name, items[2].module_name, items[2].attrs) == ("drf", "ai.backend.manager.scheduler.drf", ("DRFScheduler", ))
-        assert (items[3].name, items[3].module_name, items[3].attrs) == ("mof", "ai.backend.manager.scheduler.mof", ("MOFScheduler", ))
+        assert (items[0].name, items[0].module, items[0].attr) == ("fifo", "ai.backend.manager.scheduler.fifo", "FIFOSlotScheduler")
+        assert (items[1].name, items[1].module, items[1].attr) == ("lifo", "ai.backend.manager.scheduler.fifo", "LIFOSlotScheduler")
+        assert (items[2].name, items[2].module, items[2].attr) == ("drf", "ai.backend.manager.scheduler.drf", "DRFScheduler")
+        assert (items[3].name, items[3].module, items[3].attr) == ("mof", "ai.backend.manager.scheduler.mof", "MOFScheduler")
         items = [*extract_entrypoints_from_buildscript("backendai_error_monitor_v20", p)]
-        assert (items[0].name, items[0].module_name, items[0].attrs) == ("intrinsic", "ai.backend.manager.plugin.error_monitor", ("ErrorMonitor", ))
+        assert (items[0].name, items[0].module, items[0].attr) == ("intrinsic", "ai.backend.manager.plugin.error_monitor", "ErrorMonitor")

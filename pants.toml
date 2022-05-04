@@ -2,10 +2,10 @@
 pants_version = "2.10.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
-  "pants.backend.python",
-  "pants.backend.python.lint.flake8",
-  "pants.backend.python.typecheck.mypy",
-  "setupgen",
+    "pants.backend.python",
+    "pants.backend.python.lint.flake8",
+    "pants.backend.python.typecheck.mypy",
+    "setupgen",
 ]
 
 [anonymous-telemetry]
@@ -23,15 +23,16 @@ interpreter_constraints = ["CPython>=3.10"]
 version = "flake8>=4.0"
 extra_requirements.add = [
     "flake8-commas>=2.1",
+    "setuptools>=60.0",
 ]
 lockfile = "tools/flake8.lock"
 
 [pytest]
 version = "pytest>=7.0"
 extra_requirements.add = [
-  "pytest-asyncio>=0.18",
-  "pytest-aiohttp>=1.0.4",
-  "pytest-mock>=3.5.0",
+    "pytest-asyncio>=0.18",
+    "pytest-aiohttp>=1.0.4",
+    "pytest-mock>=3.5.0",
 ]
 args = ["-v", "-m", "'not integration'"]
 lockfile = "tools/pytest.lock"
