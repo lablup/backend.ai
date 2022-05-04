@@ -104,3 +104,9 @@ tmp/
 /.pants.workdir.file_lock*
 /.pants.rc
 /pants-local
+
+# Local configurations
+/manager.toml
+/agent.toml
+/storage-proxy.toml
+/webserver.conf
