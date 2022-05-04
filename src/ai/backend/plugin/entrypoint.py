@@ -3,7 +3,7 @@ import itertools
 import logging
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
-from typing import Container, Iterator, Optional
+from typing import Container, Iterator, Sequence, Optional
 
 log = logging.getLogger(__name__)
 
@@ -14,34 +14,46 @@ def scan_entrypoints(
 ) -> Iterator[EntryPoint]:
     if blocklist is None:
         blocklist = set()
+    existing_names: dict[str, EntryPoint] = {}
     for entrypoint in itertools.chain(
         scan_entrypoint_from_buildscript(group_name),
         scan_entrypoint_from_package_metadata(group_name),
     ):
         if entrypoint.name in blocklist:
             continue
+        if existing_entrypoint := existing_names.get(entrypoint.name):
+            raise RuntimeError(
+                f"Detected a duplicate plugin entrypoint name {entrypoint.name!r} "
+                f"from {existing_entrypoint.value} and {entrypoint.value}",
+            )
+        existing_names[entrypoint.name] = entrypoint
         yield entrypoint
 
 
 def scan_entrypoint_from_package_metadata(group_name: str) -> Iterator[EntryPoint]:
-    for entrypoint in entry_points().get(group_name, []):
-        yield entrypoint
+    yield from entry_points().get(group_name, [])
 
 
 def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
+    # First try to scan the entrypoints in the current source directories,
+    # and override them with the package environment (e.g., pex by pants).
+    entrypoints = {}
+    try:
+        src_path = find_build_root() / 'src'
+    except ValueError:
+        yield from []
+    log.debug("scan_entrypoint_from_buildscript({!r}): current src: {}", group_name, src_path)
+    for buildscript_path in src_path.glob("**/BUILD"):
+        log.debug("reading entry points [{}] from {}", group_name, buildscript_path)
+        for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
+            entrypoints[entrypoint.name] = entrypoint
     ai_backend_ns_path = Path(__file__).parent.parent
     log.debug("scan_entrypoint_from_buildscript({!r}): Namespace path: {}", group_name, ai_backend_ns_path)
     for buildscript_path in ai_backend_ns_path.glob("**/BUILD"):
         log.debug("reading entry points [{}] from {}", group_name, buildscript_path)
-        yield from extract_entrypoints_from_buildscript(group_name, buildscript_path)
-    try:
-        src_path = find_build_root() / 'src'
-    except ValueError:
-        return
-    log.debug("scan_entrypoint_from_buildscript({!r}): current src: {}", group_name, src_path)
-    for buildscript_path in src_path.glob("**/BUILD"):
-        log.debug("reading entry points [{}] from {}", group_name, buildscript_path)
-        yield from extract_entrypoints_from_buildscript(group_name, buildscript_path)
+        for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
+            entrypoints[entrypoint.name] = entrypoint
+    yield from entrypoints.values()
 
 
 def find_build_root(path: Optional[Path] = None) -> Path:

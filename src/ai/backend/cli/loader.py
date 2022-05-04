@@ -9,8 +9,9 @@ def load_entry_points() -> click.Group:
     entry_prefix = 'backendai_cli_v10'
     for entrypoint in scan_entrypoints(entry_prefix):
         if entrypoint.name == "_":
-            cmd_group = entrypoint.load()
-            return cmd_group
+            cmd_group: click.Group = entrypoint.load()
+            for name, cmd in cmd_group.commands.items():
+                main.add_command(cmd, name=name)
         else:
             prefix, _, subprefix = entrypoint.name.partition(".")
             if not subprefix:

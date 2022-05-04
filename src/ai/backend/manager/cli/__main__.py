@@ -37,6 +37,9 @@ log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.cli'))
               help='Enable the debug mode and override the global log level to DEBUG.')
 @click.pass_context
 def main(ctx, config_path, debug):
+    """
+    Manager Administration CLI
+    """
     local_config = load_config(config_path)
     setproctitle(f"backend.ai: manager.cli {local_config['etcd']['namespace']}")
     ctx.obj = CLIContext(
