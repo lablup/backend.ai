@@ -1,8 +1,9 @@
 import ast
+import itertools
 import logging
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
-from typing import Container, Iterator
+from typing import Container, Iterator, Optional
 
 log = logging.getLogger(__name__)
 
@@ -13,11 +14,10 @@ def scan_entrypoints(
 ) -> Iterator[EntryPoint]:
     if blocklist is None:
         blocklist = set()
-    for entrypoint in scan_entrypoint_from_buildscript(group_name):
-        if entrypoint.name in blocklist:
-            continue
-        yield entrypoint
-    for entrypoint in scan_entrypoint_from_package_metadata(group_name):
+    for entrypoint in itertools.chain(
+        scan_entrypoint_from_buildscript(group_name),
+        scan_entrypoint_from_package_metadata(group_name),
+    ):
         if entrypoint.name in blocklist:
             continue
         yield entrypoint
@@ -30,11 +30,30 @@ def scan_entrypoint_from_package_metadata(group_name: str) -> Iterator[EntryPoin
 
 def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     ai_backend_ns_path = Path(__file__).parent.parent
-    print("scan_entrypoint_from_buildscript(): Namespace path:", ai_backend_ns_path)
-    print("scan_entrypoint_from_buildscript(): All BUILD files:\n", [*ai_backend_ns_path.glob("**/BUILD")])
+    log.debug("scan_entrypoint_from_buildscript({!r}): Namespace path: {}", group_name, ai_backend_ns_path)
     for buildscript_path in ai_backend_ns_path.glob("**/BUILD"):
         log.debug("reading entry points [{}] from {}", group_name, buildscript_path)
         yield from extract_entrypoints_from_buildscript(group_name, buildscript_path)
+    try:
+        src_path = find_build_root() / 'src'
+    except ValueError:
+        return
+    log.debug("scan_entrypoint_from_buildscript({!r}): current src: {}", group_name, src_path)
+    for buildscript_path in src_path.glob("**/BUILD"):
+        log.debug("reading entry points [{}] from {}", group_name, buildscript_path)
+        yield from extract_entrypoints_from_buildscript(group_name, buildscript_path)
+
+
+def find_build_root(path: Optional[Path] = None) -> Path:
+    cwd = Path.cwd() if path is None else path
+    while True:
+        if (cwd / 'BUILD_ROOT').exists():
+            return cwd
+        cwd = cwd.parent
+        if cwd.parent == cwd:
+            # reached the root directory
+            break
+    raise ValueError("Could not find the build root directory")
 
 
 def extract_entrypoints_from_buildscript(
