@@ -35,7 +35,11 @@ jobs:
         else
           echo "::add-matcher::.github/workflows/flake8-matcher.json"
         fi
-        BASE_REF="${GITHUB_BASE_REF:-HEAD~1}"
+        if [ -n "$GITHUB_BASE_REF" ]; then
+          BASE_REF="origin/${GITHUB_BASE_REF"
+        else
+          BASE_REF="HEAD~1"
+        fi
         ./pants lint --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v2
@@ -77,7 +81,11 @@ jobs:
         else
           echo "::add-matcher::.github/workflows/mypy-matcher.json"
         fi
-        BASE_REF="${GITHUB_BASE_REF:-HEAD~1}"
+        if [ -n "$GITHUB_BASE_REF" ]; then
+          BASE_REF="origin/${GITHUB_BASE_REF"
+        else
+          BASE_REF="HEAD~1"
+        fi
         ./pants check --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v2
@@ -113,7 +121,11 @@ jobs:
       run: ./pants tailor --check update-build-files --check
     - name: Test
       run: |
-        BASE_REF="${GITHUB_BASE_REF:-HEAD~1}"
+        if [ -n "$GITHUB_BASE_REF" ]; then
+          BASE_REF="origin/${GITHUB_BASE_REF"
+        else
+          BASE_REF="HEAD~1"
+        fi
         ./pants test --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v2
