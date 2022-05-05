@@ -13,11 +13,11 @@ python_requirements(
     },
     type_stubs_module_mapping={
         "types-aiofiles": ["aiofiles"],
-    	"types-click": ["click"],
-    	"types-cachetools": ["cachetools"],
+        "types-click": ["click"],
+        "types-cachetools": ["cachetools"],
         "types-Jinja2": ["Jinja2"],
-    	"types-PyYAML": ["PyYAML"],
-    	"types-python-dateutil": ["python-dateutil"],
-    	"types-tabulate": ["tabulate"],
+        "types-PyYAML": ["PyYAML"],
+        "types-python-dateutil": ["python-dateutil"],
+        "types-tabulate": ["tabulate"],
     },
 )
