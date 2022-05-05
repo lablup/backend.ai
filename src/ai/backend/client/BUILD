@@ -7,6 +7,14 @@ python_sources(
     sources=["**/*.py"],
 )
 
+pex_binary(
+    name="cli",
+    dependencies=[
+        ":service",
+    ],
+    entry_point="cli/__main__.py",
+)
+
 python_distribution(
     name="dist",
     dependencies=[

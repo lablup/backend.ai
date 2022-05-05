@@ -11,6 +11,7 @@ backend_packages = [
 pants_ignore = [
     "scripts",
     "plugins",
+    "docs",  # TODO: docs build config
 ]
 
 [anonymous-telemetry]

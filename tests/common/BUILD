@@ -17,3 +17,27 @@ python_tests(
         "**/test_*.py",
     ],
 )
+
+pex_binary(
+    name="spawn-sentinel-cluster",
+    dependencies=[
+        ":test_utils",
+    ],
+    entry_point="redis/docker.py",
+)
+
+pex_binary(
+    name="spawn-compose-redis-sentinel-cluster",
+    dependencies=[
+        ":test_utils",
+    ],
+    entry_point="redis/docker.py",
+)
+
+pex_binary(
+    name="spawn-native-redis-sentinel-cluster",
+    dependencies=[
+        ":test_utils",
+    ],
+    entry_point="redis/native.py",
+)
