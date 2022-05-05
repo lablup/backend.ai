@@ -1,0 +1,153 @@
+name: default
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      id: cache
+      with:
+        # pants-specific cache
+        path: |
+          ~/.cache/pants/setup
+          ~/.cache/pants/lmdb_store
+          ~/.cache/pants/named_caches
+        key: ${{ runner.os }}-
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.10"
+        cache: pip
+    - name: Bootstrap Pants
+      run: |
+        ./pants --version
+    - name: Check BUILD files
+      run: ./pants tailor --check update-build-files --check
+    - name: Lint
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
+          echo "(skipping matchers for pull request from local branches)"
+        else
+          echo "::add-matcher::.github/workflows/flake8-matcher.json"
+        fi
+        ./pants lint '::'
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
+
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      id: cache
+      with:
+        # pants-specific cache
+        path: |
+          ~/.cache/pants/setup
+          ~/.cache/pants/lmdb_store
+          ~/.cache/pants/named_caches
+        key: ${{ runner.os }}-
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.10"
+        cache: pip
+    - name: Bootstrap Pants
+      run: |
+        ./pants --version
+    - name: Check BUILD files
+      run: ./pants tailor --check update-build-files --check
+    - name: Typecheck
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
+          echo "(skipping matchers for pull request from local branches)"
+        else
+          echo "::add-matcher::.github/workflows/mypy-matcher.json"
+        fi
+        ./pants check '::'
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      id: cache
+      with:
+        # pants-specific cache
+        path: |
+          ~/.cache/pants/setup
+          ~/.cache/pants/lmdb_store
+          ~/.cache/pants/named_caches
+        key: ${{ runner.os }}-
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.10"
+        cache: pip
+    - name: Bootstrap Pants
+      run: |
+        ./pants --version
+    - name: Check BUILD files
+      run: ./pants tailor --check update-build-files --check
+    - name: Test
+      run: |
+        ./pants test '::'
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
+
+  deploy-to-pypi:
+    needs: [lint, typecheck, test]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      id: cache
+      with:
+        # pants-specific cache
+        path: |
+          ~/.cache/pants/setup
+          ~/.cache/pants/lmdb_store
+          ~/.cache/pants/named_caches
+        key: ${{ runner.os }}-
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.10"
+        cache: pip
+    - name: Bootstrap Pants
+      run: |
+        ./pants --version
+    - name: Test
+      run: |
+        ./pants pacakge '::'
+    - name: Build and publish
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: |
+        ./pants publish '::'
+    - name: Upload pants log
+      uses: actions/upload-artifact@v2
+      with:
+        name: pants-log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.

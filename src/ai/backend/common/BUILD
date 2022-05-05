@@ -17,6 +17,9 @@ python_distribution(
         license="LGPLv3",
     ),
     generate_setup=True,
+    repositories=[
+        "@pypi",
+    ],
 )
 
 resource(name="version", source="VERSION")

@@ -42,6 +42,9 @@ python_distribution(
         },
     },
     generate_setup=True,
+    repositories=[
+        "@pypi",
+    ],
 )
 
 resource(name="version", source="VERSION")
