@@ -23,8 +23,8 @@ enable_resolves = true
 resolves = { python-default = "python.lock" }
 interpreter_constraints = ["CPython>=3.10"]
 
-[setup-py-generation]
-first_party_depenency_version_scheme = "exact"
+# [setup-py-generation]
+# first_party_depenency_version_scheme = "exact"
 
 [flake8]
 version = "flake8>=4.0"
