@@ -58,5 +58,14 @@ uvloop>=0.16
 yarl>=1.7
 zipstream-new~=1.1.8
 
+# type stubs
+types-aiofiles
+types-click
+types-cachetools
+types-Jinja2
+types-PyYAML
+types-python-dateutil
+types-tabulate
+
 backend.ai-krunner-alpine~=3.3
 backend.ai-krunner-static-gnu~=2.0

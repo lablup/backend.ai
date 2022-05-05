@@ -24,6 +24,7 @@ root_patterns = ["src", "tests", "tools/pants-plugins"]
 enable_resolves = true
 resolves = { python-default = "python.lock" }
 interpreter_constraints = ["CPython>=3.10"]
+lockfile_generator = "pex"
 
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"

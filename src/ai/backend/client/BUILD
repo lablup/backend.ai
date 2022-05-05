@@ -10,7 +10,7 @@ python_sources(
 pex_binary(
     name="cli",
     dependencies=[
-        ":service",
+        ":lib",
     ],
     entry_point="cli/__main__.py",
 )

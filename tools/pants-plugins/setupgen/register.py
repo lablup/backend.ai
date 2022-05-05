@@ -6,8 +6,8 @@ from pants.backend.python.goals.setup_py import SetupKwargs, SetupKwargsRequest
 from pants.build_graph.address import Address
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import Target
 from pants.engine.unions import UnionRule
-
 
 
 class CustomSetupKwargsRequest(SetupKwargsRequest):

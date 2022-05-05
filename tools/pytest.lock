@@ -897,7 +897,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.82",
+  "pex_version": "2.1.84",
   "prefer_older_binary": false,
   "requirements": [
     "pytest-aiohttp>=1.0.4",
