@@ -18,7 +18,7 @@ pants_ignore = [
 enabled = false
 
 [source]
-root_patterns = ["src", "tests"]
+root_patterns = ["src", "tests", "tools/pants-plugins"]
 
 [python]
 enable_resolves = true
