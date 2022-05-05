@@ -18,8 +18,8 @@ python_distribution(
         license="MIT",
     ),
     entry_points={
-        'backendai_cli_v10': {
-            '_': 'ai.backend.client.cli.main:main',
+        "backendai_cli_v10": {
+            "_": "ai.backend.client.cli.main:main",
         },
     },
     generate_setup=True,

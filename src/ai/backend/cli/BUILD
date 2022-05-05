@@ -18,8 +18,8 @@ python_distribution(
         license="MIT",
     ),
     entry_points={
-        'console_scripts': {
-            'backend.ai': 'ai.backend.cli.__main__:main',
+        "console_scripts": {
+            "backend.ai": "ai.backend.cli.__main__:main",
         },
     },
     generate_setup=True,
