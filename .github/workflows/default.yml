@@ -34,6 +34,7 @@ jobs:
           echo "(skipping matchers for pull request from local branches)"
         else
           echo "::add-matcher::.github/workflows/flake8-matcher.json"
+        fi
         BASE_REF="${GITHUB_BASE_REF:-HEAD~1}"
         ./pants --changed-since=$BASE_REF --changed-dependees=transitive lint
     - name: Upload pants log
