@@ -5,7 +5,12 @@ backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.flake8",
     "pants.backend.python.typecheck.mypy",
+    "pants.backend.experimental.python",
     "setupgen",
+]
+pants_ignore = [
+    "scripts",
+    "plugins",
 ]
 
 [anonymous-telemetry]
@@ -18,6 +23,9 @@ root_patterns = ["src", "tests"]
 enable_resolves = true
 resolves = { python-default = "python.lock" }
 interpreter_constraints = ["CPython>=3.10"]
+
+[setup-py-generation]
+first_party_depenency_version_scheme = "exact"
 
 [flake8]
 version = "flake8>=4.0"
