@@ -37,6 +37,7 @@ jobs:
         fi
         if [ -n "$GITHUB_BASE_REF" ]; then
           BASE_REF="origin/${GITHUB_BASE_REF}"
+          git fetch --no-tags --depath=1 origin "$GITHUB_BASE_REF"
         else
           BASE_REF="HEAD~1"
         fi
@@ -83,6 +84,7 @@ jobs:
         fi
         if [ -n "$GITHUB_BASE_REF" ]; then
           BASE_REF="origin/${GITHUB_BASE_REF}"
+          git fetch --no-tags --depath=1 origin "$GITHUB_BASE_REF"
         else
           BASE_REF="HEAD~1"
         fi
@@ -123,6 +125,7 @@ jobs:
       run: |
         if [ -n "$GITHUB_BASE_REF" ]; then
           BASE_REF="origin/${GITHUB_BASE_REF}"
+          git fetch --no-tags --depath=1 origin "$GITHUB_BASE_REF"
         else
           BASE_REF="HEAD~1"
         fi
