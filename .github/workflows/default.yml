@@ -36,7 +36,7 @@ jobs:
           echo "::add-matcher::.github/workflows/flake8-matcher.json"
         fi
         if [ -n "$GITHUB_BASE_REF" ]; then
-          BASE_REF="origin/${GITHUB_BASE_REF"
+          BASE_REF="origin/${GITHUB_BASE_REF}"
         else
           BASE_REF="HEAD~1"
         fi
@@ -82,7 +82,7 @@ jobs:
           echo "::add-matcher::.github/workflows/mypy-matcher.json"
         fi
         if [ -n "$GITHUB_BASE_REF" ]; then
-          BASE_REF="origin/${GITHUB_BASE_REF"
+          BASE_REF="origin/${GITHUB_BASE_REF}"
         else
           BASE_REF="HEAD~1"
         fi
@@ -122,7 +122,7 @@ jobs:
     - name: Test
       run: |
         if [ -n "$GITHUB_BASE_REF" ]; then
-          BASE_REF="origin/${GITHUB_BASE_REF"
+          BASE_REF="origin/${GITHUB_BASE_REF}"
         else
           BASE_REF="HEAD~1"
         fi
