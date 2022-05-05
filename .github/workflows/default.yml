@@ -23,7 +23,7 @@ jobs:
         cache: pip
     - name: Bootstrap Pants
       run: |
-        ./pants --version --no-verify-config
+        ./pants --no-verify-config version
     - name: Check BUILD files
       run: ./pants tailor --check update-build-files --check
     - name: Lint
@@ -62,7 +62,7 @@ jobs:
         cache: pip
     - name: Bootstrap Pants
       run: |
-        ./pants --version --no-verify-config
+        ./pants --no-verify-config version
     - name: Check BUILD files
       run: ./pants tailor --check update-build-files --check
     - name: Typecheck
@@ -100,7 +100,7 @@ jobs:
         cache: pip
     - name: Bootstrap Pants
       run: |
-        ./pants --version --no-verify-config
+        ./pants --no-verify-config version
     - name: Check BUILD files
       run: ./pants tailor --check update-build-files --check
     - name: Test
@@ -135,7 +135,7 @@ jobs:
         cache: pip
     - name: Bootstrap Pants
       run: |
-        ./pants --version --no-verify-config
+        ./pants --no-verify-config version
     - name: Test
       run: |
         ./pants pacakge '::'
