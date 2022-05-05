@@ -5,7 +5,6 @@ backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.flake8",
     "pants.backend.python.typecheck.mypy",
-    "pants.backend.experimental.python",
     "setupgen",
 ]
 pants_ignore = [
