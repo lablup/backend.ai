@@ -163,7 +163,8 @@ class _SyncWorkerThread(threading.Thread):
                             self.agen_wrapper(coro))
                 else:
                     try:
-                        result = ctx.run(loop.run_until_complete, coro)
+                        # FIXME: Once python/mypy#12756 is resolved, remove the type-ignore tag.
+                        result = ctx.run(loop.run_until_complete, coro)  # type: ignore
                     except Exception as e:
                         self.done_queue.put_nowait(e)
                     else:
