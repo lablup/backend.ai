@@ -35,24 +35,30 @@ def scan_entrypoint_from_package_metadata(group_name: str) -> Iterator[EntryPoin
 
 
 def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
-    # First try to scan the entrypoints in the current source directories,
-    # and override them with the package environment (e.g., pex by pants).
     entrypoints = {}
-    try:
-        src_path = find_build_root() / 'src'
-    except ValueError:
-        yield from []
-    log.debug("scan_entrypoint_from_buildscript({!r}): current src: {}", group_name, src_path)
-    for buildscript_path in src_path.glob("**/BUILD"):
-        log.debug("reading entry points [{}] from {}", group_name, buildscript_path)
-        for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
-            entrypoints[entrypoint.name] = entrypoint
+    # Scan self-exported entrypoints when executed via pex.
     ai_backend_ns_path = Path(__file__).parent.parent
     log.debug("scan_entrypoint_from_buildscript({!r}): Namespace path: {}", group_name, ai_backend_ns_path)
     for buildscript_path in ai_backend_ns_path.glob("**/BUILD"):
         log.debug("reading entry points [{}] from {}", group_name, buildscript_path)
         for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
             entrypoints[entrypoint.name] = entrypoint
+    # Override with the entrypoints found in the current source directories,
+    try:
+        build_root = find_build_root()
+    except ValueError:
+        pass
+    else:
+        src_path = build_root / 'src'
+        plugins_path = build_root / 'plugins'
+        log.debug("scan_entrypoint_from_buildscript({!r}): current src: {}", group_name, src_path)
+        for buildscript_path in src_path.glob("**/BUILD"):
+            if buildscript_path.is_relative_to(plugins_path):
+                # Prevent loading BUILD files in plugin checkouts if they use Pants on their own.
+                continue
+            log.debug("reading entry points [{}] from {}", group_name, buildscript_path)
+            for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
+                entrypoints[entrypoint.name] = entrypoint
     yield from entrypoints.values()
 
 
