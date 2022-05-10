@@ -576,7 +576,7 @@ if jwt_available:
             self, *,
             secret: str,
             inner_iv: t.Trafaret = None,
-            algorithms: Sequence[str] = default_algorithms,
+            algorithms: list[str] = default_algorithms,
         ) -> None:
             self.secret = secret
             self.algorithms = algorithms

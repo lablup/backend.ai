@@ -3,6 +3,7 @@ python_sources(
     sources=["**/*.py"],
     dependencies=[
         ":resources",
+        "stubs:stubs",
     ],
 )
 
