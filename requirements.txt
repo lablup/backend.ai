@@ -65,7 +65,9 @@ types-cachetools
 types-Jinja2
 types-PyYAML
 types-python-dateutil
+types-setuptools
 types-tabulate
+types-toml
 
 backend.ai-krunner-alpine~=3.3
 backend.ai-krunner-static-gnu~=2.0

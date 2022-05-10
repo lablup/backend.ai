@@ -71,7 +71,9 @@
 //     "types-cachetools",
 //     "types-click",
 //     "types-python-dateutil",
+//     "types-setuptools",
 //     "types-tabulate",
+//     "types-toml",
 //     "typing_extensions~=4.1.1",
 //     "uvloop>=0.16",
 //     "yarl>=1.7",
@@ -2526,13 +2528,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0eb63013630c6ee1237e0e395d51cb23513de6b5531235e33889e8842bdf3a6f",
-              "url": "https://files.pythonhosted.org/packages/03/43/cea2224c2a798118e06888566f0809840744268c02371dfd81308912fc8e/rich-12.3.0-py3-none-any.whl"
+              "hash": "d13c6c90c42e24eb7ce660db397e8c398edd58acb7f92a2a88a95572b838aaa4",
+              "url": "https://files.pythonhosted.org/packages/05/c0/844c879d659e15c4b1fbe8be89b25de7cf9b0d5e8485aadfe83ae6e7286a/rich-12.4.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7e8700cda776337036a712ff0495b04052fb5f957c7dfb8df997f88350044b64",
-              "url": "https://files.pythonhosted.org/packages/a4/50/8e34f3f18dc3914bd14a0722cb471410488495fdcd93e122724d4dd8c5f9/rich-12.3.0.tar.gz"
+              "hash": "d239001c0fb7de985e21ec9a4bb542b5150350330bbc1849f835b9cbc8923b91",
+              "url": "https://files.pythonhosted.org/packages/72/4d/1f48abaa1e91474af1be8622ec2a8bd3768b306def47b064aa15aa943f95/rich-12.4.1.tar.gz"
             }
           ],
           "project_name": "rich",
@@ -2544,7 +2546,7 @@
             "typing-extensions<5.0,>=4.0.0; python_version < \"3.9\""
           ],
           "requires_python": "<4.0.0,>=3.6.3",
-          "version": "12.3"
+          "version": "12.4.1"
         },
         {
           "artifacts": [
@@ -2663,13 +2665,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "26ead7d1f93efc0f8c804d9fafafbe4a44b179580a7105754b245155f9af05a8",
-              "url": "https://files.pythonhosted.org/packages/fb/58/9efbfe68482dab9557c49d433a60fff9efd7ed8835f829eba8297c2c124a/setuptools-62.1.0-py3-none-any.whl"
+              "hash": "5534570b9980fc650d45c62877ff603c7aaaf24893371708736cc016bd221c3c",
+              "url": "https://files.pythonhosted.org/packages/ee/0f/dba055d3696c63fff7430bbc5f337454ac66711d91965f08146784afecad/setuptools-62.2.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "47c7b0c0f8fc10eec4cf1e71c6fdadf8decaa74ffa087e68cd1c20db7ad6a592",
-              "url": "https://files.pythonhosted.org/packages/ea/a3/3d3cbbb7150f90c4cf554048e1dceb7c6ab330e4b9138a40e130a4cc79e1/setuptools-62.1.0.tar.gz"
+              "hash": "ca6ba73b7fd5f734ae70ece8c4c1f7062b07f3352f6428f6277e27c8f5c64237",
+              "url": "https://files.pythonhosted.org/packages/b1/77/75f6543eafdffc0b3f07f99682497bea817ef0b6c361fe72b932eb82459c/setuptools-62.2.0.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -2716,7 +2718,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "62.1"
+          "version": "62.2"
         },
         {
           "artifacts": [
@@ -3105,19 +3107,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6ac40f66cf23a5200bd179b78d6be52e81a7750e4f8e45d7cfaf3ddda60ff01f",
-              "url": "https://files.pythonhosted.org/packages/5f/e5/3fd06e2f95c39cfc5056679213caa73bd11dafca46406904c80e05279a7d/types_python_dateutil-2.8.14-py3-none-any.whl"
+              "hash": "9d6f01382d5ffe1977dc29f0782a01228dfaa36da148a7f4076cbd9beba26647",
+              "url": "https://files.pythonhosted.org/packages/ec/e3/a085aa2233d0b4227e7e44b8469b8716a15d0df6be97bde50a316b331ba7/types_python_dateutil-2.8.15-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "367c1ffa1a52a4b2a534c9b30b40b01f2b7f2ea47a97fd821f6c76d1c7ae3129",
-              "url": "https://files.pythonhosted.org/packages/31/ce/56e3ea38a5a4636a81535bebe21d8e44479c1adceb09d6e78e12c5de4f99/types-python-dateutil-2.8.14.tar.gz"
+              "hash": "7db1e4ed4916bd128cbee3eecdee0e06cc5684da2a1cdfd57f98541cdfbe0861",
+              "url": "https://files.pythonhosted.org/packages/cf/a0/8d45c10441d136dc7bc5f5a7ce0d7d368190157505a401651b307776bdb3/types-python-dateutil-2.8.15.tar.gz"
             }
           ],
           "project_name": "types-python-dateutil",
           "requires_dists": [],
           "requires_python": null,
-          "version": "2.8.14"
+          "version": "2.8.15"
         },
         {
           "artifacts": [
@@ -3141,19 +3143,55 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "628912bf968b449fc8603f5a92a45739d464da38a6eb25d9e0b78a353a6e584c",
-              "url": "https://files.pythonhosted.org/packages/91/a6/7f1a4b16c817f098d7a2535fbff119d684cb74197c1f1ce15cff6ae94ad2/types_tabulate-0.8.8-py3-none-any.whl"
+              "hash": "828f7e7e51e157876f47c80518b23ba0c3c36aa8081efd39d5d39f393938aec9",
+              "url": "https://files.pythonhosted.org/packages/c8/0d/6c9eb15fd4f6f45973ff1c70c170f2c30803415874e2e47c92eeae509085/types_setuptools-57.4.14-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0b319c7e10dd561f7c15f56dec347c3193fd865f4ebe5ff1ecb020eafa793bc3",
-              "url": "https://files.pythonhosted.org/packages/28/d1/110dfaad6154ed20c4a9befb5756a0ab195953b46d4202a23351af8e005e/types-tabulate-0.8.8.tar.gz"
+              "hash": "df02fe1dd244f58cf4e67cfc3d0a97930a2d61a72dd89f21d81c71017cd83f9a",
+              "url": "https://files.pythonhosted.org/packages/42/2e/d21d995feca499eac401958fee97879926249e60b8e5608f0361f0ee2ae1/types-setuptools-57.4.14.tar.gz"
+            }
+          ],
+          "project_name": "types-setuptools",
+          "requires_dists": [],
+          "requires_python": null,
+          "version": "57.4.14"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "7971ed0cd40454eb18d82c01e2f18bcd09ca23cc9eb901c62d2b04e5d1f57f84",
+              "url": "https://files.pythonhosted.org/packages/ca/2b/54cbdc5c90689cfd7523082dbe88d535b1ab9e35ca23221ce839dcc51a94/types_tabulate-0.8.9-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "2fc3fa4fe1853ac987cf50e8d4599e3fe446dd53064fe86a46a407a98e9fc04f",
+              "url": "https://files.pythonhosted.org/packages/26/4d/f5e4faeaa4f042f4afde95f2b4025a3edc863924410ef76d673110fcbeac/types-tabulate-0.8.9.tar.gz"
             }
           ],
           "project_name": "types-tabulate",
           "requires_dists": [],
           "requires_python": null,
-          "version": "0.8.8"
+          "version": "0.8.9"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "05a8da4bfde2f1ee60e90c7071c063b461f74c63a9c3c1099470c08d6fa58615",
+              "url": "https://files.pythonhosted.org/packages/77/02/8bb35dc27ea84f9ac5f4bf70a51ae5626734843ac73a117fd88888551069/types_toml-0.10.7-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "a567fe2614b177d537ad99a661adc9bfc8c55a46f95e66370a4ed2dd171335f9",
+              "url": "https://files.pythonhosted.org/packages/c5/da/a5fb5c4eb663a1cd2d0c8ef619c42d51e6b8f55e155341e7b39b8c6c67b4/types-toml-0.10.7.tar.gz"
+            }
+          ],
+          "project_name": "types-toml",
+          "requires_dists": [],
+          "requires_python": null,
+          "version": "0.10.7"
         },
         {
           "artifacts": [
@@ -3463,7 +3501,9 @@
     "types-cachetools",
     "types-click",
     "types-python-dateutil",
+    "types-setuptools",
     "types-tabulate",
+    "types-toml",
     "typing_extensions~=4.1.1",
     "uvloop>=0.16",
     "yarl>=1.7",

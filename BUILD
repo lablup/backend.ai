@@ -8,6 +8,7 @@ python_requirements(
         "python-json-logger": ["pythonjsonlogger"],
         "python-snappy": ["snappy"],
         "pyzmq": ["zmq"],
+        "PyYAML": ["yaml"],
         "typing-extensions": ["typing_extensions"],
         "more-itertools": ["more_itertools"],
     },
@@ -16,8 +17,8 @@ python_requirements(
         "types-click": ["click"],
         "types-cachetools": ["cachetools"],
         "types-Jinja2": ["Jinja2"],
-        "types-PyYAML": ["PyYAML"],
-        "types-python-dateutil": ["python-dateutil"],
+        "types-PyYAML": ["yaml"],
+        "types-python-dateutil": ["dateutil"],
         "types-tabulate": ["tabulate"],
     },
 )
