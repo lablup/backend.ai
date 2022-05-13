@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from pants.backend.python.goals.setup_py import SetupKwargs, SetupKwargsRequest
-from pants.build_graph.address import Address
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Target
@@ -26,11 +25,11 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
     if not kwargs["name"].startswith("backend.ai-"):
         raise ValueError(
             f"Invalid `name` kwarg in the `provides` field for {request.target.address}. The name "
-            f"must start with 'backend.ai-', but was {kwargs['name']}."
+            f"must start with 'backend.ai-', but was {kwargs['name']}.",
         )
     if "description" not in kwargs:
         raise ValueError(
-            f"Missing a `description` kwarg in the `provides` field for {request.target.address}."
+            f"Missing a `description` kwarg in the `provides` field for {request.target.address}.",
         )
 
     # Add classifiers. We preserve any that were already set.
@@ -82,7 +81,7 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
         raise ValueError(
             f"These kwargs should not be set in the `provides` field for {request.target.address} "
             "because Pants's internal plugin will automatically set them: "
-            f"{sorted(conflicting_hardcoded_kwargs)}"
+            f"{sorted(conflicting_hardcoded_kwargs)}",
         )
     kwargs.update(hardcoded_kwargs)
 

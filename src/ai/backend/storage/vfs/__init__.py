@@ -400,7 +400,7 @@ class BaseVolume(AbstractVolume):
 
         loop = asyncio.get_running_loop()
         write_task: asyncio.Task = asyncio.create_task(
-            loop.run_in_executor(None, _write, q.sync_q),  # type: ignore (mypy bug?)
+            loop.run_in_executor(None, _write, q.sync_q),  # type: ignore
         )
         try:
             async for buf in payload:
