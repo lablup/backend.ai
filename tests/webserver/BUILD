@@ -1,9 +1,5 @@
 python_test_utils(
     name="test_utils",
-    sources=[
-        "**/__init__.py",
-        "**/conftest.py",
-    ],
 )
 
 python_tests(

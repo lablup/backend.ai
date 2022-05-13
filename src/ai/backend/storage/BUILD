@@ -25,8 +25,7 @@ python_distribution(
         description="Backend.AI Storage Proxy",
         license="LGPLv3",
     ),
-    entry_points={
-    },
+    entry_points={},
     generate_setup=True,
     repositories=[
         "@pypi",

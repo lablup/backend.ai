@@ -49,3 +49,8 @@ resources(
         "**/py.typed",
     ],
 )
+
+pex_binary(
+    name="watcher",
+    entry_point="watcher.py",
+)
