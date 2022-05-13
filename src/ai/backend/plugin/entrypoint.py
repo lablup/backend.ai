@@ -3,7 +3,7 @@ import itertools
 import logging
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
-from typing import Container, Iterator, Sequence, Optional
+from typing import Container, Iterator, Optional
 
 log = logging.getLogger(__name__)
 

@@ -238,10 +238,10 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
 
 cache_patterns = {
     r'\.(?:manifest|appcache|html?|xml|json|ini|toml)$': {
-        'Cache-Control': 'no-store'
+        'Cache-Control': 'no-store',
     },
     r'(?:backend.ai-webui.js)$': {
-        'Cache-Control': 'no-store'
+        'Cache-Control': 'no-store',
     },
     r'\.(?:jpg|jpeg|gif|png|ico|cur|gz|svg|svgz|mp4|ogg|ogv|webm|htc|woff|woff2)$': {
         'Cache-Control': 'max-age=259200, public',
@@ -250,7 +250,7 @@ cache_patterns = {
         'Cache-Control': 'max-age=86400, public, must-revalidate, proxy-revalidate',
     },
     r'\.(?:py|log?|txt)$': {
-        'Cache-Control': 'no-store'
+        'Cache-Control': 'no-store',
     },
 }
 _cache_patterns = {re.compile(k): v for k, v in cache_patterns.items()}
@@ -413,7 +413,7 @@ async def logout_handler(request: web.Request) -> web.Response:
 async def webserver_healthcheck(request: web.Request) -> web.Response:
     result = {
         'version': __version__,
-        'details': 'Success'
+        'details': 'Success',
     }
     return web.json_response(result)
 
