@@ -48,7 +48,10 @@ from trafaret.keys import (
     confirm_key as confirm_key,
 )
 from trafaret.internet import (
+    Email as Email,
+    Hex as Hex,
     URL as URL,
+    URLSafe as URLSafe,
     IPv4 as IPv4,
     IPv6 as IPv6,
     IP as IP,

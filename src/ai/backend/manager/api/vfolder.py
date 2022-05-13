@@ -1008,7 +1008,7 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict({
-        t.Key('files'): t.List[t.String],
+        t.Key('files'): t.List(t.String),
         t.Key('recursive', default=False): t.ToBool,
     }))
 async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
