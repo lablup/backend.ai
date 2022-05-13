@@ -11,6 +11,7 @@ python_requirements(
         "PyYAML": ["yaml"],
         "typing-extensions": ["typing_extensions"],
         "more-itertools": ["more_itertools"],
+        "zipstream-new": ["zipstream"],
     },
     type_stubs_module_mapping={
         "types-aiofiles": ["aiofiles"],
