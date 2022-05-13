@@ -20,7 +20,7 @@ async def test_get_api_session(mocker):
     }})
 
     mock_get_session = AsyncMock(return_value={
-        'authenticated': False
+        'authenticated': False,
     })
     mocker.patch('ai.backend.web.auth.get_session', mock_get_session)
     with pytest.raises(web.HTTPUnauthorized):
@@ -29,7 +29,7 @@ async def test_get_api_session(mocker):
 
     mock_get_session = AsyncMock(return_value={
         'authenticated': True,
-        'token': {'type': 'something-else', },
+        'token': {'type': 'something-else'},
     })
     mocker.patch('ai.backend.web.auth.get_session', mock_get_session)
     with pytest.raises(web.HTTPBadRequest):
