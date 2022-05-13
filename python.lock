@@ -18,6 +18,7 @@
 //     "aiodocker~=0.21.0",
 //     "aiofiles~=0.8.0",
 //     "aiohttp_cors~=0.7",
+//     "aiohttp_session[aioredis]~=2.11",
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.0",
 //     "aiomonitor~=0.4.5",
@@ -313,6 +314,32 @@
           ],
           "requires_python": null,
           "version": "0.7"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "d5451b72ba748d72ef01f55c3af45b63be2d40b2bdadf47407007e1270343384",
+              "url": "https://files.pythonhosted.org/packages/13/e3/affe80cf6d906f5a8ca7d084b780c340d90f7649c0683ed1e65dd88c5bdf/aiohttp_session-2.11.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "0fdf39600f6a05c4943ef6c7b099071ca9854413111a26761626244be5015dc4",
+              "url": "https://files.pythonhosted.org/packages/3b/a7/0b97b9a2e3a553a86a6703f86b0e9b1afb2b262849700e8f80015c0f643f/aiohttp-session-2.11.0.tar.gz"
+            }
+          ],
+          "project_name": "aiohttp-session",
+          "requires_dists": [
+            "aiohttp>=3.8",
+            "aiomcache>=0.5.2; extra == \"aiomcache\"",
+            "aioredis>=2.0.0; extra == \"aioredis\"",
+            "cryptography; extra == \"pycrypto\"",
+            "cryptography; extra == \"secure\"",
+            "pynacl; extra == \"pynacl\"",
+            "typing-extensions>=3.7.4; python_version < \"3.8\""
+          ],
+          "requires_python": ">=3.7",
+          "version": "2.11"
         },
         {
           "artifacts": [
@@ -2281,13 +2308,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e0c4bb8d9f0af0c7f5b1ec4c5036309617d03d56932877f2f7a0beeb5318322f",
-              "url": "https://files.pythonhosted.org/packages/2a/4d/67cc66a0c49003dc216fc73db2d05a3b80c7193167fd113da1f2c678ac2a/PyJWT-2.3.0-py3-none-any.whl"
+              "hash": "72d1d253f32dbd4f5c88eaf1fdc62f3a19f676ccbadb9dbc5d07e951b2b26daf",
+              "url": "https://files.pythonhosted.org/packages/1c/fb/b82e9601b00d88cf8bbee1f39b855ae773f9d5bcbcedb3801b2f72460696/PyJWT-2.4.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b888b4d56f06f6dcd777210c334e69c737be74755d3e5e9ee3fe67dc18a0ee41",
-              "url": "https://files.pythonhosted.org/packages/1d/8e/01bdcfdbb352daaba8ea406d9df149c5bba7dbf70f908d4fa4c269fe6a08/PyJWT-2.3.0.tar.gz"
+              "hash": "d42908208c699b3b973cbeb01a969ba6a96c821eefb1c5bfe4c390c01d67abba",
+              "url": "https://files.pythonhosted.org/packages/d8/6b/6287745054dbcccf75903630346be77d4715c594402cec7c2518032416c2/PyJWT-2.4.0.tar.gz"
             }
           ],
           "project_name": "pyjwt",
@@ -2308,19 +2335,19 @@
             "zope.interface; extra == \"docs\""
           ],
           "requires_python": ">=3.6",
-          "version": "2.3"
+          "version": "2.4"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ef7b523f6356f763771559412c0d7134753f037822dad1b16945b7b846f7ad06",
-              "url": "https://files.pythonhosted.org/packages/d9/41/d9cfb4410589805cd787f8a82cddd13142d9bf7449d12adf2d05a4a7d633/pyparsing-3.0.8-py3-none-any.whl"
+              "hash": "5026bae9a10eeaefb61dab2f09052b9f4307d44aee4eda64b309723d8d206bbc",
+              "url": "https://files.pythonhosted.org/packages/6c/10/a7d0fa5baea8fe7b50f448ab742f26f52b80bfca85ac2be9d35cdd9a3246/pyparsing-3.0.9-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7bf433498c016c4314268d95df76c81b842a4cb2b276fa3312cfb1e1d85f6954",
-              "url": "https://files.pythonhosted.org/packages/31/df/789bd0556e65cf931a5b87b603fcf02f79ff04d5379f3063588faaf9c1e4/pyparsing-3.0.8.tar.gz"
+              "hash": "2b020ecf7d21b687f219b71ecad3631f644a47f01403fa1d1036b0c6416d70fb",
+              "url": "https://files.pythonhosted.org/packages/71/22/207523d16464c40a0310d2d4d8926daffa00ac1f5b1576170a32db749636/pyparsing-3.0.9.tar.gz"
             }
           ],
           "project_name": "pyparsing",
@@ -2329,7 +2356,7 @@
             "railroad-diagrams; extra == \"diagrams\""
           ],
           "requires_python": ">=3.6.8",
-          "version": "3.0.8"
+          "version": "3.0.9"
         },
         {
           "artifacts": [
@@ -3448,6 +3475,7 @@
     "aiodocker~=0.21.0",
     "aiofiles~=0.8.0",
     "aiohttp_cors~=0.7",
+    "aiohttp_session[aioredis]~=2.11",
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.0",
     "aiomonitor~=0.4.5",

@@ -1,6 +1,7 @@
 python_test_utils(
     name="test_utils",
     sources=[
+        "**/__init__.py",
         "**/conftest.py",
     ],
 )
@@ -8,7 +9,7 @@ python_test_utils(
 python_tests(
     name="tests",
     dependencies=[
-        "src/ai/backend/storage:service",
+        "src/ai/backend/web:service",
     ],
     sources=[
         "**/test_*.py",
