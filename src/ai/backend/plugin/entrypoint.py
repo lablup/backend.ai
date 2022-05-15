@@ -31,7 +31,7 @@ def scan_entrypoints(
 
 
 def scan_entrypoint_from_package_metadata(group_name: str) -> Iterator[EntryPoint]:
-    yield from entry_points().get(group_name, [])
+    yield from entry_points().select(group=group_name)
 
 
 def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:

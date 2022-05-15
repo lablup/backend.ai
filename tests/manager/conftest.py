@@ -32,7 +32,7 @@ import sqlalchemy as sa
 import pytest
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.common.config import redis_config_iv
+from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.api.context import RootContext
@@ -93,19 +93,53 @@ def vfolder_host():
 
 @pytest.fixture(scope='session')
 def local_config(test_id, test_db) -> Iterator[LocalConfig]:
-    cfg = load_config()
-    assert isinstance(cfg, LocalConfig)
-    cfg['db']['name'] = test_db
-    cfg['manager']['num-proc'] = 1
     ipc_base_path = Path(f'/tmp/backend.ai/manager-testing/ipc-{test_id}')
     ipc_base_path.mkdir(parents=True, exist_ok=True)
-    cfg['manager']['ipc-base-path'] = ipc_base_path
-    cfg['manager']['distributed-lock'] = 'filelock'
-    cfg['manager']['service-addr'] = HostPortPair('127.0.0.1', 29100)
-    # In normal setups, this is read from etcd.
-    cfg['redis'] = redis_config_iv.check({
-        'addr': {'host': '127.0.0.1', 'port': '6379'},
+
+    # Establish a self-contained config.
+    cfg = LocalConfig({
+        **etcd_config_iv.check({
+            'etcd': {
+                'namespace': test_id,
+                'addr': {'host': '127.0.0.1', 'port': '2379'},
+            },
+        }),
+        'redis': redis_config_iv.check({
+            'addr': {'host': '127.0.0.1', 'port': '6379'},
+        }),
+        'db': {
+            'addr': HostPortPair('127.0.0.1', 5432),
+            'name': test_db,
+            'user': 'postgres',
+            'password': 'develove',
+        },
+        'manager': {
+            'id': f"i-{test_id}",
+            'num-proc': 1,
+            'distributed-lock': 'filelock',
+            'ipc-base-path': ipc_base_path,
+            'service-addr': HostPortPair('127.0.0.1', 29100),
+        },
     })
+
+    def _override_if_exists(src: dict, dst: dict, key: str) -> None:
+        sentinel = object()
+        if (val := src.get(key, sentinel)) is not sentinel:
+            dst[key] = val
+
+    try:
+        # Override external database config with the current environment's config.
+        fs_local_config = load_config()
+        cfg['etcd']['addr'] = fs_local_config['etcd']['addr']
+        _override_if_exists(fs_local_config['etcd'], cfg['etcd'], 'user')
+        _override_if_exists(fs_local_config['etcd'], cfg['etcd'], 'password')
+        cfg['redis']['addr'] = fs_local_config['redis']['addr']
+        _override_if_exists(fs_local_config['redis'], cfg['redis'], 'password')
+        cfg['db']['addr'] = fs_local_config['db']['addr']
+        _override_if_exists(fs_local_config['db'], cfg['db'], 'user')
+        _override_if_exists(fs_local_config['db'], cfg['db'], 'password')
+    except ConfigurationError:
+        pass
     yield cfg
     shutil.rmtree(ipc_base_path)
 

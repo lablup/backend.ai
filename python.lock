@@ -56,6 +56,7 @@
 //     "python-json-logger>=2.0.1",
 //     "python-snappy~=0.6.0",
 //     "pyzmq~=22.1.0",
+//     "redis[hiredis]~=4.3.1",
 //     "rich~=12.2",
 //     "setproctitle~=1.2.2",
 //     "tabulate~=0.8.9",
@@ -1134,6 +1135,38 @@
           ],
           "requires_python": ">=3.6",
           "version": "37.0.2"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "64756e3e14c8c5eea9795d93c524551432a0be75629f8f29e67ab8caf076c76d",
+              "url": "https://files.pythonhosted.org/packages/51/6a/c3a0408646408f7283b7bc550c30a32cc791181ec4618592eec13e066ce3/Deprecated-1.2.13-py2.py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "43ac5335da90c31c24ba028af536a91d41d53f9e6901ddb021bcc572ce44e38d",
+              "url": "https://files.pythonhosted.org/packages/c8/d1/e412abc2a358a6b9334250629565fe12697ca1cdee4826239eddf944ddd0/Deprecated-1.2.13.tar.gz"
+            }
+          ],
+          "project_name": "deprecated",
+          "requires_dists": [
+            "PyTest-Cov; python_version >= \"3.6\" and extra == \"dev\"",
+            "PyTest-Cov<2.6; python_version < \"3.6\" and extra == \"dev\"",
+            "PyTest; python_version >= \"3.6\" and extra == \"dev\"",
+            "PyTest<5; python_version < \"3.6\" and extra == \"dev\"",
+            "bump2version<1; extra == \"dev\"",
+            "configparser<5; python_version < \"3\" and extra == \"dev\"",
+            "importlib-metadata<3; python_version < \"3\" and extra == \"dev\"",
+            "importlib-resources<4; python_version < \"3\" and extra == \"dev\"",
+            "sphinx<2; extra == \"dev\"",
+            "sphinxcontrib-websupport<2; python_version < \"3\" and extra == \"dev\"",
+            "tox; extra == \"dev\"",
+            "wrapt<2,>=1.10",
+            "zipp<2; python_version < \"3\" and extra == \"dev\""
+          ],
+          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7",
+          "version": "1.2.13"
         },
         {
           "artifacts": [
@@ -2505,6 +2538,34 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "84316970995a7adb907a56754d2b92d88fc2d252963dc5ac34c88f0f1a22c25d",
+              "url": "https://files.pythonhosted.org/packages/c3/d8/46f3c0dadb5499031282b43d9c280a3c3d70107b6b0217122a92476fb5b0/redis-4.3.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "94b617b4cd296e94991146f66fc5559756fbefe9493604f0312e4d3298ac63e9",
+              "url": "https://files.pythonhosted.org/packages/56/78/c8c819080f6fbdd72e314756e1cb259199814b64d821dd396810dedce247/redis-4.3.1.tar.gz"
+            }
+          ],
+          "project_name": "redis",
+          "requires_dists": [
+            "async-timeout>=4.0.2",
+            "cryptography>=36.0.1; extra == \"ocsp\"",
+            "deprecated>=1.2.3",
+            "hiredis>=1.0.0; extra == \"hiredis\"",
+            "importlib-metadata>=1.0; python_version < \"3.8\"",
+            "packaging>=20.4",
+            "pyopenssl==20.0.1; extra == \"ocsp\"",
+            "requests>=2.26.0; extra == \"ocsp\"",
+            "typing-extensions; python_version < \"3.8\""
+          ],
+          "requires_python": ">=3.6",
+          "version": "4.3.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "f22fa1e554c9ddfd16e6e41ac79759e17be9e492b3587efa038054674760e72d",
               "url": "https://files.pythonhosted.org/packages/2d/61/08076519c80041bc0ffa1a8af0cbd3bf3e2b62af10435d269a9d0f40564d/requests-2.27.1-py2.py3-none-any.whl"
             },
@@ -3348,6 +3409,69 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "6d323e1554b3d22cfc03cd3243b5bb815a51f5249fdcbb86fda4bf62bab9e164",
+              "url": "https://files.pythonhosted.org/packages/c0/1e/e5a5ac09e92fd112d50e1793e5b9982dc9e510311ed89dacd2e801f82967/wrapt-1.14.1-cp310-cp310-win_amd64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "4fcc4649dc762cddacd193e6b55bc02edca674067f5f98166d7713b193932b7f",
+              "url": "https://files.pythonhosted.org/packages/07/06/2b4aaaa4403f766c938f9780c700d7399726bce3dfd94f5a57c4e5b9dc68/wrapt-1.14.1-cp310-cp310-musllinux_1_1_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "380a85cf89e0e69b7cfbe2ea9f765f004ff419f34194018a6827ac0e3edfed4d",
+              "url": "https://files.pythonhosted.org/packages/11/eb/e06e77394d6cf09977d92bff310cb0392930c08a338f99af6066a5a98f92/wrapt-1.14.1.tar.gz"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "07f7a7d0f388028b2df1d916e94bbb40624c59b48ecc6cbc232546706fac74c2",
+              "url": "https://files.pythonhosted.org/packages/39/4d/34599a47c8a41b3ea4986e14f728c293a8a96cd6c23663fe33657c607d34/wrapt-1.14.1-cp310-cp310-macosx_11_0_arm64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "8ad85f7f4e20964db4daadcab70b47ab05c7c1cf2a7c1e51087bfaa83831854c",
+              "url": "https://files.pythonhosted.org/packages/40/f4/7be7124a06c14b92be53912f93c8dc84247f1cb93b4003bed460a430d1de/wrapt-1.14.1-cp310-cp310-musllinux_1_1_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "a9a52172be0b5aae932bef82a79ec0a0ce87288c7d132946d645eba03f0ad8a8",
+              "url": "https://files.pythonhosted.org/packages/4f/83/2669bf2cb4cc2b346c40799478d29749ccd17078cb4f69b4a9f95921ff6d/wrapt-1.14.1-cp310-cp310-win32.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "02b41b633c6261feff8ddd8d11c711df6842aba629fdd3da10249a53211a72c4",
+              "url": "https://files.pythonhosted.org/packages/50/d5/bf619c4d204fe8888460f65222b465c7ecfa43590fdb31864fe0e266da29/wrapt-1.14.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "2fe803deacd09a233e4762a1adcea5db5d31e6be577a43352936179d14d90069",
+              "url": "https://files.pythonhosted.org/packages/94/56/fd707fb8e1ea86e72503d823549fb002a0f16cb4909619748996daeb3a82/wrapt-1.14.1-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "11871514607b15cfeb87c547a49bca19fde402f32e2b1c24a632506c0a756656",
+              "url": "https://files.pythonhosted.org/packages/cd/ec/383d9552df0641e9915454b03139571e0c6e055f5d414d8f3d04f3892f38/wrapt-1.14.1-cp310-cp310-musllinux_1_1_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "80bb5c256f1415f747011dc3604b59bc1f91c6e7150bd7db03b19170ee06b320",
+              "url": "https://files.pythonhosted.org/packages/f7/92/121147bb2f9ed1aa35a8780c636d5da9c167545f97737f0860b4c6c92086/wrapt-1.14.1-cp310-cp310-macosx_10_9_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "257fd78c513e0fb5cdbe058c27a0624c9884e735bbd131935fd49e9fe719d310",
+              "url": "https://files.pythonhosted.org/packages/fd/70/8a133c88a394394dd57159083b86a564247399440b63f2da0ad727593570/wrapt-1.14.1-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+            }
+          ],
+          "project_name": "wrapt",
+          "requires_dists": [],
+          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
+          "version": "1.14.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "c9c6d927e098c2d360695f2e9d38870b2e92e0919be07dbe339aefa32a090265",
               "url": "https://files.pythonhosted.org/packages/7c/ad/bf6dfc6521394aa7d0b3ecbdf5e2b272fd1e79d585107869e75f0e283245/yarl-1.7.2-cp310-cp310-win_amd64.whl"
             },
@@ -3513,6 +3637,7 @@
     "python-json-logger>=2.0.1",
     "python-snappy~=0.6.0",
     "pyzmq~=22.1.0",
+    "redis[hiredis]~=4.3.1",
     "rich~=12.2",
     "setproctitle~=1.2.2",
     "tabulate~=0.8.9",

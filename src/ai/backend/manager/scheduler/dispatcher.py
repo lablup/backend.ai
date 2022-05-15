@@ -48,6 +48,7 @@ from ai.backend.common.types import (
     ClusterMode,
     ResourceSlot,
 )
+from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ai.backend.manager.types import DistributedLockFactory
 
@@ -113,7 +114,7 @@ def load_scheduler(
     scheduler_config: dict[str, Any],
 ) -> AbstractScheduler:
     entry_prefix = 'backendai_scheduler_v10'
-    for entrypoint in pkg_resources.iter_entry_points(entry_prefix):
+    for entrypoint in scan_entrypoints(entry_prefix):
         if entrypoint.name == name:
             log.debug('loading scheduler plugin "{}" from {}', name, entrypoint.module_name)
             scheduler_cls = entrypoint.load()
