@@ -92,6 +92,9 @@ async def test_vfs_operation(vfs, empty_vfolder):
     vfpath = vfs.mangle_vfpath(empty_vfolder)
     (vfpath / "test0").mkdir()
     (vfpath / "test0" / "test.txt").write_bytes(b"12345")
+    with pytest.raises(FileNotFoundError):
+        await vfs.move_file(empty_vfolder, Path("test0/test.txt"), Path("test1/test.txt"))
+    (vfpath / "test1").mkdir()
     await vfs.move_file(empty_vfolder, Path("test0/test.txt"), Path("test1/test.txt"))
     assert (vfpath / "test1" / "test.txt").is_file()
     assert (vfpath / "test1" / "test.txt").read_bytes() == b"12345"

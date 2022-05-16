@@ -32,6 +32,12 @@ async def empty_vfolder(netapp_volume):
     await netapp_volume.delete_vfolder(vfid)
 
 
+def test_dummy():
+    # prevent pants error due to when no tests are selected.
+    pass
+
+
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_netapp_get_usage(netapp_volume, empty_vfolder):
     vfpath = netapp_volume.mangle_vfpath(empty_vfolder)
@@ -46,6 +52,7 @@ async def test_netapp_get_usage(netapp_volume, empty_vfolder):
     assert usage.used_bytes == 92
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_netapp_clone(netapp_volume):
     vfid1 = uuid.uuid4()

@@ -72,6 +72,12 @@ async def empty_vfolder(xfs):
     await xfs.delete_vfolder(vfid)
 
 
+def test_dummy():
+    # prevent pants error due to when no tests are selected.
+    pass
+
+
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_xfs_single_vfolder_mgmt(xfs):
     vfid = uuid.uuid4()
@@ -99,6 +105,7 @@ async def test_xfs_single_vfolder_mgmt(xfs):
     assert vfid_project_id not in vfpath_id_dict
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_xfs_multiple_vfolder_mgmt(xfs):
     vfid1 = uuid.UUID(hex="83a6ba2b7b8e41deb5ee2c909ce34bcb")
@@ -121,6 +128,7 @@ async def test_xfs_multiple_vfolder_mgmt(xfs):
     assert not vfpath2.parent.parent.exists()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_xfs_quota(xfs):
     vfid = uuid.uuid4()
@@ -135,6 +143,7 @@ async def test_xfs_quota(xfs):
     assert not vfpath.is_dir()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_xfs_get_usage(xfs, empty_vfolder):
     vfpath = xfs.mangle_vfpath(empty_vfolder)
@@ -147,6 +156,7 @@ async def test_xfs_get_usage(xfs, empty_vfolder):
     assert usage.used_bytes == 11
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_xfs_get_used_bytes(xfs):
     vfid = uuid.uuid4()
@@ -175,6 +185,7 @@ async def test_xfs_get_used_bytes(xfs):
     assert not vfpath.is_dir()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_xfs_mkdir_rmdir(xfs, empty_vfolder):
     vfpath = xfs.mangle_vfpath(empty_vfolder)
@@ -185,6 +196,7 @@ async def test_xfs_mkdir_rmdir(xfs, empty_vfolder):
     assert not Path(vfpath, test_rel_path).is_dir()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_xfs_vfolder_operations(xfs, empty_vfolder):
     vfpath = xfs.mangle_vfpath(empty_vfolder)
@@ -201,6 +213,7 @@ async def test_xfs_vfolder_operations(xfs, empty_vfolder):
     assert (vfpath / "test2" / "test.txt").read_bytes() == b"12345"
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_xfs_clone_to_vfs(xfs, vfs):
     vfid_src = uuid.uuid4()
@@ -218,6 +231,7 @@ async def test_xfs_clone_to_vfs(xfs, vfs):
     await vfs.delete_vfolder(vfid_dst)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_vfs_clone_to_xfs(xfs, vfs):
     vfid_src = uuid.uuid4()
@@ -235,6 +249,7 @@ async def test_vfs_clone_to_xfs(xfs, vfs):
     await xfs.delete_vfolder(vfid_dst)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_xfs_clone_to_xfs(xfs, vfs):
     vfid_src = uuid.uuid4()

@@ -42,6 +42,12 @@ async def empty_vfolder(fb_volume):
     await fb_volume.delete_vfolder(vfid)
 
 
+def test_dummy():
+    # prevent pants error due to when no tests are selected.
+    pass
+
+
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_fb_get_usage(fb_volume, empty_vfolder):
     vfpath = fb_volume._mangle_vfpath(empty_vfolder)
@@ -58,6 +64,7 @@ async def test_fb_get_usage(fb_volume, empty_vfolder):
     )
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_fb_scandir(fb_volume, empty_vfolder):
     vfpath = fb_volume._mangle_vfpath(empty_vfolder)
