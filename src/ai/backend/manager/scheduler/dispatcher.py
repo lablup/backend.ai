@@ -116,7 +116,7 @@ def load_scheduler(
     entry_prefix = 'backendai_scheduler_v10'
     for entrypoint in scan_entrypoints(entry_prefix):
         if entrypoint.name == name:
-            log.debug('loading scheduler plugin "{}" from {}', name, entrypoint.module_name)
+            log.debug('loading scheduler plugin "{}" from {}', name, entrypoint.module)
             scheduler_cls = entrypoint.load()
             return scheduler_cls(sgroup_opts, scheduler_config)
     raise ImportError('Cannot load the scheduler plugin', name)
