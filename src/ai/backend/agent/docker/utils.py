@@ -3,6 +3,7 @@ import gzip
 import logging
 import pkg_resources
 import subprocess
+from pathlib import Path
 from typing import Any, BinaryIO, Mapping, Tuple, cast
 
 from aiodocker.docker import Docker
