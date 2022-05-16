@@ -93,8 +93,6 @@ ENV/
 .idea
 .*.swp
 
-tmp/
-
 # Pants
 /.pants.d/
 /.pids
@@ -109,4 +107,5 @@ tmp/
 /webserver.conf
 
 # Local temp
+/.tmp/
 /tmp/
