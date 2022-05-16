@@ -1,10 +1,16 @@
 import asyncio
 import json
 import os
+import time
 import secrets
+import shutil
 import subprocess
+import sys
+from collections import defaultdict
+from pathlib import Path
 
 from ai.backend.common import config
+from ai.backend.common import validators as tx
 from ai.backend.common.types import HostPortPair
 from ai.backend.agent import config as agent_config
 
@@ -24,11 +30,56 @@ def test_id():
 
 
 @pytest.fixture(scope='session')
-def local_config():
-    raw_cfg, cfg_src_path = config.read_from_file(None, 'agent')
-    raw_cfg['agent']['backend'] = 'docker'
-    cfg = config.check(raw_cfg, agent_config.agent_local_config_iv)
-    return cfg
+def local_config(test_id, redis_container):
+    # ipc_base_path = Path.cwd() / f'tmp/backend.ai/ipc-{test_id}'
+    ipc_base_path = Path.cwd() / f'ipc/ipc-{test_id}'
+    ipc_base_path.mkdir(parents=True, exist_ok=True)
+
+    cfg = {
+        'agent': {
+            'region': f"rg-{test_id}",
+            'id': f"i-{test_id}",
+            'scaling-group': f"sg-{test_id}",
+            'ipc-base-path': ipc_base_path,
+            'backend': 'docker',
+            'rpc-listen-addr': HostPortPair('', 6001),
+            'agent-sock-port': 6009,
+        },
+        'container': {
+            'scratch-type': 'hostdir',
+            'stats-type': 'docker',
+            'port-range': [19000, 19200],
+        },
+        'resource': {
+            'reserved-cpu': 1,
+            'reserved-mem': tx.BinarySize().check('256M'),
+            'reserved-disk': tx.BinarySize().check('1G'),
+        },
+        'logging': {},
+        'debug': defaultdict(lambda: False),
+        'etcd': {
+            'addr': HostPortPair('127.0.0.1', 2379),
+            'namespace': f'ns-{test_id}',
+        },
+        'redis': redis_container,
+        'plugins': {},
+    }
+
+    def _override_if_exists(src: dict, dst: dict, key: str) -> None:
+        sentinel = object()
+        if (val := src.get(key, sentinel)) is not sentinel:
+            dst[key] = val
+
+    try:
+        # Override external database config with the current environment's config.
+        fs_local_config, cfg_src_path = config.read_from_file(None, 'agent')
+        cfg['etcd']['addr'] = fs_local_config['etcd']['addr']
+        _override_if_exists(fs_local_config['etcd'], cfg['etcd'], 'user')
+        _override_if_exists(fs_local_config['etcd'], cfg['etcd'], 'password')
+    except config.ConfigurationError:
+        pass
+    yield cfg
+    shutil.rmtree(ipc_base_path)
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -40,8 +91,9 @@ def test_local_instance_id(local_config, session_mocker, test_id):
     except FileNotFoundError:
         pass
     mock_generate_local_instance_id = session_mocker.patch(
-        'ai.backend.agent.agent.generate_local_instance_id')
-    mock_generate_local_instance_id.return_value = test_id
+        'ai.backend.agent.agent.generate_local_instance_id',
+    )
+    mock_generate_local_instance_id.return_value = f"i-{test_id}"
     yield
     try:
         os.unlink(registry_state_path)

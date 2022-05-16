@@ -1,6 +1,7 @@
 [GLOBAL]
 pants_version = "2.11.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
+local_execution_root_dir="%(buildroot)s/tmp"
 backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.flake8",
@@ -51,6 +52,7 @@ extra_requirements.add = [
     "pytest-asyncio>=0.18",
     "pytest-aiohttp>=1.0.4",
     "pytest-mock>=3.5.0",
+    "aioresponses>=0.7.3",
 ]
 args = ["-v", "-m", "'not integration'"]
 lockfile = "tools/pytest.lock"

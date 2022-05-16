@@ -1,7 +1,6 @@
 import asyncio
 import gzip
 import logging
-from pathlib import Path
 import pkg_resources
 import subprocess
 from typing import Any, BinaryIO, Mapping, Tuple, cast

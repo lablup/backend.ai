@@ -107,3 +107,6 @@ tmp/
 /agent.toml
 /storage-proxy.toml
 /webserver.conf
+
+# Local temp
+/tmp/

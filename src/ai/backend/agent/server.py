@@ -753,7 +753,8 @@ def main(
             cfg['debug']['coredump']['core_path'] = Path(core_pattern).parent
 
         cfg['agent']['pid-file'].write_text(str(os.getpid()))
-        log_sockpath = Path(f'/tmp/backend.ai/ipc/agent-logger-{os.getpid()}.sock')
+        ipc_base_path = cfg['agent']['ipc-base-path']
+        log_sockpath = ipc_base_path / f'agent-logger-{os.getpid()}.sock'
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f'ipc://{log_sockpath}'
         cfg['logging']['endpoint'] = log_endpoint

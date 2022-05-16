@@ -16,6 +16,11 @@ pex_binary(
     entry_point="server.py",
 )
 
+pex_binary(
+    name="watcher",
+    entry_point="watcher.py",
+)
+
 python_distribution(
     name="dist",
     dependencies=[
@@ -47,10 +52,14 @@ resources(
     ],
     sources=[
         "**/py.typed",
+        "docker/*.txt",
+        "docker/*.tar.gz",
+        "docker/*.bin",
+        "kubernetes/*.txt",
+        "kubernetes/*.tar.gz",
+        "kubernetes/*.bin",
+        "../kernel/**/*",
+        "../runner/**/*",
+        "../helpers/**/*",
     ],
-)
-
-pex_binary(
-    name="watcher",
-    entry_point="watcher.py",
 )

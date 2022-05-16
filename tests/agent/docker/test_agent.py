@@ -24,31 +24,13 @@ class DummyEtcd:
 
 
 @pytest.fixture
-async def agent(test_id, redis_container, mocker):
+async def agent(local_config, mocker):
     dummy_etcd = DummyEtcd()
     mocked_etcd_get_prefix = AsyncMock(return_value={})
     mocker.patch.object(dummy_etcd, 'get_prefix', new=mocked_etcd_get_prefix)
     agent = await DockerAgent.new(
-        dummy_etcd, agent_local_config_iv.check({
-            'agent': {
-                'mode': 'docker',
-                'id': f'i-{test_id}',
-                'scaling-group': f'sg-{test_id}',
-            },
-            'container': {
-                'scratch-type': 'hostdir',
-                'stats-type': 'docker',
-                'port-range': [19000, 19200],
-            },
-            'logging': {},
-            'resource': {},
-            'debug': {},
-            'etcd': {
-                'namespace': f'ns-{test_id}',
-            },
-            'redis': redis_container,
-            'plugins': {},
-        }),
+        dummy_etcd,
+        local_config,
         stats_monitor=None,
         error_monitor=None,
         skip_initial_scan=True,

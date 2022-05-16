@@ -93,7 +93,7 @@ def vfolder_host():
 
 @pytest.fixture(scope='session')
 def local_config(test_id, test_db) -> Iterator[LocalConfig]:
-    ipc_base_path = Path(f'/tmp/backend.ai/manager-testing/ipc-{test_id}')
+    ipc_base_path = Path.cwd() / f'tmp/backend.ai/manager-testing/ipc-{test_id}'
     ipc_base_path.mkdir(parents=True, exist_ok=True)
 
     # Establish a self-contained config.
