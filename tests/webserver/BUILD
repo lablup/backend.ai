@@ -7,7 +7,4 @@ python_tests(
     dependencies=[
         "src/ai/backend/web:service",
     ],
-    sources=[
-        "**/test_*.py",
-    ],
 )

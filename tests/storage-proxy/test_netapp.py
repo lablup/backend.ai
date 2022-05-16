@@ -7,13 +7,13 @@ from ai.backend.storage.netapp import NetAppVolume
 
 
 @pytest.fixture
-async def netapp_volume():
+async def netapp_volume(vfroot):
     options = {
         # TODO: mock options
     }
     netapp = NetAppVolume(
         {},
-        Path("/vfroot/netapp"),
+        vfroot / "netapp",
         fsprefix=PurePath("fsprefix"),
         options=options,
     )

@@ -45,8 +45,8 @@ def assert_sample_dir_tree(vfpath: Path) -> None:
 
 
 @pytest.fixture
-async def xfs():
-    xfs = XfsVolume({}, Path("/vfroot/xfs"))
+async def xfs(vfroot):
+    xfs = XfsVolume({}, vfroot / "xfs")
     await xfs.init(os.getuid(), os.getgid())
     try:
         yield xfs
