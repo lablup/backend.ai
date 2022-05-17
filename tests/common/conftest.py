@@ -192,5 +192,5 @@ async def redis_container(test_ns, test_case_ns) -> AsyncIterator[tuple[str, Hos
         yield container_id, HostPortPair('127.0.0.1', host_port)
     finally:
         await asyncio.sleep(0.2)
-        await simple_run_cmd(['docker', 'rm', '-f', container_id])
+        await simple_run_cmd(['docker', 'rm', '-v', '-f', container_id])
         await asyncio.sleep(0.2)

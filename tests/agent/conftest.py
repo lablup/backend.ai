@@ -151,13 +151,14 @@ async def docker():
 @pytest.fixture(scope='session')
 def redis_container(test_id, backend_type, prepare_images):
     if backend_type == 'docker':
-        subprocess.run([
+        proc = subprocess.run([
             'docker', 'run',
             '-d',
             '-P',
             '--name', f'{test_id}.redis',
             'redis:5.0.5-alpine',
         ], capture_output=True)
+        container_id = proc.stdout.decode().strip()
         proc = subprocess.run([
             'docker', 'inspect',
             f'{test_id}.redis',
@@ -169,15 +170,16 @@ def redis_container(test_id, backend_type, prepare_images):
 
     try:
         yield {
-            'addr': HostPortPair('localhost', host_port),
+            'addr': HostPortPair('127.0.0.1', host_port),
             'password': None,
         }
     finally:
         if backend_type == 'docker':
             subprocess.run([
                 'docker', 'rm',
+                '-v',
                 '-f',
-                f'{test_id}.redis',
+                container_id,
             ], capture_output=True)
         elif backend_type == 'k8s':
             raise NotImplementedError
