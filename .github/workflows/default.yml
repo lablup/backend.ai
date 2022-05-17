@@ -25,6 +25,7 @@ jobs:
         cache: pip
     - name: Bootstrap Pants
       run: |
+        mkdir .tmp
         ./pants --no-verify-config version
     - name: Check BUILD files
       run: ./pants tailor --check update-build-files --check
@@ -72,6 +73,7 @@ jobs:
         cache: pip
     - name: Bootstrap Pants
       run: |
+        mkdir .tmp
         ./pants --no-verify-config version
     - name: Check BUILD files
       run: ./pants tailor --check update-build-files --check
@@ -128,6 +130,7 @@ jobs:
         cache: pip
     - name: Bootstrap Pants
       run: |
+        mkdir .tmp
         ./pants --no-verify-config version
     - name: Check BUILD files
       run: ./pants tailor --check update-build-files --check
@@ -179,6 +182,7 @@ jobs:
         cache: pip
     - name: Bootstrap Pants
       run: |
+        mkdir .tmp
         ./pants --no-verify-config version
     - name: Test
       run: |
