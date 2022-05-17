@@ -647,7 +647,7 @@ class EventDispatcher(aobject):
         consumer_exception_handler: PTGExceptionHandler = None,
         subscriber_exception_handler: PTGExceptionHandler = None,
     ) -> None:
-        _redis_config = {**redis_config}
+        _redis_config = redis_config.copy()
         if service_name:
             _redis_config['service_name'] = service_name
         self.redis_client = redis.get_redis_object(_redis_config, db=db)
@@ -835,7 +835,7 @@ class EventProducer(aobject):
         stream_key: str = 'events',
         log_events: bool = False,
     ) -> None:
-        _redis_config = {**redis_config}
+        _redis_config = redis_config.copy()
         if service_name:
             _redis_config['service_name'] = service_name
         self._closed = False
