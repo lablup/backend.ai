@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.testutils.bootstrap import etcd_container, redis_container
+from ai.backend.testutils.bootstrap import etcd_container, redis_container  # noqa: F401
 
 
 def pytest_addoption(parser):
@@ -53,7 +53,7 @@ def test_case_ns():
 
 
 @pytest.fixture
-async def etcd(etcd_container, test_ns):
+async def etcd(etcd_container, test_ns):  # noqa: F811
     etcd = AsyncEtcd(
         addr=etcd_container[1],
         namespace=test_ns,
@@ -77,7 +77,7 @@ async def etcd(etcd_container, test_ns):
 
 
 @pytest.fixture
-async def gateway_etcd(etcd_container, test_ns):
+async def gateway_etcd(etcd_container, test_ns):  # noqa: F811
     etcd = AsyncEtcd(
         addr=etcd_container[1],
         namespace=test_ns,

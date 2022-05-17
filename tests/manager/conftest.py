@@ -13,7 +13,6 @@ from typing import (
     Any,
     AsyncContextManager,
     AsyncIterator,
-    Final,
     Iterator,
     List,
     Mapping,
@@ -60,14 +59,14 @@ from ai.backend.manager.models import (
 )
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.testutils.bootstrap import (
+from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     redis_container,
     postgres_container,
 )
+from ai.backend.testutils.pants import get_parallel_slot
 
 here = Path(__file__).parent
-parallel_exec_slot: Final = int(os.environ.get('BACKEND_TEST_EXEC_SLOT', '0'))
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -112,9 +111,9 @@ def vfolder_host():
 @pytest.fixture(scope='session')
 def local_config(
     test_id,
-    etcd_container,
-    redis_container,
-    postgres_container,
+    etcd_container,      # noqa: F811
+    redis_container,     # noqa: F811
+    postgres_container,  # noqa: F811
     test_db,
 ) -> Iterator[LocalConfig]:
     ipc_base_path = Path.cwd() / f'tmp/backend.ai/manager-testing/ipc-{test_id}'
@@ -145,7 +144,7 @@ def local_config(
             'num-proc': 1,
             'distributed-lock': 'filelock',
             'ipc-base-path': ipc_base_path,
-            'service-addr': HostPortPair('127.0.0.1', 29100 + parallel_exec_slot * 10),
+            'service-addr': HostPortPair('127.0.0.1', 29100 + get_parallel_slot() * 10),
         },
         'debug': {
             'enabled': False,
