@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from multiprocessing import Event, Process, Queue
 import tempfile
 import threading
 import time
+from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
+from multiprocessing import Event, Process, Queue
 from pathlib import Path
 from typing import (
     Any,
@@ -24,6 +25,20 @@ from ai.backend.common.lock import EtcdLock, FileLock
 from ai.backend.common.types import AgentId, EtcdRedisConfig, HostPortPair
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+
+
+@dataclass
+class TimerNodeContext:
+    test_ns: str
+    redis_addr: HostPortPair
+    interval: float
+
+
+@dataclass
+class EtcdLockContext:
+    namespace: str
+    addr: EtcdHostPortPair
+    lock_name: str
 
 
 def drange(start: Decimal, stop: Decimal, step: Decimal) -> Iterable[Decimal]:
@@ -59,18 +74,18 @@ class TimerNode(threading.Thread):
 
     def __init__(
         self,
+        event_records: list[float],
         lock_path: Path,
-        interval: float,
         thread_idx: int,
-        test_ns: str,
-        event_records: List[float],
+        timer_ctx: TimerNodeContext,
     ) -> None:
         super().__init__()
-        self.lock_path = lock_path
-        self.interval = interval
-        self.thread_idx = thread_idx
-        self.test_ns = test_ns
         self.event_records = event_records
+        self.lock_path = lock_path
+        self.thread_idx = thread_idx
+        self.interval = timer_ctx.interval
+        self.test_ns = timer_ctx.test_ns
+        self.redis_addr = timer_ctx.redis_addr
 
     async def timer_node_async(self) -> None:
         self.loop = asyncio.get_running_loop()
@@ -80,7 +95,7 @@ class TimerNode(threading.Thread):
             print("_tick")
             self.event_records.append(time.monotonic())
 
-        redis_config = EtcdRedisConfig(addr=HostPortPair("127.0.0.1", 9379))
+        redis_config = EtcdRedisConfig(addr=self.redis_addr)
         event_dispatcher = await EventDispatcher.new(
             redis_config,
             node_id=self.test_ns,
@@ -121,11 +136,14 @@ async def test_global_timer_filelock(request, test_ns, redis_container) -> None:
     threads: List[TimerNode] = []
     for thread_idx in range(num_threads):
         timer_node = TimerNode(
-            lock_path,
-            interval,
-            thread_idx,
-            test_ns,
             event_records,
+            lock_path,
+            thread_idx,
+            TimerNodeContext(
+                test_ns=test_ns,
+                redis_addr=redis_container[1],
+                interval=interval,
+            ),
         )
         threads.append(timer_node)
         timer_node.start()
@@ -147,37 +165,43 @@ async def test_global_timer_filelock(request, test_ns, redis_container) -> None:
 
 
 def etcd_timer_node_process(
-    queue, stop_event, etcd_addr: EtcdHostPortPair, namespace: str,
-    lock_name: str, test_ns: str, interval: float,
-):
+    queue,
+    stop_event,
+    etcd_ctx: EtcdLockContext,
+    timer_ctx: TimerNodeContext,
+) -> None:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
-    async def _main():
+    async def _main() -> None:
 
         async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
             print("_tick")
             queue.put(time.monotonic())
 
-        redis_config = EtcdRedisConfig(addr=HostPortPair("127.0.0.1", 9379))
+        redis_config = EtcdRedisConfig(addr=timer_ctx.redis_addr)
         event_dispatcher = await EventDispatcher.new(
             redis_config,
-            node_id=test_ns,
+            node_id=timer_ctx.test_ns,
         )
         event_producer = await EventProducer.new(
             redis_config,
         )
         event_dispatcher.consume(NoopEvent, None, _tick)
 
-        etcd = AsyncEtcd(addr=etcd_addr, namespace=namespace, scope_prefix_map={
-            ConfigScopes.GLOBAL: 'global',
-            ConfigScopes.SGROUP: 'sgroup/testing',
-            ConfigScopes.NODE: 'node/i-test',
-        })
+        etcd = AsyncEtcd(
+            addr=etcd_ctx.addr,
+            namespace=etcd_ctx.namespace,
+            scope_prefix_map={
+                ConfigScopes.GLOBAL: 'global',
+                ConfigScopes.SGROUP: 'sgroup/testing',
+                ConfigScopes.NODE: 'node/i-test',
+            },
+        )
         timer = GlobalTimer(
-            EtcdLock(lock_name, etcd, timeout=None, debug=True),
+            EtcdLock(etcd_ctx.lock_name, etcd, timeout=None, debug=True),
             event_producer,
-            lambda: NoopEvent(test_ns),
-            interval,
+            lambda: NoopEvent(timer_ctx.test_ns),
+            timer_ctx.interval,
         )
         try:
             await timer.join()
@@ -209,8 +233,18 @@ async def test_global_timer_etcdlock(
             target=etcd_timer_node_process,
             name=f'proc-{proc_idx}',
             args=(
-                event_records_queue, stop_event, etcd_addr, test_ns,
-                lock_name, test_ns, interval,
+                event_records_queue,
+                stop_event,
+                EtcdLockContext(
+                    addr=etcd_addr,
+                    namespace=test_ns,
+                    lock_name=lock_name,
+                ),
+                TimerNodeContext(
+                    test_ns=test_ns,
+                    redis_addr=redis_container[1],
+                    interval=interval,
+                ),
             ),
         )
         process.start()
@@ -243,7 +277,7 @@ async def test_global_timer_join_leave(request, test_ns, redis_container) -> Non
         print("_tick")
         event_records.append(time.monotonic())
 
-    redis_config = EtcdRedisConfig(addr=HostPortPair("127.0.0.1", 9379))
+    redis_config = EtcdRedisConfig(addr=redis_container[1])
     event_dispatcher = await EventDispatcher.new(
         redis_config,
         node_id=test_ns,

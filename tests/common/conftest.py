@@ -1,5 +1,6 @@
 import asyncio
 from decimal import Decimal
+import json
 import os
 import secrets
 import time
@@ -7,9 +8,10 @@ from typing import (
     AsyncIterator,
 )
 
-from etcetra.types import HostPortPair
+from etcetra.types import HostPortPair as EtcdHostPortPair
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.types import HostPortPair
 
 import pytest
 
@@ -44,8 +46,8 @@ def pytest_collection_modifyitems(config, items):
 def etcd_addr():
     env_addr = os.environ.get('BACKEND_ETCD_ADDR')
     if env_addr is not None:
-        return HostPortPair.parse(env_addr)
-    return HostPortPair.parse('localhost:2379')
+        return EtcdHostPortPair.parse(env_addr)
+    return EtcdHostPortPair.parse('localhost:2379')
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -158,22 +160,37 @@ def mock_time(mocker):
 
 
 @pytest.fixture
-async def redis_container(test_ns, test_case_ns) -> AsyncIterator[str]:
-    p = await asyncio.create_subprocess_exec(*[
-        'docker', 'run',
-        '-d',
-        '--name', f'bai-common.{test_ns}.{test_case_ns}',
-        '-p', '9379:6379',
-        'redis:6-alpine',
-    ], stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
-    assert p.stdout is not None
-    stdout = await p.stdout.read()
-    await p.wait()
-    cid = stdout.decode().strip()
-    await wait_redis_ready('127.0.0.1', 9379)
+async def redis_container(test_ns, test_case_ns) -> AsyncIterator[tuple[str, HostPortPair]]:
+    proc = await asyncio.create_subprocess_exec(
+        *[
+            'docker', 'run',
+            '-d',
+            '-P',  # let OS assign a free port number
+            'redis:6-alpine',
+        ],
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    assert proc.stdout is not None
+    stdout = await proc.stdout.read()
+    await proc.wait()
+    container_id = stdout.decode().strip()
+    proc = await asyncio.create_subprocess_exec(
+        *[
+            'docker', 'inspect', container_id,
+        ],
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    assert proc.stdout is not None
+    stdout = await proc.stdout.read()
+    await proc.wait()
+    container_info = json.loads(stdout)
+    host_port = int(container_info[0]['NetworkSettings']['Ports']['6379/tcp'][0]['HostPort'])
+    await wait_redis_ready('127.0.0.1', host_port)
     try:
-        yield cid
+        yield container_id, HostPortPair('127.0.0.1', host_port)
     finally:
         await asyncio.sleep(0.2)
-        await simple_run_cmd(['docker', 'rm', '-f', cid])
+        await simple_run_cmd(['docker', 'rm', '-f', container_id])
         await asyncio.sleep(0.2)

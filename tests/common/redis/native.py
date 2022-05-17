@@ -17,6 +17,7 @@ from .types import (
     AbstractRedisNode,
     RedisClusterInfo,
 )
+from .utils import get_parallel_slot
 
 
 class NativeRedisNode(AbstractRedisNode):
@@ -25,7 +26,7 @@ class NativeRedisNode(AbstractRedisNode):
 
     def __init__(self, node_type: str, port: int, start_args: Sequence[str | bytes]) -> None:
         self.node_type = node_type
-        self.port = port
+        self.port = port + get_parallel_slot() * 10
         self.start_args = start_args
         self.proc = None
 

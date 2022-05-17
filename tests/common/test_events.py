@@ -16,7 +16,6 @@ from ai.backend.common.events import (
 from ai.backend.common.types import (
     AgentId,
     EtcdRedisConfig,
-    HostPortPair,
 )
 from ai.backend.common import redis
 
@@ -39,7 +38,7 @@ class DummyEvent(AbstractEvent):
 async def test_dispatch(redis_container) -> None:
     app = object()
 
-    redis_config = EtcdRedisConfig(addr=HostPortPair("127.0.0.1", 9379))
+    redis_config = EtcdRedisConfig(addr=redis_container[1])
     dispatcher = await EventDispatcher.new(redis_config)
     producer = await EventProducer.new(redis_config)
 
@@ -88,7 +87,7 @@ async def test_error_on_dispatch(redis_container) -> None:
     ) -> None:
         exception_log.append(type(exc).__name__)
 
-    redis_config = EtcdRedisConfig(addr=HostPortPair("127.0.0.1", 9379))
+    redis_config = EtcdRedisConfig(addr=redis_container[1])
     dispatcher = await EventDispatcher.new(
         redis_config,
         consumer_exception_handler=handle_exception,

@@ -5,6 +5,7 @@ import aioredis.exceptions
 import async_timeout
 import asyncio
 import functools
+import os
 import sys
 from typing import (
     Awaitable,
@@ -32,6 +33,12 @@ disruptions: Final = {
         'end': 'unpause',
     },
 }
+
+
+def get_parallel_slot() -> int:
+    if (slot_str := os.environ.get('BACKEND_TEST_EXEC_SLOT')):
+        return int(slot_str)
+    return 0
 
 
 async def simple_run_cmd(cmdargs: Sequence[Union[str, bytes]], **kwargs) -> asyncio.subprocess.Process:

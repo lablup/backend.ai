@@ -18,14 +18,14 @@ from .types import (
     AbstractRedisNode,
     RedisClusterInfo,
 )
-from .utils import simple_run_cmd
+from .utils import simple_run_cmd, get_parallel_slot
 
 
 class DockerRedisNode(AbstractRedisNode):
 
     def __init__(self, node_type: str, port: int, container_id: str) -> None:
         self.node_type = node_type
-        self.port = port
+        self.port = port + get_parallel_slot() * 10
         self.container_id = container_id
 
     @property
