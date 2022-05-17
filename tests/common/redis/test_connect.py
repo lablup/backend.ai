@@ -14,15 +14,17 @@ from .types import RedisClusterInfo
 from .utils import interrupt, with_timeout
 
 from ai.backend.common import redis, validators as tx
+from ai.backend.common.types import HostPortPair
 
 if TYPE_CHECKING:
     from typing import Any
 
 
 @pytest.mark.asyncio
-async def test_connect(redis_container: str) -> None:
+async def test_connect(redis_container: tuple[str, HJostPortPair]) -> None:
+    addr = redis_container[1]
     r = aioredis.from_url(
-        url='redis://localhost:9379',
+        url=f'redis://{addr.host}:{addr.port}',
         socket_timeout=0.5,
     )
     await r.ping()
