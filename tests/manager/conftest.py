@@ -2,11 +2,8 @@ import asyncio
 import hashlib, hmac
 import json
 import os
-import re
 import secrets
 import shutil
-import subprocess
-import sys
 import tempfile
 import textwrap
 from datetime import datetime

@@ -5,7 +5,6 @@ import aioredis.exceptions
 import async_timeout
 import asyncio
 import functools
-import os
 import sys
 from typing import (
     Awaitable,

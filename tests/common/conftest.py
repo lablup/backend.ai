@@ -1,23 +1,12 @@
 import asyncio
-import json
-import os
 import secrets
-import subprocess
 import time
 from decimal import Decimal
-from typing import (
-    AsyncIterator,
-    Iterator,
-)
 
-from etcetra.types import HostPortPair as EtcdHostPortPair
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.types import HostPortPair
 from ai.backend.testutils.bootstrap import etcd_container, redis_container
-
-from .redis.utils import simple_run_cmd, wait_redis_ready
 
 
 def pytest_addoption(parser):

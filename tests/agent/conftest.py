@@ -1,18 +1,13 @@
 import asyncio
-import json
 import os
-import time
 import secrets
 import shutil
-import subprocess
-import sys
 from collections import defaultdict
 from pathlib import Path
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.types import EtcdRedisConfig, HostPortPair
-from ai.backend.agent import config as agent_config
 from ai.backend.testutils.bootstrap import etcd_container, redis_container
 from ai.backend.testutils.pants import get_parallel_slot
 

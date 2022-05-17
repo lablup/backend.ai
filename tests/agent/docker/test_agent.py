@@ -9,12 +9,10 @@ from unittest.mock import AsyncMock, MagicMock
 from aiodocker.exceptions import DockerError
 import pytest
 
+from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.types import AutoPullBehavior
 from ai.backend.common.docker import ImageRef
-
-from ai.backend.agent.config import agent_local_config_iv
-from ai.backend.agent.docker.agent import DockerAgent
 
 
 class DummyEtcd:

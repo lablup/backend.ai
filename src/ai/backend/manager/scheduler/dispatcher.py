@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import pkg_resources
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from typing import (
