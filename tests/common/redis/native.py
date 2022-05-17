@@ -12,12 +12,13 @@ from typing import (
     Tuple,
 )
 
+from ai.backend.testutils.pants import get_parallel_slot
+
 from .types import (
     AbstractRedisSentinelCluster,
     AbstractRedisNode,
     RedisClusterInfo,
 )
-from .utils import get_parallel_slot
 
 
 class NativeRedisNode(AbstractRedisNode):

@@ -12,6 +12,7 @@ python_tests(
     name="tests",
     dependencies=[
         "src/ai/backend/common:lib",
+        "src/ai/backend/testutils:lib",
     ],
     sources=[
         "**/test_*.py",

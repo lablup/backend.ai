@@ -35,12 +35,6 @@ disruptions: Final = {
 }
 
 
-def get_parallel_slot() -> int:
-    if (slot_str := os.environ.get('BACKEND_TEST_EXEC_SLOT')):
-        return int(slot_str)
-    return 0
-
-
 async def simple_run_cmd(cmdargs: Sequence[Union[str, bytes]], **kwargs) -> asyncio.subprocess.Process:
     p = await asyncio.create_subprocess_exec(*cmdargs, **kwargs)
     await p.wait()

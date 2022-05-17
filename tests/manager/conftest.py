@@ -15,6 +15,7 @@ from typing import (
     Any,
     AsyncContextManager,
     AsyncIterator,
+    Final,
     Iterator,
     List,
     Mapping,
@@ -51,8 +52,14 @@ from ai.backend.manager.models import (
 )
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.testutils.bootstrap import (
+    etcd_container,
+    redis_container,
+    postgres_container,
+)
 
 here = Path(__file__).parent
+parallel_exec_slot: Final = int(os.environ.get('BACKEND_TEST_EXEC_SLOT', '0'))
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -92,23 +99,32 @@ def vfolder_host():
 
 
 @pytest.fixture(scope='session')
-def local_config(test_id, test_db) -> Iterator[LocalConfig]:
+def local_config(
+    test_id,
+    etcd_container,
+    redis_container,
+    postgres_container,
+    test_db,
+) -> Iterator[LocalConfig]:
     ipc_base_path = Path.cwd() / f'tmp/backend.ai/manager-testing/ipc-{test_id}'
     ipc_base_path.mkdir(parents=True, exist_ok=True)
+    etcd_addr = etcd_container[1]
+    redis_addr = redis_container[1]
+    postgres_addr = postgres_container[1]
 
     # Establish a self-contained config.
     cfg = LocalConfig({
         **etcd_config_iv.check({
             'etcd': {
                 'namespace': test_id,
-                'addr': {'host': '127.0.0.1', 'port': '2379'},
+                'addr': {'host': etcd_addr.host, 'port': etcd_addr.port},
             },
         }),
         'redis': redis_config_iv.check({
-            'addr': {'host': '127.0.0.1', 'port': '6379'},
+            'addr': {'host': redis_addr.host, 'port': redis_addr.port},
         }),
         'db': {
-            'addr': HostPortPair('127.0.0.1', 5432),
+            'addr': postgres_addr,
             'name': test_db,
             'user': 'postgres',
             'password': 'develove',
@@ -118,7 +134,7 @@ def local_config(test_id, test_db) -> Iterator[LocalConfig]:
             'num-proc': 1,
             'distributed-lock': 'filelock',
             'ipc-base-path': ipc_base_path,
-            'service-addr': HostPortPair('127.0.0.1', 29100),
+            'service-addr': HostPortPair('127.0.0.1', 29100 + parallel_exec_slot * 10),
         },
     })
 
@@ -147,7 +163,7 @@ def local_config(test_id, test_db) -> Iterator[LocalConfig]:
 @pytest.fixture(scope='session')
 def etcd_fixture(test_id, local_config, vfolder_mount, vfolder_fsprefix, vfolder_host) -> Iterator[None]:
     # Clear and reset etcd namespace using CLI functions.
-    print("NOTE: This test suite uses a local Redis daemon running at 127.0.0.1:6379!", file=sys.stderr)
+    redis_addr = local_config['redis']['addr']
     with tempfile.NamedTemporaryFile(mode='w', suffix='.etcd.json') as f:
         etcd_fixture = {
             'volumes': {
@@ -168,7 +184,7 @@ def etcd_fixture(test_id, local_config, vfolder_mount, vfolder_fsprefix, vfolder
                     },
                 },
                 'redis': {
-                    'addr': '127.0.0.1:6379',
+                    'addr': f"{redis_addr.host}:{redis_addr.port}",
                 },
                 'plugins': {
                     'cloudia': {

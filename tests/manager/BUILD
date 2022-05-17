@@ -10,9 +10,7 @@ python_tests(
     name="tests",
     dependencies=[
         "src/ai/backend/manager:service",
-        "tests/manager:config",
+        "src/ai/backend/testutils:lib",
         "//:reqs#aiosqlite",
     ],
 )
-
-file(name="config", source="manager.toml")

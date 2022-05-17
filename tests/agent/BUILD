@@ -6,8 +6,6 @@ python_tests(
     name="tests",
     dependencies=[
         "src/ai/backend/agent:service",
-        "tests/agent:config",
+        "src/ai/backend/testutils:lib",
     ],
 )
-
-file(name="config", source="agent.toml")

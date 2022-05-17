@@ -1,6 +1,6 @@
 python_tests(
     name="tests",
     dependencies=[
-        "tests/manager:config",
+        "src/ai/backend/manager:service",
     ],
 )

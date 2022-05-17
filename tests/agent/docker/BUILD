@@ -1,6 +1,6 @@
 python_tests(
     name="tests",
     dependencies=[
-        "tests/agent:config",
+        "src/ai/backend/common:lib",
     ],
 )

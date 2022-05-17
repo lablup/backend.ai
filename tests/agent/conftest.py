@@ -11,17 +11,13 @@ from pathlib import Path
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
-from ai.backend.common.types import HostPortPair
+from ai.backend.common.types import EtcdRedisConfig, HostPortPair
 from ai.backend.agent import config as agent_config
+from ai.backend.testutils.bootstrap import etcd_container, redis_container
+from ai.backend.testutils.pants import get_parallel_slot
 
 import aiodocker
 import pytest
-
-
-@pytest.fixture(scope='session')
-def backend_type():
-    # TODO: change by environment/tox?
-    return 'docker'
 
 
 @pytest.fixture(scope='session')
@@ -30,10 +26,11 @@ def test_id():
 
 
 @pytest.fixture(scope='session')
-def local_config(test_id, redis_container):
+def local_config(test_id, etcd_container, redis_container):
     # ipc_base_path = Path.cwd() / f'tmp/backend.ai/ipc-{test_id}'
     ipc_base_path = Path.cwd() / f'ipc/ipc-{test_id}'
     ipc_base_path.mkdir(parents=True, exist_ok=True)
+    etcd_addr = etcd_container[1]
 
     cfg = {
         'agent': {
@@ -48,7 +45,10 @@ def local_config(test_id, redis_container):
         'container': {
             'scratch-type': 'hostdir',
             'stats-type': 'docker',
-            'port-range': [19000, 19200],
+            'port-range': [
+                19000 + 200 * get_parallel_slot(),
+                19200 + 200 * get_parallel_slot(),
+            ],
         },
         'resource': {
             'reserved-cpu': 1,
@@ -58,10 +58,15 @@ def local_config(test_id, redis_container):
         'logging': {},
         'debug': defaultdict(lambda: False),
         'etcd': {
-            'addr': HostPortPair('127.0.0.1', 2379),
+            'addr': etcd_addr,
             'namespace': f'ns-{test_id}',
         },
-        'redis': redis_container,
+        'redis': EtcdRedisConfig(
+            addr=redis_container[1],
+            sentinel=None,
+            service_name=None,
+            password=None,
+        ),
         'plugins': {},
     }
 
@@ -102,26 +107,22 @@ def test_local_instance_id(local_config, session_mocker, test_id):
 
 
 @pytest.fixture(scope='session')
-def prepare_images(backend_type):
+def prepare_images():
 
     async def pull():
-        if backend_type == 'docker':
-            docker = aiodocker.Docker()
-            images_to_pull = [
-                'alpine:3.8',
-                'nginx:1.17-alpine',
-                'redis:5.0.5-alpine',
-            ]
-            for img in images_to_pull:
-                try:
-                    await docker.images.inspect(img)
-                except aiodocker.exceptions.DockerError as e:
-                    assert e.status == 404
-                    print(f'Pulling image "{img}" for testing...')
-                    await docker.pull(img)
-            await docker.close()
-        elif backend_type == 'k8s':
-            raise NotImplementedError
+        docker = aiodocker.Docker()
+        images_to_pull = [
+            'alpine:3.8',
+            'nginx:1.17-alpine',
+        ]
+        for img in images_to_pull:
+            try:
+                await docker.images.inspect(img)
+            except aiodocker.exceptions.DockerError as e:
+                assert e.status == 404
+                print(f'Pulling image "{img}" for testing...')
+                await docker.pull(img)
+        await docker.close()
 
     # We need to preserve the current loop configured by pytest-asyncio
     # because asyncio.run() calls asyncio.set_event_loop(None) upon its completion.
@@ -148,58 +149,18 @@ async def docker():
         await docker.close()
 
 
-@pytest.fixture(scope='session')
-def redis_container(test_id, backend_type, prepare_images):
-    if backend_type == 'docker':
-        proc = subprocess.run([
-            'docker', 'run',
-            '-d',
-            '-P',
-            '--name', f'{test_id}.redis',
-            'redis:5.0.5-alpine',
-        ], capture_output=True)
-        container_id = proc.stdout.decode().strip()
-        proc = subprocess.run([
-            'docker', 'inspect',
-            f'{test_id}.redis',
-        ], capture_output=True)
-        container_info = json.loads(proc.stdout)
-        host_port = int(container_info[0]['NetworkSettings']['Ports']['6379/tcp'][0]['HostPort'])
-    elif backend_type == 'k8s':
-        raise NotImplementedError
-
-    try:
-        yield {
-            'addr': HostPortPair('127.0.0.1', host_port),
-            'password': None,
-        }
-    finally:
-        if backend_type == 'docker':
-            subprocess.run([
-                'docker', 'rm',
-                '-v',
-                '-f',
-                container_id,
-            ], capture_output=True)
-        elif backend_type == 'k8s':
-            raise NotImplementedError
-
-
 @pytest.fixture
-async def create_container(test_id, backend_type, docker):
+async def create_container(test_id, docker):
     container = None
     cont_id = secrets.token_urlsafe(4)
 
-    if backend_type == 'docker':
-        async def _create_container(config):
-            nonlocal container
-            container = await docker.containers.create_or_replace(
-                config=config,
-                name=f'kernel.{test_id}-{cont_id}',
-            )
-            return container
-    elif backend_type == 'k8s':
-        raise NotImplementedError
+    async def _create_container(config):
+        nonlocal container
+        container = await docker.containers.create_or_replace(
+            config=config,
+            name=f'kernel.{test_id}-{cont_id}',
+        )
+        return container
 
     try:
         yield _create_container

@@ -7,14 +7,15 @@ import time
 from decimal import Decimal
 from typing import (
     AsyncIterator,
+    Iterator,
 )
 
 from etcetra.types import HostPortPair as EtcdHostPortPair
+import pytest
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
-
-import pytest
+from ai.backend.testutils.bootstrap import etcd_container, redis_container
 
 from .redis.utils import simple_run_cmd, wait_redis_ready
 
@@ -43,44 +44,6 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(do_skip)
 
 
-@pytest.fixture(scope='session')
-def etcd_container():
-    # Spawn a single-node etcd container for a testing session.
-    proc = subprocess.run(
-        [
-            'docker', 'run', '-d',
-            '-p', ':2379',
-            '-p', ':4001',
-            'quay.io/coreos/etcd:v3.5.4',
-            '/usr/local/bin/etcd',
-            '-advertise-client-urls', 'http://0.0.0.0:2379',
-            '-listen-client-urls', 'http://0.0.0.0:2379',
-        ],
-        capture_output=True,
-    )
-    container_id = proc.stdout.decode().strip()
-    proc = subprocess.run(
-        [
-            'docker', 'inspect', container_id,
-        ],
-        capture_output=True,
-    )
-    container_info = json.loads(proc.stdout)
-    host_port = int(container_info[0]['NetworkSettings']['Ports']['2379/tcp'][0]['HostPort'])
-    yield container_id, HostPortPair('127.0.0.1', host_port)
-    subprocess.run(
-        [
-            'docker', 'rm', '-v', '-f', container_id,
-        ],
-        capture_output=True,
-    )
-
-
-@pytest.fixture
-def etcd_addr(etcd_container):
-    return etcd_container[1]
-
-
 @pytest.fixture(scope="session", autouse=True)
 def event_loop():
     # uvloop.install()
@@ -101,9 +64,9 @@ def test_case_ns():
 
 
 @pytest.fixture
-async def etcd(etcd_addr, test_ns):
+async def etcd(etcd_container, test_ns):
     etcd = AsyncEtcd(
-        addr=etcd_addr,
+        addr=etcd_container[1],
         namespace=test_ns,
         scope_prefix_map={
             ConfigScopes.GLOBAL: 'global',
@@ -125,9 +88,9 @@ async def etcd(etcd_addr, test_ns):
 
 
 @pytest.fixture
-async def gateway_etcd(etcd_addr, test_ns):
+async def gateway_etcd(etcd_container, test_ns):
     etcd = AsyncEtcd(
-        addr=etcd_addr,
+        addr=etcd_container[1],
         namespace=test_ns,
         scope_prefix_map={
             ConfigScopes.GLOBAL: '',
@@ -196,40 +159,3 @@ def mock_time(mocker):
     _mock_async_sleep.get_total_delay = _get_total_delay
     _mock_async_sleep.get_call_count = _get_call_count
     yield _mock_async_sleep, _mock_time_monotonic
-
-
-@pytest.fixture
-async def redis_container(test_ns, test_case_ns) -> AsyncIterator[tuple[str, HostPortPair]]:
-    proc = await asyncio.create_subprocess_exec(
-        *[
-            'docker', 'run',
-            '-d',
-            '-P',  # let OS assign a free port number
-            'redis:6-alpine',
-        ],
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
-    assert proc.stdout is not None
-    stdout = await proc.stdout.read()
-    await proc.wait()
-    container_id = stdout.decode().strip()
-    proc = await asyncio.create_subprocess_exec(
-        *[
-            'docker', 'inspect', container_id,
-        ],
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.DEVNULL,
-    )
-    assert proc.stdout is not None
-    stdout = await proc.stdout.read()
-    await proc.wait()
-    container_info = json.loads(stdout)
-    host_port = int(container_info[0]['NetworkSettings']['Ports']['6379/tcp'][0]['HostPort'])
-    await wait_redis_ready('127.0.0.1', host_port)
-    try:
-        yield container_id, HostPortPair('127.0.0.1', host_port)
-    finally:
-        await asyncio.sleep(0.2)
-        await simple_run_cmd(['docker', 'rm', '-v', '-f', container_id])
-        await asyncio.sleep(0.2)

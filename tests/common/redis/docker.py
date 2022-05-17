@@ -13,12 +13,14 @@ from typing import (
 import async_timeout
 import pytest
 
+from ai.backend.testutils.pants import get_parallel_slot
+
 from .types import (
     AbstractRedisSentinelCluster,
     AbstractRedisNode,
     RedisClusterInfo,
 )
-from .utils import simple_run_cmd, get_parallel_slot
+from .utils import simple_run_cmd
 
 
 class DockerRedisNode(AbstractRedisNode):

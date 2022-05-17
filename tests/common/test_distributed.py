@@ -217,7 +217,7 @@ def etcd_timer_node_process(
 
 @pytest.mark.asyncio
 async def test_global_timer_etcdlock(
-    test_ns, etcd_addr, redis_container,
+    test_ns, etcd_container, redis_container,
 ) -> None:
     lock_name = f'{test_ns}lock'
     event_records_queue: Queue = Queue()
@@ -236,7 +236,7 @@ async def test_global_timer_etcdlock(
                 event_records_queue,
                 stop_event,
                 EtcdLockContext(
-                    addr=etcd_addr,
+                    addr=etcd_container[1],
                     namespace=test_ns,
                     lock_name=lock_name,
                 ),

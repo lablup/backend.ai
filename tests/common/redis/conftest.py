@@ -14,7 +14,7 @@ from .native import NativeRedisSentinelCluster
 from .utils import wait_redis_ready
 
 
-# A simple "redis_container" fixture is defined in the main conftest.py
+# A simple "redis_container" fixture is defined in ai.backend.testutils.bootstrap.
 
 
 @pytest.fixture
