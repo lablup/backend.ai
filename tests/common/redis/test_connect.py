@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 @pytest.mark.asyncio
-async def test_connect(redis_container: tuple[str, HJostPortPair]) -> None:
+async def test_connect(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     r = aioredis.from_url(
         url=f'redis://{addr.host}:{addr.port}',
