@@ -1,9 +1,10 @@
 import asyncio
-from decimal import Decimal
 import json
 import os
 import secrets
+import subprocess
 import time
+from decimal import Decimal
 from typing import (
     AsyncIterator,
 )
@@ -42,12 +43,42 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(do_skip)
 
 
+@pytest.fixture(scope='session')
+def etcd_container():
+    # Spawn a single-node etcd container for a testing session.
+    proc = subprocess.run(
+        [
+            'docker', 'run', '-d',
+            '-p', ':2379',
+            '-p', ':4001',
+            'quay.io/coreos/etcd:v3.5.4',
+            '/usr/local/bin/etcd',
+            '-advertise-client-urls', 'http://0.0.0.0:2379',
+            '-listen-client-urls', 'http://0.0.0.0:2379',
+        ],
+        capture_output=True,
+    )
+    container_id = proc.stdout.decode().strip()
+    proc = subprocess.run(
+        [
+            'docker', 'inspect', container_id,
+        ],
+        capture_output=True,
+    )
+    container_info = json.loads(proc.stdout)
+    host_port = int(container_info[0]['NetworkSettings']['Ports']['2379/tcp'][0]['HostPort'])
+    yield container_id, HostPortPair('127.0.0.1', host_port)
+    subprocess.run(
+        [
+            'docker', 'rm', '-v', '-f', container_id,
+        ],
+        capture_output=True,
+    )
+
+
 @pytest.fixture
-def etcd_addr():
-    env_addr = os.environ.get('BACKEND_ETCD_ADDR')
-    if env_addr is not None:
-        return EtcdHostPortPair.parse(env_addr)
-    return EtcdHostPortPair.parse('localhost:2379')
+def etcd_addr(etcd_container):
+    return etcd_container[1]
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -71,11 +102,15 @@ def test_case_ns():
 
 @pytest.fixture
 async def etcd(etcd_addr, test_ns):
-    etcd = AsyncEtcd(addr=etcd_addr, namespace=test_ns, scope_prefix_map={
-        ConfigScopes.GLOBAL: 'global',
-        ConfigScopes.SGROUP: 'sgroup/testing',
-        ConfigScopes.NODE: 'node/i-test',
-    })
+    etcd = AsyncEtcd(
+        addr=etcd_addr,
+        namespace=test_ns,
+        scope_prefix_map={
+            ConfigScopes.GLOBAL: 'global',
+            ConfigScopes.SGROUP: 'sgroup/testing',
+            ConfigScopes.NODE: 'node/i-test',
+        },
+    )
     try:
         await etcd.delete_prefix('', scope=ConfigScopes.GLOBAL)
         await etcd.delete_prefix('', scope=ConfigScopes.SGROUP)
@@ -91,9 +126,13 @@ async def etcd(etcd_addr, test_ns):
 
 @pytest.fixture
 async def gateway_etcd(etcd_addr, test_ns):
-    etcd = AsyncEtcd(addr=etcd_addr, namespace=test_ns, scope_prefix_map={
-        ConfigScopes.GLOBAL: '',
-    })
+    etcd = AsyncEtcd(
+        addr=etcd_addr,
+        namespace=test_ns,
+        scope_prefix_map={
+            ConfigScopes.GLOBAL: '',
+        },
+    )
     try:
         await etcd.delete_prefix('', scope=ConfigScopes.GLOBAL)
         yield etcd
