@@ -39,7 +39,11 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.cli.context import CLIContext, init_logger
-from ai.backend.manager.cli.dbschema import oneshot
+from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
+from ai.backend.manager.cli.etcd import (
+    put_json as cli_etcd_put_json,
+    delete as cli_etcd_delete,
+)
 from ai.backend.manager.config import LocalConfig, SharedConfig, load as load_config
 from ai.backend.manager.server import (
     build_root_app,
@@ -49,9 +53,13 @@ from ai.backend.manager.api.types import (
 )
 from ai.backend.manager.models.base import populate_fixture, pgsql_connect_opts
 from ai.backend.manager.models import (
+    domains,
     scaling_groups,
     agents,
-    kernels, keypairs, vfolders,
+    kernels,
+    keypairs,
+    users,
+    vfolders,
 )
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
@@ -183,6 +191,10 @@ def local_config(
 def etcd_fixture(test_id, local_config, vfolder_mount, vfolder_fsprefix, vfolder_host) -> Iterator[None]:
     # Clear and reset etcd namespace using CLI functions.
     redis_addr = local_config['redis']['addr']
+    cli_ctx = CLIContext(
+        logger=init_logger(local_config, nested=True),
+        local_config=local_config,
+    )
     with tempfile.NamedTemporaryFile(mode='w', suffix='.etcd.json') as f:
         etcd_fixture = {
             'volumes': {
@@ -216,18 +228,16 @@ def etcd_fixture(test_id, local_config, vfolder_mount, vfolder_fsprefix, vfolder
         }
         json.dump(etcd_fixture, f)
         f.flush()
-        subprocess.call([
-            sys.executable,
-            '-m', 'ai.backend.manager.cli',
-            'etcd', 'put-json', '', f.name,
-        ])
+        click_ctx = cli_etcd_put_json.make_context(
+            'test', ['', f.name], obj=cli_ctx,
+        )
+        click_ctx.obj = cli_ctx
+        cli_etcd_put_json.invoke(click_ctx)
     yield
-    subprocess.call([
-        sys.executable,
-        '-m', 'ai.backend.manager.cli',
-        'etcd', 'delete',
-        '--prefix', '',
-    ])
+    click_ctx = cli_etcd_delete.make_context(
+        'test', ['--prefix', ''], obj=cli_ctx,
+    )
+    cli_etcd_delete.invoke(click_ctx)
 
 
 @pytest.fixture
@@ -329,11 +339,10 @@ def database(request, local_config, test_db):
         )
         alembic_cfg.write(alembic_cfg_data)
         alembic_cfg.flush()
-        click_ctx = oneshot.make_context(
-            'test', ['-f', alembic_cfg.name],
+        click_ctx = cli_schema_oneshot.make_context(
+            'test', ['-f', alembic_cfg.name], obj=cli_ctx,
         )
-        click_ctx.obj = cli_ctx
-        oneshot.invoke(click_ctx)
+        cli_schema_oneshot.invoke(click_ctx)
 
 
 @pytest.fixture()
@@ -390,6 +399,7 @@ def database_fixture(local_config, test_db, database):
                 await conn.execute((kernels.delete()))
                 await conn.execute((agents.delete()))
                 await conn.execute((keypairs.delete()))
+                await conn.execute((users.delete()))
                 await conn.execute((scaling_groups.delete()))
                 await conn.execute((domains.delete()))
         finally:
