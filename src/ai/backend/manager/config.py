@@ -286,6 +286,9 @@ _shdefs: Mapping[str, Any] = {
         'addr': '127.0.0.1:6379',
         'password': None,
     },
+    'docker': {
+        'registry': {},
+    },
     'network': {
         'subnet': {
             'agent': '0.0.0.0/0',
@@ -323,7 +326,7 @@ shared_config_iv = t.Dict({
         t.Key('service_name', default=None): t.Null | t.String,
         t.Key('password', default=_shdefs['redis']['password']): t.Null | t.String,
     }).allow_extra('*'),
-    t.Key('docker'): t.Dict({
+    t.Key('docker', default=_shdefs['docker']): t.Dict({
         t.Key('registry'): t.Mapping(t.String, container_registry_iv),
     }).allow_extra('*'),
     t.Key('plugins', default=_shdefs['plugins']): t.Dict({

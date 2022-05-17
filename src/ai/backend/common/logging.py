@@ -1,3 +1,4 @@
+from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from contextvars import ContextVar
 from datetime import datetime
@@ -31,7 +32,9 @@ from .exception import ConfigurationError
 
 # public APIs of this module
 __all__ = (
+    'AbstractLogger',
     'Logger',
+    'NoopLogger',
     'BraceStyleAdapter',
     'LogstashHandler',
     'is_active',
@@ -42,10 +45,14 @@ is_active: ContextVar[bool] = ContextVar('is_active', default=False)
 
 loglevel_iv = t.Enum('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'NOTSET')
 logformat_iv = t.Enum('simple', 'verbose')
+default_pkg_ns = {
+    '': 'WARNING',
+    'ai.backend': 'INFO',
+}
 
 logging_config_iv = t.Dict({
     t.Key('level', default='INFO'): loglevel_iv,
-    t.Key('pkg-ns'): t.Mapping(t.String(allow_blank=True), loglevel_iv),
+    t.Key('pkg-ns', default=default_pkg_ns): t.Mapping(t.String(allow_blank=True), loglevel_iv),
     t.Key('drivers', default=['console']): t.List(t.Enum('console', 'logstash', 'file')),
     t.Key('console', default=None): t.Null | t.Dict({
         t.Key('colored', default=True): t.Bool,
@@ -381,7 +388,37 @@ class RelayHandler(logging.Handler):
             self._fallback(record)
 
 
-class Logger():
+class AbstractLogger(metaclass=ABCMeta):
+    def __init__(
+        self,
+        daemon_config: MutableMapping[str, Any],
+    ) -> None:
+        pass
+
+    @abstractmethod
+    def __enter__(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def __exit__(self, *exc_info_args):
+        raise NotImplementedError
+
+
+class NoopLogger(AbstractLogger):
+    def __init__(
+        self,
+        daemon_config: MutableMapping[str, Any],
+    ) -> None:
+        pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *exc_info_args):
+        pass
+
+
+class Logger(AbstractLogger):
 
     is_master: bool
     log_endpoint: str
@@ -389,8 +426,13 @@ class Logger():
     log_config: MutableMapping[str, Any]
     log_worker: threading.Thread
 
-    def __init__(self, daemon_config: MutableMapping[str, Any], *,
-                 is_master: bool, log_endpoint: str) -> None:
+    def __init__(
+        self,
+        daemon_config: MutableMapping[str, Any],
+        *,
+        is_master: bool,
+        log_endpoint: str,
+    ) -> None:
         legacy_logfile_path = os.environ.get('BACKEND_LOG_FILE')
         if legacy_logfile_path:
             p = Path(legacy_logfile_path)

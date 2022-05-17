@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, AsyncIterator
 
 from ai.backend.common import redis
 from ai.backend.common.config import redis_config_iv
-from ai.backend.common.logging import Logger
+from ai.backend.common.logging import AbstractLogger, Logger, NoopLogger
 from ai.backend.common.types import RedisConnectionInfo
 
 from ai.backend.manager.config import SharedConfig
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)
 class CLIContext:
-    logger: Logger
+    logger: AbstractLogger
     local_config: LocalConfig
 
 
@@ -33,8 +33,11 @@ class RedisConnectionSet:
     stream: RedisConnectionInfo
 
 
-def init_logger(local_config: LocalConfig) -> Logger:
-    if 'file' in local_config['logging']['drivers']:
+def init_logger(local_config: LocalConfig, nested: bool = False) -> AbstractLogger:
+    if nested:
+        # return a dummy logger that does nothing.
+        return NoopLogger(local_config)
+    if 'drivers' in local_config['logging'] and 'file' in local_config['logging']['drivers']:
         local_config['logging']['drivers'].remove('file')
     # log_endpoint = f'tcp://127.0.0.1:{find_free_port()}'
     ipc_base_path = local_config['manager']['ipc-base-path']

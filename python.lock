@@ -26,6 +26,7 @@
 //     "aiosqlite~=0.17.0",
 //     "aiotools~=1.5.9",
 //     "aiotusclient~=0.1.4",
+//     "alembic~=1.7.7",
 //     "appdirs~=1.4.4",
 //     "async_timeout~=4.0",
 //     "asyncudp>=0.4",
@@ -507,6 +508,30 @@
           ],
           "requires_python": ">=3.7",
           "version": "0.1.4"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "29be0856ec7591c39f4e1cb10f198045d890e6e2274cf8da80cb5e721a09642b",
+              "url": "https://files.pythonhosted.org/packages/b3/e2/8d48220731b7279911c43e95cd182961a703b939de6822b00de3ea0d3159/alembic-1.7.7-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "4961248173ead7ce8a21efb3de378f13b8398e6630fab0eb258dc74a8af24c58",
+              "url": "https://files.pythonhosted.org/packages/30/b9/5526b43a4c54d177ab14af0af4b5c31d73db33d1ad3e30976d3b023e0594/alembic-1.7.7.tar.gz"
+            }
+          ],
+          "project_name": "alembic",
+          "requires_dists": [
+            "Mako",
+            "SQLAlchemy>=1.3.0",
+            "importlib-metadata; python_version < \"3.9\"",
+            "importlib-resources; python_version < \"3.9\"",
+            "python-dateutil; extra == \"tz\""
+          ],
+          "requires_python": ">=3.6",
+          "version": "1.7.7"
         },
         {
           "artifacts": [
@@ -1751,6 +1776,30 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "23aab11fdbbb0f1051b93793a58323ff937e98e34aece1c4219675122e57e4ba",
+              "url": "https://files.pythonhosted.org/packages/6e/01/45ab9f723a93e0ca75fba4d2c266bb041120cb4215eab94f7c78743ac7ed/Mako-1.2.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "9a7c7e922b87db3686210cf49d5d767033a41d4010b284e747682c92bddd8b39",
+              "url": "https://files.pythonhosted.org/packages/50/ec/1d687348f0954bda388bfd1330c158ba8d7dea4044fc160e74e080babdb9/Mako-1.2.0.tar.gz"
+            }
+          ],
+          "project_name": "mako",
+          "requires_dists": [
+            "Babel; extra == \"babel\"",
+            "MarkupSafe>=0.9.2",
+            "importlib-metadata; python_version < \"3.8\"",
+            "lingua; extra == \"lingua\"",
+            "pytest; extra == \"testing\""
+          ],
+          "requires_python": ">=3.7",
+          "version": "1.2"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "dda30ba7e87fbbb7eab1ec9f58678558fd9a6b8b853530e176eabd064da81417",
               "url": "https://files.pythonhosted.org/packages/3d/4b/15e5b9d40c4b58e97ebcb8ed5845a215fa5b7cf49a7f1cc7908f8db9cf46/MarkupSafe-2.1.1-cp310-cp310-win_amd64.whl"
             },
@@ -2753,13 +2802,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5534570b9980fc650d45c62877ff603c7aaaf24893371708736cc016bd221c3c",
-              "url": "https://files.pythonhosted.org/packages/ee/0f/dba055d3696c63fff7430bbc5f337454ac66711d91965f08146784afecad/setuptools-62.2.0-py3-none-any.whl"
+              "hash": "588ffd1dc6e20e9f4f7057aa9873fcdc26e0270362602735d32476bad67d82c5",
+              "url": "https://files.pythonhosted.org/packages/fc/d6/764e0cf61f1456b974d9d71b696d483fe269ab31466d76007def02bc4739/setuptools-62.3.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ca6ba73b7fd5f734ae70ece8c4c1f7062b07f3352f6428f6277e27c8f5c64237",
-              "url": "https://files.pythonhosted.org/packages/b1/77/75f6543eafdffc0b3f07f99682497bea817ef0b6c361fe72b932eb82459c/setuptools-62.2.0.tar.gz"
+              "hash": "28c79c24d83c42a5e6d6cc711e5e9a6c1b89326229feaa5807fc277040658600",
+              "url": "https://files.pythonhosted.org/packages/87/db/d840e1b888bd82b0b826b8864d1674df52f6d9d909177e1d144ab38a8c50/setuptools-62.3.1.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -2796,6 +2845,7 @@
             "rst.linker>=1.9; extra == \"docs\"",
             "sphinx-favicon; extra == \"docs\"",
             "sphinx-inline-tabs; extra == \"docs\"",
+            "sphinx-reredirects; extra == \"docs\"",
             "sphinx; extra == \"docs\"",
             "sphinxcontrib-towncrier; extra == \"docs\"",
             "tomli-w>=1.0.0; extra == \"testing\"",
@@ -2806,7 +2856,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "62.2"
+          "version": "62.3.1"
         },
         {
           "artifacts": [
@@ -3607,6 +3657,7 @@
     "aiosqlite~=0.17.0",
     "aiotools~=1.5.9",
     "aiotusclient~=0.1.4",
+    "alembic~=1.7.7",
     "appdirs~=1.4.4",
     "async_timeout~=4.0",
     "asyncudp>=0.4",

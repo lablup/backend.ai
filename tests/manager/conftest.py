@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -37,6 +38,8 @@ from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_c
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.cli.context import CLIContext, init_logger
+from ai.backend.manager.cli.dbschema import oneshot
 from ai.backend.manager.config import LocalConfig, SharedConfig, load as load_config
 from ai.backend.manager.server import (
     build_root_app,
@@ -81,10 +84,13 @@ def test_db(test_id):
 
 @pytest.fixture(scope='session')
 def vfolder_mount(test_id):
-    ret = Path(f'/tmp/backend.ai-testing/vfolders-{test_id}')
+    ret = Path.cwd() / f'tmp/backend.ai/manager-testing/vfolders-{test_id}'
     ret.mkdir(parents=True, exist_ok=True)
     yield ret
-    shutil.rmtree(ret.parent)
+    try:
+        shutil.rmtree(ret.parent)
+    except IOError:
+        pass
 
 
 @pytest.fixture(scope='session')
@@ -136,6 +142,16 @@ def local_config(
             'ipc-base-path': ipc_base_path,
             'service-addr': HostPortPair('127.0.0.1', 29100 + parallel_exec_slot * 10),
         },
+        'debug': {
+            'enabled': False,
+            'log-events': False,
+            'log-scheduler-ticks': False,
+            'periodic-sync-stats': False,
+        },
+        'logging': {
+            'drivers': ['console'],
+            'console': {'colored': False, 'format': 'verbose'},
+        },
     })
 
     def _override_if_exists(src: dict, dst: dict, key: str) -> None:
@@ -157,7 +173,10 @@ def local_config(
     except ConfigurationError:
         pass
     yield cfg
-    shutil.rmtree(ipc_base_path)
+    try:
+        shutil.rmtree(ipc_base_path)
+    except IOError:
+        pass
 
 
 @pytest.fixture(scope='session')
@@ -270,22 +289,51 @@ def database(request, local_config, test_db):
 
     request.addfinalizer(lambda: asyncio.run(finalize_db()))
 
+    alembic_config_template = textwrap.dedent("""
+    [alembic]
+    script_location = ai.backend.manager.models:alembic
+    sqlalchemy.url = {sqlalchemy_url:s}
+
+    [loggers]
+    keys = root
+
+    [logger_root]
+    level = WARNING
+    handlers = console
+
+    [handlers]
+    keys = console
+
+    [handler_console]
+    class = StreamHandler
+    args = (sys.stdout,)
+    formatter = simple
+    level = INFO
+
+    [formatters]
+    keys = simple
+
+    [formatter_simple]
+    format = [%(name)s] %(message)s
+    """).strip()
+
     # Load the database schema using CLI function.
-    alembic_url = f'postgresql://{db_user}:{db_pass}@{db_addr}/{test_db}'
+    cli_ctx = CLIContext(
+        logger=init_logger(local_config, nested=True),
+        local_config=local_config,
+    )
+    sqlalchemy_url = f'postgresql://{db_user}:{db_pass}@{db_addr}/{test_db}'
     with tempfile.NamedTemporaryFile(mode='w', encoding='utf8') as alembic_cfg:
-        alembic_sample_cfg = here / '..' / 'alembic.ini.sample'
-        alembic_cfg_data = alembic_sample_cfg.read_text()
-        alembic_cfg_data = re.sub(
-            r'^sqlalchemy.url = .*$',
-            f'sqlalchemy.url = {alembic_url}',
-            alembic_cfg_data, flags=re.M)
+        alembic_cfg_data = alembic_config_template.format(
+            sqlalchemy_url=sqlalchemy_url,
+        )
         alembic_cfg.write(alembic_cfg_data)
         alembic_cfg.flush()
-        subprocess.call([
-            'python', '-m', 'ai.backend.manager.cli',
-            'schema', 'oneshot',
-            '-f', alembic_cfg.name,
-        ])
+        click_ctx = oneshot.make_context(
+            'test', ['-f', alembic_cfg.name],
+        )
+        click_ctx.obj = cli_ctx
+        oneshot.invoke(click_ctx)
 
 
 @pytest.fixture()
@@ -309,11 +357,11 @@ def database_fixture(local_config, test_db, database):
     # NOTE: The fixtures must be loaded in the order that they are present.
     #       Normal dicts on Python 3.6 or later guarantees the update ordering.
     fixtures.update(json.loads(
-        (Path(__file__).parent.parent /
+        (Path(__file__).parent /
          'fixtures' / 'example-keypairs.json').read_text(),
     ))
     fixtures.update(json.loads(
-        (Path(__file__).parent.parent /
+        (Path(__file__).parent /
          'fixtures' / 'example-resource-presets.json').read_text(),
     ))
 
@@ -343,6 +391,7 @@ def database_fixture(local_config, test_db, database):
                 await conn.execute((agents.delete()))
                 await conn.execute((keypairs.delete()))
                 await conn.execute((scaling_groups.delete()))
+                await conn.execute((domains.delete()))
         finally:
             await engine.dispose()
 

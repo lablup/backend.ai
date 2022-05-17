@@ -4,6 +4,9 @@ python_test_utils(
         "conftest.py",
         "model_factory.py",
     ],
+    dependencies=[
+        ":fixtures",
+    ],
 )
 
 python_tests(
@@ -13,4 +16,9 @@ python_tests(
         "src/ai/backend/testutils:lib",
         "//:reqs#aiosqlite",
     ],
+)
+
+files(
+    name="fixtures",
+    sources=["fixtures/*"],
 )
