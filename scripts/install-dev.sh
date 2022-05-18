@@ -58,11 +58,11 @@ usage() {
   echo ""
   echo "  ${LWHITE}--server-branch NAME${NC}"
   echo "                       The branch of git clones for server components"
-  echo "                       (default: main)"
+  echo "                       (default: 21.09)"
   echo ""
   echo "  ${LWHITE}--client-branch NAME${NC}"
   echo "                       The branch of git clones for client components"
-  echo "                       (default: main)"
+  echo "                       (default: 21.09)"
   echo ""
   echo "  ${LWHITE}--enable-cuda${NC}        Install CUDA accelerator plugin and pull a"
   echo "                       TenosrFlow CUDA kernel for testing/demo."
@@ -178,8 +178,8 @@ fi
 ROOT_PATH=$(pwd)
 ENV_ID=""
 PYTHON_VERSION="3.9.10"
-SERVER_BRANCH="main"
-CLIENT_BRANCH="main"
+SERVER_BRANCH="21.09"
+CLIENT_BRANCH="21.09"
 INSTALL_PATH="./backend.ai-dev"
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
