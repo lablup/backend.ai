@@ -42,10 +42,17 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
     kwargs["classifiers"] = [*standard_classifiers, *kwargs.get("classifiers", [])]
 
     # Determine the long description by reading from ABOUT.md and the release notes.
+    spec_path = Path(request.target.address.spec_path)
+    if (spec_path / "README.md").is_file():
+        readme_path = spec_path / "README.md"
+    elif (spec_path / "README.rst").is_file():
+        readme_path = spec_path / "README.rst"
+    else:
+        readme_path = spec_path / "README"
     _digest_contents = await Get(
         DigestContents,
         PathGlobs(
-            [str(Path(request.target.address.spec_path) / "README.md")],
+            [str(readme_path)],
             description_of_origin="setupgen plugin",
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
         ),
