@@ -1,4 +1,0 @@
-resources(
-    name="stubs",
-    sources=["**/*"],
-)

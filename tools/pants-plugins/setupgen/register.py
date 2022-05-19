@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from pants.backend.python.goals.setup_py import SetupKwargs, SetupKwargsRequest
@@ -17,9 +18,28 @@ class CustomSetupKwargsRequest(SetupKwargsRequest):
         return True
 
 
+license_classifier_map = {
+    "LGPLv3": "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+    "Apache 2.0": "License :: OSI Approved :: Apache Software License",
+    "BSD": "License :: OSI Approved :: BSD License",
+    "MIT": "License :: OSI Approved :: MIT License",
+}
+
+
 @rule
 async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
     kwargs = request.explicit_kwargs.copy()
+
+    # Single-source the version from VERSION.
+    _digest_contents = await Get(
+        DigestContents,
+        PathGlobs(
+            ["VERSION"],
+            description_of_origin="setupgen plugin",
+            glob_match_error_behavior=GlobMatchErrorBehavior.error,
+        ),
+    )
+    VERSION = _digest_contents[0].content.decode()
 
     # Validate that required fields are set.
     if not kwargs["name"].startswith("backend.ai-"):
@@ -38,8 +58,26 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: POSIX :: Linux",
         "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Environment :: No Input/Output (Daemon)",
+        "Topic :: Scientific/Engineering",
+        "Topic :: Software Development",
     ]
     kwargs["classifiers"] = [*standard_classifiers, *kwargs.get("classifiers", [])]
+    if re.search(r"\.?dev\d*$", VERSION):
+        standard_classifiers.append("Development Status :: 2 - Pre-Alpha")
+    elif re.search(r"\.?a(lpha)?\d*$", VERSION):
+        standard_classifiers.append("Development Status :: 3 - Alpha")
+    elif re.search(r"\.?b(eta)?\d*$", VERSION):
+        standard_classifiers.append("Development Status :: 4 - Beta")
+    elif re.search(r"\.?rc?\d*$", VERSION):
+        standard_classifiers.append("Development Status :: 4 - Beta")
+    else:
+        standard_classifiers.append("Development Status :: 5 - Production/Stable")
+
+    license_classifier = license_classifier_map.get(kwargs["license"])
+    if license_classifier:
+        standard_classifiers.append(license_classifier)
 
     # Determine the long description by reading from ABOUT.md and the release notes.
     spec_path = Path(request.target.address.spec_path)
@@ -58,17 +96,6 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
         ),
     )
     long_description = _digest_contents[0].content.decode()
-
-    # Single-source the version from VERSION.
-    _digest_contents = await Get(
-        DigestContents,
-        PathGlobs(
-            ["VERSION"],
-            description_of_origin="setupgen plugin",
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
-        ),
-    )
-    VERSION = _digest_contents[0].content.decode()
 
     # Hardcode certain kwargs and validate that they weren't already set.
     hardcoded_kwargs = dict(
