@@ -20,7 +20,7 @@
 //     "aiohttp_cors~=0.7",
 //     "aiohttp_session[aioredis]~=2.11",
 //     "aiohttp_sse>=2.0",
-//     "aiohttp~=3.8.0",
+//     "aiohttp~=3.8.1",
 //     "aiomonitor~=0.4.5",
 //     "aioredis[hiredis]~=2.0.1",
 //     "aiosqlite~=0.17.0",
@@ -895,19 +895,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d62a0163eb4c2344ac042ab2bdf75399a71a2d8c7d47eac2e2ee91b9d6339569",
-              "url": "https://files.pythonhosted.org/packages/37/45/946c02767aabb873146011e665728b680884cd8fe70dde973c640e45b775/certifi-2021.10.8-py2.py3-none-any.whl"
+              "hash": "8d15a5a7fde18536a249c49e07e8e462b8fc13de21b3c80e8a68315dfa227c99",
+              "url": "https://files.pythonhosted.org/packages/0d/e0/481445ea9f9a8ede3f6f373566c7fb20de435203e4828f3738906013ecfa/certifi-2022.5.18-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "78884e7c1d4b00ce3cea67b44566851c4343c120abd683433ce934a68ea58872",
-              "url": "https://files.pythonhosted.org/packages/6c/ae/d26450834f0acc9e3d1f74508da6df1551ceab6c2ce0766a593362d6d57f/certifi-2021.10.8.tar.gz"
+              "hash": "6ae10321df3e464305a46e997da41ea56c1d311fb9ff1dd4e04d6f14653ec63a",
+              "url": "https://files.pythonhosted.org/packages/c5/63/a8e4b0c24e8538cec5579edbb2df4ed1f980d5f186878905317139d83b61/certifi-2022.5.18.tar.gz"
             }
           ],
           "project_name": "certifi",
           "requires_dists": [],
-          "requires_python": null,
-          "version": "2021.10.8"
+          "requires_python": ">=3.5",
+          "version": "2022.5.18"
         },
         {
           "artifacts": [
@@ -1197,13 +1197,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "eefeba685cb0f99681149a513b41ede014f69cb6415004bc43c5318739a80b25",
-              "url": "https://files.pythonhosted.org/packages/23/1d/cac2a6b207ffbf6d7e673a78dbc477debbfd532d0f6b76e92005901af671/etcetra-0.1.5-py3-none-any.whl"
+              "hash": "78f81768dbbd498091ecf09291b8bd8ef1a9a68791f121d1fbab7b1f3220d862",
+              "url": "https://files.pythonhosted.org/packages/94/69/425848749851fb35b1aded3e89a7a0a5adb08d576ea2ca79b9678ed4546e/etcetra-0.1.6-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a7ab1299092f512debdbc2c4a88529ce2f12a13de6f94e12e29df1fa7247ffad",
-              "url": "https://files.pythonhosted.org/packages/7e/14/b664cd20bfe3748590f9a781cf968ffb5c02c601a0f86e4a54c6e69e7058/etcetra-0.1.5.tar.gz"
+              "hash": "ceaaf1ce8fa72b943e1fb69704c83cc631085187b6dc19be6eae02099e9155bb",
+              "url": "https://files.pythonhosted.org/packages/7e/f8/2dc3d6796461f27f06ac3a10adfeca52a7565d0cdbf28093fb398715b9e9/etcetra-0.1.6.tar.gz"
             }
           ],
           "project_name": "etcetra",
@@ -1225,7 +1225,7 @@
             "wheel>=0.36.2; extra == \"build\""
           ],
           "requires_python": ">=3.9",
-          "version": "0.1.5"
+          "version": "0.1.6"
         },
         {
           "artifacts": [
@@ -2802,13 +2802,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "588ffd1dc6e20e9f4f7057aa9873fcdc26e0270362602735d32476bad67d82c5",
-              "url": "https://files.pythonhosted.org/packages/fc/d6/764e0cf61f1456b974d9d71b696d483fe269ab31466d76007def02bc4739/setuptools-62.3.1-py3-none-any.whl"
+              "hash": "68e45d17c9281ba25dc0104eadd2647172b3472d9e01f911efa57965e8d51a36",
+              "url": "https://files.pythonhosted.org/packages/e9/1c/ec080fde54ab30a738c92f794eab7f5d2f354f2b619ee95b2efe353e0766/setuptools-62.3.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "28c79c24d83c42a5e6d6cc711e5e9a6c1b89326229feaa5807fc277040658600",
-              "url": "https://files.pythonhosted.org/packages/87/db/d840e1b888bd82b0b826b8864d1674df52f6d9d909177e1d144ab38a8c50/setuptools-62.3.1.tar.gz"
+              "hash": "a43bdedf853c670e5fed28e5623403bad2f73cf02f9a2774e91def6bda8265a7",
+              "url": "https://files.pythonhosted.org/packages/4a/25/ec29a23ef38b9456f9965c57a9e1221e6c246d87abbf2a31158799bca201/setuptools-62.3.2.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -2856,7 +2856,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "62.3.1"
+          "version": "62.3.2"
         },
         {
           "artifacts": [
@@ -3245,19 +3245,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9d6f01382d5ffe1977dc29f0782a01228dfaa36da148a7f4076cbd9beba26647",
-              "url": "https://files.pythonhosted.org/packages/ec/e3/a085aa2233d0b4227e7e44b8469b8716a15d0df6be97bde50a316b331ba7/types_python_dateutil-2.8.15-py3-none-any.whl"
+              "hash": "0e7286436d049d2732ba2f01552f84c52184b955552359156fc8835c10714f2a",
+              "url": "https://files.pythonhosted.org/packages/ca/17/5c5fdee8fa81a3d76484dbe2ffb48c8c344e79c554b36ee80088f92539e7/types_python_dateutil-2.8.16-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7db1e4ed4916bd128cbee3eecdee0e06cc5684da2a1cdfd57f98541cdfbe0861",
-              "url": "https://files.pythonhosted.org/packages/cf/a0/8d45c10441d136dc7bc5f5a7ce0d7d368190157505a401651b307776bdb3/types-python-dateutil-2.8.15.tar.gz"
+              "hash": "3aaac4c138eb6b8ecbc2550996ec25d6e45b5d32887d1e693d0842ee2fa659d2",
+              "url": "https://files.pythonhosted.org/packages/28/cd/2f094758ff9ee4ad820fc20b37e89908c0ff9fd541d066c1afa5a47acf2e/types-python-dateutil-2.8.16.tar.gz"
             }
           ],
           "project_name": "types-python-dateutil",
           "requires_dists": [],
           "requires_python": null,
-          "version": "2.8.15"
+          "version": "2.8.16"
         },
         {
           "artifacts": [
@@ -3651,7 +3651,7 @@
     "aiohttp_cors~=0.7",
     "aiohttp_session[aioredis]~=2.11",
     "aiohttp_sse>=2.0",
-    "aiohttp~=3.8.0",
+    "aiohttp~=3.8.1",
     "aiomonitor~=0.4.5",
     "aioredis[hiredis]~=2.0.1",
     "aiosqlite~=0.17.0",

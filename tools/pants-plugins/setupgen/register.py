@@ -63,7 +63,6 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
         "Topic :: Scientific/Engineering",
         "Topic :: Software Development",
     ]
-    kwargs["classifiers"] = [*standard_classifiers, *kwargs.get("classifiers", [])]
     if re.search(r"\.?dev\d*$", VERSION):
         standard_classifiers.append("Development Status :: 2 - Pre-Alpha")
     elif re.search(r"\.?a(lpha)?\d*$", VERSION):
@@ -78,6 +77,8 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
     license_classifier = license_classifier_map.get(kwargs["license"])
     if license_classifier:
         standard_classifiers.append(license_classifier)
+
+    kwargs["classifiers"] = [*standard_classifiers, *kwargs.get("classifiers", [])]
 
     # Determine the long description by reading from ABOUT.md and the release notes.
     spec_path = Path(request.target.address.spec_path)

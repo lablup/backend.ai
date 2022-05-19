@@ -36,6 +36,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":service",
+        "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
         name="backend.ai-manager",

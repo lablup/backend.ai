@@ -17,17 +17,19 @@ pants_ignore = [
     "src/ai/backend/kernel",
     "src/ai/backend/runner",
     "src/ai/backend/helpers",
-    "!tests/manager/manager.toml",
-    "!tests/agent/agent.toml",
-    "!manager.toml",
-    "!agent.toml",
 ]
 
 [anonymous-telemetry]
 enabled = false
 
 [source]
-root_patterns = ["src", "stubs", "tests", "tools/pants-plugins"]
+root_patterns = [
+    "/",
+    "/src",
+    "/stubs",
+    "/tests",
+    "/tools/pants-plugins",
+]
 
 [python]
 enable_resolves = true
