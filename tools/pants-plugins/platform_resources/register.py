@@ -45,8 +45,8 @@ class PlatformDependencyMapField(DictStringToStringField):
 
 class PlatformSpecificDependencies(Dependencies):
     """
-    This field will be populated by injection based on the `--platform-resources-target` from the
-    `platforms` field of the `platform_resources` target.
+    This field will be populated by injection based on the `--platform-specific-resources-target` option
+    and from the `dependency_map` field of the `platform_resources` target.
     """
 
 
