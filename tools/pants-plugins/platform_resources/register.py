@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 
 from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
-from pants.core.target_types import GenericTarget
 from pants.engine.platform import Platform
 from pants.engine.rules import (
     Get,
@@ -17,7 +16,6 @@ from pants.engine.target import (
     Dependencies,
     InjectedDependencies,
     InjectDependenciesRequest,
-    StringField,
     Target,
     WrappedTarget,
 )
@@ -28,68 +26,54 @@ from pants.option.subsystem import Subsystem
 logger = logging.getLogger(__name__)
 
 
-class SelectiveResourcesSubsystem(Subsystem):
-    options_scope = "selective-resources"
-    help = "The selective resource source provider."
+class PlatformResourcesSusbystem(Subsystem):
+    options_scope = "platform-specific-resources"
+    help = "The platform-specific resource provider."
     platform = EnumOption(
-        "--platform",
-        default=Platform.linux_x86_64,
+        "--target",
+        default=Platform.current,
         enum_type=Platform,
         advanced=False,
         help="Select only resources compatible with the given platform",
     )
 
 
-# class PlatformSelectionField(StringField):
-#     alias = "platform"
-#     help = "Selectively inject dependencies depending on the designated platform configuration"
-#     default = None
+class PlatformDependencyMapField(DictStringToStringField):
+    alias = "dependency_map"
+    help = "Specifies platform-specific dependencies as a dictionary from platform names to dependency lists."
 
 
-# class PlatformSpecificDependenciesField(Dependencies):
-#     alias = "platform_dependencies"
-#     help = "Platform-specific dependencies"
-
-
-class PlatformsField(DictStringToStringField):
-    alias = "platforms"
-    help = "Selectively inject dependencies depending on the designated platform configuration"
-
-
-class PlatformSpecificDependenciesField(Dependencies):
-    """This field will be populated by injection based on the `--selective-resources-platform` from the
+class PlatformSpecificDependencies(Dependencies):
+    """
+    This field will be populated by injection based on the `--platform-resources-target` from the
     `platforms` field of the `platform_resources` target.
-
     """
 
 
 class PlatformResourcesTarget(Target):
     alias = "platform_resources"
-    core_fields = (*COMMON_TARGET_FIELDS, PlatformsField, PlatformSpecificDependenciesField)
+    core_fields = (*COMMON_TARGET_FIELDS, PlatformDependencyMapField, PlatformSpecificDependencies)
 
 
 class InjectPlatformSpecificDependenciesRequest(InjectDependenciesRequest):
-    inject_for = PlatformSpecificDependenciesField
+    inject_for = PlatformSpecificDependencies
 
 
 @rule
 async def inject_platform_specific_dependencies(
     request: InjectPlatformSpecificDependenciesRequest,
-    subsystem: SelectiveResourcesSubsystem,
+    subsystem: PlatformResourcesSusbystem,
 ) -> InjectedDependencies:
-    logger.info("---- request: %r", request)
-    logger.info("---- selected platform: %r", subsystem.platform)
-    # logger.info("---- target platform: %r", request.platform)
-
+    logger.info(
+        "configured target platform (%s) = %s",
+        request.dependencies_field.address,
+        subsystem.platform.value,
+    )
     wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    platforms = wrapped_target.target.get(PlatformsField).value
-
-    logger.info(f"=== Platforms: {platforms}\n")
-
+    platforms = wrapped_target.target.get(PlatformDependencyMapField).value
     platform_resources_unparsed_address = platforms and platforms.get(subsystem.platform.value)
     if not platform_resources_unparsed_address:
         return InjectedDependencies()
-
     parsed_addresses = await Get(
         Addresses,
         UnparsedAddressInputs(
@@ -112,9 +96,6 @@ def target_types():
 def rules():
     return [
         *collect_rules(),
-        SubsystemRule(SelectiveResourcesSubsystem),
-        # GenericTarget.register_plugin_field(PlatformSpecificDependenciesField),
-        # GenericTarget.register_plugin_field(PlatformSelectionField),
-        # GenericTarget.register_plugin_field(PlatformSpecificDependenciesField),
+        SubsystemRule(PlatformResourcesSusbystem),
         UnionRule(InjectDependenciesRequest, InjectPlatformSpecificDependenciesRequest),
     ]

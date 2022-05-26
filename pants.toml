@@ -8,7 +8,7 @@ backend_packages = [
     "pants.backend.python.typecheck.mypy",
     "pants.backend.experimental.python",
     "setupgen",
-    "selective_resources",
+    "platform_resources",
 ]
 pants_ignore = [
     "scripts",

@@ -92,6 +92,7 @@ ENV/
 # IDE/vim
 .idea
 .*.swp
+.vscode
 
 # Pants
 /.pants.d/
