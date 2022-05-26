@@ -8,15 +8,12 @@ backend_packages = [
     "pants.backend.python.typecheck.mypy",
     "pants.backend.experimental.python",
     "setupgen",
+    "selective_resources",
 ]
 pants_ignore = [
     "scripts",
     "plugins",
     "docs",  # TODO: docs build config
-    # ignore source trees mounted inside compute session containers
-    "src/ai/backend/kernel",
-    "src/ai/backend/runner",
-    "src/ai/backend/helpers",
 ]
 
 [anonymous-telemetry]
