@@ -29,8 +29,9 @@ resources(
     name="resources",
     dependencies=[
         ":version",
-        ":linux-x86_64-target",
-        ":linux-arm64-target",
+        ":platform-binaries",
+        # ":linux-x86_64-target",
+        # ":linux-arm64-target",
     ],
     sources=[
         "*.sh",
@@ -39,28 +40,28 @@ resources(
     ],
 )
 
-target(
-    name="linux-x86_64-target",
-    platform="linux_x86_64",
-    platform_dependencies=[
-        ":linux-x86_64-binaries",
-    ],
-)
-target(
-    name="linux-arm64-target",
-    platform="linux_arm64",
-    platform_dependencies=[
-        ":linux-arm64-binaries",
-    ],
-)
-
 # target(
-#     name="platform-binaries",
-#     platforms={
-#         "linux-x86_64": ":linux-x86_64-binaries",
-#         "linux-arm64": ":linux-arm64-binaries",
-#     },
+#     name="linux-x86_64-target",
+#     platform="linux_x86_64",
+#     platform_dependencies=[
+#         ":linux-x86_64-binaries",
+#     ],
 # )
+# target(
+#     name="linux-arm64-target",
+#     platform="linux_arm64",
+#     platform_dependencies=[
+#         ":linux-arm64-binaries",
+#     ],
+# )
+
+platform_resources(
+    name="platform-binaries",
+    platforms={
+        "linux_x86_64": ":linux-x86_64-binaries",
+        "linux_arm64": ":linux-arm64-binaries",
+    },
+)
 
 resources(
     name="linux-x86_64-binaries",
