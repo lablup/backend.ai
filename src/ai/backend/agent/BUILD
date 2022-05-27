@@ -8,6 +8,7 @@ python_sources(
         "src/ai/backend/helpers:lib",
         "src/ai/backend/kernel:lib",
         ":resources",
+        "//:reqs#backend.ai-krunner-static-gnu",
     ],
 )
 
@@ -24,10 +25,20 @@ pex_binary(
     entry_point="watcher.py",
 )
 
+python_requirement(
+    name="kernel-support",
+    requirements=[
+        "backend.ai-kernel",
+        "backend.ai-kernel-binary",
+        "backend.ai-kernel-helper",
+    ],
+)
+
 python_distribution(
     name="dist",
     dependencies=[
         ":service",
+        ":kernel-support",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(

@@ -3,6 +3,7 @@ python_sources(
     sources=[
         "**/*.py",
     ],
+    interpreter_constraints=[">=3.8"],
     dependencies=[
         ":resources",
     ],
@@ -31,4 +32,14 @@ target(
     dependencies=[
         ":version",
     ],
+)
+
+python_requirements(
+    name="reqs",
+    source="requirements.txt",
+    resolve="python-kernel",
+    module_mapping={
+        "attrs": ["attr", "attrs"],
+        "pyzmq": ["zmq"],
+    },
 )

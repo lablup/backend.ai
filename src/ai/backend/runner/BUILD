@@ -13,7 +13,7 @@ python_distribution(
         ":lib",
     ],
     provides=python_artifact(
-        name="backend.ai-krunner-runtime",
+        name="backend.ai-kernel-binary",
         description="Backend.AI Kernel Runner Prebuilt Binaries Package",
         license="LGPLv3",
     ),
