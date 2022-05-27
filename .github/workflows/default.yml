@@ -184,15 +184,42 @@ jobs:
       run: |
         mkdir .tmp
         ./pants --no-verify-config version
-    - name: Test
+    - name: Build packages
       run: |
-        ./pants pacakge '::'
-    - name: Build and publish
+        PKGVER=$(cat VERSION)
+        # Build x86_64 wheels and all other non-platform-specific wheels
+        MANYLINUX_PTAG=manylinux2014_x86_64
+        MACOS_PTAG=macosx_11_0_x86_64
+        ./pants --platform-specific-resources-target=linux_x86_64 pacakge '::'
+        for pkgname in "kernel_binary"; do
+          mv dist/backend.ai_${pkgname}-${PKGVER}-*.whl \
+             dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl
+        done
+        # Build arm64 wheels
+        MANYLINUX_PTAG=manylinux2014_aarch64
+        MACOS_PTAG=macosx_11_0_arm64
+        ./pants --platform-specific-resources-target=linux_arm64 pacakge 'src/ai/backend/runner:dist'
+        for pkgname in "kernel_binary"; do
+          mv dist/backend.ai_${pkgname}-${PKGVER}-*.whl \
+             dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl
+        done
+        ls -lh dist
+    - name: Prepare for publish
+      run: |
+        pip install -U 'twine~=4.0'
+    - name: Publish
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      # We don't use `./pants publish ::` because we manually rename the
+      # wheels after buildling them to add arch-specific tags.
       run: |
-        ./pants publish '::'
+        twine upload dist/*.whl
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: dist
+        path: dist
     - name: Upload pants log
       uses: actions/upload-artifact@v2
       with:
