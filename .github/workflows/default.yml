@@ -186,13 +186,13 @@ jobs:
         ./pants --no-verify-config version
     - name: Test
       run: |
-        ./pants pacakge '::dist'
+        ./pants pacakge '::'
     - name: Build and publish
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       run: |
-        ./pants publish '::dist'
+        ./pants publish '::'
     - name: Upload pants log
       uses: actions/upload-artifact@v2
       with:
