@@ -389,7 +389,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
     def resolve_krunner_filepath(self, filename) -> Path:
         return Path(pkg_resources.resource_filename(
-            'ai.backend.agent', '../' + filename)).resolve()
+            'ai.backend.runner', '../' + filename,
+        )).resolve()
 
     def get_runner_mount(
         self,

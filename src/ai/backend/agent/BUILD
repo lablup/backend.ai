@@ -4,6 +4,9 @@ python_sources(
     dependencies=[
         "src/ai/backend/cli:lib",
         "src/ai/backend/common:lib",
+        "src/ai/backend/runner:lib",
+        "src/ai/backend/helpers:lib",
+        "src/ai/backend/kernel:lib",
         ":resources",
     ],
 )
@@ -59,8 +62,5 @@ resources(
         "kubernetes/*.txt",
         "kubernetes/*.tar.gz",
         "kubernetes/*.bin",
-        "../kernel/**/*",
-        "../runner/**/*",
-        "../helpers/**/*",
     ],
 )
