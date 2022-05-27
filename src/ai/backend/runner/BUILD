@@ -1,5 +1,6 @@
 python_sources(
     name="lib",
+    interpreter_constraints=[">=3.8"],
     dependencies=[
         ":resources",
     ],
