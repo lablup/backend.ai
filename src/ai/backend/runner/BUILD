@@ -35,6 +35,14 @@ resources(
         "*.sh",
         "*.svg",
         "*.md",
+        "*.css",
+        "*.ttf",
+        "*.dockerfile",
+        ".bash_profile",
+        ".bashrc",
+        ".tmux.conf",
+        ".vimrc",
+        "terminfo.alpine3.8/**/*",
     ],
 )
 

@@ -53,6 +53,7 @@ class PlatformSpecificDependencies(Dependencies):
 class PlatformResourcesTarget(Target):
     alias = "platform_resources"
     core_fields = (*COMMON_TARGET_FIELDS, PlatformDependencyMapField, PlatformSpecificDependencies)
+    help = "A target to declare selective dependency sets for multiple different platforms"
 
 
 class InjectPlatformSpecificDependenciesRequest(InjectDependenciesRequest):
