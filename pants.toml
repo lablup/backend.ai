@@ -31,7 +31,7 @@ root_patterns = [
 [python]
 enable_resolves = true
 resolves = { python-default = "python.lock" }
-interpreter_constraints = ["CPython>=3.10"]
+interpreter_constraints = ["CPython>=3.10,<3.11"]
 lockfile_generator = "pex"
 
 # [setup-py-generation]
