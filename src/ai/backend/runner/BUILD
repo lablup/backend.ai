@@ -6,8 +6,14 @@ python_sources(
     ],
 )
 
-# This distribution is not actually uploaded to PyPI.
-# We have separate krunner static distributions.
+pex_binary(
+    name="extract-dotfiles",
+    entry_point="extract_dotfiles.py",
+)
+
+# This package does not have external requirements.
+python_requirements()
+
 python_distribution(
     name="dist",
     dependencies=[
