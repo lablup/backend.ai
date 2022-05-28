@@ -75,6 +75,7 @@
 //     "types-click",
 //     "types-python-dateutil",
 //     "types-setuptools",
+//     "types-six",
 //     "types-tabulate",
 //     "types-toml",
 //     "typing_extensions~=4.1.1",
@@ -3299,6 +3300,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "18f6856a7df44fc7a292c2d73093908333e5f7cb858667b8cbefc8ed1e91942e",
+              "url": "https://files.pythonhosted.org/packages/13/d4/ee6b9044aac19e9a3e0463acc0b6c062db54d70294d1885de492c0c399ad/types_six-1.16.15-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d244f0537dab0d0570a5bc6f8a60c4da7f0546d960a8677520e6bff214a64fb8",
+              "url": "https://files.pythonhosted.org/packages/1c/69/1cb7e70583221b1f42147d5d59e43a230e84cebf25e774021a12dfb713fa/types-six-1.16.15.tar.gz"
+            }
+          ],
+          "project_name": "types-six",
+          "requires_dists": [],
+          "requires_python": null,
+          "version": "1.16.15"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "7971ed0cd40454eb18d82c01e2f18bcd09ca23cc9eb901c62d2b04e5d1f57f84",
               "url": "https://files.pythonhosted.org/packages/ca/2b/54cbdc5c90689cfd7523082dbe88d535b1ab9e35ca23221ce839dcc51a94/types_tabulate-0.8.9-py3-none-any.whl"
             },
@@ -3706,6 +3725,7 @@
     "types-click",
     "types-python-dateutil",
     "types-setuptools",
+    "types-six",
     "types-tabulate",
     "types-toml",
     "typing_extensions~=4.1.1",

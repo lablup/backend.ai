@@ -68,6 +68,7 @@ types-Jinja2
 types-PyYAML
 types-python-dateutil
 types-setuptools
+types-six
 types-tabulate
 types-toml
 

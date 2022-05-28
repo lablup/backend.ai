@@ -20,6 +20,7 @@ python_requirements(
         "types-Jinja2": ["Jinja2"],
         "types-PyYAML": ["yaml"],
         "types-python-dateutil": ["dateutil"],
+        "types-six": ["six"],
         "types-tabulate": ["tabulate"],
     },
 )
