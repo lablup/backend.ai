@@ -192,7 +192,7 @@ jobs:
         # Build x86_64 wheels
         MANYLINUX_PTAG=manylinux2014_x86_64
         MACOS_PTAG=macosx_11_0_x86_64
-        ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="+platform-specific package '::'
+        ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="+platform-specific" package '::'
         for pkgname in "kernel_binary"; do
           mv "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
