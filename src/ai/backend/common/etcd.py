@@ -100,9 +100,11 @@ class AsyncEtcd:
 
     etcd: EtcdClient
 
+    _creds: Optional[EtcdCredential]
+
     def __init__(
         self,
-        addr: HostPortPair,
+        addr: HostPortPair | EtcetraHostPortPair,
         namespace: str,
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,

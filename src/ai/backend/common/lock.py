@@ -112,7 +112,7 @@ class FileLock(AbstractDistributedLock):
 
 class EtcdLock(AbstractDistributedLock):
 
-    _con_mgr: EtcdConnectionManager
+    _con_mgr: Optional[EtcdConnectionManager]
     _debug: bool
 
     lock_name: str
@@ -142,12 +142,14 @@ class EtcdLock(AbstractDistributedLock):
             timeout=self._timeout,
             ttl=int(self._lifetime) if self._lifetime is not None else None,
         )
+        assert self._con_mgr is not None  # FIXME: not required if with_lock() has an explicit return type.
         communicator = await self._con_mgr.__aenter__()
         if self._debug:
             log.debug('etcd lock acquired')
         return communicator
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
+        assert self._con_mgr is not None
         await self._con_mgr.__aexit__(*exc_info)
         if self._debug:
             log.debug('etcd lock released')
