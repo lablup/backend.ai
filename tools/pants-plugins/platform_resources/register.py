@@ -80,7 +80,7 @@ async def inject_platform_specific_dependencies(
         UnparsedAddressInputs(
             (platform_resources_unparsed_address,),
             owning_address=request.dependencies_field.address,
-        )
+        ),
     )
     return InjectedDependencies(Addresses(parsed_addresses))
 
