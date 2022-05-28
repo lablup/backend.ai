@@ -184,9 +184,13 @@ jobs:
       run: |
         mkdir .tmp
         ./pants --no-verify-config version
+    - name: Install local dependencies for packaging and publishing
+      run: |
+        pip install -U 'twine~=4.0' 'packaging>=21.3'
     - name: Build packages
       run: |
-        PKGVER=$(cat VERSION)
+        # Normalize the package version
+        PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
         # Build non-platform-specific wheels
         ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="-platform-specific" package '::'
         # Build x86_64 wheels
@@ -206,9 +210,6 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
-    - name: Prepare for publish
-      run: |
-        pip install -U 'twine~=4.0'
     - name: Publish
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
