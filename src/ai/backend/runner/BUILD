@@ -25,9 +25,7 @@ python_distribution(
         license="LGPLv3",
     ),
     generate_setup=True,
-    repositories=[
-        "@pypi",
-    ],
+    tags=["wheel", "platform-specific"],
 )
 
 resource(name="version", source="VERSION")

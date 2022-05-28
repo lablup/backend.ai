@@ -24,6 +24,7 @@ python_distribution(
         },
     },
     generate_setup=True,
+    tags=["wheel"],
 )
 
 pex_binary(

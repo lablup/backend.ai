@@ -32,6 +32,7 @@ python_distribution(
         },
     },
     generate_setup=True,
+    tags=["wheel"],
 )
 
 resource(name="version", source="VERSION")

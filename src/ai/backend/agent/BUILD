@@ -53,9 +53,7 @@ python_distribution(
         },
     },
     generate_setup=True,
-    repositories=[
-        "@pypi",
-    ],
+    tags=["wheel"],
 )
 
 resource(name="version", source="VERSION")
