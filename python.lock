@@ -6,7 +6,7 @@
 // {
 //   "version": 2,
 //   "valid_for_interpreter_constraints": [
-//     "CPython>=3.10"
+//     "CPython<3.11,>=3.10"
 //   ],
 //   "generated_with_requirements": [
 //     "Jinja2~=3.0.1",
@@ -895,19 +895,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8d15a5a7fde18536a249c49e07e8e462b8fc13de21b3c80e8a68315dfa227c99",
-              "url": "https://files.pythonhosted.org/packages/0d/e0/481445ea9f9a8ede3f6f373566c7fb20de435203e4828f3738906013ecfa/certifi-2022.5.18-py3-none-any.whl"
+              "hash": "f1d53542ee8cbedbe2118b5686372fb33c297fcd6379b050cca0ef13a597382a",
+              "url": "https://files.pythonhosted.org/packages/11/dd/e015f3780f42dd9af62cf0107b44ea1298926627ecd70c17b0e484e95bcd/certifi-2022.5.18.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6ae10321df3e464305a46e997da41ea56c1d311fb9ff1dd4e04d6f14653ec63a",
-              "url": "https://files.pythonhosted.org/packages/c5/63/a8e4b0c24e8538cec5579edbb2df4ed1f980d5f186878905317139d83b61/certifi-2022.5.18.tar.gz"
+              "hash": "9c5705e395cd70084351dd8ad5c41e65655e08ce46f2ec9cf6c2c08390f71eb7",
+              "url": "https://files.pythonhosted.org/packages/07/10/75277f313d13a2b74fc56e29239d5c840c2bf09f17bf25c02b35558812c6/certifi-2022.5.18.1.tar.gz"
             }
           ],
           "project_name": "certifi",
           "requires_dists": [],
-          "requires_python": ">=3.5",
-          "version": "2022.5.18"
+          "requires_python": ">=3.6",
+          "version": "2022.5.18.1"
         },
         {
           "artifacts": [
@@ -2665,13 +2665,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d13c6c90c42e24eb7ce660db397e8c398edd58acb7f92a2a88a95572b838aaa4",
-              "url": "https://files.pythonhosted.org/packages/05/c0/844c879d659e15c4b1fbe8be89b25de7cf9b0d5e8485aadfe83ae6e7286a/rich-12.4.1-py3-none-any.whl"
+              "hash": "d2bbd99c320a2532ac71ff6a3164867884357da3e3301f0240090c5d2fdac7ec",
+              "url": "https://files.pythonhosted.org/packages/13/3f/1996db12d23733e2834b9c2b094cc59c0d1ab943fedafcdb34b5c0da9ebf/rich-12.4.4-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d239001c0fb7de985e21ec9a4bb542b5150350330bbc1849f835b9cbc8923b91",
-              "url": "https://files.pythonhosted.org/packages/72/4d/1f48abaa1e91474af1be8622ec2a8bd3768b306def47b064aa15aa943f95/rich-12.4.1.tar.gz"
+              "hash": "4c586de507202505346f3e32d1363eb9ed6932f0c2f63184dea88983ff4971e2",
+              "url": "https://files.pythonhosted.org/packages/f5/f3/f87be42279b5cfba09f7f29e2f4a77063ccf5d9075042981e2cf48752d51/rich-12.4.4.tar.gz"
             }
           ],
           "project_name": "rich",
@@ -2683,7 +2683,7 @@
             "typing-extensions<5.0,>=4.0.0; python_version < \"3.9\""
           ],
           "requires_python": "<4.0.0,>=3.6.3",
-          "version": "12.4.1"
+          "version": "12.4.4"
         },
         {
           "artifacts": [
@@ -3245,19 +3245,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0e7286436d049d2732ba2f01552f84c52184b955552359156fc8835c10714f2a",
-              "url": "https://files.pythonhosted.org/packages/ca/17/5c5fdee8fa81a3d76484dbe2ffb48c8c344e79c554b36ee80088f92539e7/types_python_dateutil-2.8.16-py3-none-any.whl"
+              "hash": "0be7435b4d382d1cd00b8c55a8a90f4e515aaad8a96f8f0bc20c22df046792e5",
+              "url": "https://files.pythonhosted.org/packages/ae/f4/4fdaa07d4ec2a722b9820d11722afb1b289e5a697ee92d2d4766b1310e97/types_python_dateutil-2.8.17-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3aaac4c138eb6b8ecbc2550996ec25d6e45b5d32887d1e693d0842ee2fa659d2",
-              "url": "https://files.pythonhosted.org/packages/28/cd/2f094758ff9ee4ad820fc20b37e89908c0ff9fd541d066c1afa5a47acf2e/types-python-dateutil-2.8.16.tar.gz"
+              "hash": "6c54265a221681dd87f61df6743bd5eab060cf1b4086ff65c1a8fd763ed6370e",
+              "url": "https://files.pythonhosted.org/packages/ea/43/f675eb9c13cb784ee18f44b99a9ec5ee73aa4d1a6aff230699c7fc76ad03/types-python-dateutil-2.8.17.tar.gz"
             }
           ],
           "project_name": "types-python-dateutil",
           "requires_dists": [],
           "requires_python": null,
-          "version": "2.8.16"
+          "version": "2.8.17"
         },
         {
           "artifacts": [
@@ -3281,19 +3281,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "828f7e7e51e157876f47c80518b23ba0c3c36aa8081efd39d5d39f393938aec9",
-              "url": "https://files.pythonhosted.org/packages/c8/0d/6c9eb15fd4f6f45973ff1c70c170f2c30803415874e2e47c92eeae509085/types_setuptools-57.4.14-py3-none-any.whl"
+              "hash": "9c7cdaf0d55113e24ac17103bde2d434472abf1dbf444238e989fe4e798ffa26",
+              "url": "https://files.pythonhosted.org/packages/58/68/dda470233bc56db72b51fb20de9ead5faa138595debbc861256ec20740b6/types_setuptools-57.4.17-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "df02fe1dd244f58cf4e67cfc3d0a97930a2d61a72dd89f21d81c71017cd83f9a",
-              "url": "https://files.pythonhosted.org/packages/42/2e/d21d995feca499eac401958fee97879926249e60b8e5608f0361f0ee2ae1/types-setuptools-57.4.14.tar.gz"
+              "hash": "9d556fcaf6808a1cead4aaa41e5c07a61f0152a875811e1239738eba4e0b7b16",
+              "url": "https://files.pythonhosted.org/packages/ba/97/1e6f2106412d038b2ca4b18bd652a15a50096c6829345d9d0076ad9555a5/types-setuptools-57.4.17.tar.gz"
             }
           ],
           "project_name": "types-setuptools",
           "requires_dists": [],
           "requires_python": null,
-          "version": "57.4.14"
+          "version": "57.4.17"
         },
         {
           "artifacts": [
@@ -3714,7 +3714,7 @@
     "zipstream-new~=1.1.8"
   ],
   "requires_python": [
-    ">=3.10"
+    "<3.11,>=3.10"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

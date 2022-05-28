@@ -27,11 +27,7 @@ pex_binary(
 
 python_requirement(
     name="kernel-support",
-    requirements=[
-        "backend.ai-kernel",
-        "backend.ai-kernel-binary",
-        "backend.ai-kernel-helper",
-    ],
+    requirements=[],
 )
 
 python_distribution(
@@ -70,6 +66,6 @@ resources(
         "docker/*.bin",
         "kubernetes/*.txt",
         "kubernetes/*.tar.gz",
-        "kubernetes/*.bin",
+        # "kubernetes/*.bin",  # no matching files yet
     ],
 )
