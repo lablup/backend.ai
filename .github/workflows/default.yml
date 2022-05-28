@@ -46,7 +46,7 @@ jobs:
     - name: Upload pants log
       uses: actions/upload-artifact@v2
       with:
-        name: pants-log
+        name: pants.lint.log
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
 
@@ -94,7 +94,7 @@ jobs:
     - name: Upload pants log
       uses: actions/upload-artifact@v2
       with:
-        name: pants-log
+        name: pants.check.log
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
 
@@ -147,7 +147,7 @@ jobs:
     - name: Upload pants log
       uses: actions/upload-artifact@v2
       with:
-        name: pants-log
+        name: pants.test.log
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
 
@@ -229,6 +229,6 @@ jobs:
     - name: Upload pants log
       uses: actions/upload-artifact@v2
       with:
-        name: pants-log
+        name: pants.deploy.log
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
