@@ -3,7 +3,6 @@ python_sources(
     sources=[
         "**/*.py",
     ],
-    interpreter_constraints=[">=3.8"],
     dependencies=[
         ":resources",
     ],
