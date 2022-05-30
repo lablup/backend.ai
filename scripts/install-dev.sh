@@ -42,12 +42,14 @@ usage() {
   echo "Installs the single-node development setup of Backend.AI from this"
   echo "semi-mono repository for the server-side components."
   echo ""
-  echo "Prior to 22.03, it used '-e/--env' and '--install-path' options"
-  echo "but they are now deprecated because the working-copy directory"
-  echo "becomes the target installation path and identifies the"
-  echo "installation".
-  echo "Also, '--server-branch' and '--client-branch' is now merged"
-  echo "into a single '--branch' option."
+  echo "Changes in 22.06 or later:"
+  echo ""
+  echo "* Deprecated '-e/--env', '--install-path', '--python-version' options"
+  echo "  as they are now deprecated because the working-copy directory"
+  echo "  becomes the target installation path and identifies the"
+  echo "  installation".
+  echo "* '--server-branch' and '--client-branch' is now merged into a single"
+  echo "  '--branch' option."
   echo ""
   echo "${LWHITE}USAGE${NC}"
   echo "  $0 ${LWHITE}[OPTIONS]${NC}"
@@ -55,10 +57,6 @@ usage() {
   echo "${LWHITE}OPTIONS${NC}"
   echo "  ${LWHITE}-h, --help${NC}"
   echo "    Show this help message and exit"
-  echo ""
-  echo "  ${LWHITE}--python-version VERSION${NC}"
-  echo "    Set the Python version to install via pyenv"
-  echo "    (default: 3.9.10)"
   echo ""
   echo "  ${LWHITE}--branch NAME${NC}"
   echo "    The branch of git clones for server components"
@@ -197,7 +195,7 @@ CUDA_BRANCH="main"
 # WEBSERVER_PORT="8080"
 # AGENT_RPC_PORT="6001"
 # AGENT_WATCHER_PORT="6009"
-# VFOLDER_REL_PATH="vfolder/local"
+# VFOLDER_REL_PATH="vfroot/local"
 # LOCAL_STORAGE_PROXY="local"
 # LOCAL_STORAGE_VOLUME="volume1"
 
@@ -208,7 +206,7 @@ MANAGER_PORT="8091"
 WEBSERVER_PORT="8090"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
-VFOLDER_REL_PATH="vfolder/local"
+VFOLDER_REL_PATH="vfroot/local"
 LOCAL_STORAGE_PROXY="local"
 # MUST be one of the real storage volumes
 LOCAL_STORAGE_VOLUME="volume1"
@@ -459,7 +457,9 @@ bootstrap_pants() {
       echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
     fi
     echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
-    git clone --branch=$PANTS_VERSION https://github.com/pantsbuild/pants tools/pants-src
+    # The branch name uses the "MAJOR.MINOR.x" format.
+    local PANTS_CLONE_VERSION="$(echo $PANTS_VERSION | cut -d. -f1).$(echo $PANTS_VERSION | cut -d. -f2).x"
+    git clone --branch=$PANTS_CLONE_VERSION https://github.com/pantsbuild/pants tools/pants-src
     cd tools/pants
     if [ "$(uname -p)" = "arm" -a "$DISTRO" != "Darwin" ]; then
       git apply ../pants-linux-aarch64.patch
@@ -503,9 +503,9 @@ if [ "$DISTRO" = "Darwin" ]; then
     show_error "You must allow mount of '$HOME/.pyenv' in the File Sharing preference of the Docker Desktop app."
     exit 1
   fi
-  docker run --rm -v "$INSTALL_PATH:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
+  docker run --rm -v "$ROOT_PATH:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
   if [ $? -ne 0 ]; then
-    show_error "You must allow mount of '$INSTALL_PATH' in the File Sharing preference of the Docker Desktop app."
+    show_error "You must allow mount of '$ROOT_PATH' in the File Sharing preference of the Docker Desktop app."
     exit 1
   fi
   echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
@@ -655,7 +655,7 @@ sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
 sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
 
 # add LOCAL_STORAGE_VOLUME vfs volume
-echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
+echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
 cp configs/webserver/webserver.sample.conf ./webserver.conf
 sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
@@ -694,7 +694,7 @@ fi
 
 # Virtual folder setup
 show_info "Setting up virtual folder..."
-mkdir -p "${INSTALL_PATH}/${VFOLDER_REL_PATH}"
+mkdir -p "${ROOT_PATH}/${VFOLDER_REL_PATH}"
 ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
 mkdir -p scratches
 POSTGRES_CONTAINER_ID=$($docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
@@ -774,7 +774,6 @@ else
   fi
 fi
 
-cd "${INSTALL_PATH}"
 show_info "Installation finished."
 show_note "Check out the default API keypairs and account credentials for local development and testing:"
 echo "> ${WHITE}cat env-local-admin-api.sh${NC}"
@@ -788,19 +787,14 @@ echo "> ${WHITE}source env-local-user-session.sh${NC}"
 echo " "
 show_important_note "You should change your default admin API keypairs for production environment!"
 show_note "How to run Backend.AI manager:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
 echo "> ${WHITE}./backend.ai mgr start-server --debug${NC}"
 show_note "How to run Backend.AI agent:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/agent${NC}"
 echo "> ${WHITE}./backend.ai ag start-server --debug${NC}"
 show_note "How to run Backend.AI storage-proxy:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/storage-proxy${NC}"
 echo "> ${WHITE}./py -m ai.backend.storage.server${NC}"
 show_note "How to run Backend.AI web server (for ID/Password login):"
-echo "> ${WHITE}cd ${INSTALL_PATH}/webserver${NC}"
 echo "> ${WHITE}./py -m ai.backend.web.server${NC}"
 show_note "How to run your first code:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/client-py${NC}"
 echo "> ${WHITE}./backend.ai --help${NC}"
 echo "> ${WHITE}source env-local-admin-api.sh${NC}"
 echo "> ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"

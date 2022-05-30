@@ -113,3 +113,4 @@ ENV/
 /.tmp/
 /tmp/
 /volumes/
+/vfroot/
