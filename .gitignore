@@ -100,13 +100,16 @@ ENV/
 /.pants.workdir.file_lock*
 /.pants.rc
 /pants-local
+/tools/pants-src
 
 # Local configurations
 /manager.toml
 /agent.toml
 /storage-proxy.toml
 /webserver.conf
+/.pants.env
 
 # Local temp
 /.tmp/
 /tmp/
+/volumes/

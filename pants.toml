@@ -30,7 +30,7 @@ root_patterns = [
 
 [python]
 enable_resolves = true
-interpreter_constraints = ["CPython>=3.10,<3.11"]
+interpreter_constraints = ["CPython==3.10.4"]
 lockfile_generator = "pex"
 
 [python.resolves]
