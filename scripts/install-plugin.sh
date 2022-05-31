@@ -1,9 +1,8 @@
 #! /bin/bash
 
 mkdir -p ./plugins
+PLUGIN_BRANCH=${PLUGIN_BRANCH:-main}
 PLUGIN_OWNER=$(echo $1 | cut -d / -f 1)
 PLUGIN_REPO=$(echo $1 | cut -d / -f 2)
-PY=${PY:-$(python --version|awk '{ print $2 }')}
-git clone "https://github.com/lablup/$1" "./plugins/$PLUGIN_REPO"
-source "dist/export/python/virtualenvs/python-default/$PY/bin/activate"
-pip install -e "./plugins/$PLUGIN_REPO"
+git clone "https://github.com/$1" "./plugins/$PLUGIN_REPO"
+./py -m pip install -e "./plugins/$PLUGIN_REPO"

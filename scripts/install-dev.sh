@@ -329,49 +329,6 @@ install_system_pkg() {
   esac
 }
 
-install_docker() {
-  show_info "Install docker"
-  case $DISTRO in
-  Debian)
-    $sudo apt-get install -y lxcfs
-    $sudo curl -fsSL https://get.docker.io | bash
-    $sudo usermod -aG docker $(whoami)
-    ;;
-  RedHat)
-    $sudo curl -fsSL https://get.docker.io | bash
-    $sudo usermod -aG docker $(whoami)
-    ;;
-  Darwin)
-    show_info "Please install the latest version of docker and try again."
-    show_info "It should have been installed with Docker Desktop for Mac or Docker Toolbox."
-    show_info " - Instructions: https://docs.docker.com/install/"
-    show_info " - Download: https://download.docker.com/mac/stable/Docker.dmg"
-    exit 1
-    ;;
-  esac
-}
-
-install_docker_compose() {
-  show_info "Install docker-compose"
-  case $DISTRO in
-  Debian)
-    $sudo curl -L "https://github.com/docker/compose/releases/download/v2.5.1/docker-compose-$(uname -s | tr '[:upper:]' '[:lower:]' | sed -e 's/_.*//')-$(uname -m)" -o /usr/local/bin/docker-compose
-    $sudo chmod +x /usr/local/bin/docker-compose
-    ;;
-  RedHat)
-    $sudo curl -L "https://github.com/docker/compose/releases/download/v2.5.1/docker-compose-$(uname -s | tr '[:upper:]' '[:lower:]' | sed -e 's/_.*//')-$(uname -m)" -o /usr/local/bin/docker-compose
-    $sudo chmod +x /usr/local/bin/docker-compose
-    ;;
-  Darwin)
-    show_info "Please install the latest version of docker-compose and try again."
-    show_info "It should have been installed with Docker Desktop for Mac or Docker Toolbox."
-    show_info " - Instructions: https://docs.docker.com/compose/install/"
-    show_info " - Download: https://download.docker.com/mac/stable/Docker.dmg"
-    exit 1
-    ;;
-  esac
-}
-
 set_brew_python_build_flags() {
   local _prefix_openssl="$(brew --prefix openssl)"
   local _prefix_sqlite3="$(brew --prefix sqlite3)"
@@ -487,20 +444,8 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-if ! type "docker" >/dev/null 2>&1; then
-  show_warning "docker is not available; trying to install it automatically..."
-  install_docker
-fi
-docker compose version >/dev/null 2>&1
-if [ $? -eq 0 ]; then
-  DOCKER_COMPOSE="docker compose"
-else
-  if ! type "docker-compose" >/dev/null 2>&1; then
-    show_warning "docker-compose is not available; trying to install it automatically..."
-    install_docker_compose
-  fi
-  DOCKER_COMPOSE="docker-compose"
-fi
+$bpython -m pip --disable-pip-version-check install -q requests requests_unixsocket
+$bpython scripts/check-docker.py
 if [ "$DISTRO" = "Darwin" ]; then
   echo "validating Docker Desktop mount permissions..."
   docker pull alpine:3.8 > /dev/null
@@ -605,17 +550,8 @@ sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.
 sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
 mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
 mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
-$docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.current.yml" up -d
-$docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
-
-if [ $ENABLE_CUDA -eq 1 ]; then
-  if [ "$CUDA_BRANCH" == "mock" ]; then
-    git clone https://github.com/lablup/backend.ai-accelerator-cuda-mock "${PLUGIN_PATH}/accel-cuda"
-    cp "${PLUGIN_PATH}/accel-cuda/configs/sample-mig.toml" cuda-mock.toml
-  else
-    git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda "${PLUGIN_PATH}/accel-cuda"
-  fi
-fi
+$docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+$docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
 check_snappy() {
   pip download python-snappy
@@ -630,6 +566,15 @@ check_snappy() {
 show_info "Creating the unified virtualenv for IDEs..."
 check_snappy
 $PANTS export '::'
+
+if [ $ENABLE_CUDA -eq 1 ]; then
+  if [ "$CUDA_BRANCH" == "mock" ]; then
+    PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda-mock"
+    cp "${PLUGIN_PATH}/backend.ai-accelerator-cuda-mock/configs/sample-mig.toml" cuda-mock.toml
+  else
+    PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda"
+  fi
+fi
 
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
@@ -705,7 +650,7 @@ show_info "Setting up virtual folder..."
 mkdir -p "${ROOT_PATH}/${VFOLDER_REL_PATH}"
 ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
 mkdir -p scratches
-POSTGRES_CONTAINER_ID=$($docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
+POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
