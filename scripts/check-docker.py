@@ -4,6 +4,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 import requests
 import requests_unixsocket
@@ -26,7 +27,7 @@ def parse_version(expr):
 def detect_snap_docker():
     if not Path('/run/snapd.socket').is_socket():
         return None
-    with requests.get('http+unix://%2Frun%2Fsnapd.socket/v2/snaps?names=docker') as r:
+    with requests.get("http+unix://%2Frun%2Fsnapd.socket/v2/snaps?names=docker") as r:
         if r.status_code != 200:
             raise RuntimeError("Failed to query Snapd package information")
         response_data = r.json()
@@ -36,9 +37,17 @@ def detect_snap_docker():
 
 
 def detect_system_docker():
-    if not Path('/run/docker.sock').is_socket():
+    sock_paths = [
+        Path('/run/docker.sock'),      # Linux default
+        Path('/var/run/docker.sock'),  # macOS default
+    ]
+    for sock_path in sock_paths:
+        if sock_path.is_socket():
+            break
+    else:
         return None
-    with requests.get('http+unix://%2Frun%2Fdocker.sock/version') as r:
+    encoded_sock_path = quote(bytes(sock_path), safe='')
+    with requests.get(f"http+unix://{encoded_sock_path}/version") as r:
         if r.status_code != 200:
             raise RuntimeError("Failed to query the Docker daemon API")
         response_data = r.json()
