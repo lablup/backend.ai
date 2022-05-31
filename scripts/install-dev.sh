@@ -755,9 +755,9 @@ echo " "
 echo "${GREEN}Development environment is now ready.${NC}"
 show_note "How to run docker-compose:"
 if [ ! -z "$docker_sudo" ]; then
-  echo "    > ${WHITE}${docker_sudo} docker-compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+  echo "    > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
 else
-  echo "    > ${WHITE}docker-compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+  echo "    > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
 fi
 show_note "How to reset this setup:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
