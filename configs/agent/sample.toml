@@ -1,0 +1,270 @@
+[etcd]
+namespace = "local"                         # env: BACKEND_NAMESPACE
+addr = { host = "127.0.0.1", port = 2379 }  # env: BACKEND_ETCD_ADDR (host:port)
+user = ""                                   # env: BACKEND_ETCD_USER
+password = ""				    # env: BACKEND_ETCD_PASSWORD
+
+
+[agent]
+# Agent mode; required
+# One of: "kubernetes", "docker"
+mode = "docker"
+
+# Change the reported host/address of the agent.
+# The manager will use this value to connect to the agent.
+# If host is an empty string, the agent tries to auto-detect it with a fallback to "127.0.0.1".
+# For mobile environments such as developer laptops which roam around different networks,
+# it is HIGHLY RECOMMENDED to set this to "127.0.0.1" manually.
+rpc-listen-addr = { host = "", port = 6001 }
+# env: BACKEND_AGENT_HOST_OVERRIDE
+# env: BACKEND_AGENT_PORT
+
+# The port number of agent socket which provides access to host-side information
+# to the containers (such as PID conversion).
+agent-sock-port = 6007
+
+# The base directory to put domain sockets for IPC.
+# Normally you don't have to change it.
+# NOTE: If Docker is installed via Snap (https://snapcraft.io/docker),
+#       you must change this to a directory under your *home* directory.
+# ipc-base-path = "/tmp/backend.ai/ipc"
+
+# Override the name of this agent.
+# If empty or unspecified, the agent builds this from the hostname by prefixing it with "i-",
+# like "i-hostname".  The "i-" prefix is not mandatory, though.
+# This affects the per-node configuration scope.
+# id = "i-something-special"
+
+# Set the scaling group of this agent.
+# This affects the per-sgroup configuration scope.
+scaling-group = "default"
+
+# Create a PID file so that daemon managers could keep track of us.
+# If set to an empty string, it does NOT create the PID file.
+# pid-file = "./agent.pid"             # env: BACKEND_PID_FILE
+
+# One of: "asyncio", "uvloop"
+# This changes the event loop backend.
+# uvloop is a fast libuv-based implementation but sometimes has
+# compatibility issues.
+# event-loop = "uvloop"
+
+# A boolean flag to check and wait until at least one manager instances are running
+# when the agent starts up. [default: false]
+# skip-manager-detection = false
+
+
+[container]
+# The port range to expose public service ports.
+# If too small, this may limit the maximum number of containers
+# allowed to run simultaneously.
+port-range = [30000, 31000]  # env: BACKEND_CONTAINER_PORT_RANGE
+
+# The UID/GID to be set to the container's main process.
+# If not specified, it uses the same user which the agent runs as.
+# This configurations could be replaced with the configurations in etcd
+# (config/container/kernel-uid, config/container/kernel-gid).
+kernel-uid = -1
+kernel-gid = -1
+
+# Change the reported host/address of the containers.
+# The manager will use this value to connect to containers.
+# If empty or unspecified, the agent tries to auto-detect it with a fallback to
+# "agent.rpc-listen-addr.host" value.  When auto-detcting, it uses the etcd's
+# "config/network/subnet/container" key to limit the candidate IP addresses bound
+# to the current host.
+# For mobile environments such as developer laptops which roam around different networks,
+# it is HIGHLY RECOMMENDED to set this to "127.0.0.1" manually.
+# bind-host = "127.0.0.1"   # env: BACKEND_KERNEL_HOST_OVERRIDE
+
+# Alias string to tell manager as a "kernel-host" value.
+# Useful when wsproxy can't access kernel with bind-host IP.
+# Optional, defaults to "bind-host" value when not specified.
+# advertised-host ""
+
+# One of: "docker", "cgroup"
+# "docker" uses the Docker API to retrieve container statistics.
+# "cgroup" makes the agent to control the creation/destruction of container cgroups so
+# that it can safely retrieve the last-moment statistics even when containers die
+# unexpectedley. But this requires the agent to be run as root.
+stats-type = "docker"
+
+# One of: "docker", "jail".
+# "docker" uses the Docker's default apparmor and seccomp profiles.
+# "jail" uses Backend.AI Jail to programmatically filter syscalls.
+sandbox-type = "docker"
+
+# Only meaningful when sandbox-type = "jail"
+# Additional arguments passed to the jail executable in containers.
+jail-args = []
+
+# One of: "hostdir", "memory", "k8s-nfs"
+# "hostdir": creates an empty host directory and mount it as /home/work of containers.
+# "memory": creates an in-memory tmpfs and mount it as /home/work of containers. (only supported in Linux)
+# "k8s-nfs": creates Kubernetes PV/PVC and mounts it when creating Pods. (only supported in Kubernetes mode)
+scratch-type = "hostdir"        # env: BACKEND_SANDBOX_TYPE
+
+# Only meaningful when scratch-type is "hostdir" or "k8s-nfs".
+# "hostdir": If not exists, it is auto-created.
+# "k8s-nfs": Source NFS device should be mounted to this location.
+scratch-root = "./scratches"    # env: BACKEND_SCRATCH_ROOT
+
+# Limit the maximum size of the scratch space.
+# If set zero, it is unlimited.
+scratch-size = "1G"
+
+# Enable legacy swarm mode.
+# This should be true to let this agent handles multi-container session.
+swarm-enabled = false
+
+# Only meaningful when scratch-type is "k8s-nfs".
+# Mount point of source NFS disk should match with scratch-root folder's mount point.
+scratch-nfs-address = ""
+
+# Only meaningful when scratch-type is "k8s-nfs".
+scratch-nfs-options = ""
+
+
+[watcher]
+# The address to accept the watcher API requests
+service-addr = { host = "127.0.0.1", port = 6009 }
+# env: BACKEND_WATCHER_SERVICE_IP
+# env: BACKEND_WATCHER_SERVICE_PORT
+
+# SSL configuration for the watcher's HTTP endpoint
+ssl-enabled = false
+ssl-cert = ""
+ssl-key = ""
+
+# The target systemd service name to watch and control.
+target-service = "backendai-agent.service"
+
+# If "reload" is supported, set true.
+soft-reset-available = false
+
+
+[logging]
+# One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+# Set the global logging level.
+level = "INFO"
+
+# Multi-choice of: "console", "logstash", "file"
+# For each choice, there must be a "logging.<driver>" section
+# in this config file as exemplified below.
+drivers = ["console", "file"]
+
+
+[logging.console]
+# If set true, use ANSI colors if the console is a terminal.
+# If set false, always disable the colored output in console logs.
+colored = true
+
+# One of: "simple", "verbose"
+format = "simple"
+
+
+[logging.file]
+# The log file path and filename pattern.
+# All messages are wrapped in single-line JSON objects.
+# Rotated logs may have additional suffixes.
+# For production, "/var/log/backend.ai" is recommended.
+path = "./logs"
+filename = "agent.log"
+
+# The maximum number of rotated logs.
+backup-count = 5
+
+# The log file size to begin rotation.
+rotation-size = "10M"
+
+
+[logging.logstash]
+# The endpoint to publish logstash records.
+endpoint = { host = "localhost", port = 9300 }
+
+# One of: "zmq.push", "zmq.pub", "tcp", "udp"
+protocol = "tcp"
+
+# SSL configs when protocol = "tcp"
+ssl-enabled = true
+ssl-verify = true
+
+
+# Specify additional package namespaces to include in the logs
+# and their individual log levels.
+# Note that the actual logging level applied is the conjunction of the global logging level and the
+# logging levels specified here for each namespace.
+[logging.pkg-ns]
+"" = "WARNING"
+"aiodocker" = "INFO"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+
+
+[resource]
+# The amount of CPU cores reserved for the agent and the OS.
+# This will be subtracted from the resource capacity reported to the manager.
+reserved-cpu = 1
+
+# The amount of memory reserved for the agent and the OS.
+# This will be subtracted from the resource capacity reported to the manager.
+reserved-mem = "1G"
+
+# The amount of disk space reserved for the agent and the OS.
+# This will be subtracted from the resource capacity reported to the manager.
+reserved-disk = "8G"
+
+
+[debug]
+# Enable or disable the debug-level logging.
+enabled = false
+
+# If set true, it does not actually delete the containers after they terminate or are terminated
+# so that developers can inspect the container logs.
+# This is useful for debugging errors that make containers to terminate immediately after kernel
+# launches, due to bugs in initialization steps such as jail.
+skip-container-deletion = false
+
+# Include debug-level logs for internal events.
+log-events = false
+
+# Include debug-level logs for detailed kernel creation configs and their resource spec.
+log-kernel-config = false
+
+# Include debug-level logs for allocation maps.
+log-alloc-map = false
+
+# Include debug-level logs for statistics.
+log-stats = false
+
+# Include debug-level logs for heartbeats
+log-heartbeats = false
+
+# Include debug-level logs for docker event stream.
+log-docker-events = false
+
+[debug.coredump]
+# If set true, enable coredumps in containers. Only supported in Linux.
+# (This option is not related to the agent itself.)
+# IMPORTANT: You must set /proc/sys/kernel/core_pattern to an absolute path which is available
+#            inside both the host and containers.
+#            If the system's core_pattern is set to a pipe (e.g., appport) or a relative path,
+#            the agent will report a configuration error upon startup.
+enabled = false
+
+# Set a host directory to store coredumps, which will be auto-created.
+# Inside the directory, coredumps are saved at container-ID-prefixed directories.
+# It will be mounted as the parent directory of /proc/sys/kernel/core_pattern
+path = "/var/crash/backend.ai"
+
+# Set the maximum number of recent container coredumps in the coredump directory.
+# Oldest coredumps are deleted if there is more than this number of coredumps.
+backup-count = 10
+
+# Set the maximum size of coredumps from containers.
+size-limit = "64M"
+
+
+[license]
+addr = { host = "127.0.0.1", port = 6099 }

@@ -1,0 +1,275 @@
+.navbar-brand {
+    width: 50px;
+}
+
+#ipython_notebook img {
+    display: block;
+    background: url(logo.svg) no-repeat;
+    background-size: contain;
+    width: 50px !important;
+    height: 33px;
+    padding-left: 80px;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+#shutdown_widget {
+    display: none;
+}
+
+.CodeMirror {
+    font-family: "Source Code Pro", "Menlo", "Consolas", monospace;
+}
+
+.output * {
+    font-family: "Source Code Pro", "Menlo", "Consolas", monospace !important;
+}
+
+.output button .fa {
+    font-family: "FontAwesome" !important;
+}
+
+.btn {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    -webkit-tap-highlight-color: transparent;
+    text-transform: uppercase;
+    outline-width: 0;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: pointer;
+    margin: 0 0.29em;
+    border-radius: 3px;
+    vertical-align: middle;
+}
+
+.btn-xs {
+    height: 32px;
+    line-height: 28px !important;
+}
+
+#select-all {
+    margin-top: 9px;
+}
+
+/* File list */
+#tabs {
+    position: absolute;
+    top: 11px;
+    z-index: 110;
+}
+
+#tabs:first-child {
+    margin-left: 70px;
+}
+
+.nav-tabs {}
+
+.nav-tabs li {
+    height: 100%;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    transition: opacity 0.1s cubic-bezier(0.4, 0.0, 1, 1);
+}
+
+
+.list_container {
+    box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+        0 1px 5px 0 rgba(0, 0, 0, 0.12),
+        0 3px 1px -2px rgba(0, 0, 0, 0.2);
+}
+
+.navbar-nav {
+    font-size: 14px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    height: 32px;
+}
+
+.indicator_area {
+    margin-top: 4px;
+    margin-bottom: 4px;
+    height: 32px;
+}
+
+.alternate_upload .btn-upload,
+.list_toolbar .btn-group button {
+    height: 32px;
+}
+
+.alternate_upload .btn-upload {
+    line-height: 28px !important;
+}
+
+.dropdown-menu {
+    font-size: 14px;
+    box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+        0 1px 5px 0 rgba(0, 0, 0, 0.12),
+        0 3px 1px -2px rgba(0, 0, 0, 0.2);
+}
+
+/* Notebook UI */
+div.cell.code_cell.selected {
+    box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+        0 1px 5px 0 rgba(0, 0, 0, 0.12),
+        0 3px 1px -2px rgba(0, 0, 0, 0.2);
+}
+
+.checkpoint_status {
+    color: #5CAD7C;
+}
+
+.autosave_status {
+    font-size: 10px !important;
+    color: #C0C0C0;
+}
+
+.kernel_idle_icon,
+.kernel_busy_icon {
+    color: #3E872D;
+    font-weight: 900;
+}
+
+#kernel_indicator {
+    border: 0;
+}
+
+.kernel_indicator_name {
+    height: 32px;
+    display: inline-block;
+    font-size: 18px;
+    line-height: 28px;
+    color: #5CAD7C;
+    font-weight: 500;
+    vertical-align: middle;
+}
+
+/* Icon menu */
+.navbar-default {
+    background-color: transparent;
+    border-bottom: 0;
+    border-left: 0;
+    border-right: 0;
+}
+
+#maintoolbar-container:first-child {
+    margin-left: 5px;
+}
+
+.container.toolbar .fa {
+    font-size: 18px;
+}
+
+.container.toolbar .btn {
+    border: none;
+}
+
+.toolbar-btn-label {
+    display: none;
+}
+
+/* Code container */
+.container {
+    border-radius: 5px;
+}
+
+/* Running button */
+/*
+.prompt_container .run_this_cell {
+    display:flex!important;
+    color: #009fb7;
+    margin: 0 auto auto auto;
+    width: 45px!important;
+    height: 25px!important;
+    background: transparent;
+    background-color: transparent;
+    border-radius: 3px;
+    text-align: center;
+    box-sizing: border-box;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -webkit-user-select: none;
+    user-select: none;
+    cursor: pointer;
+    padding: 0.7em 0.57em;
+   }
+   .running .prompt_container .run_this_cell i {
+       display: none!important;
+   }
+   .running .prompt_container .run_this_cell:after {
+       font-size:10px;
+       content: "Running";
+   }
+   .prompt_container .run_this_cell i {
+       margin: auto;
+   }
+   div.code_cell:hover div.input .run_this_cell {
+    visibility: visible;
+   }
+   div.cell.code_cell.rendered.selected .run_this_cell:hover {
+    background-color: #e3e3e3;
+    background: #e3e3e3;
+    color: #5EAE7E !important;
+   }
+   div.cell.code_cell.rendered.unselected .run_this_cell:hover {
+    background-color: #e3e3e3;
+    background: #e3e3e3;
+    color: #5EAE7E !important;
+   }
+*/
+/* misc. */
+#logout {
+    display: none;
+}
+
+#ipython-main-app #tab_content #tab:last-child {
+    display: none !important;
+}
+
+.clusters_tab_link,
+#ipyclusters {
+    display: none !important;
+}
+
+body.terminal-app #header {
+    display: none !important;
+}
+
+
+/* Editor */
+/*
+.CodeMirror { background: #272822; color: #f8f8f2; }
+.CodeMirror div.CodeMirror-selected { background: #49483E; }
+.CodeMirror .CodeMirror-line::selection, .CodeMirror .CodeMirror-line > span::selection, .CodeMirror .CodeMirror-line > span > span::selection { background: rgba(73, 72, 62, .99); }
+.CodeMirror .CodeMirror-line::-moz-selection, .CodeMirror .CodeMirror-line > span::-moz-selection, .CodeMirror .CodeMirror-line > span > span::-moz-selection { background: rgba(73, 72, 62, .99); }
+.CodeMirror .CodeMirror-gutters { background: #272822; border-right: 0px; }
+.CodeMirror .CodeMirror-guttermarker { color: white; }
+.CodeMirror .CodeMirror-guttermarker-subtle { color: #d0d0d0; }
+.CodeMirror .CodeMirror-linenumber { color: #d0d0d0; }
+.CodeMirror .CodeMirror-cursor { border-left: 1px solid #f8f8f0; }
+
+.CodeMirror span.cm-comment { color: #75715e; }
+.CodeMirror span.cm-atom { color: #ae81ff; }
+.CodeMirror span.cm-number { color: #ae81ff; }
+
+.CodeMirror span.cm-property, .CodeMirror span.cm-attribute { color: #a6e22e; }
+.CodeMirror span.cm-keyword { color: #f92672; }
+.CodeMirror span.cm-string { color: #e6db74; }
+
+.CodeMirror span.cm-variable { color: #f8f8f2; }
+.CodeMirror span.cm-variable-2 { color: #9effff; }
+.CodeMirror span.cm-variable-3 { color: #66d9ef; }
+.CodeMirror span.cm-def { color: #fd971f; }
+.CodeMirror span.cm-bracket { color: #f8f8f2; }
+.CodeMirror span.cm-tag { color: #f92672; }
+.CodeMirror span.cm-header { color: #ae81ff; }
+.CodeMirror span.cm-link { color: #ae81ff; }
+.CodeMirror span.cm-error { background: #f92672; color: #f8f8f0; }
+
+.CodeMirror .CodeMirror-activeline-background { background: #373831; }
+.CodeMirror .CodeMirror-matchingbracket {
+  text-decoration: underline;
+  color: white !important;
+}
+*/

@@ -7,7 +7,7 @@ trim_trailing_whitespace = true
 charset = utf-8
 
 [*.{py,md}]
-max_line_length = 85
+max_line_length = 105
 indent_style = space
 indent_size = 4
 
@@ -19,3 +19,10 @@ indent_size = 3
 [.travis.yml]
 indent_style = space
 indent_size = 2
+
+[BUILD]
+indent_style = space
+indent_size = 4
+
+[VERSION]
+insert_final_newline = false

@@ -1,0 +1,1 @@
+Migrate to a semi-mono repository that contains all first-party server-side components with automated dependency management via Pants

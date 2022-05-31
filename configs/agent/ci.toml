@@ -1,0 +1,65 @@
+[etcd]
+namespace = "local"
+addr = { host = "127.0.0.1", port = 2379 }
+user = ""
+password = ""
+
+
+[agent]
+rpc-listen-addr = { host = "127.0.0.1", port = 6001 }
+agent-sock-port = 6007
+id = "i-travis"
+scaling-group = "default"
+pid-file = "./agent.pid"
+event-loop = "asyncio"
+
+
+[container]
+port-range = [30000, 31000]
+kernel-uid = -1
+bind-host = "127.0.0.1"
+sandbox-type = "docker"
+jail-args = []
+scratch-type = "hostdir"
+scratch-root = "/tmp/scratches"
+scratch-size = "1G"
+
+
+[watcher]
+service-addr = { host = "127.0.0.1", port = 6009 }
+ssl-enabled = false
+#ssl-cert = ""
+#ssl-key = ""
+target-service = "backendai-agent.service"
+soft-reset-available = false
+
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiodocker" = "INFO"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+
+[logging.console]
+colored = true
+format = "simple"
+
+
+[resource]
+reserved-cpu = 1
+reserved-mem = "1G"
+reserved-disk = "8G"
+
+
+[debug]
+debug = false
+skip-container-deletion = false
+
+
+[license]
+addr = { host = "127.0.0.1", port = 6099 }
