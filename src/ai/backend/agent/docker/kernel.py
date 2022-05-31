@@ -21,6 +21,7 @@ from aiotools import TaskGroup
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import KernelId
 from ai.backend.common.utils import current_loop
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
@@ -33,25 +34,22 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 class DockerKernel(AbstractKernel):
 
-    # FIXME: apply TypedDict to data in Python 3.8
-    environ: Mapping[str, Any]
-
-    def __init__(self, kernel_id: str, image: ImageRef, version: int, *,
-                 agent_config: Mapping[str, Any],
-                 resource_spec: KernelResourceSpec,
-                 service_ports: Any,  # TODO: type-annotation
-                 environ: Mapping[str, Any],
-                 data: Dict[str, Any]) -> None:
+    def __init__(
+        self, kernel_id: KernelId, image: ImageRef, version: int, *,
+        agent_config: Mapping[str, Any],
+        resource_spec: KernelResourceSpec,
+        service_ports: Any,  # TODO: type-annotation
+        environ: Mapping[str, Any],
+        data: Dict[str, Any],
+    ) -> None:
         super().__init__(
             kernel_id, image, version,
             agent_config=agent_config,
             resource_spec=resource_spec,
             service_ports=service_ports,
-            data=data)
-        self.environ = environ
-
-    async def __ainit__(self) -> None:
-        await super().__ainit__()
+            data=data,
+            environ=environ,
+        )
 
     async def close(self) -> None:
         pass

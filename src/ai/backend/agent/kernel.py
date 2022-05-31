@@ -134,7 +134,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     version: int
     agent_config: Mapping[str, Any]
-    kernel_id: str
+    kernel_id: KernelId
     image: ImageRef
     resource_spec: KernelResourceSpec
     service_ports: Any
@@ -143,16 +143,21 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     termination_reason: Optional[str]
     clean_event: Optional[asyncio.Future]
     stats_enabled: bool
+    # FIXME: apply TypedDict to data in Python 3.8
+    environ: Mapping[str, Any]
 
     _tasks: Set[asyncio.Task]
 
     runner: 'AbstractCodeRunner'
 
-    def __init__(self, kernel_id: str, image: ImageRef, version: int, *,
-                 agent_config: Mapping[str, Any],
-                 resource_spec: KernelResourceSpec,
-                 service_ports: Any,  # TODO: type-annotation
-                 data: Dict[Any, Any]) -> None:
+    def __init__(
+        self, kernel_id: KernelId, image: ImageRef, version: int, *,
+        agent_config: Mapping[str, Any],
+        resource_spec: KernelResourceSpec,
+        service_ports: Any,  # TODO: type-annotation
+        data: Dict[Any, Any],
+        environ: Mapping[str, Any],
+    ) -> None:
         self.agent_config = agent_config
         self.kernel_id = kernel_id
         self.image = image
@@ -165,9 +170,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.clean_event = None
         self.stats_enabled = False
         self._tasks = set()
+        self.environ = environ
 
-    async def __ainit__(self) -> None:
-        log.debug('kernel.__ainit__(k:{0}, api-ver:{1}, client-features:{2}): '
+    async def init(self) -> None:
+        log.debug('kernel.init(k:{0}, api-ver:{1}, client-features:{2}): '
                   'starting new runner',
                   self.kernel_id, default_api_version, default_client_features)
         self.runner = await self.create_code_runner(

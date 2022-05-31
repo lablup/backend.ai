@@ -45,7 +45,7 @@ from .kube_object import (
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
 from ..exception import K8sError, UnsupportedResource
-from ..kernel import KernelFeatures
+from ..kernel import AbstractKernel, KernelFeatures
 from ..resources import (
     AbstractComputePlugin,
     KernelResourceSpec,
@@ -426,21 +426,10 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     async def spawn(
         self,
         resource_spec: KernelResourceSpec,
-        resource_opts,
         environ: Mapping[str, str],
         service_ports,
-        preopen_ports,
-        cmdargs: List[str],
     ) -> KubernetesKernel:
-        await kube_config.load_kube_config()
-        core_api = kube_client.CoreV1Api()
-        apps_api = kube_client.AppsV1Api()
-
         loop = current_loop()
-        image_labels = self.kernel_config['image']['labels']
-        exposed_ports = [2000, 2001]
-        for sport in service_ports:
-            exposed_ports.extend(sport['container_ports'])
 
         if self.restarting:
             pass
@@ -545,7 +534,35 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         # TODO: Mark shmem feature as unsupported when advertising agent
 
-        # PHASE 4: Run!
+        kernel_obj = KubernetesKernel(
+            self.kernel_id,
+            self.image_ref,
+            self.kspec_version,
+            agent_config=self.local_config,
+            service_ports=service_ports,
+            resource_spec=resource_spec,
+            environ=environ,
+            data={},
+        )
+        return kernel_obj
+
+    async def start_container(
+        self,
+        kernel_obj: AbstractKernel,
+        cmdargs: List[str],
+        resource_opts,
+        preopen_ports,
+    ) -> Mapping[str, Any]:
+        image_labels = self.kernel_config['image']['labels']
+        service_ports = kernel_obj.service_ports
+        environ = kernel_obj.environ
+
+        await kube_config.load_kube_config()
+        core_api = kube_client.CoreV1Api()
+        apps_api = kube_client.AppsV1Api()
+        exposed_ports = [2000, 2001]
+        for sport in service_ports:
+            exposed_ports.extend(sport['container_ports'])
 
         encoded_preopen_ports = ','.join(f'{port_no}:preopen:{port_no}' for port_no in preopen_ports)
 
@@ -654,28 +671,22 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         target_node_ip = random.choice([x['InternalIP'] for x in self.workers.values()])
 
-        kernel_obj = await KubernetesKernel.new(
-            self.kernel_id,
-            self.image_ref,
-            self.kspec_version,
-            agent_config=self.local_config,
-            service_ports=service_ports,
-            resource_spec=resource_spec,
-            data={
-                'container_id': '',
-                'kernel_host': target_node_ip,
-                'repl_in_port': repl_in_port,
-                'repl_out_port': repl_out_port,
-                'stdin_port': stdin_port,    # legacy
-                'stdout_port': stdout_port,  # legacy
-                'assigned_ports': assigned_ports,
-                # 'domain_socket_proxies': self.domain_socket_proxies,
-                'block_service_ports': self.internal_data.get('block_service_ports', False),
-            })
-        return kernel_obj
+        return {
+            'container_id': '',
+            'kernel_host': target_node_ip,
+            'repl_in_port': repl_in_port,
+            'repl_out_port': repl_out_port,
+            'stdin_port': stdin_port,    # legacy
+            'stdout_port': stdout_port,  # legacy
+            'assigned_ports': assigned_ports,
+            # 'domain_socket_proxies': self.domain_socket_proxies,
+            'block_service_ports': self.internal_data.get('block_service_ports', False),
+        }
 
 
-class KubernetesAgent(AbstractAgent[KubernetesKernel, KubernetesKernelCreationContext]):
+class KubernetesAgent(
+    AbstractAgent[KubernetesKernel, KubernetesKernelCreationContext],
+):
     workers: MutableMapping[str, MutableMapping[str, str]] = {}
     k8s_ptask_group: aiotools.PersistentTaskGroup
 

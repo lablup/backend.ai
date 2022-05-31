@@ -70,7 +70,7 @@ from .resources import detect_resources
 from .utils import PersistentServiceContainer
 from ..exception import UnsupportedResource, InitializationError
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
-from ..kernel import KernelFeatures
+from ..kernel import AbstractKernel, KernelFeatures
 from ..resources import (
     Mount,
     KernelResourceSpec,
@@ -494,17 +494,10 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     async def spawn(
         self,
         resource_spec: KernelResourceSpec,
-        resource_opts,
         environ: Mapping[str, str],
         service_ports,
-        preopen_ports,
-        cmdargs: List[str],
     ) -> DockerKernel:
         loop = current_loop()
-        image_labels = self.kernel_config['image']['labels']
-        exposed_ports = [2000, 2001]
-        for sport in service_ports:
-            exposed_ports.extend(sport['container_ports'])
 
         if self.restarting:
             pass
@@ -614,9 +607,37 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     os.chown(tmp, uid, gid)
                 tmp = tmp.parent
 
+        kernel_obj = DockerKernel(
+            self.kernel_id,
+            self.image_ref,
+            self.kspec_version,
+            agent_config=self.local_config,
+            service_ports=service_ports,
+            resource_spec=resource_spec,
+            environ=environ,
+            data={},
+        )
+        return kernel_obj
+
+    async def start_container(
+        self,
+        kernel_obj: AbstractKernel,
+        cmdargs: List[str],
+        resource_opts,
+        preopen_ports,
+    ) -> Mapping[str, Any]:
+        loop = current_loop()
+        resource_spec = kernel_obj.resource_spec
+        service_ports = kernel_obj.service_ports
+        environ = kernel_obj.environ
+        image_labels = self.kernel_config['image']['labels']
+
         # PHASE 4: Run!
         container_bind_host = self.local_config['container']['bind-host']
         advertised_kernel_host = self.local_config['container'].get('advertised-host')
+        exposed_ports = [2000, 2001]
+        for sport in service_ports:
+            exposed_ports.extend(sport['container_ports'])
         if len(exposed_ports) > len(self.port_pool):
             raise RuntimeError('Container ports are not sufficiently available.')
         host_ports = []
@@ -771,26 +792,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     ctnr_host_port_map[cport] for cport in sport['container_ports']
                 )
 
-        kernel_obj = await DockerKernel.new(
-            self.kernel_id,
-            self.image_ref,
-            self.kspec_version,
-            agent_config=self.local_config,
-            service_ports=service_ports,
-            resource_spec=resource_spec,
-            environ=environ,
-            data={
-                'container_id': container._id,
-                'kernel_host': advertised_kernel_host or container_bind_host,
-                'repl_in_port': repl_in_port,
-                'repl_out_port': repl_out_port,
-                'stdin_port': stdin_port,    # legacy
-                'stdout_port': stdout_port,  # legacy
-                'host_ports': host_ports,
-                'domain_socket_proxies': self.domain_socket_proxies,
-                'block_service_ports': self.internal_data.get('block_service_ports', False),
-            })
-        return kernel_obj
+        return {
+            'container_id': container._id,
+            'kernel_host': advertised_kernel_host or container_bind_host,
+            'repl_in_port': repl_in_port,
+            'repl_out_port': repl_out_port,
+            'stdin_port': stdin_port,    # legacy
+            'stdout_port': stdout_port,  # legacy
+            'host_ports': host_ports,
+            'domain_socket_proxies': self.domain_socket_proxies,
+            'block_service_ports': self.internal_data.get('block_service_ports', False),
+        }
 
 
 class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):

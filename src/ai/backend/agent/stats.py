@@ -19,6 +19,7 @@ from typing import (
     MutableMapping,
     Optional,
     Sequence,
+    Set,
     Tuple,
     TYPE_CHECKING,
 )
@@ -324,47 +325,6 @@ class StatContext:
                         else:
                             self.device_metrics[metric_key][dev_id].update(measure)
 
-            # gather container metrics from compute plugins
-            container_ids = []
-            kernel_id_map = {}
-            used_kernel_ids = set()
-            for kid, kobj in self.agent.kernel_registry.items():
-                cid = kobj['container_id']
-                container_ids.append(cid)
-                kernel_id_map[cid] = kid
-                used_kernel_ids.add(kid)
-            unused_kernel_ids = set(self.kernel_metrics.keys()) - used_kernel_ids
-            for unused_kernel_id in unused_kernel_ids:
-                log.debug('removing kernel_metric for {}', unused_kernel_id)
-                self.kernel_metrics.pop(unused_kernel_id, None)
-            _tasks = []
-            for computer in self.agent.computers.values():
-                _tasks.append(computer.instance.gather_container_measures(self, container_ids))
-            for ctnr_measures in (await asyncio.gather(*_tasks, return_exceptions=True)):
-                if isinstance(ctnr_measures, Exception):
-                    log.error('gather_container_measures error',
-                              exc_info=ctnr_measures)
-                    continue
-                for ctnr_measure in ctnr_measures:
-                    metric_key = ctnr_measure.key
-                    # update per-container metric
-                    for cid, measure in ctnr_measure.per_container.items():
-                        kernel_id = kernel_id_map[cid]
-                        if kernel_id not in self.kernel_metrics:
-                            self.kernel_metrics[kernel_id] = {}
-                        if metric_key not in self.kernel_metrics[kernel_id]:
-                            self.kernel_metrics[kernel_id][metric_key] = Metric(
-                                metric_key, ctnr_measure.type,
-                                current=measure.value,
-                                capacity=measure.value,
-                                unit_hint=ctnr_measure.unit_hint,
-                                stats=MovingStatistics(measure.value),
-                                stats_filter=frozenset(ctnr_measure.stats_filter),
-                                current_hook=ctnr_measure.current_hook,
-                            )
-                        else:
-                            self.kernel_metrics[kernel_id][metric_key].update(measure)
-
         # push to the Redis server
         redis_agent_updates = {
             'node': {
@@ -386,12 +346,6 @@ class StatContext:
             async with r.pipeline() as pipe:
                 pipe.set(self.agent.local_config['agent']['id'], serialized_agent_updates)
                 pipe.expire(self.agent.local_config['agent']['id'], self.cache_lifespan)
-                for kernel_id, metrics in self.kernel_metrics.items():
-                    serialized_metrics = {
-                        key: obj.to_serializable_dict()
-                        for key, obj in metrics.items()
-                    }
-                    pipe.set(str(kernel_id), msgpack.packb(serialized_metrics))
                 await pipe.execute()
 
         await redis.execute(self.agent.redis_stat_pool, _pipe_builder)
@@ -399,7 +353,7 @@ class StatContext:
     async def collect_container_stat(
         self,
         container_ids: Sequence[ContainerId],
-    ) -> Mapping[MetricKey, Metric]:
+    ) -> None:
         """
         Collect the per-container statistics only,
 
@@ -410,6 +364,11 @@ class StatContext:
             for kid, info in self.agent.kernel_registry.items():
                 cid = info['container_id']
                 kernel_id_map[ContainerId(cid)] = kid
+            unused_kernel_ids = set(self.kernel_metrics.keys()) - set(kernel_id_map.values())
+            for unused_kernel_id in unused_kernel_ids:
+                log.debug('removing kernel_metric for {}', unused_kernel_id)
+                self.kernel_metrics.pop(unused_kernel_id, None)
+
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.
@@ -420,6 +379,7 @@ class StatContext:
                     computer.instance.gather_container_measures(self, container_ids),
                 ))
             results = await asyncio.gather(*_tasks, return_exceptions=True)
+            updated_kernel_ids: Set[KernelId] = set()
             for result in results:
                 if isinstance(result, Exception):
                     log.error('collect_container_stat(): gather_container_measures() error',
@@ -433,13 +393,14 @@ class StatContext:
                             kernel_id = kernel_id_map[cid]
                         except KeyError:
                             continue
+                        updated_kernel_ids.add(kernel_id)
                         if kernel_id not in self.kernel_metrics:
                             self.kernel_metrics[kernel_id] = {}
                         if metric_key not in self.kernel_metrics[kernel_id]:
                             self.kernel_metrics[kernel_id][metric_key] = Metric(
                                 metric_key, ctnr_measure.type,
                                 current=measure.value,
-                                capacity=measure.value,
+                                capacity=measure.capacity or measure.value,
                                 unit_hint=ctnr_measure.unit_hint,
                                 stats=MovingStatistics(measure.value),
                                 stats_filter=frozenset(ctnr_measure.stats_filter),
@@ -448,22 +409,20 @@ class StatContext:
                         else:
                             self.kernel_metrics[kernel_id][metric_key].update(measure)
 
-        if kernel_id is not None:
-            metrics = self.kernel_metrics[kernel_id]
-            serializable_metrics = {
-                key: obj.to_serializable_dict()
-                for key, obj in metrics.items()
-            }
-            if self.agent.local_config['debug']['log-stats']:
-                log.debug('kernel_updates: {0}: {1}',
-                          kernel_id, serializable_metrics)
-            serialized_metrics = msgpack.packb(serializable_metrics)
+        async def _pipe_builder(r: aioredis.Redis):
+            async with r.pipeline() as pipe:
+                for kernel_id in updated_kernel_ids:
+                    metrics = self.kernel_metrics[kernel_id]
+                    serializable_metrics = {
+                        key: obj.to_serializable_dict()
+                        for key, obj in metrics.items()
+                    }
+                    if self.agent.local_config['debug']['log-stats']:
+                        log.debug('kernel_updates: {0}: {1}',
+                                kernel_id, serializable_metrics)
+                    serialized_metrics = msgpack.packb(serializable_metrics)
 
-            async def _pipe_builder(r: aioredis.Redis):
-                async with r.pipeline() as pipe:
                     pipe.set(str(kernel_id), serialized_metrics)
                     await pipe.execute()
 
-            await redis.execute(self.agent.redis_stat_pool, _pipe_builder)
-            return metrics
-        return {}
+        await redis.execute(self.agent.redis_stat_pool, _pipe_builder)

@@ -209,6 +209,7 @@ class CPUPlugin(AbstractComputePlugin):
 
         q = Decimal('0.000')
         per_container_cpu_used = {}
+        per_container_cpu_util = {}
         tasks = []
         for cid in container_ids:
             tasks.append(asyncio.ensure_future(impl(cid)))
@@ -217,6 +218,10 @@ class CPUPlugin(AbstractComputePlugin):
             if cpu_used is None:
                 continue
             per_container_cpu_used[cid] = Measurement(Decimal(cpu_used).quantize(q))
+            per_container_cpu_util[cid] = Measurement(
+                Decimal(cpu_used).quantize(q),
+                capacity=Decimal(1000),
+            )
         return [
             ContainerMeasurement(
                 MetricKey('cpu_util'),
@@ -224,13 +229,13 @@ class CPUPlugin(AbstractComputePlugin):
                 unit_hint='percent',
                 current_hook=lambda metric: metric.stats.rate,
                 stats_filter=frozenset({'avg', 'max'}),
-                per_container=per_container_cpu_used,
+                per_container=per_container_cpu_util,
             ),
             ContainerMeasurement(
                 MetricKey('cpu_used'),
                 MetricTypes.USAGE,
                 unit_hint='msec',
-                per_container=per_container_cpu_used.copy(),
+                per_container=per_container_cpu_used,
             ),
         ]
 

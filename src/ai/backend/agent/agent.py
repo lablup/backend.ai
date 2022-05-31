@@ -259,12 +259,19 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
     async def spawn(
         self,
         resource_spec: KernelResourceSpec,
-        resource_opts,
         environ: Mapping[str, str],
         service_ports,
-        preopen_ports,
-        cmdargs: List[str],
     ) -> KernelObjectType:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def start_container(
+        self,
+        kernel_obj: AbstractKernel,
+        cmdargs: List[str],
+        resource_opts,
+        preopen_ports,
+    ) -> Mapping[str, Any]:
         raise NotImplementedError
 
     @cached(
@@ -1462,13 +1469,20 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
                      pretty(attr.asdict(resource_spec)))
         kernel_obj: KernelObjectType = await ctx.spawn(
             resource_spec,
-            resource_opts,
             environ,
             service_ports,
-            preopen_ports,
-            cmdargs,
         )
-        self.kernel_registry[ctx.kernel_id] = kernel_obj
+        async with self.registry_lock:
+            self.kernel_registry[ctx.kernel_id] = kernel_obj
+        container_data = await ctx.start_container(
+            kernel_obj,
+            cmdargs,
+            resource_opts,
+            preopen_ports,
+        )
+        async with self.registry_lock:
+            self.kernel_registry[ctx.kernel_id].data.update(container_data)
+        await kernel_obj.init()
 
         current_task = asyncio.current_task()
         assert current_task is not None
