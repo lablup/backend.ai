@@ -323,6 +323,8 @@ def log_worker(
 
 class RelayHandler(logging.Handler):
 
+    _sock: zmq.Socket | None
+
     def __init__(self, *, endpoint: str) -> None:
         super().__init__()
         self.endpoint = endpoint
@@ -331,6 +333,7 @@ class RelayHandler(logging.Handler):
         # lost of synchronization sentinel messages.
         if endpoint:
             self._sock = self._zctx.socket(zmq.PUSH)
+            assert self._sock is not None
             self._sock.setsockopt(zmq.LINGER, 100)
             self._sock.connect(self.endpoint)
         else:

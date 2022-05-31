@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 import socket
 from typing import (
     Any,
@@ -23,6 +24,7 @@ import aioredis.sentinel
 import aioredis.exceptions
 import yarl
 
+from .logging import BraceStyleAdapter
 from .types import EtcdRedisConfig, RedisConnectionInfo
 from .validators import DelimiterSeperatedList, HostPortPair
 
@@ -58,6 +60,8 @@ _default_conn_opts: Mapping[str, Any] = {
 
 
 _scripts: Dict[str, str] = {}
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class ConnectionNotAvailable(Exception):
@@ -259,12 +263,15 @@ async def execute(
                 else:
                     return result
         except (
-            aioredis.exceptions.ConnectionError,
             aioredis.sentinel.MasterNotFoundError,
             aioredis.sentinel.SlaveNotFoundError,
             aioredis.exceptions.ReadOnlyError,
             ConnectionResetError,
         ):
+            await asyncio.sleep(reconnect_poll_interval)
+            continue
+        except aioredis.exceptions.ConnectionError as e:
+            log.exception(f'execute(): Connecting to redis failed: {e}')
             await asyncio.sleep(reconnect_poll_interval)
             continue
         except aioredis.exceptions.ResponseError as e:
@@ -483,3 +490,11 @@ def get_redis_object(
             client=aioredis.Redis.from_url(str(url), **kwargs),
             service_name=None,
         )
+
+
+async def ping_redis_connection(client: aioredis.client.Redis):
+    try:
+        _ = await client.time()
+    except aioredis.exceptions.ConnectionError as e:
+        log.exception(f'ping_redis_connection(): Connecting to redis failed: {e}')
+        raise e
