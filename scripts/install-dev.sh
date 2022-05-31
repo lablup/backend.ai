@@ -585,7 +585,7 @@ sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
 sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
 cp configs/manager/halfstack.alembic.ini ./alembic.ini
 sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
-python -m ai.backend.manager.cli etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
+./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
 cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
 MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
 sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
@@ -610,7 +610,7 @@ sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
 # add LOCAL_STORAGE_VOLUME vfs volume
 echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
-cp configs/webserver/webserver.sample.conf ./webserver.conf
+cp configs/webserver/sample.conf ./webserver.conf
 sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
 sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
@@ -623,8 +623,8 @@ sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
 # DB schema
 show_info "Setting up databases..."
 ./backend.ai mgr schema oneshot
-./backend.ai mgr fixture populate fixtures/example-keypairs.json
-./backend.ai mgr fixture populate fixtures/example-resource-presets.json
+./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
+./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
 
 # Docker registry setup
 show_info "Configuring the Lablup's official image registry..."

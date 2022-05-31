@@ -110,6 +110,8 @@ ENV/
 /.pants.env
 /docker-compose.halfstack.current.yml
 /alembic.ini
+/dev.etcd.volumes.json
+/env-*.sh
 
 # Local temp
 /.tmp/
