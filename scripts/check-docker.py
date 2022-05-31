@@ -84,6 +84,8 @@ def main():
         docker_version = detect_system_docker()
         if docker_version is not None:
             log(f"Detected Docker installation: System package ({docker_version})")
+        else:
+            fail_with_system_docker_install_request()
 
     try:
         proc = run(['docker', 'compose', 'version'], capture_output=True, check=True)
