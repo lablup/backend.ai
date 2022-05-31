@@ -6,7 +6,7 @@
 // {
 //   "version": 2,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<3.11,>=3.10"
+//     "CPython==3.10.4"
 //   ],
 //   "generated_with_requirements": [
 //     "async_timeout~=3.0",
@@ -554,7 +554,7 @@
     "uvloop~=0.16"
   ],
   "requires_python": [
-    "<3.11,>=3.10"
+    "==3.10.4"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

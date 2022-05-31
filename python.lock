@@ -6,7 +6,7 @@
 // {
 //   "version": 2,
 //   "valid_for_interpreter_constraints": [
-//     "CPython<3.11,>=3.10"
+//     "CPython==3.10.4"
 //   ],
 //   "generated_with_requirements": [
 //     "Jinja2~=3.0.1",
@@ -39,7 +39,7 @@
 //     "colorama>=0.4.4",
 //     "coloredlogs~=15.0",
 //     "cryptography>=2.8",
-//     "etcetra~=0.1.5",
+//     "etcetra~=0.1.6",
 //     "graphene~=2.1.9",
 //     "humanize>=3.1.0",
 //     "janus>=0.6.1",
@@ -3689,7 +3689,7 @@
     "colorama>=0.4.4",
     "coloredlogs~=15.0",
     "cryptography>=2.8",
-    "etcetra~=0.1.5",
+    "etcetra~=0.1.6",
     "graphene~=2.1.9",
     "humanize>=3.1.0",
     "janus>=0.6.1",
@@ -3734,7 +3734,7 @@
     "zipstream-new~=1.1.8"
   ],
   "requires_python": [
-    "<3.11,>=3.10"
+    "==3.10.4"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
