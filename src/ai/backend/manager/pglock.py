@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, AsyncContextManager
 
-from ai.backend.common.distributed import AbstractDistributedLock
+from ai.backend.common.lock import AbstractDistributedLock
 
 from .models.utils import ExtendedAsyncSAEngine
 from .defs import LockID

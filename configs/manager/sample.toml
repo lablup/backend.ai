@@ -85,7 +85,7 @@ hide-agents = false
 # "pg_advisory" uses PostgreSQL's session-level advisory lock.
 # "redlock" uses Redis-based distributed lock (Redlock) -- currently not supported.
 # "etcd" uses etcd-based distributed lock via etcetra.
-# distributed-lock = "etcd"
+# distributed-lock = "pg_advisory"
 
 # The Docker image name that is used for importing external Docker images.
 # You need to change this if your are at offline environments so that the manager

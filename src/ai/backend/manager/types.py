@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.engine.row import Row
 
 if TYPE_CHECKING:
-    from ai.backend.common.distributed import AbstractDistributedLock
+    from ai.backend.common.lock import AbstractDistributedLock
     from .defs import LockID
 
 

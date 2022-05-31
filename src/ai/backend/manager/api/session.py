@@ -128,6 +128,7 @@ from .exceptions import (
     InternalServerError,
     TaskTemplateNotFound,
     StorageProxyError,
+    UnknownImageReferenceError,
 )
 from .auth import auth_required
 from .types import CORSOptions, WebMiddleware
@@ -595,7 +596,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         log.exception('GET_OR_CREATE: exception')
         raise
     except UnknownImageReference:
-        raise InvalidAPIParameters(f"Unknown image reference: {params['image']}")
+        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
     except Exception:
         await root_ctx.error_monitor.capture_exception(context={'user': owner_uuid})
         log.exception('GET_OR_CREATE: unexpected error!')
@@ -631,13 +632,13 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         t.Key('maxWaitSeconds', default=0) >> 'max_wait_seconds': t.Int[0:],
         tx.AliasedKey(['starts_at', 'startsAt'], default=None): t.Null | t.String,
         t.Key('reuseIfExists', default=True) >> 'reuse': t.ToBool,
-        t.Key('startupCommand', default=undefined) >> 'startup_command':
+        t.Key('startupCommand', default=None) >> 'startup_command':
             UndefChecker | t.Null | t.String,
         tx.AliasedKey(['bootstrap_script', 'bootstrapScript'], default=undefined):
             UndefChecker | t.Null | t.String,
-        t.Key('dependencies', default=undefined):
+        t.Key('dependencies', default=None):
             UndefChecker | t.Null | t.List(tx.UUID) | t.List(t.String),
-        tx.AliasedKey(['callback_url', 'callbackUrl', 'callbackURL'], default=undefined):
+        tx.AliasedKey(['callback_url', 'callbackUrl', 'callbackURL'], default=None):
             UndefChecker | t.Null | tx.URL,
         t.Key('owner_access_key', default=undefined): UndefChecker | t.Null | t.String,
     },
@@ -1101,7 +1102,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         log.exception('GET_OR_CREATE: exception')
         raise
     except UnknownImageReference:
-        raise InvalidAPIParameters(f"Unknown image reference: {params['image']}")
+        raise UnknownImageReferenceError(f"Unknown image reference: {params['image']}")
     except Exception:
         await root_ctx.error_monitor.capture_exception()
         log.exception('GET_OR_CREATE: unexpected error!')
@@ -1116,6 +1117,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
 @auth_required
 @check_api_params(
     t.Dict({
+        t.Key('login_session_token', default=None): t.Null | t.String,
         tx.AliasedKey(['app', 'service']): t.String,
         # The port argument is only required to use secondary ports
         # when the target app listens multiple TCP ports.
@@ -1201,6 +1203,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
 
     async with aiohttp.ClientSession() as session:
         async with session.post(f'{wsproxy_addr}/v2/conf', json={
+            'login_session_token': params['login_session_token'],
             'kernel_host': kernel_host,
             'kernel_port': host_port,
         }) as resp:

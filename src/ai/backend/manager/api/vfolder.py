@@ -503,11 +503,17 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-async def list_hosts(request: web.Request) -> web.Response:
+@check_api_params(
+    t.Dict({
+        tx.AliasedKey(['group_id', 'groupId'], default=None): tx.UUID | t.String | t.Null,
+    }),
+)
+async def list_hosts(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app['_root.context']
     access_key = request['keypair']['access_key']
     log.info('VFOLDER.LIST_HOSTS (ak:{})', access_key)
     domain_name = request['user']['domain_name']
+    group_id = params['group_id']
     domain_admin = request['user']['role'] == UserRole.ADMIN
     resource_policy = request['keypair']['resource_policy']
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
@@ -515,11 +521,11 @@ async def list_hosts(request: web.Request) -> web.Response:
         allowed_hosts: Set[str] = set()
         if 'user' in allowed_vfolder_types:
             allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
-                conn, resource_policy, domain_name, request['user']['uuid'])
+                conn, resource_policy, domain_name, request['user']['uuid'], group_id)
             allowed_hosts = allowed_hosts | allowed_hosts_by_user
         if 'group' in allowed_vfolder_types:
             allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
-                conn, resource_policy, domain_name, group_id=None, domain_admin=domain_admin)
+                conn, resource_policy, domain_name, group_id, domain_admin=domain_admin)
             allowed_hosts = allowed_hosts | allowed_hosts_by_group
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
     all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}

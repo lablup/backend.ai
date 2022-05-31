@@ -414,6 +414,7 @@ async def get_allowed_vfolder_hosts_by_user(
     resource_policy,
     domain_name: str,
     user_uuid: uuid.UUID,
+    group_id: uuid.UUID = None,
 ) -> Set[str]:
     '''
     Union `allowed_vfolder_hosts` from domain, groups, and keypair_resource_policy.
@@ -432,13 +433,23 @@ async def get_allowed_vfolder_hosts_by_user(
     )
     allowed_hosts.update(await conn.scalar(query))
     # User's Groups' allowed_vfolder_hosts.
-    j = groups.join(
-        association_groups_users,
-        (
-            (groups.c.id == association_groups_users.c.group_id) &
-            (association_groups_users.c.user_id == user_uuid)
-        ),
-    )
+    if group_id is not None:
+        j = groups.join(
+            association_groups_users,
+            (
+                (groups.c.id == association_groups_users.c.group_id) &
+                (groups.c.id == group_id) &
+                (association_groups_users.c.user_id == user_uuid)
+            ),
+        )
+    else:
+        j = groups.join(
+            association_groups_users,
+            (
+                (groups.c.id == association_groups_users.c.group_id) &
+                (association_groups_users.c.user_id == user_uuid)
+            ),
+        )
     query = (
         sa.select([groups.c.allowed_vfolder_hosts])
         .select_from(j)
@@ -468,10 +479,6 @@ async def prepare_vfolder_mounts(
     Determine the actual mount information from the requested vfolder lists,
     vfolder configurations, and the given user scope.
     """
-
-    # Fast-path for empty requested mounts
-    if not requested_mounts:
-        return []
 
     requested_vfolder_names: dict[str, str] = {}
     requested_vfolder_subpaths: dict[str, str] = {}
@@ -519,12 +526,26 @@ async def prepare_vfolder_mounts(
         extra_vf_conds=extra_vf_conds,
     )
 
+    # Fast-path for empty requested mounts
+    if not accessible_vfolders:
+        if requested_vfolder_names:
+            raise VFolderNotFound("There is no accessible vfolders at all.")
+        else:
+            return []
+    accessible_vfolders_map = {
+        vfolder['name']: vfolder for vfolder in accessible_vfolders
+    }
+
+    # add automount folder list into requested_vfolder_names
+    # and requested_vfolder_subpath
+    for _vfolder in accessible_vfolders:
+        if _vfolder['name'].startswith('.'):
+            requested_vfolder_names.setdefault(_vfolder['name'], _vfolder['name'])
+            requested_vfolder_subpaths.setdefault(_vfolder['name'], '.')
+
     # for vfolder in accessible_vfolders:
     for key, vfolder_name in requested_vfolder_names.items():
-        for vfolder in accessible_vfolders:
-            if vfolder['name'] == requested_vfolder_names[key]:
-                break
-        else:
+        if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         if vfolder['group'] is not None and vfolder['group'] != str(user_scope.group_id):
             # User's accessible group vfolders should not be mounted

@@ -251,7 +251,7 @@ manager_local_config_iv = t.Dict({
         t.Key('ssl-cert', default=None): t.Null | tx.Path(type='file'),
         t.Key('ssl-privkey', default=None): t.Null | tx.Path(type='file'),
         t.Key('event-loop', default='asyncio'): t.Enum('asyncio', 'uvloop'),
-        t.Key('distributed-lock', default='etcd'):
+        t.Key('distributed-lock', default='pg_advisory'):
             t.Enum('filelock', 'pg_advisory', 'redlock', 'etcd'),
         t.Key('pid-file', default=os.devnull): tx.Path(
             type='file',
