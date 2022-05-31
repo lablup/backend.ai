@@ -446,6 +446,9 @@ show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 $bpython -m pip --disable-pip-version-check install -q requests requests_unixsocket
 $bpython scripts/check-docker.py
+if [ $? -ne 0 ]; then
+  exit 1
+fi
 if [ "$DISTRO" = "Darwin" ]; then
   echo "validating Docker Desktop mount permissions..."
   docker pull alpine:3.8 > /dev/null
