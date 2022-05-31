@@ -13,6 +13,7 @@
 //     "pytest-aiohttp>=1.0.4",
 //     "pytest-asyncio>=0.18",
 //     "pytest-cov!=2.12.1,<3.1,>=2.12",
+//     "pytest-dependency>=0.5.1",
 //     "pytest-mock>=3.5.0",
 //     "pytest>=7.0"
 //   ]
@@ -780,6 +781,21 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "c2a892906192663f85030a6ab91304e508e546cddfe557d692d61ec57a1d946b",
+              "url": "https://files.pythonhosted.org/packages/69/6d/cfd6d654877f75e0368e4040f1cf0350dd9f427b578bf7b685af629f8167/pytest-dependency-0.5.1.tar.gz"
+            }
+          ],
+          "project_name": "pytest-dependency",
+          "requires_dists": [
+            "pytest>=3.6.0"
+          ],
+          "requires_python": null,
+          "version": "0.5.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "6cff27cec936bf81dc5ee87f07132b807bcda51106b5ec4b90a04331cba76231",
               "url": "https://files.pythonhosted.org/packages/11/40/8fcb3c0f72e11dc44e1102b2adf5f160b8a00e84d915798c60aabcd9257a/pytest_mock-3.7.0-py3-none-any.whl"
             },
@@ -925,6 +941,7 @@
     "pytest-aiohttp>=1.0.4",
     "pytest-asyncio>=0.18",
     "pytest-cov!=2.12.1,<3.1,>=2.12",
+    "pytest-dependency>=0.5.1",
     "pytest-mock>=3.5.0",
     "pytest>=7.0"
   ],

@@ -53,6 +53,7 @@ version = "pytest>=7.0"
 extra_requirements.add = [
     "pytest-asyncio>=0.18",
     "pytest-aiohttp>=1.0.4",
+    "pytest-dependency>=0.5.1",
     "pytest-mock>=3.5.0",
     "aioresponses>=0.7.3",
 ]
