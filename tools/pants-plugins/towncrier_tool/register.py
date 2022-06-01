@@ -6,6 +6,7 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
+from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import (
@@ -50,7 +51,7 @@ class TowncrierSubsystem(PythonToolBase):
 
             Setting this option will disable `[{cls.options_scope}].config_discovery`. Use
             this option if the config is located in a non-standard location.
-            """
+            """,
         ),
     )
     config_discovery = BoolOption(
@@ -64,7 +65,7 @@ class TowncrierSubsystem(PythonToolBase):
 
             Use `[{cls.options_scope}].config` instead if your config is in a
             non-standard location.
-            """
+            """,
         ),
     )
 
