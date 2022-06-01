@@ -40,7 +40,7 @@ class TowncrierSubsystem(PythonToolBase):
     default_lockfile_path = "tools/pants-plugins/towncrier_tool/towncrier.lock"
     default_lockfile_url = git_url(default_lockfile_path)
 
-    skip = SkipOption("update-changelog")
+    skip = SkipOption("towncrier")
     args = ArgsListOption(example="--draft")
 
     config = FileOption(
@@ -84,7 +84,7 @@ class TowncrierSubsystem(PythonToolBase):
 
 
 class TowncrierGoal(Goal):
-    name = "towncrier"
+    name = "update-changelog"
     subsystem_cls = TowncrierSubsystem
 
 
