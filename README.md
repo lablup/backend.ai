@@ -19,7 +19,7 @@ Contents in This Repository
 This repository contains all open-source server-side components and the client SDK for Python
 as a reference implementation of API clients.
 
-## Directory Structure
+### Directory Structure
 
 * `src/ai/backend/`: Source codes
   - `manager/`: Manager
@@ -43,8 +43,9 @@ as a reference implementation of API clients.
 * `docs/`: Unified documentation
 * `tests/`
   - `manager/`, `agent/`, ...: Per-component unit tests
-* `configs`
+* `configs/`
   - `manager/`, `agent/`, ...: Per-component sample configurations
+* `docker/`: Dockerfiles for auxiliary containers
 * `fixtures/`
   - `manager/`, ...: Per-component fixtures for development setup and tests
 * `plugins/`: A directory to place plugins such as accelerators, monitors, etc.
@@ -149,6 +150,25 @@ heartbeats.
     - `backendai_accelerator_v12`
     - `backendai_monitor_stats_v10`
     - `backendai_monitor_error_v10`
+
+### Storage Proxy
+
+It provides a unified abstraction over multiple different network storage devices with
+vendor-specific enhancements such as real-time performance metrics and filesystem operation
+acceleration APIs.
+
+* `src/ai/backend/storage`
+  * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/storage/README.md)
+  * Legacy per-pkg repo: https://github.com/lablup/backend.ai-storage-proxy
+
+### Webserver
+
+It hosts the SPA (single-page application) packaged from our web UI codebase for end-users
+and basic administration tasks.
+
+* `src/ai/backend/web`
+  * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/web/README.md)
+  * Legacy per-pkg repo: https://github.com/lablup/backend.ai-webserver
 
 ### Kernels
 
