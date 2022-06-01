@@ -1,0 +1,4 @@
+Sphinx~=3.3
+sphinx-rtd-theme>=0.5.0
+pygments~=2.6
+-e git+https://github.com/lablup/pygments-graphql-lexer
