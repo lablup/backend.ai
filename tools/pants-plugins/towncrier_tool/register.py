@@ -86,7 +86,7 @@ class TowncrierLockfileSentinel(GenerateToolLockfileSentinel):
 
 
 @rule
-def setup_twine_lockfile(
+def setup_towncrier_lockfile(
     _: TowncrierLockfileSentinel,
     subsystem: TowncrierSubsystem,
     python_setup: PythonSetup,
