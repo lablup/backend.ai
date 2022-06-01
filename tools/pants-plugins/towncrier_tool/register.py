@@ -7,7 +7,9 @@ from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
-from pants.engine.rules import collect_rules, rule
+from pants.engine.console import Console
+from pants.engine.goal import Goal
+from pants.engine.rules import collect_rules, rule, goal_rule
 from pants.engine.unions import UnionRule
 from pants.option.option_types import (
     ArgsListOption,
@@ -81,6 +83,11 @@ class TowncrierSubsystem(PythonToolBase):
         )
 
 
+class TowncrierGoal(Goal):
+    name = "towncrier"
+    subsystem_cls = TowncrierSubsystem
+
+
 class TowncrierLockfileSentinel(GenerateToolLockfileSentinel):
     resolve_name = TowncrierSubsystem.options_scope
 
@@ -95,6 +102,15 @@ def setup_towncrier_lockfile(
         subsystem,
         use_pex=python_setup.generate_lockfiles_with_pex,
     )
+
+
+@goal_rule
+async def run_towncrier(
+    console: Console,
+    subsystem: TowncrierSubsystem,
+) -> TowncrierGoal:
+    console.print_stdout("towncrier!!")
+    return TowncrierGoal(exit_code=0)
 
 
 def rules():
