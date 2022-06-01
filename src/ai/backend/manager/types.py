@@ -9,16 +9,16 @@ from typing import (
 )
 
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.engine.row import Row
 
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
+    from .models import SessionRow
     from .defs import LockID
 
 
 class SessionGetter(Protocol):
 
-    def __call__(self, *, db_connection: SAConnection) -> Row:
+    def __call__(self, *, db_connection: SAConnection) -> SessionRow:
         ...
 
 

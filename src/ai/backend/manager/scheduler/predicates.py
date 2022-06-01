@@ -6,7 +6,10 @@ from typing import (
 
 from dateutil.tz import tzutc
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import (
+    AsyncConnection as SAConnection,
+    AsyncSession as SASession,
+)
 
 from ai.backend.common import redis
 from ai.backend.common.logging import BraceStyleAdapter
@@ -19,7 +22,7 @@ from ai.backend.common.types import (
 from ..models import (
     domains, groups, kernels,
     keypair_resource_policies,
-    session_dependencies,
+    SessionDependencyRow,
     query_allowed_sgroups,
     DefaultForUnspecified,
 )
@@ -116,35 +119,37 @@ async def check_dependencies(
     sched_ctx: SchedulingContext,
     sess_ctx: PendingSession,
 ) -> PredicateResult:
-    j = sa.join(
-        session_dependencies,
-        kernels,
-        session_dependencies.c.depends_on == kernels.c.session_id,
-    )
-    query = (
-        sa.select([
-            kernels.c.session_id,
-            kernels.c.session_name,
-            kernels.c.result,
-        ])
-        .select_from(j)
-        .where(session_dependencies.c.session_id == sess_ctx.session_id)
-    )
-    result = await db_conn.execute(query)
-    rows = result.fetchall()
-    pending_dependencies = []
-    for row in rows:
-        if row['result'] != SessionResult.SUCCESS:
-            pending_dependencies.append(row)
-    all_success = (not pending_dependencies)
-    if all_success:
-        return PredicateResult(True)
-    return PredicateResult(
-        False,
-        "Waiting dependency sessions to finish as success. ({})".format(
-            ", ".join(f"{row['session_name']} ({row['session_id']})" for row in pending_dependencies),
-        ),
-    )
+    # j = sa.join(
+    #     SessionDependencyRow,
+    #     kernels,
+    #     SessionDependencyRow.depends_on == kernels.c.session_id,
+    # )
+    # query = (
+    #     sa.select([
+    #         kernels.c.session_id,
+    #         kernels.c.session_name,
+    #         kernels.c.result,
+    #     ])
+    #     .select_from(j)
+    #     .where(SessionDependencyRow.session_id == sess_ctx.session_id)
+    # )
+    # result = await db_conn.execute(query)
+    # rows = result.fetchall()
+    # pending_dependencies = []
+    # for row in rows:
+    #     if row['result'] != SessionResult.SUCCESS:
+    #         pending_dependencies.append(row)
+    # all_success = (not pending_dependencies)
+    # if all_success:
+    #     return PredicateResult(True)
+    # return PredicateResult(
+    #     False,
+    #     "Waiting dependency sessions to finish as success. ({})".format(
+    #         ", ".join(f"{row['session_name']} ({row['session_id']})" for row in pending_dependencies),
+    #     ),
+    # )
+    check = SessionDependencyRow.check_all_dependencies(SASession(db_conn), sess_ctx)
+    return PredicateResult(*check)
 
 
 async def check_keypair_resource_limit(

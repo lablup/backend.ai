@@ -19,13 +19,14 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.orm import relationship
 import trafaret as t
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import SessionTypes, JSONSerializableMixin
 
 from .base import (
-    metadata,
+    mapper_registry,
     simple_db_mutate,
     simple_db_mutate_returning_item,
     set_if_set,
@@ -94,7 +95,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
 
 
 scaling_groups = sa.Table(
-    'scaling_groups', metadata,
+    'scaling_groups', mapper_registry.metadata,
     sa.Column('name', sa.String(length=64), primary_key=True),
     sa.Column('description', sa.String(length=512)),
     sa.Column('is_active', sa.Boolean, index=True, default=True),
@@ -110,13 +111,19 @@ scaling_groups = sa.Table(
     ),
 )
 
+class ScalingGroupRow:
+    pass
+
+mapper_registry.map_imperatively(ScalingGroupRow, scaling_groups, properties={
+    'sessions' : relationship('SessionRow', back_populates='scaling_group'),
+})
 
 # When scheduling, we take the union of allowed scaling groups for
 # each domain, group, and keypair.
 
 
 sgroups_for_domains = sa.Table(
-    'sgroups_for_domains', metadata,
+    'sgroups_for_domains', mapper_registry.metadata,
     sa.Column('scaling_group',
               sa.ForeignKey('scaling_groups.name',
                             onupdate='CASCADE',
@@ -132,7 +139,7 @@ sgroups_for_domains = sa.Table(
 
 
 sgroups_for_groups = sa.Table(
-    'sgroups_for_groups', metadata,
+    'sgroups_for_groups', mapper_registry.metadata,
     sa.Column('scaling_group',
               sa.ForeignKey('scaling_groups.name',
                             onupdate='CASCADE',
@@ -148,7 +155,7 @@ sgroups_for_groups = sa.Table(
 
 
 sgroups_for_keypairs = sa.Table(
-    'sgroups_for_keypairs', metadata,
+    'sgroups_for_keypairs', mapper_registry.metadata,
     sa.Column('scaling_group',
               sa.ForeignKey('scaling_groups.name',
                             onupdate='CASCADE',

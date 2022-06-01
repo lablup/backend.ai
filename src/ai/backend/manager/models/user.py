@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import TypeDecorator, VARCHAR
+from sqlalchemy.orm import relationship
 
 from ai.backend.common import redis
 from ai.backend.common.logging import BraceStyleAdapter
@@ -37,7 +38,7 @@ from .base import (
     IDColumn,
     Item,
     PaginatedList,
-    metadata,
+    mapper_registry,
     set_if_set,
     batch_result,
     batch_multiresult,
@@ -103,7 +104,7 @@ INACTIVE_USER_STATUSES = (
 
 
 users = sa.Table(
-    'users', metadata,
+    'users', mapper_registry.metadata,
     IDColumn('uuid'),
     sa.Column('username', sa.String(length=64), unique=True),
     sa.Column('email', sa.String(length=64), index=True,
@@ -125,6 +126,13 @@ users = sa.Table(
               sa.ForeignKey('domains.name'), index=True),
     sa.Column('role', EnumValueType(UserRole), default=UserRole.USER),
 )
+
+class UserRow:
+    pass
+
+mapper_registry.map_imperatively(UserRow, users, properties={
+    'sessions' : relationship('SessionRow', back_populates='user'),
+})
 
 
 class UserGroup(graphene.ObjectType):

@@ -12,6 +12,7 @@ from . import dotfile as _dotfile
 from . import resource_policy as _rpolicy
 from . import resource_preset as _rpreset
 from . import scaling_group as _sgroup
+from . import session as _session
 from . import session_template as _sessiontemplate
 from . import storage as _storage
 from . import error_logs as _errorlogs
@@ -30,6 +31,7 @@ __all__ = (
     *_rpolicy.__all__,
     *_rpreset.__all__,
     *_sgroup.__all__,
+    *_session.__all__,
     *_sessiontemplate.__all__,
     *_storage.__all__,
     *_errorlogs.__all__,
@@ -47,6 +49,7 @@ from .dotfile import *  # noqa
 from .resource_policy import *  # noqa
 from .resource_preset import *  # noqa
 from .scaling_group import *  # noqa
+from .session import *  # noqa
 from .session_template import *  # noqa
 from .storage import *  # noqa
 from .error_logs import *  # noqa

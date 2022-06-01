@@ -23,6 +23,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.engine.row import Row
 from sqlalchemy.sql.expression import false
+from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack, redis
 from ai.backend.common.types import (
@@ -38,7 +39,7 @@ from .base import (
     ForeignKeyIDColumn,
     Item,
     PaginatedList,
-    metadata,
+    mapper_registry,
     batch_result,
     batch_multiresult,
     set_if_set,
@@ -66,7 +67,7 @@ __all__: Sequence[str] = (
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 keypairs = sa.Table(
-    'keypairs', metadata,
+    'keypairs', mapper_registry.metadata,
     sa.Column('user_id', sa.String(length=256), index=True),
     sa.Column('access_key', sa.String(length=20), primary_key=True),
     sa.Column('secret_key', sa.String(length=40)),
@@ -93,6 +94,13 @@ keypairs = sa.Table(
     sa.Column('dotfiles', sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b'\x90'),
     sa.Column('bootstrap_script', sa.String(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=''),
 )
+
+class KeyPairRow:
+    pass
+
+mapper_registry.map_imperatively(KeyPairRow, keypairs, properties={
+    'sessions' : relationship('SessionRow', back_populates='access_key'),
+})
 
 
 class UserInfo(graphene.ObjectType):

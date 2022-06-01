@@ -48,6 +48,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.sql.expression import true, null
 
 from ai.backend.manager.models.image import ImageRow
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -107,6 +108,7 @@ from ..models import (
     users, UserRole,
     vfolders,
     AgentStatus, KernelStatus,
+    SessionRow, SessionStatus,
     query_accessible_vfolders,
     session_templates,
     verify_vfolder_name,
@@ -456,7 +458,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     try:
         # NOTE: We can reuse the session IDs of TERMINATED sessions only.
         # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-        kern = await root_ctx.registry.get_session(params['session_name'], owner_access_key)
+        kern = await root_ctx.registry.get_session_main_kernel(params['session_name'], owner_access_key)
         running_image_ref = ImageRef(kern['image'], [kern['registry']], kern['architecture'])
         if running_image_ref != requested_image_ref:
             # The image must be same if get_or_create() called multiple times
@@ -1140,7 +1142,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     assert myself is not None
     try:
         kernel = await asyncio.shield(app_ctx.database_ptask_group.create_task(
-            root_ctx.registry.get_session(session_name, access_key),
+            root_ctx.registry.get_session_main_kernel(session_name, access_key),
         ))
     except (SessionNotFound, TooManySessionsMatched):
         raise
@@ -1309,7 +1311,7 @@ async def handle_destroy_session(
     root_ctx: RootContext = app['_root.context']
     await root_ctx.registry.destroy_session(
         functools.partial(
-            root_ctx.registry.get_session_by_session_id,
+            root_ctx.registry.get_session,
             event.session_id,
         ),
         forced=False,
@@ -1383,13 +1385,13 @@ async def invoke_session_callback(
     }
     try:
         async with root_ctx.db.begin_readonly() as db:
-            session = await root_ctx.registry.get_session_by_session_id(
+            session = await root_ctx.registry.get_session(
                 event.session_id,
                 db_connection=db,
             )
     except SessionNotFound:
         return
-    url = session['callback_url']
+    url = session.callback_url
     if url is None:
         return
     app_ctx.webhook_ptask_group.create_task(
@@ -1412,7 +1414,7 @@ async def handle_batch_result(
         await root_ctx.registry.set_session_result(event.session_id, False, event.exit_code)
     await root_ctx.registry.destroy_session(
         functools.partial(
-            root_ctx.registry.get_session_by_session_id,
+            root_ctx.registry.get_session,
             event.session_id,
         ),
         reason='task-finished',
@@ -1596,14 +1598,15 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
             db_connection=conn,
             for_update=True,
         )
-        if compute_session['status'] != KernelStatus.RUNNING:
+        if compute_session.status != SessionStatus.RUNNING:
             raise InvalidAPIParameters('Can\'t change name of not running session')
         update_query = (
-            sa.update(kernels)
-            .values(session_name=new_name)
-            .where(kernels.c.session_id == compute_session['session_id'])
+            sa.update(SessionRow)
+            .values(name=new_name)
+            .where(SessionRow.id == compute_session.id)
         )
-        await conn.execute(update_query)
+        
+        await SASession(conn).execute(update_query)
 
     return web.Response(status=204)
 

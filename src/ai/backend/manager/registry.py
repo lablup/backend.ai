@@ -45,6 +45,7 @@ import snappy
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.sql.expression import true
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from yarl import URL
 import zmq
 
@@ -108,9 +109,9 @@ from .types import SessionGetter, UserScope
 from .models import (
     agents, kernels,
     keypair_resource_policies,
-    session_dependencies,
+    SessionDependencyRow,
     AgentStatus, KernelStatus,
-    ImageRow,
+    ImageRow, SessionRow,
     query_allowed_sgroups,
     prepare_dotfiles,
     prepare_vfolder_mounts,
@@ -120,7 +121,7 @@ from .models import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_KERNEL_STATUSES,
 )
-from .models.kernel import match_session_ids, get_all_kernels, get_main_kernels
+from .models.kernel import KernelRow, match_session_ids, get_all_kernels, get_main_kernels
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -648,8 +649,10 @@ class AgentRegistry:
         *,
         allow_stale: bool = False,
         for_update: bool = False,
+        load_kernels: bool = False,
+        load_main_kernel: bool = False,
         db_connection: SAConnection = None,
-    ) -> sa.engine.Row:
+    ) -> SessionRow:
         """
         Retrieve the session information by kernel's ID, kernel's session UUID
         (session_id), or kernel's name (session_id) paired with access_key.
@@ -663,30 +666,78 @@ class AgentRegistry:
         :param allow_stale: If True, filter "inactive" kernels as well as "active" ones.
                             If False, filter "active" kernels only.
         :param for_update: Apply for_update during select query.
+        :param load_kernels: Load kernels of selected sessions eagerly.
+        :param load_main_kernel: Load the main kernel of selected sessions eagerly.
         :param db_connection: Database connection for reuse.
-        :param cluster_role: Filter kernels by role. "main", "sub", or None (all).
         """
         async with reenter_txn(self.db, db_connection, _read_only_txn_opts) as conn:
-            if allow_stale:
-                extra_cond = None
-            else:
-                extra_cond = (~kernels.c.status.in_(DEAD_KERNEL_STATUSES))
-            session_infos = await match_session_ids(
+            # sess_rows = await SessionRow.match_sessions(
+            #     SASession(conn),
+            #     session_name_or_id,
+            #     AccessKey(access_key),
+            #     allow_stale=False,
+            #     load_kernels=True,
+            #     load_main_kernel=True,
+            # )
+            # print('\n=================')
+            # try:
+            #     print(f'{sess_rows = }')
+            #     print(f'{sess_rows[0] = }')
+            #     print(f'{type(sess_rows[0].main_kernel) = }')
+            # except IndexError:
+            #     pass
+
+            # if allow_stale:
+            #     extra_cond = None
+            # else:
+            #     extra_cond = (~kernels.c.status.in_(DEAD_KERNEL_STATUSES))
+            # session_infos = await match_session_ids(
+            #     session_name_or_id,
+            #     AccessKey(access_key),
+            #     for_update=for_update,
+            #     extra_cond=extra_cond,
+            #     db_connection=conn,
+            # )
+            # if not session_infos:
+            #     raise SessionNotFound()
+            # if len(session_infos) > 1:
+            #     raise TooManySessionsMatched(extra_data={'matches': session_infos})
+            # kernel_list = await get_main_kernels(
+            #     [SessionId(session_infos[0]['session_id'])],
+            #     db_connection=conn,
+            # )
+            # return kernel_list[0]
+
+            sess_rows = await SessionRow.match_sessions(
+                SASession(conn),
                 session_name_or_id,
                 AccessKey(access_key),
+                allow_stale=allow_stale,
                 for_update=for_update,
-                extra_cond=extra_cond,
-                db_connection=conn,
+                load_kernels=load_kernels,
+                load_main_kernel=load_main_kernel,
             )
-            if not session_infos:
+            if not sess_rows:
                 raise SessionNotFound()
-            if len(session_infos) > 1:
-                raise TooManySessionsMatched(extra_data={'matches': session_infos})
-            kernel_list = await get_main_kernels(
-                [SessionId(session_infos[0]['session_id'])],
-                db_connection=conn,
-            )
-            return kernel_list[0]
+            if len(sess_rows) > 1:
+                raise TooManySessionsMatched(extra_data={'matches': sess_rows})
+            return sess_rows[0]
+
+    async def get_session_main_kernel(
+        self,
+        session_name_or_id: Union[str, uuid.UUID],
+        access_key: Union[str, AccessKey],
+        *,
+        allow_stale: bool = False,
+        for_update: bool = False,
+        db_connection: SAConnection = None,
+    ) -> KernelRow:
+        sess = await self.get_session(
+            session_name_or_id, access_key,
+            allow_stale=allow_stale, for_update=for_update,
+            load_main_kernel=True, db_connection=db_connection,
+        )
+        return sess.main_kernel
 
     async def get_session_kernels(
         self,
@@ -723,20 +774,17 @@ class AgentRegistry:
     async def get_sessions(
         self,
         session_names: Container[str],
+        access_key: AccessKey,
         field=None,
         allow_stale=False,
         db_connection=None,
     ):
         """
         Batched version of :meth:`get_session() <AgentRegistry.get_session>`.
-        The order of the returend array is same to the order of ``sess_ids``.
-        For non-existent or missing kernel IDs, it fills None in their
-        positions without raising SessionNotFound exception.
+        The related `kernels` field is loaded lazily.
         """
 
-        cols = [kernels.c.id, kernels.c.session_id,
-                kernels.c.agent_addr, kernels.c.kernel_host, kernels.c.access_key,
-                kernels.c.service_ports]
+        cols = []
         if isinstance(field, (tuple, list)):
             cols.extend(field)
         elif isinstance(field, (sa.Column, sa.sql.elements.ColumnClause)):
@@ -744,21 +792,10 @@ class AgentRegistry:
         elif isinstance(field, str):
             cols.append(sa.column(field))
         async with reenter_txn(self.db, db_connection, _read_only_txn_opts) as conn:
-            if allow_stale:
-                query = (sa.select(cols)
-                           .select_from(kernels)
-                           .where((kernels.c.session_id.in_(session_names)) &
-                                  (kernels.c.cluster_role == DEFAULT_ROLE)))
-            else:
-                query = (sa.select(cols)
-                           .select_from(kernels.join(agents))
-                           .where((kernels.c.session_id.in_(session_names)) &
-                                  (kernels.c.cluster_role == DEFAULT_ROLE) &
-                                  (agents.c.status == AgentStatus.ALIVE) &
-                                  (agents.c.id == kernels.c.agent)))
-            result = await conn.execute(query)
-            rows = result.fetchall()
-            return rows
+            return await SessionRow.get_sessions(
+                SASession(conn), session_names, access_key,
+                info_cols=cols, allow_stale=allow_stale,
+            )
 
     async def enqueue_session(
         self,
@@ -1083,7 +1120,7 @@ class AgentRegistry:
                                     "Unknown session ID or name in the dependency list",
                                     extra_data={"session_ref": dependency_id},
                                 )
-                        dependency_bulk_insert_query = session_dependencies.insert().values(
+                        dependency_bulk_insert_query = SessionDependencyRow.insert().values(
                             {
                                 'session_id': session_id,
                                 'depends_on': sa.bindparam('dependency_id'),
@@ -1773,85 +1810,107 @@ class AgentRegistry:
         :param reason: Reason to destroy a session if client wants to specify it manually.
         """
         async with self.db.begin_readonly() as conn:
-            session = await session_getter(db_connection=conn)
+            session: SessionRow
+            session = await session_getter(
+                load_kernels=True,
+                load_main_kernel=True,
+                db_connection=conn,
+            )
         if forced:
             reason = 'force-terminated'
         hook_result = await self.hook_plugin_ctx.dispatch(
             'PRE_DESTROY_SESSION',
-            (session['session_id'], session['session_name'], session['access_key']),
+            (session.id, session.name, session.kp_access_key),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
         async with self.handle_kernel_exception(
-            'destroy_session', session['id'], session['access_key'], set_error=True,
+            'destroy_session', session.id, session.kp_access_key, set_error=True,
         ):
 
-            async def _fetch() -> Sequence[Row]:
-                async with self.db.begin_readonly() as conn:
-                    query = (
-                        sa.select([
-                            kernels.c.id,
-                            kernels.c.session_id,
-                            kernels.c.session_creation_id,
-                            kernels.c.status,
-                            kernels.c.access_key,
-                            kernels.c.cluster_role,
-                            kernels.c.agent,
-                            kernels.c.agent_addr,
-                            kernels.c.container_id,
-                        ])
-                        .select_from(kernels)
-                        .where(kernels.c.session_id == session['id'])
-                    )
-                    result = await conn.execute(query)
-                    kernel_list = result.fetchall()
-                return kernel_list
+            # async def _fetch() -> Sequence[Row]:
+            #     async with self.db.begin_readonly() as conn:
+            #         query = (
+            #             sa.select([
+            #                 kernels.c.id,
+            #                 kernels.c.session_id,
+            #                 kernels.c.session_creation_id,
+            #                 kernels.c.status,
+            #                 kernels.c.access_key,
+            #                 kernels.c.cluster_role,
+            #                 kernels.c.agent,
+            #                 kernels.c.agent_addr,
+            #                 kernels.c.container_id,
+            #             ])
+            #             .select_from(kernels)
+            #             .where(kernels.c.session_id == session['id'])
+            #         )
+            #         result = await conn.execute(query)
+            #         kernel_list = result.fetchall()
+            #     return kernel_list
 
-            kernel_list = await execute_with_retry(_fetch)
+            # kernel_list = await execute_with_retry(_fetch)
+            kernel_list: Sequence[KernelRow]
+            kernel_list = session.kernels
             main_stat = {}
             per_agent_tasks = []
             now = datetime.now(tzutc())
 
-            keyfunc = lambda item: item['agent'] if item['agent'] is not None else ''
+            keyfunc = lambda item: item.agent if item.agent is not None else ''
             for agent_id, group_iterator in itertools.groupby(
                 sorted(kernel_list, key=keyfunc), key=keyfunc,
             ):
                 destroyed_kernels = []
                 grouped_kernels = [*group_iterator]
+                kernel: KernelRow
                 for kernel in grouped_kernels:
-                    if kernel['status'] == KernelStatus.PENDING:
+                    if kernel.status == KernelStatus.PENDING:
+
+                        # async def _update() -> None:
+                        #     async with self.db.begin() as conn:
+                        #         await conn.execute(
+                        #             sa.update(kernels)
+                        #             .values({
+                        #                 'status': KernelStatus.CANCELLED,
+                        #                 'status_info': reason,
+                        #                 'status_changed': now,
+                        #                 'terminated_at': now,
+                        #             })
+                        #             .where(kernels.c.id == kernel['id']),
+                        #         )
 
                         async def _update() -> None:
-                            async with self.db.begin() as conn:
-                                await conn.execute(
-                                    sa.update(kernels)
-                                    .values({
-                                        'status': KernelStatus.CANCELLED,
-                                        'status_info': reason,
-                                        'status_changed': now,
-                                        'terminated_at': now,
-                                    })
-                                    .where(kernels.c.id == kernel['id']),
+                            values = {
+                                'status': KernelStatus.CANCELLED,
+                                'status_info': reason,
+                                'status_changed': now,
+                                'terminated_at': now,
+                            }
+                            async with self.db.begin_session() as sess:
+                                await KernelRow.update(
+                                    sess,
+                                    kernel.id,
+                                    values,
                                 )
 
                         await execute_with_retry(_update)
                         await self.event_producer.produce_event(
-                            KernelCancelledEvent(kernel['id'], '', reason),
+                            KernelCancelledEvent(kernel.id, '', reason),
                         )
-                        if kernel['cluster_role'] == DEFAULT_ROLE:
+                        if kernel.cluster_role == DEFAULT_ROLE:
                             main_stat = {'status': 'cancelled'}
                             await self.event_producer.produce_event(
                                 SessionCancelledEvent(
-                                    kernel['session_id'],
-                                    kernel['session_creation_id'],
+                                    kernel.session_id,
+                                    session.creation_id,
                                     reason,
                                 ),
                             )
-                    elif kernel['status'] == KernelStatus.PULLING:
+                    elif kernel.status == KernelStatus.PULLING:
                         raise GenericForbidden('Cannot destroy kernels in pulling status')
-                    elif kernel['status'] in (
+                    elif kernel.status in (
                         KernelStatus.SCHEDULED,
                         KernelStatus.PREPARING,
                         KernelStatus.TERMINATING,
@@ -1862,82 +1921,83 @@ class AgentRegistry:
                                 'Cannot destroy kernels in scheduled/preparing/terminating/error status',
                             )
                         log.warning('force-terminating kernel (k:{}, status:{})',
-                                    kernel['id'], kernel['status'])
-                        if kernel['container_id'] is not None:
+                                    kernel.id, kernel.status)
+                        if kernel.container_id is not None:
                             destroyed_kernels.append(kernel)
 
+                        if kernel.cluster_role == DEFAULT_ROLE:
+                            # The main session is terminated;
+                            # decrement the user's concurrency counter
+                            await redis.execute(
+                                self.redis_stat,
+                                lambda r: r.incrby(
+                                    f"keypair.concurrency_used.{kernel.access_key}",
+                                    -1,
+                                ),
+                            )
+                        
                         async def _update() -> None:
                             kern_stat = await redis.execute(
                                 self.redis_stat,
                                 lambda r: r.get(str(kernel['id'])),
                             )
-                            async with self.db.begin() as conn:
-                                values = {
-                                    'status': KernelStatus.TERMINATED,
-                                    'status_info': reason,
-                                    'status_changed': now,
-                                    'terminated_at': now,
-                                }
-                                if kern_stat:
-                                    values['last_stat'] = msgpack.unpackb(kern_stat)
-                                await conn.execute(
-                                    sa.update(kernels)
-                                    .values(values)
-                                    .where(kernels.c.id == kernel['id']),
+                            values = {
+                                'status': KernelStatus.TERMINATED,
+                                'status_info': reason,
+                                'status_changed': now,
+                                'terminated_at': now,
+                            }
+                            if kern_stat:
+                                values['last_stat'] = msgpack.unpackb(kern_stat)
+                            async with self.db.begin_session() as sess:
+                                await KernelRow.update(
+                                    sess,
+                                    kernel.id,
+                                    values,
                                 )
-
-                        if kernel['cluster_role'] == DEFAULT_ROLE:
-                            # The main session is terminated;
-                            # decrement the user's concurrency counter
-                            await redis.execute(
-                                self.redis_stat,
-                                lambda r: r.incrby(
-                                    f"keypair.concurrency_used.{kernel['access_key']}",
-                                    -1,
-                                ),
-                            )
 
                         await execute_with_retry(_update)
                         await self.event_producer.produce_event(
-                            KernelTerminatedEvent(kernel['id'], reason),
+                            KernelTerminatedEvent(kernel.id, reason),
                         )
                     else:
 
                         async def _update() -> None:
-                            async with self.db.begin() as conn:
-                                await conn.execute(
-                                    sa.update(kernels)
-                                    .values({
-                                        'status': KernelStatus.TERMINATING,
-                                        'status_info': reason,
-                                        'status_changed': now,
-                                        'status_data': {
-                                            "kernel": {"exit_code": None},
-                                            "session": {"status": "terminating"},
-                                        },
-                                    })
-                                    .where(kernels.c.id == kernel['id']),
+                            value = {
+                                'status': KernelStatus.TERMINATING,
+                                'status_info': reason,
+                                'status_changed': now,
+                                'status_data': {
+                                    "kernel": {"exit_code": None},
+                                    "session": {"status": "terminating"},
+                                },
+                            }
+                            async with self.db.begin_session() as sess:
+                                await KernelRow.update(
+                                    sess,
+                                    kernel.id,
+                                    value,
                                 )
 
-                        if kernel['cluster_role'] == DEFAULT_ROLE:
+                        if kernel.cluster_role == DEFAULT_ROLE:
                             # The main session is terminated;
                             # decrement the user's concurrency counter
                             await redis.execute(
                                 self.redis_stat,
                                 lambda r: r.incrby(
-                                    f"keypair.concurrency_used.{kernel['access_key']}",
+                                    f"keypair.concurrency_used.{kernel.access_key}",
                                     -1,
                                 ),
                             )
 
                         await execute_with_retry(_update)
                         await self.event_producer.produce_event(
-                            KernelTerminatingEvent(kernel['id'], reason),
+                            KernelTerminatingEvent(kernel.id, reason),
                         )
 
-                    if kernel['agent_addr'] is None:
-                        await self.mark_kernel_terminated(kernel['id'], 'missing-agent-allocation')
-                        if kernel['cluster_role'] == DEFAULT_ROLE:
+                    if kernel.agent_addr is None:
+                        await self.mark_kernel_terminated(kernel.id, 'missing-agent-allocation')
+                        if kernel.cluster_role == DEFAULT_ROLE:
                             main_stat = {'status': 'terminated'}
                     else:
                         destroyed_kernels.append(kernel)

@@ -18,12 +18,13 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.engine.row import Row
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot
 from .base import (
-    metadata, ResourceSlotColumn,
+    mapper_registry, ResourceSlotColumn,
     simple_db_mutate,
     simple_db_mutate_returning_item,
     set_if_set,
@@ -52,7 +53,7 @@ MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 _rx_slug = re.compile(r'^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$')
 
 domains = sa.Table(
-    'domains', metadata,
+    'domains', mapper_registry.metadata,
     sa.Column('name', sa.String(length=64), primary_key=True),
     sa.Column('description', sa.String(length=512)),
     sa.Column('is_active', sa.Boolean, default=True),
@@ -68,6 +69,13 @@ domains = sa.Table(
     # dotfiles column, \x90 means empty list in msgpack
     sa.Column('dotfiles', sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b'\x90'),
 )
+
+class DomainRow:
+    pass
+
+mapper_registry.map_imperatively(DomainRow, domains, properties={
+    'sessions' : relationship('SessionRow', back_populates='domain'),
+})
 
 
 class Domain(graphene.ObjectType):

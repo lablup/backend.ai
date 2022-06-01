@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import json
 from typing import (
+    TYPE_CHECKING,
     Any,
     Dict,
+    Iterable,
     Optional,
     Mapping,
     Union,
@@ -26,6 +28,9 @@ from aiohttp import web
 from ai.backend.common.plugin.hook import HookResult
 
 from ..exceptions import AgentError
+
+if TYPE_CHECKING:
+    from ..models import SessionRow
 
 
 class BackendError(web.HTTPError):
@@ -223,11 +228,12 @@ class TooManySessionsMatched(BackendError, web.HTTPNotFound):
             extra_data is not None and
             (matches := extra_data.get('matches', None)) is not None
         ):
+            matches: Iterable[SessionRow]
             serializable_matches = [{
-                'id': str(item['session_id']),
-                'name': item['session_name'],
-                'status': item['status'].name,
-                'created_at': item['created_at'].isoformat(),
+                'id': str(item.id),
+                'name': item.name,
+                'status': item.status.name,
+                'created_at': item.created_at.isoformat(),
             } for item in matches]
             extra_data['matches'] = serializable_matches
         super().__init__(extra_msg, extra_data, **kwargs)
