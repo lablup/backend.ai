@@ -69,8 +69,8 @@ class TowncrierSubsystem(PythonToolBase):
     )
 
     def config_request(self) -> ConfigFilesRequest:
-        # See https://flake8.pycqa.org/en/latest/user/configuration.html#configuration-locations
-        # for how Flake8 discovers config files.
+        # See https://github.com/twisted/towncrier#readme
+        # for how Towncrier discovers config files.
         return ConfigFilesRequest(
             specified=self.config,
             specified_option_name=f"[{self.options_scope}].config",
