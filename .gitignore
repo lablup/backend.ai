@@ -107,6 +107,7 @@ ENV/
 /agent.toml
 /storage-proxy.toml
 /webserver.conf
+/cuda-mock.toml
 /.pants.env
 /docker-compose.halfstack.current.yml
 /alembic.ini

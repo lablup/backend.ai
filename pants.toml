@@ -9,6 +9,7 @@ backend_packages = [
     "pants.backend.experimental.python",
     "setupgen",
     "platform_resources",
+    "towncrier_tool",
 ]
 pants_ignore = [
     "scripts",
@@ -66,3 +67,9 @@ version = "mypy>=0.950"
 extra_requirements.add = [
 ]
 lockfile = "tools/mypy.lock"
+
+[towncrier]
+version = "towncrier>=21.9"
+extra_requirements.add = [
+]
+lockfile = "tools/towncrier.lock"
