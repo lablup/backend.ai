@@ -3,7 +3,7 @@ from __future__ import annotations
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.subsystems.python_tool_base import PythonToolBase
+from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
@@ -43,6 +43,7 @@ class TowncrierSubsystem(PythonToolBase):
 
     skip = SkipOption("towncrier")
     args = ArgsListOption(example="--draft")
+    export = ExportToolOption()
 
     config = FileOption(
         "--config",
@@ -99,9 +100,8 @@ class TowncrierExportSentinel(ExportPythonToolSentinel):
 
 @rule
 def export_towncrier(_: TowncrierExportSentinel, towncrier: TowncrierSubsystem) -> ExportPythonTool:
-    # FIXME: Introduce export = ExportToolOption() when Pants 2.13 or later is released.
-    # if not towncrier.export:
-    #     return ExportPythonTool(resolve_name=towncrier.options_scope, pex_request=None)
+    if not towncrier.export:
+        return ExportPythonTool(resolve_name=towncrier.options_scope, pex_request=None)
     return ExportPythonTool(resolve_name=towncrier.options_scope, pex_request=towncrier.to_pex_request())
 
 
@@ -122,7 +122,8 @@ async def run_towncrier(
     console: Console,
     subsystem: TowncrierSubsystem,
 ) -> TowncrierGoal:
-    console.print_stdout("towncrier!!")
+    console.print_stdout("Not implemented yet.")
+    # TODO: await Get(...) to invoke towncrier as a pex process with proper arguments.
     return TowncrierGoal(exit_code=0)
 
 
