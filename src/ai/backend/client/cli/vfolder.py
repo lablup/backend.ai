@@ -288,9 +288,9 @@ def cp(filenames):
 @click.argument('name', type=str)
 @click.argument('path', type=str)
 @click.option('-p', '--parents', default=False, is_flag=True,
-              help='Make parents directories of the given directory.')
+              help='Make missing parents of this path as needed')
 @click.option('-e', '--exist-ok', default=False, is_flag=True,
-              help='Skip if the given directory exists.')
+              help='Skip an error caused by file not found')
 def mkdir(name, path, parents, exist_ok):
     '''Create an empty directory in the virtual folder.
 

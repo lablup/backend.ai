@@ -290,8 +290,8 @@ class VFolder(BaseFunction):
     async def mkdir(
         self,
         path: Union[str, Path],
-        parents,
-        exist_ok,
+        parents: Optional[bool] = False,
+        exist_ok: Optional[bool] = False,
     ):
         rqst = Request('POST',
                        '/folders/{}/mkdir'.format(self.name))
