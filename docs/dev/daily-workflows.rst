@@ -150,7 +150,10 @@ To (re-)generate the virtualenv, run:
 
     $ ./pants export ::
 
-Then configure your IDEs/editors to use ``dist/export/python/virtualenvs/python-default/VERSION/bin/python`` as the interpreter for your code, where ``VERSION`` is the interpreter version specified in ``pants.toml``.
+Then configure your IDEs/editors to use
+``dist/export/python/virtualenvs/python-default/VERSION/bin/python`` as the
+interpreter for your code, where ``VERSION`` is the interpreter version
+specified in ``pants.toml``.
 
 .. tip::
 
@@ -247,9 +250,18 @@ Here are considerations for writing Pants-friendly tests:
 
 .. warning::
 
-   Mounting `/tmp` directories to a container
+   **About using /tmp in tests**
 
-   If your Docker service is installed using **Snap** (e.g., Ubuntu), it cannot access the system `/tmp` directory because Snap applies a private tmp directory to the Docker service. You should use other locations to avoid mount failures for the developers/users in such platforms.
+   If your Docker service is installed using **Snap** (e.g., Ubuntu 20.04 or
+   later), it cannot access the system ``/tmp`` directory because Snap applies a
+   private "virtualized" tmp directory to the Docker service.
+
+   You should use other locations under the user's home directory (or
+   preferably ``.tmp`` in the working copy directory) to avoid mount failures
+   for the developers/users in such platforms.
+
+   It is okay to use the system ``/tmp`` directory if they are not mounted inside
+   any containers.
 
 .. _debugging-tests:
 
