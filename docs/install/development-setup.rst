@@ -22,6 +22,8 @@ Install the followings accordingly to your host operating system.
 
 * `pyenv <https://github.com/pyenv/pyenv>`_ and `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_
 
+  - Ensure that you have the Python version specified in ``pants.toml`` on your ``PATH``.
+
 * `docker <https://docs.docker.com/install/>`_
 
 * `docker-compose <https://docs.docker.com/compose/install/>`_ (v2 required)

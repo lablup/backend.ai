@@ -134,7 +134,22 @@ To build a specific package:
 
 .. code-block:: console
 
-    $ ./pants package src/ai/backend/common:dist
+    $ ./pants \
+    >   --tag="wheel" \
+    >   package \
+    >   src/ai/backend/common:dist
+    $ ls -l dist/*.whl
+
+If the package content varies by the target platform, use:
+
+.. code-block:: console
+
+    $ ./pants \
+    >   --tag="wheel" \
+    >   --tag="+platform-specific" \
+    >   --platform-specific-resources-target=linux_arm64 \
+    >   package \
+    >   src/ai/backend/runner:dist
     $ ls -l dist/*.whl
 
 Using IDEs and editors
@@ -184,30 +199,8 @@ Examples:
     $ ./backend.ai mgr start-server
     $ ./backend.ai ps
 
-
-Advanced Topics
----------------
-
-Adding new external dependencies
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* Add the package version requirements to the unified requirements file (``./requirements.txt``).
-
-* Update the ``module_mapping`` field in the root build configuration (``./BUILD``)
-  if the package name and its import name differs.
-
-* Update the ``type_stubs_module_mapping`` field in the root build configuration
-  if the package provides a type stubs package separately.
-
-* Run:
-
-  .. code-block:: console
-
-     $ ./pants generate-lockfiles
-     $ ./pants export ::
-
 Writing test cases
-~~~~~~~~~~~~~~~~~~
+------------------
 
 Mostly it is just same as before: use the standard pytest practices.
 Though, there are a few key differences:
@@ -263,6 +256,62 @@ Here are considerations for writing Pants-friendly tests:
    It is okay to use the system ``/tmp`` directory if they are not mounted inside
    any containers.
 
+Writing documentation
+---------------------
+
+* Create a new pyenv virtualenv based on Python 3.10.
+
+  .. code-block:: console
+
+     $ pyenv virtualenv 3.10.4 venv-bai-docs
+
+* Activate the virtualenv and run:
+
+  .. code-block:: console
+
+     $ pyenv activate venv-bai-docs
+     $ pip install -U pip setuptools wheel
+     $ pip install -U -r docs/requirements.txt
+
+* You can build the docs as follows:
+
+  .. code-block:: console
+
+     $ cd docs
+     $ pyenv activate venv-bai-docs
+     $ make html
+
+* To locally serve the docs:
+
+  .. code-block:: console
+
+     $ cd docs
+     $ python -m http.server --directory=_build/html
+
+(TODO: Make a Pants tool plugin that provides ``./pants build-docs`` and ``./pants serve-docs``)
+
+
+Advanced Topics
+---------------
+
+Adding new external dependencies
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add the package version requirements to the unified requirements file (``./requirements.txt``).
+
+* Update the ``module_mapping`` field in the root build configuration (``./BUILD``)
+  if the package name and its import name differs.
+
+* Update the ``type_stubs_module_mapping`` field in the root build configuration
+  if the package provides a type stubs package separately.
+
+* Run:
+
+  .. code-block:: console
+
+     $ ./pants generate-lockfiles
+     $ ./pants export ::
+
 .. _debugging-tests:
 
 Debugging test cases (or interactively running test cases)
@@ -304,6 +353,25 @@ the ``.tmp`` directory under the working copy root a tmpfs partition:
   .. code-block:: console
 
      $ sudo mount -t tmpfs -o remount,size=8G tmpfs .tmp
+
+Making a new release
+~~~~~~~~~~~~~~~~~~~~
+
+* Update ``./VERSION`` file to set a new version number. (Remove the ending new
+  line, e.g., using ``set noeol`` in Vim.  This is also configured in
+  ``./editorconfig``)
+
+* Run ``./pants towncrier`` to auto-generate the changelog.
+
+  - (TODO: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
+
+* Make a new git commit with the commit message: "release: <version>".
+
+* Make an annotated tag to the commit with the message: "Release v<version>"
+  or "Pre-release v<version>" depending on the release version.
+
+* Push the commit and tag.  The GitHub Actions workflow will build the packages
+  and publish them to PyPI.
 
 Backporting to legacy per-pkg repositories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
