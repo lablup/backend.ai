@@ -122,9 +122,9 @@ async def run_towncrier(
     console: Console,
     subsystem: TowncrierSubsystem,
 ) -> TowncrierGoal:
-    console.print_stdout("Not implemented yet.")
+    console.print_stderr("Not implemented yet.")
     # TODO: await Get(...) to invoke towncrier as a pex process with proper arguments.
-    return TowncrierGoal(exit_code=0)
+    return TowncrierGoal(exit_code=1)
 
 
 def rules():
