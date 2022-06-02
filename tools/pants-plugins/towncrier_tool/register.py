@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pants.backend.python.goals import lockfile
 from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
@@ -92,6 +93,18 @@ class TowncrierLockfileSentinel(GenerateToolLockfileSentinel):
     resolve_name = TowncrierSubsystem.options_scope
 
 
+class TowncrierExportSentinel(ExportPythonToolSentinel):
+    pass
+
+
+@rule
+def export_towncrier(_: TowncrierExportSentinel, towncrier: TowncrierSubsystem) -> ExportPythonTool:
+    # FIXME: Introduce export = ExportToolOption() when Pants 2.13 or later is released.
+    # if not towncrier.export:
+    #     return ExportPythonTool(resolve_name=towncrier.options_scope, pex_request=None)
+    return ExportPythonTool(resolve_name=towncrier.options_scope, pex_request=towncrier.to_pex_request())
+
+
 @rule
 def setup_towncrier_lockfile(
     _: TowncrierLockfileSentinel,
@@ -118,4 +131,5 @@ def rules():
         *collect_rules(),
         *lockfile.rules(),
         UnionRule(GenerateToolLockfileSentinel, TowncrierLockfileSentinel),
+        UnionRule(ExportPythonToolSentinel, TowncrierExportSentinel),
     )
