@@ -44,7 +44,7 @@ jobs:
         fi
         ./pants lint --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants.lint.log
         path: .pants.d/pants.log
@@ -92,7 +92,7 @@ jobs:
         fi
         ./pants check --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants.check.log
         path: .pants.d/pants.log
@@ -145,7 +145,7 @@ jobs:
         fi
         ./pants test --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants.test.log
         path: .pants.d/pants.log
@@ -222,12 +222,12 @@ jobs:
       run: |
         twine upload dist/*.whl
     - name: Upload artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: dist
         path: dist
     - name: Upload pants log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants.deploy.log
         path: .pants.d/pants.log
