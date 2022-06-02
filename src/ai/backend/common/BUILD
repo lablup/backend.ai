@@ -1,6 +1,6 @@
 python_sources(
     name="lib",
-    sources=["**/*.py"],
+    sources=["**/*.py", "**/*.pyi"],
     dependencies=[
         ":resources",
         "stubs/trafaret:stubs",
