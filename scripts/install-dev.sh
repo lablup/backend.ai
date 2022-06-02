@@ -404,7 +404,7 @@ bootstrap_pants() {
   set +e
   PANTS="./pants"
   ./pants version
-  # Note that pants 2.11 requires Python 3.9 (not Python 3.10!) to work properly.
+  # Note that Pants requires Python 3.9 (not Python 3.10!) to work properly.
   if [ $? -eq 1 ]; then
     show_info "Downloading and building Pants for the current setup"
     _PYENV_PYVER=$(pyenv versions --bare | grep '^3\.9\.' | grep -v '/envs/' | sort -t. -k1,1r -k 2,2nr -k 3,3nr | head -n 1)
@@ -419,16 +419,8 @@ bootstrap_pants() {
     fi
     echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
     set -e
-    # FIXME: The branch name uses the "MAJOR.MINOR.x" format. Until Pants is officially released with Linux arm64 support,
-    #        we need to fallback to the main branch for custom patches.
-    ## local PANTS_CLONE_VERSION="$(echo $PANTS_VERSION | cut -d. -f1).$(echo $PANTS_VERSION | cut -d. -f2).x"
-    local PANTS_CLONE_VERSION="main"
+    local PANTS_CLONE_VERSION="release_${PANTS_VERSION}"
     git clone --branch=$PANTS_CLONE_VERSION --depth=1 https://github.com/pantsbuild/pants tools/pants-src
-    cd tools/pants-src
-    if [ "$(uname -p)" = "arm" -a "$DISTRO" != "Darwin" ]; then
-      git apply ../pants-linux-aarch64.patch
-    fi
-    cd ../..
     ln -s tools/pants-local
     ./pants-local version
     PANTS="./pants-local"
