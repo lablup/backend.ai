@@ -26,6 +26,8 @@ Install the followings accordingly to your host operating system.
 
 * `docker-compose <https://docs.docker.com/compose/install/>`_ (v2 required)
 
+* `rust <https://rustup.rs/>`_ (for bootstrapping Pants)
+
 .. note::
 
    In some cases, locale conflicts between the terminal client and the remote host
