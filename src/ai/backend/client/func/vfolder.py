@@ -287,11 +287,18 @@ class VFolder(BaseFunction):
             return await uploader.upload()
 
     @api_function
-    async def mkdir(self, path: Union[str, Path]):
+    async def mkdir(
+        self,
+        path: Union[str, Path],
+        parents,
+        exist_ok,
+    ):
         rqst = Request('POST',
                        '/folders/{}/mkdir'.format(self.name))
         rqst.set_json({
             'path': path,
+            'parents': parents,
+            'exist_ok': exist_ok,
         })
         async with rqst.fetch() as resp:
             return await resp.text()

@@ -287,7 +287,11 @@ def cp(filenames):
 @vfolder.command()
 @click.argument('name', type=str)
 @click.argument('path', type=str)
-def mkdir(name, path):
+@click.option('-p', '--parents', default=False, is_flag=True,
+              help='Make parents directories of the given directory.')
+@click.option('-e', '--exist-ok', default=False, is_flag=True,
+              help='Skip if the given directory exists.')
+def mkdir(name, path, parents, exist_ok):
     '''Create an empty directory in the virtual folder.
 
     \b
@@ -297,7 +301,7 @@ def mkdir(name, path):
     '''
     with Session() as session:
         try:
-            session.VFolder(name).mkdir(path)
+            session.VFolder(name).mkdir(path, parents=parents, exist_ok=exist_ok)
             print_done('Done.')
         except Exception as e:
             print_error(e)
