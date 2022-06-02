@@ -9,7 +9,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       id: cache
       with:
         # pants-specific cache
@@ -44,7 +44,7 @@ jobs:
         fi
         ./pants lint --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants.lint.log
         path: .pants.d/pants.log
@@ -57,7 +57,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       id: cache
       with:
         # pants-specific cache
@@ -92,7 +92,7 @@ jobs:
         fi
         ./pants check --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants.check.log
         path: .pants.d/pants.log
@@ -105,7 +105,7 @@ jobs:
       with:
         fetch-depth: 2
         submodules: true
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       id: cache
       with:
         # pants-specific cache
@@ -117,7 +117,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       id: lfs-cache
       with:
           path: .git/lfs
@@ -145,7 +145,7 @@ jobs:
         fi
         ./pants test --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants.test.log
         path: .pants.d/pants.log
@@ -159,7 +159,7 @@ jobs:
     - uses: actions/checkout@v2
       with:
         submodules: true
-    - uses: actions/cache@v2
+    - uses: actions/cache@v3
       id: cache
       with:
         # pants-specific cache
@@ -171,7 +171,7 @@ jobs:
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       id: lfs-cache
       with:
           path: .git/lfs
@@ -222,12 +222,12 @@ jobs:
       run: |
         twine upload dist/*.whl
     - name: Upload artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: dist
         path: dist
     - name: Upload pants log
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: pants.deploy.log
         path: .pants.d/pants.log
