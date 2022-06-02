@@ -288,7 +288,7 @@ Writing documentation
      $ cd docs
      $ python -m http.server --directory=_build/html
 
-(TODO: Make a Pants tool plugin that provides ``./pants build-docs`` and ``./pants serve-docs``)
+(TODO: Use Pants' own Sphinx support when `pantsbuild/pants#15512 <https://github.com/pantsbuild/pants/pull/15512>`_ is released.)
 
 
 Advanced Topics
