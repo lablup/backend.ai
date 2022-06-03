@@ -1,5 +1,5 @@
 [tool.towncrier]
-package = "ai.backend"
+package = "ai.backend.manager"  # reference point for getting __version__
 filename = "CHANGELOG.md"
 directory = "changes/"
 title_format = "## {version} ({project_date})"
