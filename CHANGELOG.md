@@ -16,6 +16,16 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.06.0.dev1 (2022-06-03)
+
+### Miscellaneous
+* Migrate to a semi-mono repository that contains all first-party server-side components with automated dependency management via Pants ([#417](https://github.com/lablup/backend.ai/issues/417))
+* Add a Pants plulgin `towncrier_tool` to allow running towncrier for changelog generation ([#427](https://github.com/lablup/backend.ai/issues/427))
+* Update readthedocs.org build configurations ([#428](https://github.com/lablup/backend.ai/issues/428))
+* Update documentation for daily development workflows using Pants ([#429](https://github.com/lablup/backend.ai/issues/429))
+* Automate creation of the release in GitHub when we commit tags ([#433](https://github.com/lablup/backend.ai/issues/433))
+
+
 ## 22.06.0.dev0 (2022-06-02)
 
 * This is the first test release after migration to the mono-repository and the Pants build system.
