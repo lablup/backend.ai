@@ -445,11 +445,6 @@ $bpython scripts/check-docker.py
 if [ $? -ne 0 ]; then
   exit 1
 fi
-if [ "$DISTRO" = "RedHat" ]; then
-  if ! type "$docker_sudo docker-compose" >/dev/null 2>&1; then
-    $docker_sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
-  fi
-fi
 if [ "$DISTRO" = "Darwin" ]; then
   echo "validating Docker Desktop mount permissions..."
   docker pull alpine:3.8 > /dev/null
