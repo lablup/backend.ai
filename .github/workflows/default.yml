@@ -216,7 +216,7 @@ jobs:
       # We don't use `./pants publish ::` because we manually rename the
       # wheels after buildling them to add arch-specific tags.
       run: |
-        twine upload dist/*.whl
+        twine upload dist/*.whl dist/*.tar.gz
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
