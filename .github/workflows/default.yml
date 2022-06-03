@@ -209,7 +209,7 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
-    - name: Publish
+    - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
@@ -217,11 +217,15 @@ jobs:
       # wheels after buildling them to add arch-specific tags.
       run: |
         twine upload dist/*.whl
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+    - name: Extract the release changelog
+      run: |
+        python ./scripts/extract-release-changelog.py
+    - name: Release to GitHub
+      uses: softprops/action-gh-release@v1
       with:
-        name: dist
-        path: dist
+        body_path: "CHANGELOG_RELEASE.md"
+        files: |
+          dist/*.whl
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:

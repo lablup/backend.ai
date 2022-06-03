@@ -1,11 +1,11 @@
 [tool.towncrier]
-package = "ai.backend.manager"
+package = "ai.backend"
 filename = "CHANGELOG.md"
 directory = "changes/"
 title_format = "## {version} ({project_date})"
 template = "changes/template.md"
 start_string = "<!-- towncrier release notes start -->\n"
-issue_format = "([#{issue}](https://github.com/lablup/backend.ai-manager/issues/{issue}))"
+issue_format = "([#{issue}](https://github.com/lablup/backend.ai/issues/{issue}))"
 underlines = ["", "", ""]
 
 [[tool.towncrier.type]]
