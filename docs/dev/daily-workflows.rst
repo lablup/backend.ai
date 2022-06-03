@@ -199,6 +199,31 @@ Examples:
     $ ./backend.ai mgr start-server
     $ ./backend.ai ps
 
+Working with plugins
+--------------------
+
+To develop Backend.AI plugins together, the repository offers a special location
+``./plugins`` where you can clone plugin repositories and a shortcut script
+``scripts/install-plugin.sh`` to install them inside the exported venv.
+
+.. code-block:: console
+
+    $ scripts/install-plugin.sh lablup/backend.ai-accelerator-cuda-mock
+
+Manual installation:
+
+.. code-block:: console
+
+    $ git clone https://github.com/lablup/backend.ai-accelerator-cuda-mock plugins/cuda-mock
+    $ ./py -m pip install -e plugins/cuda-mock
+
+.. warning::
+
+   Whenever you re-export the venv using ``./pants export ::``, you must
+   *reinstall* the plugins.  There is also a shrotcut script that does this
+   for you: ``scripts/reinstall-plugins.sh``.
+
+
 Writing test cases
 ------------------
 
