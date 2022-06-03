@@ -16,6 +16,8 @@
 import sys
 import os
 
+import sphinx_rtd_theme
+
 on_rtd = os.environ.get('READTHEDOCS') == 'True'
 
 # If extensions (or modules to document with autodoc) are in another directory,
@@ -34,6 +36,7 @@ on_rtd = os.environ.get('READTHEDOCS') == 'True'
 extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
+    'sphinx_rtd_theme',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -69,7 +72,9 @@ release = '20.03'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'ko_KR'
+locale_dirs = ['locales/']
+gettext_compact = True
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:

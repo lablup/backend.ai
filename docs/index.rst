@@ -34,6 +34,7 @@ Table of Contents
 
    install/guides
    install/supplementary
+   install/configure-autoscaling
 
 .. _migration:
 
@@ -105,6 +106,7 @@ Table of Contents
    :caption: Developer Manuals
 
    install/development-setup
+   dev/daily-workflows
    dev/adding-kernels
 
 

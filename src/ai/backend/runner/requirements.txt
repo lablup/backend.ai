@@ -1,0 +1,1 @@
+# see src/ai/backend/krunner/*/requirements.txt in "backend.ai-krunner-*" repositories

@@ -1,0 +1,3 @@
+[submodule "src/ai/backend/web/static"]
+	path = src/ai/backend/web/static
+	url = https://github.com/lablup/backend.ai-app

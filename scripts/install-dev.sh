@@ -39,61 +39,61 @@ trim() {
 usage() {
   echo "${GREEN}Backend.AI Development Setup${NC}: ${CYAN}Auto-installer Tool${NC}"
   echo ""
+  echo "Installs the single-node development setup of Backend.AI from this"
+  echo "semi-mono repository for the server-side components."
+  echo ""
+  echo "Changes in 22.06 or later:"
+  echo ""
+  echo "* Deprecated '-e/--env', '--install-path', '--python-version' options"
+  echo "  as they are now deprecated because the working-copy directory"
+  echo "  becomes the target installation path and identifies the"
+  echo "  installation".
+  echo "* '--server-branch' and '--client-branch' is now merged into a single"
+  echo "  '--branch' option."
+  echo ""
   echo "${LWHITE}USAGE${NC}"
   echo "  $0 ${LWHITE}[OPTIONS]${NC}"
   echo ""
   echo "${LWHITE}OPTIONS${NC}"
-  echo "  ${LWHITE}-h, --help${NC}           Show this help message and exit"
+  echo "  ${LWHITE}-h, --help${NC}"
+  echo "    Show this help message and exit"
   echo ""
-  echo "  ${LWHITE}-e, --env ENVID${NC}"
-  echo "                       Manually override the environment ID to use"
-  echo "                       (default: random-generated)"
+  echo "  ${LWHITE}--enable-cuda${NC}"
+  echo "    Install CUDA accelerator plugin and pull a"
+  echo "    TenosrFlow CUDA kernel for testing/demo."
+  echo "    (default: false)"
   echo ""
-  echo "  ${LWHITE}--python-version VERSION${NC}"
-  echo "                       Set the Python version to install via pyenv"
-  echo "                       (default: 3.9.5)"
+  echo "  ${LWHITE}--cuda-branch NAME${NC}"
+  echo "    The branch of git clone for the CUDA accelerator "
+  echo "    plugin; only valid if ${LWHITE}--enable-cuda${NC} is specified."
+  echo "    If set as ${LWHITE}\"mock\"${NC}, it will install the mockup version "
+  echo "    plugin so that you may develop and test CUDA integration "
+  echo "    features without real GPUs."
+  echo "    (default: main)"
   echo ""
-  echo "  ${LWHITE}--install-path PATH${NC}  Set the target directory"
-  echo "                       (default: ./backend.ai-dev)"
+  echo "  ${LWHITE}--postgres-port PORT${NC}"
+  echo "    The port to bind the PostgreSQL container service."
+  echo "    (default: 8100)"
   echo ""
-  echo "  ${LWHITE}--server-branch NAME${NC}"
-  echo "                       The branch of git clones for server components"
-  echo "                       (default: main)"
+  echo "  ${LWHITE}--redis-port PORT${NC}"
+  echo "    The port to bind the Redis container service."
+  echo "    (default: 8110)"
   echo ""
-  echo "  ${LWHITE}--client-branch NAME${NC}"
-  echo "                       The branch of git clones for client components"
-  echo "                       (default: main)"
+  echo "  ${LWHITE}--etcd-port PORT${NC}"
+  echo "    The port to bind the etcd container service."
+  echo "    (default: 8120)"
   echo ""
-  echo "  ${LWHITE}--enable-cuda${NC}        Install CUDA accelerator plugin and pull a"
-  echo "                       TenosrFlow CUDA kernel for testing/demo."
-  echo "                       (default: false)"
-  echo ""
-  echo "  ${LWHITE}--cuda-branch NAME${NC}   The branch of git clone for the CUDA accelerator "
-  echo "                       plugin; only valid if ${LWHITE}--enable-cuda${NC} is specified."
-  echo "                       If set as ${LWHITE}\"mock\"${NC}, it will install the mockup version "
-  echo "                       plugin so that you may develop and test CUDA integration "
-  echo "                       features without real GPUs."
-  echo "                       (default: main)"
-  echo ""
-  echo "  ${LWHITE}--postgres-port PORT${NC} The port to bind the PostgreSQL container service."
-  echo "                       (default: 8100)"
-  echo ""
-  echo "  ${LWHITE}--redis-port PORT${NC}    The port to bind the Redis container service."
-  echo "                       (default: 8110)"
-  echo ""
-  echo "  ${LWHITE}--etcd-port PORT${NC}     The port to bind the etcd container service."
-  echo "                       (default: 8120)"
-  echo ""
-  echo "  ${LWHITE}--manager-port PORT${NC}  The port to expose the manager API service."
-  echo "                       (default: 8081)"
+  echo "  ${LWHITE}--manager-port PORT${NC}"
+  echo "    The port to expose the manager API service."
+  echo "    (default: 8081)"
   echo ""
   echo "  ${LWHITE}--agent-rpc-port PORT${NC}"
-  echo "                       The port for the manager-to-agent RPC calls."
-  echo "                       (default: 6001)"
+  echo "    The port for the manager-to-agent RPC calls."
+  echo "    (default: 6001)"
   echo ""
   echo "  ${LWHITE}--agent-watcher-port PORT${NC}"
-  echo "                       The port for the agent's watcher service."
-  echo "                       (default: 6009)"
+  echo "    The port for the agent's watcher service."
+  echo "    (default: 6009)"
 }
 
 show_error() {
@@ -175,12 +175,12 @@ else
   exit 1
 fi
 
-ROOT_PATH=$(pwd)
-ENV_ID=""
-PYTHON_VERSION="3.9.5"
-SERVER_BRANCH="main"
-CLIENT_BRANCH="main"
-INSTALL_PATH="./backend.ai-dev"
+ROOT_PATH="$(pwd)"
+PLUGIN_PATH="${ROOT_PATH}/plugins"
+HALFSTACK_VOLUME_PATH="${ROOT_PATH}/volumes"
+PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
+PYTHON_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("CPython==([^\"]+)", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
 CUDA_BRANCH="main"
@@ -191,7 +191,7 @@ CUDA_BRANCH="main"
 # WEBSERVER_PORT="8080"
 # AGENT_RPC_PORT="6001"
 # AGENT_WATCHER_PORT="6009"
-# VFOLDER_REL_PATH="vfolder/local"
+# VFOLDER_REL_PATH="vfroot/local"
 # LOCAL_STORAGE_PROXY="local"
 # LOCAL_STORAGE_VOLUME="volume1"
 
@@ -202,23 +202,16 @@ MANAGER_PORT="8091"
 WEBSERVER_PORT="8090"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
-VFOLDER_REL_PATH="vfolder/local"
+VFOLDER_REL_PATH="vfroot/local"
 LOCAL_STORAGE_PROXY="local"
+# MUST be one of the real storage volumes
 LOCAL_STORAGE_VOLUME="volume1"
 
 while [ $# -gt 0 ]; do
   case $1 in
     -h | --help)           usage; exit 1 ;;
-    -e | --env)            ENV_ID=$2; shift ;;
-    --env=*)               ENV_ID="${1#*=}" ;;
     --python-version)      PYTHON_VERSION=$2; shift ;;
     --python-version=*)    PYTHON_VERSION="${1#*=}" ;;
-    --install-path)        INSTALL_PATH=$2; shift ;;
-    --install-path=*)      INSTALL_PATH="${1#*=}" ;;
-    --server-branch)       SERVER_BRANCH=$2; shift ;;
-    --server-branch=*)     SERVER_BRANCH="${1#*=}" ;;
-    --client-branch)       CLIENT_BRANCH=$2; shift ;;
-    --client-branch=*)     CLIENT_BRANCH="${1#*=}" ;;
     --enable-cuda)         ENABLE_CUDA=1 ;;
     --download-big-images) DOWNLOAD_BIG_IMAGES=1 ;;
     --cuda-branch)         CUDA_BRANCH=$2; shift ;;
@@ -244,7 +237,6 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-INSTALL_PATH=$(readlinkf "$INSTALL_PATH")
 
 install_brew() {
     case $DISTRO in
@@ -259,11 +251,11 @@ install_script_deps() {
   case $DISTRO in
   Debian)
     $sudo apt-get update
-    $sudo apt-get install -y git
+    $sudo apt-get install -y git jq gcc make g++
     ;;
   RedHat)
     $sudo yum clean expire-cache  # next yum invocation will update package metadata cache
-    $sudo yum install -y git
+    $sudo yum install -y git jq gcc make gcc-c++
     ;;
   Darwin)
     if ! type "brew" >/dev/null 2>&1; then
@@ -272,6 +264,7 @@ install_script_deps() {
       install_brew
     fi
     brew update
+    brew install jq
     # Having Homebrew means that the user already has git.
     ;;
   esac
@@ -283,7 +276,7 @@ install_pybuild_deps() {
     $sudo apt-get install -y libssl-dev libreadline-dev libgdbm-dev zlib1g-dev libbz2-dev libsqlite3-dev libffi-dev liblzma-dev
     ;;
   RedHat)
-    $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel libsqlite-devel libffi-devel lzma-devel
+    $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel sqlite-devel libffi-devel xz-devel
     ;;
   Darwin)
     brew install openssl
@@ -291,6 +284,11 @@ install_pybuild_deps() {
     brew install zlib xz
     brew install sqlite3 gdbm
     brew install tcl-tk
+    if [ "$(uname -p)" = "arm" ]; then
+      # On M1 Macs, psycopg2-binary tries to build itself and requires pg_config
+      # to access the postgresql include/library path information.
+      brew install postgresql
+    fi
     ;;
   esac
 }
@@ -325,47 +323,19 @@ install_system_pkg() {
   esac
 }
 
-install_docker() {
-  show_info "Install docker"
-  case $DISTRO in
-  Debian)
-    $sudo apt-get install -y lxcfs
-    $sudo curl -fsSL https://get.docker.io | bash
-    $sudo usermod -aG docker $(whoami)
-    ;;
-  RedHat)
-    $sudo curl -fsSL https://get.docker.io | bash
-    $sudo usermod -aG docker $(whoami)
-    ;;
-  Darwin)
-    show_info "Please install the latest version of docker and try again."
-    show_info "It should have been installed with Docker Desktop for Mac or Docker Toolbox."
-    show_info " - Instructions: https://docs.docker.com/install/"
-    show_info"  - Download: https://download.docker.com/mac/stable/Docker.dmg"
-    exit 1
-    ;;
-  esac
-}
-
-install_docker_compose() {
-  show_info "Install docker-compose"
-  case $DISTRO in
-  Debian)
-    $sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    $sudo chmod +x /usr/local/bin/docker-compose
-    ;;
-  RedHat)
-    $sudo curl -L "https://github.com/docker/compose/releases/download/1.24.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    $sudo chmod +x /usr/local/bin/docker-compose
-    ;;
-  Darwin)
-    show_info "Please install the latest version of docker-compose and try again."
-    show_info "It should have been installed with Docker Desktop for Mac or Docker Toolbox."
-    show_info " - Instructions: https://docs.docker.com/compose/install/"
-    show_info"  - Download: https://download.docker.com/mac/stable/Docker.dmg"
-    exit 1
-    ;;
-  esac
+set_brew_python_build_flags() {
+  local _prefix_openssl="$(brew --prefix openssl)"
+  local _prefix_sqlite3="$(brew --prefix sqlite3)"
+  local _prefix_readline="$(brew --prefix readline)"
+  local _prefix_zlib="$(brew --prefix zlib)"
+  local _prefix_gdbm="$(brew --prefix gdbm)"
+  local _prefix_tcltk="$(brew --prefix tcl-tk)"
+  local _prefix_xz="$(brew --prefix xz)"
+  local _prefix_snappy="$(brew --prefix snappy)"
+  local _prefix_libffi="$(brew --prefix libffi)"
+  local _prefix_protobuf="$(brew --prefix protobuf)"
+  export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_snappy}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
+  export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_snappy}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
 }
 
 install_python() {
@@ -383,11 +353,6 @@ install_python() {
       export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib"
     fi
     pyenv install --skip-existing "${PYTHON_VERSION}"
-    if [ "$DISTRO" = "Darwin" ]; then
-      unset PYTHON_CONFIGURE_OPTS
-      unset CFLAGS
-      unset LDFLAGS
-    fi
     if [ $? -ne 0 ]; then
       show_error "Installing the Python version ${PYTHON_VERSION} via pyenv has failed."
       show_note "${PYTHON_VERSION} is not supported by your current installation of pyenv."
@@ -419,33 +384,66 @@ check_python() {
   pyenv shell --unset
 }
 
+bootstrap_pants() {
+  set -e
+  mkdir -p .tmp
+  if [ -f '.pants.env' -a -f './pants-local' ]; then
+    echo "It seems that you have an already locally bootstrapped Pants."
+    echo "The installer will keep using it."
+    echo "If you want to reset it, delete ./.pants.env and ./pants-local files."
+    ./pants-local version
+    PANTS="./pants-local"
+    return
+  fi
+  set +e
+  PANTS="./pants"
+  ./pants version
+  # Note that Pants requires Python 3.9 (not Python 3.10!) to work properly.
+  if [ $? -eq 1 ]; then
+    show_info "Downloading and building Pants for the current setup"
+    local _PYENV_PYVER=$(pyenv versions --bare | grep '^3\.9\.' | grep -v '/envs/' | sort -t. -k1,1r -k 2,2nr -k 3,3nr | head -n 1)
+    if [ -z "$_PYENV_PYVER" ]; then
+      echo "No Python 3.9 available via pyenv!"
+      echo "Please install Python 3.9 using pyenv,"
+      echo "or add 'PY=<python-executable-path>' in ./.pants.env to "
+      echo "manually set the Pants-compatible interpreter path."
+      exit 1
+    else
+      echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
+    fi
+    echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
+    if [ -d tools/pants-src ]; then
+      rm -rf tools/pants-src
+    fi
+    local PANTS_CLONE_VERSION="release_${PANTS_VERSION}"
+    set -e
+    git -c advice.detachedHead=false clone --branch=$PANTS_CLONE_VERSION --depth=1 https://github.com/pantsbuild/pants tools/pants-src
+    # TODO: remove the manual patch after pants 2.13 or later is released.
+    cd tools/pants-src
+    local arch_name=$(uname -p)
+    if [ "$arch_name" = "arm64" -o "$arch_name" = "aarch64" ] && [ "$DISTRO" != "Darwin" ]; then
+      git apply ../pants-linux-aarch64.patch
+    fi
+    cd ../..
+    ln -s tools/pants-local
+    ./pants-local version
+    PANTS="./pants-local"
+  fi
+  set +e
+}
+
 # BEGIN!
 
 echo " "
 echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 
-# NOTE: docker-compose enforces lower-cased project names
-if [ -z "${ENV_ID}" ]; then
-  ENV_ID=$(LC_ALL=C tr -dc 'a-z0-9' < /dev/urandom | head -c 8)
-fi
-show_note "Your environment ID is ${YELLOW}${ENV_ID}${NC}."
-
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-if ! type "docker" >/dev/null 2>&1; then
-  show_warning "docker is not available; trying to install it automatically..."
-  install_docker
-fi
-docker compose version >/dev/null 2>&1
-if [ $? -eq 0 ]; then
-  DOCKER_COMPOSE="docker compose"
-else
-  if ! type "docker-compose" >/dev/null 2>&1; then
-    show_warning "docker-compose is not available; trying to install it automatically..."
-    install_docker_compose
-  fi
-  DOCKER_COMPOSE="docker-compose"
+$bpython -m pip --disable-pip-version-check install -q requests requests_unixsocket
+$bpython scripts/check-docker.py
+if [ $? -ne 0 ]; then
+  exit 1
 fi
 if [ "$DISTRO" = "Darwin" ]; then
   echo "validating Docker Desktop mount permissions..."
@@ -457,16 +455,12 @@ if [ "$DISTRO" = "Darwin" ]; then
     show_error "You must allow mount of '$HOME/.pyenv' in the File Sharing preference of the Docker Desktop app."
     exit 1
   fi
-  docker run --rm -v "$INSTALL_PATH:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
+  docker run --rm -v "$ROOT_PATH:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
   if [ $? -ne 0 ]; then
-    show_error "You must allow mount of '$INSTALL_PATH' in the File Sharing preference of the Docker Desktop app."
+    show_error "You must allow mount of '$ROOT_PATH' in the File Sharing preference of the Docker Desktop app."
     exit 1
   fi
   echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
-
-  export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
-  export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
-  echo "set grpcio wheel build variables."
 fi
 
 # Install pyenv
@@ -509,52 +503,58 @@ install_python
 show_info "Checking Python features..."
 check_python
 
+show_info "Bootstrapping the Pants build system..."
+bootstrap_pants
+
 set -e
-show_info "Creating virtualenv on pyenv..."
-pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-manager"
-pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-agent"
-pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-common"
-pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-client"
-pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-storage-proxy"
-pyenv virtualenv "${PYTHON_VERSION}" "venv-${ENV_ID}-webserver"
 
 # Make directories
-show_info "Creating the install directory..."
-mkdir -p "${INSTALL_PATH}"
-cd "${INSTALL_PATH}"
+show_info "Using the current working-copy directory as the installation path..."
+
+mkdir -p ./wheelhouse
+if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
+  show_info "Prebuild grpcio wheels for Apple Silicon..."
+  pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
+  pyenv shell tmp-grpcio-build
+  if [ $(python -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)') -eq 0 ]; then
+    # ref: https://github.com/grpc/grpc/issues/25082
+    export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
+    export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
+    echo "Set grpcio wheel build variables."
+  else
+    unset GRPC_PYTHON_BUILD_SYSTEM_OPENSSL
+    unset GRPC_PYTHON_BUILD_SYSTEM_ZLIB
+    unset CFLAGS
+    unset LDFLAGS
+  fi
+  pip install -U -q pip setuptools wheel
+  # ref: https://github.com/grpc/grpc/issues/28387
+  pip wheel -w ./wheelhouse --no-binary :all: grpcio grpcio-tools
+  pyenv shell --unset
+  pyenv uninstall -f tmp-grpcio-build
+  echo "List of prebuilt wheels:"
+  ls -l ./wheelhouse
+  # Currently there are not many packages that provides prebuilt binaries for M1 Macs.
+  # Let's configure necessary env-vars to build them locally via bdist_wheel.
+  echo "Configuring additional build flags for local wheel builds for macOS on Apple Silicon ..."
+  set_brew_python_build_flags
+fi
 
 # Install postgresql, etcd packages via docker
 show_info "Launching the docker compose \"halfstack\"..."
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai
-
-cd backend.ai
-cp "docker-compose.halfstack-${SERVER_BRANCH//.}.yml" "docker-compose.halfstack.${ENV_ID}.yml"
-sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.${ENV_ID}.yml"
-sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.${ENV_ID}.yml"
-sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.${ENV_ID}.yml"
-mkdir -p tmp/backend.ai-halfstack/postgres-data
-mkdir -p tmp/backend.ai-halfstack/etcd-data
-$docker_sudo $DOCKER_COMPOSE -f "docker-compose.halfstack.${ENV_ID}.yml" -p "${ENV_ID}" up -d
-$docker_sudo docker ps | grep "${ENV_ID}"   # You should see three containers here.
-
-# Clone source codes
-show_info "Cloning backend.ai source codes..."
-cd "${INSTALL_PATH}"
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-manager manager
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-agent agent
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-common common
-git clone --branch "${SERVER_BRANCH}" https://github.com/lablup/backend.ai-storage-proxy storage-proxy
-git clone --branch "${SERVER_BRANCH}" --recurse-submodules https://github.com/lablup/backend.ai-webserver webserver
-git clone --branch "${CLIENT_BRANCH}" https://github.com/lablup/backend.ai-client-py client-py
-
-if [ $ENABLE_CUDA -eq 1 ]; then
-  if [ "$CUDA_BRANCH" == "mock" ]; then
-    git clone https://github.com/lablup/backend.ai-accelerator-cuda-mock accel-cuda
-    cp accel-cuda/configs/sample-mig.toml agent/cuda-mock.toml
-  else
-    git clone --branch "${CUDA_BRANCH}" https://github.com/lablup/backend.ai-accelerator-cuda accel-cuda
-  fi
+mkdir -p "$HALFSTACK_VOLUME_PATH"
+SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
+if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
+  SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
 fi
+cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
+sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
+sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
+mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
+mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
+$docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+$docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
 check_snappy() {
   pip download python-snappy
@@ -566,67 +566,40 @@ check_snappy() {
   rm -f $pkgfile
 }
 
-show_info "Install packages on virtual environments..."
-cd "${INSTALL_PATH}/manager"
-pyenv local "venv-${ENV_ID}-manager"
-pip install -U -q pip setuptools wheel
+show_info "Creating the unified virtualenv for IDEs..."
 check_snappy
-pip install -U -e ../common -r requirements/dev.txt
+$PANTS export '::'
 
-cd "${INSTALL_PATH}/agent"
-pyenv local "venv-${ENV_ID}-agent"
-pip install -U -q pip setuptools wheel
-pip install -U -e ../common -r requirements/dev.txt
-if [[ "$OSTYPE" == "linux-gnu" ]]; then
-  $sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlinkf $(pyenv which python))
-fi
 if [ $ENABLE_CUDA -eq 1 ]; then
-  cd "${INSTALL_PATH}/accel-cuda"
-  pyenv local "venv-${ENV_ID}-agent"  # share the agent's venv
-  pip install -U -e .
+  if [ "$CUDA_BRANCH" == "mock" ]; then
+    PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda-mock"
+    cp "${PLUGIN_PATH}/backend.ai-accelerator-cuda-mock/configs/sample-mig.toml" cuda-mock.toml
+  else
+    PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda"
+  fi
 fi
-
-cd "${INSTALL_PATH}/common"
-pyenv local "venv-${ENV_ID}-common"
-pip install -U -q pip setuptools wheel
-pip install -U -r requirements/dev.txt
-
-cd "${INSTALL_PATH}/storage-proxy"
-pyenv local "venv-${ENV_ID}-storage-proxy"
-pip install -U -q pip setuptools wheel
-pip install -U -e ../common -r requirements/dev.txt
-
-cd "${INSTALL_PATH}/webserver"
-pyenv local "venv-${ENV_ID}-webserver"
-pip install -U -q pip setuptools wheel
-pip install -U -e ../client-py -r requirements/dev.txt
 
 # Copy default configurations
 show_info "Copy default configuration files to manager / agent root..."
-cd "${INSTALL_PATH}/manager"
-pyenv local "venv-${ENV_ID}-manager"
-cp config/halfstack.toml ./manager.toml
+cp configs/manager/halfstack.toml ./manager.toml
+sed_inplace "s/num-proc = .*/num-proc = 1/" ./manager.toml
 sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
 sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
 sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
-cp config/halfstack.alembic.ini ./alembic.ini
+cp configs/manager/halfstack.alembic.ini ./alembic.ini
 sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
-python -m ai.backend.manager.cli etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
-cp config/sample.etcd.volumes.json ./dev.etcd.volumes.json
+./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
+cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
 MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
 sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
 sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
 
-cd "${INSTALL_PATH}/agent"
-pyenv local "venv-${ENV_ID}-agent"
-cp config/halfstack.toml ./agent.toml
+cp configs/agent/halfstack.toml ./agent.toml
 sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 
-cd "${INSTALL_PATH}/storage-proxy"
-pyenv local "venv-${ENV_ID}-storage-proxy"
-cp config/sample.toml ./storage-proxy.toml
+cp configs/storage-proxy/sample.toml ./storage-proxy.toml
 STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
 sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
 sed_inplace "s/secret = \"some-secret-shared-with-manager\"/secret = \"${MANAGER_AUTH_KEY}\"/" ./storage-proxy.toml
@@ -635,123 +608,165 @@ sed_inplace "s/^\[volume\./# \[volume\./" ./storage-proxy.toml
 sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
 sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
 sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
-# add "volume1" vfs volume
-echo "\n[volume.volume1]\nbackend = \"vfs\"\npath = \"${INSTALL_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
+sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
 
-cd "${INSTALL_PATH}/webserver"
-pyenv local "venv-${ENV_ID}-webserver"
-cp webserver.sample.conf ./webserver.conf
+# add LOCAL_STORAGE_VOLUME vfs volume
+echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
+
+cp configs/webserver/sample.conf ./webserver.conf
 sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
 sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
 sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
 
-# Docker registry setup
-show_info "Configuring the Lablup's official Docker registry..."
-cd "${INSTALL_PATH}/manager"
-python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
-python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-python -m ai.backend.manager.cli etcd put config/docker/registry/cr.backend.ai/project "stable,community"
-python -m ai.backend.manager.cli etcd rescan-images cr.backend.ai
-python -m ai.backend.manager.cli etcd alias python cr.backend.ai/stable/python:3.8-ubuntu18.04
+# TODO
+## cp configs/testers/sample-env-tester.sh ./env-tester-admin.sh
+## cp configs/testers/sample-env-tester.sh ./env-tester-user.sh
 
 # DB schema
 show_info "Setting up databases..."
-cd "${INSTALL_PATH}/manager"
-python -m ai.backend.manager.cli schema oneshot
-python -m ai.backend.manager.cli fixture populate fixtures/example-keypairs.json
-python -m ai.backend.manager.cli fixture populate fixtures/example-resource-presets.json
+./backend.ai mgr schema oneshot
+./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
+./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
+
+# Docker registry setup
+show_info "Configuring the Lablup's official image registry..."
+./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
+./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
+if [ "$(uname -p)" = "arm" ]; then
+  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
+else
+  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
+fi
+
+# Scan the container image registry
+show_info "Scanning the image registry..."
+./backend.ai mgr etcd rescan-images cr.backend.ai
+if [ "$(uname -p)" = "arm" ]; then
+  ./backend.ai mgr etcd alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
+else
+  ./backend.ai mgr etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
+fi
 
 # Virtual folder setup
 show_info "Setting up virtual folder..."
-mkdir -p "${INSTALL_PATH}/${VFOLDER_REL_PATH}"
-cd "${INSTALL_PATH}/manager"
-python -m ai.backend.manager.cli etcd put-json volumes "./dev.etcd.volumes.json"
-cd "${INSTALL_PATH}/agent"
+mkdir -p "${ROOT_PATH}/${VFOLDER_REL_PATH}"
+./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
 mkdir -p scratches
-POSTGRES_CONTAINER_ID=$(sudo docker ps | grep "${ENV_ID}_backendai-half-db_1" | awk '{print $1}')
+POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
 
-show_info "Installing Python client SDK/CLI source..."
-# Install python client package
-cd "${INSTALL_PATH}/client-py"
-pyenv local "venv-${ENV_ID}-client"
-pip install -U -q pip setuptools wheel
-pip install -U -r requirements/dev.txt
-
 # Client backend endpoint configuration shell script
-echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> my-backend-ai.sh
-echo "export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" >> my-backend-ai.sh
-echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> my-backend-ai.sh
-echo "export BACKEND_ENDPOINT_TYPE=api" >> my-backend-ai.sh
-chmod +x my-backend-ai.sh
+CLIENT_ADMIN_CONF_FOR_API="env-local-admin-api.sh"
+CLIENT_ADMIN_CONF_FOR_SESSION="env-local-admin-session.sh"
+echo "# Directly access to the manager using API keypair (admin)" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .access_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .secret_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
+echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+chmod +x "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+CLIENT_DOMAINADMIN_CONF_FOR_API="env-local-domainadmin-api.sh"
+CLIENT_DOMAINADMIN_CONF_FOR_SESSION="env-local-domainadmin-session.sh"
+echo "# Directly access to the manager using API keypair (admin)" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .access_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .secret_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+CLIENT_USER_CONF_FOR_API="env-local-user-api.sh"
+CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
+echo "# Directly access to the manager using API keypair (user)" >> "${CLIENT_USER_CONF_FOR_API}"
+echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER_CONF_FOR_API}"
+echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .access_key')" >> "${CLIENT_USER_CONF_FOR_API}"
+echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .secret_key')" >> "${CLIENT_USER_CONF_FOR_API}"
+echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER_CONF_FOR_API}"
+chmod +x "${CLIENT_USER_CONF_FOR_API}"
+echo "# Indirectly access to the manager via the web server a using cookie-based login session (user)" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 
-echo "export BACKEND_ENDPOINT=http://0.0.0.0:${WEBSERVER_PORT}" >> my-backend-ai-session.sh
-echo "export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" >> my-backend-ai-session.sh
-echo "export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" >> my-backend-ai-session.sh
-echo "export BACKEND_ENDPOINT_TYPE=session" >> my-backend-ai-session.sh
-chmod +x my-backend-ai-session.sh
+# TODO: Update tester env script
+## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-admin.sh
+## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_ADMIN_CONF_FOR_API}@" ./env-tester-admin.sh
+## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-user.sh
+## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_USER_CONF_FOR_API}@" ./env-tester-user.sh
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
-$docker_sudo docker pull cr.backend.ai/stable/python:3.8-ubuntu18.04
-if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
-  $docker_sudo docker pull cr.backend.ai/stable/python-tensorflow:2.3-py36-cuda10.1
-  $docker_sudo docker pull cr.backend.ai/stable/python-pytorch:1.6-py36-cuda10.1
+if [ "$(uname -p)" = "arm" ]; then
+  $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
+else
+  $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
+  if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
+    $docker_sudo docker pull "cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"
+    $docker_sudo docker pull "cr.backend.ai/stable/python-pytorch:1.8-py38-cuda11.1"
+  fi
 fi
 
-DELETE_OPTS=''
-if [ ! "$INSTALL_PATH" = $(readlinkf "./backend.ai-dev") ]; then
-  DELETE_OPTS+=" --install-path=${INSTALL_PATH}"
-fi
-DELETE_OPTS=$(trim "$DELETE_OPTS")
-
-cd "${INSTALL_PATH}"
 show_info "Installation finished."
-show_note "Default API keypair configuration for test / develop (my-backend-ai.sh):"
-echo "> ${WHITE}export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/${NC}"
-echo "> ${WHITE}export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE${NC}"
-echo "> ${WHITE}export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY${NC}"
-echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=api${NC}"
+show_note "Check out the default API keypairs and account credentials for local development and testing:"
+echo "> ${WHITE}cat env-local-admin-api.sh${NC}"
+echo "> ${WHITE}cat env-local-admin-session.sh${NC}"
+echo "> ${WHITE}cat env-local-domainadmin-api.sh${NC}"
+echo "> ${WHITE}cat env-local-domainadmin-session.sh${NC}"
+echo "> ${WHITE}cat env-local-user-api.sh${NC}"
+echo "> ${WHITE}cat env-local-user-session.sh${NC}"
+show_note "To apply the client config, source one of the configs like:"
+echo "> ${WHITE}source env-local-user-session.sh${NC}"
 echo " "
-show_note "Default ID/Password configuration for test / develop (my-backend-ai-session.sh):"
-echo "> ${WHITE}export BACKEND_ENDPOINT=http://0.0.0.0:${WEBSERVER_PORT}/${NC}"
-echo "> ${WHITE}export BACKEND_ENDPOINT_TYPE=session${NC}"
-echo "> ${WHITE}backend.ai login${NC}"
-echo "> ${WHITE}ID      : admin@lablup.com${NC}"
-echo "> ${WHITE}Password: wJalrXUt${NC}"
+show_note "Your pants invocation command:"
+echo "> ${WHITE}${PANTS}${NC}"
 echo " "
-echo "These environment variables are added in my-backend-ai.sh and my-backend-ai-session.sh."
 show_important_note "You should change your default admin API keypairs for production environment!"
 show_note "How to run Backend.AI manager:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/manager${NC}"
-echo "> ${WHITE}python -m ai.backend.manager.server --debug${NC}"
+echo "> ${WHITE}./backend.ai mgr start-server --debug${NC}"
 show_note "How to run Backend.AI agent:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/agent${NC}"
-echo "> ${WHITE}python -m ai.backend.agent.server --debug${NC}"
+echo "> ${WHITE}./backend.ai ag start-server --debug${NC}"
 show_note "How to run Backend.AI storage-proxy:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/storage-proxy${NC}"
-echo "> ${WHITE}python -m ai.backend.storage.server${NC}"
+echo "> ${WHITE}./py -m ai.backend.storage.server${NC}"
 show_note "How to run Backend.AI web server (for ID/Password login):"
-echo "> ${WHITE}cd ${INSTALL_PATH}/webserver${NC}"
-echo "> ${WHITE}python -m ai.backend.web.server${NC}"
+echo "> ${WHITE}./py -m ai.backend.web.server${NC}"
 show_note "How to run your first code:"
-echo "> ${WHITE}cd ${INSTALL_PATH}/client-py${NC}"
-echo "> ${WHITE}backend.ai --help${NC}"
-echo "> ${WHITE}backend.ai run python -c \"print('Hello World\\!')\"${NC}"
+echo "> ${WHITE}./backend.ai --help${NC}"
+echo "> ${WHITE}source env-local-admin-api.sh${NC}"
+echo "> ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
 echo " "
 echo "${GREEN}Development environment is now ready.${NC}"
-show_note "Reminder: Your environment ID is ${YELLOW}${ENV_ID}${NC}."
-echo "  * When using docker-compose, do:"
-echo "    > ${WHITE}cd ${INSTALL_PATH}/backend.ai${NC}"
+show_note "How to run docker-compose:"
 if [ ! -z "$docker_sudo" ]; then
-  echo "    > ${WHITE}${docker_sudo} docker-compose -p ${ENV_ID} -f docker-compose.halfstack.${ENV_ID}.yml up -d ...${NC}"
+  echo "    > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
 else
-  echo "    > ${WHITE}docker-compose -p ${ENV_ID} -f docker-compose.halfstack.${ENV_ID}.yml up -d ...${NC}"
+  echo "    > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
 fi
-echo "  * To delete this development environment, run:"
-echo "    > ${WHITE}$(dirname $0)/delete-dev.sh --env ${ENV_ID} ${DELETE_OPTS}${NC}"
+show_note "How to reset this setup:"
+echo "    > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
 echo " "
+
+# vim: tw=0

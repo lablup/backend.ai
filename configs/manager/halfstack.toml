@@ -1,0 +1,67 @@
+[etcd]
+namespace = "local"
+addr = { host = "127.0.0.1", port = 8120 }
+user = ""
+password = ""
+
+
+[db]
+type = "postgresql"
+addr = { host = "localhost", port = 8100 }
+name = "backend"
+user = "postgres"
+password = "develove"
+
+
+[manager]
+num-proc = 4
+service-addr = { host = "127.0.0.1", port = 8081 }
+#user = "nobody"
+#group = "nobody"
+ssl-enabled = false
+#ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"   # env: BACKNED_SSL_CERT
+#ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
+
+heartbeat-timeout = 10.0
+#id = ""
+pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
+disabled-plugins = []
+
+hide-agents = true
+
+
+[docker-registry]
+ssl-verify = false
+
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+"alembic" = "INFO"
+"sqlalchemy" = "WARNING"
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "manager.log"
+backup-count = 5
+rotation-size = "10M"
+
+[logging.logstash]
+endpoint = { host = "localhost", port = 9300 }
+protocol = "tcp"
+ssl-enabled = true
+ssl-verify = true
+
+
+[debug]
+enabled = false
