@@ -16,6 +16,10 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.06.0.dev2 (2022-06-03)
+
+* This ia another test release to verify automation of marking pre-releases.
+
 ## 22.06.0.dev1 (2022-06-03)
 
 ### Miscellaneous
