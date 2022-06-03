@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.11.0"
+pants_version = "2.12.0rc2"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
@@ -9,12 +9,14 @@ backend_packages = [
     "pants.backend.experimental.python",
     "setupgen",
     "platform_resources",
+    "towncrier_tool",
 ]
 pants_ignore = [
     "scripts",
     "plugins",
     "docs",  # TODO: docs build config
 ]
+# use_deprecated_directory_cli_args_semantics = false  # for 2.13 or later
 
 [anonymous-telemetry]
 enabled = false
@@ -66,3 +68,9 @@ version = "mypy>=0.950"
 extra_requirements.add = [
 ]
 lockfile = "tools/mypy.lock"
+
+[towncrier]
+version = "towncrier>=21.9"
+extra_requirements.add = [
+]
+lockfile = "tools/towncrier.lock"

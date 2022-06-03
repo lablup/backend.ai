@@ -361,9 +361,12 @@ Making a new release
   line, e.g., using ``set noeol`` in Vim.  This is also configured in
   ``./editorconfig``)
 
-* Run ``./pants towncrier`` to auto-generate the changelog.
+* Run ``LOCKSET=tools/towncrier ./py -m towncrier`` to auto-generate the changelog.
 
-  - (TODO: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
+  - You may append ``--draft`` to see a preview of the changelog update without
+    actually modifying the filesytem.
+
+  - (WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
 
 * Make a new git commit with the commit message: "release: <version>".
 
