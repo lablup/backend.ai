@@ -1,0 +1,30 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2018-12-17 15:51+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.6.0\n"
+
+# 247c4ce2da714b1ca39c9d9de95b1158
+#: ../../func/vfolder.rst:2
+msgid "Virtual Folder Functions"
+msgstr "가상폴더 함수"
+
+# 8c01710979784f518f13f38dc23e3eaf
+#: ai.backend.client.vfolder.VFolder.session:1 of
+msgid "The client session instance that this function class is bound to."
+msgstr "이 함수 클래스가 사용할 클라이언트 세션 인스턴스"
+

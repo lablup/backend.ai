@@ -1,0 +1,40 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2018-12-17 15:51+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.6.0\n"
+
+# a6e6df2f9a3a475888eb594517eba401
+#: ../../lowlevel/exceptions.rst:2
+msgid "Exceptions"
+msgstr "예외 클래스들"
+
+# 28ed6a551ed3437d8ddd7affd55eda48
+#: ai.backend.client.exceptions.BackendError:1 of
+msgid "Exception type to catch all ai.backend-related errors."
+msgstr ""
+
+# c622535b9c744e85b654d279b0297566
+#: ai.backend.client.exceptions.BackendAPIError:1 of
+msgid "Exceptions returned by the API gateway."
+msgstr ""
+
+# bf495df1709948119a75c7ab4b6951f9
+#: ai.backend.client.exceptions.BackendClientError:1 of
+msgid "Exceptions from the client library, such as argument validation errors."
+msgstr ""
+

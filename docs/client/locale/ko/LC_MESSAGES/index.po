@@ -1,0 +1,124 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2018-12-17 15:51+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.6.0\n"
+
+# dc7e45bc0f1e421188c938440a2f0caf
+#: ../../index.rst:7
+msgid "Backend.AI Client SDK for Python"
+msgstr ""
+
+# 9587a65c466d4acfa8d6ae754c73756d
+#: ../../index.rst:9
+msgid ""
+"This is the documentation for the Python Client SDK which implements "
+":doc:`the Backend.AI API <backendai:index>`."
+msgstr ""
+"이 문서는 :doc:`Backend.AI API <backendai:index>`\ 를 구현하는 "
+"Python용 클라이언트 소프트웨어 개발킷(SDK)에 관한 매뉴얼입니다."
+
+# 935e26d49fbd4253b87603b475e189e4
+#: ../../index.rst:13
+msgid "Requirements"
+msgstr "요구사항"
+
+# b7cf23769a684d6192ecc9a581d20cc3
+#: ../../index.rst:15
+msgid "Python 3.5.3 or higher is required."
+msgstr "Python 3.5.3 또는 그보다 최신 버전이 필요합니다."
+
+# 8ca1127c323949e48e7e663a602f97d4
+#: ../../index.rst:17
+msgid ""
+"You can download `its official installer from python.org "
+"<https://www.python.org/downloads/>`_, or use a 3rd-party package/version"
+" manager such as `homebrew <http://brew.sh/index_ko.html>`_, `miniconda "
+"<http://conda.pydata.org/miniconda.html>`_, or `pyenv "
+"<https://github.com/pyenv/pyenv>`_.  It works on Linux, macOS, and "
+"Windows."
+msgstr ""
+"`python.org에서 공식 설치 패키지 <https://www.python.org/downloads/>`_\ 를 다운로드하거나, "
+"사용 중인 운영환경에 적합한 별도의 패키지 관리자(예: `homebrew <http://brew.sh/index_ko.html>`_, "
+"`miniconda <http://conda.pydata.org/miniconda.html>`_, `pyenv <https://github.com/pyenv/pyenv>`_ 등)를 이용할 수 있습니다. "
+"이 클라이언트 SDK는 Linux, macOS, Windows 환경에서 테스트되었습니다."
+
+# 0444ab12b7d24d3ca532aa63b8edbe92
+#: ../../index.rst:25
+msgid "Getting Started"
+msgstr "시작하기"
+
+# 3f48b69b5aaa4c9d99cb26f93cf8b67a
+#: ../../index.rst:27
+msgid ""
+"We recommend to create a virtual environment for isolated, unobtrusive "
+"installation of the client SDK library and tools."
+msgstr ""
+"SDK 라이브러리와 도구를 다른 소프트웨어와의 충돌 없이 설치하기 위해서 "
+"별도의 Python 가상환경(virtual environment)을 만드실 것을 권장합니다."
+
+# 4247c91bca0e46b490dd8828c9540ed9
+#: ../../index.rst:36
+msgid "Then install the client library from PyPI."
+msgstr "PyPI로부터 클라이언트 라이브러리를 설치합니다."
+
+# 1914cd4407134b87896f0ddfbec6d922
+#: ../../index.rst:43
+msgid "Set your API keypair as environment variables:"
+msgstr "자신의 API keypair를 다음과 같이 환경변수에 설정합니다:"
+
+# e95d33615c444bfab3ba5208bcc99981
+#: ../../index.rst:50
+msgid "And then try the first commands:"
+msgstr "그 다음엔 첫 명령어를 실행해봅니다:"
+
+# ec296e1d23e0487db3b0e11d2ceb3780
+#: ../../index.rst:59
+msgid ""
+"Check out more details about :doc:`client configuration <gsg/config>`, "
+":doc:`command-line examples <cli/examples>`, and :doc:`code examples "
+"<gsg/examples>`."
+msgstr ""
+"보다 자세한 내용은 :doc:`클라이언트 설정 <gsg/config>`, "
+":doc:`명령줄 예제 <cli/examples>` 및 :doc:`코드 예제 <gsg/examples>`\ 를 "
+"참고하기 바랍니다."
+
+# 7de9f479f7f549d69b845dd61ffe12ea
+#: ../../index.rst:63
+msgid "Table of contents"
+msgstr "목차"
+
+# 51d843796aae45d0888b094e358ddb9e
+#: ../../index.rst:74
+msgid "Indices and tables"
+msgstr "색인과 표"
+
+# bda6b5348b0049a282569b1669fb1913
+#: ../../index.rst:76
+msgid ":ref:`genindex`"
+msgstr ""
+
+# e44dff7a575e4cb69b4c5968d99bc986
+#: ../../index.rst:77
+msgid ":ref:`modindex`"
+msgstr ""
+
+# 834e482ed3024444ae1cd1d322b5b03c
+#: ../../index.rst:78
+msgid ":ref:`search`"
+msgstr ""
+

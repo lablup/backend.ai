@@ -1,0 +1,92 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2018-12-17 15:51+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.6.0\n"
+
+# cfebb0640f504b48ad07cc6a8bf4e3e5
+#: ../../func/agent.rst:2
+msgid "Agent Functions"
+msgstr "에이전트 함수"
+
+# aee3c1ef25054aec88d6ec84917eff23
+#: ai.backend.client.agent.Agent:1 of
+msgid ""
+"Provides a shortcut of :func:`Admin.query() "
+"<ai.backend.client.admin.Admin.query>` that fetches various agent "
+"information."
+msgstr ""
+"서버측 에이전트들에 관한 정보를 조회하기 위한 :func:`Admin.query() "
+"<ai.backend.client.admin.Admin.query>` 함수의 단축 버전입니다."
+
+# 8a10292301aa49c8b583ae050a9f61f6
+#: ai.backend.client.agent.Agent:7 of
+msgid ""
+"All methods in this function class require your API access key to have "
+"the *admin* privilege."
+msgstr ""
+"이 함수 클래스의 모든 메소드들은 사용 중인 API access key가 관리자 권한을 "
+"가지고 있어야 작동합니다."
+
+# 04f2c7e119914819906d8bc5b84b5a04
+#: ai.backend.client.agent.Agent.session:1 of
+msgid "The client session instance that this function class is bound to."
+msgstr "이 함수 클래스가 사용할 클라이언트 세션 인스턴스"
+
+# 1b8fb0c3b8b046b6a444165c08bedfcf
+#: ai.backend.client.agent.Agent.info:1 of
+msgid "Returns the agent's information including resource capacity and usage."
+msgstr ""
+
+# 471ad03c5be7496e8bf724c33c311615
+# b6c8e828267f497e91ef8b242e6322d6
+#: ai.backend.client.agent.Agent.info ai.backend.client.agent.Agent.list of
+msgid "Return type"
+msgstr ""
+
+# 1bfc74380e71427fb44ee22bc5c32e92
+#: ai.backend.client.agent.Agent.info:6 of
+msgid ":py:class:`dict`"
+msgstr ""
+
+# 14976fc37eb54dd3b19aa376c641b3ed
+#: ai.backend.client.agent.Agent.list:1 of
+msgid "Fetches the list of agents with the given status."
+msgstr ""
+
+# 88d459a135b942aebb14a4179db9d360
+#: ai.backend.client.agent.Agent.list of
+msgid "Parameters"
+msgstr ""
+
+# de4fab648d2c436890c71f5edc25f9d2
+#: ai.backend.client.agent.Agent.list:4 of
+msgid ""
+"An upper-cased string constant representing agent status (one of "
+"``'ALIVE'``, ``'TERMINATED'``, ``'LOST'``, etc.)"
+msgstr ""
+
+# 07d2b34867ce44618a714960e2797806
+#: ai.backend.client.agent.Agent.list:8 of
+msgid "Additional per-agent query fields to fetch."
+msgstr ""
+
+# 12112c0aec294c92b9604a0a8854e66c
+#: ai.backend.client.agent.Agent.list:11 of
+msgid ":py:class:`~typing.Sequence`\\[:py:class:`dict`]"
+msgstr ""
+

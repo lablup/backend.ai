@@ -1,0 +1,96 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2018-12-17 15:51+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.6.0\n"
+
+# 8d5399b091514659b3b2ad71650a4b65
+#: ../../func/keypair.rst:2
+msgid "KeyPair Functions"
+msgstr "KeyPair 함수"
+
+# 43c138fb98b6400994d349c1798dfb5f
+#: ai.backend.client.keypair.KeyPair:1 of
+msgid "Provides interactions with keypairs."
+msgstr "Keypair들을 다룹니다."
+
+# da07514c69194c23af79f29d5512a7df
+#: ai.backend.client.keypair.KeyPair.session:1 of
+msgid "The client session instance that this function class is bound to."
+msgstr "이 함수 클래스가 사용할 클라이언트 세션 인스턴스"
+
+# 730a84549d4242ff9b81be724334633a
+#: ai.backend.client.keypair.KeyPair.activate:1 of
+msgid "Activates this keypair. You need an admin privilege for this operation."
+msgstr ""
+
+# b4ad11bca6574150a0e5d112fabf0627
+#: ai.backend.client.keypair.KeyPair.create:1 of
+msgid ""
+"Creates a new keypair with the given options. You need an admin privilege"
+" for this operation."
+msgstr ""
+
+# 972e065d6ab44ee8becb3627f25d65e2
+# ceba03daf58d4c7f9ddd59eb5c82f98d
+# 8f04cdd738c74a449c1daf0c9a11e618
+#: ai.backend.client.keypair.KeyPair.create
+#: ai.backend.client.keypair.KeyPair.info
+#: ai.backend.client.keypair.KeyPair.list of
+msgid "Return type"
+msgstr ""
+
+# 321785a66618464ebf6fa358c1b211f4
+# a9eb108354934d45ab4cfc5cf9255e0d
+#: ai.backend.client.keypair.KeyPair.create:5
+#: ai.backend.client.keypair.KeyPair.info:9 of
+msgid ":py:class:`dict`"
+msgstr ""
+
+# 4441bb0dacab4a6e83036f6c4081e279
+#: ai.backend.client.keypair.KeyPair.deactivate:1 of
+msgid ""
+"Deactivates this keypair. Deactivated keypairs cannot make any API "
+"requests unless activated again by an administrator. You need an admin "
+"privilege for this operation."
+msgstr ""
+
+# 4dcb961129b347c8807e7037cba9b613
+#: ai.backend.client.keypair.KeyPair.info:1 of
+msgid "Returns the keypair's information such as resource limits."
+msgstr ""
+
+# 697e8042088c4481ad748329ed5cbbcb
+#: ai.backend.client.keypair.KeyPair.info of
+msgid "Parameters"
+msgstr ""
+
+# 7db18e5a12ef4aaa92621874efd14294
+#: ai.backend.client.keypair.KeyPair.info:4 of
+msgid "Additional per-agent query fields to fetch."
+msgstr ""
+
+# 167aaa838aa2472088796fe719cbea89
+#: ai.backend.client.keypair.KeyPair.list:1 of
+msgid "Lists the keypairs. You need an admin privilege for this operation."
+msgstr ""
+
+# 5a20bef791f849e38a5ac4455c897f39
+#: ai.backend.client.keypair.KeyPair.list:5 of
+msgid ":py:class:`~typing.Sequence`\\[:py:class:`dict`]"
+msgstr ""
+

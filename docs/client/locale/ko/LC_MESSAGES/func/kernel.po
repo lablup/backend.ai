@@ -1,0 +1,404 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2018-12-17 15:51+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.6.0\n"
+
+# 4cb8460d73a249efbf594e68f226e625
+#: ../../func/kernel.rst:2
+msgid "ComputeSession Functions"
+msgstr "커널 함수"
+
+# 9c7262da0af04da993d60a30569085fa
+#: ai.backend.client.kernel.Kernel:1 of
+msgid "Provides various interactions with compute sessions in Backend.AI."
+msgstr "연산 세션들을 관리하면서 다양한 상호작용을 제공합니다."
+
+# 1da141f4918146039ced208e8275941d
+#: ai.backend.client.kernel.Kernel:3 of
+msgid ""
+"The term 'kernel' is now deprecated and we prefer 'compute sessions'. "
+"However, for historical reasons and to avoid confusion with client "
+"sessions, we keep the backward compatibility with the naming of this API "
+"function class."
+msgstr ""
+"Backend.AI의 개발이 진행됨에 따라 '커널'이라는 용어는 '연산 세션'이라는 용어로 대체되었지만, "
+"클라이언트 세션과의 혼동을 피하고 과거 코드와의 호환성을 위해 여전히 이 함수 클래스는 "
+"커널이라는 이름을 사용하고 있습니다."
+
+# f968eab9e3074da4bbb96ed378112222
+#: ai.backend.client.kernel.Kernel:7 of
+msgid ""
+"For multi-container sessions, all methods take effects to the master "
+"container only, except :func:`~ComputeSession.destroy` and "
+":func:`~ComputeSession.restart` methods. So it is the user's responsibility to "
+"distribute uploaded files to multiple containers using explicit copies or"
+" virtual folders which are commonly mounted to all containers belonging "
+"to the same compute session."
+msgstr ""
+"여러 개의 다중 컨테이너로 이뤄진 연산 세션에서는, :func:`~ComputeSession.destroy` 및 "
+":func:`~ComputeSession.restart` 메소드를 제외한 모든 메소드는 세션의 마스터 컨테이너에게만 "
+"유효합니다. 따라서 여러 컨테이너가 동일한 데이터를 바라보거나 분산 처리하도록 "
+"하기 위해서는 가상폴더 탑재 옵션을 활용하여야 합니다. 현재 이러한 작업은 "
+"사용자의 몫입니다. (추후 업데이트로 편의성 개선 예정)"
+
+# 0d1a45e4ce7e439da4857cf151cc47ac
+#: ai.backend.client.kernel.Kernel.session:1 of
+msgid "The client session instance that this function class is bound to."
+msgstr "이 함수 클래스가 사용할 클라이언트 세션 인스턴스"
+
+# 18c7fc7c995549438b9c06316eef6a6e
+#: ai.backend.client.kernel.Kernel.complete:1 of
+msgid ""
+"Gets the auto-completion candidates from the given code string, as if a "
+"user has pressed the tab key just after the code in IDEs."
+msgstr ""
+
+# bc62a6902cc04d03b736cc7c00a0bbd3
+#: ai.backend.client.kernel.Kernel.complete:5 of
+msgid ""
+"Depending on the language of the compute session, this feature may not be"
+" supported.  Unsupported sessions returns an empty list."
+msgstr ""
+
+# 765f1f54e4f446fb96f4d17eaf4773cf
+# f73374f7b3394c77ac2d5afcc0d80144
+# 8d98b3f5a49e4767b4c12de32b46f2df
+# 179984d324294928afb5c99bc2c2b2ad
+# d6fc6061adfe43919e5638679b8c751f
+# c39c88556be442cabc801eda09ece47d
+#: ai.backend.client.kernel.Kernel.complete
+#: ai.backend.client.kernel.Kernel.download
+#: ai.backend.client.kernel.Kernel.execute
+#: ai.backend.client.kernel.Kernel.get_or_create
+#: ai.backend.client.kernel.Kernel.list_files
+#: ai.backend.client.kernel.Kernel.upload of
+msgid "Parameters"
+msgstr ""
+
+# 4d1f90740873462a8cca900fd9fc29ea
+#: ai.backend.client.kernel.Kernel.complete:9 of
+msgid "An (incomplete) code text."
+msgstr ""
+
+# 29ff77ca55dd46aabb8b5b81d18de570
+#: ai.backend.client.kernel.Kernel.complete:11 of
+msgid ""
+"Additional information about the current cursor position, such as row, "
+"col, line and the remainder text."
+msgstr ""
+
+# 32a97aa801b54ee6a70c778d77501f26
+# b6cab4e85bbe46e8892aec5ab7def812
+# d4c47203219f490ca732b69836949c51
+# 50c86295a58f419db633c2ddc1e93dab
+#: ai.backend.client.kernel.Kernel.complete
+#: ai.backend.client.kernel.Kernel.get_or_create
+#: ai.backend.client.kernel.Kernel.stream_execute
+#: ai.backend.client.kernel.Kernel.stream_pty of
+msgid "Return type"
+msgstr ""
+
+# b1a8c88713a545f0ae028290e78d33c0
+#: ai.backend.client.kernel.Kernel.complete:14 of
+msgid ":py:class:`~typing.Iterable`\\[:py:class:`str`]"
+msgstr ""
+
+# 07e9e6fb463647e981cfd838385eaad8
+# 7127c1bcfd5541468c51e82ba4bde32f
+# 3eae39a91bc6400890335cea88c2886e
+# 516982b7e24644b0b49bb9ef96c73b21
+#: ai.backend.client.kernel.Kernel.complete
+#: ai.backend.client.kernel.Kernel.execute
+#: ai.backend.client.kernel.Kernel.get_or_create
+#: ai.backend.client.kernel.Kernel.stream_pty of
+msgid "Returns"
+msgstr ""
+
+# eb8f011e751b46ee875a5432194f1c0d
+#: ai.backend.client.kernel.Kernel.complete:15 of
+msgid "An ordered list of strings."
+msgstr ""
+
+# 2a23b8893bcc4b61a2f336ff08391a08
+#: ai.backend.client.kernel.Kernel.destroy:1 of
+msgid ""
+"Destroys the compute session. Since the server literally kills the "
+"container(s), all ongoing executions are forcibly interrupted."
+msgstr ""
+
+# db05a4c8a60844149660da71de9c2b51
+#: ai.backend.client.kernel.Kernel.download:1 of
+msgid "Downloads the given list of files from the compute session."
+msgstr ""
+
+# 681d3850927649eda2a62824a2b67ebb
+#: ai.backend.client.kernel.Kernel.download:4 of
+msgid ""
+"The list of file paths in the compute session. If they are relative "
+"paths, the path is calculated from ``/home/work`` in the compute session "
+"container."
+msgstr ""
+
+# 833ce455c59f4591ac61920893bce3ab
+#: ai.backend.client.kernel.Kernel.download:8 of
+msgid "The destination directory in the client-side."
+msgstr ""
+
+# 43fc8ed399aa4630b5d40928b70dc6a9
+#: ai.backend.client.kernel.Kernel.download:10 of
+msgid "Displays a progress bar during downloads."
+msgstr ""
+
+# 2113d43506cc4cac9751b3a360aed587
+#: ai.backend.client.kernel.Kernel.execute:1 of
+msgid ""
+"Executes a code snippet directly in the compute session or sends a set of"
+" build/clean/execute commands to the compute session."
+msgstr ""
+
+# d5aec28ddf6941beb44f8e4a7fcca5ed
+#: ai.backend.client.kernel.Kernel.execute:4 of
+msgid ""
+"For more details about using this API, please refer :doc:`the official "
+"API documentation <user-api/intro>`."
+msgstr ""
+
+# 6c267f379c1d49e999ba4485d6bab059
+#: ai.backend.client.kernel.Kernel.execute:8 of
+msgid ""
+"A unique identifier for a particular run loop.  In the first call, it may"
+" be ``None`` so that the server auto-assigns one. Subsequent calls must "
+"use the returned ``runId`` value to request continuation or to send user "
+"inputs."
+msgstr ""
+
+# 11ac99ebfe04492086ab50b6982209ee
+#: ai.backend.client.kernel.Kernel.execute:13 of
+msgid ""
+"A code snippet as string.  In the continuation requests, it must be an "
+"empty string.  When sending user inputs, this is where the user input "
+"string is stored."
+msgstr ""
+
+# acc3fb9a46db4aaf85a8c462c1f934ab
+#: ai.backend.client.kernel.Kernel.execute:17 of
+msgid ""
+"A constant string which is one of ``\"query\"``, ``\"batch\"``, "
+"``\"continue\"``, and ``\"user-input\"``."
+msgstr ""
+
+# d6cbbc43655b42909a38851fc46b309f
+#: ai.backend.client.kernel.Kernel.execute:20 of
+msgid ""
+"A dict for specifying additional options. Mainly used in the batch mode "
+"to specify build/clean/execution commands. See :ref:`the API object "
+"reference <batch-execution-query-object>` for details."
+msgstr ""
+
+# 73815864642d4bb49ee6b2a972444770
+#: ai.backend.client.kernel.Kernel.execute:25 of
+msgid ":ref:`An execution result object <execution-result-object>`"
+msgstr ""
+
+# b754f1ea7e654c2b9337a0be78e3c4b9
+#: ai.backend.client.kernel.Kernel.get_info:1 of
+msgid "Retrieves a brief information about the compute session."
+msgstr ""
+
+# 0ea5af9adb2442959e731812c37ba8b3
+#: ai.backend.client.kernel.Kernel.get_logs:1 of
+msgid "Retrieves the console log of the compute session container."
+msgstr ""
+
+# c317baf4e8a344348e8bec4e022b7b15
+#: ai.backend.client.kernel.Kernel.get_or_create:1 of
+msgid ""
+"Get-or-creates a compute session. If *client_token* is ``None``, it "
+"creates a new compute session as long as the server has enough resources "
+"and your API key has remaining quota. If *client_token* is a valid string"
+" and there is an existing compute session with the same token and the "
+"same *lang*, then it returns the :class:`ComputeSession` instance representing "
+"the existing session."
+msgstr ""
+
+# 65b54de4e16a49b6a9539a465f040999
+#: ai.backend.client.kernel.Kernel.get_or_create:9 of
+msgid ""
+"The image name and tag for the compute session. Example: "
+"``python:3.6-ubuntu``. Check out the full list of available images in "
+"your server using (TODO: new API)."
+msgstr ""
+
+# 96a04b84d91d4b3ab8cea09b26d7ea3d
+#: ai.backend.client.kernel.Kernel.get_or_create:14 of
+msgid ""
+"A client-side identifier to seamlessly reuse the compute session already "
+"created."
+msgstr ""
+
+# 830f746e84164135bc17725208ed9ebc
+#: ai.backend.client.kernel.Kernel.get_or_create:17 of
+msgid "The list of vfolder names that belongs to the currrent API access key."
+msgstr ""
+
+# 2bb3cac4c41047ad90ef6c0c2104c007
+#: ai.backend.client.kernel.Kernel.get_or_create:20 of
+msgid "The environment variables which always bypasses the jail policy."
+msgstr ""
+
+# a156a9e400604beb8f50c580769dd5e6
+#: ai.backend.client.kernel.Kernel.get_or_create:22 of
+msgid "The resource specification. (TODO: details)"
+msgstr ""
+
+# 87d3ab9afa1340a1b914ea84e51bd573
+#: ai.backend.client.kernel.Kernel.get_or_create:24 of
+msgid "The number of containers in this compute session. Must be at least 1."
+msgstr ""
+
+# 8e3200540e60487facbf5024bb2b3139
+#: ai.backend.client.kernel.Kernel.get_or_create:27 of
+msgid "An optional string to annotate extra information."
+msgstr ""
+
+# 06268f9393be48a79612500e1701b57e
+#: ai.backend.client.kernel.Kernel.get_or_create:29 of
+msgid ":py:class:`~ai.backend.client.kernel.ComputeSession`"
+msgstr ""
+
+# 1b943060d8914f20ad8b8f0b9c6ab952
+#: ai.backend.client.kernel.Kernel.get_or_create:30 of
+msgid "The :class:`ComputeSession` instance."
+msgstr ""
+
+# 3c3f2172f52f409ab77747baf65aba81
+#: ai.backend.client.kernel.Kernel.interrupt:1 of
+msgid ""
+"Tries to interrupt the current ongoing code execution. This may fail "
+"without any explicit errors depending on the code being executed."
+msgstr ""
+
+# 9d1c41c5e77e4fb59729522b6e6d38e0
+#: ai.backend.client.kernel.Kernel.list_files:1 of
+msgid ""
+"Gets the list of files in the given path inside the compute session "
+"container."
+msgstr ""
+
+# c753838dc9964cdfbc835ed53292e2d0
+#: ai.backend.client.kernel.Kernel.list_files:5 of
+msgid "The directory path in the compute session."
+msgstr ""
+
+# d7862190214547e0831758019cca5f73
+#: ai.backend.client.kernel.Kernel.restart:1 of
+msgid ""
+"Restarts the compute session. The server force-destroys the current "
+"running container(s), but keeps their temporary scratch directories "
+"intact."
+msgstr ""
+
+# fc866b2671734d9b8bbbd2fe9691fd09
+#: ai.backend.client.kernel.Kernel.upload:1 of
+msgid ""
+"Uploads the given list of files to the compute session. You may refer "
+"them in the batch-mode execution or from the code executed in the server "
+"afterwards."
+msgstr ""
+
+# 30db3df0de0b4e3cab4587d525868cb6
+#: ai.backend.client.kernel.Kernel.upload:6 of
+msgid ""
+"The list of file paths in the client-side. If the paths include "
+"directories, the location of them in the compute session is calculated "
+"from the relative path to *basedir* and all intermediate parent "
+"directories are automatically created if not exists.  For example, if a "
+"file path is ``/home/user/test/data.txt`` (or ``test/data.txt``) where "
+"*basedir* is ``/home/user`` (or the current working directory is "
+"``/home/user``), the uploaded file is located at "
+"``/home/work/test/data.txt`` in the compute session container."
+msgstr ""
+
+# 988fdce062584c44a7b2c5214f05a7ca
+#: ai.backend.client.kernel.Kernel.upload:6 of
+msgid ""
+"The list of file paths in the client-side. If the paths include "
+"directories, the location of them in the compute session is calculated "
+"from the relative path to *basedir* and all intermediate parent "
+"directories are automatically created if not exists."
+msgstr ""
+
+# acd6209bb9814418804f87d6298a8079
+#: ai.backend.client.kernel.Kernel.upload:11 of
+msgid ""
+"For example, if a file path is ``/home/user/test/data.txt`` (or "
+"``test/data.txt``) where *basedir* is ``/home/user`` (or the current "
+"working directory is ``/home/user``), the uploaded file is located at "
+"``/home/work/test/data.txt`` in the compute session container."
+msgstr ""
+
+# d3122d7a4d504769aa60c5e7951ac4fe
+#: ai.backend.client.kernel.Kernel.upload:16 of
+msgid ""
+"The directory prefix where the files reside. The default value is the "
+"current working directory."
+msgstr ""
+
+# c062dcd05399490c8b75f1aead7df3df
+#: ai.backend.client.kernel.Kernel.upload:19 of
+msgid "Displays a progress bar during uploads."
+msgstr ""
+
+# ed29ed7db7774c099201a80f5ec796a7
+#: ai.backend.client.kernel.Kernel.stream_pty:1 of
+msgid ""
+"Opens a pseudo-terminal of the kernel (if supported) streamed via "
+"websockets."
+msgstr ""
+
+# 184c6fdc95c5447b957ff9fc1674ea52
+#: ai.backend.client.kernel.Kernel.stream_pty:4 of
+msgid ":py:class:`~ai.backend.client.kernel.StreamPty`"
+msgstr ""
+
+# dbe271ac95ad4b43b7ace5f6a6eae239
+#: ai.backend.client.kernel.Kernel.stream_pty:5 of
+msgid "a :class:`StreamPty` object."
+msgstr ""
+
+# e238c20305544ac1be38b7385ff77c4b
+#: ai.backend.client.kernel.Kernel.stream_execute:1 of
+msgid ""
+"Executes a code snippet in the streaming mode. Since the returned "
+"websocket represents a run loop, there is no need to specify *run_id* "
+"explicitly."
+msgstr ""
+
+# 6fd7bf2b7f8b46dcba9e828eb417e963
+#: ai.backend.client.kernel.Kernel.stream_execute:6 of
+msgid ":py:class:`~ai.backend.client.request.WebSocketResponse`"
+msgstr ""
+
+# df1bf7e79b244375a1d3885ae9d6feaf
+#: ai.backend.client.kernel.StreamPty:1 of
+msgid ""
+"A derivative class of "
+":class:`~ai.backend.client.request.WebSocketResponse` which provides "
+"additional functions to control the terminal."
+msgstr ""
+

@@ -1,0 +1,283 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2018-12-17 15:51+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.6.0\n"
+
+# 5f5f6856c0b547cc877537a530a5c743
+#: ../../gsg/config.rst:2
+msgid "Client Configuration"
+msgstr "클라이언트 설정"
+
+# f61e0d7a422c41cba15f46e3fdaf3fb5
+#: ../../gsg/config.rst:7
+msgid ""
+"The configuration for Backend.AI API includes the endpoint URL prefix, "
+"API keypairs (access and secret keys), and a few others."
+msgstr "Backend.AI API 설정에는 endpoint URL과 API keypair (access 및 secret key) 등이 포함됩니다."
+
+# fc2bc62a458a49e893c94aafc2bdec59
+#: ../../gsg/config.rst:10
+msgid "There are two ways to set the configuration:"
+msgstr "설정 방법은 2가지가 있습니다:"
+
+# c9e9db26a1bd4e919932dbe12ad5a752
+#: ../../gsg/config.rst:12
+msgid ""
+"Setting environment variables before running your program that uses this "
+"SDK."
+msgstr "이 SDK를 사용하는 여러분의 프로그램이 실행되기 전 환경변수를 미리 설정해두기"
+
+# 4c05d6328dcf4d05ac51eef196d7c973
+#: ../../gsg/config.rst:13
+msgid ""
+"Manually creating :class:`APIConfig` instance and creating sessions with "
+"it."
+msgstr ""
+"직접 :class:`APIConfig` 인스턴스를 만들고 그로부터 세션을 초기화하기"
+
+# 01d5ea64cb8f4b6d82b2233d6b526533
+#: ../../gsg/config.rst:15
+msgid "The list of supported environment variables are:"
+msgstr "다음과 같은 환경변수들을 사용할 수 있습니다:"
+
+# 98b9e9dc1d9b41fb9e1829ff5d80af47
+#: ../../gsg/config.rst:17
+msgid "``BACKEND_ENDPOINT``"
+msgstr ""
+
+# f259368b1722412e97da5df56255d813
+#: ../../gsg/config.rst:18
+msgid "``BACKEND_ACCESS_KEY``"
+msgstr ""
+
+# cce443a5999e4bfda2ae8fd47d3d9322
+#: ../../gsg/config.rst:19
+msgid "``BACKEND_SECRET_KEY``"
+msgstr ""
+
+# 1bd0884af81f40f1b28c3da3612624a8
+#: ../../gsg/config.rst:20
+msgid "``BACKEND_VFOLDER_MOUNTS``"
+msgstr ""
+
+# bed1378db2594bea9e7998918ceb9122
+#: ../../gsg/config.rst:22
+msgid "Other configurations are set to defaults."
+msgstr "다른 설정들은 기본값을 사용합니다."
+
+# 51e8b8f179f441c09e8709ccc0c0801d
+#: ../../gsg/config.rst:24
+msgid ""
+"Note that when you use our client-side Jupyter integration, "
+"``BACKEND_VFOLDER_MOUNTS`` is the only way to attach your virtual folders"
+" to the notebook kernels."
+msgstr ""
+"클라이언트측 Jupyter 통합 플러그인을 사용하는 경우, "
+"``BACKEND_VFOLDER_MOUNTS`` 변수는 가상폴더를 노트북 커널 안에서 사용하기 위한 "
+"유일한 방법입니다."
+
+# e09645bd86f04c72a8e187fa71da540e
+#: ai.backend.client.config.get_env:1 of
+msgid ""
+"Retrieves a configuration value from the environment variables. The given"
+" *key* is uppercased and prefixed by ``\"BACKEND_\"`` and then "
+"``\"SORNA_\"`` if the former does not exist."
+msgstr ""
+"환경변수에서 설정값을 가져옵니다. "
+"설정 이름을 대문자화한 후 먼저 ``\"BACKEND_\"`` 접두어를 붙여서 찾아보고, "
+"없으면 ``\"SORNA_\"``\ 를 붙여서 찾아봅니다."
+
+# 75d23070fa0f4333a2635b57f9c07315
+# 1450fa030d01448b8ce6fb5e08b8538d
+#: ai.backend.client.config.APIConfig ai.backend.client.config.get_env of
+msgid "Parameters"
+msgstr "매겨변수"
+
+# d67cd89803f343cab4f5fddad27a26bb
+#: ai.backend.client.config.get_env:6 of
+msgid "The key name."
+msgstr "설정 이름"
+
+# d68059ef01834516a9f9de49a46705eb
+#: ai.backend.client.config.get_env:8 of
+msgid ""
+"The default value returned when there is no corresponding environment "
+"variable."
+msgstr "환경변수에 대응하는 값이 없을 때 반환되는 기본값"
+
+# bbb0b04b8c254600914626ebd8d918f3
+#: ai.backend.client.config.get_env:11 of
+msgid ""
+"A single-argument function that is applied to the result of lookup (in "
+"both successes and the default value for failures). The default is "
+"returning the value as-is."
+msgstr ""
+
+# ebf8814cc4b6494cb9e4d769edfca012
+#: ai.backend.client.config.get_env of
+msgid "Returns"
+msgstr "반환"
+
+# 0b4dcb8f4f634c1f84c1614d37ef69d6
+#: ai.backend.client.config.get_env:15 of
+msgid "The value processed by the *clean* function."
+msgstr "*clean* 함수를 거쳐 처리된 값"
+
+# 9ed07db4551d4a74af135301b33795ae
+#: ai.backend.client.config.get_config:1 of
+msgid ""
+"Returns the configuration for the current process. If there is no "
+"explicitly set :class:`APIConfig` instance, it will generate a new one "
+"from the current environment variables and defaults."
+msgstr ""
+
+# 27bb63f9e5d84619b75ed69944d140be
+#: ai.backend.client.config.set_config:1 of
+msgid "Sets the configuration used throughout the current process."
+msgstr "현재 프로세스 전체에서 사용될 전역 설정을 지정합니다."
+
+# 13ead2d700f44cda943c7371261e42bd
+#: ai.backend.client.config.APIConfig:1 of
+msgid ""
+"Represents a set of API client configurations. The access key and secret "
+"key are mandatory -- they must be set in either environment variables or "
+"as the explicit arguments."
+msgstr ""
+
+# fffe57ecbc044c8fa2287b124a6b1a7f
+#: ai.backend.client.config.APIConfig:6 of
+msgid "The URL prefix to make API requests via HTTP/HTTPS."
+msgstr "API 서버의 주소"
+
+# a9927574dc16492a860dc55a197c8e5d
+#: ai.backend.client.config.APIConfig:8 of
+msgid "The API protocol version."
+msgstr "API 프로토콜 버전"
+
+# ef852c9b9cad4371aa915b4aa11a3352
+#: ai.backend.client.config.APIConfig:10 of
+msgid ""
+"A custom user-agent string which is sent to the API server as a ``User-"
+"Agent`` HTTP header."
+msgstr "``User-Agent`` HTTP 헤더로 전송될 사용자 에이전트 문자열"
+
+# 915de1d4811a4cbc98c7b2abbb1450bc
+#: ai.backend.client.config.APIConfig:13 of
+msgid "The API access key."
+msgstr "API access key"
+
+# d4e5fdb3d51443e7a9de2488a58c37c0
+#: ai.backend.client.config.APIConfig:15 of
+msgid "The API secret key."
+msgstr "API secret key"
+
+# a0a915774457476793f65c1956c8cd2a
+#: ai.backend.client.config.APIConfig:17 of
+msgid "The hash type to generate per-request authentication signatures."
+msgstr "API 요청별 인증 서명 생성 알고리즘을 위한 해쉬 알고리즘 종류"
+
+# 660463aa5af4413792d44ca6ebad8273
+#: ai.backend.client.config.APIConfig:20 of
+msgid ""
+"A list of vfolder names (that must belong to the given access key) to be "
+"automatically mounted upon any :func:`ComputeSession.get_or_create() "
+"<ai.backend.client.kernel.ComputeSession.get_or_create>` calls."
+msgstr ""
+":func:`ComputeSession.get_or_create() <ai.backend.client.kernel.ComputeSession.get_or_create>`\ 와 같이 세션 생성 API 호출 시 "
+"자동으로 탑재될 가상폴더의 목록 (반드시 요청자의 access key가 소유 또는 접근 가능한 것이어야 함)"
+
+# 6b26e74504d641c68d85a9006247f0be
+#: ai.backend.client.config.APIConfig.DEFAULTS:1 of
+msgid "The default values except the access and secret keys."
+msgstr "access key와 secret key를 제외한 기본값"
+
+# fbe8f8e5373b48ce84fd4c1239b74ef3
+#: ai.backend.client.config.APIConfig.endpoint:1 of
+msgid "The configured endpoint URL prefix."
+msgstr "설정된 API 서버 주소"
+
+# 8d48756cb2af4f5c85c94db9572edd33
+# ea16f3bdf2e74eb2860474dc2b7c8402
+# c922056e30f347a98de55c30bce10a64
+# b779cebfa38e4a0486a7bff172fa278a
+# b32b0457e3824a8baf085efeb0dbe97c
+# 1e8d97b6cfc5463aab6fb53a330b6016
+# 0cad6ff3e7f74c6da341a4adc0fbc2e6
+#: ai.backend.client.config.APIConfig.access_key
+#: ai.backend.client.config.APIConfig.endpoint
+#: ai.backend.client.config.APIConfig.hash_type
+#: ai.backend.client.config.APIConfig.secret_key
+#: ai.backend.client.config.APIConfig.user_agent
+#: ai.backend.client.config.APIConfig.version
+#: ai.backend.client.config.APIConfig.vfolder_mounts of
+msgid "Return type"
+msgstr "반환 타입"
+
+# 1f5e9673922547bca0e4143f2bddc7a4
+#: ai.backend.client.config.APIConfig.endpoint:4 of
+msgid ":py:class:`~yarl.URL`"
+msgstr ""
+
+# fdbabf4b96dc4c4a8fec4176f8e91894
+#: ai.backend.client.config.APIConfig.user_agent:1 of
+msgid "The configured user agent string."
+msgstr "설정된 사용자 에이전트 문자열"
+
+# 2d3217c9201243e789b2b1e7f1c49d73
+# 455fd2b82b5e4df2b9c5c0521b198d4c
+# 1ad5a707e0e54992b158ec110df57ea1
+# 57717a4e3a4b4028844069667fb248f3
+# f5e7984c39984685ba49b4cdc34bc857
+#: ai.backend.client.config.APIConfig.access_key:4
+#: ai.backend.client.config.APIConfig.hash_type:4
+#: ai.backend.client.config.APIConfig.secret_key:4
+#: ai.backend.client.config.APIConfig.user_agent:4
+#: ai.backend.client.config.APIConfig.version:4 of
+msgid ":py:class:`str`"
+msgstr ""
+
+# 22f4c93675ef47948743a541476e992f
+#: ai.backend.client.config.APIConfig.access_key:1 of
+msgid "The configured API access key."
+msgstr "설정된 API access key"
+
+# d4f6ec97db2e4154adca0016dbac8582
+#: ai.backend.client.config.APIConfig.secret_key:1 of
+msgid "The configured API secret key."
+msgstr "설정된 API secret key"
+
+# d5494a4ef18145c6b04ac783bebf2ceb
+#: ai.backend.client.config.APIConfig.version:1 of
+msgid "The configured API protocol version."
+msgstr "설정된 API 프로토콜 버전"
+
+# 4d341191ed634917a2aceea7f644f426
+#: ai.backend.client.config.APIConfig.hash_type:1 of
+msgid "The configured hash algorithm for API authentication signatures."
+msgstr "설정된 API 인증 서명 생성을 위한 해쉬 알고리즘"
+
+# fe21a2a9c755483581efe6e41e5e68d1
+#: ai.backend.client.config.APIConfig.vfolder_mounts:1 of
+msgid "The configured auto-mounted vfolder list."
+msgstr "세션 생성 시 자동으로 탑재될 가상폴더 목록"
+
+# 9485e2f84aab40f99527a8e11fac5916
+#: ai.backend.client.config.APIConfig.vfolder_mounts:4 of
+msgid ":py:class:`~typing.Tuple`\\[:py:class:`str`, ...]"
+msgstr ""
+
