@@ -16,7 +16,7 @@ pants_ignore = [
     "plugins",
     "docs",  # TODO: docs build config
 ]
-use_deprecated_directory_cli_args_semantics = false
+# use_deprecated_directory_cli_args_semantics = false  # for 2.13 or later
 
 [anonymous-telemetry]
 enabled = false
