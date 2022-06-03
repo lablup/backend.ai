@@ -52,8 +52,8 @@ msgid "Backend.AI API Documentation"
 msgstr "Backend.AI API 문서"
 
 #: ../../index.rst:9
-msgid "**Latest API version: v4.20190315**"
-msgstr "**최근 API 버전: v4.20190315**"
+msgid "**Latest API version: v5.20191215**"
+msgstr "**최근 API 버전: v5.20191215**"
 
 #: ../../index.rst:11
 msgid ""
@@ -61,9 +61,9 @@ msgid ""
 "deployment. It runs arbitrary user codes safely in resource-constrained "
 "environments, using Docker and our own sandbox wrapper."
 msgstr ""
-"Backend.AI 는 AI 모델 개발 및 배포를 위한 귀찮음에서 벗어난 백엔드입니"
-"다. Docker 및 자체 샌드박스 래퍼를 사용하여 리소스가 제한된 환경에서 임의"
-"의 사용자 코드를 안전하게 실행합니다."
+"Backend.AI는 AI 모델 개발과 배포를 위해 수반되는 모든 골치아픈 작업을 대신하는 백엔드 플랫폼입니다. "
+"Backend.AI는 Docker나 자체 구현된 샌드박스 래퍼를 사용함으로서 "
+"제한된 자원 환경에서 사용자의 코드를 안전하게 실행합니다."
 
 #: ../../index.rst:14
 msgid ""
@@ -72,10 +72,9 @@ msgid ""
 "as well as AI-oriented libraries such as TensorFlow, Keras, Caffe, and "
 "MXNet."
 msgstr ""
-"다음과 같은 Python 2/3, R, PHP, C/C++, Java, Javascript, Julia, Octave, "
-"Haskel, Lua 및 NodeJS와 같은 다양한 프로그래밍 언어 및 런타임을 실행할 "
-"수 있으며, 또한 Tensorflow, Keras, Caffe 및 MXNet과 같은 AI지향 라이브러"
-"리도 관리합니다."
+"Backend.AI는 Python 2/3, R, PHP, C/C++, Java, Javascript, Julia, Octave, "
+"Haskell, Lua, 그리고 NodeJS 등의 다양한 프로그래밍 언어와 런타임을 지원하며, "
+"TensorFlow, Keras, Caffe, MXNet 등의 AI 라이브러리를 지원합니다."
 
 #: ../../index.rst:17
 msgid "Table of Contents"

@@ -47,7 +47,7 @@ msgid ""
 " use social accounts for log-ins such as Twitter, Facebook, and GitHub."
 msgstr ""
 "클라우드 버전의 Backend.AI API 서비스를 설치하면 개인 장비에 설치하는 것보다 훨씬 더 용이하고 나은 서비스로 이용할 수 있습니다."
-"'cloud.backend.ai <https://cloud.backend.ai>`에서 계정을 만들고 새 API 키페어를 생성하세요."
+"`cloud.backend.ai <https://cloud.backend.ai>`_ 에서 계정을 만들고 새 API 키페어를 생성하세요."
 "트위터, 페이스북, 깃허브와 같은 소셜 아이디로도 로그인할 수 있습니다."
 
 #: ../../concepts/api-overview.rst:18
@@ -65,9 +65,9 @@ msgid ""
 " a given keypair. Keep you eyes on further announcements for upgraded "
 "paid plans."
 msgstr ""
-"현재 서비스는 베타 버전입니다. 무료이지만 1인당 1개의 키페어와"
-"주어진 키페어에 따른 5개의 병렬 커널 세션을 가질 수 있게 됩니다."
-"정기 이용료에 대한 안내는 추후에 공지해드리겠습니다."
+"현재 서비스는 베타 버전으로, 무료입니다."
+"다만 1인당 1개의 키 쌍을 받고, 최대 5개의 병렬 세션을 만들 수 있습니다."
+"정기 이용료에 대한 안내는 추후에 공지할 예정입니다."
 
 #: ../../concepts/api-overview.rst:24
 msgid "Accessing Admin APIs"
@@ -75,7 +75,7 @@ msgstr "관리자 API 접속하기"
 
 #: ../../concepts/api-overview.rst:26
 msgid "The admin APIs require a special keypair with the admin privilege:"
-msgstr ""
+msgstr "관리자 API는 관리자 권한의 특별한 키 쌍을 요구합니다."
 
 #: ../../concepts/api-overview.rst:28
 msgid ""
@@ -84,12 +84,16 @@ msgid ""
 "already available via our management console at `cloud.backend.ai "
 "<https://cloud.backend.ai>`_."
 msgstr ""
+"공용 클라우드 서비스 (``api.backend.ai``)는 현재 사용자에게 어떠한 관리자 권한을 제공하지 않습니다."
+"이미 `cloud.backend.ai <https://cloud.backend.ai>`_ 에서 매니저 콘솔을 통해 충분히 기능을"
+"사용할 수 있기 때문입니다."
 
 #: ../../concepts/api-overview.rst:29
 msgid ""
 "On-premise installation: You will get an auto-generated admin keypair "
 "during installation."
 msgstr ""
+"온프레미스 설치: 설치 중에 자동 생성된 키 쌍을 받게 됩니다."
 
 #: ../../concepts/faq.rst:2
 msgid "FAQ"
@@ -113,7 +117,7 @@ msgstr ""
 
 #: ../../concepts/faq.rst:13
 msgid "Apache Zeppelin, Jupyter Notebook"
-msgstr ""
+msgstr "Apache Zeppelin, Jupyter Notebook"
 
 #: ../../concepts/faq.rst:14
 msgid "Notebook-style document + code *frontends*"
@@ -126,7 +130,7 @@ msgstr ""
 #: ../../concepts/faq.rst:17 ../../concepts/faq.rst:34
 #: ../../concepts/faq.rst:59
 msgid "**Backend.AI**"
-msgstr ""
+msgstr "**Backend.AI**"
 
 #: ../../concepts/faq.rst:18
 msgid "Pluggable *backend* to any frontends"
@@ -150,7 +154,7 @@ msgstr ""
 
 #: ../../concepts/faq.rst:30
 msgid "Amazon ECS, Kubernetes"
-msgstr ""
+msgstr "Amazon ECS, Kubernetes"
 
 #: ../../concepts/faq.rst:31
 msgid "Long-running service daemons"
@@ -170,7 +174,7 @@ msgstr ""
 
 #: ../../concepts/faq.rst:38
 msgid "Amazon Lambda, Azure Functions"
-msgstr ""
+msgstr "Amazon Lambda, Azure Functions"
 
 #: ../../concepts/faq.rst:39
 msgid "Stateless, light-weight functions"
@@ -186,7 +190,7 @@ msgstr ""
 
 #: ../../concepts/faq.rst:51
 msgid "TensorFlow, Apache Spark, Apache Hive"
-msgstr ""
+msgstr "TensorFlow, Apache Spark, Apache Hive"
 
 #: ../../concepts/faq.rst:52
 msgid "Computation runtime"
@@ -198,7 +202,7 @@ msgstr ""
 
 #: ../../concepts/faq.rst:55
 msgid "Amazon ML, Azure ML, GCP ML"
-msgstr ""
+msgstr "Amazon ML, Azure ML, GCP ML"
 
 #: ../../concepts/faq.rst:56
 msgid "Managed MLaaS"
