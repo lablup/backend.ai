@@ -6,87 +6,146 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+    - uses: actions/cache@v3
+      id: cache
+      with:
+        # pants-specific cache
+        path: |
+          ~/.cache/pants/setup
+          ~/.cache/pants/lmdb_store
+          ~/.cache/pants/named_caches
+        key: ${{ runner.os }}-
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: "3.9"
-    - name: Cache pip packages
-      uses: actions/cache@v2
-      with:
-        path: ~/.cache/pip
-        key: lint-flake8-${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('setup.cfg') }}
-        restore-keys: |
-          lint-flake8-${{ runner.os }}-pip-${{ matrix.python-version }}
-          lint-flake8-${{ runner.os }}-pip-
-    - name: Install dependencies
-      env:
-        REQUIREMENTS_FILE: lint
+        python-version: "3.10"
+        cache: pip
+    - name: Bootstrap Pants
       run: |
-        python -m pip install -U pip setuptools wheel
-        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
-    - name: Lint with flake8
+        mkdir .tmp
+        ./pants --no-verify-config version
+    - name: Check BUILD files
+      run: ./pants tailor --check update-build-files --check # '::' # to add in 2.13+
+    - name: Lint
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
           echo "(skipping matchers for pull request from local branches)"
         else
           echo "::add-matcher::.github/workflows/flake8-matcher.json"
         fi
-        python -m flake8 src/ai/backend tests
-  
+        if [ -n "$GITHUB_BASE_REF" ]; then
+          BASE_REF="origin/${GITHUB_BASE_REF}"
+          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+        else
+          BASE_REF="HEAD~1"
+        fi
+        ./pants lint --changed-since=$BASE_REF --changed-dependees=transitive
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants.lint.log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
+
+
   typecheck:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+    - uses: actions/cache@v3
+      id: cache
+      with:
+        # pants-specific cache
+        path: |
+          ~/.cache/pants/setup
+          ~/.cache/pants/lmdb_store
+          ~/.cache/pants/named_caches
+        key: ${{ runner.os }}-
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: "3.9"
-    - name: Cache pip packages
-      uses: actions/cache@v2
-      with:
-        path: ~/.cache/pip
-        key: typecheck-mypy-${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('setup.cfg') }}
-        restore-keys: |
-          typecheck-mypy-${{ runner.os }}-pip-${{ matrix.python-version }}
-          typecheck-mypy-${{ runner.os }}-pip-
-    - name: Install dependencies
-      env:
-        REQUIREMENTS_FILE: typecheck
+        python-version: "3.10"
+        cache: pip
+    - name: Bootstrap Pants
       run: |
-        python -m pip install -U pip setuptools wheel
-        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
-    - name: Type check with mypy
+        mkdir .tmp
+        ./pants --no-verify-config version
+    - name: Typecheck
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
           echo "(skipping matchers for pull request from local branches)"
         else
           echo "::add-matcher::.github/workflows/mypy-matcher.json"
         fi
-        python -m mypy --no-color-output src/ai/backend
+        if [ -n "$GITHUB_BASE_REF" ]; then
+          BASE_REF="origin/${GITHUB_BASE_REF}"
+          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+        else
+          BASE_REF="HEAD~1"
+        fi
+        ./pants check --changed-since=$BASE_REF --changed-dependees=transitive
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants.check.log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
 
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+        submodules: true
+    - uses: actions/cache@v3
+      id: cache
+      with:
+        # pants-specific cache
+        path: |
+          ~/.cache/pants/setup
+          ~/.cache/pants/lmdb_store
+          ~/.cache/pants/named_caches
+        key: ${{ runner.os }}-
+    - name: Create LFS file hash list
+      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
+    - name: Restore LFS cache
+      uses: actions/cache@v3
+      id: lfs-cache
+      with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+    - name: Git LFS Pull
+      run: git lfs pull
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: "3.9"
-    - name: Cache pip packages
-      uses: actions/cache@v2
+        python-version: "3.10"
+        cache: pip
+    - name: Bootstrap Pants
+      run: |
+        mkdir .tmp
+        ./pants --no-verify-config version
+    - name: Test
+      run: |
+        if [ -n "$GITHUB_BASE_REF" ]; then
+          BASE_REF="origin/${GITHUB_BASE_REF}"
+          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+        else
+          BASE_REF="HEAD~1"
+        fi
+        ./pants test --changed-since=$BASE_REF --changed-dependees=transitive
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
       with:
-        path: ~/.cache/pip
-        key: typecheck-mypy-${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('setup.cfg') }}
-    - name: Install dependencies
-      env:
-        REQUIREMENTS_FILE: test
-      run: |
-        python -m pip install -U pip setuptools wheel
-        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
-    - name: Test with pytest
-      run: |
-        python -m pytest tests
+        name: pants.test.log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
 
   deploy-to-pypi:
     needs: [lint, typecheck, test]
@@ -94,28 +153,84 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - uses: actions/cache@v3
+      id: cache
+      with:
+        # pants-specific cache
+        path: |
+          ~/.cache/pants/setup
+          ~/.cache/pants/lmdb_store
+          ~/.cache/pants/named_caches
+        key: ${{ runner.os }}-
+    - name: Create LFS file hash list
+      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
+    - name: Restore LFS cache
+      uses: actions/cache@v3
+      id: lfs-cache
+      with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+    - name: Git LFS Pull
+      run: git lfs pull
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: "3.9"
-    - name: Cache pip packages
-      uses: actions/cache@v2
-      with:
-        path: ~/.cache/pip
-        key: test-pytest-${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('setup.py') }}
-        restore-keys: |
-          test-pytest-${{ runner.os }}-pip-${{ matrix.python-version }}
-          test-pytest-${{ runner.os }}-pip-
-    - name: Install dependencies
-      env:
-        REQUIREMENTS_FILE: build
+        python-version: "3.10"
+        cache: pip
+    - name: Bootstrap Pants
       run: |
-        python -m pip install -U pip setuptools wheel
-        python -m pip install -U -r requirements/${REQUIREMENTS_FILE}.txt
-    - name: Build and publish
+        mkdir .tmp
+        ./pants --no-verify-config version
+    - name: Install local dependencies for packaging and publishing
+      run: |
+        pip install -U 'twine~=4.0' 'packaging>=21.3'
+    - name: Build packages
+      run: |
+        # Normalize the package version
+        PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
+        # Build non-platform-specific wheels
+        ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="-platform-specific" package '::'
+        # Build x86_64 wheels
+        MANYLINUX_PTAG=manylinux2014_x86_64
+        MACOS_PTAG=macosx_11_0_x86_64
+        ./pants --platform-specific-resources-target=linux_x86_64 --tag="wheel" --tag="+platform-specific" package '::'
+        for pkgname in "kernel_binary"; do
+          mv "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
+             "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
+        done
+        # Build arm64 wheels
+        MANYLINUX_PTAG=manylinux2014_aarch64
+        MACOS_PTAG=macosx_11_0_arm64
+        ./pants --platform-specific-resources-target=linux_arm64 --tag="wheel" --tag="+platform-specific" package '::'
+        for pkgname in "kernel_binary"; do
+          mv "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-any.whl" \
+             "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
+        done
+        ls -lh dist
+    - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      # We don't use `./pants publish ::` because we manually rename the
+      # wheels after buildling them to add arch-specific tags.
       run: |
-        python setup.py sdist bdist_wheel
-        twine upload dist/*
+        twine upload dist/*.whl dist/*.tar.gz
+    - name: Extract the release changelog
+      run: |
+        python ./scripts/extract-release-changelog.py
+        python ./scripts/determine-release-type.py
+    - name: Release to GitHub
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: "CHANGELOG_RELEASE.md"
+        prerelease: ${{ env.IS_PRERELEASE }}
+        files: |
+          dist/*.whl
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants.deploy.log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.

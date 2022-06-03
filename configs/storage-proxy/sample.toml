@@ -1,0 +1,144 @@
+[etcd]
+namespace = "local"                         # env: BACKEND_NAMESPACE
+addr = { host = "127.0.0.1", port = 2379 }  # env: BACKEND_ETCD_ADDR (host:port)
+user = ""                                   # env: BACKEND_ETCD_USER
+password = ""				    # env: BACKEND_ETCD_PASSWORD
+
+
+[storage-proxy]
+# An identifier of this storage proxy, which must be unique in a cluster.
+node-id = "i-storage-proxy-01"
+num-proc = 4
+# The PID file for systemd or other daemon managers to keep track of.
+# pid-file = "./storage-proxy.pid"
+event-loop = "uvloop"
+
+# The maximum number of directory entries to return upon
+# a scandir operation to prevent excessive loads/delays on filesystems.
+# Settings it zero means no limit.
+scandir-limit = 1000
+
+# The maximum allowed size of a single upload session.
+max-upload-size = "100g"
+
+# Used to generate JWT tokens for download/upload sessions
+secret = "some-secret-private-for-storage-proxy"
+
+# The download/upload session tokens are valid for:
+session-expire = "1d"
+
+# When executed as root (e.g., to bind under-1023 ports)
+# it is recommended to set UID/GID to lower the privilege after port binding.
+# If not specified, it defaults to the owner UID/GID of the "server.py" file
+# of the installed package.
+# user = 1000
+# group = 1000
+
+
+[api.client]
+# Client-facing API
+service-addr = { host = "0.0.0.0", port = 6021 }
+ssl-enabled = false
+
+
+[api.manager]
+# Manager-facing API
+# Recommended to have SSL and bind on a private IP only accessible by managers
+service-addr = { host = "127.0.0.1", port = 6022 }
+ssl-enabled = true
+ssl-cert = "configs/storage-proxy/ssl/manager-api-selfsigned.cert.pem"
+ssl-privkey = "configs/storage-proxy/ssl/manager-api-selfsigned.key.pem"
+
+# Used to authenticate managers
+secret = "some-secret-shared-with-manager"
+
+
+[debug]
+# Enable the debug mode by overriding the global loglevel and "ai.backend" loglevel.
+enabled = false
+
+
+[logging]
+# One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+# Set the global logging level.
+level = "INFO"
+
+# Multi-choice of: "console", "logstash", "file"
+# For each choice, there must be a "logging.<driver>" section
+# in this config file as exemplified below.
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+
+[logging.console]
+# If set true, use ANSI colors if the console is a terminal.
+# If set false, always disable the colored output in console logs.
+colored = true
+
+# One of: "simple", "verbose"
+format = "simple"
+
+
+[volume]
+# volume section may define one or more named subsections with
+# backend-specific configurations.
+# It is your job to prepare the "/vfroot" directory and its inner mount
+# points from actual storage devices or using local partitions.
+
+
+[volume.local]
+# The default, generic filesystem.
+# It uses the standard syscalls to perform filesystem operations
+# such as scanning the file/directory metadata.
+# This does *NOT* support per-directory quota.
+backend = "vfs"
+path = "/vfroot/vfs"
+
+
+[volume.fastlocal]
+# An extended version for XFS, which supports per-directory quota
+# based on xfs projects.
+backend = "xfs"
+path = "/vfroot/xfs"
+
+
+[volume.mypure]
+# An extended version for PureStorage FlashBlade nodes, which uses
+# RapidFile Tools to perform filesystem metadata queries and the
+# FB REST APIs to configure per-directory quota.
+backend = "purestorage"
+path = "/vfroot/fb1"
+
+[volume.mypure.options]
+purity_endpoint = "https://pure01.example.com"
+purity_ssl_verify = false
+purity_api_token = "T-11111111-2222-3333-4444-000000000000"
+purity_api_version = "1.8"
+purity_fs_name = "FB-NFS1"  # the name of filesystem used by the filesystem API
+
+
+[volume.myceph]
+# An extended version for CephFS, which supports extended inode attributes
+# for per-directory quota and fast metadata queries.
+backend = "cephfs"
+path = "/vfroot/ceph-fuse"
+
+[volume.netapp]
+backend = "netapp"
+path = "/vfroot/netapp"
+
+[volume.netapp.options]
+netapp_endpoint = "https://netapp.example.com"
+netapp_admin = "signed-in-id"
+netapp_password = "signed-in-pw"
+netapp_svm = "svm-name"
+netapp_volume_name = "netapp-volume-name"
+netapp_qtree_name = "bai_qtree" # default qtree name for backend.ai exclusive
+netapp_xcp_container_name = "netapp-xcp" # only required when xcp activated by container
+netapp_xcp_hostname = "xcp-hostname"
+# default xcp catalog path goes to the directory named "catalog" of the first NetApp volume
+netapp_xcp_catalog_path = "path for xcp-catalog" # Hint: execute command cat /opt/NetApp/xFiles/xcp/xcp.ini and see nfs mount path

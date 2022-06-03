@@ -106,6 +106,7 @@ Table of Contents
    :caption: Developer Manuals
 
    install/development-setup
+   dev/daily-workflows
    dev/adding-kernels
 
 

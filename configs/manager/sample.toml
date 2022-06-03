@@ -1,0 +1,163 @@
+[etcd]
+namespace = "local"                         # env: BACKEND_NAMESPACE
+addr = { host = "127.0.0.1", port = 2379 }  # env: BACKEND_ETCD_ADDR (host:port)
+user = "manager"                            # env: BACKEND_ETCD_USER
+password = "ETCD_PASSWORD"                  # env: BACKEND_ETCD_PASSWORD
+
+
+[db]
+# One of: "postgresql"
+# Currently we only support PostgreSQL.
+type = "postgresql"
+
+# Address to access the database.
+# NOTE: It is RECOMMENDED to use domain names in cloud setups because the IP addresses
+# may change upon automatic upgrade or migration.
+addr = { host = "localhost", port = 5432 }  # env: BACKEND_DB_ADDR
+
+# Database name.
+name = "backend"                            # env: BACKEND_DB_NAME
+
+# Database account credentials.
+user = "postgres"                           # env: BACKEND_DB_USER
+password = "DB_PASSWORD"                    # env: BACKEND_DB_PASSWORD
+
+
+# NOTE: Redis settings are configured in etcd as it is shared by both the manager and agents.
+
+
+[manager]
+# The number of worker processes to handle API requests and event messages.
+# If set zero, it uses the number of CPU cores in the system.
+num-proc = 4                                               # env: BACKEND_MANAGER_NPROC
+
+# An arbitrary string used to salt when generating secret tokens (e.g., JWT)
+# Currently only some plugins use this configuration in the manager.
+secret = "XXXXXXXXXXXXXX"
+
+# Specify the user/group used for the manager daemon,
+# to which the manager changes after reading the daemon configuration and SSL certifiactes.
+# If not specified, it uses the file permission of ai/backend/manager/server.py
+# This config is effective only when the manager daemon is started as the root user.
+# Note that the vfolder (storage) permission must match with this.
+user = "nobody"
+group = "nobody"
+
+# Set the service hostname/port to accept API requests.
+service-addr = { host = "0.0.0.0", port = 8080 }
+# env: BACKEND_SERVICE_IP, BACKEND_SERVICE_PORT
+
+# Set the SSL certificate chain and the private keys used for serving the API requests.
+ssl-enabled = false
+#ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"   # env: BACKNED_SSL_CERT
+#ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
+
+# Set the timeout for agent heartbeats in seconds.
+heartbeat-timeout = 30.0
+
+# Override the name of this manager node.
+# If empty or unspecified, the agent builds this from the hostname by prefixing it with "i-",
+# like "i-hostname".  The "i-" prefix is not mandatory, though.
+# Explicit configuration may be required if the hostname changes frequently,
+# to handle the event bus messages consistently.
+# This affects the per-node configuration scope.
+# id = ""
+
+# Create a PID file so that daemon managers could keep track of us.
+# If set to an empty string, it does NOT create the PID file.
+# pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
+
+# The list of black-listed manager plugins.
+disabled-plugins = []
+
+# Hide agent and container IDs from GraphQL results unless the API requester is super-admin.
+hide-agents = false
+
+# One of: "asyncio", "uvloop"
+# This changes the event loop backend.
+# uvloop is a fast libuv-based implementation but sometimes has
+# compatibility issues.
+# event-loop = "asyncio"
+
+# One of: "filelock", "pg_advisory", "redlock", "etcd"
+# Choose the implementation of distributed lock.
+# "filelock" is the simplest one when the manager is deployed on only one node.
+# "pg_advisory" uses PostgreSQL's session-level advisory lock.
+# "redlock" uses Redis-based distributed lock (Redlock) -- currently not supported.
+# "etcd" uses etcd-based distributed lock via etcetra.
+# distributed-lock = "pg_advisory"
+
+# The Docker image name that is used for importing external Docker images.
+# You need to change this if your are at offline environments so that the manager
+# uses an importer image from a private registry.
+importer-image = "lablup/importer:manylinux2010"
+
+
+[docker-registry]
+# Enable or disable SSL certificate verification when accessing Docker registries.
+ssl-verify = false                       # env: BACKEND_SKIP_SSLCERT_VALIDATION
+
+
+[logging]
+# One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+# Set the global logging level.
+level = "INFO"
+
+# Multi-choice of: "console", "logstash", "file"
+# For each choice, there must be a "logging.<driver>" section
+# in this config file as exemplified below.
+drivers = ["console", "file"]
+
+
+[logging.console]
+# If set true, use ANSI colors if the console is a terminal.
+# If set false, always disable the colored output in console logs.
+colored = true
+
+# One of: "simple", "verbose"
+format = "verbose"
+
+
+[logging.file]
+# The log file path and filename pattern.
+# All messages are wrapped in single-line JSON objects.
+# Rotated logs may have additional suffixes.
+# For production, "/var/log/backend.ai" is recommended.
+path = "./logs"
+filename = "manager.log"
+
+# The maximum number of rotated logs.
+backup-count = 5
+
+# The log file size to begin rotation.
+rotation-size = "10M"
+
+
+[logging.logstash]
+# The endpoint to publish logstash records.
+endpoint = { host = "localhost", port = 9300 }
+
+# One of: "zmq.push", "zmq.pub", "tcp", "udp"
+protocol = "tcp"
+
+# SSL configs when protocol = "tcp"
+ssl-enabled = true
+ssl-verify = true
+
+
+# Specify additional package namespaces to include in the logs
+# and their individual log levels.
+# Note that the actual logging level applied is the conjunction of the global logging level and the
+# logging levels specified here for each namespace.
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+"alembic" = "INFO"
+"sqlalchemy" = "WARNING"
+
+
+[debug]
+enabled = false
+periodic-sync-stats = false  # periodically sync container stat from Redis to the kernels.last_stat column.

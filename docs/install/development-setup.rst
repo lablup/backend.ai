@@ -8,8 +8,8 @@ Development Setup
 Currently Backend.AI is developed and tested under only \*NIX-compatible platforms (Linux or macOS).
 
 
-Method 1: Automatic Installation
---------------------------------
+Installation from Source
+------------------------
 
 For the ease of on-boarding developer experience, we provide an automated
 script that installs all server-side components in editable states with just
@@ -22,9 +22,13 @@ Install the followings accordingly to your host operating system.
 
 * `pyenv <https://github.com/pyenv/pyenv>`_ and `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_
 
+  - Ensure that you have the Python version specified in ``pants.toml`` on your ``PATH``.
+
 * `docker <https://docs.docker.com/install/>`_
 
-* `docker-compose <https://docs.docker.com/compose/install/>`_
+* `docker-compose <https://docs.docker.com/compose/install/>`_ (v2 required)
+
+* `rust <https://rustup.rs/>`_ (for bootstrapping Pants)
 
 .. note::
 
@@ -32,307 +36,111 @@ Install the followings accordingly to your host operating system.
    may cause encoding errors when installing Backend.AI components due to Unicode characters
    in README files.  Please keep correct locale configurations to prevent such errors.
 
-.. warning::
-
-   In macOS, Homebrew offers its own pyenv and pyenv-virtualenv packages but we *do
-   not* recommend using them!  Updating those packages and cleaning up via
-   Homebrew will break your virtual environments as each version uses different
-   physical directories.
-
-   Our installer script will try to install pyenv automatically if not installed,
-   but we *do* recommend installing them by yourself as it may interfere with your
-   shell configurations.
-
-Running the script
-~~~~~~~~~~~~~~~~~~
+Running the install-dev script
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: console
 
-   $ wget https://raw.githubusercontent.com/lablup/backend.ai/main/scripts/install-dev.sh
-   $ chmod +x ./install-dev.sh
-   $ ./install-dev.sh
+   $ git clone https://github.com/lablup/backend.ai bai-dev
+   $ cd bai-dev
+   $ ./scripts/install-dev.sh
 
 .. note::
 
-   The script may ask your root password in the middle to run sudo in Linux.
+   The script requires ``sudo`` to check and install several system packages
+   such as ``build-essential``.
 
-This installs a set of Backend.AI server-side components in the
-``backend.ai-dev`` directory under the current working directory.
-
-Inside the directory, there are ``manager``, ``agent``, ``common`` and a few
-other auxiliary directories.  You can directly modify the source codes inside
-them and re-launch the gateway and agent.  The ``common`` directory is shared
-by ``manager`` and ``agent`` so just editing sources there takes effects in the
-next launches of the gateway and agent.
-
+This script will bootstrap `Pants <https://pantsbuild.org>`_ and creates the halfstack
+containers using ``docker compose`` with fixture population.
 At the end of execution, the script will show several command examples about
-launching the gateway and agent.  It also displays a unique random key called
-"environment ID" to distinguish a particular execution of this script so that
-repeated execution does not corrupt your existing setups.
+launching the service daemons such as manager and agent.
+You may execute this script multiple times when you encounter prerequisite errors and
+resolve them.
+Also check out additional options using ``-h`` / ``--help`` option, such as installing
+the CUDA mockup plugin together, etc.
 
-By default, the script pulls the docker images for our standard Python kernel and
-TensorFlow CPU-only kernel.  To try out other images, you have to pull them
-manually afterwards.
+.. versionchanged:: 22.09
 
-The script provides a set of command-line options.  Check out them using ``-h``
-/ ``--help`` option.
+   We have migrated to per-package repositories to a semi-mono repository that contains
+   all Python-based components except plugins.  This has changed the installation
+   instruction completely with introduction of Pants.
 
 .. note::
 
-   To install multiple instances of development environments using this script,
-   you need to run the script at different working directories because
-   the ``backend.ai-dev`` directory name is fixed.
+   To install multiple instances/versions of development environments using this script,
+   just clone the repository in another location and run ``scripts/install-dev.sh``
+   inside that directory.
 
-   Also, you cannot run multiple gateways and agents from different environments
-   at the same time because docker container in different environments use the
-   same TCP ports of the host system.  Use ``docker-compose`` command to stop
-   the current environment and start another to switch between environments.
-   Please do not forget to specify ``-p <ENVID>`` option to ``docker-compose``
-   commands to distinguish different environments.
+   It is important to name these working-copy directories *differently* not to confuse
+   ``docker compose`` so that it can distinguish the containers for each setup.
+
+   Unless you customize all port numbers by the options of ``scripts/install-dev.sh``,
+   you should ``docker compose -f docker-compose.halfstack.current.yml down`` and ``docker compose -f docker-compose.halfstack.current.yml up -d`` when switching
+   between multiple working copies.
+
+.. note::
+
+   By default, the script pulls the docker images for our standard Python kernel and
+   TensorFlow CPU-only kernel.  To try out other images, you have to pull them
+   manually afterwards.
+
+.. tip::
+
+   **Using the agent's cgroup-based statistics without the root privilege (Linux-only)**
+
+   To allow Backend.AI to collect sysfs/cgroup resource usage statistics, the Python executable must have the following Linux capabilities: ``CAP_SYS_ADMIN``, ``CAP_SYS_PTRACE``, and ``CAP_DAC_OVERRIDE``.
+
+   .. code-block:: console
+
+      $ sudo setcap \
+      >   cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip \
+      >   $(readlink -f $(pyenv which python))
+
+
+Verifying Installation
+~~~~~~~~~~~~~~~~~~~~~~
+
+Refer the instructions displayed after running ``scripts/install-dev.sh``.
+We recommend to use `tmux <https://github.com/tmux/tmux/wiki>`_ to open
+multiple terminals in a single SSH session.
+Your terminal app may provide a tab interface, but when using remote servers,
+tmux is more convenient because you don't have to setup a new SSH connection
+whenever adding a new terminal.
+
+Ensure the halfstack containers are running:
+
+.. code-block:: console
+
+   $ docker compose -f docker-compose.halfstack.current.yml up -d
+
+Open a terminal for manager and run:
+
+.. code-block:: console
+
+   $ ./backend.ai mgr start-server --debug
+
+Open another terminal for agent and run:
+
+.. code-block:: console
+
+   $ ./backend.ai ag start-server --debug
+
+Open yet another terminal for client and run:
+
+.. code-block:: console
+
+   $ export BACKEND_ENDPOINT=http://127.0.0.1:8081/  # change the port number if customized
+   $ export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
+   $ export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+   $ ./backend.ai config
+   $ ./backend.ai run python -c 'print("hello world")'
+   $ ./backend.ai ps
+
 
 Resetting the environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. code-block:: console
+Shutdown all docker containers using ``docker compose -f docker-compose.halfstack.current.yml down`` and delete the entire working copy directory.  That's all.
 
-   $ wget https://raw.githubusercontent.com/lablup/backend.ai/main/scripts/delete-dev.sh
-   $ chmod +x ./delete-dev.sh
-   $ ./delete-dev.sh --env <ENVID>
-
-.. note::
-
-   The script may ask your root password in the middle to run sudo in Linux.
-
-This will purge all docker resources related to the given environment ID and
-the ``backend.ai-dev`` directory under the current working directory.
-
-The script provides a set of command-line options.  Check out them using ``-h``
-/ ``--help`` option.
-
-.. warning::
-
-   Be aware that this script force-removes, without any warning, all contents
-   of the ``backend.ai-dev`` directory, which may contain your own
-   modifications that is not yet pushed to a remote git repository.
-
-
-Method 2: Manual Installation
------------------------------
-
-Requirement packages
-~~~~~~~~~~~~~~~~~~~~
-
-* PostgreSQL: 9.6
-
-* etcd: v3.3.9
-
-* redis: latest
-
-Prepare containers for external daemons
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-First install an appropriate version of Docker (later than 2017.03 version) and docker-compose (later than 1.21).
-Check out the :doc:`Install Docker </install/install-docker>` guide.
-
-.. note::
-   In this guide, ``$WORKSPACE`` means the absolute path to an arbitrary working directory in your system.
-
-   To copy-and-paste commands in this guide, set ``WORKSPACE`` environment variable.
-
-   The directory structure would look like after finishing this guide:
-
-   * ``$WORKSPACE``
-      * backend.ai
-      * backend.ai-manager
-      * backend.ai-agent
-      * backend.ai-common
-      * backend.ai-client-py
-
-.. code-block:: console
-
-   $ cd $WORKSPACE
-   $ git clone https://github.com/lablup/backend.ai
-   $ cd backend.ai
-   $ docker-compose -f docker-compose.halfstack.yml up -d
-   $ docker ps  # you should see 3 containers running
-
-
-.. image:: https://asciinema.org/a/Q2Y3JuwqYoJjG9RB64Ovcpal2.png
-   :target: https://asciinema.org/a/Q2Y3JuwqYoJjG9RB64Ovcpal2
-   :alt: asciicast
-
-
-This will create and start PostgreSQL, Redis, and a single-instance etcd containers.
-Note that PostgreSQL and Redis uses non-default ports by default (5442 and 6389 instead of 5432 and 6379)
-to prevent conflicts with other application development environments.
-
-Prepare Python 3.6+
-~~~~~~~~~~~~~~~~~~~
-
-Check out :doc:`Install Python via pyenv <install-python-via-pyenv>` for instructions.
-
-Create the following virtualenvs: ``venv-manager``, ``venv-agent``, ``venv-common``, and ``venv-client``.
-
-
-.. image:: https://asciinema.org/a/xcMY9g5iATrCchoziCbErwgbG.png
-   :target: https://asciinema.org/a/xcMY9g5iATrCchoziCbErwgbG
-   :alt: asciicast
-
-
-Prepare dependent libraries
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Install ``snappy`` (brew on macOS), ``libsnappy-dev`` (Debian-likes), or ``libsnappy-devel`` (RHEL-likes) system package depending on your environment.
-
-Prepare server-side source clones
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-.. image:: https://asciinema.org/a/SKJv19aNu9XKiCTOF0ASXibDq.png
-   :target: https://asciinema.org/a/SKJv19aNu9XKiCTOF0ASXibDq
-   :alt: asciicast
-
-
-Clone the Backend.AI source codes.
-
-.. code-block:: console
-
-   $ cd $WORKSPACE
-   $ git clone https://github.com/lablup/backend.ai-manager
-   $ git clone https://github.com/lablup/backend.ai-agent
-   $ git clone https://github.com/lablup/backend.ai-common
-
-Inside each directory, install the sources as editable packages.
-
-
-.. note::
-   Editable packages makes Python to apply any changes of the source code in git clones immediately when importing the installed packages.
-
-
-.. code-block:: console
-
-   $ cd $WORKSPACE/backend.ai-manager
-   $ pyenv local venv-manager
-   $ pip install -U -r requirements-dev.txt
-
-.. code-block:: console
-
-   $ cd $WORKSPACE/backend.ai-agent
-   $ pyenv local venv-agent
-   $ pip install -U -r requirements-dev.txt
-
-.. code-block:: console
-
-   $ cd $WORKSPACE/backend.ai-common
-   $ pyenv local venv-common
-   $ pip install -U -r requirements-dev.txt
-
-(Optional) Symlink backend.ai-common in the manager and agent directories to the cloned source
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If you do this, your changes in the source code of the backend.ai-common directory will be reflected immediately to the manager and agent.
-You should install backend.ai-common dependencies into ``venv-manager`` and ``venv-agent`` as well, but this is already done in the previous step.
-
-.. code-block:: console
-
-   $ cd "$(pyenv prefix venv-manager)/src"
-   $ mv backend.ai-common backend.ai-common-backup
-   $ ln -s "$WORKSPACE/backend.ai-common" backend.ai-common
-
-.. code-block:: console
-
-   $ cd "$(pyenv prefix venv-agent)/src"
-   $ mv backend.ai-common backend.ai-common-backup
-   $ ln -s "$WORKSPACE/backend.ai-common" backend.ai-common
-
-Initialize databases and load fixtures
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Check out the :doc:`Prepare Databases for Manager </install/prepare-database-for-manager>` guide.
-
-Prepare Kernel Images
-~~~~~~~~~~~~~~~~~~~~~
-
-You need to pull the kernel container images first to actually spawn compute sessions.\ :raw-html-m2r:`<br>`
-The kernel images here must have the tags specified in image-metadata.yml file.
-
-.. code-block:: console
-
-   $ docker pull lablup/kernel-python:3.6-debian
-
-For the full list of publicly available kernels, `check out the kernels repository. <https://github.com/lablup/backend.ai-kernels>`_
-
-**NOTE:** You need to restart your agent if you pull images after starting the agent.
-
-Setting Linux capabilities to Python (Linux-only)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-To allow Backend.AI to collect sysfs/cgroup resource usage statistics, the Python executable must have the following Linux capabilities (to run without "root"): ``CAP_SYS_ADMIN``, ``CAP_SYS_PTRACE``, and ``CAP_DAC_OVERRIDE``.
-You may use the following command to set them to the current virtualenv's Python executable.
-
-.. code-block:: console
-
-   $ sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip $(readlink -f $(pyenv which python))
-
-Running daemons from cloned sources
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: console
-
-   $ cd $WORKSPACE/backend.ai-manager
-   $ ./scripts/run-with-halfstack.sh python -m ai.backend.gateway.server --service-port=8081 --debug
-
-Note that through options, PostgreSQL and Redis ports set above for development environment are used. You may change other options to match your environment and personal configurations. (Check out ``-h`` / ``--help``)
-
-.. code-block:: console
-
-   $ cd $WORKSPACE/backend.ai-agent
-   $ mkdir -p scratches  # used as in-container scratch "home" directories
-   $ ./scripts/run-with-halfstack.sh python -m ai.backend.agent.server --scratch-root=`pwd`/scratches --debug --idle-timeout 30
-
-※ The role of ``run-with-halfstack.sh`` script is to set appropriate environment variables so that the manager/agent daemons use the halfstack docker containers.
-
-Prepare client-side source clones
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-.. image:: https://asciinema.org/a/dJQKPrcmIliVkCX4ldSg3rPki.png
-   :target: https://asciinema.org/a/dJQKPrcmIliVkCX4ldSg3rPki
-   :alt: asciicast
-
-
-.. code-block:: console
-
-   $ cd $WORKSPACE
-   $ git clone https://github.com/lablup/backend.ai-client-py
-
-.. code-block:: console
-
-   $ cd $WORKSPACE/backend.ai-client-py
-   $ pyenv local venv-client
-   $ pip install -U -r requirements-dev.txt
-
-Inside ``venv-client``\ , now you can use the ``backend.ai`` command for testing and debugging.
-
-
-Verifying Installation
-----------------------
-
-Write a shell script (e.g., ``env_local.sh``) like below to easily switch the API endpoint and credentials for testing:
-
-.. code-block:: sh
-
-   #! /bin/sh
-   export BACKEND_ENDPOINT=http://127.0.0.1:8081/
-   export BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
-   export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
-
-Load this script (e.g., ``source env_local.sh``) before you run the client against your server-side installation.
-
-Now you can do ``backend.ai ps`` to confirm if there are no sessions running and run the hello-world:
-
-.. code-block:: sh
-
-   $ cd $WORKSPACE/backend.ai-client-py
-   $ source env_local.sh  # check above
-   $ backend.ai run python -c 'print("hello")'
+You may need ``sudo`` to remove the directories mounted as halfstack container volumes
+because Docker auto-creates them with the root privilege.

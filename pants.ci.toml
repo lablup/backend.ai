@@ -1,0 +1,6 @@
+[GLOBAL]
+dynamic_ui = false
+colors = true
+
+[pytest]
+args = ["-vv", "--no-header"]

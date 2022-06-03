@@ -1,0 +1,67 @@
+[etcd]
+namespace = "local"
+addr = { host = "127.0.0.1", port = 2379 }
+user = ""
+password = ""
+
+
+[db]
+type = "postgresql"
+addr = { host = "localhost", port = 5432 }
+name = "testing_db_XXX"  # auto-generated for every test run
+user = "lablup"
+password = "develove"
+
+
+[manager]
+num-proc = 2
+service-addr = { host = "0.0.0.0", port = 8080 }
+ssl-enabled = false
+#ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"
+#ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"
+
+heartbeat-timeout = 5.0
+id = "i-travis"
+pid-file = "./manager.pid"
+disabled-plugins = []
+
+importer-image = "lablup/importer:manylinux2010"
+
+event-loop = "asyncio"
+
+
+[docker-registry]
+ssl-verify = true
+
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+"alembic" = "INFO"
+"sqlalchemy" = "WARNING"
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "manager.log"
+backup-count = 5
+rotation-size = "10M"
+
+[logging.logstash]
+endpoint = { host = "localhost", port = 9300 }
+protocol = "tcp"
+ssl-enabled = true
+ssl-verify = true
+
+
+[debug]
+enabled = false

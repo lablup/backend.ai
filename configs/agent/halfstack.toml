@@ -1,0 +1,83 @@
+[etcd]
+namespace = "local"
+addr = { host = "127.0.0.1", port = 8120 }
+user = ""
+password = ""
+
+
+[agent]
+mode = "docker"
+rpc-listen-addr = { host = "127.0.0.1", port = 6001 }
+agent-sock-port = 6007
+# id = "i-something-special"
+scaling-group = "default"
+pid-file = "./agent.pid"
+event-loop = "uvloop"
+
+
+[container]
+port-range = [30000, 31000]
+kernel-uid = -1
+kernel-gid = -1
+bind-host = "127.0.0.1"
+sandbox-type = "docker"
+scratch-type = "hostdir"
+scratch-root = "./scratches"
+scratch-size = "1G"
+
+
+[watcher]
+service-addr = { host = "127.0.0.1", port = 6009 }
+ssl-enabled = false
+#ssl-cert = ""
+#ssl-key = ""
+target-service = "backendai-agent.service"
+soft-reset-available = false
+
+
+[logging]
+level = "INFO"
+drivers = ["console"]
+
+[logging.pkg-ns]
+"" = "WARNING"
+"aiodocker" = "INFO"
+"aiotools" = "INFO"
+"aiohttp" = "INFO"
+"ai.backend" = "INFO"
+
+[logging.console]
+colored = true
+format = "verbose"
+
+[logging.file]
+path = "./logs"
+filename = "agent.log"
+rotation-size = "10M"
+
+[logging.logstash]
+endpoint = { host = "localhost", port = 9300 }
+protocol = "tcp"
+ssl-enabled = true
+ssl-verify = false
+
+
+[resource]
+reserved-cpu = 1
+reserved-mem = "1G"
+reserved-disk = "8G"
+
+
+[debug]
+enabled = true
+skip-container-deletion = false
+
+[debug.coredump]
+enabled = false
+path = "./coredumps"
+backup-count = 10
+size-limit = "64M"
+
+
+[license]
+addr = { host = "127.0.0.1", port = 6099 }

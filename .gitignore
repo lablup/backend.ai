@@ -3,9 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# C extensions
-*.so
-
 # Distribution / packaging
 .Python
 env/
@@ -95,5 +92,33 @@ ENV/
 # IDE/vim
 .idea
 .*.swp
+.vscode
 
-tmp/
+# Pants
+/.pants.d/
+/.pids
+/.pants.workdir.file_lock*
+/.pants.rc
+/pants-local
+/tools/pants-src
+
+# Local configurations
+/manager.toml
+/agent.toml
+/storage-proxy.toml
+/webserver.conf
+/cuda-mock.toml
+/.pants.env
+/docker-compose.halfstack.current.yml
+/alembic.ini
+/dev.etcd.volumes.json
+/env-*.sh
+
+# Local temp
+/.tmp/
+/tmp/
+/volumes/
+/vfroot/
+
+# Release artifacts
+/CHANGELOG_RELEASE.md
