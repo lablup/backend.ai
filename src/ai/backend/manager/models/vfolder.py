@@ -788,6 +788,28 @@ class VirtualFolder(graphene.ObjectType):
             ]
 
     @classmethod
+    async def load_by_id(
+        cls,
+        graph_ctx: GraphQueryContext,
+        id: str,
+    ) -> Optional[VirtualFolder]:
+        from .user import users
+        from .group import groups
+        j = (
+            vfolders
+            .join(users, vfolders.c.user == users.c.uuid, isouter=True)
+            .join(groups, vfolders.c.group == groups.c.id, isouter=True)
+        )
+        query = (
+            sa.select([vfolders, users.c.email, groups.c.name.label('groups_name')])
+            .select_from(j)
+            .where(vfolders.c.id == id)
+        )
+        async with graph_ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return cls.from_row(graph_ctx, result.fetchone())
+
+    @classmethod
     async def batch_load_by_user(
         cls,
         graph_ctx: GraphQueryContext,

@@ -411,6 +411,11 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
     )
 
+    vfolder = graphene.Field(
+        VirtualFolder,
+        id=graphene.String(),
+    )
+
     vfolder_list = graphene.Field(  # legacy non-paginated list
         VirtualFolderList,
         limit=graphene.Int(required=True),
@@ -1067,6 +1072,15 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return StorageVolumeList(items, total_count)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_vfolder(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        id: str,
+    ) -> Optional[VirtualFolder]:
+        return await VirtualFolder.load_by_id(info.context, id)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key='user_id')
