@@ -420,7 +420,8 @@ bootstrap_pants() {
     git -c advice.detachedHead=false clone --branch=$PANTS_CLONE_VERSION --depth=1 https://github.com/pantsbuild/pants tools/pants-src
     # TODO: remove the manual patch after pants 2.13 or later is released.
     cd tools/pants-src
-    if [ "$(uname -p)" = "arm" -a "$DISTRO" != "Darwin" ]; then
+    local arch_name=$(uname -p)
+    if [ "$arch_name" = "arm64" -o "$arch_name" = "aarch64" ] && [ "$DISTRO" != "Darwin" ]; then
       git apply ../pants-linux-aarch64.patch
     fi
     cd ../..
