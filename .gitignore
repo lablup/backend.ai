@@ -119,3 +119,6 @@ ENV/
 /tmp/
 /volumes/
 /vfroot/
+
+# Release artifacts
+/CHANGELOG_RELEASE.md
