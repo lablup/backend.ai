@@ -506,8 +506,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         owner_uuid, group_id, resource_policy = await _query_userinfo(request, params, conn)
 
         # Use keypair bootstrap_script if it is not delivered as a parameter
-        # (only for INTERACTIVE sessions).
-        if params['session_type'] == SessionTypes.INTERACTIVE and not params['bootstrap_script']:
+        if not params['bootstrap_script']:
             script, _ = await query_bootstrap_script(conn, owner_access_key)
             params['bootstrap_script'] = script
 
