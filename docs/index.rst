@@ -22,6 +22,7 @@ Using the plugin architecture, Backend.AI also offers more advanced features suc
    install/index
    migration/index
    manager/index
+   agent/index
    storage-proxy/index
    client/index
    dev/index
