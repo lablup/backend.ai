@@ -15,101 +15,16 @@ With detailed policy-based idle checks and resource limits, you no longer have t
 
 Using the plugin architecture, Backend.AI also offers more advanced features such as fractional sharing of GPUs and site-specific SSO integrations, etc. for various-sized enterprise customers.
 
-Table of Contents
------------------
-
-.. _concepts:
-
 .. toctree::
    :maxdepth: 2
-   :caption: Concepts
 
-   concepts/key-concepts
-   concepts/api-overview
-   concepts/faq
-
-.. _install:
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Cluster Installation
-
-   install/guides
-   install/supplementary
-   install/configure-autoscaling
-
-.. _migration:
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Migration Guides
-
-   migration/2003-to-2009
-   migration/docker-hub-to-backendai-cr
-
-.. _clients:
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Client SDK
-
+   concepts/index
+   install/index
+   migration/index
+   manager/index
+   storage-proxy/index
    client/index
-
-.. _common_api:
-
-.. toctree::
-   :maxdepth: 1
-   :caption: API Common Reference
-
-   common-api/convention
-   common-api/auth
-   common-api/ratelimit
-   common-api/objects
-
-.. _user_api:
-
-.. toctree::
-   :maxdepth: 1
-   :caption: User API Reference
-
-   user-api/intro
-   user-api/sessions
-   user-api/service-ports
-   user-api/exec-stream
-   user-api/exec-query
-   user-api/exec-batch
-   user-api/events
-   user-api/vfolders
-   user-api/resource-presets
-
-.. _admin_api:
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Admin API Reference
-
-   admin-api/intro
-   admin-api/agents
-   admin-api/scaling-groups
-   admin-api/domains
-   admin-api/groups
-   admin-api/users
-   admin-api/images
-   admin-api/sessions
-   admin-api/vfolders
-   admin-api/keypairs
-   admin-api/keypair-resource-policies
-   admin-api/resource-presets
-
-.. _dev:
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Developer Manuals
-
-   install/development-setup
-   dev/daily-workflows
-   dev/adding-kernels
+   dev/index
 
 
 

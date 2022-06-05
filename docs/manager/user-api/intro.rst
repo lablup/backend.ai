@@ -1,7 +1,19 @@
-Introduction
-============
+Manager REST API
+================
 
-Backend.AI User API is for running instant compute sessions at scale in clouds or on-premise clusters.
+Backend.AI REST API is for running instant compute sessions at scale in clouds or on-premise clusters.
+
+.. toctree::
+   :maxdepth: 2
+
+   sessions
+   exec-query
+   exec-batch
+   exec-stream
+   events
+   service-ports
+   resource-presets
+   vfolders
 
 
 .. _code-execution-model:

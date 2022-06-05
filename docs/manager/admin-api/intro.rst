@@ -1,7 +1,7 @@
-Introduction
-============
+Manager GraphQL API
+===================
 
-Backend.AI's Admin API is for developing in-house management consoles.
+Backend.AI GraphQL API is for developing in-house management consoles.
 
 There are two modes of operation:
 
@@ -19,6 +19,20 @@ There are two modes of operation:
    To test and debug with the Admin API easily, try the proxy mode of `the official Python client <https://pypi.python.org/pypi/backend.ai-client>`_.
    It provides an insecure (non-SSL, non-authenticated) local HTTP proxy where all the required authorization headers are attached from the client configuration.
    Using this you do not have to add any custom header configurations to your favorite API development tools such as `GraphiQL <https://github.com/graphql/graphiql>`_.
+
+.. toctree::
+   :maxdepth: 2
+
+   domains
+   scaling-gruops
+   agents
+   users
+   groups
+   keypairs
+   keypair-resource-policies
+   sessions
+   vfolders
+   images
 
 Basics of GraphQL
 -----------------
