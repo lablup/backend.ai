@@ -1,6 +1,13 @@
 Backend.AI Client SDK for Python
 ================================
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Table of Contents
+
+   gsg/installation
+   gsg/config
+
 Quickstart
 ----------
 
@@ -46,16 +53,6 @@ And then try the first commands:
 
 Check out more details about :doc:`client configuration <gsg/config>`, the command-line
 examples, and :doc:`SDK code examples <dev/examples>`.
-
-Getting Started
----------------
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Getting Started
-
-   gsg/installation
-   gsg/config
 
 Command-line Interface
 ----------------------
