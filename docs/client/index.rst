@@ -1,9 +1,6 @@
 Backend.AI Client SDK for Python
 ================================
 
-This is the documentation for the Python Client SDK which implements
-:doc:`the Backend.AI API <backendai:index>`.
-
 Quickstart
 ----------
 
