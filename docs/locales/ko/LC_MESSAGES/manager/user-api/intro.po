@@ -1,0 +1,209 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/user-api/intro.rst:2 6062408630ce475c9e82fd3b32b2c01b
+msgid "Manager REST API"
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:4 dd076d613a98431faf2636a717bd59fc
+msgid ""
+"Backend.AI REST API is for running instant compute sessions at scale in "
+"clouds or on-premise clusters."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:22 d107dc02adbd45fd81a92385fb79174f
+msgid "Code Execution Model"
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:24 693ae0b0faf9457ea2abcb1b34f9816a
+msgid ""
+"The core of the user API is the **execute** call which allows clients to "
+"execute user-provided codes in isolated **compute sessions** (aka "
+"**kernels**). Each session is managed by a **kernel runtime**, whose "
+"implementation is language-specific. A runtime is often a containerized "
+"daemon that interacts with the Backend.AI agent via our internal ZeroMQ "
+"protocol. In some cases, kernel runtimes may be just proxies to other code "
+"execution services instead of actual executor daemons."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:29 b962f837b505431aa67857556828b8d4
+msgid ""
+"Inside each compute session, a client may perform multiple **runs**. Each "
+"run is for executing different code snippets (**the query mode**) or "
+"different sets of source files (**the batch mode**). The client often has to "
+"call the **execute** API *multiple times* to finish a single run. It is "
+"completely legal to mix query-mode runs and batch-mode runs inside the same "
+"session, given that the kernel runtime supports both modes."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:34 f2a95641a87746ef806785e6f2fbeea0
+msgid ""
+"To distinguish different runs which may be overlapped, the client must "
+"provide the same **run ID** to all **execute** calls during a single run. "
+"The run ID should be unique for each run and can be an arbitrary random "
+"string. If the run ID is not provided by the client at the first execute "
+"call of a run, the API server will assign a random one and inform it to the "
+"client via the first response. Normally, if two or more runs are overlapped, "
+"they are processed in a FIFO order using an internal queue. But they may be "
+"processed in parallel if the kernel runtime supports parallel processing. "
+"Note that the API server may raise a timeout error and cancel the run if the "
+"waiting time exceeds a certain limit."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:41 c4b67d16996d43f0b4c1ed4fa73afdd6
+msgid ""
+"In the query mode, usually the runtime context (e.g., global variables) is "
+"preserved for next subsequent runs, but this is not guaranteed by the API "
+"itself---it's up to the kernel runtime implementation."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:46 fc81f0e211bb44d382503b04b2cfc791
+msgid "The state diagram of a “run” with the **execute** API."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:48 328adc2188be43168ca4cabf07bf42c5
+msgid ""
+"The **execute** API accepts 4 arguments: ``mode``, ``runId``, ``code``, and "
+"``options`` (``opts``). It returns an :ref:`execution-result-object` encoded "
+"as JSON."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:51 40438aa6635447488ac82cc7cb3e6085
+msgid ""
+"Depending on the value of ``status`` field in the returned :ref:`execution-"
+"result-object`, the client must perform another subsequent **execute** call "
+"with appropriate arguments or stop. :numref:`run-state-diagram` shows all "
+"possible states and transitions between them via the ``status`` field value."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:55 515077e641bb47cbaf3efafb0035200f
+msgid "If ``status`` is ``\"finished\"``, the client should stop."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:57 957c646b28cd4d91bad53af3dc8d3eb1
+msgid ""
+"If ``status`` is ``\"continued\"``, the client should make another "
+"**execute** API call with the ``code`` field set to an empty string and the "
+"``mode`` field set to ``\"continue\"``. Continuation happens when the user "
+"code runs longer than a few seconds to allow the client to show its "
+"progress, or when it requires extra step to finish the run cycle."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:60 8eed3753033d49c7ada2e05d71da16e1
+msgid ""
+"If ``status`` is ``\"clean-finished\"`` or ``\"build-finished\"`` (this "
+"happens at the batch-mode only), the client should make the same "
+"continuation call. Since cleanup is performed before every build, the client "
+"will always receive ``\"build-finished\"`` after ``\"clean-finished\"`` "
+"status. All outputs prior to ``\"build-finished\"`` status return are from "
+"the build program and all future outputs are from the executed program "
+"built. Note that even when the ``exitCode`` value is non-zero (failed), the "
+"client must continue to complete the run cycle."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:65 5f6c1fd0a374496f99439ee0906bfc5c
+msgid ""
+"If ``status`` is ``\"waiting-input\"``, you should make another **execute** "
+"API call with the ``code`` field set to the user-input text and the ``mode`` "
+"field set to ``\"input\"``. This happens when the user code calls "
+"interactive ``input()`` functions. Until you send the user input, the "
+"current run is blocked. You may use modal dialogs or other input forms (e."
+"g., HTML input) to retrieve user inputs. When the server receives the user "
+"input, the kernel's ``input()`` returns the given value. Note that each "
+"kernel runtime may provide different ways to trigger this interactive input "
+"cycle or may not provide at all."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:72 1099237c920a41c88e65abcebaa903f8
+msgid ""
+"When each call returns, the ``console`` field in the :ref:`execution-result-"
+"object` have the console logs captured since the last previous call. Check "
+"out the following section for details."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:79 5e02a3b3b63142fd85ee3e9d362ee0d8
+msgid "Handling Console Output"
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:81 b2e2600a8fe045d9aea1ad63b240ed96
+msgid ""
+"The console output consists of a list of tuple pairs of item type and item "
+"data. The item type is one of ``\"stdout\"``, ``\"stderr\"``, ``\"media\"``, "
+"``\"html\"``, or ``\"log\"``."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:84 6ec95e02764a407aa1c660bd2d5fcd45
+msgid ""
+"When the item type is ``\"stdout\"`` or ``\"stderr\"``, the item data is the "
+"standard I/O stream outputs as (non-escaped) UTF-8 string. The total length "
+"of either streams is limited to 524,288 Unicode characters per each "
+"**execute** API call; all excessive outputs are truncated. The stderr often "
+"includes language-specific tracebacks of (unhandled) exceptions or errors "
+"occurred in the user code. If the user code generates a mixture of stdout "
+"and stderr, the print ordering is preserved and each contiguous block of "
+"stdout/stderr becomes a separate item in the console output list so that the "
+"client user can reconstruct the same console output by sequentially "
+"rendering the items."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:91 edd798b1492a41a68bc4071db4372f0c
+msgid ""
+"The text in the stdout/stderr item may contain arbitrary terminal control "
+"sequences such as ANSI color codes and cursor/line manipulations. It is the "
+"user's job to strip out them or implement some sort of terminal emulation."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:96 5336f96427174f8484b81a80a4059f8e
+msgid ""
+"Since the console texts are *not* escaped, the client user should take care "
+"of rendering and escaping depending on the UI implementation. For example, "
+"use ``<pre>`` element, replace newlines with ``<br>``, or apply ``white-"
+"space: pre`` CSS style when rendering as HTML. An easy way to do escape the "
+"text safely is to use ``insertAdjacentText()`` DOM API."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:100 4af7d8c2a2fa4b2ba8e7af44564161be
+msgid ""
+"When the item type is ``\"media\"``, the item data is a pair of the MIME "
+"type and the content data. If the MIME type is text-based (e.g., ``\"text/"
+"plain\"``) or XML-based (e.g., ``\"image/svg+xml\"``), the content is just a "
+"string that represent the content. Otherwise, the data is encoded as a data "
+"URI format (RFC 2397). You may use `backend.ai-media library <https://github."
+"com/lablup/backend.ai-media>`_ to handle this field in Javascript on web-"
+"browsers."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:105 fdb1dae603204dbd8fa5abb28aff317d
+msgid ""
+"When the item type is ``\"html\"``, the item data is a partial HTML document "
+"string, such as a table to show tabular data. If you are implementing a web-"
+"based front-end, you may use it directly to the standard DOM API, for "
+"instance, ``consoleElem.insertAdjacentHTML(value, \"beforeend\")``."
+msgstr ""
+
+#: ../../manager/user-api/intro.rst:108 ec2e64f773de4b3d8f00a27ace41b9f4
+msgid ""
+"When the item type is ``\"log\"``, the item data is a 4-tuple of the log "
+"level, the timestamp in the ISO 8601 format, the logger name and the log "
+"message string. The log level may be one of ``\"debug\"``, ``\"info\"``, ``"
+"\"warning\"``, ``\"error\"``, or ``\"fatal\"``. You may use different colors/"
+"formatting by the log level when printing the log message. Not every kernel "
+"runtime supports this rich logging facility."
+msgstr ""

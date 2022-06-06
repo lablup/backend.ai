@@ -1,0 +1,129 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2018-12-17 15:51+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.6.0\n"
+
+# bcda3be0d0474c9fbc993bed347b9fc7
+#: ../../gsg/examples.rst:2
+msgid "Examples"
+msgstr "코드 예제"
+
+# 192c92eb0697413caef1c65514032295
+#: ../../gsg/examples.rst:5
+msgid "Synchronous-mode execution"
+msgstr "동기 모드 실행"
+
+# cf3af47143bb406b869e2ab4b1408296
+#: ../../gsg/examples.rst:8
+msgid "Query mode"
+msgstr "쿼리 모드"
+
+# 07eefc8bd2ae434088dce719c3b3789d
+#: ../../gsg/examples.rst:10
+msgid ""
+"This is the minimal code to execute a code snippet with this client SDK."
+msgstr ""
+
+# 158fecd6142e42bba57e8cd3b2afec3a
+#: ../../gsg/examples.rst:40
+msgid ""
+"You need to take care of ``client_token`` because it determines whether to "
+"reuse kernel sessions or not. Backend.AI cloud has a timeout so that it "
+"terminates long-idle kernel sessions, but within the timeout, any kernel "
+"creation requests with the same ``client_token`` let Backend.AI cloud to "
+"reuse the kernel."
+msgstr ""
+
+# cc5675daa33a410eb7fe940564e7d07e
+#: ../../gsg/examples.rst:48
+msgid "Batch mode"
+msgstr "배치 모드"
+
+# 2ceb3c879cee4a2bb9a16bdb2a56f7ee
+#: ../../gsg/examples.rst:50
+msgid ""
+"You first need to upload the files after creating the session and construct "
+"a ``opts`` struct."
+msgstr ""
+
+# c7df13a3e7874dcbb096eeda676f2f3a
+#: ../../gsg/examples.rst:89
+msgid "Handling user inputs"
+msgstr "사용자 입력 다루기"
+
+# 78bc3e35569d4cbc92ec258685dc5858
+#: ../../gsg/examples.rst:91
+msgid ""
+"Inside the while-loop for ``kern.execute()`` above, change the if-block for "
+"``result['status']`` as follows:"
+msgstr ""
+
+# 5951f8fae7fd47fe92960327f463072c
+#: ../../gsg/examples.rst:110
+msgid "A common gotcha is to miss setting ``mode = 'input'``. Be careful!"
+msgstr ""
+
+# ddd8c92a0c614833bb2c4cb9ee2ab7ee
+#: ../../gsg/examples.rst:114
+msgid "Handling multi-media outputs"
+msgstr "멀티미디어 출력 다루기"
+
+# a04a1af08e9043529535f18a21910f37
+#: ../../gsg/examples.rst:116
+msgid "The ``handle_media()`` function used above examples would look like:"
+msgstr ""
+
+# ec351afe18da4e2b91ea98ff0e33c18c
+#: ../../gsg/examples.rst:125
+msgid ""
+"The exact method to process ``media_data`` depends on the ``media_type``. "
+"Currently the following behaviors are well-defined:"
+msgstr ""
+
+# 8a9f35764701488085f59968288cc7db
+#: ../../gsg/examples.rst:128
+msgid "For (binary-format) images, the content is a dataURI-encoded string."
+msgstr ""
+
+# 145f787ad9d942f79383551704349437
+#: ../../gsg/examples.rst:129
+msgid ""
+"For SVG (scalable vector graphics) images, the content is an XML string."
+msgstr ""
+
+# ac638539bb5a4fb2a5ed9407d210eb19
+#: ../../gsg/examples.rst:130
+msgid ""
+"For ``application/x-sorna-drawing``, the content is a JSON string that "
+"represents a set of vector drawing commands to be replayed the client-side "
+"(e.g., Javascript on browsers)"
+msgstr ""
+
+# 93d991b2f9a54c16a85463e58728e9ab
+#: ../../gsg/examples.rst:136
+msgid "Asynchronous-mode Execution"
+msgstr ""
+
+# 5e890489f2e1426891f62693f9fc3b99
+#: ../../gsg/examples.rst:138
+msgid ""
+"The async version has all sync-version interfaces as coroutines but comes "
+"with additional features such as ``stream_execute()`` which streams the "
+"execution results via websockets and ``stream_pty()`` for interactive "
+"terminal streaming."
+msgstr ""

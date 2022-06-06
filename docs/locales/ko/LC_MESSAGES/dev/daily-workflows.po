@@ -1,0 +1,526 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../dev/daily-workflows.rst:2 0480c5cdbe8249acbfd10749f0b09912
+msgid "Daily Development Workflows"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:5 76b2fa814e3147169961821ecf1ba0fc
+msgid "About Pants"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:7 1cb433812f084526ae2b7e0007dbcdf0
+msgid ""
+"Since 22.09, we have migrated to `Pants <https://pantsbuild.org>`_ as our "
+"primary build system and dependency manager for the mono-repository of "
+"Python components."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:11 aa7793a4a3744480817bf503f3aab8ce
+msgid ""
+"Pants is a graph-based async-parallel task executor written in Rust and "
+"Python. It is tailored to building programs with explicit and auto-inferred "
+"dependency checks and aggressive caching."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:16 18cb82b5bf524998a5a2ca252f333d2f
+msgid "Key concepts"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:18 e328d30359444266859801613728ba9e
+msgid "The command pattern:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:26 7c58c66878f14ea982eb687f8325b92f
+msgid ""
+"If your ``scripts/install-dev.sh`` says that you need to use ``./pants-"
+"local`` instead of ``./pants``, replace all ``./pants`` in the following "
+"command examples with ``./pants-local``."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:30 b1e82483f8e6415ea0c52e6e895e7dc2
+msgid "Goal: an action to execute"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:32 0f2c67bd6a66401a9361233b90d09002
+msgid ""
+"You may think this as the root node of the task graph executed by Pants."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:34 83d8560fd6b94c58b2aa432093aa6a71
+msgid ""
+"Target: objectives for the action, usually expressed as ``path/to/dir:name``"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:36 862cd36988ae4bee9aa26ee8bf3783ba
+msgid "The targets are declared/defined by ``path/to/dir/BUILD`` files."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:38 fa836f36e6364daa8dbc72c71db2e484
+msgid "The global configuration is at ``pants.toml``."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:40 af03d5036f29434e84e6e7608f443f56
+msgid "Recommended reading: https://www.pantsbuild.org/docs/concepts"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:43 c4fe60fb70de4c0fb4ff15ade181c196
+msgid "Inspecting build configurations"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:45 976c75a8c993400caf6bb5e84a51cf70
+msgid "Display all targets"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:51 8b4c6912b84a4f4e90d537332c68ff23
+msgid ""
+"This list includes the full enumeration of individual targets auto-generated "
+"by collective targets (e.g., ``python_sources()`` generates multiple "
+"``python_source()`` targets by globbing the ``sources`` pattern)"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:55 14461c35361d44d182ce1b54f68abdab
+msgid ""
+"Display all dependencies of a specific target (i.e., all targets required to "
+"build this target)"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:62 79f59c169881480081d2d9a9ff4b472c
+msgid ""
+"Display all dependees of a specific target (i.e., all targets affected when "
+"this target is changed)"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:71 7a4e99a4941c4bee9aeb4ef3728621f5
+msgid ""
+"Pants statically analyzes the source files to enumerate all its imports and "
+"determine the dependencies automatically.  In most cases this works well, "
+"but sometimes you may need to manually declare explicit dependencies in "
+"``BUILD`` files."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:77 17db1b0150e54fb789462c408c67dd8f
+msgid "Running lint and check"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:79 dd0bef61b4d14968bd2291eb54f4c10a
+msgid "Run lint/check for all targets:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:86 3656e54557e74be6b364d37d100db6b8
+msgid "To run lint/check for a specific target or a set of targets:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:93 2d082eafb3a549d78b72e6392f662b13
+msgid ""
+"Currently running mypy with pants is slow because mypy cannot utilize its "
+"own cache as pants invokes mypy per file due to its own dependency "
+"management scheme. (e.g., Checking all sources takes more than 1 minutes!) "
+"This performance issue is being tracked by `pantsbuild/pants#10864 <https://"
+"github.com/pantsbuild/pants/issues/10864>`_.  For now, try using a smaller "
+"target of files that you work on and `use an option to select the targets "
+"only changed <https://www.pantsbuild.org/docs/advanced-target-"
+"selection#running-over-changed-files-with---changed-since>`_ (``--changed-"
+"since``)."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:102 6404162f5b714efda7d74feca437a773
+msgid "Running unit tests"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:104 44db92ee701d4ca398290a62d9b79e69
+msgid "Here are various methods to run tests:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:112 5ef6ab558af044ba81c99fbf2b1f7eb1
+msgid ""
+"You may also try ``--changed-since`` option like ``lint`` and ``check``."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:114 7fda78665eac46289a6210c7e85a8ae4
+msgid ""
+"To specify extra environment variables for tests, use the ``--test-extra-env-"
+"vars`` option:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:124 8cb51411d618418c88d083c477994aa1
+msgid "Running integration tests"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:131 1f9b5f71d8144bcd98059cb7d13766c2
+msgid "Building wheel packages"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:133 c5324017962f4dcda68334d132f083ab
+msgid "To build a specific package:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:143 ea83d70baed84125bfdd8fb31cbb9ba9
+msgid "If the package content varies by the target platform, use:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:156 095dd686b8c24b7e8da16a9fb1ceb843
+msgid "Using IDEs and editors"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:158 418b950c8d2845d3b77407efe2c707a7
+msgid ""
+"Pants has an ``export`` goal to auto-generate a virtualenv that contains all "
+"external dependencies installed in a single place. This is very useful when "
+"you work with IDEs and editors."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:162 1cd49931a9ee471cad3a9849ee29fd97
+msgid "To (re-)generate the virtualenv, run:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:168 08cc6fe05ca0487085ce6c4e3e672faa
+msgid ""
+"Then configure your IDEs/editors to use ``dist/export/python/virtualenvs/"
+"python-default/VERSION/bin/python`` as the interpreter for your code, where "
+"``VERSION`` is the interpreter version specified in ``pants.toml``."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:175 3a1cf2525af04bfea594241f9282d258
+msgid ""
+"To activate flake8/mypy checks (in Vim) and get proper intelli-sense support "
+"for pytest (in VSCode), just install them in the exported venv as follows. "
+"(You need to repeat this when you re-export!)"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:183 d06051cd462f4bbaa61d265d5d598221
+msgid "For Vim, you also need to explicitly activate the exported venv."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:186 11f1093b2a904584859a68f76b10fd65
+msgid "Running entrypoints"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:188 66c60e1e5b1245b1a3e6a26f99dc002a
+msgid ""
+"To run a Python program within the unified virtualenv, use the ``./py`` "
+"helper script.  It automatically passes additional arguments transparently "
+"to the Python executable of the unified virtualenv."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:192 ac50bdf6d85b4f2aacda1387378b7da1
+msgid "``./backend.ai`` is an alias of ``./py -m ai.backend.cli``."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:194 746be7b7ee374fc78063c72eb9a46277
+msgid "Examples:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:203 a867589a4bbe4a6f888e87566e818af9
+msgid "Working with plugins"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:205 7d7494ffbbf04ffb865be0d48d441b5c
+msgid ""
+"To develop Backend.AI plugins together, the repository offers a special "
+"location ``./plugins`` where you can clone plugin repositories and a "
+"shortcut script ``scripts/install-plugin.sh`` to install them inside the "
+"exported venv."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:213 5727f75c9e9f47c6b633080156257dc1
+msgid "Manual installation:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:222 c685acb9c2da401e91fc2b5b59b0a34f
+msgid ""
+"Whenever you re-export the venv using ``./pants export ::``, you must "
+"*reinstall* the plugins.  There is also a shrotcut script that does this for "
+"you: ``scripts/reinstall-plugins.sh``."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:228 bd72f534ec674e21b3adc147c17534a2
+msgid "Writing test cases"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:230 d3bd3d5bf62f40f3942c73e3fa515667
+msgid ""
+"Mostly it is just same as before: use the standard pytest practices. Though, "
+"there are a few key differences:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:233 ed0bfed446b548049943935a26dc01b5
+msgid "Tests are executed **in parallel** in the unit of test modules."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:235 143968db111c46dabef44bd50b28e617
+msgid ""
+"Therefore, session-level fixtures may be executed *multiple* times during a "
+"single run of ``./pants test``."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:240 30bf836593184ce1a6e7fb30e302f461
+msgid ""
+"If you *interrupt* (Ctrl+C, SIGINT) a run of ``./pants test``, it will "
+"immediately kill all pytest processes without fixture cleanup. This may "
+"accumulate unused Docker containers in your system, so it is a good practice "
+"to run ``docker ps -a`` periodically and clean up dangling containers."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:245 9c15e85bb232447aaaeb6fefc97cc403
+msgid "To interactively run tests, see :ref:`debugging-tests`."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:247 a2f38062dd1f4c0ea4a3e2dfa4957a10
+msgid "Here are considerations for writing Pants-friendly tests:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:249 ceec3d91707641b4b7a790647d1743fb
+msgid ""
+"Ensure that it runs in an isolated/mocked environment and minimize external "
+"dependency."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:251 70b05a021d0b48828fb7e2c6a5aa4cf8
+msgid ""
+"If required, use the environment variable ``BACKEND_TEST_EXEC_SLOT`` (an "
+"integer value) to uniquely define TCP port numbers and other resource "
+"identifiers to allow parallel execution. `Refer the Pants docs <https://www."
+"pantsbuild.org/docs/reference-pytest#section-execution-slot-var](https://www."
+"pantsbuild.org/docs/reference-pytest#section-execution-slot-var>`_."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:256 85e89b4d9cf242409f617bbaf99966e9
+msgid ""
+"Use ``ai.backend.testutils.bootstrap`` to populate a single-node Redis/etcd/"
+"Postgres container as fixtures of your test cases. Import the fixture and "
+"use it like a plain pytest fixture."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:260 24fca03ba0bc4e9f89948e2fca1bbc52
+msgid ""
+"These fixtures create those containers with **OS-assigned public port "
+"numbers** and give you a tuple of container ID and a ``ai.backend.common."
+"types.HostPortPair`` for use in test codes. In manager and agent tests, you "
+"could just refer ``local_config`` to get a pre-populated local "
+"configurations with those port numbers."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:266 b4b9a8b005b4416fb15b381d3c2bf82c
+msgid ""
+"In this case, you may encounter ``flake8`` complaining about unused imports "
+"and redefinition. Use ``# noqa: F401`` and ``# noqa: F811`` respectively for "
+"now."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:271 7c78e5cf535d49a5a856abcb4af244a0
+msgid "**About using /tmp in tests**"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:273 dc174339019c4d7d9f67cda521e76896
+msgid ""
+"If your Docker service is installed using **Snap** (e.g., Ubuntu 20.04 or "
+"later), it cannot access the system ``/tmp`` directory because Snap applies "
+"a private \"virtualized\" tmp directory to the Docker service."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:277 5eb4621ad2514d1ab5da585d0b86949f
+msgid ""
+"You should use other locations under the user's home directory (or "
+"preferably ``.tmp`` in the working copy directory) to avoid mount failures "
+"for the developers/users in such platforms."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:281 ad66cdc069be48198f7eae4a5e2675c9
+msgid ""
+"It is okay to use the system ``/tmp`` directory if they are not mounted "
+"inside any containers."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:285 029037e2bd134eb5a0ac421369e88d3e
+msgid "Writing documentation"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:287 3e5d09bbfa674ec4bd91d297e379d61e
+msgid "Create a new pyenv virtualenv based on Python 3.10."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:293 fd786c2b66f7477ea3d780a4dd0e2662
+msgid "Activate the virtualenv and run:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:301 c750e481add9436a961d3aa152fc58aa
+msgid "You can build the docs as follows:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:309 4d755367d5c64ff386207b3dffb1a258
+msgid "To locally serve the docs:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:316 580c6d82999643899ccb10d00006d5f4
+msgid ""
+"(TODO: Use Pants' own Sphinx support when `pantsbuild/pants#15512 <https://"
+"github.com/pantsbuild/pants/pull/15512>`_ is released.)"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:320 3f8e9a33947542a8a8ebca48d720b22a
+msgid "Advanced Topics"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:323 46ffc160dcd04fb8b59660cb3659706a
+msgid "Adding new external dependencies"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:325 f51d82a017344c4780b9ec3315a32cd2
+msgid ""
+"Add the package version requirements to the unified requirements file (``./"
+"requirements.txt``)."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:327 ce7107ea3d5a46e6a521122a6d43b396
+msgid ""
+"Update the ``module_mapping`` field in the root build configuration (``./"
+"BUILD``) if the package name and its import name differs."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:330 6baa7bb992be47c18bf0a90015af3e6e
+msgid ""
+"Update the ``type_stubs_module_mapping`` field in the root build "
+"configuration if the package provides a type stubs package separately."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:333 da3cca0ffe224a10affe6e453198e27d
+msgid "Run:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:343 a79d4f3f33fa4822b48c162bd9446d31
+msgid "Debugging test cases (or interactively running test cases)"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:345 efe858c07b4847d9aa9d20415d1cbc55
+msgid ""
+"When your tests *hang*, you can try adding the ``--debug`` flag to the ``./"
+"pants test`` command:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:351 8907ed2940ac4b4288f8b22f0c94c12a
+msgid ""
+"so that Pants runs the designated test targets **serially and "
+"interactively**. This means that you can directly observe the console output "
+"and Ctrl+C to gracefully shutdown the tests  with fixture cleanup. You can "
+"also apply additional pytest options such as ``--fulltrace``, ``-s``, etc. "
+"by passing them after target arguments and ``--`` when executing ``./pants "
+"test`` command."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:358 d43f8d9b05ac48ddb249b21b86722cd0
+msgid "Boosting the performance of Pants commands"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:360 aefdea9a82b8402188b08891c2b29a24
+msgid ""
+"Since Pants uses temporary directories for aggressive caching, you could "
+"make the ``.tmp`` directory under the working copy root a tmpfs partition:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:367 966e1fcef7cd423f8b154f19c284f2c3
+msgid ""
+"To make this persistent across reboots, add the following line to ``/etc/"
+"fstab``:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:373 8618fdea6cbc402db56d17a55ad0637f
+msgid ""
+"The size should be more than 3GB. (Running ``./pants test ::`` consumes "
+"about 2GB.)"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:376 6259cf09254b42fcb628a782bce166d2
+msgid ""
+"To change the size at runtime, you could simply remount it with a new size "
+"option:"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:383 26f9ab563da8445987630fd64928b591
+msgid "Making a new release"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:385 b44a9e7b8a8a4c38ab0a9d489e9949a5
+msgid ""
+"Update ``./VERSION`` file to set a new version number. (Remove the ending "
+"new line, e.g., using ``set noeol`` in Vim.  This is also configured in ``./"
+"editorconfig``)"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:389 705e16fa5c384117b0508a9ba34705d2
+msgid ""
+"Run ``LOCKSET=tools/towncrier ./py -m towncrier`` to auto-generate the "
+"changelog."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:391 cec6ff3809c6498699179faa43e03ef2
+msgid ""
+"You may append ``--draft`` to see a preview of the changelog update without "
+"actually modifying the filesytem."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:394 d2f2fd9a1e6f4e90b7e8062c546d09e9
+msgid ""
+"(WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/"
+"pull/427>`_)."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:396 190a5afc0e6e478aa0631ca424982344
+msgid "Make a new git commit with the commit message: \"release: <version>\"."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:398 74add71639344a9a8584b16d4b61d0fe
+msgid ""
+"Make an annotated tag to the commit with the message: \"Release v<version>\" "
+"or \"Pre-release v<version>\" depending on the release version."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:401 afe0424e336245a79de6d97c3a94c7ea
+msgid ""
+"Push the commit and tag.  The GitHub Actions workflow will build the "
+"packages and publish them to PyPI."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:405 ceae32004fe54852a52f40519ad45100
+msgid "Backporting to legacy per-pkg repositories"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:407 61dc8df34af94d1396f3c07e333684bf
+msgid "Use ``git diff`` and ``git apply`` instead of ``git cherry-pick``."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:409 9bfac3a27703498590c1803e99cabf6d
+msgid ""
+"To perform a three-way merge for conflicts, add ``-3`` option to the ``git "
+"apply`` command."
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:411 21babab9f5674a01a783f3198401dd52
+msgid ""
+"You may need to rewrite some codes as the package structure differs. (The "
+"new mono repository has more fine-grained first party packages divided from "
+"the ``backend.ai-common`` package.)"
+msgstr ""
+
+#: ../../dev/daily-workflows.rst:415 5dd8405cba3846678a47d65430602a89
+msgid ""
+"When referring the PR/issue numbers in the commit for per-pkg repositories, "
+"update them like ``lablup/backend.ai#NNN`` instead of ``#NNN``."
+msgstr ""

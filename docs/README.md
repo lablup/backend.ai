@@ -48,7 +48,7 @@ $ make gettext
 #### Build po (Portable Object) files using sphinx-intl
 
 ```console
-$ sphinx-intl update -p _build/locale/ -l ko_KR
+$ sphinx-intl update -p _build/locale/ -l ko
 ```
 
 The `.po` message files are under `locales/ko/LC_MESSAGES/`.

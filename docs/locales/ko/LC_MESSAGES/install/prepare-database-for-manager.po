@@ -1,0 +1,242 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/prepare-database-for-manager.rst:5
+#: 34b5887f7f1c4d648add2e97892dddad
+msgid "Prepare Database for Manager"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:9
+#: d6903343fe2240f88851d4bd780d2a62
+msgid "Guide variables"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:11
+#: 4d4385cab9154fd4b119cc0c2efe005d
+msgid ""
+"⚠️ Prepare the values of the following variables before working with this "
+"page and replace their occurrences with the values when you follow the guide."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:19
+#: 03f1111e1af74747b0464c7757c7c475
+msgid "Name"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:20
+#: d347b44043d846c2afe2217eecf269e4
+msgid "Description"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:21
+#: 8f3e0920e74e4917baf4756c635ce5cf
+msgid "``{NS}``"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:22
+#: 9115d4669e644d548e73e2eb8a2aa899
+msgid "The etcd namespace"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:23
+#: cbdc405519b942518de219d340e290f3
+msgid "``{ETCDADDR}``"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:24
+#: f85220349aa444f68fc861c5b2ac3cf5
+msgid ""
+"The etcd cluster address (``{ETCDHOST}``:``{ETCDPORT}``, ``localhost:8120`` "
+"for development setup)"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:25
+#: ddf083feb1a54a429e26d487dc27636b
+msgid "``{DBADDR}``"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:26
+#: 8c211842a0344e69ac274426cdc43c10
+msgid ""
+"The PostgreSQL server address (``{DBHOST}``:``{DBPORT}``, ``localhost:8100`` "
+"for development setup)"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:27
+#: 86357620806e4535aa58bcd0a0b79887
+msgid "``{DBUSER}``"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:28
+#: da6ee1d138c2497eac9f8ce766171295
+msgid "The database username (e.g., ``postgres`` for development setup)"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:29
+#: 74cc46408eed4aecb36d25784551d6a8
+msgid "``{DBPASS}``"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:30
+#: ed5ca0f4c9114f98b0434a97d5b2f721
+msgid "The database password (e.g., ``develove`` for development setup)"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:31
+#: d9fd37f81a664381a5a28c182f5ae8fc
+msgid "``{STRGMOUNT}``"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:32
+#: 4680661e94ae41ebba3398ac05105639
+msgid ""
+"The path to a directory that the manager and all agents share together (e."
+"g., a network-shared storage mountpoint). Note that the path must be same "
+"across all the nodes that run the manager and agents."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:34
+#: 577334490b2b404c9b31b2e4ba5087e6
+msgid ""
+"Development setup: Use an arbitrary empty directory where Docker containers "
+"can also mount as volumes — e.g., `Docker for Mac requires explicit "
+"configuration for mountable parent folders. <https://docs.docker.com/docker-"
+"for-mac/#file-sharing>`_"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:38
+#: fcc6fb91b7d04737bdd7c12da4d46fce
+msgid "Load initial etcd data"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:-1
+#: 14b6047735cc446d94cf6b5af085a3d9
+msgid "asciicast"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:50
+#: a21187b2309343448a8f2610cbad7ed3
+msgid ""
+"Copy ``sample-configs/image-metadata.yml`` and ``sample-configs/image-"
+"aliases.yml`` and edit according to your setup."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:57
+#: 978f3b39c507464cbbf51478f860cdde
+msgid ""
+"By default you can pull the images listed in the sample via ``docker pull "
+"lablup/kernel-xxxx:tag``\\ (e.g. ``docker pull lablup/kernel-python-"
+"tensorflow:latest`` for the latest tensorflow) as they are hosted on the "
+"public Docker registry."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:60
+#: 9c08646397264e3781602424dc961171
+msgid "Load image registry metadata"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:62
+#: e7c8d8c50a1c423cb04d2564f09354a9
+msgid ""
+"(Instead of manually specifying environment variables, you may use ``scripts/"
+"run-with-halfstack.sh`` script in a development setup.)"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:71
+#: b8204b94e8644f25b588417c99450b7a
+msgid "Load image aliases"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:80
+#: 053b5fae4f934e57af83148c5acc9634
+msgid "Set the default storage mount for virtual folders"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:89
+#: 8c18cdf0ad174eadaf3c9e44681f055b
+msgid "Database Setup"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:92
+#: e2503d4bc9c04bc9a4793370d5e7d4ae
+msgid "Create a new database"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:94
+#: bd8adfdc3d184a4584c24625a7b3395c
+msgid "In docker-compose based configurations, you may skip this step."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:106
+#: 352c8085bf3b4354bf4c3401e9ed6e28
+msgid "Install database schema"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:108
+#: 3aa23adf442d4a7f8151db006e97dbad
+msgid ""
+"Backend.AI uses `alembic <http://alembic.zzzcomputing.com/en/latest/>`_ to "
+"manage database schema and its migration during version upgrades. First, "
+"localize the sample config:"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:115
+#: aae2ff5153f542a1839a54cea0536dc7
+msgid ""
+"Modify the line where ``sqlalchemy.url`` is set. You may use the following "
+"shell command: (ensure that special characters in your password are properly "
+"escaped)"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:127
+#: ../../install/prepare-database-for-manager.rst:160
+#: 6d863c02e2024473b59df08629e259d4 c37e05a8d253414793fe09ddce00bc8e
+msgid "example execution result"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:140
+#: 28f07a59bab94abbb1a1d334ee4bd93b
+msgid ""
+"NOTE: All sub-commands under \"schema\" uses alembic.ini to establish "
+"database connections."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:143
+#: db9307f6db984ac198635fc4be4d7e2f
+msgid "Load initial fixtures"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:145
+#: ca103f247c794109805f2fede681e6fa
+msgid ""
+"Edit ``ai/backend/manager/models/fixtures.py`` so that you have a randomized "
+"admin keypair."
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:147
+#: 869ec53867094b18808d16ef50b8266f
+msgid ""
+":raw-html-m2r:`<span style=\"color:red\">**(TODO: automate here!)**</span>`"
+msgstr ""
+
+#: ../../install/prepare-database-for-manager.rst:149
+#: 3d7d02c7c5754cd5a71623527f6cbf57
+msgid "Then pour it to the database:"
+msgstr ""

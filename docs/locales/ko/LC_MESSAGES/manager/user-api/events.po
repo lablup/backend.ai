@@ -1,0 +1,452 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/user-api/events.rst:4 5228f29f1c954527b208fa280db16614
+msgid "Event Monitoring"
+msgstr "이벤트 모니터링"
+
+#: ../../manager/user-api/events.rst:9 2638eb8b8058486cbc41359357e2d855
+#, fuzzy
+msgid "Session Lifecycle Events"
+msgstr "커널 라이프사이클 이벤트"
+
+#: ../../manager/user-api/events.rst:11 e530fddbe47449b99eeb4be6b19d4e4b
+#, fuzzy
+msgid "URI: ``/events/session``"
+msgstr "URI: ``/session/:id``"
+
+#: ../../manager/user-api/events.rst:12 e34eaaa122f9405bb30811ed94198dee
+msgid "Method: ``GET``"
+msgstr "메소드 : ``GET``"
+
+#: ../../manager/user-api/events.rst:14 cee1ed2e02ed41ad99c12183e9b2858f
+#, fuzzy
+msgid ""
+"Provides a continuous message-by-message JSON object stream of session "
+"lifecycles. It uses `HTML5 Server-Sent Events (SSE) <https://developer."
+"mozilla.org/en-US/docs/Web/API/Server-sent_events>`_. Browser-based clients "
+"may use `the EventSource API <https://developer.mozilla.org/en-US/docs/Web/"
+"API/EventSource>`_ for convenience."
+msgstr ""
+"커널 라이프사이클의 메시지별 JSON 객체 스트림을 지속적으로 제공합니다.`HTML5 "
+"Server-Sent Events (SSE) <https://developer.mozilla.org/en-US/docs/Web/API/"
+"Server-sent_events>`_를 사용합니다. 브라우저 기반의 클라이언트는 편의상 `the "
+"EventSource API <https://developer.mozilla.org/en-US/docs/Web/API/"
+"EventSource>`_ 를 사용할 수 있습니다."
+
+#: ../../manager/user-api/events.rst:21 c11f779a94664a309b4cd759625a4863
+msgid ""
+"First properly implemented in this version, deprecating prior unimplemented "
+"interfaces."
+msgstr ""
+"이 버전에서 처음 적절하게 구현되었고 구현 되지 않았던 이전 인터페이스는 폐지"
+"됩니다."
+
+#: ../../manager/user-api/events.rst:25 0358f3cb82a048cf9ec2e1812f973575
+msgid ""
+"The URI is changed from ``/stream/session/_/events`` to ``/events/session``."
+msgstr ""
+
+#: ../../manager/user-api/events.rst:29 ../../manager/user-api/events.rst:138
+#: d4a9858d25464454abc8a5ff5b55b360 e2518aabc8904b6ca439b8baaf635cfe
+msgid "Parameters"
+msgstr "매개변수들"
+
+#: ../../manager/user-api/events.rst:35 ../../manager/user-api/events.rst:144
+#: 2d7f7c9b0bde48198d7a27a1c5b60830 4e0c45e5b98a4f5db0e3b59dae3fc068
+msgid "Parameter"
+msgstr "매개변수"
+
+#: ../../manager/user-api/events.rst:36 ../../manager/user-api/events.rst:145
+#: ../../manager/user-api/events.rst:186 07f9b6f3b3104ebba84b6c1dee6b1ee3
+#: 1f777b17ccee4155a6a43cc4c4a88b68 8b8ef02e76cd4bff949e1a3a2dd22910
+msgid "Type"
+msgstr "타입"
+
+#: ../../manager/user-api/events.rst:37 ../../manager/user-api/events.rst:67
+#: ../../manager/user-api/events.rst:104 ../../manager/user-api/events.rst:146
+#: ../../manager/user-api/events.rst:163 ../../manager/user-api/events.rst:187
+#: 03ad6f405ab04d15a62389c067a72f5c 4d4851ded9c940a6b72b0aafa57a7b7d
+#: 725165c747af44658892deb41775e3a5 80794fe025764d4ca07a366f1fa5e164
+#: 98028b75fe0a49c0893ab65e5445c829 f34c585e73b44b769a9d9aa0e3f4cf4e
+msgid "Description"
+msgstr "설명"
+
+#: ../../manager/user-api/events.rst:38 ../../manager/user-api/events.rst:105
+#: 5f277853e71c45b6913179f6c37e19cb f9c1871658804be085bb951cff1df16c
+msgid "``sessionId``"
+msgstr "``sessionId``"
+
+#: ../../manager/user-api/events.rst:39 87f554879f774449a222794fd8b0a2a2
+msgid "``slug``"
+msgstr "``slug``"
+
+#: ../../manager/user-api/events.rst:40 80cea908e2da45f2a9422cf3a52b535b
+#, fuzzy
+msgid ""
+"The session ID to monitor the lifecycle events. If set ``\"*\"``, the API "
+"will stream events from all sessions visible to the client depending on the "
+"client's role and permissions."
+msgstr ""
+"라이프사이클 이벤트를 모니터링하기 위한 세션 ID 입니다. ``\"*``로 설정하면, "
+"API는 클라이언트의 역할과 권한에 따라 클라이언트에 보여지는 모든 커널에서 이"
+"벤트를 스트리밍합니다."
+
+#: ../../manager/user-api/events.rst:43 ../../manager/user-api/events.rst:107
+#: 01ea8e9e57734cfbb428e0e8d6d670c6 cce66e4c339846d0b1af69b5ffb22738
+msgid "``ownerAccessKey``"
+msgstr "``ownerAccessKey``"
+
+#: ../../manager/user-api/events.rst:44 ../../manager/user-api/events.rst:49
+#: ../../manager/user-api/events.rst:189 ../../manager/user-api/events.rst:203
+#: 77b92f14fbd04813801efc874c933632 c34c8fef56a641e498337ee0e69890e0
+#: daa3b3ab0a5d4692a9bb37c6340a628d fb788fd5fd4e497f86f6a84018cd401b
+msgid "``str``"
+msgstr "``str``"
+
+#: ../../manager/user-api/events.rst:45 85b522e46e8a49c58784b3090c262e0d
+msgid ""
+"*(optional)* The access key of the owner of the specified session, since "
+"different access keys (users) may share a same session ID for different "
+"session instances. You can specify this only when the client is either a "
+"domain admin or a superadmin."
+msgstr ""
+"*(선택사항)* 다른 액세스 키(사용자)가 다른 세션 인스턴스에 대해 동일한 세션 "
+"아이디를 공유할 수 있기 때문에 지정된 세션 소유자의 접근 키 입니다. 도메인 소"
+"유자나 슈퍼관리자만이 이를 지정할 수 있습니다."
+
+#: ../../manager/user-api/events.rst:48 4188c612ad55407e9749c568fb9d459c
+msgid "``group``"
+msgstr "``group``"
+
+#: ../../manager/user-api/events.rst:50 815c687e94d245a1afe16f2250deb3f2
+#, fuzzy
+msgid ""
+"The group name to filter the lifecycle events. If set ``\"*\"``, the API "
+"will stream events from all sessions visible to the client depending on the "
+"client's role and permissions."
+msgstr ""
+"라이프사이클 이벤트를 필터링할 그룹 이름입니다. ``\"*``로 설정하면, API는 클"
+"라이언트의 역할과 권한에 따라 클라이언트에 보여지는 모든 커널에서 이벤트를 스"
+"트리밍합니다."
+
+#: ../../manager/user-api/events.rst:55 ../../manager/user-api/events.rst:152
+#: 6ded45a902b9401ead20615226d65c98 97bf701c62f243819cfd3978e9775061
+msgid "Responses"
+msgstr "응답"
+
+#: ../../manager/user-api/events.rst:57 9bc896afe46c410c893578e9c0557592
+msgid ""
+"The response is a continuous stream of UTF-8 text lines following the ``text/"
+"event-stream`` format. Each event is composed of the event type and data, "
+"where the data part is encoded as JSON."
+msgstr ""
+"응답은 ``text/event-stream`` 형식을 따르는 연속적인 여러 줄의 UTF-8 텍스트 스"
+"트림입니다. 각 이벤트는 이벤트 타입과 데이터로 구성되어 있으며, 데이터는 "
+"JSON 으로 인코딩 됩니다. "
+
+#: ../../manager/user-api/events.rst:60 86a5e82e543c4302a0944ca9e70a3f32
+msgid "Possible event names (more events may be added in the future):"
+msgstr "가능한 이벤트 명(추후 더 많은 이벤트가 추가될 수 있습니다)"
+
+#: ../../manager/user-api/events.rst:66 ../../manager/user-api/events.rst:162
+#: 805b7a45f2884835999484e242dcd655 884efeaa989b4f43916229003099de42
+msgid "Event Name"
+msgstr "이벤트 명"
+
+#: ../../manager/user-api/events.rst:68 562a8ac12d4049afaa7428431a3e0b24
+#, fuzzy
+msgid "``session_preparing``"
+msgstr "커널-준비"
+
+#: ../../manager/user-api/events.rst:69 54039530cf2d41d1988e61641b1b0437
+msgid ""
+"The session is just scheduled from the job queue and got an agent resource "
+"allocation."
+msgstr ""
+"세션이 방금 작업 큐에 스케쥴링 되었고, 에이전트로부터 자원 할당을 받았습니다."
+
+#: ../../manager/user-api/events.rst:70 ecdafe6fed1f4927833a304f29fdb368
+#, fuzzy
+msgid "``session_pulling``"
+msgstr "커널-가져오기"
+
+#: ../../manager/user-api/events.rst:71 52a5269859c64eab88e249edc9c74e3c
+#, fuzzy
+msgid ""
+"The session begins pulling the session image (usually from a Docker "
+"registry) to the scheduled agent."
+msgstr ""
+"세션이 (대개 도커 레지스트리로부터 온) 커널 이미지를 예약된 에이전트로 가져오"
+"기 시작합니다."
+
+#: ../../manager/user-api/events.rst:72 9e0fc2ca9c7c4a79acae395cd2716c94
+#, fuzzy
+msgid "``session_creating``"
+msgstr "커널-생성"
+
+#: ../../manager/user-api/events.rst:73 5aae94e83ba04bcfa574fe940e84071b
+msgid ""
+"The session is being created as containers (or other entities in different "
+"agent backends)."
+msgstr ""
+"세션이 컨테이너 (또는 다른 에이전트 백엔드의 다른 객체로) 생성되는 중입니다."
+
+#: ../../manager/user-api/events.rst:74 5611d8d9281a4c6e9d830083546fd410
+#, fuzzy
+msgid "``session_started``"
+msgstr "커널-시작됨"
+
+#: ../../manager/user-api/events.rst:75 a08bd949da2649539596d4d46004e60d
+msgid "The session becomes ready to execute codes."
+msgstr "세션에서 코드를 실행할 준비를 마쳤습니다."
+
+#: ../../manager/user-api/events.rst:76 e30d3d79eaa144139be86229cb5ccc4d
+#, fuzzy
+msgid "``session_terminated``"
+msgstr "커널-종료"
+
+#: ../../manager/user-api/events.rst:77 5a126218fc224e0ea708389101a501c8
+msgid "The session has terminated."
+msgstr "세션이 종료되었습니다."
+
+#: ../../manager/user-api/events.rst:79 0975852207284d70a6baed466c2f5f99
+msgid ""
+"When using the EventSource API, you should add event listeners as follows:"
+msgstr ""
+"이벤트소스 API를 사용할 경우, 다음을 따르는 이벤트 리스너를 추가해주십시오 : "
+
+#: ../../manager/user-api/events.rst:92 749ad331834a452a86b1cf14654ee90b
+msgid ""
+"The EventSource API must be used with the session-based authentication mode "
+"(when the endpoint is a console-server) which uses the browser cookies. "
+"Otherwise, you need to manually implement the event stream parser using the "
+"standard fetch API running against the manager server."
+msgstr ""
+"이벤트소스 API는 (콘솔-서버가 종단점 일 때) 반드시 브라우저 쿠키를 사용하는 "
+"세션-기반 인증 모드여야 합니다. 다른 방식으로는 관리자 서버에 대해 실행되는 "
+"표준 fetch API를 사용해 이벤트 스트림 파서를 수동으로 구현해야 합니다."
+
+#: ../../manager/user-api/events.rst:97 8e849d8d72984338b8f5c1d2654785d8
+msgid ""
+"The event data contains a JSON string like this (more fields may be added in "
+"the future):"
+msgstr ""
+"이벤트 데이터는 다음과 같은 JSON 문자열로 구성됩니다 (추후 더 많은 필드가 추"
+"가될 수 있음) : "
+
+#: ../../manager/user-api/events.rst:103 ../../manager/user-api/events.rst:185
+#: 09cd889cbf77433c946a8537e8da37d6 b8dbfa6dec3644ada23d166599fe8f44
+msgid "Field Name"
+msgstr "필드 명"
+
+#: ../../manager/user-api/events.rst:106 64c0d0d245fe419281f2b347e7b1e8a2
+msgid "The source session ID."
+msgstr "소스 세션 아이디"
+
+#: ../../manager/user-api/events.rst:108 413a3fcd6141440387b01e8b5300016d
+msgid "The access key who owns the session."
+msgstr "세션을 소유하고 있는 액세스 키"
+
+#: ../../manager/user-api/events.rst:109 453afae61b124c9e80070214a09d9e9e
+msgid "``reason``"
+msgstr "``reason``"
+
+#: ../../manager/user-api/events.rst:110 064e8c5bcd8243a288e8bbf7039d02be
+msgid ""
+"A short string that describes why the event happened. This may be ``null`` "
+"or an empty string."
+msgstr ""
+"이 이벤트가 왜 발생했는지에 대한 짧은 문자열입니다. 이것은 ``null``이거나 빈 "
+"문자열일 수 있습니다."
+
+#: ../../manager/user-api/events.rst:112 016e7b14b7884a61b939d1924cb83e11
+msgid "``result``"
+msgstr "``result``"
+
+#: ../../manager/user-api/events.rst:113 b398b49829c1426bb1e2e794c1c9ece4
+#, fuzzy
+msgid ""
+"Only present for ``session-terminated`` events. Only meaningful for batch-"
+"type sessions. Either one of: ``\"UNDEFINED\"``, ``\"SUCCESS\"``, ``\"FAILURE"
+"\"``"
+msgstr ""
+"``kernel-terminated`` 이벤트만을 위해 존재합니다. 배치-타입 세션에만 유의미합"
+"니다.다음 중 하나:  ``\"UNDEFINED\"``, ``\"SUCCESS\"``, ``\"FAILURE\"``"
+
+#: ../../manager/user-api/events.rst:130 aa1cc7d50c774e7ba408c14737f5a408
+msgid "Background Task Progress Events"
+msgstr ""
+
+#: ../../manager/user-api/events.rst:132 6b5b3d26239f4f87aa73012534e18185
+msgid "URI: ``/events/background-task``"
+msgstr ""
+
+#: ../../manager/user-api/events.rst:133 b2afa3075d394e13a170b3e462b5af70
+msgid "Method: ``GET`` for server-side events"
+msgstr ""
+
+#: ../../manager/user-api/events.rst:147 a15040c779154a7b9f13abd501361ef2
+#, fuzzy
+msgid "``taskId``"
+msgstr "``:id``"
+
+#: ../../manager/user-api/events.rst:148 698581551910498f87908dd221d5614d
+#, fuzzy
+msgid "``UUID``"
+msgstr "``:id``"
+
+#: ../../manager/user-api/events.rst:149 bf1061d37aba4683a777672564bec078
+msgid "The background task ID to monitor the progress and completion."
+msgstr ""
+
+#: ../../manager/user-api/events.rst:154 cbf5524773344fb9a01a399053be7dcb
+#, fuzzy
+msgid ""
+"The response is a continuous stream of UTF-8 text lines following ``text/"
+"event-stream`` format. Each event is composed of the event type and data, "
+"where the data part is encoded as JSON. Possible event names (more events "
+"may be added in the future):"
+msgstr ""
+"응답은 ``text/event-stream`` 형식을 따르는 연속적인 여러 줄의 UTF-8 텍스트 스"
+"트림입니다. 각 이벤트는 이벤트 타입과 데이터로 구성되어 있으며, 데이터는 "
+"JSON 으로 인코딩 됩니다. "
+
+#: ../../manager/user-api/events.rst:164 bbd347cf4c5d4e218dbc5bf36e6e16bd
+msgid "``task_updated``"
+msgstr ""
+
+#: ../../manager/user-api/events.rst:165 9aa5971fdb7147b8b2ff688dee28729e
+msgid ""
+"Updates for the progress. This can be generated many times during the "
+"background task execution."
+msgstr ""
+
+#: ../../manager/user-api/events.rst:166 afbf1428477c4f3fa5962cbf0567ff88
+#, fuzzy
+msgid "``task_done``"
+msgstr "``reason``"
+
+#: ../../manager/user-api/events.rst:167 cb8210c315e84acda280aa401c8a432c
+#, fuzzy
+msgid "The background task is successfully completed."
+msgstr "세션이 종료되었습니다."
+
+#: ../../manager/user-api/events.rst:168 cdcedaf5636647ee8506a245024947ce
+#, fuzzy
+msgid "``tak_failed``"
+msgstr "``files``"
+
+#: ../../manager/user-api/events.rst:169 0f4b6f721b674b1a98568a60fdcac0e3
+msgid ""
+"The background task has failed. Check the ``message`` field and/or query the "
+"error logs API for error details."
+msgstr ""
+
+#: ../../manager/user-api/events.rst:171 3dc8b18693bb4455bd46a775957c4927
+msgid "``task_cancelled``"
+msgstr ""
+
+#: ../../manager/user-api/events.rst:172 1445974e41564cb0bf6ad6e67bef9818
+msgid ""
+"The background task is cancelled in the middle. Usually this means that the "
+"server is being shutdown for maintenance."
+msgstr ""
+
+#: ../../manager/user-api/events.rst:174 7d46c3e774ed4e8bbd738042f2245725
+#, fuzzy
+msgid "``server_close``"
+msgstr "``:service``"
+
+#: ../../manager/user-api/events.rst:175 ad67591ef8d74a4ea99a0a07026cc318
+msgid ""
+"This event indicates explicit server-initiated close of the event monitoring "
+"connection, which is raised just after the background task is either done/"
+"failed/cancelled. The client should not reconnect because there is nothing "
+"more to monitor about the given task."
+msgstr ""
+
+#: ../../manager/user-api/events.rst:179 5fff509e38394f5aac775e3edfeccb20
+msgid "The event data (per-line JSON objects) include the following fields:"
+msgstr ""
+
+#: ../../manager/user-api/events.rst:188 af5a9d9b57174189bd75070be3387cd1
+#, fuzzy
+msgid "``task_id``"
+msgstr "``:id``"
+
+#: ../../manager/user-api/events.rst:190 56f37d8fb85244a78f77021631575ed7
+msgid "The background task ID."
+msgstr ""
+
+#: ../../manager/user-api/events.rst:191 cea506771e2149ee82989f1ac2a0cdde
+#, fuzzy
+msgid "``current_progress``"
+msgstr "``errors``"
+
+#: ../../manager/user-api/events.rst:192 ../../manager/user-api/events.rst:197
+#: 17fdd2ee5d4d46b0bce6efb31e962915 f83e2c514ad54b549ffeff3917c45f21
+msgid "``int``"
+msgstr "``int``"
+
+#: ../../manager/user-api/events.rst:193 4939f3ccaf47451f83b55f2ee02d0199
+msgid ""
+"The current progress value. Only meaningful for ``task_update`` events. If "
+"``total_progress`` is zero, this value should be ignored."
+msgstr ""
+
+#: ../../manager/user-api/events.rst:196 33f95fa7d2644ad2a3c797891a9e289a
+msgid "``total_progress``"
+msgstr ""
+
+#: ../../manager/user-api/events.rst:198 571e18c122414d279440ff044b8b9fa4
+msgid ""
+"The total progress count. Only meaningful for ``task_update`` events. The "
+"scale may be an arbitrary positive integer. If the total count is not "
+"defined, this may be zero."
+msgstr ""
+
+#: ../../manager/user-api/events.rst:202 46b0024a7e06419db1e10ce2116864d6
+#, fuzzy
+msgid "``message``"
+msgstr "``slug``"
+
+#: ../../manager/user-api/events.rst:204 a9a13ae5441744bfb3a251268da6da38
+msgid ""
+"An optional human-readable message indicating what the task is doing. It may "
+"be ``null``. For example, it may contain the name of agent or scaling group "
+"being worked on for image preload/unload APIs."
+msgstr ""
+
+#: ../../manager/user-api/events.rst:208 adaa79fb8bd1435fa91bc766eca42705
+msgid ""
+"Check out :ref:`the session lifecycle events API <session-lifecycle-events>` "
+"for example client-side Javascript implementations to handle ``text/event-"
+"stream`` responses."
+msgstr ""
+
+#: ../../manager/user-api/events.rst:210 fd226c9219c74b28a930ec62fd7f2e09
+msgid ""
+"If you make the request for the tasks already finished, it may return either "
+"\"404 Not Found\" (the result is expired or the task ID is invalid) or a "
+"single event which is one of ``task_done``, ``task_fail``, or "
+"``task_cancel`` followed by immediate  response disconnection. Currently, "
+"the results for finished tasks may be archived up to one day (24 hours)."
+msgstr ""

@@ -1,0 +1,121 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+# 0f5bd6d355184c2482bfc19991248ac5
+#: ../../client/gsg/installation.rst:2 f3628316e39348a3b7b38a7c974a3e9f
+msgid "Installation"
+msgstr "설치하기"
+
+# 4f1319d791a04b1ea43d6574b87c76bc
+#: ../../client/gsg/installation.rst:5 4be8beb7d0d54dc1892d6f16aa547cdf
+msgid "Linux/macOS"
+msgstr ""
+
+# 348d06ccc9294718a879e4f6d7b99308
+#: ../../client/gsg/installation.rst:7 d1a10c8350054b65a880b76b0702123a
+msgid ""
+"We recommend using `pyenv <https://github.com/pyenv/pyenv>`_ to manage your "
+"Python versions and virtual environments to avoid conflicts with other "
+"Python applications."
+msgstr ""
+
+#: ../../client/gsg/installation.rst:10 c980d3507b624c43bb0213544a1535b8
+msgid ""
+"Create a new virtual environment (Python 3.6 or higher) and activate it on "
+"your shell.  Then run the following commands:"
+msgstr ""
+
+# 90c98126d3cc42c5955eba1dd55c52e7
+#: ../../client/gsg/installation.rst:18 adab81fe3dee47e29a4365489934d2af
+msgid "Create a shell script ``my-backendai-env.sh`` like:"
+msgstr ""
+
+# c251ca34006d49b0b068ac8db5ceef7e
+#: ../../client/gsg/installation.rst:27 126402929e7b4754b2c7433717350dc2
+msgid "Run this shell script before using ``backend.ai`` command."
+msgstr ""
+
+#: ../../client/gsg/installation.rst:31 b4c094b295dd419583a1aa70fe454518
+msgid ""
+"The console-server users should set ``BACKEND_ENDPOINT_TYPE`` to "
+"``session``. For details, check out :doc:`the client configuration document "
+"<config>`."
+msgstr ""
+
+# 2c3ce805cf3e46b89f408fdfe6fcf872
+#: ../../client/gsg/installation.rst:35 f323b3c8993146948b7ddae0f4125b4e
+msgid "Windows"
+msgstr ""
+
+# 06edc0fe633c4854ac461c0d4ac285d5
+#: ../../client/gsg/installation.rst:37 4612de8f9a4748cc90eee176bb72d95b
+msgid ""
+"We recommend using `the Anaconda Navigator <https://www.anaconda.com/"
+"download/>`_ to manage your Python environments with a slick GUI app."
+msgstr ""
+
+#: ../../client/gsg/installation.rst:40 2cc504733d06462688912df64824abdb
+msgid ""
+"Create a new environment (Python 3.6 or higher) and launch a terminal "
+"(command prompt).  Then run the following commands:"
+msgstr ""
+
+# ce7e20dc8d0f4b008bb3228bc8e9f614
+#: ../../client/gsg/installation.rst:48 ec0617404dad4c57a35fb45a07b9d68a
+msgid "Create a batch file ``my-backendai-env.bat`` like:"
+msgstr ""
+
+# 8ae133725e214634a53181992644acfa
+#: ../../client/gsg/installation.rst:59 017cef0236204446948ada80e97a9fe8
+msgid "Run this batch file before using ``backend.ai`` command."
+msgstr ""
+
+# c719c14703004e9288f9c957fbdcbeaf
+#: ../../client/gsg/installation.rst:61 c32c1e8bfb3b40898eebf88a0a13da61
+msgid ""
+"Note that this batch file switches your command prompt to use the UTF-8 "
+"codepage for correct display of special characters in the console logs."
+msgstr ""
+
+# a55aeccbf7aa438ba3b8a545429b8f8c
+#: ../../client/gsg/installation.rst:65 7bb796b8889f46fd9f4f418868245338
+msgid "Verification"
+msgstr ""
+
+# da9af8348ce2464692036e9a4e99b079
+#: ../../client/gsg/installation.rst:67 d7020376e2e04454a4031aa8d13fe917
+msgid ""
+"Run ``backend.ai ps`` command and check if it says \"there is no compute "
+"sessions running\" or something similar."
+msgstr ""
+
+# 98c0bbb7ad464135a80833e7c94e6011
+#: ../../client/gsg/installation.rst:70 8f0ae59289e04aa786fc3b19bcd74195
+msgid ""
+"If you encounter error messages about \"ACCESS_KEY\", then check if your "
+"batch/shell scripts have the correct environment variable names."
+msgstr ""
+
+# b8dc7c9878bc4b8f93a83def0e4bb248
+#: ../../client/gsg/installation.rst:73 7741015d53ff41e0be0834748e0eff27
+msgid ""
+"If you encounter network connection error messages, check if the endpoint "
+"server is configured correctly and accessible."
+msgstr ""

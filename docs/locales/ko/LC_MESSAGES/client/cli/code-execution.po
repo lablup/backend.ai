@@ -1,0 +1,143 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2019, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2020.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 20.03\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2020-07-08 11:33+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.8.0\n"
+
+#: ../../cli/code-execution.rst:2 9be06b60488148aaad89d6c2ea600f6f
+msgid "Advanced Code Execution"
+msgstr "코드 실행하기 (고급)"
+
+#: ../../cli/code-execution.rst:6 427c3c0708be46c8a9a129bd6244f887
+msgid ""
+"Please consult the detailed usage in the help of each command (use ``-h`` or "
+"``--help`` argument to display the manual)."
+msgstr ""
+"각 명령어의 help에서 자세한 사용법을 확인할 것을 권장합니다. help는 ``-h`` 혹"
+"은 ``--help`` 를 명령어의 인자로 입력하여 불러올 수 있습니다."
+
+#: ../../cli/code-execution.rst:11 af0863ccb45f4863aac4fe505d2ced10
+msgid "Running concurrent experiment sessions"
+msgstr "동시 세션 실행하기"
+
+#: ../../cli/code-execution.rst:13 570d013f03ef4d53b0465349f0fc495f
+msgid ""
+"In addition to single-shot code execution as described in :ref:`simple-"
+"execution`, the ``run`` command offers concurrent execution of multiple "
+"sessions with different parameters interpolated in the execution command "
+"specified in ``--exec`` option and environment variables specified as ``-"
+"e`` / ``--env`` options."
+msgstr ""
+"``run`` 명령어는 :ref:`simple-execution` 에 설명되어 있는 단일 세션 실행뿐만 "
+"아니라 여러 세션의 동시 실행 기능을 제공하고, 이 때 ``--exec`` 옵션으로 입력"
+"되는 인수와 ``-e`` / ``--env`` 옵션으로 입력되는 환경 변수가 사용됩니다."
+
+#: ../../cli/code-execution.rst:19 f9759b8e45894830946a2e74f3fe17ce
+msgid ""
+"To define variables interpolated in the ``--exec`` option, use ``--exec-"
+"range``. To define variables interpolated in the ``--env`` options, use ``--"
+"env-range``."
+msgstr ""
+"``--exec`` 옵션에 해당하는 변수를 설정할 때에는 ``--exec-range`` 이 사용되"
+"고, ``--env`` 옵션에 해당하는 변수를 설정할 때에는 ``--env-range`` 이 사용됩"
+"니다. "
+
+#: ../../cli/code-execution.rst:22 ad0ec6247d2341dd86d90a124ff5569b
+msgid ""
+"Here is an example with environment variable ranges that expands into 4 "
+"concurrent sessions."
+msgstr "아래는 4개의 세션을 생성하도록 환경 변수의 범위를 설정하는 예시입니다."
+
+#: ../../cli/code-execution.rst:33 3fab2217e3b841139739d5834ccc0f4d
+msgid ""
+"Both range options accept a special form of argument: \"range expressions\". "
+"The front part of range option value consists of the variable name used for "
+"interpolation and an equivalence sign (``=``). The rest of range expressions "
+"have the following three types:"
+msgstr ""
+"range 옵션은 \"range expressions\" 라는 형식의 인자를 입력 받습니다. range 옵"
+"션의 앞 부분은 해당 변수와 등호(``=``)로 이루어져 있습니다. 뒷 부분은 아래에 "
+"나열된 종류의 형식의 식입니다."
+
+#: ../../cli/code-execution.rst:42 ba0f6e3b40ae45238898f204524e745e
+msgid "Expression"
+msgstr "식 (Expression)"
+
+#: ../../cli/code-execution.rst:43 c0e5c8d3a7524ad8b267b038fe27a29c
+msgid "Interpretation"
+msgstr "설명"
+
+#: ../../cli/code-execution.rst:45 aadfe52dfef74e3fbb9763c28197ee4b
+msgid "``case:CASE1,CASE2,...,CASEN``"
+msgstr "``case:CASE1,CASE2,...,CASEN``"
+
+#: ../../cli/code-execution.rst:46 a611958faf454da8a4a53370c573756c
+msgid "A list of discrete values. The values may be either string or numbers."
+msgstr "문자열 또는 숫자로 구성된 배열"
+
+#: ../../cli/code-execution.rst:48 675f299a3cde48f3a8edd7dae0779ae9
+msgid "``linspace:START,STOP,POINTS``"
+msgstr "``linspace:START,STOP,POINTS``"
+
+#: ../../cli/code-execution.rst:49 f4ceacb8614c45548f4fb1fdc829c304
+msgid ""
+"An inclusive numerical range with discrete points, in the same way of "
+"``numpy.linspace()``.  For example, ``linspace:1,2,3`` generates a list of "
+"three values: 1, 1.5, and 2."
+msgstr ""
+"``numpy.linspace()`` 와 같은 문법으로 정의되는 구간의 값들. 예를 들어 "
+"``linspace:1,2,3`` 은 길이가 3인 배열 [1, 1.5, 2]을 생성합니다."
+
+#: ../../cli/code-execution.rst:53 3b28ecfd20a94dc89039a4bcfc01d417
+msgid "``range:START,STOP,STEP``"
+msgstr "``range:START,STOP,STEP``"
+
+#: ../../cli/code-execution.rst:54 6bf89a06f92549cc8f3d006079ee9e74
+msgid ""
+"A numerical range with the same semantics of Python's :func:`range`. For "
+"example, ``range:1,6,2`` generates a list of values: 1, 3, and 5."
+msgstr ""
+"파이썬의 :func:`range` 와 같은 문법으로 정의되는 수의 범위 (range). 예를 들"
+"어 ``range:1,6,2`` 은 배열 [1, 3, 5]을 생성합니다."
+
+#: ../../cli/code-execution.rst:58 74e8edb6d071460fad28da82ebbe4222
+msgid ""
+"If you specify multiple occurrences of range options in the ``run`` command, "
+"the client spawns sessions for *all possible combinations* of all values "
+"specified by each range."
+msgstr ""
+"``run`` 명령어에 여러 개의 range 옵션을 입력하면 클라이언트는 각 범위로 정의"
+"된 값들의 모든 조합에 해당하는 개수의 세션을 생성합니다."
+
+#: ../../cli/code-execution.rst:64 dec1f5f51b064a929c798e2d4ed8579e
+msgid ""
+"When your resource limit and cluster's resource capacity cannot run all "
+"spawned sessions at the same time, some of sessions may be queued and the "
+"command may take a long time to finish."
+msgstr ""
+"생성된 세션을 실행하기 위한 사용자 혹은 클러스터의 자원이 부족하면 일부 세션"
+"은 큐에 추가되어 커맨드가 실행되는 데에 오랜 시간이 걸릴 수 있습니다."
+
+#: ../../cli/code-execution.rst:70 be5e280524574004bd788e8f548d0efc
+msgid ""
+"Until all cases finish, the client must keep its network connections to the "
+"server alive because this feature is implemented in the client-side. Server-"
+"side batch job scheduling is under development!"
+msgstr ""
+"위의 기능은 클라이언트에서 구현되었기 때문에 모든 케이스가 완료 될 때까지 클"
+"라이언트는 서버와의 연결을 유지해야 합니다. 서버의 batch job 스케줄링은 현재 "
+"개발 중입니다!"

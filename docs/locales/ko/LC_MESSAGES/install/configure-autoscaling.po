@@ -1,0 +1,90 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/configure-autoscaling.rst:3 3abe6d931bbe437491b4d393a10dd090
+msgid "Configure Autoscaling"
+msgstr "자동 확장 구성"
+
+#: ../../install/configure-autoscaling.rst:5 a1694d1033074db6b2ef9e0eb2189fc3
+msgid ""
+"Autoscaling strategies may vary cluster by cluster. Here we introduce a "
+"brief summary of high-level guides. (More details about configuring Backend."
+"AI will follow soon.)"
+msgstr ""
+"자동 확장 전략은 클러스터마다 다를 수 있습니다. 여기서는 고급 가이드에 대한 "
+"간략한 요약을 소개합니다. (Backend.AI 구성에 대한 자세한 내용은 곧 제공 될 것"
+"입니다.)"
+
+#: ../../install/configure-autoscaling.rst:10 05001bc19a4a4c8d92afb7309c59ad57
+msgid "ASG (Auto-scaling Group)"
+msgstr "Autoscaling 그룹"
+
+#: ../../install/configure-autoscaling.rst:12 fda90458c6874829b7138e1f8ab44f14
+msgid ""
+"AWS and other cloud providers offer auto-scaling groups so that they control "
+"the number of VM instances sharing the same base image within certain limits "
+"depending on the VMs' CPU utilization or other resource metrics. You could "
+"use this model for Backend.AI, but we recommend some customization due to "
+"the following reasons:"
+msgstr ""
+"AWS 및 기타 클라우드 제공 업체는 Autoscaling 그룹을 제공하여 VM의 CPU 사용률 "
+"또는 기타 리소스 지표에 따라 특정 제한 내에서 동일한 기본 이미지를 공유하는 "
+"VM 인스턴스 수를 제어합니다.이 모델을 Backend.AI에 사용할 수 있지만, 다음과 "
+"같은 이유로 커스터마이징을 권장합니다."
+
+#: ../../install/configure-autoscaling.rst:16 5a956942d44d47599979632a01502b9b
+msgid ""
+"Backend.AI's kernels are allocated a fixed and isolated amount of resources "
+"even when they do not use that much. So simple resource metering may expose "
+"\"how busy\" the spawned kernels are but not \"how many\" kernels are "
+"spwned. In the perspective of Backend.AI's scheduler, the latter is much "
+"more important."
+msgstr ""
+"Backend.AI 의 커널은 그렇게 많이 사용하지 않더라도 고정되고 고립된 양의 리소"
+"스를 할당합니다. 따라서 간단한 리소스 측정은 \"얼마나 많은 커널이 생성되었는"
+"지\" 가 아닌 \"생성된 커널의 사용량이 얼마나 많은지\" 노출시킬 수 있습니다. "
+"Backend.AI의 스케줄러 관점에서는, 전자가 훨씬 더 중요합니다. "
+
+#: ../../install/configure-autoscaling.rst:17 685c9e1af0cb41df82b651232b2a8dcb
+msgid ""
+"Backend.AI tries to maintain low latency when spawning new compute sessions. "
+"This means that it requires to keep a small number of VM instances to be at "
+"a \"hot\" ready state -- maybe just running idle ones or stopped ones for "
+"fast booting. If the cloud provider supports such fine-grained control, it "
+"is best to use their options. We are currently under development of Backend."
+"AI's own fine-grained scaling."
+msgstr ""
+"Backend.AI는 새로운 컴퓨팅 세션을 생성할때 낮은 지연 시간을 유지하려고 합니"
+"다. 즉, 적은 수의 VM 인스턴스를 \"핫\" 준비 상태(--유휴 인스턴스를 실행 중이"
+"거나 빠른 부팅을 위해 중지된 인스턴스 일 수 있습니다)로 유지해야합니다. 만약 "
+"클라우드 제공자가 그러한 세밀한 조절을 제공한다면, 해당 옵션을 사용하는 것이 "
+"가장 좋은 방법일 것입니다. 저희는 현재 Backend.AI의 고유한 세밀한 스케일링을 "
+"개발중에 있습니다. "
+
+#: ../../install/configure-autoscaling.rst:18 ef1a188a9c744f2caa46252e83e4e55b
+msgid ""
+"The Backend.AI scheduler treats GPUs as the first-class citizen like CPU "
+"cores and main memory for its capacity planning. Traditional auto-scaling "
+"metrics often miss this, so you need to set up a custom metric using vendor-"
+"specific ways."
+msgstr ""
+"Backend.AI 스케줄러는 용량 계획을 위해 GPU를 CPU 코어와 주 메모리와 같은 1급 "
+"객체로 취급합니다. 기존의 자동 스케일링 메트릭은 종종 이를 놓치기 때문에 벤더"
+"별 방법으로 사용자 지정 메트릭을 설정해야 합니다. "

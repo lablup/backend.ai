@@ -1,0 +1,206 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/server-concepts.md:1 4fe4d1af8cb2450c99331bade63f98c3
+msgid "## Server Concepts"
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:3 8c3c48a2625647ba89cd0a82c5415800
+msgid ""
+"Here we describe what the core components of Backend.AI do and why/how we "
+"use 3rd-party components."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:5 76b88b45a8e0450d9c991a24204f1428
+msgid ""
+"<img src=\"https://raw.githubusercontent.com/wiki/lablup/backend.ai/images/"
+"server-architecture.svg?sanitize=true\" alt=\"Server architecture diagram\">"
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:7 e5f79c4e528b4cb6b095d50ef6feac48
+msgid ""
+"The above diagram shows a brief Backend.AI server-side architecture where "
+"the components are what you need to install and configure."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:9 f02ec77cc87c4bc78cbaf2bb423ca079
+msgid ""
+"Each border-connected group of components is intended to be run on the same "
+"server, but you may split them into multiple servers or merge different "
+"groups into a single server as you need. For example, you can run separate "
+"servers for the nginx reverse-proxy and the Backend.AI manager or run both "
+"on a single server. In the [[development setup]], all these components run "
+"on a single PC such as your laptop."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:13
+#: 62dde1519d574b6798a16afc69c2f5b3
+msgid ""
+"### Kernels ![#c1e4f7](https://placehold.it/15/c1e4f7/000000?text=+) !"
+"[#e5f5ff](https://placehold.it/15/e5f5ff/000000?text=+)"
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:15
+#: c349edbed718466382a1f12183918762
+msgid ""
+"In Backend.AI, we generally call the containers spawned upon user requests "
+"as kernels. In detail, what the user requests is a compute session (with "
+"user-provided options), and kernels are the members of that session. This "
+"means that a single compute session may have multiple kernels across "
+"different agent servers for parallel and distribute processing."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:19
+#: 387ac89019b847eb994c0bab01063e5f
+msgid ""
+"Note that all kernel images must be downloaded during Backend.AI "
+"installation. Each agent may have different sets of kernel images: for "
+"instance, you could set up a cluster where GPU servers have GPU-enabled "
+"kernels only while CPU-only servers have other generic programming language "
+"kernels."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:22
+#: c27310bb255341c1a8f38aaefa644319
+msgid ""
+"### Manager and Agents ![#fafafa](https://placehold.it/15/fafafa/000000?text="
+"+)"
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:24
+#: 207752c10ce441ea9d265e63d0600fd5
+msgid ""
+"Backend.AI manager is the central governor of the cluster. It accepts user "
+"requests, creates/destroys the kernels, and routes code execution requests "
+"to appropriate agents and kernels. It also collects the output of kernels "
+"and responds the users with them."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:28
+#: c1c982b843284c16922dff18eed79050
+msgid ""
+"Backend.AI agent is a small daemon installed onto individual worker servers "
+"to control them. It manages and monitors the lifecycle of kernel containers, "
+"and also mediates the input/output of kernels. Each agent also reports the "
+"resource capacity and status of its server, so that the manager can assign "
+"new kernels on idle servers to load balance."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:32
+#: 18e4a7f205ba414a9bd123b3161ec511
+msgid ""
+"### Cluster Networking ![#99d5ca](https://placehold.it/15/99d5ca/000000?text="
+"+) ![#202020](https://placehold.it/15/202020/000000?text=+)"
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:34
+#: 24b423646d5b4353a3544812cc437a3d
+msgid ""
+"You may use your own on-premise server farm or a public cloud service such "
+"as AWS, GCP, or Azure. The primary requirements are:"
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:37
+#: 8dcd2a0fdfce4a15beaabaf812f42565
+msgid ""
+"The manager server (the HTTPS 443 port) should be exposed to the public "
+"Internet or the network that your client can access."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:38
+#: 0eb85da468754a87982683ee07b4d59f
+msgid ""
+"The manager, agents, and all other database/storage servers should reside at "
+"the same local private network where any traffic between them are "
+"transparently allowed."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:39
+#: c8fc6a25e8e543df88179d8a6d2b66cf
+msgid ""
+"For high-volume big-data processing, you may want to separate the network "
+"for the storage using a secondary network interface on each server."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:41
+#: f3ae500ccb474bf2bf53e70bf7765da6
+msgid "### Databases ![#ffbbb1](https://placehold.it/15/ffbbb1/000000?text=+)"
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:43
+#: 7bb6343a797a4d8b96e5874e4f17b9b0
+msgid ""
+"Redis and PostgreSQL are used to keep track of liveness of agents and "
+"compute sessions (which may be composed of one or more kernels). They also "
+"store user metadata such as keypairs and resource usage statistics. You can "
+"just follow standard installation procedures for them. To spin up your "
+"Backend.AI cluster for the first time, you need to load the SQL schema into "
+"the PostgreSQL server, but nothing is required for the Redis server. Please "
+"check out the installation guides for details."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:49
+#: 924b23fcd78d47b8bd639722533aaa47
+msgid "### etcd ![#d1bcd2](https://placehold.it/15/d1bcd2/000000?text=+)"
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:51
+#: 75ecdcf7052a407eb298095f00babdf8
+msgid ""
+"etcd is used to share configurations across all the manager and agent "
+"servers. To spin up your Backend.AI cluster for the first time, you need to "
+"preload some data into the etcd. Please check out the installation guides "
+"for details."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:55
+#: 36eb856d05c1435b87eaa28325cdb0fd
+msgid ""
+"### Network Storage ![#ffdba9](https://placehold.it/15/ffdba9/000000?text=+)"
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:57
+#: b8f6e325ef6748e6a02c549450c1fdc7
+msgid ""
+"The network storage is used for providing \"virtual folder\" functions. The "
+"client users may create their own virtual folders to copy data files and "
+"shared library files, and then mount the virtual folder when spawning a new "
+"compute session to access them like local files."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:60
+#: 449b94b38a0a4f5da26ffea1f20858ec
+msgid ""
+"The implementation can be anything that provides a local mount point at each "
+"server including both the manager and agents—Backend.AI only requires a "
+"known local UNIX path as configuration that must be same across all manager "
+"and agnet servers. Common setups may use a dedicated NFS or SMB server, but "
+"for more scalability, one might want to use distributed file systems such as "
+"GlusterFS or Alluxio where their local agents run on each Backend.AI agent "
+"servers providing fast in-memory cache while backed by another storage "
+"server/service such as AWS S3."
+msgstr ""
+
+#: ../../install/_archive/server-concepts.md:63
+#: 1e9b7c201db942358ea877940f0dabdb
+msgid ""
+"For local development setup, you may simply use a local empty directory for "
+"this."
+msgstr ""

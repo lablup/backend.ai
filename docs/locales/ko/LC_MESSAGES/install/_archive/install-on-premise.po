@@ -1,0 +1,68 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/install-on-premise.md:1
+#: 3e6a0985aba249788f176c0475476331
+msgid "# Install on Premise"
+msgstr ""
+
+#: ../../install/_archive/install-on-premise.md:3
+#: a09e1ec1c9584c15837af0438378a38e
+msgid ""
+"Prepare the instances and databases. - 1x SSL certificate with a private key "
+"for your own domain (for production) - 1x gateway server - 1x agent server - "
+"1x PostgreSQL server - 1x Redis server - 1x etcd cluster"
+msgstr ""
+
+#: ../../install/_archive/install-on-premise.md:10
+#: 1702d0d037c84f7a9f3b1940525f21b6
+msgid ""
+"It is up to you whether to setup a HA-enabled multi-server cluster or a "
+"single-server cluster with backups."
+msgstr ""
+
+#: ../../install/_archive/install-on-premise.md:11
+#: 6cc94b487abe4d6e821ef318d1354eb1
+msgid ""
+"Check out [[this page|Install etcd]] for details. If you install etcd on the "
+"same instance where the manager runs, you could try using docker-compose "
+"configuration in this meta-repository's code."
+msgstr ""
+
+#: ../../install/_archive/install-on-premise.md:12
+#: 8259b167232e478f92293b9a32ca25dd
+msgid ""
+"1x network-accessible storage server (NAS) with NFS/SMB mounts - All should "
+"be in the same private network (LAN)."
+msgstr ""
+
+#: ../../install/_archive/install-on-premise.md:14
+#: e5e05b5c58a74d8e9dfb557ea23b93d5
+msgid ""
+"Depending on the cluster size, different service daemons may run on the same "
+"physical server."
+msgstr ""
+
+#: ../../install/_archive/install-on-premise.md:15
+#: 85eed281646146eca676eed52d189a5f
+msgid ""
+"1. [Install Manager](install/install-manager.md) 1. [Install Agent](install/"
+"install-agent.md)"
+msgstr ""

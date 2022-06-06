@@ -1,0 +1,111 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../client/dev/examples.rst:2 e6270e201eca4c3d8f0c322f9d596ec5
+msgid "Examples"
+msgstr ""
+
+#: ../../client/dev/examples.rst:5 1ef2515bf6764f838212d79e1424f45d
+msgid "Synchronous-mode execution"
+msgstr ""
+
+#: ../../client/dev/examples.rst:8 39053a7d17fc4452bc9254ef13be9b7a
+msgid "Query mode"
+msgstr ""
+
+#: ../../client/dev/examples.rst:10 7ac162b2a25a42138ab8d4694d351e51
+msgid ""
+"This is the minimal code to execute a code snippet with this client SDK."
+msgstr ""
+
+#: ../../client/dev/examples.rst:40 84ff54e3e7374ba1a42e0ed558cd2f92
+msgid ""
+"You need to take care of ``client_token`` because it determines whether to "
+"reuse kernel sessions or not. Backend.AI cloud has a timeout so that it "
+"terminates long-idle kernel sessions, but within the timeout, any kernel "
+"creation requests with the same ``client_token`` let Backend.AI cloud to "
+"reuse the kernel."
+msgstr ""
+
+#: ../../client/dev/examples.rst:48 0a03a4c7e8014c44a3eeccd9cab08772
+msgid "Batch mode"
+msgstr ""
+
+#: ../../client/dev/examples.rst:50 efcf16c90c8d4df38026446350d6fdd8
+msgid ""
+"You first need to upload the files after creating the session and construct "
+"a ``opts`` struct."
+msgstr ""
+
+#: ../../client/dev/examples.rst:89 c2f3389a4cb240b2b35e70f44044c629
+msgid "Handling user inputs"
+msgstr ""
+
+#: ../../client/dev/examples.rst:91 68a5855a4a914ab0929fb5aacd3f3a23
+msgid ""
+"Inside the while-loop for ``kern.execute()`` above, change the if-block for "
+"``result['status']`` as follows:"
+msgstr ""
+
+#: ../../client/dev/examples.rst:110 7780a7b421d4457f813f626122acc0f8
+msgid "A common gotcha is to miss setting ``mode = 'input'``. Be careful!"
+msgstr ""
+
+#: ../../client/dev/examples.rst:114 df2014be8a7742ae9d63d3134cd35ba1
+msgid "Handling multi-media outputs"
+msgstr ""
+
+#: ../../client/dev/examples.rst:116 0dc87cf31c664ad2b9d8ad3fb9cf5d37
+msgid "The ``handle_media()`` function used above examples would look like:"
+msgstr ""
+
+#: ../../client/dev/examples.rst:125 c3ef582a90c943ef853239da7847d7e5
+msgid ""
+"The exact method to process ``media_data`` depends on the ``media_type``. "
+"Currently the following behaviors are well-defined:"
+msgstr ""
+
+#: ../../client/dev/examples.rst:128 a440630122f24138a27e1e6be12c6fe9
+msgid "For (binary-format) images, the content is a dataURI-encoded string."
+msgstr ""
+
+#: ../../client/dev/examples.rst:129 7d176da1ecd4489ea41c3d484cb457fa
+msgid ""
+"For SVG (scalable vector graphics) images, the content is an XML string."
+msgstr ""
+
+#: ../../client/dev/examples.rst:130 4bdc70987e68425399963e056d48fdf2
+msgid ""
+"For ``application/x-sorna-drawing``, the content is a JSON string that "
+"represents a set of vector drawing commands to be replayed the client-side "
+"(e.g., Javascript on browsers)"
+msgstr ""
+
+#: ../../client/dev/examples.rst:136 3d26fe9f011b4cb5af576e50d1127313
+msgid "Asynchronous-mode Execution"
+msgstr ""
+
+#: ../../client/dev/examples.rst:138 fca2902160844cb38d326e7a8e2f6814
+msgid ""
+"The async version has all sync-version interfaces as coroutines but comes "
+"with additional features such as ``stream_execute()`` which streams the "
+"execution results via websockets and ``stream_pty()`` for interactive "
+"terminal streaming."
+msgstr ""

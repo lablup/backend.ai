@@ -1,0 +1,149 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/demo-setup.md:1 72b26208e0c24375874f0dd6fd58e477
+msgid "# Demo Setup"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:3 406460d6e32b4ecd94adc0156baa7aec
+msgid ""
+"[This meta-repository](https://github.com/lablup/backend.ai) provides a "
+"docker-compose configuration to fire up a single-node Backend.AI cluster "
+"running on your PC (http://localhost:8081)."
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:5 d38a7035be9c45c9ac8f4d7626e480f3
+msgid ""
+"## Prerequisites * All: [install Docker 17.06 or later](https://docs.docker."
+"com/install/) with [docker-compose v1.21 or later](https://docs.docker.com/"
+"compose/install/) * Linux users: change \"docker.for.mac.localhost\" in "
+"docker-compose.yml to \"172.17.0.1\""
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:9 eb391089e4834af297740bdeb7caccbe
+msgid "### Notes * This demo setup does *not* support GPUs."
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:12 c01540ad4acd42768f81a6c33ddbc468
+msgid "## All you have to do"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:14 6373f655931046f0ae1e94ade805354c
+msgid "Clone the repository"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:15 e5fe2b9be6454927919f8a8da25bca67
+msgid "Check out the prerequisites above"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:16 d9cb8e9ca19449568fd93e6265c79919
+msgid ""
+"`docker-compose up -d` - For Windows, `docker-compose -f docker-compose.win-"
+"demo.yml up -d`"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:18 fa74c10f97ef4f348b4be4111169c515
+msgid "Pull some kernel images to try out"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:20 ecd579d53a7c40688252ea933a10e99f
+msgid "### Pulling kernel images"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:22 220ff6b92136498fa00da74f7f8e4d5c
+msgid "Pull the images on your host Docker daemon like:"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:24 bf4cbace1674483785aae46eaa52c5a8
+msgid ""
+"``` $ docker pull lablup/kernel-python:latest $ docker pull lablup/kernel-"
+"python-tensorflow:latest-dense $ docker pull lablup/kernel-c:latest ```"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:30 508a1a8995b74325b5e60959f2e7a685
+msgid ""
+"By default this demo cluster already has metadata/alias information for [all "
+"publicly available Backend.AI kernels](https://github.com/lablup/backend.ai-"
+"kernels), so you don't have to manually register the pulled kernel "
+"information to the cluster but only have to *pull* those you want to try out."
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:32 6928131c03e34dc9b18c79df3e3f9fc1
+msgid "### Using Clients"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:34 0e97ff7b275d4a6b87e28f054737bfea
+msgid ""
+"To access this local cluster, set the following configurations to your "
+"favoriate Backend.AI client:"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:36 962a1b13dad14f299d1d9276d01f0008
+msgid ""
+"```console $ export BACKEND_ENDPOINT=\"http://localhost:8081\" $ export "
+"BACKEND_ACCESS_KEY=\"AKIAIOSFODNN7EXAMPLE\" $ export BACKEND_SECRET_KEY="
+"\"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\" ```"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:42 d91a2aad98554d839f79a9d27a008acf
+msgid ""
+"With [our official Python client](http://pypi.python.org/pypi/backend.ai-"
+"client), you can do:"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:44 6d9ab07294bd418f8f333c0caf2a0790
+msgid ""
+"```console $ backend.ai run python -c \"print('hello world')\" ✔ Session "
+"9c737d84724173354fa10445d0b35fe0 is ready. hello world ✔ Finished. (exit "
+"code = 0)"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:50 499aefb6be024e0fb7fd4daf992f2ce9
+msgid ""
+"$ backend.ai run python-tensorflow:latest-dense -c \"import tensorflow as "
+"tf; print(tf.__version__)\" ✔ Session 950713741d5ed43a191704f2cd375ff0 is "
+"ready. 1.5.0 ✔ Finished. (exit code = 0) ```"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:56 2771c462eaa8444db3fb3c6e419c2b2e
+msgid ""
+"WARNING: This demo configuration is highly insecure. DO NOT USE in "
+"production!"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:58 78b2a177c0c045d18e9579197e81ab00
+msgid "## FAQ"
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:60 3be8d4a94d484e2e9432a38f8070d9ed
+msgid ""
+"When launching a kernel, it says \"Service Unavailable\"! - Each image has "
+"different default resource requirements and your Docker daemon may have a "
+"too small amount of resources. For example, TensorFlow images require 8 GiB "
+"or more RAM for your Docker daemon. - Or, you might have launched 30 kernel "
+"sessions already, which is the default limit for this demo setup."
+msgstr ""
+
+#: ../../install/_archive/demo-setup.md:63 d5d19a3f2ec045a4b535861507c463d3
+msgid ""
+"What does the \"dense\" tag mean in the TensorFlow kernel images? - Images "
+"with \"dense\" tags are optimized for shared multi-tenancy environments. "
+"There is no difference in functionalities."
+msgstr ""

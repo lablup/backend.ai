@@ -1,0 +1,114 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/install-python-via-pyenv.rst:5
+#: d096568d57864809b9df8fce102f2c5f
+msgid ""
+"We highly recommend `pyenv <https://github.com/pyenv/pyenv>`_ to install "
+"multiple Python versions side-by-side, which does not interfere with system-"
+"default Pythons."
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:-1
+#: 3558b7c716db439ebebf761030149ae8
+msgid "asciicast"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:15
+#: 75a444ebe26a42c8bc54bef0f5073af9
+msgid "Install dependencies for building Python"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:18
+#: 0c0efe0f0eb04b26a0b95d59e103e8dc
+msgid "Ubuntu"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:30
+#: 6fa280233be54bd2b087d0930ea7a7d6
+msgid "CentOS / RHEL"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:32
+#: 94dfd2b4e2f94aca9c9091c0e2003845
+msgid "(TODO)"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:35
+#: 68d423fc9e264c13b1e8f31300263e4e
+msgid "Install pyenv"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:37
+#: 93a7c8f68b3a44f7a49dca49d0e0606d
+msgid ""
+"**NOTE:** Change ``~/.profile`` accroding to your shell/system (e.g., ``~/."
+"bashrc``\\ , ``~/.bash_profile``\\ , ``~/.zshrc``\\ , ...) -- whichever "
+"loaded at startup of your shell!"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:55
+#: a34a739bdf0e455d9c75abca074bf82b
+msgid "Install pyenv's virtualenv plugin"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:67
+#: 1d52b6107d0449f3b8051c69e9ffad72
+msgid "Install Python via pyenv"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:69
+#: 183bdd0d59794f93881cd6837ef5f571
+msgid "Install Python 3.6 latest version.\\ :raw-html-m2r:`<br>`"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:72
+#: 707fab6891054a60a00ccf87fcb843a0
+msgid "Currently Python 3.7 is not supported yet."
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:79
+#: 086781cbd33245359899b6644c5ab007
+msgid "Create a virtualenv using a specific Python version"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:81
+#: 45a4205572ab47f29c2908c31404f91f
+msgid "Change ``myvenv`` to specific names required in other guide pages."
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:88
+#: 3fa8e022aec5418e8c3272e482ea93a9
+msgid "Activate the virtualenv for the current shell"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:95
+#: 9e946605dd0740e092c4203ea336e30a
+msgid "Activate the virtualenv when your shell goes into a directory"
+msgstr ""
+
+#: ../../install/install-python-via-pyenv.rst:105
+#: 15d092f119f443fc9eee1027a4cb7a59
+msgid ""
+"`pyenv local` creates a hidden `.python-version` file at each directory "
+"specifying the Python version/virtualenv recongnized by pyenv. Any pyenv-"
+"enabled shells will automagically activate/deactivate this version/"
+"virtualenv when going in/out such directories."
+msgstr ""

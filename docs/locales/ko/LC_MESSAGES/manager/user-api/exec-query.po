@@ -1,0 +1,397 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/user-api/exec-query.rst:2 5347a2fa862c4546aa831d676b11dc83
+msgid "Code Execution (Query Mode)"
+msgstr "코드 실행 (쿼리 모드)"
+
+#: ../../manager/user-api/exec-query.rst:5 fe89b80046d94c2e89e912c876b9058e
+msgid "Executing Snippet"
+msgstr "실행중인 스니펫"
+
+#: ../../manager/user-api/exec-query.rst:7 a7112ba7123c4137a613e6c9bfd5d57e
+msgid "URI: ``/session/:id``"
+msgstr "URI: ``/session/:id``"
+
+#: ../../manager/user-api/exec-query.rst:8
+#: ../../manager/user-api/exec-query.rst:256
+#: ../../manager/user-api/exec-query.rst:346 2291410607fc4e6d887a8e9c09ccaaec
+#: 58f254e679dd4034a088ae7f30c18a13 a9c39760b0e54d61a7062e153faf9e1e
+msgid "Method: ``POST``"
+msgstr "Method: ``POST``"
+
+#: ../../manager/user-api/exec-query.rst:10 29c3faa19f7542eb8223f50a26b4fcde
+#, fuzzy
+msgid ""
+"Executes a snippet of user code using the specified session. Each execution "
+"request to a same session may have side-effects to subsequent executions. "
+"For instance, setting a global variable in a request and reading the "
+"variable in another request is completely legal. It is the job of the user "
+"(or the front-end) to gaurantee the correct execution order of multiple "
+"interdependent requests. When the session is terminated or restarted, all "
+"such volatile states vanish."
+msgstr ""
+"지정된 세션을 사용해서 사용자 코드 스니펫을 실행합니다. 동일한 세션에 대한 "
+"각 실행 요청은 후속 실행 시 부작용을 일으킬 수 있습니다. 예를 들어, 요청에서 "
+"전역 변수를 설정하고 다른 요청에서 변수를 읽는 것은 완전히 합법적입니다. 복수"
+"의 상호 의존적 요청의 정확한 실행 순서를 보장하는 것은 사용자(혹은 front-end)"
+"의 일입니다. 세션이 종료되거나 다시 시작되면, 모든 휘발적 상태는 사라집니다."
+
+#: ../../manager/user-api/exec-query.rst:17
+#: ../../manager/user-api/exec-query.rst:259
+#: ../../manager/user-api/exec-query.rst:349 13e302941e6b4e54bfe633207bb7e41e
+#: 37b1b9831f054238bd30d22edeb9f61a 487068000eb140cbbdd1b08a00e136c5
+msgid "Parameters"
+msgstr "매개변수들"
+
+#: ../../manager/user-api/exec-query.rst:23
+#: ../../manager/user-api/exec-query.rst:265
+#: ../../manager/user-api/exec-query.rst:355 24a1286ac8b84485866669e601f208fb
+#: 539a1bdc31a0455a9e3f4da1dac7467c 9be1675218b54be6b870c3fb7c2d07fb
+msgid "Parameter"
+msgstr "매개변수"
+
+#: ../../manager/user-api/exec-query.rst:24
+#: ../../manager/user-api/exec-query.rst:71
+#: ../../manager/user-api/exec-query.rst:266
+#: ../../manager/user-api/exec-query.rst:319
+#: ../../manager/user-api/exec-query.rst:356 122d4261bb9748ed9285abbb2dbfd189
+#: 23d9a506933948c88972ef81047fc309 88b7700914ba4726abbbd41d78117129
+#: 8f41df9f863e496eb2fb68a68196e170 ce4b130b076c40db8e251ad8c7683af9
+msgid "Type"
+msgstr "타입"
+
+#: ../../manager/user-api/exec-query.rst:25
+#: ../../manager/user-api/exec-query.rst:61
+#: ../../manager/user-api/exec-query.rst:267
+#: ../../manager/user-api/exec-query.rst:309
+#: ../../manager/user-api/exec-query.rst:357
+#: ../../manager/user-api/exec-query.rst:370 24d5b952997e40fa929d9e46ff2fece4
+#: 4bd534500fed4b8dbc10bf631533cdce 4c62d8df324c45c0aae591ec9c6f5c5f
+#: 4de8b5736dcd457fb8b4ab7358c7df93 51ce3a4176294e118d3c844237c0e1d1
+#: f5f0760e1f4640ba8f5adc37b8a391d8
+msgid "Description"
+msgstr "설명"
+
+#: ../../manager/user-api/exec-query.rst:26
+#: ../../manager/user-api/exec-query.rst:268
+#: ../../manager/user-api/exec-query.rst:358 38f21f35320642be8aec61f5fa4cf61c
+#: 44016a8235e743f6a93296204e7e5675 948df14e8de64d3da23f8e03e7c356ab
+msgid "``:id``"
+msgstr "``:id``"
+
+#: ../../manager/user-api/exec-query.rst:27
+#: ../../manager/user-api/exec-query.rst:269
+#: ../../manager/user-api/exec-query.rst:359 7a5ae158c37b4ebb81ece823287876b7
+#: bfb66dd8bfc347208b2cb1493b0f6f47 d5bdab995b004a08888005d8bcccda55
+msgid "``slug``"
+msgstr "``slug``"
+
+#: ../../manager/user-api/exec-query.rst:28
+#: ../../manager/user-api/exec-query.rst:270
+#: ../../manager/user-api/exec-query.rst:360 4810fb21b75840a4b48697a82ecfd80b
+#: 4ae7d44284754548b9a8a3a484741a77 d1c03e9750f5480c8e85755e15d4ec2c
+#, fuzzy
+msgid "The session ID."
+msgstr "세션 ID."
+
+#: ../../manager/user-api/exec-query.rst:29 baedc4053c934f158efd1f5f96d832c5
+msgid "``mode``"
+msgstr "``mode``"
+
+#: ../../manager/user-api/exec-query.rst:30
+#: ../../manager/user-api/exec-query.rst:33
+#: ../../manager/user-api/exec-query.rst:37
+#: ../../manager/user-api/exec-query.rst:272
+#: ../../manager/user-api/exec-query.rst:275
+#: ../../manager/user-api/exec-query.rst:278 0f4651d3adf4435db1d188620714ead4
+#: 1e2b2a344f9847cc895358c36a16d3ea 821436f08e844c9e8b999645539233d3
+#: b6fe7e70e6c947abab638ac1f9efc5b9 cf719b258c0845dba2a2beb1a88f12d6
+#: f9af934ff60d482aa01d7a379d915db8
+msgid "``str``"
+msgstr "``str``"
+
+#: ../../manager/user-api/exec-query.rst:31 1212a3e75487421bb8996ac3d63adf7b
+msgid "A constant string ``\"query\"``."
+msgstr "상수 문자열 ``\"query\"``."
+
+#: ../../manager/user-api/exec-query.rst:32
+#: ../../manager/user-api/exec-query.rst:271 0ed6ca0222054ca495c0d3c866f6a526
+#: c0e7b1b86f1846c48447067154e93d2a
+msgid "``code``"
+msgstr "``code``"
+
+#: ../../manager/user-api/exec-query.rst:34 79269fe8bdff4cefb6c78932e0199b68
+#, fuzzy
+msgid ""
+"A string of user-written code. All non-ASCII data must be encoded in UTF-8 "
+"or any format acceptable by the session."
+msgstr ""
+"사용자가 쓴 코드 문자열입니다. 모든 non-ASCII 데이터는 반드시 UTF-8이나 커널"
+"에서 허용하는 다른 형식으로 인코딩되어야 합니다."
+
+#: ../../manager/user-api/exec-query.rst:36 d8f988153a01478fa85c786191b8ecb4
+msgid "``runId``"
+msgstr "``runId``"
+
+#: ../../manager/user-api/exec-query.rst:38 f13b55fa03654e3b945b5ae3d9daad75
+msgid ""
+"A string of client-side unique identifier for this particular run. For more "
+"details about the concept of a run, see :ref:`code-execution-model`. If not "
+"given, the API server will assign a random one in the first response and the "
+"client must use it for the same run afterwards."
+msgstr ""
+"특정 실행을 위한 클라이언트측 고유 식별자 문자열 입니다. 해당 실행 개념에 대"
+"한 자세한 사항은 \"ref\"`code-execution-model`을 참조하십시오. 문자열이 주어"
+"지지 않는다면, API 서버가 첫 번째 응답에 임의로 하나를 할당할 것이고 클라이언"
+"트는 이후 같은 실행에서 이를 사용해야만 합니다."
+
+#: ../../manager/user-api/exec-query.rst:42
+#: ../../manager/user-api/exec-query.rst:287
+#: ../../manager/user-api/exec-query.rst:331 64e547bd5f4f4a8fb3542000e6dcd814
+#: 72a5fe57f2dc41a8a8512f94538d1219 a0862e28b55542b28607f950b79bdfda
+msgid "**Example:**"
+msgstr "**예시:**"
+
+#: ../../manager/user-api/exec-query.rst:54
+#: ../../manager/user-api/exec-query.rst:302
+#: ../../manager/user-api/exec-query.rst:363 491ec6ba9a934d229d5f7d1704f1981b
+#: 4d6b37a5bb344e598ab9abaddfdbe6ea dd10cfe1513e4fa2bf06a7c3f9959d33
+msgid "Response"
+msgstr "응답"
+
+#: ../../manager/user-api/exec-query.rst:60
+#: ../../manager/user-api/exec-query.rst:308
+#: ../../manager/user-api/exec-query.rst:369 673faa40096f46519b7e6fed321e01ac
+#: 934627e5607c4f449b6edfe37cde72ca b9ac00356b44478494847c5e14d87d81
+msgid "HTTP Status Code"
+msgstr "HTTP Status Code"
+
+#: ../../manager/user-api/exec-query.rst:62
+#: ../../manager/user-api/exec-query.rst:310 12c28568a4c44d3f8ddb8fb8a23d105b
+#: bc82d7956d3d4f14b116e7dba53fb4b9
+msgid "200 OK"
+msgstr "200 OK"
+
+#: ../../manager/user-api/exec-query.rst:63
+#: ../../manager/user-api/exec-query.rst:311 204bc3f1787c43d3adc1176a37a71426
+#: 91fa4e1ae97a4c85a876ef42e8213ad6
+#, fuzzy
+msgid ""
+"The session has responded with the execution result. The response body "
+"contains a JSON object as described below."
+msgstr ""
+"커널이 실행 결과로 응답했습니다. 응답 본문에는 아래에 설명된 것처럼 JSON 객체"
+"가 포함되어 있습니다."
+
+#: ../../manager/user-api/exec-query.rst:70
+#: ../../manager/user-api/exec-query.rst:318 45877d728ad241c3b0d958482f8f9ff1
+#: a879a77c6c094b7a840293abdfd0ca3e
+msgid "Fields"
+msgstr "필드"
+
+#: ../../manager/user-api/exec-query.rst:72
+#: ../../manager/user-api/exec-query.rst:320 45828bb757164e05acf176d99019d55f
+#: c72d053ad83244d89e9253191ce84191
+msgid "Values"
+msgstr "값"
+
+#: ../../manager/user-api/exec-query.rst:73
+#: ../../manager/user-api/exec-query.rst:321 5c12d8d456ca42e5932c2a14420ca173
+#: cd6f71e0d8b745cbb44987afc5e3ea6c
+msgid "``result``"
+msgstr "``result``"
+
+#: ../../manager/user-api/exec-query.rst:74 b5ea178cbf1c4dab874b3eac12045844
+msgid "``object``"
+msgstr "``object``"
+
+#: ../../manager/user-api/exec-query.rst:75 1c249fe4ac534b228a9674d6bfc6cd72
+msgid ":ref:`execution-result-object`."
+msgstr ":ref:`execution-result-object`."
+
+#: ../../manager/user-api/exec-query.rst:79 a1204c76e6994282a7dc9c06ca39c396
+msgid ""
+"Even when the user code raises exceptions, such queries are treated as "
+"successful execution. i.e., The failure of this API means that our API "
+"subsystem had errors, not the user codes."
+msgstr ""
+"사용자 코드가 예외를 제기해도, 이러한 쿼리들은 성공적인 실행으로 취급됩니다. "
+"즉, 이 API의 실패는 유저 코드가 아닌 우리의 API 하위 시스템에 오류가 있다는 "
+"것을 의미합니다."
+
+#: ../../manager/user-api/exec-query.rst:84 f8baec080e1a49e8828de64be90f0a06
+msgid ""
+"If the user code tries to breach the system, causes crashs (e.g., "
+"segmentation fault), or runs too long (timeout), the session is "
+"automatically terminated. In such cases, you will get incomplete console "
+"logs with ``\"finished\"`` status earlier than expected. Depending on "
+"situation, the ``result.stderr`` may also contain specific error information."
+msgstr ""
+"만일 유저 코드가 시스템을 위반하려고 하거나, 충돌(e.g., \"세그멘테이션 결함"
+"\")을 일으키거나, 너무 오래 실행(timeout)하면, 세션이 자동적으로 종료됩니다. "
+"이러한 경우에, 예상보다 빠르게 ``\"finishted\"`` 상태로 불완전한 콘솔 로그를 "
+"얻게 됩니다. 상황에 따라 ``result.stderr``에도 구체적인 에러 정보가 포함될 "
+"수 있습니다."
+
+#: ../../manager/user-api/exec-query.rst:89 52f254e2e76c43bcaf87b97cec7f0fcc
+msgid ""
+"Here we demonstrate a few example returns when various Python codes are "
+"executed."
+msgstr "우리는 다양한 Python 코드가 실행될 때 몇가지 예시 반환을 나타냅니다."
+
+#: ../../manager/user-api/exec-query.rst:91 08406c69ec3746e9adf900b0f904170f
+msgid "**Example: Simple return.**"
+msgstr "**예시: 간단한 반환.**"
+
+#: ../../manager/user-api/exec-query.rst:110 59eb36f6139440c88e307af7587428a2
+msgid "**Example: Runtime error.**"
+msgstr "**예시: 런타임 에러.**"
+
+#: ../../manager/user-api/exec-query.rst:132 6df29f6b39874b3f999f5470870c3537
+msgid "**Example: Multimedia output.**"
+msgstr "**예시: 멀티미디어 결과**"
+
+#: ../../manager/user-api/exec-query.rst:134 53be76962bd84de993b910eefdffa2ba
+msgid ""
+"Media outputs are also mixed with other console outputs according to their "
+"execution order."
+msgstr "미디어 출력물은 실행 순서에 따라 다른 콘솔 출력물과도 혼합됩니다."
+
+#: ../../manager/user-api/exec-query.rst:161 16db12b22de04f65a0f2a27270b89419
+msgid "**Example: Continuation results.**"
+msgstr "**예시: 지속적 결과**"
+
+#: ../../manager/user-api/exec-query.rst:184 8932fb3ecafd47e4b46d5847e5aea823
+msgid "Here you should make another API query with the empty ``code`` field."
+msgstr "당신은 빈 ``code``필드로 다른 API 쿼리를 만들어야 합니다."
+
+#: ../../manager/user-api/exec-query.rst:199 9b7149463f1e40dea6b47eb5133c02c1
+msgid "Again."
+msgstr "다시."
+
+#: ../../manager/user-api/exec-query.rst:214 6b7bc1ca0ff64459b3846a9486018b39
+msgid "**Example: User input.**"
+msgstr "**예시: 사용자 입력**"
+
+#: ../../manager/user-api/exec-query.rst:237 99269bd240a84457a0be7d59c9deffac
+msgid ""
+"You should make another API query with the ``code`` field filled with the "
+"user input."
+msgstr ""
+"당신은 사용자 입력으로 채워진 ``code`` 필드로 다른 API 쿼리를 만들어야 합니"
+"다."
+
+#: ../../manager/user-api/exec-query.rst:253 60dc15e3bf134b10b440d7aacb61bc25
+msgid "Auto-completion"
+msgstr "자동-완성"
+
+#: ../../manager/user-api/exec-query.rst:255 f8c0f4af1e6e4f98b2b6f8b716ed5c23
+#, fuzzy
+msgid "URI: ``/session/:id/complete``"
+msgstr "URI: ``/kernel/:id/complete``"
+
+#: ../../manager/user-api/exec-query.rst:273 966a71ed3ada4affa8b2564f6be65f32
+msgid "A string containing the code until the current cursor position."
+msgstr ""
+
+#: ../../manager/user-api/exec-query.rst:274 ad6afc807911445c8766462e613647b3
+msgid "``options.post``"
+msgstr ""
+
+#: ../../manager/user-api/exec-query.rst:276 56dc3a231ff049b79b964f6637a1da33
+msgid "A string containing the code after the current cursor position."
+msgstr "현재 커서 위치까지 코드가 포함된 문자열."
+
+#: ../../manager/user-api/exec-query.rst:277 0cf76ee0e2af4250a3e1c0b12dfe3873
+msgid "``options.line``"
+msgstr "``options.line``"
+
+#: ../../manager/user-api/exec-query.rst:279 78f8f7b8da02410abd80fe7d38022c67
+msgid "A string containing the content of the current line."
+msgstr "현재 라인의 내용을 포함하는 문자열"
+
+#: ../../manager/user-api/exec-query.rst:280 b6d87bc5625a45f9853606bf54fbadc1
+msgid "``options.row``"
+msgstr "``options.row``"
+
+#: ../../manager/user-api/exec-query.rst:281
+#: ../../manager/user-api/exec-query.rst:284 2d049d4790374229a2d9d287cdc38e5e
+#: 4d1bdb5e3fdf422e9ea7e2babe94ecdf
+msgid "``int``"
+msgstr "``int``"
+
+#: ../../manager/user-api/exec-query.rst:282 67aca7ac6f1d42858fc98d2ce3ba728b
+msgid "An integer indicating the line number (0-based) of the cursor."
+msgstr "커서의 라인 번호(0-based)를 나타내는 정수"
+
+#: ../../manager/user-api/exec-query.rst:283 0d253cf535c641d7a0af13de42dd36dd
+msgid "``options.col``"
+msgstr "``options.col``"
+
+#: ../../manager/user-api/exec-query.rst:285 4f1ccb353b43441cb5ffa90f5f9af96a
+msgid ""
+"An integer indicating the column number (0-based) in the current line of the "
+"cursor."
+msgstr "커서의 현재 라인에 있는 열 번호(0-based)를 나타내는 정수"
+
+#: ../../manager/user-api/exec-query.rst:322 c64a245edf254bb59a42f5febad9ff61
+msgid "``list[str]``"
+msgstr "``list[str]``"
+
+#: ../../manager/user-api/exec-query.rst:324 b88cd641ae4c47d9802a48ad2d2ad5c0
+#, fuzzy
+msgid ""
+"An ordered list containing the possible auto-completion matches as strings. "
+"This may be empty if the current session does not implement auto-completion "
+"or no matches have been found."
+msgstr ""
+"자동-완성 가능성을 포함하는 주문 리스트가 문자열로 일치합니다. 현재 커널이 자"
+"동-완성을 시행하지 않거나 일치하는 항목이 발견되지 않을 경우 이는 비어있을 "
+"수 있습니다."
+
+#: ../../manager/user-api/exec-query.rst:328 866278ca025a4b7aab832e2bf13f9119
+msgid ""
+"Selecting a match and merging it into the code text are up to the front-end "
+"implementation."
+msgstr ""
+"일치를 선택하고 이를 코드 텍스트에 병합하는 것은 front-end 구현에 달려 있다."
+
+#: ../../manager/user-api/exec-query.rst:343 3c08440a443f4807923c2c17fc7b582e
+msgid "Interrupt"
+msgstr "인터럽트"
+
+#: ../../manager/user-api/exec-query.rst:345 5785b0ed0c744c699fafd2dd8b11c7d4
+#, fuzzy
+msgid "URI: ``/session/:id/interrupt``"
+msgstr "URI: ``/kernel/:id/interrupt``"
+
+#: ../../manager/user-api/exec-query.rst:371 852ef667c40d4a17a39b5655685d66a0
+msgid "204 No Content"
+msgstr "204 내용 없음"
+
+#: ../../manager/user-api/exec-query.rst:372 c897573e99614035be1b73ddbce56c80
+#, fuzzy
+msgid ""
+"Sent the interrupt signal to the session. Note that this does *not* "
+"guarantee the effectiveness of the interruption."
+msgstr ""
+"커널에 인터럽트 신호를 보냈습니다. 이것이 중단의 효과를 보장하지 *않는다는* "
+"점에 유의하십시오."

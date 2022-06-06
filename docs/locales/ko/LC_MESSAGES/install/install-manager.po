@@ -1,0 +1,280 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/install-manager.rst:6 1544711b80de4da19374598128dd812f
+msgid "Install Manager"
+msgstr ""
+
+#: ../../install/install-manager.rst:8 9ca7c87797eb41c387d37f2c91c94095
+msgid ""
+"We assume that your system is configured with a sudoable admin user named "
+"``devops``. Also, you should already have a running etcd cluster, PostgreSQL "
+"and Redis servers as guided in previous step guides."
+msgstr ""
+
+#: ../../install/install-manager.rst:12 4fe45ee42b054f0c93d2f85ad3f8a7a2
+msgid "Guide variables"
+msgstr ""
+
+#: ../../install/install-manager.rst d7201187818b4017a8e7992731f03407
+msgid "warning"
+msgstr ""
+
+#: ../../install/install-manager.rst:14 2788469cea1e47acbb64b08dcd1aba66
+msgid ""
+"Prepare the values of the following variables before working with this page "
+"and replace their occurrences with the values when you follow the guide."
+msgstr ""
+
+#: ../../install/install-manager.rst:19 ../../install/install-manager.rst:43
+#: 44d3920c9f67482d9d8945c87c10a5d7 c1b11f67888644e0a8a17e64e13773d1
+msgid "Name"
+msgstr ""
+
+#: ../../install/install-manager.rst:20 ../../install/install-manager.rst:44
+#: 4e2da68314644935835019933d6eb25d a3c19df88ac248dba45cb4389235b170
+msgid "Meaning"
+msgstr ""
+
+#: ../../install/install-manager.rst:21 5725d7ed11f44b8b82f4aacc3198adad
+msgid "``{NS}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:22 85333fa4fbb2462db02285d71dada942
+msgid "The etcd namespace (just create a unique string like domain names)"
+msgstr ""
+
+#: ../../install/install-manager.rst:23 b81ca1bef7b14fc2b9186d99e3b1e859
+msgid "``{ETCDADDR}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:24 81f45523ae6e4b989b156f8207171e61
+msgid ""
+"The etcd cluster address (\\ ``{ETCDHOST}:{ETCDPORT}``\\ , "
+"``localhost:2379`` for development setup)"
+msgstr ""
+
+#: ../../install/install-manager.rst:25 2a7b6427a28c4507affc6821badce554
+msgid "``{REDISADDR}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:26 2595d4ec6066428ca4e5195ee5bfa6db
+msgid ""
+"The Redis server address (\\ ``{REDISHOST}:{REDISPORT}``\\ , "
+"``localhost:6389`` for development setup)"
+msgstr ""
+
+#: ../../install/install-manager.rst:27 17ab0215f51d4bbc9a294b495188d9f7
+msgid "``{DBADDR}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:28 3016347e343f49d9bef11556ec676110
+msgid ""
+"The PostgreSQL server address (\\ ``{DBHOST}:{DBPORT}``\\ , "
+"``localhost:5442`` for development setup)"
+msgstr ""
+
+#: ../../install/install-manager.rst:29 ae3953c15c8447c79859625bb5a46dc7
+msgid "``{DBUSER}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:30 d5ec76e33ff442c388bd838649d5eb48
+msgid "The database username (e.g., ``postgres`` for development setup)"
+msgstr ""
+
+#: ../../install/install-manager.rst:31 5fdfb6cabde64d3c8211aaff86972f07
+msgid "``{DBPASS}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:32 81930e9cee0149eb927c8942fdbfc7ca
+msgid "The database password (e.g., ``develove`` for development setup)"
+msgstr ""
+
+#: ../../install/install-manager.rst:33 527fb56ca2ff4caaa43f4775a08e4164
+msgid "``{ENDPOINT}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:34 21d1946d08244016ac93defe7c9c7e37
+msgid ""
+"The DNS hostname of the API server (depending on your environment, this may "
+"be either a publicly registered domain or a local private domain)"
+msgstr ""
+
+#: ../../install/install-manager.rst:38 9c8f1d7df93b4abeb70d6da1fa317abd
+msgid "Optional variables"
+msgstr ""
+
+#: ../../install/install-manager.rst:45 da5b3673200448b386670503ea5960cf
+msgid "``{SSLCERT}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:46 a5ff7719eff54e1c9db88816168fa34e
+msgid "The path to your SSL certificate (bundled with CA chain certificates)"
+msgstr ""
+
+#: ../../install/install-manager.rst:47 86134f7b0bf04133a038fb1d89ad73bb
+msgid "``{SSLPKEY}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:48 78f059dc74e5467da1ed5389880715e4
+msgid "The path to your SSL private key"
+msgstr ""
+
+#: ../../install/install-manager.rst:49 f12523b6c208458282d6a0db8ab1ce80
+msgid "``{S3AKEY}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:50 c40aaa465ef1477fac5837343f87d93e
+msgid "The access key for AWS S3 or compatible services [#fn1]_"
+msgstr ""
+
+#: ../../install/install-manager.rst:51 d2c33ce73eb2420793e35de93def24e0
+msgid "``{S3SKEY}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:52 cd7a6db549654d17b10af4ec9ce62cda
+msgid "The secret key for AWS S3 or compatible services"
+msgstr ""
+
+#: ../../install/install-manager.rst:53 8a0f30ac3e054af988becf104823b0ea
+msgid "``{DDAPIKEY}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:54 995ee5b9a92449859bab820811b9f6c4
+msgid "The Datadog API key"
+msgstr ""
+
+#: ../../install/install-manager.rst:55 2217217f1c484e0a928d4384ca0027ba
+msgid "``{DDAPPKEY}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:56 69dc93c444a64352bfdb7cb3e7a8a304
+msgid "The Datadog application key"
+msgstr ""
+
+#: ../../install/install-manager.rst:57 da34e2f1763d4055beaf4af810eba8dc
+msgid "``{SENTRYURL}``"
+msgstr ""
+
+#: ../../install/install-manager.rst:58 dbcba084eaab45469506a6a7c1fbba9a
+msgid "The private Sentry report URL"
+msgstr ""
+
+#: ../../install/install-manager.rst:61 178f72011d764e42a4ddacabc1f71126
+msgid ""
+"AWS S3 is used to store the output files generated by the user code in "
+"kernels' ``/home/work/.output`` directory. If not specified, Backend.AI will "
+"just skip uploading generated files."
+msgstr ""
+
+#: ../../install/install-manager.rst:64 ebda753c2bbe469bb847484c9edc2f75
+msgid "Install dependencies for daemonization"
+msgstr ""
+
+#: ../../install/install-manager.rst:67 42e4200ba9784b7fad9c0d59dda9214f
+msgid "Ubuntu"
+msgstr ""
+
+#: ../../install/install-manager.rst:75 6cc7ba729f22433ba842cfbb8415ccff
+msgid "Here are some optional but useful packages:"
+msgstr ""
+
+#: ../../install/install-manager.rst:82 f92679c1a3d843da91d17a8745dcbb0d
+msgid "CentOS / RHEL"
+msgstr ""
+
+#: ../../install/install-manager.rst:84 3472db28919c4339b110550e3e5f02de
+msgid "(TODO)"
+msgstr ""
+
+#: ../../install/install-manager.rst:87 56b0baa2a622479fab94b64e8ec7b8b1
+msgid "Prepare Python 3.6+"
+msgstr ""
+
+#: ../../install/install-manager.rst:89 05498e3891cd439dba4ac5e21453299d
+msgid ""
+"Check out :doc:`Install Python via pyenv </install/install-python-via-"
+"pyenv>` for instructions.\\ :raw-html-m2r:`<br>` Create a virtualenv named "
+"\"venv-manager\"."
+msgstr ""
+
+#: ../../install/install-manager.rst:93 50bb36e717224b15af6e23b9538f0d70
+msgid "Install Backend.AI Manager from Source"
+msgstr ""
+
+#: ../../install/install-manager.rst:104 0d546326292b47e28218fede69506b46
+msgid "Configure NGINX"
+msgstr ""
+
+#: ../../install/install-manager.rst:111 461bd0feb4ec478aa203088b301ac22a
+msgid "(For testing) Without SSL"
+msgstr ""
+
+#: ../../install/install-manager.rst:146 788b8f30bede4adfad71654cc0238d25
+msgid "(For production) With SSL"
+msgstr ""
+
+#: ../../install/install-manager.rst:188 e0b34358ba3141da8d34dc79fddc35de
+msgid "Monitoring and Logging (optional)"
+msgstr ""
+
+#: ../../install/install-manager.rst:190 6c063e34a83d47b5b8e4b20ffc2fa8ba
+msgid "Check out the [[Install Monitoring and Logging Tools]] guide."
+msgstr ""
+
+#: ../../install/install-manager.rst:193 9434cec34ada404ebc0a353fda3b0a01
+msgid "Configure supervisord"
+msgstr ""
+
+#: ../../install/install-manager.rst:195 fe918c6d11fc4032914730322b844db4
+msgid ""
+"supervisord eases the management of daemonization lifecycles of user-defined "
+"programs."
+msgstr ""
+
+#: ../../install/install-manager.rst:198 fd785f07eb7445b7bb2008a744cc8c3c
+msgid "supervisord application config"
+msgstr ""
+
+#: ../../install/install-manager.rst:213 05d10739a3804a53b4327d852b877cfa
+msgid "pyenv + venv initialization script for non-login shells"
+msgstr ""
+
+#: ../../install/install-manager.rst:229 2bf30cfdad2744f199db8a761e1791b0
+msgid "The main program managed by supervisord"
+msgstr ""
+
+#: ../../install/install-manager.rst:258 56e97e9e75a142f6b8d288bcf5f7e0f5
+msgid "Initialize database and load intial fixtures"
+msgstr ""
+
+#: ../../install/install-manager.rst:260 4b5f25a9f44b48ffb599f6f85d0d57ea
+msgid ""
+"See the :doc:`Prepare Databases for Manager </install/prepare-database-for-"
+"manager>` guide."
+msgstr ""
+
+#: ../../install/install-manager.rst:263 f83ca467b9fb483ab8352e5c792a1ae5
+msgid "Restart nginx"
+msgstr ""
+
+#: ../../install/install-manager.rst:273 024d3f90d987420f98937bd240823d7d
+msgid "Finally, Run!"
+msgstr ""

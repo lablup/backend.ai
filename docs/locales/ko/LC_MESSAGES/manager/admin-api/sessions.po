@@ -1,0 +1,95 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/admin-api/sessions.rst:2 de0bbfe6be3b4da79ac7ff3e1d720d3a
+msgid "Compute Session Monitoring"
+msgstr "컴퓨팅 세션 모니터링"
+
+#: ../../manager/admin-api/sessions.rst:4 09e3bb9a8559489da4b1a326e6e23d07
+msgid ""
+"As of Backend.AI v20.03, compute sessions are composed of one or more "
+"containers, while interactions with sessions only occur with the *master* "
+"container when using REST APIs. The GraphQL API allows users and admins to "
+"check details of sessions and their belonging containers."
+msgstr ""
+
+#: ../../manager/admin-api/sessions.rst:10 259c593b860249efa2b16c7891808fa5
+msgid "Query Schema"
+msgstr "쿼리 스키마"
+
+#: ../../manager/admin-api/sessions.rst:12 1fbc8e1832ae40c288fd4f7c0423cfa3
+msgid ""
+"``ComputeSession`` provides information about the whole session, including "
+"user-requested parameters when creating sessions."
+msgstr ""
+
+#: ../../manager/admin-api/sessions.rst:65 077a583de3b74fb4bc645910aa57497b
+msgid ""
+"The sessions may be queried one by one using ``compute_sesssion`` field on "
+"the root query schema, or as a paginated list using ``compute_session_list``."
+msgstr ""
+
+#: ../../manager/admin-api/sessions.rst:87 5bd4309f921d4defa8fc461a56b822ec
+msgid ""
+"``ComputeContainer`` provides information about individual containers that "
+"belongs to the given session. Note that the client must assume that ``id`` "
+"is different from ``container_id``, because agents may be configured to use "
+"non-Docker backends."
+msgstr ""
+
+#: ../../manager/admin-api/sessions.rst:92 047a7dc12c2b4243a34fdaa33fb061ba
+msgid ""
+"The container ID in the GraphQL queries and REST APIs are *different* from "
+"the actual Docker container ID. The Docker container IDs can be queried "
+"using ``container_id`` field of ``ComputeContainer`` objects. If the agents "
+"are configured to using non-Docker-based backends, then ``container_id`` may "
+"also be completely arbitrary identifiers."
+msgstr ""
+
+#: ../../manager/admin-api/sessions.rst:128 f09224e573b94f3bad22fc822c026dfe
+msgid ""
+"In the same way, the containers may be queried one by one using "
+"``compute_container`` field on the root query schema, or as a paginated list "
+"using ``compute_container_list`` for a single session."
+msgstr ""
+
+#: ../../manager/admin-api/sessions.rst:132 67c87346167441ffab4c8bffc1dbcc6a
+msgid ""
+"The container ID of the master container of each session is same to the "
+"session ID."
+msgstr ""
+
+#: ../../manager/admin-api/sessions.rst:150 24c1d9e050d944bea99e8cc2bfd3fcbf
+msgid "Query Example"
+msgstr ""
+
+#: ../../manager/admin-api/sessions.rst:185 0777ae84e444420b9f4fb07a2a27015c
+msgid "API Parameters"
+msgstr ""
+
+#: ../../manager/admin-api/sessions.rst:187 48c471fa5b3a4db8b09e19ab2f13f4a0
+msgid ""
+"Using the above GraphQL query, clients may send the following JSON object as "
+"the request:"
+msgstr ""
+
+#: ../../manager/admin-api/sessions.rst:202 c57002b4eebb49db8b90233ef5f8225a
+msgid "API Response"
+msgstr ""
