@@ -20,4 +20,4 @@ msgstr ""
 
 #: ../../agent/index.rst:2 6a238e02e17a45ac87be7e90a9d040ad
 msgid "Backend.AI Agent Reference"
-msgstr ""
+msgstr "Backend.AI Agent 레퍼런스"

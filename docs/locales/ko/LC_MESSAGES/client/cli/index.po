@@ -9,21 +9,26 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2018-12-17 15:51+0900\n"
+"POT-Creation-Date: 2022-06-06 07:21+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.6.0\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../client/cli/index.rst:4 c9b81afb41e043e39e5bd4c81452b102
+msgid "CLI"
+msgstr ""
 
 # 363feabba8b64ab9b5bb0a354bafcd91
-#: ../../cli/index.rst:2
-msgid "Command-line Interface"
+#: ../../client/cli/index.rst:2 ba9f8274edbe467190de82caafb6d5b3
+#, fuzzy
+msgid "Command Line Interface"
 msgstr "명령줄 인터페이스"
 
 # efaae717d58648aaba1f5a064a083adc
-#: ../../cli/index.rst:4
-msgid "Table of contents"
-msgstr "목차"
+#~ msgid "Table of contents"
+#~ msgstr "목차"
+

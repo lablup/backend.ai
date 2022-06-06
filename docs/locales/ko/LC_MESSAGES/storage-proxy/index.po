@@ -20,4 +20,4 @@ msgstr ""
 
 #: ../../storage-proxy/index.rst:2 3daff7c8c3da4aaeb3f0caa8455449a9
 msgid "Backend.AI Storage Proxy Reference"
-msgstr ""
+msgstr "Backend.AI Storage Proxy 레퍼런스"

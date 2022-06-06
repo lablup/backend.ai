@@ -1,16 +1,6 @@
 Backend.AI Client SDK for Python
 ================================
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Table of Contents
-
-   gsg/installation
-   gsg/config
-
-Quickstart
-----------
-
 Python 3.8 or higher is required.
 
 You can download `its official installer from python.org
@@ -51,29 +41,14 @@ And then try the first commands:
    (venv-backend-ai) $ backend.ai ps
    ...
 
-Check out more details about :doc:`client configuration <gsg/config>`, the command-line
-examples, and :doc:`SDK code examples <dev/examples>`.
-
-Command-line Interface
-----------------------
+Check out more details with the below table of contents.
 
 .. toctree::
    :maxdepth: 2
-   :caption: CLI
 
-   cli/config
-   cli/sessions
-   cli/apps
-   cli/storage
-   cli/code-execution
-   cli/session-templates
-
-Developer Reference
--------------------
-.. toctree::
-   :maxdepth: 2
-   :caption: Development
-
+   gsg/installation
+   gsg/config
+   cli/index
    dev/index
    func/index
    lowlevel/index

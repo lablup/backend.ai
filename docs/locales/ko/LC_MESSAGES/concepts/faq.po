@@ -20,7 +20,7 @@ msgstr ""
 
 #: ../../concepts/faq.rst:2 3272a0327c5d4e46b7f0569c16f5de8c
 msgid "FAQ"
-msgstr ""
+msgstr "자주 묻는 질문"
 
 #: ../../concepts/faq.rst:5 41ed1678129946219caa33a52fbbc02e
 msgid "vs. Notebooks"

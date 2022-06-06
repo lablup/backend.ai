@@ -20,4 +20,4 @@ msgstr ""
 
 #: ../../storage-proxy/manager-api.rst:2 9280107773114798a15e94cfaac9ab5d
 msgid "Storage Proxy Manager-facing API"
-msgstr ""
+msgstr "Storage Proxy Manager 대응 API"

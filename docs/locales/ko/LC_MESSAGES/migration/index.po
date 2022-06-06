@@ -20,4 +20,4 @@ msgstr ""
 
 #: ../../migration/index.rst:2 163f1eea72a84f259962870e2fc1fde6
 msgid "Migration Guides"
-msgstr ""
+msgstr "버전 업그레이드 가이드"

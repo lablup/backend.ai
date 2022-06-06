@@ -20,4 +20,4 @@ msgstr ""
 
 #: ../../install/index.rst:2 10ee56bd047c4c628b3dbdc634c29d84
 msgid "Installation Guides"
-msgstr ""
+msgstr "설치 가이드"

@@ -20,4 +20,4 @@ msgstr ""
 
 #: ../../manager/index.rst:2 b4e04b9107f54bc1aa2c80f701b8aaa3
 msgid "Backend.AI Manager Reference"
-msgstr ""
+msgstr "Backend.AI Manager 레퍼런스"

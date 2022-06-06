@@ -20,7 +20,7 @@ msgstr ""
 
 #: ../../concepts/key-concepts.rst:6 c3e07076addb406e87864bc8edf19bdc
 msgid "Key Concepts"
-msgstr ""
+msgstr "핵심 개념"
 
 #: ../../concepts/key-concepts.rst:8 eef5b87bd70445e3919f1cf23eddeb0f
 msgid ""

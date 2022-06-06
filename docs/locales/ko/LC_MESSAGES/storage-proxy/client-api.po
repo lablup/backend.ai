@@ -20,4 +20,4 @@ msgstr ""
 
 #: ../../storage-proxy/client-api.rst:2 de76d6992a03485090a68c66cfe5cd5f
 msgid "Storage Proxy Client-facing API"
-msgstr ""
+msgstr "Storage Proxy 클라이언트 대응 API"

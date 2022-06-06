@@ -20,4 +20,4 @@ msgstr ""
 
 #: ../../concepts/index.rst:2 a88a24d8c2704d96b996c341338ae85d
 msgid "Backend.AI Concepts"
-msgstr ""
+msgstr "Backend.AI 주요 개념"

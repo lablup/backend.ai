@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-06-06 07:21+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,89 +18,58 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.10.1\n"
 
-# 7de9f479f7f549d69b845dd61ffe12ea
-#: ../../client/index.rst:4 852aa50f289042d19dacb43fdf64520d
-#, fuzzy
-msgid "Table of Contents"
-msgstr "목차"
-
-#: ../../client/index.rst:60 726be1559b704329bdc4e161c8a694ef
-msgid "CLI"
-msgstr ""
-
-#: ../../client/index.rst:73 4efe0bc4cb3c4fc8a47cf0a4b511b157
-msgid "Development"
-msgstr ""
-
 # dc7e45bc0f1e421188c938440a2f0caf
 #: ../../client/index.rst:2 410332e255014fe486cf9264e1effbb2
 msgid "Backend.AI Client SDK for Python"
-msgstr ""
-
-#: ../../client/index.rst:12 63949c459996432bba993608ca09e146
-msgid "Quickstart"
-msgstr ""
+msgstr "Python용 Backend.AI 클라이언트 SDK"
 
 # b7cf23769a684d6192ecc9a581d20cc3
-#: ../../client/index.rst:14 aa8a385fc9c642d388b352029fa98d9d
+#: ../../client/index.rst:4 aa8a385fc9c642d388b352029fa98d9d
 #, fuzzy
 msgid "Python 3.8 or higher is required."
 msgstr "Python 3.5.3 또는 그보다 최신 버전이 필요합니다."
 
 # 8ca1127c323949e48e7e663a602f97d4
-#: ../../client/index.rst:16 c6d00725f23042d6874b56d255be9bf9
+#: ../../client/index.rst:6 c6d00725f23042d6874b56d255be9bf9
 msgid ""
-"You can download `its official installer from python.org <https://www.python."
-"org/downloads/>`_, or use a 3rd-party package/version manager such as "
-"`homebrew <http://brew.sh/index_ko.html>`_, `miniconda <http://conda.pydata."
-"org/miniconda.html>`_, or `pyenv <https://github.com/pyenv/pyenv>`_.  It "
-"works on Linux, macOS, and Windows."
+"You can download `its official installer from python.org "
+"<https://www.python.org/downloads/>`_, or use a 3rd-party package/version"
+" manager such as `homebrew <http://brew.sh/index_ko.html>`_, `miniconda "
+"<http://conda.pydata.org/miniconda.html>`_, or `pyenv "
+"<https://github.com/pyenv/pyenv>`_.  It works on Linux, macOS, and "
+"Windows."
 msgstr ""
 "`python.org에서 공식 설치 패키지 <https://www.python.org/downloads/>`_\\ 를 "
-"다운로드하거나, 사용 중인 운영환경에 적합한 별도의 패키지 관리자(예: "
-"`homebrew <http://brew.sh/index_ko.html>`_, `miniconda <http://conda.pydata."
-"org/miniconda.html>`_, `pyenv <https://github.com/pyenv/pyenv>`_ 등)를 이용"
-"할 수 있습니다. 이 클라이언트 SDK는 Linux, macOS, Windows 환경에서 테스트되었"
-"습니다."
+"다운로드하거나, 사용 중인 운영환경에 적합한 별도의 패키지 관리자(예: `homebrew "
+"<http://brew.sh/index_ko.html>`_, `miniconda "
+"<http://conda.pydata.org/miniconda.html>`_, `pyenv "
+"<https://github.com/pyenv/pyenv>`_ 등)를 이용할 수 있습니다. 이 클라이언트 SDK는 Linux, "
+"macOS, Windows 환경에서 테스트되었습니다."
 
 # 3f48b69b5aaa4c9d99cb26f93cf8b67a
-#: ../../client/index.rst:22 41313da1028a4c0a86a1cd55a477cf74
+#: ../../client/index.rst:12 41313da1028a4c0a86a1cd55a477cf74
 msgid ""
 "We recommend to create a virtual environment for isolated, unobtrusive "
 "installation of the client SDK library and tools."
 msgstr ""
-"SDK 라이브러리와 도구를 다른 소프트웨어와의 충돌 없이 설치하기 위해서 별도의 "
-"Python 가상환경(virtual environment)을 만드실 것을 권장합니다."
+"SDK 라이브러리와 도구를 다른 소프트웨어와의 충돌 없이 설치하기 위해서 별도의 Python 가상환경(virtual "
+"environment)을 만드실 것을 권장합니다."
 
 # 4247c91bca0e46b490dd8828c9540ed9
-#: ../../client/index.rst:31 b84d3948399547c1ba8e4a7c78a402eb
+#: ../../client/index.rst:21 b84d3948399547c1ba8e4a7c78a402eb
 msgid "Then install the client library from PyPI."
 msgstr "PyPI로부터 클라이언트 라이브러리를 설치합니다."
 
 # 1914cd4407134b87896f0ddfbec6d922
-#: ../../client/index.rst:38 14c05f04711f449393522a0150a0cc7e
+#: ../../client/index.rst:28 14c05f04711f449393522a0150a0cc7e
 msgid "Set your API keypair as environment variables:"
 msgstr "자신의 API keypair를 다음과 같이 환경변수에 설정합니다:"
 
 # e95d33615c444bfab3ba5208bcc99981
-#: ../../client/index.rst:45 d78a90204f3f400aa3268ffe4d19e6c2
+#: ../../client/index.rst:35 d78a90204f3f400aa3268ffe4d19e6c2
 msgid "And then try the first commands:"
 msgstr "그 다음엔 첫 명령어를 실행해봅니다:"
 
-# ec296e1d23e0487db3b0e11d2ceb3780
-#: ../../client/index.rst:54 76b5cda9a6084803b2ab70113dd22519
-#, fuzzy
-msgid ""
-"Check out more details about :doc:`client configuration <gsg/config>`, the "
-"command-line examples, and :doc:`SDK code examples <dev/examples>`."
-msgstr ""
-"보다 자세한 내용은 :doc:`클라이언트 설정 <gsg/config>`, :doc:`명령줄 예제 "
-"<cli/examples>` 및 :doc:`코드 예제 <gsg/examples>`\\ 를 참고하기 바랍니다."
-
-#: ../../client/index.rst:58 251f1e32778842218fcab6b01d570264
-msgid "Command-line Interface"
-msgstr ""
-
-#: ../../client/index.rst:72 6de76050a4f54493985c979d0ab257cf
-msgid "Developer Reference"
+#: ../../client/index.rst:44 6fd611230e3640fa849693dc296e6bc3
+msgid "Check out more details with the below table of contents."
 msgstr ""
