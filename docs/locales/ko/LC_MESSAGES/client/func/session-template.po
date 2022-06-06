@@ -1,0 +1,58 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../client/func/session-template.rst:2 dddd59ad54254dfd855373d0defb269c
+msgid "Session Template Functions"
+msgstr ""
+
+#: 013f5e841f5347369d92b07789c8cfb1 0aeadf8d8ff5419e84f86af0ec90decc
+#: 40d32518e05144879354a4b4e29ac5af 4624c186608a4c69aa01a3c2cc2b9e24
+#: ai.backend.client.func.session_template.SessionTemplate.create
+#: ai.backend.client.func.session_template.SessionTemplate.delete
+#: ai.backend.client.func.session_template.SessionTemplate.get
+#: ai.backend.client.func.session_template.SessionTemplate.list_templates
+#: ai.backend.client.func.session_template.SessionTemplate.put
+#: c17da6d5759e4889a77c90f21024fc17 of
+msgid "Return type"
+msgstr ""
+
+#: 76e332b4dc34483ea3c9bfbdb5dfb676
+#: ai.backend.client.func.session_template.SessionTemplate.create:2 of
+msgid ":py:class:`~ai.backend.client.func.session_template.SessionTemplate`"
+msgstr ""
+
+#: 77c0d1424d8242c787393d512cc34728
+#: ai.backend.client.func.session_template.SessionTemplate.list_templates:2 of
+msgid ""
+":py:class:`~typing.List`\\[:py:class:`~typing.Mapping`\\[:py:class:`str`, :"
+"py:class:`str`]]"
+msgstr ""
+
+#: 4eb1ae0474674fa699f93aef5c899037
+#: ai.backend.client.func.session_template.SessionTemplate.get:2 of
+msgid ":py:class:`str`"
+msgstr ""
+
+#: 2b21c08452224d12b8f6bf04367d8398
+#: ai.backend.client.func.session_template.SessionTemplate.delete:2
+#: ai.backend.client.func.session_template.SessionTemplate.put:2
+#: b651fa75557042839e629f79f3be84eb of
+msgid ":py:data:`~typing.Any`"
+msgstr ""

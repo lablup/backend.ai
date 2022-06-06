@@ -1,0 +1,396 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/development-setup.md:1
+#: 0edd43e0a02b473cb435596cefa19a04
+msgid "# Development Setup"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:3
+#: 27293ee5b619494a93257fedc714a6db
+msgid "Currently we support only \\*NIX-compatible platforms (Linux or macOS)."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:5
+#: 4956c0f51d0a4b72bfc705e87f774f72
+msgid ""
+"# Requirement packages * PostgreSQL: 9.6 * etcd: v3.2.15 * redis: latest"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:10
+#: 09fa213eb3bb4eea81e4ef6ebbe8fe7a
+msgid "## Prepare containers for external daemons"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:12
+#: a8505f22103944e39f452904c670d477
+msgid ""
+"First install an appropriate version of Docker (later than 2017.03 version) "
+"and docker-compose (later than 1.21). Check out the [[Install Docker]] guide."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:15
+#: ef078059ac7945ddb52f77656b572f40
+msgid ""
+"<table><tr><td>:bulb:</td><td> In this guide, <code>$WORKSPACE</code> means "
+"the absolute path to an arbitrary working directory in your system.<br> To "
+"copy-and-paste commands in this guide, set <code>WORKSPACE</code> "
+"environment variable.<br> The directory structure would look like after "
+"finishing this guide: <ul> <li><code>$WORKSPACE</code>"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:24
+#: 6adc107a03824c2891688a644c96fcda
+msgid "<ul><li><code>backend.ai</code>"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:22
+#: 867ad72c42f34cdf8c9f9a214f142cd9
+msgid ""
+"<li><code>backend.ai-manager</code> <li><code>backend.ai-agent</code> "
+"<li><code>backend.ai-common</code> <li><code>backend.ai-client-py</code>"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:26
+#: 8afe68f331154fccb76ca0546402b9ea
+msgid "</ul>"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:27
+#: 6d60a10d44f14cdebfedab84b25ea7f2
+msgid "</ul> </td></tr></table>"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:30
+#: 6d9d64184e2e48ccaef83eb977b00f9c
+msgid ""
+"```console $ cd $WORKSPACE $ git clone https://github.com/lablup/backend.ai "
+"$ cd backend.ai $ docker-compose -f docker-compose.halfstack.yml up -d $ "
+"docker ps  # you should see 3 containers running ``` [![asciicast](https://"
+"asciinema.org/a/Q2Y3JuwqYoJjG9RB64Ovcpal2.png)](https://asciinema.org/a/"
+"Q2Y3JuwqYoJjG9RB64Ovcpal2)"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:39
+#: 3b58a5f7efdd4740b6edac274a84f8c4
+msgid ""
+"This will create and start PostgreSQL, Redis, and a single-instance etcd "
+"containers. Note that PostgreSQL and Redis uses non-default ports by default "
+"(5442 and 6389 instead of 5432 and 6379) to prevent conflicts with other "
+"application development environments."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:43
+#: 8871f439a6dc49348d7809bcbd9e7db6
+msgid "## Prepare Python 3.6+"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:45
+#: 1db41058436e442cb2218b36d40a71a0
+msgid ""
+"Check out [[Install Python via pyenv]] for instructions. Create the "
+"following virtualenvs: `venv-manager`, `venv-agent`, `venv-common`, and "
+"`venv-client`."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:48
+#: b36a90b1a65547a1b5f0fb2945051966
+msgid ""
+"[![asciicast](https://asciinema.org/a/xcMY9g5iATrCchoziCbErwgbG.png)]"
+"(https://asciinema.org/a/xcMY9g5iATrCchoziCbErwgbG)"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:50
+#: 239fb8371dc44d22947a719def7846b2
+msgid "## Prepare dependent libraries"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:52
+#: abf08882049248b186e7128832cc4d39
+msgid ""
+"Install `snappy` (brew on macOS), `libsnappy-dev` (Debian-likes), or "
+"`libsnappy-devel` (RHEL-likes) system package depending on your environment."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:54
+#: 7ecd6844bc6d4357b46e9bb80aecfae1
+msgid "## Prepare server-side source clones"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:56
+#: 0e81e1adb8b04db5b157732fe82c8586
+msgid ""
+"[![asciicast](https://asciinema.org/a/SKJv19aNu9XKiCTOF0ASXibDq.png)]"
+"(https://asciinema.org/a/SKJv19aNu9XKiCTOF0ASXibDq)"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:58
+#: bebb807e9efc48bab5e9e328ecf0f62f
+msgid "Clone the Backend.AI source codes."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:60
+#: 8609fb421ca649dfa814a30fc82383eb
+msgid ""
+"```console $ cd $WORKSPACE $ git clone https://github.com/lablup/backend.ai-"
+"manager $ git clone https://github.com/lablup/backend.ai-agent $ git clone "
+"https://github.com/lablup/backend.ai-common ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:67
+#: 044f9fc4ece34f4886805adb8892d753
+msgid "Inside each directory, install the sources as editable packages."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:69
+#: 30a74637475e458d83a6eda9b03dc58a
+msgid ""
+"<table><tr><td>:bulb:</td><td> Editable packages makes Python to apply any "
+"changes of the source code in git clones immediately when importing the "
+"installed packages. </td></tr></table>"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:73
+#: 4ddd77faa88843f4a6007dcdc29d8243
+msgid ""
+"```console $ cd $WORKSPACE/backend.ai-manager $ pyenv local venv-manager $ "
+"pip install -U -r requirements-dev.txt ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:79
+#: 1814024ecbd04dec8d92c415de2418f9
+msgid ""
+"```console $ cd $WORKSPACE/backend.ai-agent $ pyenv local venv-agent $ pip "
+"install -U -r requirements-dev.txt ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:85
+#: 9916be61872d4c81808e8eb1c0ce524b
+msgid ""
+"```console $ cd $WORKSPACE/backend.ai-common $ pyenv local venv-common $ pip "
+"install -U -r requirements-dev.txt ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:91
+#: 53d9ba9be7b342ea97fa88c045eed3e6
+msgid ""
+"### (Optional) Symlink backend.ai-common in the manager and agent "
+"directories to the cloned source"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:93
+#: 8159f07a2064466db243e679ad9e49de
+msgid ""
+"If you do this, your changes in the source code of the backend.ai-common "
+"directory will be reflected immediately to the manager and agent. You should "
+"install backend.ai-common dependencies into `venv-manager` and `venv-agent` "
+"as well, but this is already done in the previous step."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:96
+#: 6ad65a42d4b14afba285114d9862d44b
+msgid ""
+"```console $ cd \"$(pyenv prefix venv-manager)/src\" $ mv backend.ai-common "
+"backend.ai-common-backup $ ln -s \"$WORKSPACE/backend.ai-common\" backend.ai-"
+"common ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:102
+#: cf79615a0fd74174b6a31c078662de19
+msgid ""
+"```console $ cd \"$(pyenv prefix venv-agent)/src\" $ mv backend.ai-common "
+"backend.ai-common-backup $ ln -s \"$WORKSPACE/backend.ai-common\" backend.ai-"
+"common ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:108
+#: 2097a04436024f0091b338de86c41aca
+msgid "## Initialize databases and load fixtures"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:110
+#: 922c95bfa03e4bff827fd9f77afa2de7
+msgid "Check out the [[Prepare Databases for Manager]] guide."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:112
+#: 2eab2074238a4782ac11de6e96d40589
+msgid "## Prepare Kernel Images"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:114
+#: e0bdea389555471f9f81f23fcb0e4aca
+msgid ""
+"You need to pull the kernel container images first to actually spawn compute "
+"sessions. The kernel images here must have the tags specified in image-"
+"metadata.yml file."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:117
+#: 193c8a8754984237ac606c6f643667db
+msgid "```console $ docker pull lablup/kernel-python:3.6-debian ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:121
+#: 6174fae8a24a42a18499698dae2d06ce
+msgid ""
+"For the full list of publicly available kernels, [check out the kernels "
+"repository.](https://github.com/lablup/backend.ai-kernels)"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:123
+#: 1101f1d768a74ce6b42a738105fb8785
+msgid ""
+"**NOTE:** You need to restart your agent if you pull images after starting "
+"the agent."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:125
+#: 7f03bc4e1d9245caa3195884cc432958
+msgid "## Setting Linux capabilities to Python (Linux-only)"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:127
+#: 3f8b909c3a5e430ebc0fdc6eafb23547
+msgid ""
+"To allow Backend.AI to collect sysfs/cgroup resource usage statistics, the "
+"Python executable must have the following Linux capabilities (to run without "
+"\"root\"): `CAP_SYS_ADMIN`, `CAP_SYS_PTRACE`, and `CAP_DAC_OVERRIDE`. You "
+"may use the following command to set them to the current virtualenv's Python "
+"executable."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:130
+#: 3cfbe6eb5e5547fbbdb0165cbeef1094
+msgid ""
+"```console $ sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip "
+"$(readlink -f $(pyenv which python)) ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:134
+#: 7b193a03fe0f437ba026586fd50f4643
+msgid "## Running daemons from cloned sources"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:136
+#: d40d289754994073b0651c6711adf83e
+msgid ""
+"```console $ cd $WORKSPACE/backend.ai-manager $ ./scripts/run-with-halfstack."
+"sh python -m ai.backend.gateway.server --service-port=8081 --debug ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:141
+#: e2655cdbc72c41babb6048f1ab4badf4
+msgid ""
+"Note that through options, PostgreSQL and Redis ports set above for "
+"development environment are used. You may change other options to match your "
+"environment and personal configurations. (Check out `-h`/`--help`)"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:143
+#: 37935e974fa742958e6873f363693c8a
+msgid ""
+"```console $ cd $WORKSPACE/backend.ai-agent $ mkdir -p scratches  # used as "
+"in-container scratch \"home\" directories $ ./scripts/run-with-halfstack.sh "
+"python -m ai.backend.agent.server --scratch-root=`pwd`/scratches --debug --"
+"idle-timeout 30 ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:149
+#: 8d7a48181cef45e4b431cf849e5977df
+msgid ""
+"※ The role of `run-with-halfstack.sh` script is to set appropriate "
+"environment variables so that the manager/agent daemons use the halfstack "
+"docker containers."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:152
+#: d983b4f5e04d4c4c81fae1e2938c2120
+msgid "## Prepare client-side source clones"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:154
+#: 33a2fe6973564cdf8808b9f60ab26949
+msgid ""
+"[![asciicast](https://asciinema.org/a/dJQKPrcmIliVkCX4ldSg3rPki.png)]"
+"(https://asciinema.org/a/dJQKPrcmIliVkCX4ldSg3rPki)"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:156
+#: cceb299c90b04d558cba59973f11271a
+msgid ""
+"```console $ cd $WORKSPACE $ git clone https://github.com/lablup/backend.ai-"
+"client-py ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:161
+#: 247369931699439fbe92c60c70e90bcc
+msgid ""
+"```console $ cd $WORKSPACE/backend.ai-client-py $ pyenv local venv-client $ "
+"pip install -U -r requirements-dev.txt ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:167
+#: 7f7ed1a7ab93481088b3cdcb7ed887d8
+msgid ""
+"Inside `venv-client`, now you can use the `backend.ai` command for testing "
+"and debugging."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:170
+#: ba0d43cff481437180a037b857d4b914
+msgid "## Running the client for the first time!"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:172
+#: 9dbb688e826d4d8bb6fce7b3cdb7ac50
+msgid ""
+"Write a shell script (e.g., `env_local.sh`) like below to easily switch the "
+"API endpoint and credentials for testing:"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:174
+#: cc4d399f32c1484995bd77f57096edb3
+msgid ""
+"```sh #! /bin/sh export BACKEND_ENDPOINT=http://127.0.0.1:8081/ export "
+"BACKEND_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE export "
+"BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY ```"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:181
+#: 9a485c776ffc4a1b9e71dfef3f1bb31a
+msgid ""
+"Load this script (e.g., `source env_local.sh`) before you run the client "
+"against your server-side installation."
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:183
+#: dca5b9d9193945ffa46cb5a32e95b3e3
+msgid ""
+"Now you can do `backend.ai ps` to confirm if there are no sessions running "
+"and run the hello-world:"
+msgstr ""
+
+#: ../../install/_archive/development-setup.md:185
+#: 5fb7ec8a25f44ef6b085c8ae60e5b9bb
+msgid ""
+"```sh $ cd $WORKSPACE/backend.ai-client-py $ source env_local.sh  # check "
+"above $ backend.ai run python -c 'print(\"hello\")' ```"
+msgstr ""

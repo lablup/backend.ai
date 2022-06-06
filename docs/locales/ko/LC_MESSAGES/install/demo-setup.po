@@ -1,0 +1,160 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/demo-setup.rst:2 75a5b9a631054dd4bd218421d1dce856
+msgid "One-line Demo Setup"
+msgstr "한 줄로 데모 설정하기"
+
+#: ../../install/demo-setup.rst:4 8c57c8c4df3545c09ca1fddf52d96bde
+msgid ""
+"`This meta-repository <https://github.com/lablup/backend.ai>`_ provides a "
+"docker-compose configuration to fire up a single-node Backend.AI cluster "
+"running on your PC (http://localhost:8081)."
+msgstr ""
+"`이 메타 저장소 <https://github.com/lablup/backend.ai>`_ 는 당신의 PC "
+"(http://localhost:8081)에서 실행 중인 단일 노드 Backend.AI 클러스터를 시작하"
+"기 위한 docker-compose 환경 설정을 제공합니다."
+
+#: ../../install/demo-setup.rst:7 22992f16d3564044ab0d9ab90b343c5e
+msgid "Prerequisites"
+msgstr "필수 선행 사항"
+
+#: ../../install/demo-setup.rst:10 5efe98e84182415a9bcf7c98792fe6a8
+msgid ""
+"All: `install Docker 17.06 or later <https://docs.docker.com/install/>`_ "
+"with `docker-compose v1.21 or later <https://docs.docker.com/compose/install/"
+">`_"
+msgstr ""
+
+#: ../../install/demo-setup.rst:11 5316d35e6c57457b8be6079bd19f43fb
+msgid ""
+"Linux users: change \"docker.for.mac.localhost\" in docker-compose.yml to "
+"\"172.17.0.1\""
+msgstr ""
+"리눅스 유저의 경우 docker-compose.yml 내 \"docker.for.mac.localhost\" 를  "
+"\"172.17.0.1\" 로 변경해 주세요."
+
+#: ../../install/demo-setup.rst:14 aa0b58b91e644bb9866ab038b0df6e48
+msgid "Notes"
+msgstr ""
+
+#: ../../install/demo-setup.rst:17 f3af34b7a2ea4b10ab64469532755a61
+msgid "This demo setup does *not* support GPUs."
+msgstr "이 데모는 GPU를 지원하지 *않습니다*."
+
+#: ../../install/demo-setup.rst:20 a3c81cac0f3c4dfcbe666e3287b56a89
+msgid "All you have to do"
+msgstr "당신이 해야 할 일"
+
+#: ../../install/demo-setup.rst:23 320056ac491c44d4a8df6f915245fb9b
+msgid "Clone the repository"
+msgstr "이 저장소를 클론하세요"
+
+#: ../../install/demo-setup.rst:24 fb90b3b1c0cf46f2a70818e33bf0c119
+msgid "Check out the prerequisites above"
+msgstr "위 요구사항을 확인해주세요"
+
+#: ../../install/demo-setup.rst:25 48b53629274a4ceaa0efb21e401e8058
+msgid "``docker-compose up -d``"
+msgstr "``docker-compose up -d``"
+
+#: ../../install/demo-setup.rst:27 53352c7679c94303997e15420bab7ebe
+msgid "For Windows, ``docker-compose -f docker-compose.win-demo.yml up -d``"
+msgstr ""
+"윈도우 유저의 경우 ``docker-compose -f docker-compose.win-demo.yml up -d``를 "
+"입력하세요"
+
+#: ../../install/demo-setup.rst:29 5bc1f74df4d94a388b013e46a7e96be9
+msgid "Pull some kernel images to try out"
+msgstr "원하는 커널 이미지를 가져옵니다"
+
+#: ../../install/demo-setup.rst:32 29093a465fea4129b450bb580a134b61
+msgid "Pulling kernel images"
+msgstr "커널 이미지 가져오기"
+
+#: ../../install/demo-setup.rst:34 bb4e77e74447482ab0869328b62a4655
+msgid "Pull the images on your host Docker daemon like:"
+msgstr "다음과 같이 호스트 Docker 데몬에서 이미지를 가져옵니다."
+
+#: ../../install/demo-setup.rst:42 5a86f449f17a4ffb892db1d5c9b81b76
+msgid ""
+"By default this demo cluster already has metadata/alias information for `all "
+"publicly available Backend.AI kernels <https://github.com/lablup/backend.ai-"
+"kernels>`_\\ , so you don't have to manually register the pulled kernel "
+"information to the cluster but only have to *pull* those you want to try out."
+msgstr ""
+
+#: ../../install/demo-setup.rst:45 38016023716f4a08948da40ecd63adde
+msgid "Using Clients"
+msgstr "클라이언트 사용"
+
+#: ../../install/demo-setup.rst:47 070c8472500f41a38725bedd540d8a71
+msgid ""
+"To access this local cluster, set the following configurations to your "
+"favoriate Backend.AI client:"
+msgstr ""
+
+#: ../../install/demo-setup.rst:55 969704aa1dd84f0ca75cb9734e93819f
+msgid ""
+"With `our official Python client <http://pypi.python.org/pypi/backend.ai-"
+"client>`_\\ , you can do:"
+msgstr ""
+
+#: ../../install/demo-setup.rst:69 a35673e6c9da4f0d8b7af292fd1a80ea
+msgid ""
+"WARNING: This demo configuration is highly insecure. DO NOT USE in "
+"production!"
+msgstr ""
+"경고: 이 데모 구성은 보안에 매우 취약합니다.*실제 서비스환경에서 사용하지 마"
+"십시오*"
+
+#: ../../install/demo-setup.rst:72 31607a787a2b4cf991b79bb399adc779
+msgid "FAQ"
+msgstr "FAQ"
+
+#: ../../install/demo-setup.rst:75 b8c02ef9a77941a692946476f9e0c1d7
+msgid "When launching a kernel, it says \"Service Unavailable\"!"
+msgstr "kernel을 실행할 때, \"Service Unavailable\"! 가 표시됩니다"
+
+#: ../../install/demo-setup.rst:77 03dc0708256241a99d29001d07b6515a
+msgid ""
+"Each image has different default resource requirements and your Docker "
+"daemon may have a too small amount of resources. For example, TensorFlow "
+"images require 8 GiB or more RAM for your Docker daemon."
+msgstr ""
+
+#: ../../install/demo-setup.rst:78 dc5711f4fd5643c3b685cdb2b22c39e7
+msgid ""
+"Or, you might have launched 30 sessions already, which is the default limit "
+"for this demo setup."
+msgstr ""
+"또는, 이 데모 설정의 기본 제한인 30개의 세션을 이미 시작했을 수도 있습니다."
+
+#: ../../install/demo-setup.rst:80 52ba5dccf4784d29b820a9bc310f7566
+msgid "What does the \"dense\" tag mean in the TensorFlow kernel images?"
+msgstr "Tensorflow 커널 이미지에서 \"dense\"는 뭘 의미하는 건가요?"
+
+#: ../../install/demo-setup.rst:82 e85b574ff648496fac0d3fcf3acfcedb
+msgid ""
+"Images with \"dense\" tags are optimized for shared multi-tenancy "
+"environments. There is no difference in functionalities."
+msgstr ""
+"\"dense\" 태그가 있는 이미지들은 공유 멀티 테넌시 환경에 최적화되어 있습니다."
+"기능에는 차이가 없습니다."

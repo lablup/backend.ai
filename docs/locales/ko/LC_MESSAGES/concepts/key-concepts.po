@@ -1,0 +1,217 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../concepts/key-concepts.rst:6 c3e07076addb406e87864bc8edf19bdc
+msgid "Key Concepts"
+msgstr "핵심 개념"
+
+#: ../../concepts/key-concepts.rst:8 eef5b87bd70445e3919f1cf23eddeb0f
+msgid ""
+"Here we describe the key concepts that are required to understand and follow "
+"this documentation."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:13 c0ce2b76209f4c2a9f79a52c4aef0687
+msgid "The diagram of a typical multi-node Backend.AI server architecture"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:15 ad12a0d4dea4495eaddded6fc0d90f3c
+msgid ""
+":numref:`server-arch-diagram` shows a brief Backend.AI server-side "
+"architecture where the components are what you need to install and configure."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:17 715df25fba85409a91f3ed774cd0b5f1
+msgid ""
+"Each border-connected group of components is intended to be run on the same "
+"server, but you may split them into multiple servers or merge different "
+"groups into a single server as you need. For example, you can run separate "
+"servers for the nginx reverse-proxy and the Backend.AI manager or run both "
+"on a single server. In the [[development setup]], all these components run "
+"on a single PC such as your laptop."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:22 8a9cf7d51c224c7b85fc2e1facc48c0a
+msgid "Manager and Agents"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:23 dafa6944b67c45279546dea685b1d301
+msgid ""
+":raw-html-m2r:`<span style=\"background-color:#fafafa;border:1px solid #ccc;"
+"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:25 faf9d01e47d747468acebeebe792f085
+msgid ""
+"Backend.AI manager is the central governor of the cluster. It accepts user "
+"requests, creates/destroys the sessions, and routes code execution requests "
+"to appropriate agents and sessions. It also collects the output of sessions "
+"and responds the users with them."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:29 105a17e1cf2a42b480783b0e90976a0f
+msgid ""
+"Backend.AI agent is a small daemon installed onto individual worker servers "
+"to control them. It manages and monitors the lifecycle of kernel containers, "
+"and also mediates the input/output of sessions. Each agent also reports the "
+"resource capacity and status of its server, so that the manager can assign "
+"new sessions on idle servers to load balance."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:34 2fe56c8b00ee4845888e114e185df32b
+msgid "Compute sessions and Kernels"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:35 4a6c8ac90ac44f72a7e01b95ea43340b
+msgid ""
+":raw-html-m2r:`<span style=\"background-color:#c1e4f7;border:1px solid #ccc;"
+"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>` :"
+"raw-html-m2r:`<span style=\"background-color:#e5f5ff;border:1px solid #ccc;"
+"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:38 067e04aee91b4136852dd7afd2765c0c
+msgid ""
+"Backend.AI spawns compute sessions as the form of containers upon user API "
+"requests. Each compute session may have one or more containers (distributed "
+"across different nodes), and we call those member containers \"kernels\". "
+"Such multi-container sessions are for distributed and parallel computation "
+"at large scales. The agent automatically pulls and updates the kernel images "
+"if needed."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:44 cbcd6265e88d42a09bfc2363087b41b5
+msgid "Cluster Networking"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:45 f5bb112c44d64973a209c01384b20851
+msgid ""
+":raw-html-m2r:`<span style=\"background-color:#99d5ca;border:1px solid #ccc;"
+"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>` :"
+"raw-html-m2r:`<span style=\"background-color:#202020;border:1px solid #ccc;"
+"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:48 db30343b5a4a400d975d72949e4d11b7
+msgid "The primary networking requirements are:"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:50 5d1215df3f12479d9903bd78351aa4bf
+msgid ""
+"The manager server (the HTTPS 443 port) should be exposed to the public "
+"Internet or the network that your client can access."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:51 ba55a7a664684fd38465dec9361a5153
+msgid ""
+"The manager, agents, and all other database/storage servers should reside at "
+"the same local private network where any traffic between them are "
+"transparently allowed."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:52 8cd138ce6bb14e08adf98e7172349357
+msgid ""
+"For high-volume big-data processing, you may want to separate the network "
+"for the storage using a secondary network interface on each server, such as "
+"Infiniband and RoCE adaptors."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:55 d47fa62d79d144b3b3c51cf6f80c12c8
+msgid "Databases"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:56 33dde74e15ea41a0a447aff03f70051a
+msgid ""
+":raw-html-m2r:`<span style=\"background-color:#ffbbb1;border:1px solid #ccc;"
+"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:58 234a346c6aee48329bd65e5eefcf0e77
+msgid ""
+"Redis and PostgreSQL are used to keep track of liveness of agents and "
+"compute sessions (which may be composed of one or more kernels). They also "
+"store user metadata such as keypairs and resource usage statistics."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:62 c32de0da35314430b8cbef129058b02d
+msgid "Configuration Management"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:63 73133b1397074a2083994f50b540a2ec
+msgid ""
+":raw-html-m2r:`<span style=\"background-color:#d1bcd2;border:1px solid #ccc;"
+"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:65 9afa4d5e1d154deeb28638ef3795a68c
+msgid ""
+"Most cluster-level configurations are stored in an etcd server or cluster. "
+"The etcd server is also used for service discovery; when new agents boot up "
+"they register themselves to the cluster manager via etcd. For production "
+"deployments, we recommend to use an etcd cluster composed of odd (3 or "
+"higher) number of nodes to keep high availability."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:70 2cb447f480134873853364d43130bd1a
+msgid "Virtual Folders"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:71 94b8e50778e84281956cf88ec9e1530c
+msgid ""
+":raw-html-m2r:`<span style=\"background-color:#ffdba9;border:1px solid #ccc;"
+"display:inline-block;width:16px;height:16px;margin:0;padding:0;\"></span>`"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:76 a7768a5852bc4019b4ca1590108ab9d3
+msgid ""
+"A conceptual diagram of virtual folders when using two NFS servers as "
+"vfolder hosts"
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:78 71009e25f0cd43e0a100ff52166c29a4
+msgid ""
+"As shown in :numref:`vfolder-concept-diagram`, Backend.AI abstracts network "
+"storages as \"virtual folder\", which provides a cloud-like private file "
+"storage to individual users. The users may create their own (one or more) "
+"virtual folders to store data files, libraries, and program codes. Each "
+"vfolder (virtual folder) is created under a designated storage mount (called "
+"\"vfolder hosts\"). Virtual folders are mounted into compute session "
+"containers at ``/home/work/{name}`` so that user programs have access to the "
+"virtual folder contents like a local directory. As of Backend.AI v18.12, "
+"users may also share their own virtual folders with other users in "
+"differentiated permissions such as read-only and read-write."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:84 369721942d374502ba4d45871b0c484d
+msgid ""
+"A Backend.AI cluster setup may use any filesystem that provides a local "
+"mount point at each node (including the manager and agents) given that the "
+"filesystem contents are synchronized across all nodes. The only requirement "
+"is that the local mount-point must be same across all cluster nodes (e.g., "
+"``/mnt/vfroot/mynfs``). Common setups may use a centralized network storage "
+"(served via NFS or SMB), but for more scalability, one might want to use "
+"distributed file systems such as CephFS and GlusterFS, or Alluxio that "
+"provides fast in-memory cache while backed by another storage server/service "
+"such as AWS S3."
+msgstr ""
+
+#: ../../concepts/key-concepts.rst:88 36fcf7bdbcd749e98c171bba805b68c5
+msgid "For a single-node setup, you may simply use an empty local directory."
+msgstr ""

@@ -1,0 +1,144 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/version-management-and-upgrades.md:1
+#: fbabff4aa36245f48876e8c30e41dbb4
+msgid "## Version Numbering"
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:3
+#: 54af9cb5610e484faf9df0364de07853
+msgid ""
+"Version numbering uses `x.y.z` format (where `x`, `y`, `z` are integers)."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:4
+#: c6ee628ec96442178af1f4cd1e95348e
+msgid ""
+"Mostly, we follow [the semantic versioning scheme](https://semver.org/)."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:5
+#: 82d866ac549e4a439a9ed1f70d1e8877
+msgid "`x.y` is a release branch name."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:6
+#: ebce33fa9c724c17a390218a2ac2772e
+msgid "`x.y.z` is a release tag name."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:7
+#: 7d765507ca634389af6cbc803394c7c2
+msgid ""
+"When releasing `x.y.0`: - Create a new `x.y` branch, do all bugfix/hotfix "
+"there, and make `x.y.z` releases there. - All fixes in the `x.y` branch must "
+"be merged back to `master` and `develop`."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:10
+#: 237dfc34add54732a66f6c8884fcce10
+msgid ""
+"Use `git merge --no-ff --no-commit master` to inspect the changes before "
+"commits."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:11
+#: 81a175c3b75b4b86b1a7bd36bfbf41a5
+msgid ""
+"When merging back, you would encounter merge conflicts on the version number "
+"(e.g., `ai/backend/manager/__init__.py`) if you are doing it after releasing "
+"`x.y.z` patch builds: then resolve it by *preserving the version number of "
+"the `master` branch.* ([example here](https://github.com/lablup/backend.ai-"
+"manager/commit/8a498ad4a24e4e074d683a3e2fc177647eb17a9a))"
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:12
+#: 8de720817c5046e1b5d3b06de40d60fd
+msgid ""
+"It is recommeded to use \"merge\" but you may use \"cherry-pick\" as well, "
+"to keep the history clean if `master` has deviated too much."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:13
+#: c5943b3e40d54453849271fdb2dc95c9
+msgid "Change the version number of `master` to `x.(y+1).0a1`"
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:14
+#: b44c79d110e249c4b881055a3e0639ed
+msgid ""
+"There is no strict rules about alpha/beta/rc builds yet. We will elaborate "
+"as we scale up. Once used, alpha versions will have `aN` suffixes, beta "
+"versions `bN` suffixes, and RC versions `rcN` suffixes where `N` is an "
+"integer."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:16
+#: 3ccd65586d574ec586fe02cc52ca148d
+msgid ""
+"New development should go on `master` and `develop` branches. - `master`: "
+"commit here directly if your changes are a self-complete one as a single "
+"commit. - `develop`: for long-running incomplete development. - Use both "
+"short-lived and long-running feature branches freely, but ensure there names "
+"differ from release branches and tags."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:20
+#: a652b5d34b9f49bc8e0f79e8be0b68cf
+msgid ""
+"The major/minor (`x.y`) version of Backend.AI subprojects will go together "
+"to indicate compatibility.  Currently manager/agent/common versions progress "
+"this way, while client SDKs have their own version numbers and the API "
+"specification has a different `vN.yyyymmdd` version format. - `backend.ai-"
+"manager 1.2.p` is guaranteed to be compatible with `backend.ai-agent 1.2.q` "
+"(where `p` and `q` are same or different integers) - The client is "
+"guaranteed to be backward-compatible with the server they share the same API "
+"specification version."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:24
+#: 3aeb27f96aef4d70987c794c2968500b
+msgid "## Upgrading"
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:26
+#: f64d72843ab84362ac28f7ff024c6d0f
+msgid ""
+"You can upgrade the installed Python packages using `pip install -U ...` "
+"command along with dependencies."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:28
+#: 2bec415ef09341e887267e244321327e
+msgid ""
+"If you have cloned the stable version of source code from git, then pull and "
+"check out the next `x.y` release branch. It is recommended to re-run `pip "
+"install -U -r requirements.txt` as dependencies might be updated."
+msgstr ""
+
+#: ../../install/_archive/version-management-and-upgrades.md:31
+#: a35754c70cec4065a1571d0a56f68257
+msgid ""
+"For the manager, ensure that your database schema is up-to-date by running "
+"`alembic upgrade head`. Also check if any manual etcd configuration scheme "
+"change is required, though we will try to keep it compatible and "
+"automatically upgrade when first executed."
+msgstr ""

@@ -1,0 +1,77 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/configure-autoscaling.md:1
+#: 93c62b088d394f0d8de1d37a0f1b3690
+msgid "# Configure Autoscaling"
+msgstr ""
+
+#: ../../install/_archive/configure-autoscaling.md:3
+#: 6840913989dd4da2bac3fd20c9293397
+msgid ""
+"Autoscaling strategies may vary cluster by cluster. Here we introduce a "
+"brief summary of high-level guides. (More details about configuring Backend."
+"AI will follow soon.)"
+msgstr ""
+
+#: ../../install/_archive/configure-autoscaling.md:7
+#: 9577cdfff62f4591a5140cecd6cb5920
+msgid "## ASG (Auto-scaling Group)"
+msgstr ""
+
+#: ../../install/_archive/configure-autoscaling.md:9
+#: 69fccf6a7a2348abbb8b041c1544ff93
+msgid ""
+"AWS and other cloud providers offer auto-scaling groups so that they control "
+"the number of VM instances sharing the same base image within certain limits "
+"depending on the VMs' CPU utilization or other resource metrics. You could "
+"use this model for Backend.AI, but we recommend some customization due to "
+"the following reasons:"
+msgstr ""
+
+#: ../../install/_archive/configure-autoscaling.md:12
+#: b3b2dbf6ee4b4aa0b75e1158fcfeed0b
+msgid ""
+"Backend.AI's kernels are allocated a fixed and isolated amount of resources "
+"even when they do not use that much. So simple resource metering may expose "
+"\"how busy\" the spawned kernels are but not \"how many\" kernels are "
+"spwned. In the perspective of Backend.AI's scheduler, the latter is much "
+"more important."
+msgstr ""
+
+#: ../../install/_archive/configure-autoscaling.md:13
+#: 9e65c761e9e9450e82e45424124e9480
+msgid ""
+"Backend.AI tries to maintain low latency when spawning new compute sessions. "
+"This means that it requires to keep a small number of VM instances to be at "
+"a \"hot\" ready state -- maybe just running idle ones or stopped ones for "
+"fast booting. If the cloud provider supports such fine-grained control, it "
+"is best to use their options. We are currently under development of Backend."
+"AI's own fine-grained scaling."
+msgstr ""
+
+#: ../../install/_archive/configure-autoscaling.md:14
+#: 5a8f12fc722143558803e4de6f4c38f3
+msgid ""
+"The Backend.AI scheduler treats GPUs as the first-class citizen like CPU "
+"cores and main memory for its capacity planning. Traditional auto-scaling "
+"metrics often miss this, so you need to set up a custom metric using vendor-"
+"specific ways."
+msgstr ""

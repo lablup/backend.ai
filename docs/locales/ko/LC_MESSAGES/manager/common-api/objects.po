@@ -1,0 +1,1307 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/common-api/objects.rst:2 0a1b365413ec466f94c9c3da47578c1f
+msgid "JSON Object References"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:7 e655ac3d50964b74a33b3741cafb4f3e
+msgid "Paging Query Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:9 b615b77dd50c49a49044fc96d5d07621
+msgid ""
+"It describes how many items to fetch for object listing APIs. If ``index`` "
+"exceeds the number of pages calculated by the server, an empty list is "
+"returned."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:16
+#: ../../manager/common-api/objects.rst:38
+#: ../../manager/common-api/objects.rst:57
+#: ../../manager/common-api/objects.rst:82
+#: ../../manager/common-api/objects.rst:108
+#: ../../manager/common-api/objects.rst:130
+#: ../../manager/common-api/objects.rst:150
+#: ../../manager/common-api/objects.rst:241
+#: ../../manager/common-api/objects.rst:302
+#: ../../manager/common-api/objects.rst:323
+#: ../../manager/common-api/objects.rst:344
+#: ../../manager/common-api/objects.rst:384
+#: ../../manager/common-api/objects.rst:448
+#: ../../manager/common-api/objects.rst:515
+#: ../../manager/common-api/objects.rst:544
+#: ../../manager/common-api/objects.rst:577
+#: ../../manager/common-api/objects.rst:621
+#: ../../manager/common-api/objects.rst:672
+#: ../../manager/common-api/objects.rst:703
+#: ../../manager/common-api/objects.rst:731 09f5868aa2bf4eb9a4b17cbb4aeea783
+#: 0ffe27735ab04b7bbe2ad27e1020139d 2b75820194a34f56ab1cbb9f4066c4df
+#: 2faa17461a224f3a8c131b3cfc598fb3 3e739fc550fe4ea1a3333ff1a05b4afc
+#: 541fb72912164195adcc586114b5d666 5640bd93dfa141a39b189764e896b3ea
+#: 63ba79f1aa164e93a860f9c2224558e7 68d83ff891de48aabdeacca8bc4dbc49
+#: 7515e6f9f7b74c46aba205c8b4629143 7d6a1452a08241f7ac81b9b4b449f424
+#: 7ec0fe8ea10c40a69e5741bb3642eca9 7f46d36be0584077a3802224f9f7fa5a
+#: 9eee004c0fb145a28a3c508c830f6c5c b0162ad0322049098915d56746d40504
+#: d56e9fe51f134deca347b39d333e62d4 dafd4e4fb1e14870987c01d495c5570f
+#: dd1b0140046b4e018956ec53bdaf5e1e e1294a0df6694c38afd45d9979389812
+#: f0284737004f41a2b63b8625942faa95
+msgid "Key"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:17
+#: ../../manager/common-api/objects.rst:39
+#: ../../manager/common-api/objects.rst:58
+#: ../../manager/common-api/objects.rst:83
+#: ../../manager/common-api/objects.rst:109
+#: ../../manager/common-api/objects.rst:131
+#: ../../manager/common-api/objects.rst:151
+#: ../../manager/common-api/objects.rst:242
+#: ../../manager/common-api/objects.rst:303
+#: ../../manager/common-api/objects.rst:324
+#: ../../manager/common-api/objects.rst:345
+#: ../../manager/common-api/objects.rst:385
+#: ../../manager/common-api/objects.rst:449
+#: ../../manager/common-api/objects.rst:516
+#: ../../manager/common-api/objects.rst:545
+#: ../../manager/common-api/objects.rst:578
+#: ../../manager/common-api/objects.rst:622
+#: ../../manager/common-api/objects.rst:673
+#: ../../manager/common-api/objects.rst:704
+#: ../../manager/common-api/objects.rst:732 25f30cd816464cebb57e0b4ab0568e7a
+#: 28c9ae09678240a587bfdc4aecbecac5 2a855a70a7a245f69e57e1564b565d88
+#: 2cea67b6fe9c41c5b2c6eb1670e4178f 302a26088cee4d6a9ce5ce6a865233b6
+#: 42d0517aac3b435f8a914d70c592f103 48ff23c317bc497890e1849847601498
+#: 51652a65a7414097aff581e9b2ab803c 5ab8a4d41ca84502ba13531625e383eb
+#: 5f5e6a7d8ace4c5e8d7f0459f97982a5 757bd4aecd1a4d26902623fa35a45cda
+#: 7b3894c577b5427c9ccf8ad7572d6ed6 8a07887d792e4214af27d1aeb2ecfbbf
+#: 9dc2c887d30e4b6d9f507511912e3da1 a59a28c022b6449da8a73c37b4920a56
+#: c12c8147049d4f2ea1248797c510314d c241ecb2494a4665a1d712b0dec129a6
+#: e981b11b023e4c62bb0cf50f389afda2 e9d286648f65455bbe63a9206b3133e2
+#: f74820f947184ebcb82b5a53bd3c32f4
+msgid "Type"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:18
+#: ../../manager/common-api/objects.rst:40
+#: ../../manager/common-api/objects.rst:59
+#: ../../manager/common-api/objects.rst:84
+#: ../../manager/common-api/objects.rst:110
+#: ../../manager/common-api/objects.rst:132
+#: ../../manager/common-api/objects.rst:152
+#: ../../manager/common-api/objects.rst:243
+#: ../../manager/common-api/objects.rst:304
+#: ../../manager/common-api/objects.rst:325
+#: ../../manager/common-api/objects.rst:346
+#: ../../manager/common-api/objects.rst:386
+#: ../../manager/common-api/objects.rst:450
+#: ../../manager/common-api/objects.rst:517
+#: ../../manager/common-api/objects.rst:546
+#: ../../manager/common-api/objects.rst:579
+#: ../../manager/common-api/objects.rst:623
+#: ../../manager/common-api/objects.rst:674
+#: ../../manager/common-api/objects.rst:705
+#: ../../manager/common-api/objects.rst:733 022ac34a2105417484b8862ccdc9a85e
+#: 163289fd9fc04ceb855dc0f6d8482197 176e6bc01d0b4a8cb25ffff444c07339
+#: 1fe1fe1e3a6848df955ef9c9786d024a 21c2dc22cdc34ffdbb94fe95da420eac
+#: 286af09acc3e4f899e78050275e9947c 29fc93e80a67414c87e25f896fe5148a
+#: 36f267f57de1488c89b4a96995c5fbfa 4f31079fe4af4cb08cd637a334f4a8ff
+#: 61439eef2a9a4d46aafaaa3144febb9f 691a3c3eeb1340718a99a0dc944ce7e6
+#: 79b911ca39b54182a64c6fe60d54480c 8e312e98839d49d7bc2ba3323275ff7f
+#: 958d5a7285ef4cfbbcf5680f9cbb75e7 95f63935813c48419f191d8bc2cf2b29
+#: 9675ec518c224aab97c15676b8a9a300 a186f2bb0afe4a0f81331a76631d1f6d
+#: a9a9c2339a93417dbdca443faf8775ef b5190e11557d4d5d8fe61a9e6276ac72
+#: e12124277b4d4f078adaf5980bb1c53b
+msgid "Description"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:19
+#: ../../manager/common-api/objects.rst:681 25b2a622947041a2a50a6fe2b92050a6
+#: e5d90068fd09488fb83b63e2345a76e7
+msgid "``size``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:20
+#: ../../manager/common-api/objects.rst:24
+#: ../../manager/common-api/objects.rst:42
+#: ../../manager/common-api/objects.rst:45
+#: ../../manager/common-api/objects.rst:67
+#: ../../manager/common-api/objects.rst:92
+#: ../../manager/common-api/objects.rst:96
+#: ../../manager/common-api/objects.rst:406
+#: ../../manager/common-api/objects.rst:424
+#: ../../manager/common-api/objects.rst:638
+#: ../../manager/common-api/objects.rst:679
+#: ../../manager/common-api/objects.rst:682
+#: ../../manager/common-api/objects.rst:685
+#: ../../manager/common-api/objects.rst:688
+#: ../../manager/common-api/objects.rst:691 2e55cd2881884c6893629a65a3779f56
+#: 436cbe22a9a54e6387cd64d053a8c3d7 499ffbf04b26494fb65c3fb85e4f9e69
+#: 5c10b8147a7b4c54985c17eb7f169c96 653bc6f44dfc4e23a7016d4410e6fa89
+#: 67472451d93c4c66a7d8cf2119d79ce2 84e1bba682be43cc82a7cdfe0cd49d27
+#: 8a41321228d04076a54e5033b82382f9 9ed8cb45012d4f428a7594f3cb6e832d
+#: ba13d93e2dd34ff789f14ca36d094f62 c93d3cf71daa424eb5354c75fc76e2d4
+#: dc7a1042b3b94c83bb362f0c8369b6a0 ede2959b9ecf4b499ebb28351ee470a7
+#: f08cea74e29a4c42ac841ad4a6fdb9e4 f589cc8eac6244beb2aed2ab687b82ab
+msgid "``int``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:21 61f38413e3b34e23a773ea7ddfeac606
+msgid ""
+"The number of items per page. If set zero or this object is entirely "
+"omitted, all items are returned and ``index`` is ignored."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:23 6379faa18f864998b7d5962315a44ba1
+msgid "``index``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:25 36d6eee7513e4bf4af8f408319aa56e5
+msgid "The page number to show, zero-based."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:30 fe05995c064649208e36327d4353588c
+msgid "Paging Info Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:32 e305365121764f9cacd27050b073d6ca
+msgid ""
+"It contains the paging information based on the paging query object in the "
+"request."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:41 3b22ccf7ba9c48f39e4913d932c1db4f
+msgid "``pages``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:43 3e6012282e6240bdbe6baebd9373f27f
+msgid "The number of total pages."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:44 3dd52fb9b48d4807b5602bd3a6588275
+msgid "``count``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:46 78bf957b43f44a8e97f34c8aae3d461c
+msgid "The number of all items."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:51 339215b15a4d400a91d571cfe519c87e
+msgid "KeyPair Item Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:60 239397774df8409e8c1200bfbbce1fae
+msgid "``accessKey``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:61
+#: ../../manager/common-api/objects.rst:134
+#: ../../manager/common-api/objects.rst:584 97bb1c322b944083b1525ec86edecc97
+#: e69cc97386ab4a648689fbd699497c68 fc01e2650ebd46dcb69dfa0581f24945
+msgid "``slug``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:62 41cbbd620c0d48aeb33496267771e8c1
+msgid "The access key part."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:63
+#: ../../manager/common-api/objects.rst:85 147450194a9841c0b0eff039e82326c8
+#: 42835df696f94071b363d8f4b8eab1f1
+msgid "``isActive``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:64
+#: ../../manager/common-api/objects.rst:86
+#: ../../manager/common-api/objects.rst:112
+#: ../../manager/common-api/objects.rst:590
+#: ../../manager/common-api/objects.rst:634 5bef6807fcc54e308faf9bafd2174d31
+#: 7b237e17f7f140f9b249c64318682f48 9fcc7f88e8d24c41a439aecace27bd92
+#: a7a2df6b727543adb38023201ac8e4e5 e85e708cf44549219ed12dd38e6c85cb
+msgid "``bool``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:65 dd37e1ebbb4a4723a2b32bc3b955ee7f
+msgid "Indicates if the keypair is active or not."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:66 6e7796134da547d7b687595bf72c2d73
+msgid "``totalQueries``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:68 44e7ff5791014cd4a9cbfa1dcdd3ddae
+msgid "The number of queries done via this keypair. It may have a stale value."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:69 30de04b7050146f4b840f6a721daa582
+msgid "``created``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:70
+#: ../../manager/common-api/objects.rst:644
+#: ../../manager/common-api/objects.rst:647 b6a15527cb1d4bd38199e9d7bb3510be
+#: dd2739a10bba46b5961cb2fd1bdd610b e90885d6bf31459798d836c3580e839b
+msgid "``datetime``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:71 a0a1004d9ca74ffbb7a77a1d38ad996f
+msgid "The timestamp when the keypair was created."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:76 706df8ef502345dcae50da0f5ffada49
+msgid "KeyPair Properties Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:87 aaa8261fb5f34525925a7df37be56228
+msgid ""
+"Indicates if the keypair is activated or not. If not activated, all "
+"authentication using the keypair returns 401 Unauthorized. When changed from "
+"``true`` to ``false``, existing running sessions continue to run but any "
+"requests to create new sessions are refused. (default: ``true``)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:91 c04929744cc6401b95dece83ef350c62
+msgid "``concurrecy``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:93 db881757ecb545a38dc3beb6a20f3257
+msgid ""
+"The maximum number of concurrent sessions allowed for this keypair. "
+"(default: ``5``)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:95 193e3477774c4d63830cb7b9c98b74d7
+msgid "``ML.clusterSize``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:97 fce9cec420824e9fad5843f5dfd92995
+msgid ""
+"Sets the number of instances clustered together when launching new machine "
+"learning sessions. (default: ``1``)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:98 098307066c4d44519c960c5bd4d1b4b4
+msgid "``ML.instanceMemory``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:99
+#: ../../manager/common-api/objects.rst:416 295c528fa40d4729b21d4d0a4fd5cc64
+#: 8e74b2173527494fb6288f16de8e278f
+msgid "``int`` (MiB)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:100 297838d4631e4bcebbbd1613d60504b8
+msgid ""
+"Sets the memory limit of each instance in the cluster launched for new "
+"machine learning sessions. (default: ``8``)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:102 07c02af02cb94ba489df3a60e89bb53d
+msgid "The enterprise edition offers the following additional properties:"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:111 52cb73615a6342a0aa844fd46d51f7f4
+msgid "``cost.automatic``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:113 09a2fece36cb453c857cbe0f0389aa59
+msgid ""
+"If set ``true``, enables automatic cost optimization (BETA). With supported "
+"kernel types, it automatically suspends or resize the sessions not to exceed "
+"the configured cost limit per day. (default: ``false``)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:116 ff975e61729141b3884134fad8a455ef
+msgid "``cost.dailyLimit``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:117
+#: ../../manager/common-api/objects.rst:138
+#: ../../manager/common-api/objects.rst:154
+#: ../../manager/common-api/objects.rst:167
+#: ../../manager/common-api/objects.rst:176
+#: ../../manager/common-api/objects.rst:246
+#: ../../manager/common-api/objects.rst:328
+#: ../../manager/common-api/objects.rst:332
+#: ../../manager/common-api/objects.rst:483
+#: ../../manager/common-api/objects.rst:495
+#: ../../manager/common-api/objects.rst:520
+#: ../../manager/common-api/objects.rst:552
+#: ../../manager/common-api/objects.rst:555
+#: ../../manager/common-api/objects.rst:581
+#: ../../manager/common-api/objects.rst:587
+#: ../../manager/common-api/objects.rst:625
+#: ../../manager/common-api/objects.rst:631
+#: ../../manager/common-api/objects.rst:676
+#: ../../manager/common-api/objects.rst:710
+#: ../../manager/common-api/objects.rst:713
+#: ../../manager/common-api/objects.rst:716
+#: ../../manager/common-api/objects.rst:722
+#: ../../manager/common-api/objects.rst:735
+#: ../../manager/common-api/objects.rst:738
+#: ../../manager/common-api/objects.rst:741 09aa6c8c8b8b4224957d94818d83a4ec
+#: 1b220e7aac214e5bb41eab90c52e737b 1bd2e43e7e3448e2a641591a798a213f
+#: 1dd32e440b1b4c0b951114142ec41d78 320a2fda95ad45c180d859c783db06ae
+#: 39a9342bce694ad981a899de2f507cae 40182cb6d00b45768fe15f6aa3d04e8b
+#: 4f375f63f937423c857a792ad3652b32 7ebc4823576441409d15518dfd5510df
+#: 80fa14c11ce242d48d38e86876ed855d 8139f44876d44b07adf3fe86fe1d1c96
+#: 87bab69cdaf7482686c61f6c779eb263 88728ee780394cc9a18267b31dcbde34
+#: 89799c8b091640df8dcace017f683554 93eb127479c049ff914b468e0d671d10
+#: 9531777b80a642eeb5d1a401c2ef5569 9948fb08bedf4c398ed93f02768345c2
+#: 9dbb640ddc7642e5a64e489b42ebf5fe ac739142b6d54084b68ef59d7b526193
+#: ad66d7038c7048b091bfdfd6164f3acc d8c1dcbb642f4f549a65b79cec022a6a
+#: dbdd82fe92af4ceb8d83ae1a943426a2 f35d188ab87c4c3f9c98924465713f8e
+#: f4ae6b6d967b42e0aca2dbfdc38bc41c faed03e8a1af4e6db585ebf6f623b441
+msgid "``str``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:118 d679d500106342cfb77f326eba32904b
+msgid ""
+"The string representation of money amount as decimals. The currency is fixed "
+"to USD. (default: ``\"50.00\"``)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:124 e935bf802e064e3ea6d36787872a7fe1
+msgid "Service Port Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:133
+#: ../../manager/common-api/objects.rst:327
+#: ../../manager/common-api/objects.rst:519
+#: ../../manager/common-api/objects.rst:551
+#: ../../manager/common-api/objects.rst:580
+#: ../../manager/common-api/objects.rst:624 248e5585d85f47dc8d0597824b80419c
+#: 3569072e2a43407fa477772a88530e2b 4213decd97b74136af9b95ce8cdfc1ee
+#: 7f2201fa84b046fe897bbde2fc628837 addca6afdc3f4d1b894b6b2513a78a73
+#: d60cdc35e45e4bebac90b7f3e3b862ca
+msgid "``name``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:135 203c7d4c01d3449aae0138bd49ac123a
+msgid ""
+"The name of service provided by the container. See also: :ref:`service-ports`"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:137 ad22af76b3384cc0a0c5b2755d333f3c
+msgid "``protocol``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:139 7dbe786908ed41da9bc2618f7247ffce
+msgid "The type of network protocol used by the container service."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:144 3b14099d74f7459fb552be77d1324d51
+msgid "Batch Execution Query Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:153 fc45caba798c42168ec9b2b62b45b8d3
+msgid "``build``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:156 d63ec9c099af43a38408616497b32918
+msgid ""
+"The bash command to build the main program from the given uploaded files."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:158 2da74d8af4034bb8a66f5b3a40f177b2
+msgid ""
+"If this field is not present, an empty string or ``null``, it skips the "
+"build step."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:160 81b22569791242d79f3492721660fdab
+msgid ""
+"If this field is a constant string ``\"*\"``, it will use a default build "
+"script provided by the kernel. For example, the C kernel's default Makefile "
+"adds all C source files under the working directory and copmiles them into "
+"``./main`` executable, with commonly used C/link flags: ``\"-pthread -lm -"
+"lrt -ldl\"``."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:166 be0a000532144654a9049ff19209663a
+msgid "``exec``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:169 68d70d35f2764c799660a471be9cbd5f
+msgid "The bash command to execute the main program."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:171 aafd7e9ae7bf4e7aba3deae698a5208d
+msgid ""
+"If this is not present, an empty string, or ``null``, the server only "
+"performs the build step and ``options.buildLog`` is assumed to be ``true`` "
+"(the given value is ignored)."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:175 f9e142ee2d0a4a03b808ddde42eba177
+msgid "``clean``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:178 145a26037b5946899cfe7acc609a1ea6
+msgid ""
+"The bash command to clean the intermediate files produced during the build "
+"phase. The clean step comes *before* the build step if specified so that the "
+"build step can (re)start fresh."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:182 f1a6515099f0411a92dfa97ab485d5ff
+msgid ""
+"If the field is not present, an empty string, or ``null``, it skips the "
+"clean step."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:184 c4ac20efd7ba4f8ba7c0aa3356639d09
+msgid ""
+"Unlike the build and exec command, the default for ``\"*\"`` is do-nothing "
+"to prevent deletion of other files unrelated to the build by bugs or "
+"mistakes."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:190 0a11926710f04daf82c8a7a7a1519dc8
+msgid ""
+"A client can distinguish whether the current output is from the build phase "
+"or the execution phase by whether it has received ``build-finished`` status "
+"or not."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:196 15a3c2969e6b4a259b76dea0707a07f9
+msgid ""
+"All shell commands are by default executed under ``/home/work``. The common "
+"environment is:"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:207 8300ec61e9814f3f867ec9c4762bef5c
+msgid "but individual kernels may have additional environment settings."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:211 41b397510664423a94a452741a431e43
+msgid ""
+"The shell does NOT have access to sudo or the root privilege. Though, some "
+"kernels may allow installation of language-specific packages in the user "
+"directory."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:215 3384649453ad4959b5cd3abf04c19b78
+msgid ""
+"Also, your build script and the main program is executed inside Backend.AI "
+"Jail, meaning that some system calls are blocked by our policy. Since "
+"``ptrace`` syscall is blocked, you cannot use native debuggers such as gdb."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:220 2273db4a08b847e5b4e60c250d1ad84f
+msgid "This limitation, however, is subject to change in the future."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:222 d89b234650b1425294289b8d1b9cdf31
+msgid "Example:"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:235 6e96b85a46154d2a813c0ec9064e4164
+msgid "Execution Result Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:245 03d910c75d624101aa8a35975f7878a3
+msgid "``runId``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:247 f2aa5e6a17914ae98389a5901603e9c1
+msgid ""
+"The user-provided run identifier. If the user has NOT provided it, this will "
+"be set by the API server upon the first execute API call. In that case, the "
+"client should use it for the subsequent execute API calls during the same "
+"run."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:251 9e968cab3b834629a5c8ddd9e3c3cc89
+msgid "``status``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:252 f7a064f38eac4e7a81f148f5ff93043d
+msgid "``enum[str]``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:254 e5e150b2ca2b4dc4aaa3f157c19589a7
+msgid ""
+"One of ``\"continued\"``, ``\"waiting-input\"``, ``\"finished\"``, ``\"clean-"
+"finished\"``, ``\"build-finished\"``, or ``\"exec-timeout\"``. See more "
+"details at :ref:`code-execution-model`."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:258 491ff734e0434d23b3cb33c24715ac22
+msgid "``exitCode``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:259 f349254b0a01455ba6c120494f7c2f5e
+msgid "``int | null``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:260 fe72dcd159d3453e8c77fd36f78f3bda
+msgid ""
+"The exit code of the last process. This field has a valid value only when "
+"the ``status`` is ``\"finished\"``, ``\"clean-finished\"`` or ``\"build-"
+"finished\"``. Otherwise it is set to ``null``."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:264 0faaac0621724ecf95f4e9d0e6de513e
+msgid ""
+"For batch-mode kernels and query-mode kernels *without* global context "
+"support, ``exitCode`` is the return code of the last executed child process "
+"in the kernel. In the execution step of a batch mode run, this is always 127 "
+"(a UNIX shell common practice for \"command not found\") when the build step "
+"has failed."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:269 891d73582f7f4c5ebfac51409387b484
+msgid ""
+"For query-mode kernels with global context support, this value is always "
+"zero, regardless of whether the user code has caused an exception or not."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:272 690e09bb7208466c889f6ddfe5aeb47e
+msgid ""
+"A negative value (which cannot happen with normal process termination) "
+"indicates a Backend.AI-side error."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:274 dbea1a64f8364ed6842dacfb5adebc20
+msgid "``console``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:275
+#: ../../manager/common-api/objects.rst:287 c45fd0a17eae4cc98c5711bb9a8f12b2
+#: dd90bb8cdd4f46b198c918862e683391
+msgid "``list[object]``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:277 973975b272484d39bc61896e83d19d55
+msgid "A list of :ref:`console-item-object`."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:279 8ff42435ff864caa9f1300a5b4c8fb71
+msgid "``options``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:280
+#: ../../manager/common-api/objects.rst:389 86fb903ea2dd4daeb2d07b7b0862eeed
+#: dc90118700aa4e0b99e657c062fc733d
+msgid "``object``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:282 0b388d6523f34f5e899bdd5725c6b360
+msgid ""
+"An object containing extra display options.  If there is no options "
+"indicated by the kernel, this field is ``null``. When ``result.status`` is ``"
+"\"waiting-input\"``, it has a boolean field ``is_password`` so that you "
+"could use different types of text boxes for user inputs."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:286 4ec1d17bd36c4360a23c5840f860af45
+msgid "``files``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:289 c105da351e184c01b69b2ed6abcfcf79
+msgid ""
+"A list of :ref:`execution-result-file-object` that represents files "
+"generated in ``/home/work/.output`` directory of the container during the "
+"code execution ."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:296 762ee74fd6c74d0bbbd0fd7038f54117
+msgid "Console Item Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:306 a3f8d8adae934d9d9cad1cbd0d3f858b
+msgid "(root)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:307 1e2434d51be247bfa6ec6c57f2cd9555
+msgid "``[enum, *]``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:308 bf0dba80b01042de97041632994663d0
+msgid ""
+"A tuple of the item type and the item content. The type may be ``\"stdout"
+"\"``, ``\"stderr\"``, and others."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:311 fe9f3dd211c04cacac35810b6adb20ed
+msgid "See more details at :ref:`handling-console-output`."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:317 d017a55c51f84178a5066cc5cf615ecf
+msgid "Execution Result File Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:329 bf5e2be83a7f482fb48d6307fa42dcda
+msgid "The name of a created file after execution."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:331 09dcd796a9c2470280d2dc010ef99bff
+msgid "``url``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:333 7d4621063fb7412281df8aa11e57782e
+msgid "The URL of a create file uploaded to AWS S3."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:338 6f90cc73e6204b33b1516a1893a0dd98
+msgid "Container Stats Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:347 5d56801e9670403d91435c92d95ad26e
+msgid "``cpu_used``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:348 9a9007b783a349119aa33d7c8216732e
+msgid "``int`` (msec)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:349 c129c291590948d7a18a94552ed4e06a
+msgid "The total time the kernel was running."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:350 2713043aa1854f8182e25ce8fc0493a4
+msgid "``mem_max_bytes``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:351
+#: ../../manager/common-api/objects.rst:354
+#: ../../manager/common-api/objects.rst:357
+#: ../../manager/common-api/objects.rst:360
+#: ../../manager/common-api/objects.rst:363
+#: ../../manager/common-api/objects.rst:366
+#: ../../manager/common-api/objects.rst:369
+#: ../../manager/common-api/objects.rst:372
+#: ../../manager/common-api/objects.rst:530 0051426172ce406fa11049c9d1417b7e
+#: 09fee989f6484df19b8c0aa1fd357fd0 51e671c8ef5d4927b81c74627141d056
+#: 7b59223db0254f67bf7a4d8d06131fe5 85c0b1e4083443dd85a440d7b4dec7a7
+#: 8dba5d4948ef4e38a4f62236972eebf3 9fda83a59b2644d4a705c86dd89de40d
+#: ba7330e9a895455493ea9bd2300c8fc6 e50f8e3cc5e7408bbd436ac56e560182
+msgid "``int`` (Byte)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:352 826524e8172249d68e65cb85bcb5c788
+msgid "The maximum memory usage."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:353 0efef12212d0431ab564fad1aaaf184e
+msgid "``mem_cur_bytes``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:355 ff42044c359447a88154e1ad8dac6bc3
+msgid "The current memory usage."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:356 a25353c298d345dcb126e19457bc1ad2
+msgid "``net_rx_bytes``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:358 af286ea2d9614bd7a582b048569c7a36
+msgid "The total amount of received data through network."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:359 ff0f38c82358455b90fb6faf7854dcf2
+msgid "``net_tx_bytes``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:361 b513fd1e4ff74fc787682e263e4267a0
+msgid "The total amount of transmitted data through network."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:362 9841bcdf4a834ae5869a4c840a2b2390
+msgid "``io_read_bytes``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:364 81a530e59d984970b80e8eda69609347
+msgid "The total amount of received data from IO."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:365
+#: ../../manager/common-api/objects.rst:371 444132ac29c045879b7a8e2dc4da0405
+#: ec88c2639bfe4f499b86be1c0ab7b8a8
+msgid "``io_write_bytes``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:367 52d097a57afb4770b8aeaf443e4c0c56
+msgid "The total amount of transmitted data to IO."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:368 a1a4d8a4d5234020af0c73a5fb0aa57b
+msgid "``io_max_scratch_size``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:370
+#: ../../manager/common-api/objects.rst:373 49a69a27d82841da805d8e9ecc3384dd
+#: edbe5d2191984082bfa112cfe33fb4ed
+msgid "Currently not used field."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:378 c461a4bcba374f21b98132e5e5399444
+msgid "Creation Config Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:388 0b67526d410e4013a525330d70f44d46
+msgid "``environ``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:390 d5ac9934278a49b78ea92cc40d09181c
+msgid ""
+"A dictionary object specifying additional environment variables. The values "
+"must be strings."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:393 7fe25e58a6574c9b980509736fba5002
+msgid "``mounts``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:394 64cf8353cee5493cbd5be5d971166ac2
+msgid "``list[str]``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:395 012b9373ad5f47e0bab0366beae85c32
+msgid ""
+"An optional list of the name of virtual folders that belongs to the current "
+"API key. These virtual folders are mounted under ``/home/work``. For "
+"example, if the virtual folder name is ``abc``, you can access it on ``/home/"
+"work/abc``."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:400 fa3f29b219224ebeaae6dd1b2d591cf3
+msgid ""
+"If the name contains a colon in the middle, the second part of the string "
+"indicates the alias location in the kernel's file system which is relative "
+"to ``/home/work``."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:403 3720d24ca4dc473781df9bb080219783
+msgid "You may mount up to 5 folders for each session."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:405 34ed107716ec423ea49e89d4d379118b
+msgid "``clusterSize``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:407 79d5ee49839c41e68c1c512a246cc75e
+msgid "The number of instances bundled for this session."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:409 63e6971d86514560bc8cc1a2605034db
+msgid "``resources``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:410
+#: ../../manager/common-api/objects.rst:524 1565cccc34554db28c955d1fd8729ce9
+#: c496684beced4d40861e63d5136155e1
+msgid ":ref:`resource-slot-object`"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:411 28650fea60b24efcac0f4e79c37effff
+msgid "The resource slot specification for each container in this session."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:415 fbebc5c621c940638c05b2be977f0fea
+msgid "``instanceMemory``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:417 a797059e4063406cb4b65c8f41e21826
+msgid ""
+"The maximum memory allowed per instance. The value is capped by the per-"
+"kernel image limit. Additional charges may apply on the public API service."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:423 f43f3c6f67774347852ceeecd40d26e9
+msgid "``instanceCores``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:425 57dc3d77f3dc47398d2d480c8e35ccd1
+msgid ""
+"The number of CPU cores. The value is capped by the per-kernel image limit. "
+"Additional charges may apply on the public API service."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:431 ccdd148645b1414a8477120bd3c78a62
+msgid "``instanceGPUs``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:432 ff90f7bf9c82489ba0dbb2c68d58d5d0
+msgid "``float``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:433 de855f8d165e4236a5c04339d5814fcf
+msgid ""
+"The fraction of GPU devices (1.0 means a whole device). The value is capped "
+"by the per-kernel image limit. Additional charges may apply on the public "
+"API service."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:442 3198be7f54154ae591b838c427034c80
+msgid "Resource Slot Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:452 b936dfede9f54bad87ed592dcce53ba8
+msgid "``cpu``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:453
+#: ../../manager/common-api/objects.rst:457
+#: ../../manager/common-api/objects.rst:478
+#: ../../manager/common-api/objects.rst:489 1b4e6db5ef8d4e2dad6e5510daa54761
+#: 87c13d7cfabd44ad9677df51149b2e81 b4b57ea1d7734c2c91062932f817a6db
+#: d1433e8845b74f219475661a9c0285cb
+msgid "``str | int``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:454 5075f93132e94311b30603e997630f85
+msgid "The number of CPU cores."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:456 79d1346a83af415ca6183fb32509ca58
+msgid "``mem``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:458 bdbdb02be57c49be819a984a316e6083
+msgid ""
+"The amount of main memory in bytes. When the slot object is used as an input "
+"to an API, it may be represented as binary numbers using the binary scale "
+"suffixes such as *k*, *m*, *g*, *t*, *p*, *e*, *z*, and *y*, e.g., \"512m\", "
+"\"512M\", \"512MiB\", \"64g\", \"64G\", \"64GiB\", etc. When the slot object "
+"is used as an output of an API, this field is **always** represented in the "
+"unscaled number of bytes as strings."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:468 446ec6d150bb424888aaf083395619de
+msgid ""
+"When parsing this field as JSON, you must check whether your JSON library or "
+"the programming language supports large integers. For instance, most modern "
+"Javascript engines support up to :math:`2^{53}-1` (8 PiB -- 1) which is "
+"often defined as the ``Number.MAX_SAFE_INTEGER`` constant. Otherwise you "
+"need to use a third-party big number calculation library.  To prevent "
+"unexpected side-effects, Backend.AI always returns this field as a string."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:477 6081abcbe6004c6abf293c57cc4b3722
+msgid "``cuda.device``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:479 b71cad69d3e64e98935456a07de60b69
+msgid ""
+"The number of CUDA devices. Only available when the server is configured to "
+"use the CUDA agent plugin."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:482 984905acb7b24ea8beb14858d3d33a58
+msgid "``cuda.shares``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:484 3c599094d58e443886b3c19465622474
+msgid ""
+"The virtual share of CUDA devices represented as fractional decimals. Only "
+"available when the server is configured to use the CUDA agent plugin with "
+"the fractional allocation mode (enterprise edition only)."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:488 4ad602a243494835a1cd9e076902ab8a
+msgid "``tpu.device``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:490 2eee3360fd694aeab5d2e6613027d9fa
+msgid ""
+"The number of TPU devices. Only available when the server is configured to "
+"use the TPU agent plugin (cloud edition only)."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:494 9fb41c520e934283a845fb807f7f4898
+msgid "(others)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:496 bd9feba24db749f2a18cfb8b4dd27693
+msgid ""
+"More resource slot types may be available depending on the server "
+"configuration and agent plugins. There are two types for an arbitrary slot: "
+"\"count\" (the default) and \"bytes\"."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:500 472e9ea8c8c94f33a4c8d47994b1cce9
+msgid ""
+"For \"count\" slots, you may put arbitrary positive real number there, but "
+"fractions may be truncated depending on the plugin implementation."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:503 7f5cb377adf3421083bbd59a37b74f01
+msgid ""
+"For \"bytes\" slots, its interpretation and representation follows that of "
+"the ``mem`` field."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:509 59d28fabd8064f58abc1d596cfc7f81b
+msgid "Resource Preset Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:521 126f8383e2424d15a86c53f295621720
+msgid "The name of this preset."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:523 0079bf54ec484b63970df966322c2fcb
+msgid "``resource_slots``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:525 ca799501b3174639902fe1b58de059da
+msgid ""
+"The pre-configured combination of resource slots. If it contains slot types "
+"that are not currently used/activated in the cluster, they will be removed "
+"when returned via ``/resource/*`` REST APIs."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:529 d06bc250199c4c2eab5fe21d1c895e3f
+msgid "``shared_memory``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:531 d39230522f734b088c8ea8a6eca2f954
+msgid ""
+"The pre-configured shared memory size. Client can send humanized strings "
+"like '2g', '128m', '534773760', etc, and they will be automatically "
+"converted into bytes."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:538 0f206b1a030b40e1952ddb037cac3c40
+msgid "Virtual Folder Creation Result Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:547
+#: ../../manager/common-api/objects.rst:583
+#: ../../manager/common-api/objects.rst:627
+#: ../../manager/common-api/objects.rst:706 05fd27dfb77f4bada707abf2800503a6
+#: 1248028097334456b5b461974f9bae74 8492d3ac8af0410b80789d81f1cd8239
+#: a2b93b1f4461440db22d6f716506cf07
+msgid "``id``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:548
+#: ../../manager/common-api/objects.rst:558
+#: ../../manager/common-api/objects.rst:561
+#: ../../manager/common-api/objects.rst:599
+#: ../../manager/common-api/objects.rst:602
+#: ../../manager/common-api/objects.rst:628
+#: ../../manager/common-api/objects.rst:650
+#: ../../manager/common-api/objects.rst:653
+#: ../../manager/common-api/objects.rst:707
+#: ../../manager/common-api/objects.rst:719 19442d486820423f92aa4c44bc553a3f
+#: 39109432b2294fe4869a60641713f929 3e8d85daa912461d8a9dd50e46ffb5ae
+#: 423e28717291432288a8ec47e31f6621 80f00067aec6454b899e838ef4cda475
+#: 858218fe7cf5464db85f730704a6ba7d b4d3455a2b974a10ae1caae67a77d33c
+#: b4d3d03e52214ae489c7fda2ed3bd99d b984c736d6064685a359d2af0d4f913b
+#: e688b8ae96ae474db0ba6e30c9860f2e
+msgid "``UUID``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:549 96a0d40f2b104b649d276a30cfd2f64d
+msgid ""
+"An internally used unique identifier of the created vfolder. Currently it "
+"has no use in the client-side."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:553 207a51aa506a4eaabad578ffc2d34080
+msgid "The name of created vfolder, as the client has given."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:554
+#: ../../manager/common-api/objects.rst:586
+#: ../../manager/common-api/objects.rst:630 2c9727f50cfa4df48772d0e41ede3828
+#: a3891fde7d6b46e0914e64d5319b2217 bd3320c3163f4638a5f393ef9a20b2ee
+msgid "``host``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:556 37199d9503de4049aef83109ef1421bf
+msgid "The host name where the vfolder is created."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:557
+#: ../../manager/common-api/objects.rst:598
+#: ../../manager/common-api/objects.rst:649 28bfecb8daf14547a46b16e5272a1991
+#: 5fd845d4d9ce4b5d8c017d79cb7522b0 fdea6be13c6a4a45a9666a3c064b931b
+msgid "``user``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:559 fea3cbb5e2fb4a41bd73b28da9aa717e
+msgid "The user who has the ownership of this vfolder."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:560
+#: ../../manager/common-api/objects.rst:601
+#: ../../manager/common-api/objects.rst:652 088947a0b8a2436399c61a8f2c31dbab
+#: 99a63439671d4d16a972e6c84ae0c62e cc9986a9525b4d15baecb1f77b66339a
+msgid "``group``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:562 07a870cd08c743a9ad6c6326e4f562ce
+msgid "The group who is the owner of this vfolder."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:566 8923320cbd94489d88ec83fc1f1fff96
+msgid "``user`` and ``group`` fields."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:571 2921b1b6aaf24b14b9e72e9783882110
+msgid "Virtual Folder List Item Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:582
+#: ../../manager/common-api/objects.rst:626 b828eef486074c58ab95b59e946b2fef
+#: ccd5a754e62a4a1d8c25b9f056585eb7
+msgid "The human readable name set when created."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:585
+#: ../../manager/common-api/objects.rst:629 0add974885604ce986962201d8e5c5a6
+#: 3973e5fb926640848e66c817f936f644
+msgid "The unique ID of the folder."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:588
+#: ../../manager/common-api/objects.rst:632 832e2f25b5ed42508db21d23522f6e2a
+#: da4e5af11b4f4033bb2fac50117a3735
+msgid "The host name where this folder is located."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:589
+#: ../../manager/common-api/objects.rst:633 66ae24ae3c834689bd2e16ba1bcc4fdb
+#: 6efb858358964852939e31ffe7a9d45a
+msgid "``is_owner``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:591
+#: ../../manager/common-api/objects.rst:635 1fefedac8f884285a67b51732e4842eb
+#: 57e35d49dae1474ba00be035f3ffab8e
+msgid ""
+"True if the client user is the owner of this folder. False if the folder is "
+"shared from a group or another user."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:593
+#: ../../manager/common-api/objects.rst:640
+#: ../../manager/common-api/objects.rst:712 2f06ac002b744ebfa74c72463afa2939
+#: 3bbc488e669941738ca0d0fe71525746 5817f8bee9dc4bdea23c7f7f1947d379
+msgid "``permission``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:594
+#: ../../manager/common-api/objects.rst:605
+#: ../../manager/common-api/objects.rst:641
+#: ../../manager/common-api/objects.rst:656 2da0c7c993b142e781c4abf488162e71
+#: 75b45966f9c24ee3af0c7003ebcc0f6b 9c63bd4bc1024c13a36a92f0bf72f2bd
+#: b5825f6a759d4d0db7e8e19c6cb4f936
+msgid "``enum``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:595 cc943d5ea5b24451afdc108fc5de50af
+msgid ""
+"The requested user's permission for this folder. (One of \"ro\", \"rw\", and "
+"\"wd\" which represents read-only, read-write, and write-delete "
+"respectively. Currently \"rw\" and \"wd\" has no difference.)"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:600 c2c68263ab944aefbb4773f4c73db83c
+msgid ""
+"The user ID if the owner of this item is a user vfolder. Otherwise, ``null``."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:603 4cc2dd68e41f428d840c520378b85a1f
+msgid ""
+"The group ID if the owner of this item is a group vfolder. Otherwise, "
+"``null``."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:604
+#: ../../manager/common-api/objects.rst:655 51fa5f03e89e418a9a2c0609bac0f994
+#: d2ae3a4d3f904d2e9bfcbf6926e892eb
+msgid "``type``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:606
+#: ../../manager/common-api/objects.rst:657 0d28b77c18e54af6829f358b5b1420a5
+#: 4e1c81f4b87047739430cf5acb2e3757
+msgid "The owner type of vfolder. One of \"user\" or \"group\"."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:610
+#: ../../manager/common-api/objects.rst:661 1c9d9ca3bf65433194f9e7469201f170
+#: b5fdb443a4cd4e2db7355bd1d3defe1c
+msgid "``user``, ``group``, and ``type`` fields."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:615 f2851903b3f8486ea79f7332c0a8cd4e
+msgid "Virtual Folder Item Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:637 1bb5e08f753c4ce4a4f6d2afbda1049f
+msgid "``num_files``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:639 2b41b818850d411991e554655b203c3d
+msgid "The number of files in this folder."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:642 594f09933515490abee71cbee2d1c1d8
+msgid "The requested user's permission for this folder."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:643 deb21584597d4a23856e96f2d334d908
+msgid "``created_at``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:645 fc9c79b640664806be14a8aee6982523
+msgid "The date and time when the folder is created."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:646 e9ea8af454ef416e9be2817863745c66
+msgid "``last_used``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:648 a7d7c0483d994d56b69d2d0664432e70
+msgid "The date adn time when the folder is last used."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:651 6764c6a42bb34ee5b6750988381da10f
+msgid "The user ID if the owner of this item is a user. Otherwise, ``null``."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:654 ed581d34be484c40bb95f1f700d90df6
+msgid "The group ID if the owner of this item is a group. Otherwise, ``null``."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:666 6507794e924f4cf586f684eb961963a0
+msgid "Virtual Folder File Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:675 340853bdea3142759e8532be2a0d5985
+msgid "``filename``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:677 135210192b5748a48e5ae9a3cf8e84e5
+msgid "The filename."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:678 5acfde844ddb49f9ab8672fe4370ebd9
+msgid "``mode``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:680 363e91e87bc7436fbfc99c8ae09c2ba7
+msgid "The file's mode (permission) bits as an integer."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:683 8231f172e1044ba2b4b84b83804cc57d
+msgid "The file's size."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:684 7fd5984e9c0248f2b1ad2d24e3bd3f58
+msgid "``ctime``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:686 485c9b1984c24b63b59a95e40d185d29
+msgid "The timestamp when the file is created."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:687 babb99cfa5fc46a98fc0b3770c2a4beb
+msgid "``mtime``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:689 c68af924fb4a454fa6dc84926875da83
+msgid "The timestamp when the file is last modified."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:690 c63e54c3be254405a1531d8366c33fdf
+msgid "``atime``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:692 f57fd410b42d4724bc091f50154db9df
+msgid "The timestamp when the file is last accessed."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:697 b297861ee678483a810a08a94028756d
+msgid "Virtual Folder Invitation Object"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:708 92ccf00248b54b8f81644f49ce662d66
+msgid ""
+"The unique ID of the invitation. Use this when making API requests referring "
+"this invitation."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:709 8b9834fdc4924a14ad4dc64caab0a01c
+msgid "``inviter``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:711 fb5be1f1b98a45d4bf17bf52a8101219
+msgid "The inviter's user ID (email) of the invitation."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:714 30a424523a8f4af7ac1bbeed60be5325
+msgid "The permission that the invited user will have."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:715 a5c63ce06f584658b427ad0d49251eb2
+msgid "``state``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:717 80d37654aef047be8eb58f5175efddaa
+msgid "The current state of the invitation."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:718 84fadf064f8448f6895216e55f1e7af3
+msgid "``vfolder_id``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:720 93cad672ac4f4c3e82b23db29f5dfb43
+msgid "The unique ID of the vfolder where the user is invited."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:721 9bd92de29ded4952b151ca8d7d211af7
+msgid "``vfolder_name``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:723 5b379525c3e44039a6252a7c18b2555c
+msgid "The name of the vfolder where the user is invited."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:734 8fcab05a211c40d8bfa1520a86892653
+#, fuzzy
+msgid "``content``"
+msgstr "``Content-Type``"
+
+#: ../../manager/common-api/objects.rst:736 088a66e0c70b477d94114f0efdcf90b1
+msgid "The retrieved content (multi-line string) of fstab."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:737 b9ac0dca8ce8404faf24caa9efb4180a
+#, fuzzy
+msgid "``node``"
+msgstr "``Link``"
+
+#: ../../manager/common-api/objects.rst:739 7245f01a552b4c39afb27fa29a72652e
+msgid "The node type, either \"agent\" or \"manager."
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:740 00fdcde966dd4c889bff703ee48cb8b4
+msgid "``node_id``"
+msgstr ""
+
+#: ../../manager/common-api/objects.rst:742 32c3c9ae94a14f97b477467bad7326e4
+msgid "The node's unique ID."
+msgstr ""

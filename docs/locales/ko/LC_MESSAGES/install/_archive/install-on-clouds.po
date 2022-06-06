@@ -1,0 +1,78 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/install-on-clouds.md:1
+#: b0291ce2c6da48c4bcdb703ca436d6b3
+msgid "## Install on Clouds"
+msgstr ""
+
+#: ../../install/_archive/install-on-clouds.md:4
+#: 29dff0541444498a9f85670553630462
+msgid ""
+"Prepare the instances and databases. - 1x SSL certificate with a private key "
+"for your own domain (for production) - 1x gateway instance (e.g., t2.xlarge "
+"on AWS) - 1x agent instances (e.g., t2.medium / p2.xlarge on AWS -- for "
+"minimal testing) - 1x PostgreSQL instance (e.g., AWS RDS) - 1x Redis "
+"instance (e.g., AWS ElasticCache) - 1x etcd cluster"
+msgstr ""
+
+#: ../../install/_archive/install-on-clouds.md:11
+#: 7181327327d142678d64da1ca9d45154
+msgid ""
+"It is up to you whether to setup a HA-enabled multi-instance cluster or a "
+"single-instance cluster with storage backups."
+msgstr ""
+
+#: ../../install/_archive/install-on-clouds.md:12
+#: e051dba6351f48d4b05b43dc251475d8
+msgid ""
+"Check out [[this page|Install etcd]] for details. If you install etcd on the "
+"same instance where the manager runs, you could try using docker-compose "
+"configuration in this meta-repository's code."
+msgstr ""
+
+#: ../../install/_archive/install-on-clouds.md:13
+#: 275a81be077949fa98b1f68790ecf4b0
+msgid "1x cloud file system (e.g., AWS EFS, Azure FileShare)"
+msgstr ""
+
+#: ../../install/_archive/install-on-clouds.md:14
+#: eec9f01c45b544b6a5b1f28238512e78
+msgid "All should be in the same virtual private network."
+msgstr ""
+
+#: ../../install/_archive/install-on-clouds.md:16
+#: cae01f29a9b8404e8ec45bb8db336dd1
+msgid ""
+"[Install Manager](install/install-manager.md) - After done, create an image "
+"of this instance as a backup."
+msgstr ""
+
+#: ../../install/_archive/install-on-clouds.md:19
+#: 563f1ad7ebc54752ba08f778fe8f0585
+msgid ""
+"[Install Agent](install/install-agent.md) - After done, create an image of "
+"this instance for ease of manual/autoamtic scaling."
+msgstr ""
+
+#: ../../install/_archive/install-on-clouds.md:22
+#: c273e2718ff14c768cd03ef2b1fabb67
+msgid "[Configure Autoscaling](install/configure-autoscaling.md)"
+msgstr ""

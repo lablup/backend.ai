@@ -1,0 +1,126 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:2
+#: 0d11c8176a6047598292e46463b21767
+msgid "Migrating from the Docker Hub to cr.backend.ai"
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:4
+#: 5685ab20a56b4c9c8f6f870eec5804ee
+msgid ""
+"As of November 2020, the Docker Hub has begun to limit the retention time "
+"and the rate of pulls of public images. Since Backend.AI uses a number of "
+"Docker images with variety of access frequencies, we decided to migrate to "
+"our own container registry, https://cr.backend.ai."
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:7
+#: 8ce861ae2bd441448d7de20c0e3e5fa3
+msgid ""
+"It is strongly recommended to set a maintenance period if there are active "
+"users of the Backend.AI cluster to prevent new session starts during "
+"migration. This registry migration does not affect existing running "
+"sessions, though the Docker image removal in the agent nodes can only be "
+"done after terminating all existing containers started with the old images "
+"and there will be brief disconnection of service ports as the manager "
+"requires to be restarted."
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:10
+#: 3cdadd1dcf094e819d501ed6a54642ba
+msgid ""
+"Update your Backend.AI installation to the latest version (manager 20.03.11 "
+"or 20.09.0b2) to get support for Harbor v2 container registries."
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:11
+#: 487f921095564eac8a0bc254734a8a3f
+msgid "Save the following JSON snippet as ``registry-config.json``."
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:29
+#: 0d656f5e13644dbaa789e21603323f73
+msgid "Run the following using the manager CLI on one of the manager nodes:"
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:38
+#: 5cdc2a3aae814eb9835df6beeea63260
+msgid ""
+"The agents will automatically pull the images since the image references are "
+"changed even when the new images are actually same to the existing ones. It "
+"is recommended to pull the essential images by yourself in the agents to "
+"avoid long waiting times when starting sessions using the ``docker pull`` "
+"command in the agent nodes."
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:42
+#: 1b542897a8d5447db766f9a3acaebe1d
+msgid ""
+"Now the images are categorized with additional path prefix, such as "
+"``stable`` and ``community``. More prefixes may be introduced in the future "
+"and some prefixes may be set only available to specific set of users/user "
+"groups, with dedicated credentials."
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:45
+#: 9051fd98f3fc48f893ac4ac252c36a12
+msgid ""
+"For example, ``lablup/python:3.6-ubuntu18.04`` is now referred as ``cr."
+"backend.ai/stable/python:3.6-ubuntu18.04``."
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:47
+#: 1b9e1c630e544377b9081d4416a3e555
+msgid ""
+"If you have configured image aliases, you need to udpate them manually as "
+"well, using the ``backend.ai mgr etcd alias`` command. This does not affect "
+"existing sessions running with old aliases."
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:50
+#: 38f3c509eae5450ba1a4dcd51c5f504c
+msgid ""
+"Update the allowed docker registries policy for each domain using the "
+"``backend.ai mgr dbshell`` command. Remove \"index.docker.io\" from the "
+"existing values and replace \"...\" below with your own domain names and "
+"additional registries."
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:57
+#: b315673c0bfc4d45b0548826408f8bb5
+msgid "Now you may start new sessions using the images from the new registry."
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:58
+#: 706e6a1cb8ab4844b753e9dd91682b8b
+msgid ""
+"After terminating all existing sessions using the old images from the Docker "
+"Hub (i.e., images whose names start with ``lablup/`` prefix), remove the "
+"image metadata and registry configuration using the manager CLI:"
+msgstr ""
+
+#: ../../migration/docker-hub-to-backendai-cr.rst:65
+#: 7a7aeef02ecf4b5fbead1ee442e81cbf
+msgid ""
+"Run ``docker rmi`` commands to clean up the pulled images in the agent "
+"nodes. (Automatic/managed removal of images will be implemented in the "
+"future versions of Backend.AI)"
+msgstr ""

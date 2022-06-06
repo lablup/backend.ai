@@ -1,0 +1,92 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+# 5f5f6856c0b547cc877537a530a5c743
+#: ../../client/gsg/config.rst:2 1a007d58af924b43bcff6567a79e7695
+msgid "Client Configuration"
+msgstr "클라이언트 설정"
+
+# f61e0d7a422c41cba15f46e3fdaf3fb5
+#: ../../client/gsg/config.rst:4 8e13a5f198dd43508f8b8ee093e2b46b
+msgid ""
+"The configuration for Backend.AI API includes the endpoint URL prefix, API "
+"keypairs (access and secret keys), and a few others."
+msgstr ""
+"Backend.AI API 설정에는 endpoint URL과 API keypair (access 및 secret key) 등"
+"이 포함됩니다."
+
+# fc2bc62a458a49e893c94aafc2bdec59
+#: ../../client/gsg/config.rst:7 923b083015974ad2a1ccf81db32a9a5b
+msgid "There are two ways to set the configuration:"
+msgstr "설정 방법은 2가지가 있습니다:"
+
+# c9e9db26a1bd4e919932dbe12ad5a752
+#: ../../client/gsg/config.rst:9 a10c073f16fa453897bd41a2b1b814ca
+#, fuzzy
+msgid ""
+"Setting environment variables before running your program that uses this "
+"SDK. This applies to the command-line interface as well."
+msgstr ""
+"이 SDK를 사용하는 여러분의 프로그램이 실행되기 전 환경변수를 미리 설정해두기"
+
+# 4c05d6328dcf4d05ac51eef196d7c973
+#: ../../client/gsg/config.rst:11 5fe23d5b55b14e93a5922d5e81555b1f
+#, fuzzy
+msgid ""
+"Manually creating :class:`~ai.backend.client.config.APIConfig` instance and "
+"creating sessions with it."
+msgstr "직접 :class:`APIConfig` 인스턴스를 만들고 그로부터 세션을 초기화하기"
+
+# 01d5ea64cb8f4b6d82b2233d6b526533
+#: ../../client/gsg/config.rst:13 c3436a41c7eb4e0686e3a0143d11025a
+#, fuzzy
+msgid "The list of configurable environment variables are:"
+msgstr "다음과 같은 환경변수들을 사용할 수 있습니다:"
+
+# 98b9e9dc1d9b41fb9e1829ff5d80af47
+#: ../../client/gsg/config.rst:15 52dc009b7ffa456cb44610b09da875d9
+msgid "``BACKEND_ENDPOINT``"
+msgstr ""
+
+#: ../../client/gsg/config.rst:16 5bdc594bf46f48dcbce42eb3c3e824e5
+msgid "``BACKEND_ENDPOINT_TYPE``"
+msgstr ""
+
+# f259368b1722412e97da5df56255d813
+#: ../../client/gsg/config.rst:17 b7ec7a800eb14ed59a5a4f6c504dbfe0
+msgid "``BACKEND_ACCESS_KEY``"
+msgstr ""
+
+# cce443a5999e4bfda2ae8fd47d3d9322
+#: ../../client/gsg/config.rst:18 ad696bef6d73469bb8f2e4470130ecef
+msgid "``BACKEND_SECRET_KEY``"
+msgstr ""
+
+# 1bd0884af81f40f1b28c3da3612624a8
+#: ../../client/gsg/config.rst:19 926932a5455b4d01b02dcd6c14bda25f
+msgid "``BACKEND_VFOLDER_MOUNTS``"
+msgstr ""
+
+#: ../../client/gsg/config.rst:21 b53ee5b1721741cc98b69fd205751fc9
+msgid ""
+"Please refer the parameter descriptions of :class:`~ai.backend.client.config."
+"APIConfig`'s constructor for what each environment variable means and what "
+"value format should be used."
+msgstr ""

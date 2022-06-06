@@ -1,0 +1,74 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../client/cli/session-templates.rst:2 e78f561538064bb1881a0e5f4a3968c5
+msgid "Session Templates"
+msgstr ""
+
+#: ../../client/cli/session-templates.rst:5 7a078ad1b8184728a8f9bccee04563eb
+msgid "Creating and starting session template"
+msgstr ""
+
+#: ../../client/cli/session-templates.rst:7 78a99347049748c7b6009e5ed309ac7e
+msgid ""
+"Users may define commonly used set of session creation parameters as "
+"reusable templates."
+msgstr ""
+
+#: ../../client/cli/session-templates.rst:10 ead7e56b00084b7cbed7c34f227b8e5c
+msgid ""
+"A session template includes common session parameters such as resource "
+"slots, vfolder mounts, the kernel iamge to use, and etc. It also support an "
+"extra feature that automatically clones a Git repository upon startup as a "
+"bootstrap command."
+msgstr ""
+
+#: ../../client/cli/session-templates.rst:15 db925c9e4e71445f95bcdf9f9797bb56
+msgid "The following sample shows how a session template looks like:"
+msgstr ""
+
+#: ../../client/cli/session-templates.rst:43 ca514d1cf2a047a8b379dbf8f20d3b1e
+msgid ""
+"The ``backend.ai sesstpl`` command set provides the basic CRUD operations of "
+"user-specific session templates."
+msgstr ""
+
+#: ../../client/cli/session-templates.rst:46 5bcd79854a674aa38a7fec0efaed2446
+msgid ""
+"The ``create`` command accepts the YAML content either piped from the "
+"standard input or read from a file using ``-f`` flag:"
+msgstr ""
+
+#: ../../client/cli/session-templates.rst:55 d8a8bb2db94f43d5909de552c4bde376
+msgid ""
+"Once the session template is uploaded, you may use it to start a new session:"
+msgstr ""
+
+#: ../../client/cli/session-templates.rst:62 ef1b17bd71e84db28fe0d3df5dd2269e
+msgid "with substituting ``<templateId>`` to your template ID."
+msgstr ""
+
+#: ../../client/cli/session-templates.rst:64 e02ea91917ca4c368eeaef8c8e29fe0f
+msgid "Other CRUD command examples are as follows:"
+msgstr ""
+
+#: ../../client/cli/session-templates.rst:75 9ac54513435b46028c66c0f465533a31
+msgid "Full syntax for task template"
+msgstr ""

@@ -1,0 +1,63 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/overview.md:2 0bad973fa2104c759663ae65931e95c0
+msgid "Welcome to the Backend.AI Installation!"
+msgstr ""
+
+#: ../../install/_archive/overview.md:4 11b96403b8924f289cb6ba7cd220c44c
+msgid "## Server Installation Guides"
+msgstr ""
+
+#: ../../install/_archive/overview.md:6 dd16e515257c4ef58c49900e045ef144
+msgid ""
+"[Server Concepts](server-concepts.md#) – Key concepts to know before diving "
+"into the installation process"
+msgstr ""
+
+#: ../../install/_archive/overview.md:7 91d87c0eca14403b9d9d325754510227
+msgid ""
+"[Install on Clouds](install-on-clouds#) – How to install a working cluster "
+"on public IaaS clouds"
+msgstr ""
+
+#: ../../install/_archive/overview.md:8 2e6bc56d58ab41bb97c3180c94ffa57e
+msgid ""
+"[Install on Premise](install-on-premise#) – How to install a working cluster "
+"on your server farm"
+msgstr ""
+
+#: ../../install/_archive/overview.md:9 b5351868bd174c32a9bfa5757a433fb6
+msgid ""
+"[Development Setup](development-setup#) – How to install all components as "
+"editable packages on your PC"
+msgstr ""
+
+#: ../../install/_archive/overview.md:10 9343bb833ac7452484666975b3b7a92f
+msgid "[Demo Setup](demo-setup#) – `docker-compose up -d` and that's all!"
+msgstr ""
+
+#: ../../install/_archive/overview.md:12 d83332c5b6614521aa7c51b7dabd3720
+msgid "## Developer Guides"
+msgstr ""
+
+#: ../../install/_archive/overview.md:14 7501c6586e9b4bf7853f1a43ad7f1561
+msgid "[Version Management and Upgrades](version-management-and-upgrades.md#)"
+msgstr ""

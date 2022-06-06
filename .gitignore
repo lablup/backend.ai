@@ -91,7 +91,8 @@ ENV/
 
 # IDE/vim
 .idea
-.*.swp
+*.swp
+*.swo
 .vscode
 
 # Pants

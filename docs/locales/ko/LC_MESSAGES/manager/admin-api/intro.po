@@ -1,0 +1,222 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/admin-api/intro.rst:2 728d0deab66f41c1a8535b7a2842c369
+msgid "Manager GraphQL API"
+msgstr ""
+
+#: ../../manager/admin-api/intro.rst:4 7786d000406e40478f1fa5f9d8a86d18
+#, fuzzy
+msgid "Backend.AI GraphQL API is for developing in-house management consoles."
+msgstr "Backend.AI의 관리자 계정은 내부 관리 콘솔을 개발하는 것이 목적입니다."
+
+#: ../../manager/admin-api/intro.rst:6 59a28efaf50540d1bbfb296b31b451c0
+msgid "There are two modes of operation:"
+msgstr "두 가지 모드의 작업이 있습니다."
+
+#: ../../manager/admin-api/intro.rst:8 b4e81918050d43f4b8667ae2266b316d
+msgid ""
+"Full admin access: you can query all information of all users. It requires a "
+"privileged keypair."
+msgstr ""
+"전체 관리자 접근 : 모든 사용자에 대한 모든 정보를 쿼리할 수 있습니다. 이 방법"
+"은 권한있는 키 쌍을 필요로 합니다."
+
+#: ../../manager/admin-api/intro.rst:10 10a5a4daabf240ad910d920188e3ca39
+msgid ""
+"Restricted owner access: you can query only your own information. The server "
+"processes your request in this mode if you use your own plain keypair."
+msgstr ""
+"제한된 사용자 계정 : 오직 본인의 정보에 대해서만 질문할 수 있습니다.만약 본인"
+"의 고유한 키 쌍을 사용한다면, 서버는 이 모드에서의 요청을 처리합니다."
+
+#: ../../manager/admin-api/intro.rst:15 e2d31f51c83e4efc9582555a4625507a
+msgid "The Admin API *only* accepts authenticated requests."
+msgstr "관리자 API는 *오직* 인증된 요청들만 받아들입니다."
+
+#: ../../manager/admin-api/intro.rst:19 e1b0aa50b0694f3ca91098f1791955b0
+#, fuzzy
+msgid ""
+"To test and debug with the Admin API easily, try the proxy mode of `the "
+"official Python client <https://pypi.python.org/pypi/backend.ai-client>`_. "
+"It provides an insecure (non-SSL, non-authenticated) local HTTP proxy where "
+"all the required authorization headers are attached from the client "
+"configuration. Using this you do not have to add any custom header "
+"configurations to your favorite API development tools such as `GraphiQL "
+"<https://github.com/graphql/graphiql>`_."
+msgstr ""
+"관리자 API를 쉽게 테스트하고 디버그하기 위해서는, 공식 파이썬 클라이언트 "
+"<https://pypi.python.org/pypi/backend.ai-client>의 프록시 모드로 시도해보세"
+"요. 그것은 필요한 모든 권한 헤더가 클라이언트 방식에서 첨부되는 불안정한(SSL"
+"이 아닌, 비인증된) 로컬 HTTP 프록시를 제공합니다. 이를 사용하면 사용자 정의 "
+"헤더 방식을 더이상 당신의 API 개발 툴에 추가할 필요가 없습니다"
+
+#: ../../manager/admin-api/intro.rst:38 90d98b928b2a425a83aaa1d6e33bd6ab
+msgid "Basics of GraphQL"
+msgstr "GraphQL의 기본"
+
+#: ../../manager/admin-api/intro.rst:40 30bb1a880d9c453d9c2fbdc2a5288a89
+msgid ""
+"The Admin API uses a single GraphQL endpoint for both queries and mutations."
+msgstr "관리자 API는 단일 GraphQL 엔드포인트를 쿼리와 뮤테이션에 사용합니다."
+
+#: ../../manager/admin-api/intro.rst:46 6913ab725c9c4d099ba8ca5c2a420336
+msgid ""
+"For more information about GraphQL concepts and syntax, please visit the "
+"following site(s):"
+msgstr ""
+"GraphQL에 대한 개념과 구문에 대한 더 많은 정보를 위해서는, 다음 사이트를 방문"
+"하십시오."
+
+#: ../../manager/admin-api/intro.rst:48 fde755147f1e467281167e974093c00b
+msgid "`GraphQL official website <http://graphql.org/>`_"
+msgstr "GraphQL 공식 웹사이트 <http://graphql.org/>"
+
+#: ../../manager/admin-api/intro.rst:52 3255eaf1aa6048f0b54415e7425525f5
+msgid "HTTP Request Convention"
+msgstr "HTTP 요청 규칙"
+
+#: ../../manager/admin-api/intro.rst:54 5613f94311aa4f9f82159252b1b119b4
+msgid ""
+"A client must use the ``POST`` HTTP method. The server accepts a JSON-"
+"encoded body with an object containing two fields: ``query`` and "
+"``variables``, pretty much like other GraphQL server implementations."
+msgstr ""
+"클라이언트는 HTTP 메소드인 POST를 사용해야 합니다. 서버는 다른 GraphQL 서버 "
+"구현과 매우 유사한 ``쿼리``와 ``변수`` 두 가지 필드를 포함하는 JSON 인코딩 본"
+"문을 허용합니다."
+
+#: ../../manager/admin-api/intro.rst:60 7e3a84eb47c648918bd930348972e57a
+msgid ""
+"Currently the API gateway does not support schema discovery which is often "
+"used by API development tools such as Insomnia and GraphiQL."
+msgstr ""
+"현재 API 게이트웨이는 Insomina와 GraphiQL과 같은 API 개발 도구에서 자주 사용"
+"되는 스키마 검색을 지원하지 않습니다."
+
+#: ../../manager/admin-api/intro.rst:65 0dbfd1909ca243c5bb1a9fd4ddd5432f
+msgid "Field Naming Convention"
+msgstr "필드 명명 규칙"
+
+#: ../../manager/admin-api/intro.rst:67 13937f31e212450c83bfa3e2fd38d988
+msgid ""
+"We do *NOT* automatically camel-case our field names. All field names follow "
+"the underscore style, which is common in the Python world as our server-side "
+"framework uses Python."
+msgstr ""
+"필드 네임을 자동으로 대문자로 만들지 않습니다. 서버 측의 프레임 워크가 파이썬"
+"을 사용하기 때문에 모든 필드 네임은 파이썬 상에서 일반적인 밑줄 스타일을 따릅"
+"니다."
+
+#: ../../manager/admin-api/intro.rst:73 5e169a836e4041cdb3d1a755ac6d22ee
+msgid "Common Object Types"
+msgstr ""
+
+#: ../../manager/admin-api/intro.rst:75 4e72c7530e98415089463eca54f91464
+msgid ""
+"``ResourceLimit`` represents a range (``min``, ``max``) of specific resource "
+"slot (``key``). The ``max`` value may be the string constant \"Infinity\" if "
+"not specified."
+msgstr ""
+
+#: ../../manager/admin-api/intro.rst:86 005cb81d72a24c38905a0960a8c7d875
+msgid ""
+"``KVPair`` is used to represent a mapping data structure with arbitrary "
+"(runtime-determined) key-value pairs, in contrast to other data types in "
+"GraphQL which have a set of predefined static fields."
+msgstr ""
+
+#: ../../manager/admin-api/intro.rst:97 fe8be017986949cbb9ab8228a93f1226
+msgid "Pagination Convention"
+msgstr "페이지 번호 규칙"
+
+#: ../../manager/admin-api/intro.rst:99 2d227f3fda0c463fb824f54b49cb9173
+msgid ""
+"GraphQL itself does not enforce how to pass pagination information when "
+"querying multiple objects of the same type."
+msgstr ""
+"GraphQL 자체는 동일 유형의 다수 객체들에게 질문할 때, 페이지 번호 정보를전달"
+"하는 방법을 강요하지 않습니다."
+
+#: ../../manager/admin-api/intro.rst:102 464a1f76c87549fc9087e74a4940f83b
+#, fuzzy
+msgid "We use a pagination convention as described below:"
+msgstr "아래에 설명 된대로 실질적인 표준 페이지 번호 규칙을 사용합니다."
+
+#: ../../manager/admin-api/intro.rst:123 7be2ef8551634752b179738d016ce579
+msgid ""
+"``offset`` and ``limit`` are interpreted as SQL's offset and limit clauses. "
+"For the first page, set the offset to zero and the limit to the page size. "
+"The ``items`` field may contain from zero up to ``limit`` items. Use "
+"``total_count`` field to determine how many pages are there. Fields that "
+"support pagination is suffixed with ``_list`` in our schema."
+msgstr ""
+
+#: ../../manager/admin-api/intro.rst:131 6d1b821e02124462b7365561321d8a67
+msgid "Custom Scalar Types"
+msgstr "커스텀 스칼라 타입"
+
+#: ../../manager/admin-api/intro.rst:133 2c2a9648c82c4b7cb4d1248d3599166f
+msgid ""
+"``UUID``: A hexademically formatted (8-4-4-4-12 alphanumeric characters "
+"connected via single hyphens) UUID values represented as ``String``"
+msgstr ""
+"범용 고유 식별자 : ``문자열``로 표시되는 16진수 형식의 범용 고유 식별자 값(단"
+"일 하이픈으로 연결된 8-4-4-4-12 영숫자)"
+
+#: ../../manager/admin-api/intro.rst:134 cbb7f3a7279c472780c02470ba978347
+msgid ""
+"``DateTime``: An ISO-8601 formatted date-time value represented as ``String``"
+msgstr "``DateTime`` : ``문자열``로 표시되는 ISO-8601 형식의 날짜-시간 값"
+
+#: ../../manager/admin-api/intro.rst:135 d6a82dd8620043c3af4d09e17783fa87
+msgid ""
+"``BigInt``: GraphQL's integer is officially 32-bits only, so we define a "
+"\"big integer\" type which can represent from -9007199254740991 (-2\\ :sup:"
+"`53`\\ +1) to 9007199254740991 (2\\ :sup:`53`\\ -1) (or, ±(8 PiB - 1 byte). "
+"This range is regarded as a \"safe\" (i.e., can be compared without loosing "
+"precision) integer range in most Javascript implementations which represent "
+"numbers in the IEEE-754 double (64-bit) format."
+msgstr ""
+
+#: ../../manager/admin-api/intro.rst:138 0128e45491aa440a908c3313f07fbe93
+msgid ""
+"``JSONString``: It contains a stringified JSON value, whereas the whole "
+"query result is already a JSON object.  A client must parse the value "
+"*again* to get an object representation."
+msgstr ""
+
+#: ../../manager/admin-api/intro.rst:142 96d61df20a124a77aa7887cc3e56013a
+msgid "Authentication"
+msgstr "인증"
+
+#: ../../manager/admin-api/intro.rst:144 0492d3f05dcc47da8d353d007daf6eab
+msgid "The admin API shares the same authentication method of the user API."
+msgstr "관리자 API는 사용자 API와 같은 인증 방법을 공유한다."
+
+#: ../../manager/admin-api/intro.rst:148 a5087d32f1f24d20a1322583eac13880
+msgid "Versioning"
+msgstr "버전관리"
+
+#: ../../manager/admin-api/intro.rst:150 5f197952c3604aab9ef602125906afe2
+msgid ""
+"As we use GraphQL, there is no explicit versioning. Check out the "
+"descriptions for each API for its own version history."
+msgstr ""

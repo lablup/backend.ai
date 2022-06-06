@@ -1,0 +1,246 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/install-agent.md:1 8e1e258f2c0748f4aa102d3c4583b9e6
+msgid "# Install Agent"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:3 59f92aca5b984c66bdd45fbe3376639f
+msgid ""
+"We assume that your system is configured with a sudoable admin user named "
+"`devops`. Your Backend.AI manager should be already set up and running."
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:6 dda4aab5d25a42f5ae9205b43edd7e43
+msgid "## Guide variables"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:8 d7c5d3527f654aa98ea33907ef21e316
+msgid ""
+"⚠️ Prepare the values of the following variables before working with this "
+"page and replace their occurrences with the values when you follow the guide."
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:10 376685ca57e340c9b84df742f7b346f9
+msgid ""
+"<table> <tr><td><code>{NS}</code></td><td>The etcd namespace (just create a "
+"unique string like domain names)</td></tr> <tr><td><code>{ETCDADDR}</code></"
+"td><td>The etcd cluster address (<code>{ETCDHOST}:{ETCDPORT}</code>, "
+"<code>localhost:2379</code> for development setup)</td></tr> </table>"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:15 e4a838eab456462581cf5eef98441778
+msgid ""
+"### Optional variables <table> <tr><td><code>{SSLCERT}</code></td><td>The "
+"path to your SSL certificate (bundled with CA chain certificates)</td></tr> "
+"<tr><td><code>{SSLPKEY}</code></td><td>The path to your SSL private key</"
+"td></tr> <tr><td><code>{S3AKEY}</code></td><td>The access key for AWS S3 or "
+"compatible services<sup><a href=\"#fn1\">[1]</a></sup></td></tr> "
+"<tr><td><code>{S3SKEY}</code></td><td>The secret key for AWS S3 or "
+"compatible services</td></tr> <tr><td><code>{DDAPIKEY}</code></td><td>The "
+"Datadog API key</td></tr> <tr><td><code>{DDAPPKEY}</code></td><td>The "
+"Datadog application key</td></tr> <tr><td><code>{SENTRYURL}</code></"
+"td><td>The private Sentry report URL</td></tr> </table>"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:26 5b94997726784e78a986d9de9a7ddaa8
+msgid "## Install dependencies for daemonization"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:28 151ed1772a1c439197793ed8bb0c13a4
+msgid "### Ubuntu"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:30 3f001104421b4dd4adf640de7bbd3975
+msgid ""
+"```console $ sudo apt-get -y update $ sudo apt-get -y dist-upgrade $ sudo "
+"apt-get install -y ca-certificates git-core supervisor ```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:36 2096aa6770ec41ec9bf320d2370bfb33
+msgid "Here are some optional but useful packages:"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:38 422dc00d8dd64423aa64b01ae545e4ea
+msgid "```console $ sudo apt-get install -y vim tmux htop ```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:42 aab2d9b6c0ba4b3bbae03843a559b1b5
+msgid "### CentOS / RHEL"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:44 1cc9a6672fb241e9bd6d4ec7bcfce2e2
+msgid "(TODO)"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:46 c9b712ad68974668a949d9a1f81c55f3
+msgid "## Prepare CUDA (if available)"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:48 62e3f8fd7fe04d02b3cb82ee467e5746
+msgid "Check out the [[Install CUDA]] guide."
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:50 4ab63b5b6e7940d3b43ccca4fa4ed0fc
+msgid "## Prepare Python 3.6+"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:52 86e47f7a44e54d26aab3654f62bef928
+msgid ""
+"Check out [[Install Python via pyenv]] for instructions. Create a virtualenv "
+"named `venv-agent`."
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:55 3b87463b7db14904aff57f9b123d63bf
+msgid ""
+"**(Only in Linux)** To enable detailed resource statistics, give the Python "
+"executable to have `CAP_SYS_ADMIN`, `CAP_SYS_PTRACE`, and `CAP_DAC_OVERRIDE` "
+"capabilities."
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:57 0b002670c44e45c884476123633cfcd6
+msgid ""
+"```console $ sudo setcap cap_sys_ptrace,cap_sys_admin,cap_dac_override+eip "
+"\"$(readlink -f $(pyenv which python))\" ```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:61 4ca34fe15e4c434fba4230a11255b3b9
+msgid "## Install Backend.AI Agent as Package"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:63 aaccbeaa9d6348f38bf75b90e35de4c4
+msgid ""
+"```console $ pyenv shell venv-agent $ pip install -U setuptools pip $ pip "
+"install -U backend.ai-agent ```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:69 47b7e6b1db2349218293c710b023da24
+msgid "## Monitoring and Logging"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:71 9a488287204d42c9b9d82af1d07c71eb
+msgid "Check out the [[Install Monitoring and Logging Tools]] guide."
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:73 5f9200bf86c14a7ea1c6f08fd18f79e6
+msgid "## Configure supervisord"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:75 6f14d21197b84522b51b8914bbe35648
+msgid "#### supervisord application config"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:77 97e16716f9f143889d348c1159d5d067
+msgid "```console $ sudo vi /etc/supervisor/conf.d/apps.conf ```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:81 9caad97a6a9041f9870b22e79ecb832d
+msgid ""
+"```dosini [program:backendai-agent] user = devops stopsignal = TERM "
+"stopasgroup = true command = /home/devops/run-agent.sh ```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:89 b93e47aebf9649b990954a331484080c
+msgid "#### pyenv + venv initialization script for non-login shells"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:91 20056dd984a34e059a39f0c0b7648b5e
+msgid "```console $ vi /home/devops/init-venv.sh ```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:95 3c330440a8154d67bc7d0dd3255eb2d3
+msgid ""
+"```shell #!/bin/bash export PYENV_ROOT=\"$HOME/.pyenv\" export PATH="
+"\"$PYENV_ROOT/bin:$PATH\" eval \"$(pyenv init -)\" eval \"$(pyenv virtualenv-"
+"init -)\" pyenv shell venv-agent ```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:104 888170a9b9fe416aafd043de9afc15a6
+msgid ""
+"#### Prepare scratch directory (place for kernel containers' `/home/work`)"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:106 c777894ca1784b8ab00189c7f52cf500
+msgid ""
+"```console $ sudo mkdir -p /var/cache/scratches $ sudo chown devops:devops /"
+"var/cache/scratches ```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:111 58aaa5771a364e6fbf2531e4259889fd
+msgid "#### The main program managed by supervisord"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:113 120112325f254364b9ea81dfadf44db0
+msgid "```console $ vi /home/devops/run-agent.sh ```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:117 f9ed385e4c054e8f83b648f99793d269
+msgid ""
+"```shell source /home/devops/init-venv.sh umask 0002 export "
+"AWS_ACCESS_KEY_ID=\"{S3AKEY}\" export AWS_SECRET_ACCESS_KEY=\"{S3SEKEY}\" "
+"export DATADOG_API_KEY={DDAPIKEY} export DATADOG_APP_KEY={DDAPPKEY} export "
+"RAVEN_URI=\"{SENTRYURL}\" exec python -m ai.backend.agent.server \\"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:126 76e45705aac747d2a324b94445c022ef
+msgid ""
+"--etcd-addr {ETCDADDR} \\ --namespace {NS} \\ --scratch-root=/var/cache/"
+"scratches"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:129 5d58cb76bf2548ce894b4f58807d7fde
+msgid "```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:131 da0c7a49e8ed427d9f3af88b367efeb4
+msgid "## Prepare Kernel Images"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:133 2bfa02a3281d411393825b782cf96e2e
+msgid ""
+"You need to pull the kernel container images first to actually spawn compute "
+"sessions. The name and tag pairs of images must be also specified in "
+"`backend.ai-manager/sample-configs/image-metadata.yml` file imported into "
+"etcd."
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:136 ed40aa6e6d9c46adb1a332aa926d891c
+msgid ""
+"Here are the pull commands for a few commonly used Python-based images: "
+"```console $ docker pull lablup/kernel-python:3.6-debian $ docker pull "
+"lablup/kernel-python-tensorflow:1.8-py36 $ docker pull lablup/kernel-python-"
+"tensorflow:1.8-py36-gpu ```"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:143 6441332945ac4262aeb2f60d9cbb2509
+msgid ""
+"For the full list of publicly available kernels, [check out the kernels "
+"repository.](https://github.com/lablup/backend.ai-kernels)"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:145 f85d634fc7724301a29b281ec668ebe8
+msgid "## Finally, Run!"
+msgstr ""
+
+#: ../../install/_archive/install-agent.md:147 4f84ec2f7aed4b419f5cdecaeb42e190
+msgid ""
+"```console $ sudo supervisorctl reread $ sudo supervisorctl start backendai-"
+"agent ```"
+msgstr ""

@@ -1,0 +1,267 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/common-api/convention.rst:2 3b5f9812bf7b4f8f8a35aeba97984020
+msgid "API and Document Conventions"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:5 d287a07824294d4eb17f9e7b3f83f420
+msgid "HTTP Methods"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:7 1d27318d66d24170b63126b33bfafc0d
+msgid ""
+"We use the standard HTTP/1.1 methods (`RFC-2616 <https://tools.ietf.org/html/"
+"rfc2616>`_), such as ``GET``, ``POST``, ``PUT``, ``PATCH`` and ``DELETE``, "
+"with some additions from WebDAV (`RFC-3253 <https://tools.ietf.org/html/"
+"rfc3253>`_) such as ``REPORT`` method to send JSON objects in request bodies "
+"with ``GET`` semantics."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:9 974ed29683c740e3ba30368bb73bd181
+msgid ""
+"If your client runs under a restrictive environment that only allows a "
+"subset of above methods, you may use the universal ``POST`` method with an "
+"extra HTTP header like ``X-Method-Override: REPORT``, so that the Backend.AI "
+"gateway can recognize the intended HTTP method."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:12 158bfe4f16f34f649ecdc809c57c3085
+msgid "Parameters in URI and JSON Request Body"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:14 2d17e250bb0b4d478fb0e0c7f50a12c6
+msgid ""
+"The parameters with *colon prefixes* (e.g., ``:id``) are part of the URI "
+"path and must be encoded using a proper URI-compatible encoding schemes such "
+"as ``encodeURIComponent(value)`` in Javascript and ``urllib.parse."
+"quote(value, safe='~()*!.\\'')`` in Python 3+."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:16 e4d3ab4412234f1192c754d2e0a134b9
+msgid ""
+"Other parameters should be set as a key-value pair of the JSON object in the "
+"HTTP request body. The API server accepts both UTF-8 encoded bytes and "
+"standard-compliant Unicode-escaped strings in the body."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:20 ab6e1feab8b24c898cb096bc1672c65e
+msgid "HTTP Status Codes and JSON Response Body"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:22 e0b7e9576c62464098cfcc7bd36bfda2
+msgid ""
+"The API responses always contain a root JSON object, regardless of success "
+"or failures."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:24 45aaa053415a4775b3e105b006fa1c77
+msgid ""
+"For successful responses (HTTP status 2xx), the root object has a varying "
+"set of key-value pairs depending on the API."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:26 f895a2cd34a54c1eada7007b3919e8b6
+msgid ""
+"For failures (HTTP status 4xx/5xx), the root object contains at least two "
+"keys: ``type`` which uniquely identifies the failure reason as an URI and "
+"``title`` for human-readable error messages. Some failures may return extra "
+"structured information as additional key-value pairs. We use `RFC 7807 "
+"<https://tools.ietf.org/html/rfc7807>`_-style problem detail description "
+"returned in JSON of the response body."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:31 66735030a6084b3fbcb53e99afc2c903
+msgid "JSON Field Notation"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:33 a2ec09c1ceb242028d65c5dcd76fe879
+msgid ""
+"Dot-separated field names means a nested object. If the field name is a pure "
+"integer, it means a list item."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:40 0cbb0bee8fb54480bd57c66cb016d35a
+msgid "Example"
+msgstr "예시"
+
+#: ../../manager/common-api/convention.rst:41 6c5ed8726d5a4028b93714e374cbec59
+msgid "Meaning"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:42 fd0861c4dc394664a58e71ee31cda8c4
+msgid "``a``"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:43 5e14784c2050483d98bae9e1e34fd769
+msgid ""
+"The attribute ``a`` of the root object. (e.g., ``123`` at ``{\"a\": 123}``)"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:45 b70b1ee0e3f14f1a876a709ef0c95f28
+msgid "``a.b``"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:46 99ef57e109b4440bb653b9e674910a5d
+msgid ""
+"The attribute ``b`` of the object ``a`` on the root. (e.g., ``456`` at ``{\"a"
+"\": {\"b\": 456}}``)"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:48 dbc7a13c02134526bfa7d59ea75cd329
+msgid "``a.0``"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:49 a01d9d38018f4459a1b8a3c468b80a3e
+msgid ""
+"An item in the list ``a`` on the root. ``0`` means an arbitrary array index, "
+"not the specific item at index zero. (e.g., any of ``13``, ``57``, ``24``, "
+"and ``68`` at ``{\"a\": [13, 57, 24, 68]}``)"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:52 45e8f73f332f487c80842960b2724081
+msgid "``a.0.b``"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:53 c6522165fcdc490294b7f2055b9306df
+msgid ""
+"The attribute ``b`` of an item in the list ``a`` on the root. (e.g., any of "
+"``1``, ``2``, and ``3`` at ``{\"a\": [{\"b\": 1}, {\"b\": 2}, {\"b\": 3}]}``)"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:57 6aaafcd38820411fb9972999b933fd88
+msgid "JSON Value Types"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:59 4781d344d0474166ad9bda6998ac67f2
+msgid ""
+"This documentation uses a type annotation style similar to `Python's typing "
+"module <https://docs.python.org/3/library/typing.html>`_, but with minor "
+"intuitive differences such as lower-cased generic type names and wildcard as "
+"asterisk ``*`` instead of ``Any``."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:61 a34b339bb18b4b13a5f5f900665421ef
+msgid ""
+"The common types are ``array`` (JSON array), ``object`` (JSON object), "
+"``int`` (integer-only subset of JSON number), ``str`` (JSON string), and "
+"``bool`` (JSON ``true`` or ``false``). ``tuple`` and ``list`` are aliases to "
+"``array``. Optional values may be omitted or set to ``null``."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:65 efbfd707a933457d830cf8ee886633c2
+msgid "We also define several custom types:"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:71 726a63f877874364aad93efa04ea95cb
+msgid "Type"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:72 e08255611fed4b74b800ccb66d08203f
+msgid "Description"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:73 ecafec37eb614875b64021df80bb8cac
+msgid "``decimal``"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:74 b35558ff6487410cbc2153336d5b4e81
+msgid ""
+"Fractional numbers represented as ``str`` not to loose precision. (e.g., to "
+"express money amounts)"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:75 440bba93eaaa4246b7e52cf252acaae0
+msgid "``slug``"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:76 b0f53ba70adb4c2282f58645af6d969b
+msgid ""
+"Similar to ``str``, but the values should contain only alpha-numeric "
+"characters, hyphens, and underscores. Also, hyphens and underscores should "
+"have at least one alphanumeric neighbor as well as cannot become the prefix "
+"or suffix."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:78 250505533b3c485d86f37ba4b218ab7e
+msgid "``datetime``"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:79 4eeb1f4de45143bd85c5ff45c8370fc7
+msgid ""
+"ISO-8601 timestamps in ``str``, e.g., ``\"YYY-mm-ddTHH:MM:SS.ffffff+HH:MM"
+"\"``. It may include an optional timezone information. If timezone is not "
+"included, the value is assumed to be UTC. The sub-seconds parts has at most "
+"6 digits (micro-seconds)."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:82 8c3ba4c6720141fba7481742f0720369
+msgid "``enum[*]``"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:83 76967c43312543ee90bbfba3cebc6725
+msgid ""
+"Only allows a fixed/predefined set of possible values in the given "
+"parametrized type."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:86 0bcf38c2e1e44ecf8a06c743f8d1d834
+msgid "API Versioning"
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:88 2767c80f7cf24b46840fc3fb858333d2
+msgid ""
+"A version string of the Backend.AI API uses two parts: a major revision "
+"(prefixed with ``v``) and minor release dates after a dot following the "
+"major revision. For example, ``v23.20250101`` indicates a 23rd major "
+"revision with a minor release at January 1st in 2025."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:91 c668f1d337884936ad3fd45ad33167b4
+msgid ""
+"We keep backward compatibility between minor releases within the same major "
+"version. Therefore, all API query URLs are prefixed with the major revision, "
+"such as ``/v2/kernel/create``. Minor releases may introduce new parameters "
+"and response fields but no URL changes. Accessing unsupported major revision "
+"returns HTTP 404 Not Found."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:96 82f1e0acc5f745ad895ed1ca39ee208d
+msgid ""
+"Version prefix in API queries are deprecated. (Yet still supported "
+"currently) For example, now users should call ``/kernel/create`` rather than "
+"``/v2/kernel/create``."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:100 18bf87c791e24c079fd1b11cd3cfcc83
+msgid ""
+"A client must specify the API version in the HTTP request header named ``X-"
+"BackendAI-Version``. To check the latest minor release date of a specific "
+"major revision, try a GET query to the URL with only the major revision part "
+"(e.g., ``/v2``). The API server will return a JSON string in the response "
+"body containing the full version. When querying the API version, you do not "
+"have to specify the authorization header and the rate-limiting is enforced "
+"per the client IP address. Check out more details about :doc:`auth` and :doc:"
+"`ratelimit`."
+msgstr ""
+
+#: ../../manager/common-api/convention.rst:106 0d840a40f5c649d597cc9e2899194cfd
+msgid "Example version check response body:"
+msgstr ""

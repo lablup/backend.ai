@@ -1,0 +1,145 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../client/dev/testing.rst:2 a1c4446c60294ea48c1e4d909ea7bf85
+msgid "Testing"
+msgstr ""
+
+#: ../../client/dev/testing.rst:5 e8c5da43e1d44961a29b984932c3163a
+msgid "Unit Tests"
+msgstr ""
+
+#: ../../client/dev/testing.rst:7 9f89fe864cba41669e5162d76f7e1885
+msgid ""
+"Unit tests perform function-by-function tests to ensure their individual "
+"functionality.  This test suite runs without depending on the server-side "
+"and thus it is executed in Travis CI for every push."
+msgstr ""
+
+#: ../../client/dev/testing.rst:12 ../../client/dev/testing.rst:76
+#: 117a3cebe64545b8b9b46a3366eb2d65 7c143219fa4d4785a30ba4bcaae5996f
+msgid "How to run"
+msgstr ""
+
+#: ../../client/dev/testing.rst:20 3eb17398350e498cb01f9d371a7ac185
+msgid "Integration Tests"
+msgstr ""
+
+#: ../../client/dev/testing.rst:22 e27360f668b447d58083200cad22c280
+msgid ""
+"Integration tests combine multiple invocations of high-level interfaces to "
+"make underlying API requests to a running gateway server to test the full "
+"functionality of the client as well as the manager."
+msgstr ""
+
+#: ../../client/dev/testing.rst:25 cfd23abce6a746bca037ddda6777667b
+msgid ""
+"They are marked as \"integration\" using the ``@pytest.mark.integration`` "
+"decorator to each test case."
+msgstr ""
+
+#: ../../client/dev/testing.rst:30 6db6a5e8a16b4bf3a7c509e77b83ec4a
+msgid ""
+"The integration tests actually make changes to the target gateway server and "
+"agents. If some tests fail, those changes may remain in an inconsistent "
+"state and requires a manual recovery such as resetting the database and "
+"populating fixtures again, though the test suite tries to clean up them "
+"properly."
+msgstr ""
+
+#: ../../client/dev/testing.rst:35 6df5cdd3d23647178c5b01da44fad182
+msgid "So, DO NOT RUN it against your production server."
+msgstr ""
+
+#: ../../client/dev/testing.rst:38 99e9b918886d4031b878ed69165ad698
+msgid "Prerequisite"
+msgstr ""
+
+#: ../../client/dev/testing.rst:40 474058ccd46a425fbc87da29d77311f7
+msgid ""
+"Please refer the README of the manager and agent repositories to set up "
+"them. To avoid an indefinite waiting time for pulling Docker images:"
+msgstr ""
+
+#: ../../client/dev/testing.rst:43 7c8dd221394042c0bd080363b7cfce48
+msgid "(manager) ``python -m ai.backend.manager.cli etcd rescan-images``"
+msgstr ""
+
+#: ../../client/dev/testing.rst:45 3df55cd371254d379a190c6fead3d0a6
+msgid "(agent) ``docker pull``"
+msgstr ""
+
+#: ../../client/dev/testing.rst:47 ec7aa36376ea475aaf155083fd97d2a2
+msgid "``lablup/python:3.6-ubuntu18.04``"
+msgstr ""
+
+#: ../../client/dev/testing.rst:49 ef1c331e60a742c5a0c4a7a9e0679840
+msgid "``lablup/lua:5.3-alpine3.8``"
+msgstr ""
+
+#: ../../client/dev/testing.rst:51 14e6897182b54f7a89f05216b71321fd
+msgid ""
+"The manager must also have at least the following active suerp-admin account "
+"in the ``default`` domain and the ``default`` group."
+msgstr ""
+
+#: ../../client/dev/testing.rst:54 45647f9bc5224ba88474f56399e36760
+msgid "Example super-admin account:"
+msgstr ""
+
+#: ../../client/dev/testing.rst:56 1647b68fd1ad4aa8b6ccb834b2d2fbf7
+msgid "User ID: ``admin@lablup.com``"
+msgstr ""
+
+#: ../../client/dev/testing.rst:58 344e808af7b845eb9b2f9efa3ea5e528
+msgid "Password ``wJalrXUt``"
+msgstr ""
+
+#: ../../client/dev/testing.rst:60 d54038e1de13469bae5405ebb6038816
+msgid "Access key: ``AKIAIOSFODNN7EXAMPLE``"
+msgstr ""
+
+#: ../../client/dev/testing.rst:62 05fcb60cf29d4ac8af4c304fc8e904c2
+msgid "Secret key: ``wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY``"
+msgstr ""
+
+#: ../../client/dev/testing.rst:64 8790cb9430ad4f728022a4776ed37104
+msgid ""
+"One or more ``testing-XXXX`` domain, one or more ``testing-XXXX`` groups, "
+"and one ore more dummy users are created and used during the tests and "
+"destroyed after running tests.  ``XXXX`` will be filled with random "
+"identifiers."
+msgstr ""
+
+#: ../../client/dev/testing.rst:71 aca90fe9a32043adad4e62ef607d0f32
+msgid ""
+"The *halfstack* configuration and the ``example-keypairs.json`` fixture is "
+"compatible with this integration test suite."
+msgstr ""
+
+#: ../../client/dev/testing.rst:78 85562d34f3c6472eb9133897d9a3b95e
+msgid ""
+"Execute the gateway and at least one agent in their respective virtualenvs "
+"and hosts:"
+msgstr ""
+
+#: ../../client/dev/testing.rst:86 4b499c0508d34f59a55ddf4abc107b5d
+msgid "Then run the tests:"
+msgstr ""
