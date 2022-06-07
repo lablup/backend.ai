@@ -204,7 +204,7 @@ Working with plugins
 
 To develop Backend.AI plugins together, the repository offers a special location
 ``./plugins`` where you can clone plugin repositories and a shortcut script
-``scripts/install-plugin.sh`` to install them does this for you.
+``scripts/install-plugin.sh`` that does this for you.
 
 .. code-block:: console
 
