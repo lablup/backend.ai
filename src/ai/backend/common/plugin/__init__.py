@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 import asyncio
 import logging
-import pkg_resources
 import re
 from typing import (
     Any,
