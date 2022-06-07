@@ -171,7 +171,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.stats_enabled = False
         self._tasks = set()
         self.environ = environ
-        self.runner = None
 
     async def init(self) -> None:
         log.debug('kernel.init(k:{0}, api-ver:{1}, client-features:{2}): '
