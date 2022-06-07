@@ -890,7 +890,6 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
         async with aiotools.PersistentTaskGroup(
             exception_handler=lifecycle_task_exception_handler,
         ) as tg:
-            ipc_base_path = self.local_config['agent']['ipc-base-path']
             while True:
                 ev = await self.container_lifecycle_queue.get()
                 if isinstance(ev, Sentinel):
