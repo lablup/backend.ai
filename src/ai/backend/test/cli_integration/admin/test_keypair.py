@@ -10,27 +10,32 @@ def test_add_keypair(run: ClientRunnerFunc):
     This test should be execued first in test_keypair.py.
     """
     print("[ Add keypair ]")
+
     # Add test user
     add_arguments = ['--output=json', 'admin', 'user', 'add', '-u', 'adminkeypair', '-n', 'John Doe',
                      '-r', 'admin', 'default', 'adminkeypair@lablup.com', '1q2w3e4r']
     with closing(run(add_arguments)) as p:
         p.expect(EOF)
-        assert 'User adminkeypair@lablup.com is created' in p.before.decode(), 'Account add error'
+        response = json.loads(p.before.decode())
+        assert response.get('ok') is True, 'Account#1 add error'
 
     add_arguments = ['--output=json', 'admin', 'user', 'add', '-u', 'userkeypair', '-n', 'Richard Doe',
                      'default', 'userkeypair@lablup.com', '1q2w3e4r']
     with closing(run(add_arguments)) as p:
         p.expect(EOF)
-        assert 'User userkeypair@lablup.com is created' in p.before.decode(), 'Account add error'
+        response = json.loads(p.before.decode())
+        assert response.get('ok') is True, 'Account#2 add error'
 
     # Create keypair
-    with closing(run(['admin', 'keypair', 'add', '-a', '-i', '-r', '25000', 'adminkeypair@lablup.com', 'default'])) as p:
+    with closing(run(['--output=json', 'admin', 'keypair', 'add', '-a', '-i', '-r', '25000', 'adminkeypair@lablup.com', 'default'])) as p:
         p.expect(EOF)
-        assert 'Access Key:' in p.before.decode() and 'Secret Key:' in p.before.decode(), 'Keypair add error'
+        response = json.loads(p.before.decode())
+        assert response.get('ok') is True, 'Keypair#1 add error'
 
-    with closing(run(['admin', 'keypair', 'add', 'userkeypair@lablup.com', 'default'])) as p:
+    with closing(run(['--output=json', 'admin', 'keypair', 'add', 'userkeypair@lablup.com', 'default'])) as p:
         p.expect(EOF)
-        assert 'Access Key:' in p.before.decode() and 'Secret Key:' in p.before.decode(), 'Keypair add error'
+        response = json.loads(p.before.decode())
+        assert response.get('ok') is True, 'Keypair#2 add error'
 
     # Check if keypair is added
     with closing(run(['--output=json', 'admin', 'keypair', 'list'])) as p:
@@ -77,6 +82,7 @@ def test_update_keypair(run: ClientRunnerFunc):
 
     # Update keypair
     with closing(run([
+        '--output=json',
         'admin', 'keypair', 'update',
         '--is-active', 'TRUE',
         '--is-admin', 'FALSE',
@@ -84,9 +90,11 @@ def test_update_keypair(run: ClientRunnerFunc):
         admin_keypair['access_key'],
     ])) as p:
         p.expect(EOF)
-        assert 'Key pair is updated:' in p.before.decode(), 'Admin keypair update error'
+        response = json.loads(p.before.decode())
+        assert response.get('ok') is True, 'Admin keypair update error'
 
     with closing(run([
+        '--output=json',
         'admin', 'keypair', 'update',
         '--is-active', 'FALSE',
         '--is-admin', 'TRUE',
@@ -94,7 +102,8 @@ def test_update_keypair(run: ClientRunnerFunc):
         user_keypair['access_key'],
     ])) as p:
         p.expect(EOF)
-        assert 'Key pair is updated:' in p.before.decode(), 'User keypair update error'
+        response = json.loads(p.before.decode())
+        assert response.get('ok') is True, 'User keypair update error'
 
     # Check if keypair is updated
     with closing(run(['--output=json', 'admin', 'keypair', 'list'])) as p:
@@ -142,22 +151,24 @@ def test_delete_keypair(run: ClientRunnerFunc):
     # Delete keypair
     with closing(run(['admin', 'keypair', 'delete', admin_keypair['access_key']])) as p:
         p.expect(EOF)
-        print(p.before.decode())
 
     with closing(run(['admin', 'keypair', 'delete', user_keypair['access_key']])) as p:
         p.expect(EOF)
-        print(p.before.decode())
 
     # Delete test user
-    with closing(run(['admin', 'user', 'purge', 'adminkeypair@lablup.com'])) as p:
+    with closing(run(['--output=json', 'admin', 'user', 'purge', 'adminkeypair@lablup.com'])) as p:
         p.sendline('y')
         p.expect(EOF)
-        assert 'User is deleted:' in p.before.decode(), 'Account deletion failed: adminkeypair'
+        before = p.before.decode()
+        response = json.loads(before[before.index('{'):])
+        assert response.get('ok') is True, 'Account deletion failed: adminkeypair'
 
-    with closing(run(['admin', 'user', 'purge', 'userkeypair@lablup.com'])) as p:
+    with closing(run(['--output=json', 'admin', 'user', 'purge', 'userkeypair@lablup.com'])) as p:
         p.sendline('y')
         p.expect(EOF)
-        assert 'User is deleted:' in p.before.decode(), 'Account deletion failed: userkeypair'
+        before = p.before.decode()
+        response = json.loads(before[before.index('{'):])
+        assert response.get('ok') is True, 'Account deletion failed: userkeypair'
 
 
 def test_list_keypair(run: ClientRunnerFunc):

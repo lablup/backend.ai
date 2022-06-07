@@ -7,6 +7,7 @@ from ...utils.cli import EOF, ClientRunnerFunc
 def test_add_scaling_group(run: ClientRunnerFunc):
     # Create scaling group
     with closing(run([
+        '--output=json',
         'admin', 'scaling-group', 'add',
         '-d', 'Test scaling group',
         '-i',
@@ -16,8 +17,8 @@ def test_add_scaling_group(run: ClientRunnerFunc):
         'test_group1',
     ])) as p:
         p.expect(EOF)
-        assert 'Scaling group name test_group1 is created.' in p.before.decode(), \
-            'Test scaling group not created successfully'
+        response = json.loads(p.before.decode())
+        assert response.get('ok') is True, 'Test scaling group not created successfully'
 
     # Check if scaling group is created
     with closing(run(['--output=json', 'admin', 'scaling-group', 'list'])) as p:
@@ -44,12 +45,17 @@ def test_add_scaling_group(run: ClientRunnerFunc):
     assert test_group.get('driver') == 'static', 'Scaling group driver mismatch'
     assert test_group.get('driver_opts') == {'x': 1}, 'Scaling group driver options mismatch'
     assert test_group.get('scheduler') == 'fifo', 'Scaling group scheduler mismatch'
-    assert test_group.get('scheduler_opts') == {}, 'Scaling group scheduler options mismatch'
+    assert test_group.get('scheduler_opts') == {
+        'allowed_session_types': ['interactive', 'batch'],
+        'pending_timeout': 0.0,
+        'config': {}
+    }, 'Scaling group scheduler options mismatch'
 
 
 def test_update_scaling_group(run: ClientRunnerFunc):
     # Update scaling group
     with closing(run([
+        '--output=json',
         'admin', 'scaling-group', 'update',
         '-d', 'Test scaling group updated',
         '--driver', 'non-static',
@@ -57,8 +63,8 @@ def test_update_scaling_group(run: ClientRunnerFunc):
         'test_group1',
     ])) as p:
         p.expect(EOF)
-        assert 'Scaling group test_group1 is updated.' in p.before.decode(), \
-            'Test scaling group not updated successfully'
+        response = json.loads(p.before.decode())
+        assert response.get('ok') is True, 'Test scaling group not updated successfully'
 
     # Check if scaling group is updated
     with closing(run(['--output=json', 'admin', 'scaling-group', 'info', 'test_group1'])) as p:
@@ -76,13 +82,18 @@ def test_update_scaling_group(run: ClientRunnerFunc):
     assert test_group.get('driver') == 'non-static', 'Scaling group driver mismatch'
     assert test_group.get('driver_opts') == {'x': 1}, 'Scaling group driver options mismatch'
     assert test_group.get('scheduler') == 'lifo', 'Scaling group scheduler mismatch'
-    assert test_group.get('scheduler_opts') == {}, 'Scaling group scheduler options mismatch'
+    assert test_group.get('scheduler_opts') == {
+        'allowed_session_types': ['interactive', 'batch'],
+        'pending_timeout': 0.0,
+        'config': {}
+    }, 'Scaling group scheduler options mismatch'
 
 
 def test_delete_scaling_group(run: ClientRunnerFunc):
-    with closing(run(['admin', 'scaling-group', 'delete', 'test_group1'])) as p:
+    with closing(run(['--output=json', 'admin', 'scaling-group', 'delete', 'test_group1'])) as p:
         p.expect(EOF)
-        assert 'Scaling group is deleted: test_group1.' in p.before.decode(), 'Test scaling group deletion unsuccessful'
+        response = json.loads(p.before.decode())
+        assert response.get('ok') is True, 'Test scaling group deletion unsuccessful'
 
 
 def test_list_scaling_group(run: ClientRunnerFunc):
