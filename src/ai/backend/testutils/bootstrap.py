@@ -12,6 +12,21 @@ import pytest
 from ai.backend.common.types import HostPortPair
 
 
+def wait_health_check(container_id):
+    while True:
+        proc = subprocess.run(
+            [
+                'docker', 'inspect', container_id,
+            ],
+            capture_output=True,
+        )
+        container_info = json.loads(proc.stdout)
+        if container_info[0]['State']['Health']['Status'].lower() != 'healthy':
+            time.sleep(0.2)
+            continue
+        return container_info
+
+
 @pytest.fixture(scope='session')
 def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
@@ -52,6 +67,9 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
         [
             'docker', 'run', '-d',
             '-p', ':6379',
+            '--health-cmd', 'redis-cli ping',
+            '--health-interval', '0.3s',
+            '--health-start-period', '0.2s',
             'redis:6.2-alpine',
         ],
         capture_output=True,
@@ -64,6 +82,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_info = json.loads(proc.stdout)
+    container_info = wait_health_check(container_id)
     host_port = int(container_info[0]['NetworkSettings']['Ports']['6379/tcp'][0]['HostPort'])
     yield container_id, HostPortPair('127.0.0.1', host_port)
     subprocess.run(
@@ -91,19 +110,8 @@ def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
-    host_port = 0
-    while host_port == 0:
-        proc = subprocess.run(
-            [
-                'docker', 'inspect', container_id,
-            ],
-            capture_output=True,
-        )
-        container_info = json.loads(proc.stdout)
-        if container_info[0]['State']['Health']['Status'].lower() != 'healthy':
-            time.sleep(0.2)
-            continue
-        host_port = int(container_info[0]['NetworkSettings']['Ports']['5432/tcp'][0]['HostPort'])
+    container_info = wait_health_check(container_id)
+    host_port = int(container_info[0]['NetworkSettings']['Ports']['5432/tcp'][0]['HostPort'])
     yield container_id, HostPortPair('127.0.0.1', host_port)
     subprocess.run(
         [
