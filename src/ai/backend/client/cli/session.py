@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import asyncio
+from contextlib import suppress
 from datetime import datetime
 import json
 from pathlib import Path
 import secrets
 import subprocess
 import sys
-from typing import IO, Literal, Sequence
+from typing import IO, List, Literal, Optional, Sequence, Tuple
 import uuid
 
 import click
+import inquirer
 from humanize import naturalsize
 from tabulate import tabulate
 
@@ -19,6 +22,8 @@ from .ssh import container_ssh_ctx
 from .run import format_stats, prepare_env_arg, prepare_resource_arg, prepare_mount_arg
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
+from ..output.fields import session_fields
+from ..output.types import FieldSpec
 from ..session import Session, AsyncSession
 from ..types import Undefined, undefined
 from .params import CommaSeparatedListType
@@ -115,7 +120,7 @@ def _create_cmd(docs: str = None):
         starts_at: str | None,
         startup_command: str | None,
         enqueue_only: bool,
-        max_wait: bool,
+        max_wait: int,
         no_reuse: bool,
         depends: Sequence[str],
         callback_url: str,
@@ -861,3 +866,154 @@ def _events_cmd(docs: str = None):
 # - backend.ai session events
 main.command()(_events_cmd(docs="Alias of \"session events\""))
 session.command()(_events_cmd())
+
+
+def _fetch_session_names():
+    status = ",".join([
+        "PENDING",
+        "SCHEDULED",
+        "PREPARING",
+        "PULLING",
+        "RUNNING",
+        "RESTARTING",
+        "TERMINATING",
+        "RESIZING",
+        "SUSPENDED",
+        "ERROR",
+    ])
+    fields: List[FieldSpec] = [
+        session_fields['name'],
+        session_fields['session_id'],
+        session_fields['group_name'],
+        session_fields['kernel_id'],
+        session_fields['image'],
+        session_fields['type'],
+        session_fields['status'],
+        session_fields['status_info'],
+        session_fields['status_changed'],
+        session_fields['result'],
+    ]
+    with Session() as session:
+        sessions = session.ComputeSession.paginated_list(
+            status=status, access_key=None,
+            fields=fields,
+            page_offset=0,
+            page_size=10,
+            filter=None,
+            order=None,
+        )
+
+    return tuple(map(lambda x: x.get('session_id'), sessions.items))
+
+
+def _watch_cmd(docs: Optional[str] = None):
+
+    @click.argument('session_name_or_id', metavar='SESSION_ID_OR_NAME', nargs=-1)
+    @click.option('-o', '--owner', '--owner-access-key', 'owner_access_key', metavar='ACCESS_KEY',
+                help='Specify the owner of the target session explicitly.')
+    @click.option('--scope', type=click.Choice(['*', 'session', 'kernel']), default='*',
+                help='Filter the events by kernel-specific ones or session-specific ones.')
+    @click.option('--max-wait', metavar='SECONDS', type=int, default=0,
+                help='The maximum duration to wait until the session starts.')
+    def watch(session_name_or_id: Tuple[str], owner_access_key: str, scope: str, max_wait: int):
+        """
+        Monitor the lifecycle events of a compute session
+        and display in human-friendly interface.
+        """
+        session_names = _fetch_session_names()
+        if not session_names:
+            click.echo('No matching items.')
+            return
+
+        states = (
+            'kernel_creating',
+            'kernel_started',
+            'session_started',
+            'kernel_terminating',
+            'kernel_terminated',
+            'session_terminated',
+        )
+
+        if not session_name_or_id:
+            click.clear()
+            questions = [inquirer.List(
+                'session',
+                message="Select session to watch.",
+                choices=session_names,
+            )]
+            session_name_or_id = inquirer.prompt(questions).get('session')
+        else:
+            for session_name in session_names:
+                if session_name.startswith(session_name_or_id[0]):
+                    session_name_or_id = session_name
+                    break
+            else:
+                click.echo('No matching items.')
+                return
+
+        def print_state(session_name_or_id: str, current_state_idx: int):
+            click.clear()
+            click.echo(click.style(f'session name: {session_name_or_id}', fg='cyan'))
+            for i, state in enumerate(states):
+                if i < current_state_idx:
+                    click.echo(click.style('\u2714 ', fg='green') + state)
+                elif i == current_state_idx:
+                    click.echo(click.style(f'\u22EF {state}', bold=True))
+                else:
+                    click.echo(click.style('\u2219 ', fg='yellow') + state)
+
+        async def _run_events():
+            async with AsyncSession() as session:
+                try:
+                    session_id = uuid.UUID(session_name_or_id)
+                    compute_session = session.ComputeSession.from_session_id(session_id)
+                except ValueError:
+                    compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
+                print_state(session_name_or_id, current_state_idx=-1)
+                async with compute_session.listen_events(scope=scope) as response:  # AsyncSession
+                    async for ev in response:
+                        if ev.event == 'kernel_cancelled':
+                            click.echo(click.style('\u2718 ', fg='red') + 'kernel_cancelled')
+                            break
+
+                        try:
+                            print_state(session_name_or_id, current_state_idx=states.index(ev.event))
+                        except ValueError:
+                            pass
+
+                        if ev.event == states[-1]:
+                            print_state(session_name_or_id, current_state_idx=len(states))
+                            break
+
+        async def _run_events_with_timeout(timeout: int):
+            assert timeout > 0
+            done, pending = await asyncio.wait({
+                asyncio.create_task(_run_events()),
+                asyncio.create_task(asyncio.sleep(timeout)),
+            }, return_when=asyncio.FIRST_COMPLETED)
+            for task in pending:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+
+        try:
+            if max_wait > 0:
+                asyncio_run(_run_events_with_timeout(max_wait))
+            else:
+                asyncio_run(_run_events())
+        except Exception as e:
+            print_error(e)
+            return 1
+
+        return 0
+
+    if docs is not None:
+        watch.__doc__ = docs
+    return watch
+
+
+# Make it available as:
+# - backend.ai watch
+# - backend.ai session watch
+main.command()(_watch_cmd(docs="Alias of \"session watch\""))
+session.command()(_watch_cmd())
