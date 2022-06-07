@@ -5,6 +5,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, AsyncIterator, Mapping, Type
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.storage.weka import WekaVolume
 
 from .abc import AbstractVolume
 from .exception import InvalidVolumeError
@@ -19,6 +20,7 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     "vfs": BaseVolume,
     "xfs": XfsVolume,
     "netapp": NetAppVolume,
+    "weka": WekaVolume,
 }
 
 

@@ -19,6 +19,8 @@ storage-specific optimization support.
     - PureStorage's FlashBlade-optimized backend with RapidFile Toolkit (formerly PureTools)
   - `netapp`
     - NetApp QTree integration backend based on the NetApp ONTAP REST API
+  - `weka`
+    - Weka.IO integration backend with Weka.IO V2 REST API
   - `cephfs` (TODO)
     - CephFS-optimized backend with quota limit support
 
@@ -160,3 +162,12 @@ Please DO NOT remove Backend.AI mapped qtree in NetApp ONTAP Sysmgr GUI. If not,
 
 > NOTE:   
 Qtree name in configuration file(`storage-proxy.toml`) must have the same name created in NetApp ONTAP Sysmgr.
+
+### Weka.IO
+
+#### Prerequisites
+
+* Weka.IO agent installed and running
+* Weka.IO filesystem mounted under `/vfroot`
+* Weka.IO REST API access (username/password/organization)
+
