@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import (
     Any,
     Collection,
-    Container,
     Iterable,
     Iterator,
     List,
