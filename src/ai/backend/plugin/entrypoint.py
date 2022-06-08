@@ -4,14 +4,14 @@ import itertools
 import logging
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
-from typing import Container, Iterator, Optional
+from typing import Iterator, Optional
 
 log = logging.getLogger(__name__)
 
 
 def scan_entrypoints(
     group_name: str,
-    blocklist: Optional[Container[str]] = None,
+    blocklist: Optional[set[str]] = None,
 ) -> Iterator[EntryPoint]:
     if blocklist is None:
         blocklist = set()
@@ -43,7 +43,7 @@ def scan_entrypoints(
         yield entrypoint
 
 
-def match_blocklist(entry_path: str, blocklist: Container[str]) -> bool:
+def match_blocklist(entry_path: str, blocklist: set[str]) -> bool:
     """
     Checks if the given module attribute reference is in the blocklist.
     The blocklist items are assumeed to be prefixes of package import paths
