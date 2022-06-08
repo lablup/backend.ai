@@ -42,7 +42,6 @@ from trafaret.dataerror import DataError as TrafaretDataError
 from ai.backend.common import config, utils, identity, msgpack
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.logging import Logger, BraceStyleAdapter
-from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     HardwareMetadata, aobject,
     ClusterInfo,
@@ -61,6 +60,7 @@ from .config import (
     container_etcd_config_iv,
 )
 from .exception import ResourceError
+from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, VolumeInfo, LifecycleEvent
 from .utils import get_subnet_ip
 
@@ -187,8 +187,8 @@ class AgentRPCServer(aobject):
         await self.read_agent_config()
         await self.read_agent_config_container()
 
-        self.stats_monitor = StatsPluginContext(self.etcd, self.local_config)
-        self.error_monitor = ErrorPluginContext(self.etcd, self.local_config)
+        self.stats_monitor = AgentStatsPluginContext(self.etcd, self.local_config)
+        self.error_monitor = AgentErrorPluginContext(self.etcd, self.local_config)
         await self.stats_monitor.init()
         await self.error_monitor.init()
 
