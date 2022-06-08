@@ -632,6 +632,8 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
                             await t
                         except asyncio.CancelledError:
                             continue
+        if isinstance(event, KernelStartedEvent) or isinstance(event, KernelTerminatedEvent):
+            await self.save_last_registry()
         await self.event_producer.produce_event(event, source=self.local_config['agent']['id'])
 
     async def produce_error_event(
@@ -888,16 +890,10 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
         async with aiotools.PersistentTaskGroup(
             exception_handler=lifecycle_task_exception_handler,
         ) as tg:
-            ipc_base_path = self.local_config['agent']['ipc-base-path']
             while True:
                 ev = await self.container_lifecycle_queue.get()
-                now = time.monotonic()
-                if now > self.last_registry_written_time + 60 or isinstance(ev, Sentinel):
-                    self.last_registry_written_time = now
-                    with open(ipc_base_path / f'last_registry.{self.local_instance_id}.dat', 'wb') as f:
-                        pickle.dump(self.kernel_registry, f)
-                    log.debug(f'saved last_registry.{self.local_instance_id}.dat')
                 if isinstance(ev, Sentinel):
+                    await self.save_last_registry()
                     return
                 # attr currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
@@ -1805,3 +1801,16 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
 
     async def list_files(self, kernel_id: KernelId, path: str):
         return await self.kernel_registry[kernel_id].list_files(path)
+
+    async def save_last_registry(self) -> None:
+        if now := time.monotonic() <= self.last_registry_written_time + 60:
+            return  # don't save too frequently
+        try:
+            ipc_base_path = self.local_config["agent"]["ipc-base-path"]
+            last_registry_file = f"last_registry.{self.local_instance_id}.dat"
+            with open(ipc_base_path / last_registry_file, "wb") as f:
+                pickle.dump(self.kernel_registry, f)
+            self.last_registry_written_time = now
+            log.debug("saved {}", last_registry_file)
+        except Exception as e:
+            log.exception("unable to save {}", last_registry_file, exc_info=e)
