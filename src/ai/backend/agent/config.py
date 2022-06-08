@@ -33,6 +33,7 @@ agent_local_config_iv = t.Dict({
         t.Key('event-loop', default='asyncio'): t.Enum('asyncio', 'uvloop'),
         t.Key('skip-manager-detection', default=False): t.ToBool,
         t.Key('aiomonitor-port', default=50102): t.Int[1:65535],
+        t.Key('metadata-server-port', default=40128): t.Int[1:65535],
     }).allow_extra('*'),
     t.Key('container'): t.Dict({
         t.Key('kernel-uid', default=-1): tx.UserID,
