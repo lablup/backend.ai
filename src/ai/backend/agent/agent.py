@@ -1803,7 +1803,8 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
         return await self.kernel_registry[kernel_id].list_files(path)
 
     async def save_last_registry(self, force=False) -> None:
-        if (not force) and (now := time.monotonic() <= self.last_registry_written_time + 60):
+        now = time.monotonic()
+        if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
         try:
             ipc_base_path = self.local_config["agent"]["ipc-base-path"]
