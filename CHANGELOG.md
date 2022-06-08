@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.03.4 (2022-06-08)
+
+### Fixes
+* Always dump kernel registry information to a file upon agent termination. ([#450](https://github.com/lablup/backend.ai/issues/450))
+
+
 ## 22.03.4rc1 (2022-06-08)
 
 ### Features
