@@ -65,6 +65,7 @@ agent_local_config_iv = t.Dict({
         t.Key('log-alloc-map', default=False): t.Bool,
         t.Key('log-events', default=False): t.Bool,
         t.Key('log-heartbeats', default=False): t.Bool,
+        t.Key('log-pidmap', default=False): t.Bool,
         t.Key('log-docker-events', default=False): t.Bool,
         t.Key('coredump', default=coredump_defaults): t.Dict({
             t.Key('enabled', default=coredump_defaults['enabled']): t.Bool,

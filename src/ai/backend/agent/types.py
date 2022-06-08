@@ -1,11 +1,13 @@
 import asyncio
 import enum
 from typing import (
-    Any, Optional,
+    Any, Awaitable, Callable, Optional,
     Mapping,
     Sequence,
 )
 
+from aiohttp import web
+from aiohttp.typedefs import Handler
 import attr
 
 from ai.backend.common.types import (
@@ -81,3 +83,9 @@ class ContainerLifecycleEvent:
             f"c:{cid}, "
             f"reason:{self.reason!r})"
         )
+
+
+WebMiddleware = Callable[
+    [web.Request, Handler],
+    Awaitable[web.StreamResponse],
+]

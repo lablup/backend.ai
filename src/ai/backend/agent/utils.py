@@ -200,7 +200,11 @@ async def get_subnet_ip(etcd: AsyncEtcd, network: str, fallback_addr: str = '0.0
     return addr
 
 
-async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> ContainerPID:
+async def host_pid_to_container_pid(container_id: str, host_pid: HostPID, verbose=False) -> ContainerPID:
+    def verbose_log(*args, **kwargs):
+        if verbose:
+            log.debug(*args, **kwargs)
+
     kernel_ver = Path('/proc/version').read_text()
     if m := re.match(r'Linux version (\d+)\.(\d+)\..*', kernel_ver):  # noqa
         kernel_ver_tuple: Tuple[str, str] = m.groups()  # type: ignore
@@ -298,20 +302,28 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                 await docker.close()
 
     try:
+        verbose_log('{}:{} map', container_id, host_pid)
         for p in Path('/sys/fs/cgroup/pids/docker').iterdir():
+            verbose_log('Entering {}', p)
             if not p.is_dir():
                 continue
             tasks_path = p / 'tasks'
             cgtasks = [*map(int, tasks_path.read_text().splitlines())]
             if host_pid not in cgtasks:
+                verbose_log('PID {} not in {}', host_pid, cgtasks)
                 continue
+            verbose_log('Found job in cgtasks')
             if p.name == container_id:
+                verbose_log('Container ID matches')
                 proc_path = Path(f'/proc/{host_pid}/status')
                 proc_status = {k: v for k, v
                                in map(lambda l: l.split(':\t'),
                                       proc_path.read_text().splitlines())}
+                verbose_log('Found proc file')
                 nspids = [*map(lambda pid: ContainerPID(PID(int(pid))), proc_status['NSpid'].split())]
                 return nspids[1]
+            else:
+                verbose_log('Container ID does not match')
             return InOtherContainerPID
         return NotContainerPID
     except (ValueError, KeyError, IOError):

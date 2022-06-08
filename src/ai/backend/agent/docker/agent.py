@@ -9,7 +9,6 @@ import json
 import logging
 import os
 from pathlib import Path
-from aiohttp import web
 import pkg_resources
 import secrets
 import shutil
@@ -64,8 +63,8 @@ from ai.backend.common.types import (
     current_resource_slots,
 )
 from ai.backend.common.utils import AsyncFileWriter, current_loop
-from .kernel import DockerKernel, prepare_kernel_metadata_uri_handling
-from .metadata.server import create_server as create_metadata_server
+from .kernel import DockerKernel
+from .metadata.server import MetadataServer
 from .resources import detect_resources
 from .utils import PersistentServiceContainer
 from ..exception import UnsupportedResource, InitializationError
@@ -811,7 +810,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     agent_sockpath: Path
     agent_sock_task: asyncio.Task
     scan_images_timer: asyncio.Task
-    metadata_server_runner: web.AppRunner
+    metadata_server: MetadataServer
     docker_ptask_group: aiotools.PersistentTaskGroup
 
     def __init__(
@@ -871,14 +870,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self.monitor_swarm_task = asyncio.create_task(self.check_swarm_status(as_task=True))
         self.docker_ptask_group = aiotools.PersistentTaskGroup()
 
-        await prepare_kernel_metadata_uri_handling(self.local_config)
-        metadata_server_runner = web.AppRunner(
-            await create_metadata_server(self.local_config, self.kernel_registry),
+        self.metadata_server = await MetadataServer.new(
+            self.local_config,
+            self.etcd,
+            self.kernel_registry,
         )
-        await metadata_server_runner.setup()
-        site = web.TCPSite(metadata_server_runner, '0.0.0.0', 40128)
-        await site.start()
-        self.metadata_server_runner = metadata_server_runner
+        await self.metadata_server.start_server()
         # For legacy accelerator plugins
         self.docker = Docker()
 
@@ -902,7 +899,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.monitor_swarm_task.cancel()
             await self.monitor_swarm_task
 
-        await self.metadata_server_runner.cleanup()
+        await self.metadata_server.cleanup()
         if self.docker:
             await self.docker.close()
 
@@ -1039,7 +1036,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             container_id = msg[1].decode()
                             host_pid = struct.unpack('i', msg[2])[0]
                             container_pid = await host_pid_to_container_pid(
-                                container_id, host_pid)
+                                container_id, host_pid, verbose=self.local_config['debug']['log-pidmap'])
                             reply = [
                                 struct.pack('i', 0),
                                 struct.pack('i', container_pid),
