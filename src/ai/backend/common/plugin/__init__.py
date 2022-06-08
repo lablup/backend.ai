@@ -128,12 +128,11 @@ class BasePluginContext(Generic[P]):
     def discover_plugins(
         cls,
         plugin_group: str,
-        blocklist: Container[str] = None,
+        blocklist: set[str] = None,
     ) -> Iterator[Tuple[str, Type[P]]]:
         cls_blocklist = set() if cls.blocklist is None else cls.blocklist
-        if blocklist is None:
-            blocklist = set()
-        for entrypoint in scan_entrypoints(plugin_group, cls_blocklist | blocklist):
+        arg_blocklist = set() if blocklist is None else blocklist
+        for entrypoint in scan_entrypoints(plugin_group, cls_blocklist | arg_blocklist):
             log.info('loading plugin (group:{}): {}', plugin_group, entrypoint.name)
             yield entrypoint.name, entrypoint.load()
 
