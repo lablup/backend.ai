@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.03.5 (2022-06-08)
+
+### Features
+* Implement plugin blocklist and utilize it to mutually exclude self-embedded plugins in the manager and agent for when they are executed under a unified virtualenv ([#453](https://github.com/lablup/backend.ai/issues/453))
+
+### Fixes
+* Agent startup error due to `UnboundLocalError` of `now` variable in dumping the last registry. ([#452](https://github.com/lablup/backend.ai/issues/452))
+
+
 ## 22.03.4 (2022-06-08)
 
 ### Fixes
