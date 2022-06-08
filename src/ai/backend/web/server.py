@@ -28,7 +28,7 @@ import aioredis
 import click
 import jinja2
 from setproctitle import setproctitle
-import toml
+import tomli
 import uvloop
 import yarl
 
@@ -630,7 +630,7 @@ async def server_main(
               default=False,
               help='Use more verbose logging.')
 def main(config_path: str, debug: bool) -> None:
-    config = toml.loads(Path(config_path).read_text(encoding='utf-8'))
+    config = tomli.loads(Path(config_path).read_text(encoding='utf-8'))
     config['debug'] = debug
     if config['debug']:
         debugFlag = 'DEBUG'

@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 import asyncio
 import logging
-import pkg_resources
 import re
 from typing import (
     Any,
@@ -20,6 +19,7 @@ from typing import (
 from weakref import WeakSet
 
 from ai.backend.common.asyncio import cancel_tasks
+from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..etcd import AsyncEtcd
 from ..logging_utils import BraceStyleAdapter
@@ -130,7 +130,7 @@ class BasePluginContext(Generic[P]):
     ) -> Iterator[Tuple[str, Type[P]]]:
         if blocklist is None:
             blocklist = set()
-        for entrypoint in pkg_resources.iter_entry_points(plugin_group):
+        for entrypoint in scan_entrypoints(plugin_group):
             if entrypoint.name in blocklist:
                 continue
             log.info('loading plugin (group:{}): {}', plugin_group, entrypoint.name)

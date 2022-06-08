@@ -3,6 +3,10 @@
 # Set "echo -e" as default
 shopt -s xpg_echo
 
+# For CentOS 7 or older versions of Linux only
+# - To make old gcc to allow declaring a vairiable inside a for loop.
+# PANTS_PYTHON_NATIVE_CODE_CPP_FLAGS="-std=gnu99"
+
 RED="\033[0;91m"
 GREEN="\033[0;92m"
 YELLOW="\033[0;93m"
