@@ -12,6 +12,7 @@ from typing import (
     Generic,
     Iterator,
     Mapping,
+    Optional,
     Tuple,
     Type,
     TypeVar,
@@ -106,6 +107,7 @@ class BasePluginContext(Generic[P]):
     local_config: Mapping[str, Any]
     plugins: Dict[str, P]
     plugin_group: ClassVar[str] = 'backendai_XXX_v10'
+    blocklist: ClassVar[Optional[set[str]]] = None
 
     _config_watchers: WeakSet[asyncio.Task]
 
@@ -128,11 +130,10 @@ class BasePluginContext(Generic[P]):
         plugin_group: str,
         blocklist: Container[str] = None,
     ) -> Iterator[Tuple[str, Type[P]]]:
+        cls_blocklist = set() if cls.blocklist is None else cls.blocklist
         if blocklist is None:
             blocklist = set()
-        for entrypoint in scan_entrypoints(plugin_group):
-            if entrypoint.name in blocklist:
-                continue
+        for entrypoint in scan_entrypoints(plugin_group, cls_blocklist | blocklist):
             log.info('loading plugin (group:{}): {}', plugin_group, entrypoint.name)
             yield entrypoint.name, entrypoint.load()
 
