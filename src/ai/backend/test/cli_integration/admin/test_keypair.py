@@ -27,7 +27,14 @@ def test_add_keypair(run: ClientRunnerFunc):
         assert response.get('ok') is True, 'Account#2 add error'
 
     # Create keypair
-    with closing(run(['--output=json', 'admin', 'keypair', 'add', '-a', '-i', '-r', '25000', 'adminkeypair@lablup.com', 'default'])) as p:
+    with closing(run([
+        '--output=json',
+        'admin', 'keypair', 'add',
+        '-a', '-i',
+        '-r', '25000',
+        'adminkeypair@lablup.com',
+        'default',
+    ])) as p:
         p.expect(EOF)
         response = json.loads(p.before.decode())
         assert response.get('ok') is True, 'Keypair#1 add error'

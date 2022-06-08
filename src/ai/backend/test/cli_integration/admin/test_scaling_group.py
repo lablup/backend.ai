@@ -48,7 +48,7 @@ def test_add_scaling_group(run: ClientRunnerFunc):
     assert test_group.get('scheduler_opts') == {
         'allowed_session_types': ['interactive', 'batch'],
         'pending_timeout': 0.0,
-        'config': {}
+        'config': {},
     }, 'Scaling group scheduler options mismatch'
 
 
@@ -85,7 +85,7 @@ def test_update_scaling_group(run: ClientRunnerFunc):
     assert test_group.get('scheduler_opts') == {
         'allowed_session_types': ['interactive', 'batch'],
         'pending_timeout': 0.0,
-        'config': {}
+        'config': {},
     }, 'Scaling group scheduler options mismatch'
 
 
