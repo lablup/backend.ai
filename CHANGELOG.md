@@ -16,6 +16,34 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.06.0.dev4 (2022-06-09)
+
+### Fixes
+* Fix upload failures of the Client SDK wheel packages due to a bogus syntax/rendering error of reST caused by specific backslash patterns ([#455](https://github.com/lablup/backend.ai/issues/455))
+
+
+## 22.06.0.dev3 (2022-06-09)
+
+### Features
+* Add missing options (`parents`, `exist_ok`) for the `mkdir` CLI command and functional API in the client SDK ([#431](https://github.com/lablup/backend.ai/issues/431))
+* Execute the keypair bootstrap script for batch compute session as well (previously it was only executed for interactive sessions) ([#437](https://github.com/lablup/backend.ai/issues/437))
+* Implement plugin blocklist and utilize it to mutually exclude self-embedded plugins in the manager and agent for when they are executed under a unified virtualenv ([#453](https://github.com/lablup/backend.ai/issues/453))
+
+### Fixes
+* Dump kernel registry information to a file upon `KernelStartedEvent` or `KernelTerminatedEvent`. Saving at container start event did not ensure the existence of kernel object's `runner` attribute, which may cause `AttributeError` in restarting the Agent server. ([#441](https://github.com/lablup/backend.ai/issues/441))
+* Replace `toml` with `tomli` which is chosen as the stdlib base implementation in Python 3.11 ([#445](https://github.com/lablup/backend.ai/issues/445))
+* Always dump kernel registry information to a file upon agent termination. ([#450](https://github.com/lablup/backend.ai/issues/450))
+* Agent startup error due to `UnboundLocalError` of `now` variable in dumping the last registry. ([#452](https://github.com/lablup/backend.ai/issues/452))
+
+### Documentation Changes
+* Add a guide for plugin related workflow with the new mono-style repository structure ([#434](https://github.com/lablup/backend.ai/issues/434))
+* Merge the documentation of the Client SDK for Python into the unified docs ([#435](https://github.com/lablup/backend.ai/issues/435))
+
+### Miscellaneous
+* Fix `install-dev.sh` to work with RHEL-like distros by fixing system package names ([#372](https://github.com/lablup/backend.ai/issues/372))
+* Improve auto-detection of plugins in development setups so that we no longer need to reinstall them after running `./pants export` ([#439](https://github.com/lablup/backend.ai/issues/439))
+
+
 ## 22.06.0.dev2 (2022-06-03)
 
 * This ia another test release to verify automation of marking pre-releases.

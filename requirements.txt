@@ -54,7 +54,7 @@ setproctitle~=1.2.2
 tabulate~=0.8.9
 tblib~=1.7
 tenacity>=8.0
-toml>=0.10.2 ; python_version<='3.11'
+tomli~=2.0.1
 tomlkit~=0.8.0
 tqdm>=4.61
 trafaret~=2.1
@@ -74,7 +74,6 @@ types-python-dateutil
 types-setuptools
 types-six
 types-tabulate
-types-toml
 
 backend.ai-krunner-alpine~=3.3
 backend.ai-krunner-static-gnu~=2.0

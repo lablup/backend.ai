@@ -25,7 +25,7 @@ Backend.AI Client
    :target: https://codecov.io/gh/lablup/backend.ai-client-py
    :alt: Code Coverage
 
-The official API client library for `Backend.AI <https://backend.ai>`_
+The official client SDK for `Backend.AI <https://backend.ai>`_
 
 
 Usage (KeyPair mode)
@@ -113,19 +113,8 @@ By default, you need to specify language with full version tag like
 alias settings, this can be shortened just as ``python``. If you want to
 know defined language aliases, contact the admin of Backend.AI server.
 
-You can even run a C code on-the-fly. (Note that we put a dollar sign before
-the single-quoted code argument so that the shell to interpret ``'\n'`` as
-actual newlines.)
-
-.. code-block:: console
-
-   $ backend.ai run gcc:gcc6.4-alpine3.8 -c $'#include <stdio.h>\nint main() {printf("hello world\\n");}'
-   ∙ Client session token: abc06ee5e03fce60c51148c6d2dd6126
-   ✔ Kernel (ID: d1YXvee-uAJTx4AKYyeksA) is ready.
-   hello world
-
-For larger programs, you may upload multiple files and then build & execute
-them.  The below is a simple example to run `a sample C program
+For more complicated programs, you may upload multiple files and then build &
+execute them.  The below is a simple example to run `a sample C program
 <https://gist.github.com/achimnol/df464c6a3fe05b21e9b06d5b80e986c5>`_.
 
 .. code-block:: console

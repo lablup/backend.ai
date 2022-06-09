@@ -1,9 +1,8 @@
 import pickle
 
-import toml
-from toml.decoder import InlineTableDict
+import tomli
 
-from ai.backend.common.config import override_key, merge, _sanitize_inline_dicts
+from ai.backend.common.config import override_key, merge
 
 
 def test_override_key():
@@ -62,21 +61,10 @@ def test_sanitize_inline_dicts():
     b = { x = 1, y = { t = 2, u = 2 } }
     '''
 
-    result = toml.loads(sample)
+    result = tomli.loads(sample)
     assert isinstance(result['section']['a'], dict)
-    assert isinstance(result['section']['a'], InlineTableDict)
     assert isinstance(result['section']['b'], dict)
-    assert isinstance(result['section']['b'], InlineTableDict)
     assert isinstance(result['section']['b']['y'], dict)
-    assert isinstance(result['section']['b']['y'], InlineTableDict)
-
-    result = _sanitize_inline_dicts(result)
-    assert isinstance(result['section']['a'], dict)
-    assert not isinstance(result['section']['a'], InlineTableDict)
-    assert isinstance(result['section']['b'], dict)
-    assert not isinstance(result['section']['b'], InlineTableDict)
-    assert isinstance(result['section']['b']['y'], dict)
-    assert not isinstance(result['section']['b']['y'], InlineTableDict)
 
     # Also ensure the result is picklable.
     data = pickle.dumps(result)

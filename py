@@ -11,4 +11,8 @@ if [ $? -ne 0 ]; then
 fi
 LOCKSET=${LOCKSET:-python-default/$PYTHON_VERSION}
 source dist/export/python/virtualenvs/$LOCKSET/bin/activate
-PYTHONPATH=src python "$@"
+PYTHONPATH="${PYTHONPATH}"
+for plugin_dir in $(ls -d plugins/*/); do
+  PYTHONPATH="${plugin_dir}/src:${PYTHONPATH}"
+done
+PYTHONPATH="src:${PYTHONPATH}" python "$@"

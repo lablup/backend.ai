@@ -120,6 +120,7 @@ ENV/
 /tmp/
 /volumes/
 /vfroot/
+/*.pid
 
 # Release artifacts
 /CHANGELOG_RELEASE.md
