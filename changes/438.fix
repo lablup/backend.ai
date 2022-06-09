@@ -1,1 +1,1 @@
-modify install and pants executing scripts for detail handling.
+Refine `install-dev.sh` and `./pants` script to better detect and use an existing CPython available in the host
