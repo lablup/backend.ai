@@ -1,1 +1,0 @@
-Agent startup error due to `UnboundLocalError` of `now` variable in dumping the last registry.
