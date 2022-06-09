@@ -166,10 +166,10 @@ else
   show_info "Please send us a pull request or file an issue to support your environment!"
   exit 1
 fi
-if [ $(has_python "python") -eq 1 ]; then
-  bpython=$(which "python")
-elif [ $(has_python "python3") -eq 1 ]; then
+if [ $(has_python "python3") -eq 1 ]; then
   bpython=$(which "python3")
+elif [ $(has_python "python") -eq 1 ]; then
+  bpython=$(which "python")
 elif [ $(has_python "python2") -eq 1 ]; then
   bpython=$(which "python2")
 else
@@ -444,7 +444,7 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-$bpython -m pip --disable-pip-version-check install -q requests requests_unixsocket
+$bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
 $bpython scripts/check-docker.py
 if [ $? -ne 0 ]; then
   exit 1
@@ -521,7 +521,9 @@ show_info "Using the current working-copy directory as the installation path..."
 mkdir -p ./wheelhouse
 if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
   show_info "Prebuild grpcio wheels for Apple Silicon..."
-  pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
+  if [ -z "$(pyenv virtualenvs | grep "tmp-grpcio-build")" ]; then
+    pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
+  fi
   pyenv shell tmp-grpcio-build
   if [ $(python -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)') -eq 0 ]; then
     # ref: https://github.com/grpc/grpc/issues/25082
