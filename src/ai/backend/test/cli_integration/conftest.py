@@ -16,18 +16,8 @@ _rx_env_export = re.compile(r"^(export )?(?P<key>\w+)=(?P<val>.*)$")
 
 
 @pytest.fixture(scope="session")
-def client_venv() -> Path:
-    p = os.environ.get("BACKENDAI_TEST_CLIENT_VENV", None)
-    if p is None:
-        raise RuntimeError("Missing BACKENDAI_TEST_CLIENT_VENV env-var!")
-    return Path(p)
-
-
-@pytest.fixture(scope="session")
-def client_bin(
-    client_venv: Path,
-) -> Path:
-    return client_venv / 'backend.ai'
+def client_bin() -> Path:
+    return Path(os.path.abspath(os.path.dirname(__file__))) / '..' / '..' / '..' / '..' / '..' / 'backend.ai'
 
 
 @pytest.fixture(scope="session")
