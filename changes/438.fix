@@ -1,1 +1,1 @@
-Refine `install-dev.sh` and `./pants` script to better detect and use an existing CPython available in the host
+Refine `scripts/install-dev.sh`, `./py`, and `./pants-local` scripts to better detect and use an existing CPython available in the host
