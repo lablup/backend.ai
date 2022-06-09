@@ -27,7 +27,7 @@ def client_venv() -> Path:
 def client_bin(
     client_venv: Path,
 ) -> Path:
-    return client_venv / 'bin' / 'backend.ai'
+    return client_venv / 'backend.ai'
 
 
 @pytest.fixture(scope="session")

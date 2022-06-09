@@ -620,7 +620,9 @@ sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
 sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
 
 cp configs/testers/sample-env-tester.sh ./env-tester-admin.sh
+echo "BACKENDAI_TEST_CLIENT_ENV=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )/env-local-admin-api.sh" >> ./env-tester-admin.sh
 cp configs/testers/sample-env-tester.sh ./env-tester-user.sh
+echo "BACKENDAI_TEST_CLIENT_ENV=$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )/env-local-user-api.sh" >> ./env-tester-user.sh
 
 # DB schema
 show_info "Setting up databases..."
