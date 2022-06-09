@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.06.0.dev4 (2022-06-09)
+
+### Fixes
+* Fix upload failures of the Client SDK wheel packages due to a bogus syntax/rendering error of reST caused by specific backslash patterns ([#455](https://github.com/lablup/backend.ai/issues/455))
+
+
 ## 22.06.0.dev3 (2022-06-09)
 
 ### Features
