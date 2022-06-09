@@ -182,6 +182,12 @@ specified in ``pants.toml``.
 
    For Vim, you also need to explicitly activate the exported venv.
 
+Switching between branches
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When each branch has different external package requirements, you should run ``./pants export ::``
+before running codes after ``git switch``-ing between such branches.
+
 Running entrypoints
 -------------------
 
