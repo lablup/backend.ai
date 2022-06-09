@@ -334,6 +334,25 @@ Adding new external dependencies
      $ ./pants generate-lockfiles
      $ ./pants export ::
 
+Merging lockfile conflicts
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you work on a branch that adds a new external dependency and the main branch has also
+another external dependency addition, merging the main branch into your branch is likely to
+make a merge conflict on ``python.lock`` file.
+
+In this case, you can just do the followings since we can just *regenerate* the lockfile
+after merging ``requirements.txt`` and ``BUILD`` files.
+
+.. code-block:: console
+
+   $ git merge main
+   ... it says a conflict on python.lock ...
+   $ git checkout --theirs python.lock
+   $ ./pants generate-lockfiles --resolve=python-default
+   $ git add python.lock
+   $ git commit
+
 .. _debugging-tests:
 
 Debugging test cases (or interactively running test cases)
