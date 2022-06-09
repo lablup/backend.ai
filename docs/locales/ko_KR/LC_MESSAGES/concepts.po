@@ -162,7 +162,7 @@ msgstr "Long-running service daemons"
 
 #: ../../concepts/faq.rst:32
 msgid "Load balancing, fault tolerance, incremental deployment"
-msgstr "Load balancing, fault tolerance, incremetal deployment"
+msgstr "Load balancing, fault tolerance, incremental deployment"
 
 #: ../../concepts/faq.rst:35
 msgid "Stateful compute sessions"
@@ -249,8 +249,8 @@ msgid ""
 "architecture where the components are what you need to install and "
 "configure."
 msgstr ""
-":numref: `server-arch-diagram`은 Backend.AI 서버 단의 구조, 즉 컴포넌트들이 "
-"어디에 위치해 있는지, 설치하고 설정해야 하는 것들은 무엇인지를 간단하게 보여줍니다."
+":numref: `server-arch-diagram`은 설치하고 설정해야 할 구성요소인 Backend.AI 서버 단의."
+"구조를 간략하게 보여줍니다."
 
 #: ../../concepts/key-concepts.rst:17
 msgid ""
@@ -263,7 +263,7 @@ msgid ""
 msgstr ""
 "각 경계선이 맞닿아 있는 컴포넌트 그룹은 같은 서버에 실행되도록 의도한 것이지만, "
 "필요에 따라 여러 서버에 나누거나 하나의 서버에 몰아넣어 실행해도 됩니다."
-"예를 들어, nginx reverse-proxy와 Backend.AI Manager를 다른 서버에 실행시키거나, "
+"예를 들어, nginx reverse-proxy와 Backend.AI Manager를 다른 서버에 각각 실행시키거나, "
 "한 서버에 같이 실행시킬 수 있습니다. [[development setup]]에서, 랩탑과 같은 "
 "한 개의 PC에서 모든 컴포넌트들을 실행시킵니다."
 
