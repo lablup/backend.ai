@@ -14,6 +14,8 @@ fi
 if [ -z "$PY" ]; then
   echo "The Python version for source-built Pants is not configured in ./.pants.env"
   exit 1
+else
+  export PY=$PY
 fi
 PANTS_SOURCE="${PANTS_SOURCE:-$(pwd)/tools/pants-src}"
 
