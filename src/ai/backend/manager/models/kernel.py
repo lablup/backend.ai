@@ -21,11 +21,11 @@ from typing import (
 from uuid import UUID
 import uuid
 
-import aioredis
-import aioredis.client
 from dateutil.parser import parse as dtparse
 import graphene
 from graphene.types.datetime import DateTime as GQLDateTime
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 import sqlalchemy as sa
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -516,7 +516,7 @@ class KernelStatistics:
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
 
-        def _build_pipeline(redis: aioredis.Redis) -> aioredis.client.Pipeline:
+        def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
             for sess_id in session_ids:
                 pipe.get(str(sess_id))

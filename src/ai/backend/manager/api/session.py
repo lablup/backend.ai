@@ -35,7 +35,6 @@ from urllib.parse import urlparse
 
 import aiohttp
 import aiohttp_cors
-import aioredis
 import aiotools
 import attr
 import multidict
@@ -45,6 +44,7 @@ from aiohttp import web, hdrs
 from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from redis.asyncio import Redis
 from sqlalchemy.sql.expression import true, null
 
 from ai.backend.manager.models.image import ImageRow
@@ -1459,7 +1459,7 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
         now = datetime.now(tzutc())
         timeout = timedelta(seconds=root_ctx.local_config['manager']['heartbeat-timeout'])
 
-        async def _check_impl(r: aioredis.Redis):
+        async def _check_impl(r: Redis):
             async for agent_id, prev in r.hscan_iter('agent.last_seen'):
                 prev = datetime.fromtimestamp(float(prev), tzutc())
                 if now - prev > timeout:

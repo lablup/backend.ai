@@ -32,7 +32,6 @@ import uuid
 import weakref
 
 import aiodocker
-import aioredis
 import aiotools
 from async_timeout import timeout as _timeout
 from callosum.rpc import Peer, RPCUserError
@@ -41,6 +40,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 from dateutil.tz import tzutc
+from redis.asyncio import Redis
 import snappy
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
@@ -1692,13 +1692,13 @@ class AgentRegistry:
         # Update keypair resource usage for keypairs with running containers.
         kp_key = 'keypair.concurrency_used'
 
-        async def _update(r: aioredis.Redis):
+        async def _update(r: Redis):
             updates: Mapping[str, int] = \
                 {f'{kp_key}.{k}': concurrency_used_per_key[k] for k in concurrency_used_per_key}
             if updates:
                 await r.mset(updates)
 
-        async def _update_by_fullscan(r: aioredis.Redis):
+        async def _update_by_fullscan(r: Redis):
             updates: Dict[str, int] = {}
             keys = await r.keys(f'{kp_key}.*')
             for ak in keys:
@@ -2486,7 +2486,7 @@ class AgentRegistry:
             known_registries = await get_known_registries(self.shared_config.etcd)
             loaded_images = msgpack.unpackb(snappy.decompress(agent_info['images']))
 
-            def _pipe_builder(r: aioredis.Redis):
+            def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 for image in loaded_images:
                     image_ref = ImageRef(image[0], known_registries, agent_info['architecture'])
@@ -2502,7 +2502,7 @@ class AgentRegistry:
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
         await redis.execute(self.redis_live, lambda r: r.hdel('agent.last_seen', agent_id))
 
-        async def _pipe_builder(r: aioredis.Redis):
+        async def _pipe_builder(r: Redis):
             pipe = r.pipeline()
             async for imgname in r.scan_iter():
                 pipe.srem(imgname, agent_id)

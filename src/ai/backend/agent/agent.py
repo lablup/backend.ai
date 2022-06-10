@@ -41,11 +41,11 @@ from typing import (
 )
 import weakref
 
-import aioredis
 import aiotools
 from async_timeout import timeout
 import attr
 from cachetools import cached, LRUCache
+from redis.asyncio import Redis
 import snappy
 from tenacity import (
     AsyncRetrying,
@@ -476,7 +476,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
     images: Mapping[str, str]
     port_pool: Set[int]
 
-    redis: aioredis.Redis
+    redis: Redis
     zmq_ctx: zmq.asyncio.Context
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]

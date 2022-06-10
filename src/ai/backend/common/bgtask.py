@@ -18,10 +18,10 @@ from typing import (
     Type,
 )
 
-import aioredis
-import aioredis.client
 from aiohttp import web
 from aiohttp_sse import sse_response
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 
 from . import redis
 from .events import (
@@ -68,7 +68,7 @@ class ProgressReporter:
         current, total = self.current_progress, self.total_progress
         redis_producer = self.event_producer.redis_client
 
-        def _pipe_builder(r: aioredis.Redis) -> aioredis.client.Pipeline:
+        def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
             tracker_key = f'bgtask.{self.task_id}'
             pipe.hset(tracker_key, mapping={
@@ -201,7 +201,7 @@ class BackgroundTaskManager:
         task_id = uuid.uuid4()
         redis_producer = self.event_producer.redis_client
 
-        def _pipe_builder(r: aioredis.Redis) -> aioredis.client.Pipeline:
+        def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline()
             tracker_key = f'bgtask.{task_id}'
             now = str(time.time())
@@ -247,7 +247,7 @@ class BackgroundTaskManager:
         finally:
             redis_producer = self.event_producer.redis_client
 
-            async def _pipe_builder(r: aioredis.Redis):
+            async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 tracker_key = f'bgtask.{task_id}'
                 pipe.hset(tracker_key, mapping={

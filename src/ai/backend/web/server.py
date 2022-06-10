@@ -24,9 +24,9 @@ import aiohttp_cors
 from aiohttp_session import get_session, setup as setup_session
 from aiohttp_session.redis_storage import RedisStorage
 import aiotools
-import aioredis
 import click
 import jinja2
+from redis.asyncio import Redis
 from setproctitle import setproctitle
 import tomli
 import uvloop
@@ -533,7 +533,7 @@ async def server_main(
         keepalive_options[socket.TCP_KEEPINTVL] = 5
     if hasattr(socket, 'TCP_KEEPCNT'):
         keepalive_options[socket.TCP_KEEPCNT] = 3
-    app['redis'] = await aioredis.Redis.from_url(
+    app['redis'] = await Redis.from_url(
         str(redis_url),
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
