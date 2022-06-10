@@ -18,7 +18,7 @@ python_tests(
         "**/test_*.py",
     ],
     overrides={
-      "test_distributed.py": {"timeout": 30},
+        "test_distributed.py": {"timeout": 30},
     },
 )
 
