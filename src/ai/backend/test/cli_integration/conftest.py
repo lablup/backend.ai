@@ -10,6 +10,7 @@ from typing import Iterator, Sequence
 import pexpect
 import pytest
 
+from ai.backend.plugin.entrypoint import find_build_root
 from ai.backend.test.utils.cli import ClientRunnerFunc, EOF, run as _run
 
 _rx_env_export = re.compile(r"^(export )?(?P<key>\w+)=(?P<val>.*)$")
@@ -17,7 +18,7 @@ _rx_env_export = re.compile(r"^(export )?(?P<key>\w+)=(?P<val>.*)$")
 
 @pytest.fixture(scope="session")
 def client_bin() -> Path:
-    return Path(os.path.abspath(os.path.dirname(__file__))) / '..' / '..' / '..' / '..' / '..' / 'backend.ai'
+    return find_build_root(Path(__file__)) / 'backend.ai'
 
 
 @pytest.fixture(scope="session")
