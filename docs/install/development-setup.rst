@@ -28,15 +28,15 @@ Install the followings accordingly to your host operating system.
 
   - Depend on your Linux Distributions, the distribution's system pip is required.
 
-      * Ubuntu
+    * Ubuntu - If you have no pip package, install ``python3-pip`` package.
 
-         * If you have no pip package, install ``python3-pip`` package.
+      .. code-block:: console
 
          $ sudo apt install python3-pip
 
-      * Fedora Core & CentOS
+    * Fedora Core & CentOS - If you have no pip package, install ``python3-pip`` package.
 
-         * If you have no pip package, install ``python3-pip`` package.
+      .. code-block:: console
 
          $ sudo dnf install python3-pip
 
