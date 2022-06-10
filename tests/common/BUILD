@@ -17,6 +17,9 @@ python_tests(
     sources=[
         "**/test_*.py",
     ],
+    overrides={
+      "test_distributed.py": {"timeout": 30},
+    },
 )
 
 pex_binary(
