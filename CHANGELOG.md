@@ -16,6 +16,17 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.03.6 (2022-06-10)
+
+### Fixes
+* Refine `scripts/install-dev.sh`, `./py`, and `./pants-local` scripts to better detect and use an existing CPython available in the host ([#438](https://github.com/lablup/backend.ai/issues/438))
+* Fix upload failures of the Client SDK wheel packages due to a bogus syntax/rendering error of reST caused by specific backslash patterns ([#455](https://github.com/lablup/backend.ai/issues/455))
+* Correct missing dependencies due to different package-import names and indirect module references in the webserver ([#459](https://github.com/lablup/backend.ai/issues/459))
+
+### Documentation Changes
+* Mention Git LFS as a prerequisite explicitly and let the install-dev script run `git lfs pull` always ([#446](https://github.com/lablup/backend.ai/issues/446))
+
+
 ## 22.03.5 (2022-06-08)
 
 ### Features
