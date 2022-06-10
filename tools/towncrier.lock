@@ -368,13 +368,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "68e45d17c9281ba25dc0104eadd2647172b3472d9e01f911efa57965e8d51a36",
-              "url": "https://files.pythonhosted.org/packages/e9/1c/ec080fde54ab30a738c92f794eab7f5d2f354f2b619ee95b2efe353e0766/setuptools-62.3.2-py3-none-any.whl"
+              "hash": "d1746e7fd520e83bbe210d02fff1aa1a425ad671c7a9da7d246ec2401a087198",
+              "url": "https://files.pythonhosted.org/packages/27/0b/cb81bc3a06a242c7626fca8aa9ce82453af3bc44e72a39666bb4052ac302/setuptools-62.3.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a43bdedf853c670e5fed28e5623403bad2f73cf02f9a2774e91def6bda8265a7",
-              "url": "https://files.pythonhosted.org/packages/4a/25/ec29a23ef38b9456f9965c57a9e1221e6c246d87abbf2a31158799bca201/setuptools-62.3.2.tar.gz"
+              "hash": "e7d11f3db616cda0751372244c2ba798e8e56a28e096ec4529010b803485f3fe",
+              "url": "https://files.pythonhosted.org/packages/fb/50/005826d31d58a7b90585b5510f2f597c5406ae34df884f4f5d63abfb6ca7/setuptools-62.3.3.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -422,7 +422,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "62.3.2"
+          "version": "62.3.3"
         },
         {
           "artifacts": [
@@ -527,7 +527,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.84",
+  "pex_version": "2.1.90",
   "prefer_older_binary": false,
   "requirements": [
     "towncrier>=21.9"
