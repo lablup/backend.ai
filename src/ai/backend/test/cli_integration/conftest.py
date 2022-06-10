@@ -10,24 +10,15 @@ from typing import Iterator, Sequence
 import pexpect
 import pytest
 
+from ai.backend.plugin.entrypoint import find_build_root
 from ai.backend.test.utils.cli import ClientRunnerFunc, EOF, run as _run
 
 _rx_env_export = re.compile(r"^(export )?(?P<key>\w+)=(?P<val>.*)$")
 
 
 @pytest.fixture(scope="session")
-def client_venv() -> Path:
-    p = os.environ.get("BACKENDAI_TEST_CLIENT_VENV", None)
-    if p is None:
-        raise RuntimeError("Missing BACKENDAI_TEST_CLIENT_VENV env-var!")
-    return Path(p)
-
-
-@pytest.fixture(scope="session")
-def client_bin(
-    client_venv: Path,
-) -> Path:
-    return client_venv / 'bin' / 'backend.ai'
+def client_bin() -> Path:
+    return find_build_root(Path(__file__)) / 'backend.ai'
 
 
 @pytest.fixture(scope="session")
