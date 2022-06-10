@@ -2909,13 +2909,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f22fa1e554c9ddfd16e6e41ac79759e17be9e492b3587efa038054674760e72d",
-              "url": "https://files.pythonhosted.org/packages/2d/61/08076519c80041bc0ffa1a8af0cbd3bf3e2b62af10435d269a9d0f40564d/requests-2.27.1-py2.py3-none-any.whl"
+              "hash": "bc7861137fbce630f17b03d3ad02ad0bf978c844f3536d0edda6499dafce2b6f",
+              "url": "https://files.pythonhosted.org/packages/41/5b/2209eba8133fc081d3ffff02e1f6376e3117e52bb16f674721a83e67e68e/requests-2.28.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "68d7c56fd5a8999887728ef304a6d12edc7be74f1cfa47714fc8b414525c9a61",
-              "url": "https://files.pythonhosted.org/packages/60/f3/26ff3767f099b73e0efa138a9998da67890793bfa475d8278f84a30fec77/requests-2.27.1.tar.gz"
+              "hash": "d568723a7ebd25875d8d1eaf5dfa068cd2fc8194b2e483d7b1f7c81918dbec6b",
+              "url": "https://files.pythonhosted.org/packages/e9/23/384d9953bb968731212dc37af87cb75a885dc48e0615bd6a303577c4dc4b/requests-2.28.0.tar.gz"
             }
           ],
           "project_name": "requests",
@@ -2923,15 +2923,12 @@
             "PySocks!=1.5.7,>=1.5.6; extra == \"socks\"",
             "certifi>=2017.4.17",
             "chardet<5,>=3.0.2; extra == \"use_chardet_on_py3\"",
-            "chardet<5,>=3.0.2; python_version < \"3\"",
-            "charset-normalizer~=2.0.0; python_version >= \"3\"",
-            "idna<3,>=2.5; python_version < \"3\"",
-            "idna<4,>=2.5; python_version >= \"3\"",
-            "urllib3<1.27,>=1.21.1",
-            "win-inet-pton; (sys_platform == \"win32\" and python_version == \"2.7\") and extra == \"socks\""
+            "charset-normalizer~=2.0.0",
+            "idna<4,>=2.5",
+            "urllib3<1.27,>=1.21.1"
           ],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "2.27.1"
+          "requires_python": "<4,>=3.7",
+          "version": "2.28"
         },
         {
           "artifacts": [
@@ -3946,7 +3943,7 @@
       "platform_tag": [
         "cp310",
         "cp310",
-        "manylinux_2_31_aarch64"
+        "macosx_12_0_arm64"
       ]
     }
   ],
