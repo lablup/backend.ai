@@ -16,8 +16,8 @@ from typing import (
 
 from aiohttp import web
 import aiohttp_cors
-from aioredis import Redis
-from aioredis.client import Pipeline as RedisPipeline
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline as RedisPipeline
 from dateutil.tz import tzutc
 from dateutil.parser import parse as dtparse
 import sqlalchemy as sa

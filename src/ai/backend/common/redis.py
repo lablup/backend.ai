@@ -136,7 +136,7 @@ async def subscribe(
 
 
 async def blpop(
-    redis: RedisConnectionInfo | Redis | Sentinel,
+    redis_obj: RedisConnectionInfo | Redis | Sentinel,
     key: str,
     *,
     service_name: str = None,
@@ -150,11 +150,11 @@ async def blpop(
         **_default_conn_opts,
         'socket_connect_timeout': reconnect_poll_interval,
     }
-    if isinstance(redis, RedisConnectionInfo):
-        redis_client = redis.client
-        service_name = service_name or redis.service_name
+    if isinstance(redis_obj, RedisConnectionInfo):
+        redis_client = redis_obj.client
+        service_name = service_name or redis_obj.service_name
     else:
-        redis_client = redis
+        redis_client = redis_obj
 
     if isinstance(redis_client, Sentinel):
         assert service_name is not None
@@ -175,8 +175,8 @@ async def blpop(
         except (
             redis.exceptions.ConnectionError,
             MasterNotFoundError,
+            SlaveNotFoundError,
             redis.exceptions.ReadOnlyError,
-            redis.exceptions.ResponseError,
             ConnectionResetError,
         ):
             await asyncio.sleep(reconnect_poll_interval)
@@ -195,7 +195,7 @@ async def blpop(
 
 
 async def execute(
-    redis: RedisConnectionInfo | Redis | Sentinel,
+    redis_obj: RedisConnectionInfo | Redis | Sentinel,
     func: Callable[[Redis], Awaitable[Any]],
     *,
     service_name: str = None,
@@ -214,11 +214,11 @@ async def execute(
         **_default_conn_opts,
         'socket_connect_timeout': reconnect_poll_interval,
     }
-    if isinstance(redis, RedisConnectionInfo):
-        redis_client = redis.client
-        service_name = service_name or redis.service_name
+    if isinstance(redis_obj, RedisConnectionInfo):
+        redis_client = redis_obj.client
+        service_name = service_name or redis_obj.service_name
     else:
-        redis_client = redis
+        redis_client = redis_obj
 
     if isinstance(redis_client, Sentinel):
         assert service_name is not None
@@ -292,7 +292,7 @@ async def execute(
 
 
 async def execute_script(
-    redis: RedisConnectionInfo | Redis | Sentinel,
+    redis_obj: RedisConnectionInfo | Redis | Sentinel,
     script_id: str,
     script: str,
     keys: Sequence[str],
@@ -314,7 +314,7 @@ async def execute_script(
     script_hash = _scripts.get(script_id, 'x')
     while True:
         try:
-            ret = await execute(redis, lambda r: r.evalsha(
+            ret = await execute(redis_obj, lambda r: r.evalsha(
                 script_hash,
                 len(keys),
                 *keys, *args,
@@ -322,12 +322,12 @@ async def execute_script(
             break
         except redis.exceptions.NoScriptError:
             # Redis may have been restarted.
-            script_hash = await execute(redis, lambda r: r.script_load(script))
+            script_hash = await execute(redis_obj, lambda r: r.script_load(script))
             _scripts[script_id] = script_hash
         except redis.exceptions.ResponseError as e:
             if 'NOSCRIPT' in e.args[0]:
                 # Redis may have been restarted.
-                script_hash = await execute(redis, lambda r: r.script_load(script))
+                script_hash = await execute(redis_obj, lambda r: r.script_load(script))
                 _scripts[script_id] = script_hash
             else:
                 raise
@@ -443,7 +443,7 @@ async def read_stream_by_group(
                         lambda r: r.xgroup_create(
                             stream_key,
                             group_name,
-                            b"$",
+                            '$',
                             mkstream=True,
                         ),
                     )

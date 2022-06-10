@@ -32,7 +32,7 @@ from typing import (
 import uuid
 
 from redis.asyncio import Redis
-from redis.asyncio.sentinel import Sentinel
+import redis.asyncio.sentinel
 
 import attr
 import trafaret as t
@@ -840,7 +840,7 @@ class EtcdRedisConfig(TypedDict, total=False):
 
 @attr.s(auto_attribs=True)
 class RedisConnectionInfo:
-    client: Redis | Sentinel
+    client: Redis | redis.asyncio.sentinel.Sentinel
     service_name: Optional[str]
 
     async def close(self) -> None:

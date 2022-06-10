@@ -21,8 +21,8 @@ from typing import (
 import aiohttp
 from aiohttp import web
 import aiohttp_cors
-from aioredis import Redis
-from aioredis.client import Pipeline as RedisPipeline
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline as RedisPipeline
 from async_timeout import timeout as _timeout
 from dateutil.tz import tzutc
 import msgpack
