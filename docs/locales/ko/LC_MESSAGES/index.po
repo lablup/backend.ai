@@ -34,6 +34,9 @@ msgid ""
 "operating high density computing clusters including GPUs and heterogeneous "
 "accelerators."
 msgstr ""
+"Backend.AI는 광범위한 AI 기반 애플리케이션을 위한 엔터프라이즈급 개발 및 서비스 백엔드입니다. "
+"Backend.AI의 핵심 기술은 GPU와 이종 가속기 등을 포함한 고밀도 컴퓨팅 클러스터 "
+"운영에 맞춰져 있습니다."
 
 #: ../../index.rst:9 9b9f8f4e958745d5862ca7e4acf45ba2
 msgid ""
@@ -44,6 +47,12 @@ msgid ""
 "Javascript, Julia, Octave, Haskell, Lua and NodeJS, as well as AI-oriented "
 "libraries such as TensorFlow, Keras, Caffe, and MXNet."
 msgstr ""
+"사용자의 관점에서 Backend.AI는 클라우드처럼 동작하는 GPU 기반 고성능 컴퓨팅/딥 러닝 "
+"애플리케이션 호스트입니다 (\"사용자의 머신에 있는 Google Collab\"). "
+"Backend.AI는 제한된 자원의 컨테이너에서 사용자의 코드를 안전하게 실행합니다."
+"Backend.AI는 Python 2/3, R, PHP, C/C++, Java, Javascript, Julia, Octave, "
+"Haskell, Lua, 그리고 NodeJS 등의 다양한 프로그래밍 언어와 런타임을 지원하며, "
+"TensorFlow, Keras, Caffe, MXNet 등의 AI 라이브러리를 지원합니다."
 
 #: ../../index.rst:13 7ed948aa66b74ef28e1baf2ea931fd18
 msgid ""

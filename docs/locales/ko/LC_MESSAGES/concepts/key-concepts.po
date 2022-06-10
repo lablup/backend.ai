@@ -27,16 +27,20 @@ msgid ""
 "Here we describe the key concepts that are required to understand and follow "
 "this documentation."
 msgstr ""
+"여기서는 이 문서를 이해하고 따라오는데 반드시 필요한 주요 개념들을 설명합니다."
 
 #: ../../concepts/key-concepts.rst:13 c0ce2b76209f4c2a9f79a52c4aef0687
 msgid "The diagram of a typical multi-node Backend.AI server architecture"
 msgstr ""
+"멀티 노드 상의 Backend.AI 서버 구조 다이어그램"
 
 #: ../../concepts/key-concepts.rst:15 ad12a0d4dea4495eaddded6fc0d90f3c
 msgid ""
 ":numref:`server-arch-diagram` shows a brief Backend.AI server-side "
 "architecture where the components are what you need to install and configure."
 msgstr ""
+":numref: `server-arch-diagram`은 설치하고 설정해야 할 구성요소인 Backend.AI 서버 단의."
+"구조를 간략하게 보여줍니다."
 
 #: ../../concepts/key-concepts.rst:17 715df25fba85409a91f3ed774cd0b5f1
 msgid ""
@@ -47,10 +51,15 @@ msgid ""
 "on a single server. In the [[development setup]], all these components run "
 "on a single PC such as your laptop."
 msgstr ""
+"각 경계선이 맞닿아 있는 컴포넌트 그룹은 같은 서버에 실행되도록 의도한 것이지만, "
+"필요에 따라 여러 서버에 나누거나 하나의 서버에 몰아넣어 실행해도 됩니다."
+"예를 들어, nginx reverse-proxy와 Backend.AI Manager를 다른 서버에 각각 실행시키거나, "
+"한 서버에 같이 실행시킬 수 있습니다. [[development setup]]에서, 랩탑과 같은 "
+"한 개의 PC에서 모든 컴포넌트들을 실행시킵니다."
 
 #: ../../concepts/key-concepts.rst:22 8a9cf7d51c224c7b85fc2e1facc48c0a
 msgid "Manager and Agents"
-msgstr ""
+msgstr "Manager and Agents"
 
 #: ../../concepts/key-concepts.rst:23 dafa6944b67c45279546dea685b1d301
 msgid ""
