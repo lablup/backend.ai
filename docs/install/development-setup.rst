@@ -26,6 +26,20 @@ Install the followings accordingly to your host operating system.
 
   - Ensure that you have the Python version specified in ``pants.toml`` on your ``PATH``.
 
+  - Depend on your Linux Distributions, the distribution's system pip is required.
+
+      * Ubuntu
+
+         * If you have no pip package, install ``python3-pip`` package.
+
+         $ sudo apt install python3-pip
+
+      * Fedora Core & CentOS
+
+         * If you have no pip package, install ``python3-pip`` package.
+
+         $ sudo dnf install python3-pip
+
 * `Docker <https://docs.docker.com/install/>`_
 
 * `Docker Compose <https://docs.docker.com/compose/install/>`_ (v2 required)
