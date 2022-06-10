@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import suppress
 from datetime import datetime
 import json
 from pathlib import Path
@@ -11,6 +10,7 @@ import sys
 from typing import IO, List, Literal, Optional, Sequence, Tuple
 import uuid
 
+from async_timeout import timeout
 import click
 import inquirer
 from humanize import naturalsize
@@ -973,7 +973,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 async with compute_session.listen_events(scope=scope) as response:  # AsyncSession
                     async for ev in response:
                         if ev.event == 'kernel_cancelled':
-                            click.echo(click.style('\u2718 ', fg='red') + 'kernel_cancelled')
+                            click.echo(click.style('\u2718 ', fg='red') + ev.event)
                             break
 
                         try:
@@ -985,16 +985,12 @@ def _watch_cmd(docs: Optional[str] = None):
                             print_state(session_name_or_id, current_state_idx=len(states))
                             break
 
-        async def _run_events_with_timeout(timeout: int):
-            assert timeout > 0
-            done, pending = await asyncio.wait({
-                asyncio.create_task(_run_events()),
-                asyncio.create_task(asyncio.sleep(timeout)),
-            }, return_when=asyncio.FIRST_COMPLETED)
-            for task in pending:
-                task.cancel()
-                with suppress(asyncio.CancelledError):
-                    await task
+        async def _run_events_with_timeout(max_wait: int):
+            try:
+                async with timeout(max_wait):
+                    await _run_events()
+            except asyncio.TimeoutError:
+                pass
 
         try:
             if max_wait > 0:
