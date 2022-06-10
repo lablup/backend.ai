@@ -62,6 +62,10 @@ msgid ""
 "you no longer have to worry about exceeding the capacity of the cluster when "
 "there are high demands."
 msgstr ""
+"관리자의 관점에서 Backend.AI는 컴퓨팅 노드와 GPU, 스토리지를 "
+"연구 팀원 개개인에게 할당하는 프로세스를 간소화합니다. "
+"세부적인 정책 기반 유휴 상태 검사와 자원 제한으로 인해, 요구량이 "
+"많을 때에도 클러스터의 용량을 초과할 염려가 없습니다."
 
 #: ../../index.rst:16 d6ac109cdf464e47a74c6d080ab8f148
 msgid ""
@@ -69,6 +73,9 @@ msgid ""
 "such as fractional sharing of GPUs and site-specific SSO integrations, etc. "
 "for various-sized enterprise customers."
 msgstr ""
+"Backend.AI는 플러그인 아키텍쳐를 사용하여 다양한 규모의 엔터프라이즈 고객을 "
+"위한 GPU 분할 공유나 사이트별 SSO 통합 등과 같은 고급 기능을 보다 많이 "
+"제공합니다."
 
 #: ../../index.rst:33 ec573c6b6797436fb76ebe6b8c887bf4
 msgid "Indices and tables"
