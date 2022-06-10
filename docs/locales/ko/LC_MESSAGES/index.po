@@ -73,7 +73,7 @@ msgid ""
 "such as fractional sharing of GPUs and site-specific SSO integrations, etc. "
 "for various-sized enterprise customers."
 msgstr ""
-"Backend.AI는 플러그인 아키텍쳐를 사용하여 다양한 규모의 엔터프라이즈 고객을 "
+"Backend.AI는 플러그인 구조를 사용하여 다양한 규모의 엔터프라이즈 고객을 "
 "위한 GPU 분할 공유나 사이트별 SSO 통합 등과 같은 고급 기능을 보다 많이 "
 "제공합니다."
 
