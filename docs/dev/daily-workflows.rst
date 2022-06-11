@@ -359,6 +359,19 @@ after merging ``requirements.txt`` and ``BUILD`` files.
    $ git add python.lock
    $ git commit
 
+Resetting Pants
+~~~~~~~~~~~~~~~
+
+If Pants behaves strangely, you could simply reset all its runtime-generated files by:
+
+.. code-block:: console
+
+   $ killall pantsd
+   $ rm -r .tmp .pants.d ~/.cache/pants
+
+After this, re-running any Pants command will automatically reinitialize itself and
+all cached data as necessary.
+
 .. _debugging-tests:
 
 Debugging test cases (or interactively running test cases)
