@@ -40,10 +40,11 @@ def pass_ctx_obj(f: F) -> F:
         obj = get_current_context().obj
         match obj:
             case CLIContext():
-                return f(obj, *args, **kwargs)
+                inner = f(obj, *args, **kwargs)
             case CliContextInfo(info=info):
-                return f(set_client_config(info), *args, **kwargs)
+                inner = f(set_client_config(info), *args, **kwargs)
             case _:
                 raise RuntimeError('Invalid Context from client command')
+        return inner
 
     return update_wrapper(cast(F, new_func), f)
