@@ -15,6 +15,7 @@ from ...session import AsyncSession
 from ..pretty import print_done, print_warn, print_fail, print_error
 
 from ..types import CLIContext
+from ..extensions import pass_ctx_obj
 
 
 @admin.group()
@@ -25,7 +26,7 @@ def image() -> None:
 
 
 @image.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.option('--operation', is_flag=True, help='Get operational images only')
 def list(ctx: CLIContext, operation: bool) -> None:
     """
