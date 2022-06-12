@@ -27,38 +27,38 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "bfd4f6536bd384c27c392a8b8f790fd0ed5c0cf2f63fc2fed7bce56751d53026",
-              "url": "https://files.pythonhosted.org/packages/7e/53/386d8b939c5654c7a2218c1625f991cc123c3d3f69d2c0e2aed16c475eb4/mypy-0.960-py3-none-any.whl"
+              "hash": "03c6cc893e7563e7b2949b969e63f02c000b32502a1b4d1314cabe391aa87d66",
+              "url": "https://files.pythonhosted.org/packages/cb/30/03a46a37902348b309aa5fe8a92636b9417fdcea77e20dfc1455581a0ae7/mypy-0.961-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7a76dc4f91e92db119b1be293892df8379b08fd31795bb44e0ff84256d34c251",
-              "url": "https://files.pythonhosted.org/packages/0c/8f/9b3e12e9971389befe2bfca98eb99b5555a5f6f625f8482ded3a0e97715e/mypy-0.960-cp310-cp310-macosx_10_9_x86_64.whl"
+              "hash": "e999229b9f3198c0c880d5e269f9f8129c8862451ce53a011326cad38b9ccd24",
+              "url": "https://files.pythonhosted.org/packages/02/e0/6c11b3a6828d1bf8edd066d87588f9461bce3154e4dcc542729bbe6cdc3e/mypy-0.961-cp310-cp310-win_amd64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d4fccf04c1acf750babd74252e0f2db6bd2ac3aa8fe960797d9f3ef41cf2bfd4",
-              "url": "https://files.pythonhosted.org/packages/22/22/49792504e249a774554cd473e69af411a62c7d0591651104538fbcdaec10/mypy-0.960.tar.gz"
+              "hash": "b117650592e1782819829605a193360a08aa99f1fc23d1d71e1a75a142dc7e15",
+              "url": "https://files.pythonhosted.org/packages/46/d7/3cf7605655f78daded7a23e66f632b50a3b3a8b4262739782f558f8949cf/mypy-0.961-cp310-cp310-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ffdad80a92c100d1b0fe3d3cf1a4724136029a29afe8566404c0146747114382",
-              "url": "https://files.pythonhosted.org/packages/33/b8/bab515402dbb5874b3bc5c1586c9a70bccee73f5daa82c170c54a72b729e/mypy-0.960-cp310-cp310-macosx_11_0_arm64.whl"
+              "hash": "f730d56cb924d371c26b8eaddeea3cc07d78ff51c521c6d04899ac6904b75492",
+              "url": "https://files.pythonhosted.org/packages/67/48/e73045183ce9824d98365f18255a79d0b01638f40a0a68f898dc8f3cebcc/mypy-0.961.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "7d390248ec07fa344b9f365e6ed9d205bd0205e485c555bed37c4235c868e9d5",
-              "url": "https://files.pythonhosted.org/packages/7f/b8/aaa840a5f37e39bb3eccef982d48dccb8689074e7f6fd76d8dfffe3a8a66/mypy-0.960-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+              "hash": "697540876638ce349b01b6786bc6094ccdaba88af446a9abb967293ce6eaa2b0",
+              "url": "https://files.pythonhosted.org/packages/86/df/16748348d0119a6f2528f370e20f644a15ffb8a335a79e91023babc34d0b/mypy-0.961-cp310-cp310-macosx_10_9_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3a3e525cd76c2c4f90f1449fd034ba21fcca68050ff7c8397bb7dd25dd8b8248",
-              "url": "https://files.pythonhosted.org/packages/a7/1c/ac13b5d83aa025adc9d7e525b8eea180f3600ac40d47b6ad7746cf796a9a/mypy-0.960-cp310-cp310-macosx_10_9_universal2.whl"
+              "hash": "3e09f1f983a71d0672bbc97ae33ee3709d10c779beb613febc36805a6e28bb4e",
+              "url": "https://files.pythonhosted.org/packages/9c/4b/37c32ab752c1a16cd528bfa239553207108ae33c7b617f9cfea3bb6e2f00/mypy-0.961-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "925aa84369a07846b7f3b8556ccade1f371aa554f2bd4fb31cb97a24b73b036e",
-              "url": "https://files.pythonhosted.org/packages/f1/8f/1cf7aaad4957c3e329e160d993353b440da7499365d2f639cf973ab0f235/mypy-0.960-cp310-cp310-win_amd64.whl"
+              "hash": "bdd5ca340beffb8c44cb9dc26697628d1b88c6bddf5c2f6eb308c46f269bb6f3",
+              "url": "https://files.pythonhosted.org/packages/ba/85/d59bd3b0c84a59d862d2494a3461710ad4a2a1616312414ecc95b2393310/mypy-0.961-cp310-cp310-macosx_11_0_arm64.whl"
             }
           ],
           "project_name": "mypy",
@@ -72,7 +72,7 @@
             "typing-extensions>=3.10"
           ],
           "requires_python": ">=3.6",
-          "version": "0.960"
+          "version": "0.961"
         },
         {
           "artifacts": [
@@ -134,12 +134,12 @@
       "platform_tag": [
         "cp310",
         "cp310",
-        "manylinux_2_31_aarch64"
+        "manylinux_2_31_x86_64"
       ]
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.84",
+  "pex_version": "2.1.90",
   "prefer_older_binary": false,
   "requirements": [
     "mypy>=0.950"

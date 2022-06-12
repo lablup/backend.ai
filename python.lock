@@ -40,6 +40,7 @@
 //     "coloredlogs~=15.0",
 //     "cryptography>=2.8",
 //     "etcetra~=0.1.6",
+//     "faker~=13.12.0",
 //     "graphene~=2.1.9",
 //     "humanize>=3.1.0",
 //     "janus>=0.6.1",
@@ -1252,6 +1253,27 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "0122b75e7960cbb1e2bbbf10ef9b8c183377878e38466854953539c6d822e7c0",
+              "url": "https://files.pythonhosted.org/packages/5a/65/c0aabfe3343b1699bc7cddcfbfba60177b1ac47bea44f5b5331a15c4d9c9/Faker-13.12.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "fb95f956bac59c90f54543919d5c5ef41625e12a0773e5aa08c9b9c62ba58fb3",
+              "url": "https://files.pythonhosted.org/packages/b9/0f/e73c16b978961ef519982420b9c2827c8efcb814593d95965999409858e8/Faker-13.12.1.tar.gz"
+            }
+          ],
+          "project_name": "faker",
+          "requires_dists": [
+            "python-dateutil>=2.4",
+            "typing-extensions>=3.10.0.2; python_version < \"3.8\""
+          ],
+          "requires_python": ">=3.6",
+          "version": "13.12.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "f7353ba3367473d1d616ee727945f439e027f0bb16ac1a750219a8344d1d5d3c",
               "url": "https://files.pythonhosted.org/packages/a0/fa/7e6e4cbd0911966ca52846deee74b6ef9b138c45765bdb0f7242f14688e4/frozenlist-1.3.0-cp310-cp310-win_amd64.whl"
             },
@@ -1340,21 +1362,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "349ac49b18b01019453cc99c11c92ed772739778c92f184002b7ab3a5b7ac77d",
-              "url": "https://files.pythonhosted.org/packages/fc/04/ea9a945a6fbd7f7f977fcf7e300a715f1635939e5daf141b95068abaa5ec/google_auth-2.6.6-py2.py3-none-any.whl"
+              "hash": "df549a1433108801b11bdcc0e312eaf0d5f0500db42f0523e4d65c78722e8475",
+              "url": "https://files.pythonhosted.org/packages/81/1f/f2e98da9ccf8f94bddecd690dbf2defb6244011874e3b523aa397887d8a9/google_auth-2.7.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1ba4938e032b73deb51e59c4656a00e0939cf0b1112575099f136babb4563312",
-              "url": "https://files.pythonhosted.org/packages/fd/8c/3c24a436775d6582effe4ecaf33b2562e6a7f0cbc647a293c764c5eac9ee/google-auth-2.6.6.tar.gz"
+              "hash": "8a954960f852d5f19e6af14dd8e75c20159609e85d8db37e4013cc8c3824a7e1",
+              "url": "https://files.pythonhosted.org/packages/44/f3/4ee51a2f7d1c262e8bac333338479006b556f97ef9622e81c73460ad72a2/google-auth-2.7.0.tar.gz"
             }
           ],
           "project_name": "google-auth",
           "requires_dists": [
             "aiohttp<4.0.0dev,>=3.6.2; python_version >= \"3.6\" and extra == \"aiohttp\"",
             "cachetools<6.0,>=2.0.0",
+            "cryptography==36.0.2; extra == \"enterprise_cert\"",
             "enum34>=1.1.10; python_version < \"3.4\"",
             "pyasn1-modules>=0.2.1",
+            "pyopenssl==22.0.0; extra == \"enterprise_cert\"",
             "pyopenssl>=20.0.0; extra == \"pyopenssl\"",
             "pyu2f>=0.1.5; extra == \"reauth\"",
             "requests<3.0.0dev,>=2.20.0; extra == \"aiohttp\"",
@@ -1363,7 +1387,7 @@
             "six>=1.9.0"
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "2.6.6"
+          "version": "2.7"
         },
         {
           "artifacts": [
@@ -2786,13 +2810,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f22fa1e554c9ddfd16e6e41ac79759e17be9e492b3587efa038054674760e72d",
-              "url": "https://files.pythonhosted.org/packages/2d/61/08076519c80041bc0ffa1a8af0cbd3bf3e2b62af10435d269a9d0f40564d/requests-2.27.1-py2.py3-none-any.whl"
+              "hash": "bc7861137fbce630f17b03d3ad02ad0bf978c844f3536d0edda6499dafce2b6f",
+              "url": "https://files.pythonhosted.org/packages/41/5b/2209eba8133fc081d3ffff02e1f6376e3117e52bb16f674721a83e67e68e/requests-2.28.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "68d7c56fd5a8999887728ef304a6d12edc7be74f1cfa47714fc8b414525c9a61",
-              "url": "https://files.pythonhosted.org/packages/60/f3/26ff3767f099b73e0efa138a9998da67890793bfa475d8278f84a30fec77/requests-2.27.1.tar.gz"
+              "hash": "d568723a7ebd25875d8d1eaf5dfa068cd2fc8194b2e483d7b1f7c81918dbec6b",
+              "url": "https://files.pythonhosted.org/packages/e9/23/384d9953bb968731212dc37af87cb75a885dc48e0615bd6a303577c4dc4b/requests-2.28.0.tar.gz"
             }
           ],
           "project_name": "requests",
@@ -2800,15 +2824,12 @@
             "PySocks!=1.5.7,>=1.5.6; extra == \"socks\"",
             "certifi>=2017.4.17",
             "chardet<5,>=3.0.2; extra == \"use_chardet_on_py3\"",
-            "chardet<5,>=3.0.2; python_version < \"3\"",
-            "charset-normalizer~=2.0.0; python_version >= \"3\"",
-            "idna<3,>=2.5; python_version < \"3\"",
-            "idna<4,>=2.5; python_version >= \"3\"",
-            "urllib3<1.27,>=1.21.1",
-            "win-inet-pton; (sys_platform == \"win32\" and python_version == \"2.7\") and extra == \"socks\""
+            "charset-normalizer~=2.0.0",
+            "idna<4,>=2.5",
+            "urllib3<1.27,>=1.21.1"
           ],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "2.27.1"
+          "requires_python": "<4,>=3.7",
+          "version": "2.28"
         },
         {
           "artifacts": [
@@ -2973,13 +2994,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "68e45d17c9281ba25dc0104eadd2647172b3472d9e01f911efa57965e8d51a36",
-              "url": "https://files.pythonhosted.org/packages/e9/1c/ec080fde54ab30a738c92f794eab7f5d2f354f2b619ee95b2efe353e0766/setuptools-62.3.2-py3-none-any.whl"
+              "hash": "30b6b0fbacc459c90d27a63e6173facfc8b8c99a48fb24b5044f459ba63cd6cf",
+              "url": "https://files.pythonhosted.org/packages/8d/67/614c3c236f2b638b503aa388302bd1eba67b9a10c34caa046e4352e5b825/setuptools-62.3.4-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a43bdedf853c670e5fed28e5623403bad2f73cf02f9a2774e91def6bda8265a7",
-              "url": "https://files.pythonhosted.org/packages/4a/25/ec29a23ef38b9456f9965c57a9e1221e6c246d87abbf2a31158799bca201/setuptools-62.3.2.tar.gz"
+              "hash": "1f5d3a1502812025cdb2e5609b6af2d207332e3f50febe6db10ed3a59b2f155f",
+              "url": "https://files.pythonhosted.org/packages/7f/49/7c3f041fa83a28137f8945c025795d749292a1ab643d4d52cf63a3413849/setuptools-62.3.4.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -3027,7 +3048,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "62.3.2"
+          "version": "62.3.4"
         },
         {
           "artifacts": [
@@ -3803,7 +3824,7 @@
       "platform_tag": [
         "cp310",
         "cp310",
-        "manylinux_2_31_aarch64"
+        "manylinux_2_31_x86_64"
       ]
     }
   ],
@@ -3842,6 +3863,7 @@
     "coloredlogs~=15.0",
     "cryptography>=2.8",
     "etcetra~=0.1.6",
+    "faker~=13.12.0",
     "graphene~=2.1.9",
     "humanize>=3.1.0",
     "janus>=0.6.1",
