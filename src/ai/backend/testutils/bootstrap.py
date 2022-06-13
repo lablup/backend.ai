@@ -46,6 +46,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
+    time.sleep(0.5)
     yield container_id, HostPortPair('127.0.0.1', etcd_allocated_port)
     subprocess.run(
         [
