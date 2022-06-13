@@ -87,11 +87,11 @@ class FileLock(AbstractDistributedLock):
                 stop=stop_func,
             ):
                 with attempt:
-                    fcntl.flock(self._fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(self._fp.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     self._locked = True
                     if self._lifetime is not None:
                         self._watchdog_task = asyncio.create_task(
-                            self._watchdog_timer(ttl=self._lifetime)
+                            self._watchdog_timer(ttl=self._lifetime),
                         )
                     if self._debug:
                         log.debug("file lock acquired: {}", self._path)
@@ -104,7 +104,7 @@ class FileLock(AbstractDistributedLock):
             if not task.done():
                 task.cancel()
         if self._locked:
-            fcntl.flock(self._fp, fcntl.LOCK_UN)
+            fcntl.flock(self._fp.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
                 log.debug("file lock explicitly released: {}", self._path)
@@ -122,7 +122,7 @@ class FileLock(AbstractDistributedLock):
     async def _watchdog_timer(self, ttl: float):
         await asyncio.sleep(ttl)
         if self._locked:
-            fcntl.flock(self._fp, fcntl.LOCK_UN)
+            fcntl.flock(self._fp.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
                 log.debug(f"file lock implicitly released by watchdog: {self._path}")
