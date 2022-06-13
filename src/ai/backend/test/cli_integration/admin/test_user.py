@@ -6,7 +6,7 @@ from ..conftest import User
 from ...utils.cli import EOF, ClientRunnerFunc
 
 
-def test_add_user(run: ClientRunnerFunc, users: Tuple[User]):
+def test_add_user(run: ClientRunnerFunc, users: Tuple[User, ...]):
     """
     Testcase for user addition.
     """
@@ -49,14 +49,15 @@ def test_add_user(run: ClientRunnerFunc, users: Tuple[User]):
         assert added_user.get('full_name') == user.full_name, f'Full name mismatch: Account#{i+1}'
         assert added_user.get('status') == user.status, f'User status mismatch: Account#{i+1}'
         assert added_user.get('role') == user.role, f'Role mismatch: Account#{i+1}'
-        assert added_user.get('need_password_change') is user.need_password_change, f'Password change status mismatch: Account#{i+1}'
+        assert added_user.get('need_password_change') is user.need_password_change, \
+                                                    f'Password change status mismatch: Account#{i+1}'
 
 
 def test_update_user(
     run: ClientRunnerFunc,
-    users: Tuple[User],
-    gen_username: Callable[None, str],
-    gen_fullname: Callable[None, str]
+    users: Tuple[User, ...],
+    gen_username: Callable[[], str],
+    gen_fullname: Callable[[], str],
 ):
     """
     Run this testcase after test_add_user.
@@ -75,7 +76,7 @@ def test_update_user(
             role=['user', 'admin', 'monitor'][i % 3],
             status=['inactive', 'active', 'active'][i % 3],
             domain_name='default',
-            need_password_change=[False, True, False][i % 3]
+            need_password_change=[False, True, False][i % 3],
         )
         for i, user in enumerate(users)
     )
@@ -106,7 +107,7 @@ def test_update_user(
         assert isinstance(updated_user_list, list), 'Expected user list'
 
     for i, updated_user in enumerate(updated_users):
-        user = get_user_from_list(updated_user_list, updated_user.username)
+        user: dict = get_user_from_list(updated_user_list, updated_user.username)
         assert bool(user), f'Account not found - Account#{i+1}'
         assert user.get('full_name') == updated_user.full_name, f'Full name mismatch: Account#{i+1}'
         assert user.get('status') == updated_user.status, f'User status mismatch: Account#{i+1}'
@@ -116,7 +117,7 @@ def test_update_user(
         assert user.get('domain_name') == updated_user.domain_name, f'Domain mismatch: Account#{i+1}'
 
 
-def test_delete_user(run: ClientRunnerFunc, users: Tuple[dict]):
+def test_delete_user(run: ClientRunnerFunc, users: Tuple[User, ...]):
     """
     !!Run this testcase after running test_add_user
     Testcase for user deletion.

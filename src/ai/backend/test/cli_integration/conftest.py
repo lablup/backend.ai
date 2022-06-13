@@ -71,7 +71,7 @@ def temp_domain(domain_name: str, run: ClientRunnerFunc) -> Iterator[str]:
 
 
 @pytest.fixture(scope="module")
-def users(n: int = 3) -> Tuple[User]:
+def users(n: int = 3) -> Tuple[User, ...]:
     fake = Faker()
     return tuple(
         User(
@@ -82,24 +82,24 @@ def users(n: int = 3) -> Tuple[User]:
             role=['user', 'admin', 'monitor'][i % 3],
             status=['active', 'inactive', 'before-verification', 'deleted'][i % 4],
             domain_name='default',
-            need_password_change=[True, False, True][i % 3]
+            need_password_change=[True, False, True][i % 3],
         )
         for i in range(3)
     )
 
 
 @pytest.fixture
-def gen_username() -> Callable[None, str]:
+def gen_username() -> Callable[[], str]:
     return lambda: Faker().user_name()
 
 
 @pytest.fixture
-def gen_fullname() -> Callable[None, str]:
+def gen_fullname() -> Callable[[], str]:
     return lambda: Faker().name()
 
 
 @pytest.fixture(scope="module")
-def keypair_options() -> Tuple[KeypairOption]:
+def keypair_options() -> Tuple[KeypairOption, ...]:
     return (
         KeypairOption(is_active=False, is_admin=True, rate_limit=25000, resource_policy='default'),
         KeypairOption(is_active=True, is_admin=False, rate_limit=None, resource_policy='default'),
@@ -108,7 +108,7 @@ def keypair_options() -> Tuple[KeypairOption]:
 
 
 @pytest.fixture(scope="module")
-def new_keypair_options() -> Tuple[KeypairOption]:
+def new_keypair_options() -> Tuple[KeypairOption, ...]:
     return (
         KeypairOption(is_active=True, is_admin=False, rate_limit=15000, resource_policy='default'),
         KeypairOption(is_active=False, is_admin=True, rate_limit=15000, resource_policy='default'),
