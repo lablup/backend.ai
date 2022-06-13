@@ -4,7 +4,7 @@ import abc
 import asyncio
 import fcntl
 import logging
-from io import IOBase
+from io import BufferedReader
 from pathlib import Path
 from typing import Any, Optional
 
@@ -46,7 +46,7 @@ class FileLock(AbstractDistributedLock):
 
     default_timeout: float = 3  # not allow infinite timeout for safety
 
-    _fp: IOBase | None
+    _fp: BufferedReader | None
     _locked: bool = False
 
     def __init__(
