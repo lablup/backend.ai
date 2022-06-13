@@ -127,7 +127,7 @@ async def subscribe(
                 await _reset_chan()
                 continue
             raise
-        except (TimeoutError, asyncio.TimeoutError):
+        except (redis.exceptions.TimeoutError, asyncio.TimeoutError):
             continue
         except asyncio.CancelledError:
             raise
@@ -186,7 +186,7 @@ async def blpop(
                 await asyncio.sleep(reconnect_poll_interval)
                 continue
             raise
-        except (TimeoutError, asyncio.TimeoutError):
+        except (redis.exceptions.TimeoutError, asyncio.TimeoutError):
             continue
         except asyncio.CancelledError:
             raise
@@ -283,7 +283,7 @@ async def execute(
                 await asyncio.sleep(reconnect_poll_interval)
                 continue
             raise
-        except (TimeoutError, asyncio.TimeoutError):
+        except (redis.exceptions.TimeoutError, asyncio.TimeoutError):
             continue
         except asyncio.CancelledError:
             raise
@@ -404,11 +404,10 @@ async def read_stream_by_group(
                         autoclaim_start_id,
                     ),
                 )
-                for msg_id, msg_data in parse_stream_list(reply[1]):
+                for msg_id, msg_data in reply:
                     messages.append((msg_id, msg_data))
-                if reply[0] == b'0-0':
+                if len(reply) == 0:
                     break
-                autoclaim_start_id = reply[0]
             reply = await execute(
                 r,
                 lambda r: r.xreadgroup(

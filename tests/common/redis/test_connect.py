@@ -3,12 +3,11 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-import aioredis
-import aioredis.client
-import aioredis.exceptions
-import aioredis.sentinel
 import aiotools
 import pytest
+import redis.asyncio
+from redis.asyncio import Redis
+from redis.asyncio.sentinel import Sentinel, MasterNotFoundError, SlaveNotFoundError
 
 from .types import RedisClusterInfo
 from .utils import interrupt, with_timeout
@@ -23,7 +22,7 @@ if TYPE_CHECKING:
 @pytest.mark.asyncio
 async def test_connect(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
-    r = aioredis.from_url(
+    r = Redis.from_url(
         url=f'redis://{addr.host}:{addr.port}',
         socket_timeout=0.5,
     )
@@ -40,7 +39,7 @@ async def test_instantiate_redisconninfo() -> None:
         'password': 'develove',
     })
 
-    assert isinstance(r1.client, aioredis.sentinel.Sentinel)
+    assert isinstance(r1.client, Sentinel)
 
     for i in range(3):
         assert r1.client.sentinels[i].connection_pool.connection_kwargs['host'] == '127.0.0.1'
@@ -54,7 +53,7 @@ async def test_instantiate_redisconninfo() -> None:
         'password': 'develove',
     })
 
-    assert isinstance(r2.client, aioredis.sentinel.Sentinel)
+    assert isinstance(r2.client, Sentinel)
 
     for i in range(3):
         assert r2.client.sentinels[i].connection_pool.connection_kwargs['host'] == '127.0.0.1'
@@ -79,7 +78,7 @@ async def test_connect_cluster_sentinel(redis_cluster: RedisClusterInfo) -> None
         do_unpause.set()
         await unpaused.wait()
 
-    s = aioredis.sentinel.Sentinel(
+    s = Sentinel(
         redis_cluster.sentinel_addrs,
         password='develove',
         socket_timeout=0.5,
@@ -102,13 +101,13 @@ async def test_connect_cluster_sentinel(redis_cluster: RedisClusterInfo) -> None
             try:
                 master_addr = await s.discover_master('mymaster')
                 print("MASTER", master_addr)
-            except aioredis.sentinel.MasterNotFoundError:
+            except MasterNotFoundError:
                 print("MASTER (not found)")
             try:
                 slave_addrs = await s.discover_slaves('mymaster')
                 print("SLAVE", slave_addrs)
                 slave = s.slave_for('mymaster', db=9)
                 await slave.ping()
-            except aioredis.sentinel.SlaveNotFoundError:
+            except SlaveNotFoundError:
                 print("SLAVE (not found)")
             await asyncio.sleep(1)

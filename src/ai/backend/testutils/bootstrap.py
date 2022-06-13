@@ -3,13 +3,12 @@ from __future__ import annotations
 import json
 import subprocess
 import time
-from typing import (
-    Iterator,
-)
+from typing import Iterator
 
 import pytest
 
 from ai.backend.common.types import HostPortPair
+from ai.backend.testutils.pants import get_parallel_slot
 
 
 def wait_health_check(container_id):
@@ -29,11 +28,12 @@ def wait_health_check(container_id):
 
 @pytest.fixture(scope='session')
 def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
-    # Spawn a single-node etcd container for a testing session.
+    # Spawn a single-node etcd container for a testing session. 
+    etcd_allocated_port = 12379 + get_parallel_slot() * 10
     proc = subprocess.run(
         [
             'docker', 'run', '-d',
-            '-p', ':2379',
+            '-p', f'0.0.0.0:{etcd_allocated_port}:2379',
             '-p', ':4001',
             'quay.io/coreos/etcd:v3.5.4',
             '/usr/local/bin/etcd',
@@ -43,15 +43,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
-    proc = subprocess.run(
-        [
-            'docker', 'inspect', container_id,
-        ],
-        capture_output=True,
-    )
-    container_info = json.loads(proc.stdout)
-    host_port = int(container_info[0]['NetworkSettings']['Ports']['2379/tcp'][0]['HostPort'])
-    yield container_id, HostPortPair('127.0.0.1', host_port)
+    yield container_id, HostPortPair('127.0.0.1', etcd_allocated_port)
     subprocess.run(
         [
             'docker', 'rm', '-v', '-f', container_id,
@@ -63,10 +55,11 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
 @pytest.fixture(scope='session')
 def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
+    redis_allocated_port = 36379 + get_parallel_slot() * 10
     proc = subprocess.run(
         [
             'docker', 'run', '-d',
-            '-p', ':6379',
+            '-p', f'0.0.0.0:{redis_allocated_port}:6379',
             '--health-cmd', 'redis-cli ping',
             '--health-interval', '0.3s',
             '--health-start-period', '0.2s',
@@ -75,16 +68,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
-    proc = subprocess.run(
-        [
-            'docker', 'inspect', container_id,
-        ],
-        capture_output=True,
-    )
-    container_info = json.loads(proc.stdout)
-    container_info = wait_health_check(container_id)
-    host_port = int(container_info[0]['NetworkSettings']['Ports']['6379/tcp'][0]['HostPort'])
-    yield container_id, HostPortPair('127.0.0.1', host_port)
+    yield container_id, HostPortPair('127.0.0.1', redis_allocated_port)
     subprocess.run(
         [
             'docker', 'rm', '-v', '-f', container_id,
@@ -96,10 +80,11 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
 @pytest.fixture(scope='session')
 def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
+    postgres_allocated_port = 15432 + get_parallel_slot() * 10
     proc = subprocess.run(
         [
             'docker', 'run', '-d',
-            '-p', ':5432',
+            '-p', f'0.0.0.0:{postgres_allocated_port}:5432',
             '-e', 'POSTGRES_PASSWORD=develove',
             '-e', 'POSTGRES_DB=testing',
             '--health-cmd', 'pg_isready -U postgres',
@@ -110,9 +95,7 @@ def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
-    container_info = wait_health_check(container_id)
-    host_port = int(container_info[0]['NetworkSettings']['Ports']['5432/tcp'][0]['HostPort'])
-    yield container_id, HostPortPair('127.0.0.1', host_port)
+    yield container_id, HostPortPair('127.0.0.1', postgres_allocated_port)
     subprocess.run(
         [
             'docker', 'rm', '-v', '-f', container_id,

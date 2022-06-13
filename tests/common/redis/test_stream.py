@@ -6,18 +6,19 @@ import traceback
 from typing import (
     Dict,
     List,
+    Tuple,
 )
 
-import aioredis
-import aioredis.client
-import aioredis.exceptions
-import aioredis.sentinel
 import aiotools
 from aiotools.context import aclosing
 import pytest
+import redis.asyncio
+from redis.asyncio import Redis
+from redis.asyncio.sentinel import Sentinel
+from redis.exceptions import ConnectionError as RedisConnectionError, TimeoutError as RedisTimeoutError
 
 from ai.backend.common import redis
-from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 from .docker import DockerRedisNode
 from .types import RedisClusterInfo
@@ -27,7 +28,8 @@ from .utils import interrupt, with_timeout
 @pytest.mark.redis
 @pytest.mark.asyncio
 @pytest.mark.parametrize("disruption_method", ['stop', 'pause'])
-async def test_stream_fanout(redis_container: str, disruption_method: str, chaos_generator) -> None:
+async def test_stream_fanout(redis_container: Tuple[str, HostPortPair], disruption_method: str, chaos_generator) -> None:
+    addr = redis_container[1]
     do_pause = asyncio.Event()
     paused = asyncio.Event()
     do_unpause = asyncio.Event()
@@ -54,10 +56,10 @@ async def test_stream_fanout(redis_container: str, disruption_method: str, chaos
             raise
 
     r = RedisConnectionInfo(
-        aioredis.from_url('redis://localhost:9379', socket_timeout=0.5),
+        Redis.from_url(url=f'redis://{addr.host}:{addr.port}', socket_timeout=0.5),
         service_name=None,
     )
-    assert isinstance(r.client, aioredis.Redis)
+    assert isinstance(r.client, Redis)
     await redis.execute(r, lambda r: r.delete("stream1"))
 
     consumer_tasks = [
@@ -67,7 +69,7 @@ async def test_stream_fanout(redis_container: str, disruption_method: str, chaos
     await asyncio.sleep(0.1)
     interrupt_task = asyncio.create_task(interrupt(
         disruption_method,
-        DockerRedisNode("node", 9379, redis_container),
+        DockerRedisNode("node", addr.port, redis_container[0]),
         do_pause=do_pause,
         do_unpause=do_unpause,
         paused=paused,
@@ -85,10 +87,10 @@ async def test_stream_fanout(redis_container: str, disruption_method: str, chaos
     for i in range(5):
         # The Redis server is dead temporarily...
         if disruption_method == 'stop':
-            with pytest.raises(aioredis.exceptions.ConnectionError):
+            with pytest.raises(RedisConnectionError):
                 await r.client.xadd("stream1", {"idx": 5 + i})
         elif disruption_method == 'pause':
-            with pytest.raises(asyncio.TimeoutError):
+            with pytest.raises((asyncio.TimeoutError, RedisTimeoutError)):
                 await r.client.xadd("stream1", {"idx": 5 + i})
         else:
             raise RuntimeError("should not reach here")
@@ -147,7 +149,7 @@ async def test_stream_fanout_cluster(redis_cluster: RedisClusterInfo, disruption
             raise
 
     s = RedisConnectionInfo(
-        aioredis.sentinel.Sentinel(
+        Sentinel(
             redis_cluster.sentinel_addrs,
             password='develove',
             socket_timeout=0.5,
@@ -210,7 +212,8 @@ async def test_stream_fanout_cluster(redis_cluster: RedisClusterInfo, disruption
 @pytest.mark.asyncio
 @pytest.mark.parametrize("disruption_method", ['stop', 'pause'])
 @with_timeout(30.0)
-async def test_stream_loadbalance(redis_container: str, disruption_method: str, chaos_generator) -> None:
+async def test_stream_loadbalance(redis_container: Tuple[str, HostPortPair], disruption_method: str, chaos_generator) -> None:
+    addr = redis_container[1]
     do_pause = asyncio.Event()
     paused = asyncio.Event()
     do_unpause = asyncio.Event()
@@ -241,10 +244,10 @@ async def test_stream_loadbalance(redis_container: str, disruption_method: str, 
             return
 
     r = RedisConnectionInfo(
-        aioredis.from_url(url='redis://localhost:9379', socket_timeout=0.5),
+        Redis.from_url(url=f'redis://{addr.host}:{addr.port}', socket_timeout=0.5),
         service_name=None,
     )
-    assert isinstance(r.client, aioredis.Redis)
+    assert isinstance(r.client, Redis)
     await redis.execute(r, lambda r: r.delete("stream1"))
     await redis.execute(r, lambda r: r.xgroup_create("stream1", "group1", b"$", mkstream=True))
 
@@ -255,7 +258,7 @@ async def test_stream_loadbalance(redis_container: str, disruption_method: str, 
     await asyncio.sleep(0.1)
     interrupt_task = asyncio.create_task(interrupt(
         disruption_method,
-        DockerRedisNode("node", 9379, redis_container),
+        DockerRedisNode("node", addr.port, redis_container[0]),
         do_pause=do_pause,
         do_unpause=do_unpause,
         paused=paused,
@@ -273,10 +276,10 @@ async def test_stream_loadbalance(redis_container: str, disruption_method: str, 
     for i in range(5):
         # The Redis server is dead temporarily...
         if disruption_method == 'stop':
-            with pytest.raises(aioredis.exceptions.ConnectionError):
+            with pytest.raises(RedisConnectionError):
                 await r.client.xadd("stream1", {"idx": 5 + i})
         elif disruption_method == 'pause':
-            with pytest.raises(asyncio.TimeoutError):
+            with pytest.raises((asyncio.TimeoutError, RedisTimeoutError)):
                 await r.client.xadd("stream1", {"idx": 5 + i})
         else:
             raise RuntimeError("should not reach here")
@@ -339,7 +342,7 @@ async def test_stream_loadbalance_cluster(redis_cluster: RedisClusterInfo, disru
             return
 
     s = RedisConnectionInfo(
-        aioredis.sentinel.Sentinel(
+        Sentinel(
             redis_cluster.sentinel_addrs,
             password='develove',
             socket_timeout=0.5,

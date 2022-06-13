@@ -493,7 +493,7 @@ async def stream_proxy(defer, request: web.Request, params: Mapping[str, Any]) -
             now = now[0] + (now[1] / (10**6))
             await redis.execute(
                 redis_live,
-                # aioredis' ZADD implementation flattens mapping in value-key order
+                # redis-py's ZADD implementation flattens mapping in value-key order
                 lambda r: r.zadd(conn_tracker_key, {conn_tracker_val: now}),
             )
             await root_ctx.idle_checker_host.update_app_streaming_status(

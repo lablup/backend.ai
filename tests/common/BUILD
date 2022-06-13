@@ -1,5 +1,17 @@
+resources(
+    name="redis-cluster-compose",
+    sources=[
+        "redis/redis-cluster.yml",
+        "redis/redis-sentinel.dockerfile",
+        "redis/sentinel.conf",
+    ],
+)
+
 python_test_utils(
     name="test_utils",
+    dependencies=[
+        ":redis-cluster-compose",
+    ],
     sources=[
         "**/__init__.py",
         "**/conftest.py",
@@ -13,6 +25,7 @@ python_tests(
     dependencies=[
         "src/ai/backend/common:lib",
         "src/ai/backend/testutils:lib",
+        ":redis-cluster-compose",
     ],
     sources=[
         "**/test_*.py",
