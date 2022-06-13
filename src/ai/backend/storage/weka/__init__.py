@@ -82,7 +82,7 @@ class WekaVolume(BaseVolume):
                 "status_info": None,
                 "metadata": {
                     "quota": json.dumps([q.to_json() for q in quotas]),
-                    **cluster_info,
+                    "cluster_info": cluster_info,
                 },
             }
         except WekaAPIError:
