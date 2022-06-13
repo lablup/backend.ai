@@ -893,7 +893,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
             while True:
                 ev = await self.container_lifecycle_queue.get()
                 if isinstance(ev, Sentinel):
-                    await self.save_last_registry()
+                    await self.save_last_registry(force=True)
                     return
                 # attr currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
@@ -1802,8 +1802,9 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
     async def list_files(self, kernel_id: KernelId, path: str):
         return await self.kernel_registry[kernel_id].list_files(path)
 
-    async def save_last_registry(self) -> None:
-        if now := time.monotonic() <= self.last_registry_written_time + 60:
+    async def save_last_registry(self, force=False) -> None:
+        now = time.monotonic()
+        if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
         try:
             ipc_base_path = self.local_config["agent"]["ipc-base-path"]

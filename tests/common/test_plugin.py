@@ -56,7 +56,12 @@ class DummyEntrypoint:
         return self.load_result
 
 
-def mock_entrypoints_with_instance(plugin_group_name: str, *, mocked_plugin):
+def mock_entrypoints_with_instance(
+    plugin_group_name: str,
+    blocklist: set[str] = None,
+    *,
+    mocked_plugin,
+):
     # Since mocked_plugin is already an instance constructed via AsyncMock,
     # we emulate the original constructor using a lambda fucntion.
     yield DummyEntrypoint(
@@ -69,6 +74,7 @@ def mock_entrypoints_with_instance(plugin_group_name: str, *, mocked_plugin):
 @overload
 def mock_entrypoints_with_class(
     plugin_group_name: str,
+    blocklist: set[str] = None,
     *,
     plugin_cls: list[Type[AbstractPlugin]],
 ) -> Iterator[DummyEntrypoint]:
@@ -78,6 +84,7 @@ def mock_entrypoints_with_class(
 @overload
 def mock_entrypoints_with_class(
     plugin_group_name: str,
+    blocklist: set[str] = None,
     *,
     plugin_cls: Type[AbstractPlugin],
 ) -> DummyEntrypoint:
@@ -86,6 +93,7 @@ def mock_entrypoints_with_class(
 
 def mock_entrypoints_with_class(
     plugin_group_name: str,
+    blocklist: set[str] = None,
     *,
     plugin_cls,
 ):

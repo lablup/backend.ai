@@ -4,6 +4,7 @@ python_requirements(
     module_mapping={
         "aiodataloader-ng": ["aiodataloader"],
         "attrs": ["attr", "attrs"],
+        "aiohttp-session": ["aiohttp_session"],
         "python-dateutil": ["dateutil"],
         "python-json-logger": ["pythonjsonlogger"],
         "python-snappy": ["snappy"],

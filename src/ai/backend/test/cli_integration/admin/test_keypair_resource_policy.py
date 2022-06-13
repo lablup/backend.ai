@@ -9,6 +9,7 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc):
 
     # Add keypair resource policy
     add_arguments = [
+        '--output=json',
         'admin', 'keypair-resource-policy', 'add',
         '--default-for-unspecified', 'LIMITED',
         '--total-resource-slots', '{}',
@@ -22,8 +23,8 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc):
     ]
     with closing(run(add_arguments)) as p:
         p.expect(EOF)
-        assert 'Keypair resource policy test_krp is created.' in p.before.decode(), \
-            'Keypair resource policy creation not successful'
+        response = json.loads(p.before.decode())
+        assert response.get('ok') is True, 'Keypair resource policy creation not successful'
 
     # Check if keypair resource policy is created
     with closing(run(['--output=json', 'admin', 'keypair-resource-policy', 'list'])) as p:
@@ -52,6 +53,7 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc):
 
     # Update keypair resource policy
     add_arguments = [
+        '--output=json',
         'admin', 'keypair-resource-policy', 'update',
         '--default-for-unspecified', 'UNLIMITED',
         '--total-resource-slots', '{}',
@@ -65,7 +67,8 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc):
     ]
     with closing(run(add_arguments)) as p:
         p.expect(EOF)
-        assert 'Update succeeded.' in p.before.decode(), 'Keypair resource policy update not successful'
+        response = json.loads(p.before.decode())
+        assert response.get('ok') is True, 'Keypair resource policy update not successful'
 
     # Check if keypair resource policy is updated
     with closing(run(['--output=json', 'admin', 'keypair-resource-policy', 'list'])) as p:
@@ -93,10 +96,12 @@ def test_delete_keypair_resource_policy(run: ClientRunnerFunc):
     print("[ Delete keypair resource policy ]")
 
     # Delete keypair resource policy
-    with closing(run(['admin', 'keypair-resource-policy', 'delete', 'test_krp'])) as p:
+    with closing(run(['--output=json', 'admin', 'keypair-resource-policy', 'delete', 'test_krp'])) as p:
         p.sendline('y')
         p.expect(EOF)
-        assert 'Resource policy test_krp is deleted.' in p.before.decode(), 'Keypair resource policy deletion failed'
+        before = p.before.decode()
+        response = json.loads(before[before.index('{'):])
+        assert response.get('ok') is True, 'Keypair resource policy deletion failed'
 
 
 def test_list_keypair_resource_policy(run: ClientRunnerFunc):

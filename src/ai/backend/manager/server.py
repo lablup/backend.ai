@@ -39,8 +39,6 @@ from ai.backend.common.utils import env_info
 from ai.backend.common.logging import Logger, BraceStyleAdapter
 from ai.backend.common.plugin.hook import HookPluginContext, ALL_COMPLETED, PASSED
 from ai.backend.common.plugin.monitor import (
-    ErrorPluginContext,
-    StatsPluginContext,
     INCREMENT,
 )
 
@@ -71,6 +69,10 @@ from .exceptions import InvalidArgument
 from .idle import init_idle_checkers
 from .models.storage import StorageSessionManager
 from .models.utils import connect_database
+from .plugin.monitor import (
+    ManagerErrorPluginContext,
+    ManagerStatsPluginContext,
+)
 from .plugin.webapp import WebappPluginContext
 from .registry import AgentRegistry
 from .scheduler.dispatcher import SchedulerDispatcher
@@ -411,8 +413,8 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    ectx = ErrorPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
-    sctx = StatsPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
+    ectx = ManagerErrorPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
+    sctx = ManagerStatsPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     await ectx.init(context={'_root.context': root_ctx})
     await sctx.init()
     root_ctx.error_monitor = ectx
