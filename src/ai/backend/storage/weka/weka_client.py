@@ -224,10 +224,16 @@ class WekaAPIClient:
                 f"/fileSystems/{fs_uid}/quota",
             )
             data = await response.json()
-        return [
-            WekaQuota.from_json(quota_id, data["data"][quota_id])
-            for quota_id in data["data"].keys()
-        ]
+        if isinstance(data['data'], list):
+            return [
+                WekaQuota.from_json(quota_info["quota_id"], quota_info)
+                for quota_info in data["data"]
+            ]
+        else:
+            return [
+                WekaQuota.from_json(quota_id, data["data"][quota_id])
+                for quota_id in data["data"].keys()
+            ]
 
     @error_handler
     async def get_quota(self, fs_uid: str, inode_id: int) -> WekaQuota:
