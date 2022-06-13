@@ -99,6 +99,7 @@ def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
+    time.sleep(1)
     yield container_id, HostPortPair('127.0.0.1', postgres_allocated_port)
     subprocess.run(
         [
