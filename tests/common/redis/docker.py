@@ -30,7 +30,7 @@ class DockerRedisNode(AbstractRedisNode):
 
     def __init__(self, node_type: str, port: int, container_id: str) -> None:
         self.node_type = node_type
-        self.port = port + get_parallel_slot() * 10
+        self.port = port
         self.container_id = container_id
 
     @property
@@ -169,8 +169,8 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
 
         await asyncio.sleep(2)
         try:
-            p = await asyncio.create_subprocess_exec(
-                *[
+            p = await simple_run_cmd(
+                [
                     *compose_cmd,
                     '-p', project_name,
                     '-f', str(compose_cfg),
@@ -187,28 +187,35 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 pytest.fail("Cannot parse \"docker compose ... ps --format json\" output. "
                             "You may need to upgrade to docker-compose v2.0.0.rc.3 or later")
             await p.wait()
-            worker_cids = {}
-            sentinel_cids = {}
-
-            def find_port_node(item):
-                if m := re.search(r"--port (\d+) ", item['Command']):
-                    return int(m.group(1))
-                return None
-
-            def find_port_sentinel(item):
-                if m := re.search(r"redis-sentinel(\d+)", item['Name']):
-                    return 26379 + (int(m.group(1)) - 1)
-                return None
 
             if not ps_output:
                 pytest.fail("Cannot detect the temporary Redis cluster running as docker compose containers")
-            for item in ps_output:
-                if 'redis-node' in item['Name']:
-                    port = find_port_node(item)
-                    worker_cids[port] = item['ID']
-                elif 'redis-sentinel' in item['Name']:
-                    port = find_port_sentinel(item)
-                    sentinel_cids[port] = item['ID']
+
+            cids = [item['ID'] for item in ps_output]
+            cid_mapping = {}
+
+            p = await simple_run_cmd(
+                [
+                    'docker', 'inspect', *cids
+                ],
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL
+            )
+
+            assert p.stdout is not None
+            try:
+                inspect_output = json.loads(await p.stdout.read())
+            except json.JSONDecodeError:
+                pytest.fail("Cannot parse \"docker inspect ...\" output. "
+                            "You may need to upgrade to docker-compose v2.0.0.rc.3 or later")
+            await p.wait()
+
+            if not inspect_output:
+                pytest.fail("Cannot detect Redis cluster containers running as docker compose containers")
+
+            for container in inspect_output:
+                cid_mapping[container['Config']['Labels']['com.docker.compose.service']] = container['Id']
+
 
             yield RedisClusterInfo(
                 node_addrs=[
@@ -220,17 +227,17 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     DockerRedisNode(
                         "node",
                         ports['REDIS_MASTER_PORT'],
-                        worker_cids[ports['REDIS_MASTER_PORT']],
+                        cid_mapping['backendai-half-redis-node01'],
                     ),
                     DockerRedisNode(
                         "node",
                         ports['REDIS_SLAVE1_PORT'],
-                        worker_cids[ports['REDIS_SLAVE1_PORT']],
+                        cid_mapping['backendai-half-redis-node02'],
                     ),
                     DockerRedisNode(
                         "node",
                         ports['REDIS_SLAVE2_PORT'],
-                        worker_cids[ports['REDIS_SLAVE2_PORT']],
+                        cid_mapping['backendai-half-redis-node03'],
                     ),
                 ],
                 sentinel_addrs=[
@@ -242,17 +249,17 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     DockerRedisNode(
                         "sentinel",
                         ports['REDIS_SENTINEL1_PORT'],
-                        sentinel_cids[ports['REDIS_SENTINEL1_PORT']],
+                        cid_mapping['backendai-half-redis-sentinel01']
                     ),
                     DockerRedisNode(
                         "sentinel",
                         ports['REDIS_SENTINEL2_PORT'],
-                        sentinel_cids[ports['REDIS_SENTINEL2_PORT']],
+                        cid_mapping['backendai-half-redis-sentinel02']
                     ),
                     DockerRedisNode(
                         "sentinel",
                         ports['REDIS_SENTINEL3_PORT'],
-                        sentinel_cids[ports['REDIS_SENTINEL3_PORT']],
+                        cid_mapping['backendai-half-redis-sentinel03']
                     ),
                 ],
             )

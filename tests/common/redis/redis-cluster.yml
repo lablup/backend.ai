@@ -5,6 +5,8 @@ services:
   # Initial master is node01.
   backendai-half-redis-node01:
     image: redis:6-alpine
+    environment:
+      - REDIS_PORT=${REDIS_MASTER_PORT:-16379}
     command: >
       redis-server
       --port ${REDIS_MASTER_PORT:-16379}
@@ -21,6 +23,8 @@ services:
 
   backendai-half-redis-node02:
     image: redis:6-alpine
+    environment:
+      - REDIS_PORT=${REDIS_SLAVE1_PORT:-16379}
     command: >
       redis-server
       --port ${REDIS_SLAVE1_PORT:-16380}
@@ -38,6 +42,8 @@ services:
 
   backendai-half-redis-node03:
     image: redis:6-alpine
+    environment:
+      - REDIS_PORT=${REDIS_SLAVE2_PORT:-16379}
     command: >
       redis-server
       --port ${REDIS_SLAVE2_PORT:-16381}
