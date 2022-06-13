@@ -30,7 +30,7 @@ import sqlalchemy as sa
 import trafaret as t
 import yarl
 
-from ai.backend.common import redis, validators as tx
+from ai.backend.common import redis_helper, validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.utils import nmget
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
@@ -341,7 +341,7 @@ async def get_container_stats_for_period(request: web.Request, start_date, end_d
             pipe.get(str(row['id']))
         return pipe
 
-    raw_stats = await redis.execute(root_ctx.redis_stat, _pipe_builder)
+    raw_stats = await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
 
     objs_per_group = {}
     local_tz = root_ctx.shared_config['system']['timezone']
@@ -593,7 +593,7 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
                 gpu_allocated += int(row.occupied_slots['cuda.devices'])
             if 'cuda.shares' in row.occupied_slots:
                 gpu_allocated += Decimal(row.occupied_slots['cuda.shares'])
-            raw_stat = await redis.execute(root_ctx.redis_stat, lambda r: r.get(str(row['id'])))
+            raw_stat = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.get(str(row['id'])))
             if raw_stat:
                 last_stat = msgpack.unpackb(raw_stat)
                 io_read_bytes += int(nmget(last_stat, 'io_read.current', 0))

@@ -12,7 +12,7 @@ from redis.asyncio.sentinel import Sentinel, MasterNotFoundError, SlaveNotFoundE
 from .types import RedisClusterInfo
 from .utils import interrupt, with_timeout
 
-from ai.backend.common import redis, validators as tx
+from ai.backend.common import redis_helper, validators as tx
 from ai.backend.common.types import HostPortPair
 
 if TYPE_CHECKING:
@@ -33,7 +33,7 @@ async def test_connect(redis_container: tuple[str, HostPortPair]) -> None:
 @pytest.mark.asyncio
 async def test_instantiate_redisconninfo() -> None:
     sentinels = '127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381'
-    r1 = redis.get_redis_object({
+    r1 = redis_helper.get_redis_object({
         'sentinel': sentinels,
         'service_name': 'mymaster',
         'password': 'develove',
@@ -47,7 +47,7 @@ async def test_instantiate_redisconninfo() -> None:
         assert r1.client.sentinels[i].connection_pool.connection_kwargs['db'] == 0
 
     parsed_addresses: Any = tx.DelimiterSeperatedList(tx.HostPortPair).check_and_return(sentinels)
-    r2 = redis.get_redis_object({
+    r2 = redis_helper.get_redis_object({
         'sentinel': parsed_addresses,
         'service_name': 'mymaster',
         'password': 'develove',

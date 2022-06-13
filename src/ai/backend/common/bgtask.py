@@ -23,7 +23,7 @@ from aiohttp_sse import sse_response
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
-from . import redis
+from . import redis_helper
 from .events import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
@@ -80,7 +80,7 @@ class ProgressReporter:
             pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
             return pipe
 
-        await redis.execute(redis_producer, _pipe_builder)
+        await redis_helper.execute(redis_producer, _pipe_builder)
         await self.event_producer.produce_event(
             BgtaskUpdatedEvent(
                 self.task_id,
@@ -133,7 +133,7 @@ class BackgroundTaskManager:
         """
         tracker_key = f'bgtask.{task_id}'
         redis_producer = self.event_producer.redis_client
-        task_info = await redis.execute(
+        task_info = await redis_helper.execute(
             redis_producer,
             lambda r: r.hgetall(tracker_key),
             encoding='utf-8',
@@ -216,7 +216,7 @@ class BackgroundTaskManager:
             pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
             return pipe
 
-        await redis.execute(redis_producer, _pipe_builder)
+        await redis_helper.execute(redis_producer, _pipe_builder)
 
         task = asyncio.create_task(self._wrapper_task(func, task_id, name))
         self.ongoing_tasks.add(task)
@@ -258,7 +258,7 @@ class BackgroundTaskManager:
                 pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
                 await pipe.execute()
 
-            await redis.execute(redis_producer, _pipe_builder)
+            await redis_helper.execute(redis_producer, _pipe_builder)
             await self.event_producer.produce_event(
                 event_cls(
                     task_id,

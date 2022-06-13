@@ -29,7 +29,7 @@ from sqlalchemy.orm import (
 import trafaret as t
 import yaml
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
@@ -485,9 +485,9 @@ class Image(graphene.ObjectType):
     ) -> Image:
         # TODO: add architecture
         installed = (
-            await redis.execute(ctx.redis_image, lambda r: r.scard(row.name))
+            await redis_helper.execute(ctx.redis_image, lambda r: r.scard(row.name))
         ) > 0
-        _installed_agents = await redis.execute(
+        _installed_agents = await redis_helper.execute(
             ctx.redis_image,
             lambda r: r.smembers(row.name),
         )

@@ -48,7 +48,7 @@ from sqlalchemy.sql.expression import true
 from yarl import URL
 import zmq
 
-from ai.backend.common import msgpack, redis
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import get_registry_info, get_known_registries, ImageRef
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -1708,12 +1708,12 @@ class AgentRegistry:
                 await r.mset(updates)
 
         if do_fullscan:
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_stat,
                 _update_by_fullscan,
             )
         else:
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_stat,
                 _update,
             )
@@ -1867,7 +1867,7 @@ class AgentRegistry:
                             destroyed_kernels.append(kernel)
 
                         async def _update() -> None:
-                            kern_stat = await redis.execute(
+                            kern_stat = await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.get(str(kernel['id'])),
                             )
@@ -1889,7 +1889,7 @@ class AgentRegistry:
                         if kernel['cluster_role'] == DEFAULT_ROLE:
                             # The main session is terminated;
                             # decrement the user's concurrency counter
-                            await redis.execute(
+                            await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.incrby(
                                     f"keypair.concurrency_used.{kernel['access_key']}",
@@ -1922,7 +1922,7 @@ class AgentRegistry:
                         if kernel['cluster_role'] == DEFAULT_ROLE:
                             # The main session is terminated;
                             # decrement the user's concurrency counter
-                            await redis.execute(
+                            await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.incrby(
                                     f"keypair.concurrency_used.{kernel['access_key']}",
@@ -1970,7 +1970,7 @@ class AgentRegistry:
                             last_stat: Optional[Dict[str, Any]]
                             last_stat = None
                             try:
-                                raw_last_stat = await redis.execute(
+                                raw_last_stat = await redis_helper.execute(
                                     self.redis_stat,
                                     lambda r: r.get(str(kernel['id'])))
                                 if raw_last_stat is not None:
@@ -2379,7 +2379,7 @@ class AgentRegistry:
             instance_rejoin = False
 
             # Update "last seen" timestamp for liveness tracking
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_live,
                 lambda r: r.hset('agent.last_seen', agent_id, now.timestamp()),
             )
@@ -2492,7 +2492,7 @@ class AgentRegistry:
                     image_ref = ImageRef(image[0], known_registries, agent_info['architecture'])
                     pipe.sadd(image_ref.canonical, agent_id)
                 return pipe
-            await redis.execute(self.redis_image, _pipe_builder)
+            await redis_helper.execute(self.redis_image, _pipe_builder)
 
         await self.hook_plugin_ctx.notify(
             'POST_AGENT_HEARTBEAT',
@@ -2500,7 +2500,7 @@ class AgentRegistry:
         )
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
-        await redis.execute(self.redis_live, lambda r: r.hdel('agent.last_seen', agent_id))
+        await redis_helper.execute(self.redis_live, lambda r: r.hdel('agent.last_seen', agent_id))
 
         async def _pipe_builder(r: Redis):
             pipe = r.pipeline()
@@ -2541,7 +2541,7 @@ class AgentRegistry:
                 )
                 await conn.execute(update_query)
 
-        await redis.execute(self.redis_image, _pipe_builder)
+        await redis_helper.execute(self.redis_image, _pipe_builder)
         await execute_with_retry(_update)
 
     async def set_session_status(
@@ -2634,7 +2634,7 @@ class AgentRegistry:
         log.debug('sync_kernel_stats(k:{!r})', kernel_ids)
         for kernel_id in kernel_ids:
             raw_kernel_id = str(kernel_id)
-            kern_stat = await redis.execute(
+            kern_stat = await redis_helper.execute(
                 self.redis_stat,
                 lambda r: r.get(raw_kernel_id),
             )
@@ -2680,7 +2680,7 @@ class AgentRegistry:
             except asyncio.CancelledError:
                 pass
 
-        kern_stat = await redis.execute(
+        kern_stat = await redis_helper.execute(
             self.redis_stat,
             lambda r: r.get(str(kernel_id)),
         )

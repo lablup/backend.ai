@@ -27,7 +27,7 @@ from typing import (
 import attr
 from redis.asyncio import Redis
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common import msgpack
@@ -348,7 +348,7 @@ class StatContext:
                 pipe.expire(self.agent.local_config['agent']['id'], self.cache_lifespan)
                 await pipe.execute()
 
-        await redis.execute(self.agent.redis_stat_pool, _pipe_builder)
+        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
 
     async def collect_container_stat(
         self,
@@ -428,4 +428,4 @@ class StatContext:
                     pipe.set(str(kernel_id), serialized_metrics)
                     await pipe.execute()
 
-        await redis.execute(self.agent.redis_stat_pool, _pipe_builder)
+        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)

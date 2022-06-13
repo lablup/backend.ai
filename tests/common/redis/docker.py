@@ -220,17 +220,17 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     DockerRedisNode(
                         "node",
                         ports['REDIS_MASTER_PORT'],
-                        worker_cids[ports['REDIS_MASTER_PORT']]
+                        worker_cids[ports['REDIS_MASTER_PORT']],
                     ),
                     DockerRedisNode(
                         "node",
                         ports['REDIS_SLAVE1_PORT'],
-                        worker_cids[ports['REDIS_SLAVE1_PORT']]
+                        worker_cids[ports['REDIS_SLAVE1_PORT']],
                     ),
                     DockerRedisNode(
                         "node",
                         ports['REDIS_SLAVE2_PORT'],
-                        worker_cids[ports['REDIS_SLAVE2_PORT']]
+                        worker_cids[ports['REDIS_SLAVE2_PORT']],
                     ),
                 ],
                 sentinel_addrs=[
@@ -242,17 +242,17 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     DockerRedisNode(
                         "sentinel",
                         ports['REDIS_SENTINEL1_PORT'],
-                        sentinel_cids[ports['REDIS_SENTINEL1_PORT']]
+                        sentinel_cids[ports['REDIS_SENTINEL1_PORT']],
                     ),
                     DockerRedisNode(
                         "sentinel",
                         ports['REDIS_SENTINEL2_PORT'],
-                        sentinel_cids[ports['REDIS_SENTINEL2_PORT']]
+                        sentinel_cids[ports['REDIS_SENTINEL2_PORT']],
                     ),
                     DockerRedisNode(
                         "sentinel",
                         ports['REDIS_SENTINEL3_PORT'],
-                        sentinel_cids[ports['REDIS_SENTINEL3_PORT']]
+                        sentinel_cids[ports['REDIS_SENTINEL3_PORT']],
                     ),
                 ],
             )

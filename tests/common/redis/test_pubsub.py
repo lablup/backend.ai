@@ -16,7 +16,7 @@ from redis.exceptions import ConnectionError as RedisConnectionError, TimeoutErr
 from .docker import DockerRedisNode
 from .utils import interrupt
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 
@@ -35,7 +35,7 @@ async def test_pubsub(redis_container: Tuple[str, HostPortPair], disruption_meth
     async def subscribe(pubsub: PubSub) -> None:
         try:
             async with aiotools.aclosing(
-                redis.subscribe(pubsub, reconnect_poll_interval=0.3),
+                redis_helper.subscribe(pubsub, reconnect_poll_interval=0.3),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()
@@ -118,7 +118,7 @@ async def test_pubsub_with_retrying_pub(redis_container: Tuple[str, HostPortPair
     async def subscribe(pubsub: PubSub) -> None:
         try:
             async with aiotools.aclosing(
-                redis.subscribe(pubsub, reconnect_poll_interval=0.3),
+                redis_helper.subscribe(pubsub, reconnect_poll_interval=0.3),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()
@@ -148,7 +148,7 @@ async def test_pubsub_with_retrying_pub(redis_container: Tuple[str, HostPortPair
         await asyncio.sleep(0)
 
         for i in range(5):
-            await redis.execute(r, lambda r: r.publish("ch1", str(i)))
+            await redis_helper.execute(r, lambda r: r.publish("ch1", str(i)))
             await asyncio.sleep(0.1)
         do_pause.set()
         await paused.wait()
@@ -159,13 +159,13 @@ async def test_pubsub_with_retrying_pub(redis_container: Tuple[str, HostPortPair
 
         wakeup_task = asyncio.create_task(wakeup())
         for i in range(5):
-            await redis.execute(r, lambda r: r.publish("ch1", str(5 + i)))
+            await redis_helper.execute(r, lambda r: r.publish("ch1", str(5 + i)))
             await asyncio.sleep(0.1)
         await wakeup_task
 
         await unpaused.wait()
         for i in range(5):
-            await redis.execute(r, lambda r: r.publish("ch1", str(10 + i)))
+            await redis_helper.execute(r, lambda r: r.publish("ch1", str(10 + i)))
             await asyncio.sleep(0.1)
 
         await interrupt_task

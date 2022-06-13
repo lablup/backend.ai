@@ -9,12 +9,11 @@ from typing import (
 
 import aiotools
 import pytest
-import redis.asyncio
 from redis.asyncio import Redis
 from redis.asyncio.sentinel import Sentinel
 from redis.exceptions import ConnectionError as RedisConnectionError, TimeoutError as RedisTimeoutError
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 from .docker import DockerRedisNode
@@ -36,7 +35,7 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
     async def pop(r: RedisConnectionInfo, key: str) -> None:
         try:
             async with aiotools.aclosing(
-                redis.blpop(r, key, reconnect_poll_interval=0.3),
+                redis_helper.blpop(r, key, reconnect_poll_interval=0.3),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()
@@ -113,7 +112,7 @@ async def test_blist_with_retrying_rpush(redis_container: Tuple[str, HostPortPai
     async def pop(r: RedisConnectionInfo, key: str) -> None:
         try:
             async with aiotools.aclosing(
-                redis.blpop(r, key, reconnect_poll_interval=0.3),
+                redis_helper.blpop(r, key, reconnect_poll_interval=0.3),
             ) as agen:
                 async for raw_msg in agen:
                     msg = raw_msg.decode()
@@ -141,7 +140,7 @@ async def test_blist_with_retrying_rpush(redis_container: Tuple[str, HostPortPai
     await asyncio.sleep(0)
 
     for i in range(5):
-        await redis.execute(r, lambda r: r.rpush("bl1", str(i)))
+        await redis_helper.execute(r, lambda r: r.rpush("bl1", str(i)))
         await asyncio.sleep(0.1)
     do_pause.set()
     await paused.wait()
@@ -152,13 +151,13 @@ async def test_blist_with_retrying_rpush(redis_container: Tuple[str, HostPortPai
 
     wakeup_task = asyncio.create_task(wakeup())
     for i in range(5):
-        await redis.execute(r, lambda r: r.rpush("bl1", str(5 + i)))
+        await redis_helper.execute(r, lambda r: r.rpush("bl1", str(5 + i)))
         await asyncio.sleep(0.1)
     await wakeup_task
 
     await unpaused.wait()
     for i in range(5):
-        await redis.execute(r, lambda r: r.rpush("bl1", str(10 + i)))
+        await redis_helper.execute(r, lambda r: r.rpush("bl1", str(10 + i)))
         await asyncio.sleep(0.1)
 
     await interrupt_task
@@ -190,7 +189,7 @@ async def test_blist_cluster_sentinel(
     async def pop(s: RedisConnectionInfo, key: str) -> None:
         try:
             async with aiotools.aclosing(
-                redis.blpop(
+                redis_helper.blpop(
                     s, key,
                     reconnect_poll_interval=0.3,
                     service_name="mymaster",
@@ -210,7 +209,7 @@ async def test_blist_cluster_sentinel(
         ),
         service_name='mymaster',
     )
-    await redis.execute(s, lambda r: r.delete("bl1"))
+    await redis_helper.execute(s, lambda r: r.delete("bl1"))
 
     pop_task = asyncio.create_task(pop(s, "bl1"))
     interrupt_task = asyncio.create_task(interrupt(
@@ -225,7 +224,7 @@ async def test_blist_cluster_sentinel(
     await asyncio.sleep(0)
 
     for i in range(5):
-        await redis.execute(
+        await redis_helper.execute(
             s,
             lambda r: r.rpush("bl1", str(i)),
             service_name="mymaster",
@@ -240,7 +239,7 @@ async def test_blist_cluster_sentinel(
 
     wakeup_task = asyncio.create_task(wakeup())
     for i in range(5):
-        await redis.execute(
+        await redis_helper.execute(
             s,
             lambda r: r.rpush("bl1", str(5 + i)),
             service_name="mymaster",
@@ -250,7 +249,7 @@ async def test_blist_cluster_sentinel(
 
     await unpaused.wait()
     for i in range(5):
-        await redis.execute(
+        await redis_helper.execute(
             s,
             lambda r: r.rpush("bl1", str(10 + i)),
             service_name="mymaster",

@@ -16,7 +16,7 @@ from redis.asyncio.client import Pipeline
 import sqlalchemy as sa
 from setproctitle import setproctitle
 
-from ai.backend.common import redis as redis_helper
+from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.validators import TimeDuration

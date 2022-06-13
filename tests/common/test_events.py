@@ -17,7 +17,7 @@ from ai.backend.common.types import (
     AgentId,
     EtcdRedisConfig,
 )
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 
 
 @attr.s(slots=True, frozen=True)
@@ -70,7 +70,7 @@ async def test_dispatch(redis_container) -> None:
     await asyncio.sleep(0.2)
     assert records == {'async', 'sync'}
 
-    await redis.execute(producer.redis_client, lambda r: r.flushdb())
+    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
     await producer.close()
     await dispatcher.close()
 
@@ -117,7 +117,7 @@ async def test_error_on_dispatch(redis_container) -> None:
     assert 'ZeroDivisionError' in exception_log
     assert 'OverflowError' in exception_log
 
-    await redis.execute(producer.redis_client, lambda r: r.flushdb())
+    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
     await producer.close()
     await dispatcher.close()
 

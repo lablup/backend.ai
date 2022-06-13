@@ -6,7 +6,7 @@ import attr
 import os
 from typing import TYPE_CHECKING, AsyncIterator
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.logging import AbstractLogger, Logger, NoopLogger
 from ai.backend.common.types import RedisConnectionInfo
@@ -66,12 +66,12 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
     await shared_config.reload()
     raw_redis_config = await shared_config.etcd.get_prefix('config/redis')
     local_config['redis'] = redis_config_iv.check(raw_redis_config)
-    redis_live = redis.get_redis_object(shared_config.data['redis'], db=REDIS_LIVE_DB)
-    redis_stat = redis.get_redis_object(shared_config.data['redis'], db=REDIS_STAT_DB)
-    redis_image = redis.get_redis_object(
+    redis_live = redis_helper.get_redis_object(shared_config.data['redis'], db=REDIS_LIVE_DB)
+    redis_stat = redis_helper.get_redis_object(shared_config.data['redis'], db=REDIS_STAT_DB)
+    redis_image = redis_helper.get_redis_object(
         shared_config.data['redis'], db=REDIS_IMAGE_DB,
     )
-    redis_stream = redis.get_redis_object(
+    redis_stream = redis_helper.get_redis_object(
         shared_config.data['redis'], db=REDIS_STREAM_DB,
     )
     yield RedisConnectionSet(

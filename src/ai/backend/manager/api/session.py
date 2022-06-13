@@ -52,7 +52,7 @@ from ai.backend.manager.models.image import ImageRow
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common import redis, validators as tx
+from ai.backend.common import redis_helper, validators as tx
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import (
     UnknownImageReference,
@@ -1467,7 +1467,7 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
                         AgentTerminatedEvent("agent-lost"),
                         source=agent_id.decode())
 
-        await redis.execute(root_ctx.redis_live, _check_impl)
+        await redis_helper.execute(root_ctx.redis_live, _check_impl)
     except asyncio.CancelledError:
         pass
 
@@ -1478,12 +1478,12 @@ async def handle_kernel_log(
     event: DoSyncKernelLogsEvent,
 ) -> None:
     root_ctx: RootContext = app['_root.context']
-    redis_conn = redis.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_STREAM_DB)
+    redis_conn = redis_helper.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_STREAM_DB)
     # The log data is at most 10 MiB.
     log_buffer = BytesIO()
     log_key = f'containerlog.{event.container_id}'
     try:
-        list_size = await redis.execute(
+        list_size = await redis_helper.execute(
             redis_conn,
             lambda r: r.llen(log_key),
         )
@@ -1495,7 +1495,7 @@ async def handle_kernel_log(
             return
         for _ in range(list_size):
             # Read chunk-by-chunk to allow interleaving with other Redis operations.
-            chunk = await redis.execute(redis_conn, lambda r: r.lpop(log_key))
+            chunk = await redis_helper.execute(redis_conn, lambda r: r.lpop(log_key))
             if chunk is None:  # maybe missing
                 log_buffer.write(b"(container log unavailable)\n")
                 break
@@ -1515,7 +1515,7 @@ async def handle_kernel_log(
             await execute_with_retry(_update_log)
         finally:
             # Clear the log data from Redis when done.
-            await redis.execute(
+            await redis_helper.execute(
                 redis_conn,
                 lambda r: r.delete(log_key),
             )

@@ -6,7 +6,7 @@ from aiohttp import web
 import attr
 import pytest
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.events import (
     BgtaskDoneEvent,
     BgtaskFailedEvent,
@@ -80,7 +80,7 @@ async def test_background_task(etcd_fixture, create_app_and_client) -> None:
         assert done_handler_ctx['event_name'] == 'bgtask_done'
         assert done_handler_ctx['message'] == 'hooray'
     finally:
-        await redis.execute(producer.redis_client, lambda r: r.flushdb())
+        await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
         await producer.close()
         await dispatcher.close()
 
@@ -119,6 +119,6 @@ async def test_background_task_fail(etcd_fixture, create_app_and_client) -> None
         assert fail_handler_ctx['message'] is not None
         assert 'ZeroDivisionError' in fail_handler_ctx['message']
     finally:
-        await redis.execute(producer.redis_client, lambda r: r.flushdb())
+        await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
         await producer.close()
         await dispatcher.close()

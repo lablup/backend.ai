@@ -31,7 +31,7 @@ from pathlib import Path
 from setproctitle import setproctitle
 import aiomonitor
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.events import EventDispatcher, EventProducer
@@ -296,12 +296,12 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
-    root_ctx.redis_live = redis.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_LIVE_DB)
-    root_ctx.redis_stat = redis.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_STAT_DB)
-    root_ctx.redis_image = redis.get_redis_object(
+    root_ctx.redis_live = redis_helper.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_LIVE_DB)
+    root_ctx.redis_stat = redis_helper.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_STAT_DB)
+    root_ctx.redis_image = redis_helper.get_redis_object(
         root_ctx.shared_config.data['redis'], db=REDIS_IMAGE_DB,
     )
-    root_ctx.redis_stream = redis.get_redis_object(
+    root_ctx.redis_stream = redis_helper.get_redis_object(
         root_ctx.shared_config.data['redis'], db=REDIS_STREAM_DB,
     )
     yield

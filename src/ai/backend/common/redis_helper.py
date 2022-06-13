@@ -18,7 +18,6 @@ from typing import (
     Union,
 )
 
-from redis.client import parse_stream_list
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline, PubSub
 from redis.asyncio.sentinel import (

@@ -13,7 +13,7 @@ from aiohttp import web
 from aiotools import apartial
 import attr
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo
 
@@ -60,7 +60,7 @@ async def rlim_middleware(
     if request['is_authorized']:
         rate_limit = request['keypair']['rate_limit']
         access_key = request['keypair']['access_key']
-        ret = await redis.execute_script(
+        ret = await redis_helper.execute_script(
             rr, 'ratelimit', _rlim_script,
             [access_key],
             [str(now), str(_rlim_window)],
@@ -95,14 +95,14 @@ class PrivateContext:
 async def init(app: web.Application) -> None:
     root_ctx: RootContext = app['_root.context']
     app_ctx: PrivateContext = app['ratelimit.context']
-    app_ctx.redis_rlim = redis.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_RLIM_DB)
+    app_ctx.redis_rlim = redis_helper.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_RLIM_DB)
     app_ctx.redis_rlim_script = \
-        await redis.execute(app_ctx.redis_rlim, lambda r: r.script_load(_rlim_script))
+        await redis_helper.execute(app_ctx.redis_rlim, lambda r: r.script_load(_rlim_script))
 
 
 async def shutdown(app: web.Application) -> None:
     app_ctx: PrivateContext = app['ratelimit.context']
-    await redis.execute(app_ctx.redis_rlim, lambda r: r.flushdb())
+    await redis_helper.execute(app_ctx.redis_rlim, lambda r: r.flushdb())
     await app_ctx.redis_rlim.close()
 
 

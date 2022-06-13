@@ -23,7 +23,7 @@ from dateutil.parser import parse as dtparse
 import sqlalchemy as sa
 import trafaret as t
 
-from ai.backend.common import redis, validators as tx
+from ai.backend.common import redis_helper, validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import (
     ALL_COMPLETED,
@@ -445,7 +445,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
                 pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
                 return pipe
 
-            await redis.execute(root_ctx.redis_stat, _pipe_builder)
+            await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
         else:
             # unsigned requests may be still accepted for public APIs
             pass
@@ -490,7 +490,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
                 pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
                 return pipe
 
-            await redis.execute(root_ctx.redis_stat, _pipe_builder)
+            await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
         else:
             # unsigned requests may be still accepted for public APIs
             pass

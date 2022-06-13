@@ -8,7 +8,7 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from redis.asyncio.sentinel import Sentinel
 
-from ai.backend.common.redis import execute
+from ai.backend.common.redis_helper import execute
 from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 from .types import RedisClusterInfo

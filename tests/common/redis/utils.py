@@ -21,7 +21,7 @@ from redis.asyncio import Redis
 from redis.exceptions import (
     AuthenticationError as RedisAuthenticationError,
     ConnectionError as RedisConnectionError,
-    TimeoutError as RedisTimeoutError
+    TimeoutError as RedisTimeoutError,
 )
 
 if TYPE_CHECKING:

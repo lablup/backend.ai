@@ -28,7 +28,7 @@ def wait_health_check(container_id):
 
 @pytest.fixture(scope='session')
 def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
-    # Spawn a single-node etcd container for a testing session. 
+    # Spawn a single-node etcd container for a testing session.
     etcd_allocated_port = 12379 + get_parallel_slot() * 10
     proc = subprocess.run(
         [

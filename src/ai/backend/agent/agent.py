@@ -57,7 +57,7 @@ from tenacity import (
 import time
 import zmq, zmq.asyncio
 
-from ai.backend.common import msgpack, redis
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import (
     ImageRef,
     MIN_KERNELSPEC,
@@ -542,8 +542,8 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
             db=4,
             log_events=self.local_config['debug']['log-events'],
         )
-        self.redis_stream_pool = redis.get_redis_object(self.local_config['redis'], db=4)
-        self.redis_stat_pool = redis.get_redis_object(self.local_config['redis'], db=0)
+        self.redis_stream_pool = redis_helper.get_redis_object(self.local_config['redis'], db=4)
+        self.redis_stat_pool = redis_helper.get_redis_object(self.local_config['redis'], db=0)
 
         self.zmq_ctx = zmq.asyncio.Context()
 
@@ -704,7 +704,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
                     while chunk_length >= chunk_size:
                         cb = chunk_buffer.getbuffer()
                         stored_chunk = bytes(cb[:chunk_size])
-                        await redis.execute(
+                        await redis_helper.execute(
                             self.redis_stream_pool,
                             lambda r: r.rpush(
                                 log_key, stored_chunk),
@@ -718,7 +718,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
                         chunk_buffer = next_chunk_buffer
             assert chunk_length < chunk_size
             if chunk_length > 0:
-                await redis.execute(
+                await redis_helper.execute(
                     self.redis_stream_pool,
                     lambda r: r.rpush(
                         log_key, chunk_buffer.getvalue()),
@@ -729,7 +729,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
         # This is just a safety measure to prevent memory leak in Redis
         # for cases when the event delivery has failed or processing
         # the log data has failed.
-        await redis.execute(
+        await redis_helper.execute(
             self.redis_stream_pool,
             lambda r: r.expire(log_key, 3600),
         )

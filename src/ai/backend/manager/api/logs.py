@@ -13,7 +13,7 @@ import sqlalchemy as sa
 import trafaret as t
 from typing import Any, TYPE_CHECKING, Tuple, MutableMapping
 
-from ai.backend.common import redis, validators as tx
+from ai.backend.common import redis_helper, validators as tx
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import AbstractEvent, EmptyEventArgs
 from ai.backend.common.logging import BraceStyleAdapter
@@ -250,7 +250,7 @@ async def init(app: web.Application) -> None:
     app_ctx.log_cleanup_timer_evh = root_ctx.event_dispatcher.consume(
         DoLogCleanupEvent, app, log_cleanup_task,
     )
-    app_ctx.log_cleanup_timer_redis = redis.get_redis_object(
+    app_ctx.log_cleanup_timer_redis = redis_helper.get_redis_object(
         root_ctx.shared_config.data['redis'],
         db=REDIS_LIVE_DB,
     )

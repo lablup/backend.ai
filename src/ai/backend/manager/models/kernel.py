@@ -31,7 +31,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.dialects import postgresql as pgsql
 
-from ai.backend.common import msgpack, redis
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
@@ -523,7 +523,7 @@ class KernelStatistics:
             return pipe
 
         stats = []
-        results = await redis.execute(ctx.redis_stat, _build_pipeline)
+        results = await redis_helper.execute(ctx.redis_stat, _build_pipeline)
         for result in results:
             if result is not None:
                 stats.append(msgpack.unpackb(result))
@@ -1534,7 +1534,7 @@ async def recalc_concurrency_used(
         result = await db_conn.execute(query)
         concurrency_used = result.first()[0]
 
-    await redis.execute(
+    await redis_helper.execute(
         redis_stat,
         lambda r: r.set(
             f'keypair.concurrency_used.{access_key}', concurrency_used,
