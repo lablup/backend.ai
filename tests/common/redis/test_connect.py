@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING
 
 import aiotools
 import pytest
-import redis.asyncio
 from redis.asyncio import Redis
 from redis.asyncio.sentinel import Sentinel, MasterNotFoundError, SlaveNotFoundError
 

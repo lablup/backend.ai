@@ -8,7 +8,6 @@ from typing import (
 
 import aiotools
 import pytest
-import redis.asyncio
 from redis.asyncio import Redis
 from redis.asyncio.client import PubSub
 from redis.exceptions import ConnectionError as RedisConnectionError, TimeoutError as RedisTimeoutError

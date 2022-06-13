@@ -12,7 +12,6 @@ from typing import (
 import aiotools
 from aiotools.context import aclosing
 import pytest
-import redis.asyncio
 from redis.asyncio import Redis
 from redis.asyncio.sentinel import Sentinel
 from redis.exceptions import ConnectionError as RedisConnectionError, TimeoutError as RedisTimeoutError
