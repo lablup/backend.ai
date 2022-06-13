@@ -4,7 +4,7 @@ import abc
 import asyncio
 import fcntl
 import logging
-from io import IOBase
+from io import BufferedReader, IOBase
 from pathlib import Path
 from typing import Any, Optional
 
@@ -30,6 +30,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 class AbstractDistributedLock(metaclass=abc.ABCMeta):
 
     def __init__(self, *, lifetime: Optional[float] = None) -> None:
+        assert lifetime is None or lifetime >= 0.0
         self._lifetime = lifetime
 
     @abc.abstractmethod
@@ -57,10 +58,11 @@ class FileLock(AbstractDistributedLock):
         debug: bool = False,
     ) -> None:
         super().__init__(lifetime=lifetime)
-        self._fp = None
+        self._fp: BufferedReader = None
         self._path = path
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
+        self._watchdog_task: Optional[asyncio.Task[Any]] = None
 
     @property
     def locked(self) -> bool:
@@ -87,6 +89,10 @@ class FileLock(AbstractDistributedLock):
                 with attempt:
                     fcntl.flock(self._fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     self._locked = True
+                    if self._lifetime is not None:
+                        self._watchdog_task = asyncio.create_task(
+                            self._watchdog_timer(ttl=self._lifetime)
+                        )
                     if self._debug:
                         log.debug("file lock acquired: {}", self._path)
         except RetryError:
@@ -94,6 +100,9 @@ class FileLock(AbstractDistributedLock):
 
     def release(self) -> None:
         assert self._fp is not None
+        if task := self._watchdog_task:
+            if not task.done():
+                task.cancel()
         if self._locked:
             fcntl.flock(self._fp, fcntl.LOCK_UN)
             self._locked = False
@@ -102,12 +111,25 @@ class FileLock(AbstractDistributedLock):
         self._fp.close()
         self._fp = None
 
-    async def __aenter__(self) -> None:
+    async def __aenter__(self) -> FileLock:
         await self.acquire()
+        return self
 
     async def __aexit__(self, *exc_info) -> bool | None:
         self.release()
         return None
+
+    async def _watchdog_timer(self, ttl: float):
+        await asyncio.sleep(ttl)
+        if self._locked:
+            fcntl.flock(self._fp, fcntl.LOCK_UN)
+            self._locked = False
+            if self._debug:
+                log.debug(f"file lock implicitly released by watchdog: {self._path}")
+
+    @property
+    def is_locked(self) -> bool:
+        return self._locked
 
 
 class EtcdLock(AbstractDistributedLock):
