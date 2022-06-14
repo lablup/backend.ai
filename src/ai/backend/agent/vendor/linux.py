@@ -41,8 +41,23 @@ class libnuma:
                     data = await resp.json()
                     return {idx for idx in range(data['NCPU'])}
         except aiohttp.ClientError:
+            file_path = os.path.join("/sys/devices/system/cpu/cpu0/topology/thread_siblings_list")
+            cpu_count = os.cpu_count()
+            num_htSiblings = 0
             try:
-                return os.sched_getaffinity(os.getpid())
+                with open(file_path) as siblings:
+                    htSiblings = len(siblings.read().split(','))
+                    if cpu_count is not None:
+                        num_htSiblings = cpu_count // htSiblings
+            except (IOError, OSError) as e:
+                raise Exception(
+                    "{}\nCould not read thread siblings list".format(e))
+            try:
+                restricted_pid_cpu = os.sched_getaffinity(os.getpid())
+                for cpu in list(restricted_pid_cpu):
+                    if cpu > num_htSiblings - 1:
+                        restricted_pid_cpu.discard(cpu)
+                return restricted_pid_cpu
             except AttributeError:
                 return {idx for idx in range(os.cpu_count())}
 
