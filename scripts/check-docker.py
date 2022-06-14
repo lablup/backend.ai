@@ -1,8 +1,8 @@
 import functools
-import json
 import re
 import subprocess
 import sys
+import os
 from pathlib import Path
 from urllib.parse import quote
 
@@ -72,6 +72,41 @@ def fail_with_compose_install_request():
     sys.exit(1)
 
 
+# Whatever is guessed above can be overridden in /usr/lib/os-release by derivatives
+def get_os_release():
+    distinfo = {}
+    os_release = os.environ.get('LSB_OS_RELEASE', '/usr/lib/os-release')
+    if os.path.exists(os_release):
+        try:
+            with open(os_release) as os_release_file:
+                for line in os_release_file:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    # Skip invalid lines
+                    if not '=' in line:
+                        continue
+                    var, arg = line.split('=', 1)
+                    if arg.startswith('"') and arg.endswith('"'):
+                        arg = arg[1:-1]
+                    if arg: # Ignore empty arguments
+                        # Concert os-release to lsb-release-style
+                        if var == 'VERSION_ID':
+                            # It'll ignore point-releases
+                            distinfo['RELEASE'] = arg.strip()
+                        elif var == 'VERSION_CODENAME':
+                            distinfo['CODENAME'] = arg.strip()
+                        elif var == 'ID':
+                            # ID=debian
+                            distinfo['ID'] = arg.strip().title()
+                        elif var == 'PRETTY_NAME':
+                            distinfo['DESCRIPTION'] = arg.strip()
+        except IOError as msg:
+            print('Unable to open ' + os_release + ':', str(msg), file=sys.stderr)
+            exit(1)
+
+    return distinfo
+
 def main():
     requests_unixsocket.monkeypatch()
 
@@ -87,20 +122,34 @@ def main():
         else:
             fail_with_system_docker_install_request()
 
-    try:
-        proc = run(['docker', 'compose', 'version'], capture_output=True, check=True)
-    except subprocess.CalledProcessError as e:
-        fail_with_compose_install_request()
-    else:
-        m = re.search(r'\d+\.\d+\.\d+', proc.stdout.decode())
-        if m is None:
-            log("Failed to retrieve the docker-compose version!")
-            sys.exit(1)
+    if sys.platform.startswith('linux') and 'suse' in get_os_release()['ID'].lower():
+        try:
+            proc = run(['docker-compose', 'version'], capture_output=True, check=True)
+        except subprocess.CalledProcessError as e:
+            fail_with_compose_install_request()
         else:
-            compose_version = m.group(0)
-            log(f"Detected docker-compose installation ({compose_version})")
-            if parse_version(compose_version) < (2, 0, 0):
-                fail_with_compose_install_request()
+            m = re.search(r'\d+\.\d+\.\d+', proc.stdout.decode())
+            if m is None:
+                log("Failed to retrieve the docker-compose version!")
+                sys.exit(1)
+            else:
+                compose_version = m.group(0)
+                log(f"Detected docker-compose installation ({compose_version})")
+                if parse_version(compose_version) < (2, 0, 0):
+                    fail_with_compose_install_request()
+    else:
+        try:
+            proc = run(['docker', 'compose', 'version'], capture_output=True, check=True)
+        except subprocess.CalledProcessError as e:
+            m = re.search(r'\d+\.\d+\.\d+', proc.stdout.decode())
+            if m is None:
+                log("Failed to retrieve the docker-compose version!")
+                sys.exit(1)
+            else:
+                compose_version = m.group(0)
+                log(f"Detected docker-compose installation ({compose_version})")
+                if parse_version(compose_version) < (2, 0, 0):
+                    fail_with_compose_install_request()
 
     # Now we can proceed with the given docker & docker-compose installation.
 

@@ -161,6 +161,8 @@ elif [ -f /etc/redhat-release -o "$DISTRO" == "RedHat" -o "$DISTRO" == "CentOS" 
   DISTRO="RedHat"
 elif [ -f /etc/system-release -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+elif [ -f /usr/lib/os-release -o "$DISTRO" == "SUSE" ]; then
+  DISTRO="SUSE"
 else
   show_error "Sorry, your host OS distribution is not supported by this script."
   show_info "Please send us a pull request or file an issue to support your environment!"
@@ -261,6 +263,10 @@ install_script_deps() {
     $sudo yum clean expire-cache  # next yum invocation will update package metadata cache
     $sudo yum install -y git jq gcc make gcc-c++
     ;;
+  SUSE)
+    $sudo zypper update
+    $sudo zypper install -y git jq gcc make gcc-c++
+    ;;
   Darwin)
     if ! type "brew" >/dev/null 2>&1; then
       show_error "brew is not available!"
@@ -281,6 +287,9 @@ install_pybuild_deps() {
     ;;
   RedHat)
     $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel sqlite-devel libffi-devel xz-devel
+    ;;
+  SUSE)
+    $sudo zypper install -y openssl-devel readline-devel gdbm-devel zlib-devel libbz2-devel sqlite3-devel libffi-devel xz-devel
     ;;
   Darwin)
     brew install openssl
@@ -306,6 +315,9 @@ install_git_lfs() {
     curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | $sudo bash
     $sudo yum install -y git-lfs
     ;;
+  SUSE)
+    $sudo zypper install -y git-lfs
+    ;;
   Darwin)
     brew install git-lfs
     ;;
@@ -321,6 +333,9 @@ install_system_pkg() {
     ;;
   RedHat)
     $sudo yum install -y $2
+    ;;
+  SUSE)
+    $sudo zypper install -y $2
     ;;
   Darwin)
     brew install $3
@@ -562,8 +577,16 @@ sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.
 sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
 mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
 mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
-$docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
-$docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
+case $DISTRO in
+  SUSE)
+    $docker_sudo docker-compose -f "docker-compose.halfstack.current.yml" up -d
+    $docker_sudo docker-compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
+    ;;
+  *)
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
+    ;;
+esac
 
 check_snappy() {
   pip download python-snappy
@@ -661,7 +684,14 @@ show_info "Setting up virtual folder..."
 mkdir -p "${ROOT_PATH}/${VFOLDER_REL_PATH}"
 ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
 mkdir -p scratches
-POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
+case $DISTRO in
+  SUSE)
+    POSTGRES_CONTAINER_ID=$($docker_sudo docker-compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
+    ;;
+  *)
+    POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
+    ;;
+esac
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
@@ -769,9 +799,23 @@ echo " "
 echo "${GREEN}Development environment is now ready.${NC}"
 show_note "How to run docker-compose:"
 if [ ! -z "$docker_sudo" ]; then
-  echo "    > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+  case $DISTRO in
+    SUSE)
+      echo "    > ${WHITE}${docker_sudo} docker-compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+      ;;
+    *)
+      echo "    > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+      ;;
+  esac
 else
-  echo "    > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+  case $DISTRO in
+    SUSE)
+      echo "    > ${WHITE}docker-compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+      ;;
+    *)
+      echo "    > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+      ;;
+  esac
 fi
 show_note "How to reset this setup:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
