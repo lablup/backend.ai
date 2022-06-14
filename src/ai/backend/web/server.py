@@ -540,7 +540,7 @@ async def server_main(
         socket_keepalive_options=keepalive_options,
     )
     # FIXME: remove after aio-libs/aiohttp-session#704 is merged
-    app['aioredis_legacy'] = await AioRedisLegacy.from_url(
+    aioredis_legacy_client = await AioRedisLegacy.from_url(
         str(redis_url),
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
@@ -550,8 +550,8 @@ async def server_main(
         await app['redis'].flushdb()
         log.info('flushed session storage.')
     redis_storage = RedisStorage(
-        # FIXME: replace to 'redis' after aio-libs/aiohttp-session#704 is merged
-        app['aioredis_legacy'],
+        # FIXME: replace to app['redis'] after aio-libs/aiohttp-session#704 is merged
+        aioredis_legacy_client,
         max_age=config['session']['max_age'])
 
     setup_session(app, redis_storage)
