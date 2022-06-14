@@ -3,7 +3,6 @@ import contextlib
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import signal
 from typing import (
@@ -196,10 +195,10 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
 
             p = await simple_run_cmd(
                 [
-                    'docker', 'inspect', *cids
+                    'docker', 'inspect', *cids,
                 ],
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.DEVNULL
+                stderr=asyncio.subprocess.DEVNULL,
             )
 
             assert p.stdout is not None
@@ -215,7 +214,6 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
 
             for container in inspect_output:
                 cid_mapping[container['Config']['Labels']['com.docker.compose.service']] = container['Id']
-
 
             yield RedisClusterInfo(
                 node_addrs=[
@@ -249,17 +247,17 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                     DockerRedisNode(
                         "sentinel",
                         ports['REDIS_SENTINEL1_PORT'],
-                        cid_mapping['backendai-half-redis-sentinel01']
+                        cid_mapping['backendai-half-redis-sentinel01'],
                     ),
                     DockerRedisNode(
                         "sentinel",
                         ports['REDIS_SENTINEL2_PORT'],
-                        cid_mapping['backendai-half-redis-sentinel02']
+                        cid_mapping['backendai-half-redis-sentinel02'],
                     ),
                     DockerRedisNode(
                         "sentinel",
                         ports['REDIS_SENTINEL3_PORT'],
-                        cid_mapping['backendai-half-redis-sentinel03']
+                        cid_mapping['backendai-half-redis-sentinel03'],
                     ),
                 ],
             )
