@@ -26,15 +26,15 @@ Install the followings accordingly to your host operating system.
 
   - Ensure that you have the Python version specified in ``pants.toml`` on your ``PATH``.
 
-  - Depend on your Linux Distributions, the distribution's system pip is required.
+  - Depending on your Linux Distribution, you may have to additionally install a sysmte package that enables Python's `pip` command.
 
-    * Ubuntu - If you have no pip package, install ``python3-pip`` package.
+    * Ubuntu
 
       .. code-block:: console
 
          $ sudo apt install python3-pip
 
-    * Fedora Core & CentOS - If you have no pip package, install ``python3-pip`` package.
+    * Fedora Core & CentOS
 
       .. code-block:: console
 
