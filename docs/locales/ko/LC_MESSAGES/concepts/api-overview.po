@@ -88,7 +88,7 @@ msgid ""
 msgstr ""
 "공용 클라우드 서비스 (``api.backend.ai``)는 현재 사용자에게 어떠한 관리자 권"
 "한을 제공하지 않습니다.이미 `cloud.backend.ai <https://cloud.backend.ai>`_ 에"
-"서 매니저 콘솔을 통해 충분히 기능을사용할 수 있기 때문입니다."
+"서 매니저 콘솔을 통해 충분히 기능을 사용할 수 있기 때문입니다."
 
 #: ../../concepts/api-overview.rst:29 c8d3db15a5a34bc5b06d72d03ade7c79
 msgid ""
