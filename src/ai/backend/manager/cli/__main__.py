@@ -164,12 +164,12 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                 delete_count = 0
                 async with redis_ctx(cli_ctx) as redis_conn_set:
 
-                    def _build_pipe(
+                    async def _build_pipe(
                         r: Redis,
                         kernel_ids: list[str],
                     ) -> Pipeline:
                         pipe = r.pipeline(transaction=False)
-                        pipe.delete(*kernel_ids)
+                        await pipe.delete(*kernel_ids)
                         return pipe
 
                     if len(target_kernels) > 0:

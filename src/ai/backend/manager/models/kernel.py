@@ -516,10 +516,10 @@ class KernelStatistics:
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
 
-        def _build_pipeline(redis: Redis) -> Pipeline:
+        async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
             for sess_id in session_ids:
-                pipe.get(str(sess_id))
+                await pipe.get(str(sess_id))
             return pipe
 
         stats = []

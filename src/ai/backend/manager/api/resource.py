@@ -335,10 +335,10 @@ async def get_container_stats_for_period(request: web.Request, start_date, end_d
         result = await conn.execute(query)
         rows = result.fetchall()
 
-    def _pipe_builder(r: Redis) -> RedisPipeline:
+    async def _pipe_builder(r: Redis) -> RedisPipeline:
         pipe = r.pipeline()
         for row in rows:
-            pipe.get(str(row['id']))
+            await pipe.get(str(row['id']))
         return pipe
 
     raw_stats = await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)

@@ -441,8 +441,8 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             async def _pipe_builder(r: Redis) -> RedisPipeline:
                 pipe = r.pipeline()
                 num_queries_key = f'kp:{access_key}:num_queries'
-                pipe.incr(num_queries_key)
-                pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
+                await pipe.incr(num_queries_key)
+                await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
                 return pipe
 
             await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
@@ -486,8 +486,8 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             async def _pipe_builder(r: Redis) -> RedisPipeline:
                 pipe = r.pipeline()
                 num_queries_key = f'kp:{access_key}:num_queries'
-                pipe.incr(num_queries_key)
-                pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
+                await pipe.incr(num_queries_key)
+                await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
                 return pipe
 
             await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)

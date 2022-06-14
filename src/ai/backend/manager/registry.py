@@ -25,9 +25,11 @@ from typing import (
     Sequence,
     Tuple,
     TYPE_CHECKING,
+    TypeAlias,
     Union,
     cast,
 )
+import typing
 import uuid
 import weakref
 
@@ -143,6 +145,7 @@ if TYPE_CHECKING:
         PendingSession,
     )
 
+MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 __all__ = ['AgentRegistry', 'InstanceNotFound']
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.registry'))
@@ -1693,19 +1696,19 @@ class AgentRegistry:
         kp_key = 'keypair.concurrency_used'
 
         async def _update(r: Redis):
-            updates: Mapping[str, int] = \
+            updates = \
                 {f'{kp_key}.{k}': concurrency_used_per_key[k] for k in concurrency_used_per_key}
             if updates:
-                await r.mset(updates)
+                await r.mset(typing.cast(MSetType, updates))
 
         async def _update_by_fullscan(r: Redis):
-            updates: Dict[str, int] = {}
+            updates = {}
             keys = await r.keys(f'{kp_key}.*')
             for ak in keys:
                 usage = concurrency_used_per_key.get(ak, 0)
                 updates[f'{kp_key}.{ak}'] = usage
             if updates:
-                await r.mset(updates)
+                await r.mset(typing.cast(MSetType, updates))
 
         if do_fullscan:
             await redis_helper.execute(
@@ -2486,11 +2489,11 @@ class AgentRegistry:
             known_registries = await get_known_registries(self.shared_config.etcd)
             loaded_images = msgpack.unpackb(snappy.decompress(agent_info['images']))
 
-            def _pipe_builder(r: Redis):
+            async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 for image in loaded_images:
                     image_ref = ImageRef(image[0], known_registries, agent_info['architecture'])
-                    pipe.sadd(image_ref.canonical, agent_id)
+                    await pipe.sadd(image_ref.canonical, agent_id)
                 return pipe
             await redis_helper.execute(self.redis_image, _pipe_builder)
 
@@ -2505,7 +2508,7 @@ class AgentRegistry:
         async def _pipe_builder(r: Redis):
             pipe = r.pipeline()
             async for imgname in r.scan_iter():
-                pipe.srem(imgname, agent_id)
+                await pipe.srem(imgname, agent_id)
             return pipe
 
         async def _update() -> None:

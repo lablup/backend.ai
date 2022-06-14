@@ -343,10 +343,10 @@ class StatContext:
         serialized_agent_updates = msgpack.packb(redis_agent_updates)
 
         async def _pipe_builder(r: Redis):
-            async with r.pipeline() as pipe:
-                pipe.set(self.agent.local_config['agent']['id'], serialized_agent_updates)
-                pipe.expire(self.agent.local_config['agent']['id'], self.cache_lifespan)
-                await pipe.execute()
+            pipe = r.pipeline()
+            await pipe.set(self.agent.local_config['agent']['id'], serialized_agent_updates)
+            await pipe.expire(self.agent.local_config['agent']['id'], self.cache_lifespan)
+            return pipe
 
         await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
 
@@ -425,7 +425,7 @@ class StatContext:
                                 kernel_id, serializable_metrics)
                     serialized_metrics = msgpack.packb(serializable_metrics)
 
-                    pipe.set(str(kernel_id), serialized_metrics)
-                    await pipe.execute()
+                    await pipe.set(str(kernel_id), serialized_metrics)
+                    return pipe
 
         await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
