@@ -23,6 +23,7 @@ from aiohttp import web
 import aiohttp_cors
 from aiohttp_session import get_session, setup as setup_session
 from aiohttp_session.redis_storage import RedisStorage
+from aioredis import Redis as AioRedisLegacy
 import aiotools
 import click
 import jinja2
@@ -538,12 +539,19 @@ async def server_main(
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
     )
+    # FIXME: remove after aio-libs/aiohttp-session#704 is merged
+    app['aioredis_legacy'] = await AioRedisLegacy.from_url(
+        str(redis_url),
+        socket_keepalive=True,
+        socket_keepalive_options=keepalive_options,
+    )
 
     if pidx == 0 and config['session'].get('flush_on_startup', False):
         await app['redis'].flushdb()
         log.info('flushed session storage.')
     redis_storage = RedisStorage(
-        app['redis'],
+        # FIXME: replace to 'redis' after aio-libs/aiohttp-session#704 is merged
+        app['aioredis_legacy'],
         max_age=config['session']['max_age'])
 
     setup_session(app, redis_storage)
