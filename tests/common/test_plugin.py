@@ -1,8 +1,13 @@
 import asyncio
 import functools
+from dataclasses import dataclass
 from typing import (
     Any,
+    Callable,
+    Iterator,
     Mapping,
+    Type,
+    overload,
 )
 from unittest.mock import AsyncMock
 
@@ -39,27 +44,74 @@ class DummyPlugin(AbstractPlugin):
         pass
 
 
+@dataclass
 class DummyEntrypoint:
 
-    def __init__(self, name: str, load_result: Any) -> None:
-        self.name = name
-        self._load_result = load_result
+    name: str
+    load_result: Type[AbstractPlugin] | Callable[..., AbstractPlugin]
+    value: str = "dummy.mod.DummyPlugin"
+    group: str = "dummy_group_v00"
 
-    def load(self) -> Any:
-        return self._load_result
+    def load(self):
+        return self.load_result
 
 
-def mock_entrypoints_with_instance(plugin_group_name: str, *, mocked_plugin):
+def mock_entrypoints_with_instance(
+    plugin_group_name: str,
+    blocklist: set[str] = None,
+    *,
+    mocked_plugin,
+):
     # Since mocked_plugin is already an instance constructed via AsyncMock,
     # we emulate the original constructor using a lambda fucntion.
-    yield DummyEntrypoint('dummy', lambda plugin_config, local_config: mocked_plugin)
+    yield DummyEntrypoint(
+        name='dummy',
+        group=plugin_group_name,
+        load_result=lambda plugin_config, local_config: mocked_plugin,
+    )
 
 
-def mock_entrypoints_with_class(plugin_group_name: str, *, plugin_cls):
+@overload
+def mock_entrypoints_with_class(
+    plugin_group_name: str,
+    blocklist: set[str] = None,
+    *,
+    plugin_cls: list[Type[AbstractPlugin]],
+) -> Iterator[DummyEntrypoint]:
+    ...
+
+
+@overload
+def mock_entrypoints_with_class(
+    plugin_group_name: str,
+    blocklist: set[str] = None,
+    *,
+    plugin_cls: Type[AbstractPlugin],
+) -> DummyEntrypoint:
+    ...
+
+
+def mock_entrypoints_with_class(
+    plugin_group_name: str,
+    blocklist: set[str] = None,
+    *,
+    plugin_cls,
+):
     if isinstance(plugin_cls, list):
-        yield from (DummyEntrypoint(getattr(p, '_entrypoint_name', 'dummy'), p) for p in plugin_cls)
+        yield from (
+            DummyEntrypoint(
+                getattr(p, '_entrypoint_name', 'dummy'),
+                group=plugin_group_name,
+                load_result=p,
+            )
+            for p in plugin_cls
+        )
     else:
-        yield DummyEntrypoint('dummy', plugin_cls)
+        yield DummyEntrypoint(
+            'dummy',
+            group=plugin_group_name,
+            load_result=plugin_cls,
+        )
 
 
 @pytest.mark.asyncio
@@ -68,7 +120,7 @@ async def test_plugin_context_init_cleanup(etcd, mocker):
     mocked_plugin = AsyncMock(DummyPlugin)
     mocked_entrypoints = functools.partial(mock_entrypoints_with_instance,
                                            mocked_plugin=mocked_plugin)
-    mocker.patch('ai.backend.common.plugin.pkg_resources.iter_entry_points', mocked_entrypoints)
+    mocker.patch('ai.backend.common.plugin.scan_entrypoints', mocked_entrypoints)
     ctx = BasePluginContext(etcd, {})
     try:
         assert not ctx.plugins
@@ -83,7 +135,7 @@ async def test_plugin_context_init_cleanup(etcd, mocker):
 @pytest.mark.asyncio
 async def test_plugin_context_config(etcd, mocker):
     mocked_entrypoints = functools.partial(mock_entrypoints_with_class, plugin_cls=DummyPlugin)
-    mocker.patch('ai.backend.common.plugin.pkg_resources.iter_entry_points', mocked_entrypoints)
+    mocker.patch('ai.backend.common.plugin.scan_entrypoints', mocked_entrypoints)
     await etcd.put('config/plugins/XXX/dummy/etcd-key', 'etcd-value')
     ctx = BasePluginContext(
         etcd,
@@ -105,7 +157,7 @@ async def test_plugin_context_config_autoupdate(etcd, mocker):
     mocked_plugin = AsyncMock(DummyPlugin)
     mocked_entrypoints = functools.partial(mock_entrypoints_with_instance,
                                            mocked_plugin=mocked_plugin)
-    mocker.patch('ai.backend.common.plugin.pkg_resources.iter_entry_points', mocked_entrypoints)
+    mocker.patch('ai.backend.common.plugin.scan_entrypoints', mocked_entrypoints)
     await etcd.put_prefix('config/plugins/XXX/dummy', {'a': '1', 'b': '2'})
     ctx = BasePluginContext(
         etcd,
@@ -223,7 +275,7 @@ async def test_hook_dispatch(etcd, mocker):
         mock_entrypoints_with_class,
         plugin_cls=[DummyHookPassingPlugin, DummyHookRejectingPlugin, DummyHookErrorPlugin],
     )
-    mocker.patch('ai.backend.common.plugin.pkg_resources.iter_entry_points', mocked_entrypoints)
+    mocker.patch('ai.backend.common.plugin.scan_entrypoints', mocked_entrypoints)
     ctx = HookPluginContext(etcd, {})
     try:
         await ctx.init()
@@ -279,7 +331,7 @@ async def test_hook_notify(etcd, mocker):
         mock_entrypoints_with_class,
         plugin_cls=[DummyHookPassingPlugin, DummyHookRejectingPlugin, DummyHookErrorPlugin],
     )
-    mocker.patch('ai.backend.common.plugin.pkg_resources.iter_entry_points', mocked_entrypoints)
+    mocker.patch('ai.backend.common.plugin.scan_entrypoints', mocked_entrypoints)
     ctx = HookPluginContext(etcd, {})
     try:
         await ctx.init()

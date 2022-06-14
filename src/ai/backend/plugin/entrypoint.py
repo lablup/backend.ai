@@ -1,33 +1,59 @@
 import ast
+import configparser
 import itertools
 import logging
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
-from typing import Container, Iterator, Optional
+from typing import Iterator, Optional
 
 log = logging.getLogger(__name__)
 
 
 def scan_entrypoints(
     group_name: str,
-    blocklist: Container[str] = None,
+    blocklist: Optional[set[str]] = None,
 ) -> Iterator[EntryPoint]:
     if blocklist is None:
         blocklist = set()
     existing_names: dict[str, EntryPoint] = {}
     for entrypoint in itertools.chain(
         scan_entrypoint_from_buildscript(group_name),
+        scan_entrypoint_from_plugin_checkouts(group_name),
         scan_entrypoint_from_package_metadata(group_name),
     ):
-        if entrypoint.name in blocklist:
+        if match_blocklist(entrypoint.value, blocklist):
             continue
-        if existing_entrypoint := existing_names.get(entrypoint.name):
-            raise RuntimeError(
-                f"Detected a duplicate plugin entrypoint name {entrypoint.name!r} "
-                f"from {existing_entrypoint.value} and {entrypoint.value}",
-            )
+        if existing_entrypoint := existing_names.get(entrypoint.name, None):
+            if existing_entrypoint.value == entrypoint.value:
+                # Allow if the same plugin is scanned multiple times.
+                # This may happen if:
+                # - A plugin is installed via `./py -m pip install -e ...`
+                # - The unified venv is re-exported *without* `./py -m pip uninstall ...`.
+                # - Adding PYTHONPATH with plugin src directories in `./py` results in
+                #   *duplicate* scan results from the remaining `.egg-info` directory (pkg metadata)
+                #   and the `setup.cfg` scan results.
+                # TODO: compare the plugin versions as well? (need to remember version with entrypoints)
+                continue
+            else:
+                raise RuntimeError(
+                    f"Detected a duplicate plugin entrypoint name {entrypoint.name!r} "
+                    f"from {existing_entrypoint.value} and {entrypoint.value}",
+                )
         existing_names[entrypoint.name] = entrypoint
         yield entrypoint
+
+
+def match_blocklist(entry_path: str, blocklist: set[str]) -> bool:
+    """
+    Checks if the given module attribute reference is in the blocklist.
+    The blocklist items are assumeed to be prefixes of package import paths
+    or the package namespaces.
+    """
+    mod_path = entry_path.partition(":")[0]
+    for block_pattern in blocklist:
+        if mod_path.startswith(block_pattern + ".") or mod_path == block_pattern:
+            return True
+    return False
 
 
 def scan_entrypoint_from_package_metadata(group_name: str) -> Iterator[EntryPoint]:
@@ -40,7 +66,6 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     ai_backend_ns_path = Path(__file__).parent.parent
     log.debug("scan_entrypoint_from_buildscript(%r): Namespace path: %s", group_name, ai_backend_ns_path)
     for buildscript_path in ai_backend_ns_path.glob("**/BUILD"):
-        log.debug("reading entry points [%s] from %s", group_name, buildscript_path)
         for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
             entrypoints[entrypoint.name] = entrypoint
     # Override with the entrypoints found in the current source directories,
@@ -50,15 +75,32 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
         pass
     else:
         src_path = build_root / 'src'
-        plugins_path = build_root / 'plugins'
         log.debug("scan_entrypoint_from_buildscript(%r): current src: %s", group_name, src_path)
         for buildscript_path in src_path.glob("**/BUILD"):
-            if buildscript_path.is_relative_to(plugins_path):
-                # Prevent loading BUILD files in plugin checkouts if they use Pants on their own.
-                continue
-            log.debug("reading entry points [%s] from %s", group_name, buildscript_path)
             for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
                 entrypoints[entrypoint.name] = entrypoint
+    yield from entrypoints.values()
+
+
+def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoint]:
+    entrypoints = {}
+    try:
+        build_root = find_build_root()
+    except ValueError:
+        pass
+    else:
+        plugins_path = build_root / 'plugins'
+        log.debug("scan_entrypoint_from_plugin_checkouts(%r): plugin parent dir: %s", group_name, plugins_path)
+        # For cases when plugins use Pants
+        for buildscript_path in plugins_path.glob("**/BUILD"):
+            for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
+                entrypoints[entrypoint.name] = entrypoint
+        # For cases when plugins use standard setup.cfg
+        for setup_cfg_path in plugins_path.glob("**/setup.cfg"):
+            for entrypoint in extract_entrypoints_from_setup_cfg(group_name, setup_cfg_path):
+                if entrypoint.name not in entrypoints:
+                    entrypoints[entrypoint.name] = entrypoint
+        # TODO: implement pyproject.toml scanner
     yield from entrypoints.values()
 
 
@@ -97,3 +139,24 @@ def extract_entrypoints_from_buildscript(
                                 yield EntryPoint(name=name, value=ref, group=group_name)
                             except ValueError:
                                 pass
+
+
+def extract_entrypoints_from_setup_cfg(
+    group_name: str,
+    setup_cfg_path: Path,
+) -> Iterator[EntryPoint]:
+    cfg = configparser.ConfigParser()
+    cfg.read(setup_cfg_path)
+    raw_data = cfg.get('options.entry_points', group_name, fallback="").strip()
+    if not raw_data:
+        return
+    data = {
+        k.strip(): v.strip()
+        for k, v in (
+            line.split("=", maxsplit=1)
+            for line in
+            raw_data.splitlines()
+        )
+    }
+    for name, ref in data.items():
+        yield EntryPoint(name=name, value=ref, group=group_name)

@@ -24,23 +24,23 @@ msgstr "자주 묻는 질문"
 
 #: ../../concepts/faq.rst:5 41ed1678129946219caa33a52fbbc02e
 msgid "vs. Notebooks"
-msgstr ""
+msgstr "vs. Notebooks"
 
 #: ../../concepts/faq.rst:9 ../../concepts/faq.rst:26 ../../concepts/faq.rst:47
 #: 79105172721e4098a6d25ad4e039fb0e 99950a9acda8452eaffe27fcc30be06f
 #: c4e968ca8763497aba424dfe7f1ead7c
 msgid "Product"
-msgstr ""
+msgstr "Product"
 
 #: ../../concepts/faq.rst:10 ../../concepts/faq.rst:48
 #: 4142161b719541aab385b8b9476f2ff5 d505e1d8df484222bc733ea135673e36
 msgid "Role"
-msgstr ""
+msgstr "Role"
 
 #: ../../concepts/faq.rst:11 ../../concepts/faq.rst:49
 #: 6a524bc6c58d47d5995b3c688eaa7eaa f73422c6ae7845df94b0d9f79fff906c
 msgid "Problem and Solution"
-msgstr ""
+msgstr "Problem and Solution"
 
 #: ../../concepts/faq.rst:13 0959e18cbd42458e90d894552006ceb9
 msgid "Apache Zeppelin, Jupyter Notebook"
@@ -48,11 +48,11 @@ msgstr "Apache Zeppelin, Jupyter Notebook"
 
 #: ../../concepts/faq.rst:14 f7b972764a1345f6841972b102b00230
 msgid "Notebook-style document + code *frontends*"
-msgstr ""
+msgstr "Notebook-style document + code *frontends*"
 
 #: ../../concepts/faq.rst:15 3b95e0e752e44d35879aedc91c740e83
 msgid "Insecure host resource sharing"
-msgstr ""
+msgstr "Insecure host resource sharing"
 
 #: ../../concepts/faq.rst:17 ../../concepts/faq.rst:34
 #: ../../concepts/faq.rst:59 141096fc36e74ac2b75538d6ac114806
@@ -62,23 +62,23 @@ msgstr "**Backend.AI**"
 
 #: ../../concepts/faq.rst:18 46cfa7de594e4e388da2d1d143e0576a
 msgid "Pluggable *backend* to any frontends"
-msgstr ""
+msgstr "Pluggable *backend* to any frontends"
 
 #: ../../concepts/faq.rst:19 ec2b4bf5c7c94c0d86df38e32552dcdb
 msgid "Built for multi-tenancy: scalable and better isolation"
-msgstr ""
+msgstr "Built for multi-tenancy: scalable and better isolation"
 
 #: ../../concepts/faq.rst:22 afd7dfbcfde74ba4a1d5dcec662f60f1
 msgid "vs. Orchestration Frameworks"
-msgstr ""
+msgstr "vs. Orchestration Frameworks"
 
 #: ../../concepts/faq.rst:27 5a961b4114694a57857120bc2d78e6b6
 msgid "Target"
-msgstr ""
+msgstr "Target"
 
 #: ../../concepts/faq.rst:28 d641399d41144159940477ce36bb08ec
 msgid "Value"
-msgstr ""
+msgstr "Value"
 
 #: ../../concepts/faq.rst:30 47860450a24246cc9c649c1da474e02c
 msgid "Amazon ECS, Kubernetes"
@@ -86,19 +86,19 @@ msgstr "Amazon ECS, Kubernetes"
 
 #: ../../concepts/faq.rst:31 76cf1c529c534ab6949a62e87f66ea8b
 msgid "Long-running service daemons"
-msgstr ""
+msgstr "Long-running service daemons"
 
 #: ../../concepts/faq.rst:32 e35c4de5610043b2ab0602d9329e4da9
 msgid "Load balancing, fault tolerance, incremental deployment"
-msgstr ""
+msgstr "Load balancing, fault tolerance, incremental deployment"
 
 #: ../../concepts/faq.rst:35 4348c99fed4047a8bc6a9fe2188c687d
 msgid "Stateful compute sessions"
-msgstr ""
+msgstr "Stateful compute sessions"
 
 #: ../../concepts/faq.rst:36 fcaeed5b0b9349438a4a86331b3c2acb
 msgid "Low-cost high-density computation"
-msgstr ""
+msgstr "Low-cost high-density computation"
 
 #: ../../concepts/faq.rst:38 93692148af6c47c088134290b9ce466c
 msgid "Amazon Lambda, Azure Functions"
@@ -106,15 +106,15 @@ msgstr "Amazon Lambda, Azure Functions"
 
 #: ../../concepts/faq.rst:39 50c067754b574c058844f32914dd7085
 msgid "Stateless, light-weight functions"
-msgstr ""
+msgstr "Stateless, light-weight functions"
 
 #: ../../concepts/faq.rst:40 bb57ffa3fb7741f99fa3a01d04bfc762
 msgid "Serverless, zero-management"
-msgstr ""
+msgstr "Serverless, zero-management"
 
 #: ../../concepts/faq.rst:43 53259dfd98fe4c4691133716b9e3a9a5
 msgid "vs. Big-data and AI Frameworks"
-msgstr ""
+msgstr "vs. Big-data and AI Frameworks"
 
 #: ../../concepts/faq.rst:51 41d2326e38054e3186f0661a22e98b8a
 msgid "TensorFlow, Apache Spark, Apache Hive"
@@ -122,11 +122,11 @@ msgstr "TensorFlow, Apache Spark, Apache Hive"
 
 #: ../../concepts/faq.rst:52 50c0bfbd3bb34719b1ecc10b9237218b
 msgid "Computation runtime"
-msgstr ""
+msgstr "Computation runtime"
 
 #: ../../concepts/faq.rst:53 dfe9a11366b246a39256df99fb48f864
 msgid "Difficult to install, configure, and operate"
-msgstr ""
+msgstr "Difficult to install, configure, and operate"
 
 #: ../../concepts/faq.rst:55 1072859cbf934c16ad754bfdf61ba2b3
 msgid "Amazon ML, Azure ML, GCP ML"
@@ -134,22 +134,22 @@ msgstr "Amazon ML, Azure ML, GCP ML"
 
 #: ../../concepts/faq.rst:56 d553672f76ec401a96d02d8bfa8f5eb6
 msgid "Managed MLaaS"
-msgstr ""
+msgstr "Managed MLaaS"
 
 #: ../../concepts/faq.rst:57 d1d25c7f372d441cb390f37794fdd9fc
 msgid "Still complicated for scientists, too restrictive for engineers"
-msgstr ""
+msgstr "Still complicated for scientists, too restrictive for engineers"
 
 #: ../../concepts/faq.rst:60 dd9a52d91cee4bf29a1553cd7e53ba73
 msgid "Host of computation runtimes"
-msgstr ""
+msgstr "Host of computation runtimes"
 
 #: ../../concepts/faq.rst:61 2b9ad00a67f0432b914e2988198057fb
 msgid "Pre-configured, versioned, reproducible, customizable (open-source)"
-msgstr ""
+msgstr "Pre-configured, versioned, reproducible, customizable (open-source)"
 
 #: ../../concepts/faq.rst:64 a6a10cdb687c43e0a2dc4477e7d0b8d9
 msgid ""
 "(All product names and trade-marks are the properties of their respective "
 "owners.)"
-msgstr ""
+msgstr "(모든 상품명과 트레이드 마크들은 각 소유자의 재산입니다.)"

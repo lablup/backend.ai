@@ -27,10 +27,10 @@ async def test_handle_heartbeat(
     mock_redis_wrapper.execute = AsyncMock()
     mocker.patch('ai.backend.manager.registry.redis', mock_redis_wrapper)
 
-    def mocked_entrypoints(entry_point_group: str):
+    def mocked_entrypoints(entry_point_group: str, blocklist: set[str] = None):
         return []
 
-    mocker.patch('ai.backend.common.plugin.pkg_resources.iter_entry_points', mocked_entrypoints)
+    mocker.patch('ai.backend.common.plugin.scan_entrypoints', mocked_entrypoints)
 
     registry, mock_dbconn, mock_dbresult, mock_shared_config, _, _ = registry_ctx
     image_data = snappy.compress(msgpack.packb([

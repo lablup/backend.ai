@@ -3,6 +3,10 @@
 # Set "echo -e" as default
 shopt -s xpg_echo
 
+# For CentOS 7 or older versions of Linux only
+# - To make old gcc to allow declaring a vairiable inside a for loop.
+# PANTS_PYTHON_NATIVE_CODE_CPP_FLAGS="-std=gnu99"
+
 RED="\033[0;91m"
 GREEN="\033[0;92m"
 YELLOW="\033[0;93m"
@@ -162,10 +166,10 @@ else
   show_info "Please send us a pull request or file an issue to support your environment!"
   exit 1
 fi
-if [ $(has_python "python") -eq 1 ]; then
-  bpython=$(which "python")
-elif [ $(has_python "python3") -eq 1 ]; then
+if [ $(has_python "python3") -eq 1 ]; then
   bpython=$(which "python3")
+elif [ $(has_python "python") -eq 1 ]; then
+  bpython=$(which "python")
 elif [ $(has_python "python2") -eq 1 ]; then
   bpython=$(which "python2")
 else
@@ -440,7 +444,7 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-$bpython -m pip --disable-pip-version-check install -q requests requests_unixsocket
+$bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
 $bpython scripts/check-docker.py
 if [ $? -ne 0 ]; then
   exit 1
@@ -497,6 +501,9 @@ install_pybuild_deps
 show_info "Checking and installing git lfs support..."
 install_git_lfs
 
+show_info "Ensuring checkout of LFS files..."
+git lfs pull
+
 show_info "Installing Python..."
 install_python
 
@@ -514,7 +521,9 @@ show_info "Using the current working-copy directory as the installation path..."
 mkdir -p ./wheelhouse
 if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
   show_info "Prebuild grpcio wheels for Apple Silicon..."
-  pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
+  if [ -z "$(pyenv virtualenvs | grep "tmp-grpcio-build")" ]; then
+    pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
+  fi
   pyenv shell tmp-grpcio-build
   if [ $(python -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)') -eq 0 ]; then
     # ref: https://github.com/grpc/grpc/issues/25082
@@ -619,9 +628,8 @@ sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./w
 sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
 sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
 
-# TODO
-## cp configs/testers/sample-env-tester.sh ./env-tester-admin.sh
-## cp configs/testers/sample-env-tester.sh ./env-tester-user.sh
+echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-admin-api.sh" > ./env-tester-admin.sh
+echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user-api.sh" > ./env-tester-user.sh
 
 # DB schema
 show_info "Setting up databases..."

@@ -13,8 +13,7 @@ def test_add_user(run: ClientRunnerFunc):
     # Check if test account exists
     with closing(run(['--output=json', 'admin', 'user', 'list'])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
-        loaded = json.loads(decoded)
+        loaded = json.loads(p.before.decode())
         user_list = loaded.get('items')
 
     test_user1 = get_user_from_list(user_list, 'testaccount1')
@@ -33,7 +32,8 @@ def test_add_user(run: ClientRunnerFunc):
         ]
         with closing(run(add_arguments)) as p:
             p.expect(EOF)
-            assert 'User testaccount1@lablup.com is created' in p.before.decode(), 'Account add error'
+            response = json.loads(p.before.decode())
+            assert response.get('ok') is True, 'Account creation failed: Account#1'
 
     if not bool(test_user2):
         # Add user
@@ -49,7 +49,8 @@ def test_add_user(run: ClientRunnerFunc):
         ]
         with closing(run(add_arguments)) as p:
             p.expect(EOF)
-            assert 'User testaccount2@lablup.com is created' in p.before.decode(), 'Account add error'
+            response = json.loads(p.before.decode())
+            assert response.get('ok') is True, 'Account creation failed: Account#2'
 
     if not bool(test_user3):
         # Add user
@@ -65,7 +66,8 @@ def test_add_user(run: ClientRunnerFunc):
         ]
         with closing(run(add_arguments)) as p:
             p.expect(EOF)
-            assert 'User testaccount3@lablup.com is created' in p.before.decode(), 'Account add error'
+            response = json.loads(p.before.decode())
+            assert response.get('ok') is True, 'Account creation failed: Account#3'
 
     # Check if user is added
     with closing(run(['--output=json', 'admin', 'user', 'list'])) as p:
@@ -171,20 +173,27 @@ def test_delete_user(run: ClientRunnerFunc):
     Testcase for user deletion.
     """
     print("[ Delete user ]")
-    with closing(run(['admin', 'user', 'purge', 'testaccount1@lablup.com'])) as p:
-        p.sendline('y')
-        p.expect(EOF)
-        assert 'User is deleted:' in p.before.decode(), 'Account deletion failed: Account#1'
 
-    with closing(run(['admin', 'user', 'purge', 'testaccount2@lablup.com'])) as p:
+    with closing(run(['--output=json', 'admin', 'user', 'purge', 'testaccount1@lablup.com'])) as p:
         p.sendline('y')
         p.expect(EOF)
-        assert 'User is deleted:' in p.before.decode(), 'Account deletion failed: Account#2'
+        before = p.before.decode()
+        response = json.loads(before[before.index('{'):])
+        assert response.get('ok') is True, 'Account deletion failed: Account#1'
 
-    with closing(run(['admin', 'user', 'purge', 'testaccount3@lablup.com'])) as p:
+    with closing(run(['--output=json', 'admin', 'user', 'purge', 'testaccount2@lablup.com'])) as p:
         p.sendline('y')
         p.expect(EOF)
-        assert 'User is deleted:' in p.before.decode(), 'Account deletion failed: Account#3'
+        before = p.before.decode()
+        response = json.loads(before[before.index('{'):])
+        assert response.get('ok') is True, 'Account deletion failed: Account#2'
+
+    with closing(run(['--output=json', 'admin', 'user', 'purge', 'testaccount3@lablup.com'])) as p:
+        p.sendline('y')
+        p.expect(EOF)
+        before = p.before.decode()
+        response = json.loads(before[before.index('{'):])
+        assert response.get('ok') is True, 'Account deletion failed: Account#3'
 
 
 def test_list_user(run: ClientRunnerFunc):
