@@ -13,8 +13,7 @@ def test_add_user(run: ClientRunnerFunc):
     # Check if test account exists
     with closing(run(['--output=json', 'admin', 'user', 'list'])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
-        loaded = json.loads(decoded)
+        loaded = json.loads(p.before.decode())
         user_list = loaded.get('items')
 
     test_user1 = get_user_from_list(user_list, 'testaccount1')
