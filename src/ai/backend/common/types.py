@@ -31,10 +31,10 @@ from typing import (
 )
 import uuid
 
-from redis.asyncio import Redis
-import redis.asyncio.sentinel
 
 import attr
+from redis.asyncio import Redis
+import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 

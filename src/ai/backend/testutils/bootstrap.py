@@ -46,7 +46,6 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
-    time.sleep(0.5)
     wait_health_check(container_id)
     yield container_id, HostPortPair('127.0.0.1', etcd_allocated_port)
     subprocess.run(
@@ -73,7 +72,6 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
-    time.sleep(0.5)
     wait_health_check(container_id)
     yield container_id, HostPortPair('127.0.0.1', redis_allocated_port)
     subprocess.run(
@@ -102,7 +100,6 @@ def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
-    time.sleep(0.5)
     wait_health_check(container_id)
     yield container_id, HostPortPair('127.0.0.1', postgres_allocated_port)
     subprocess.run(

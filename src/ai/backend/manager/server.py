@@ -501,7 +501,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
             from .pglock import PgAdvisoryLock
             return lambda lock_id, lifetime_hint: PgAdvisoryLock(root_ctx.db, lock_id)
         case 'redlock':
-            raise NotImplementedError("Redlock on redis-py/asyncio v2 is not supported yet.")
+            raise NotImplementedError("Redlock on redis-py/asyncio v4.3+ is not supported yet.")
         case 'etcd':
             from ai.backend.common.lock import EtcdLock
             return lambda lock_id, lifetime_hint: EtcdLock(

@@ -25,10 +25,9 @@ import sqlalchemy as sa
 import trafaret as t
 from dateutil.tz import tzutc
 from sqlalchemy.engine import Row
-from ai.backend.common import redis_helper as redis_helper
 
 import ai.backend.common.validators as tx
-from ai.backend.common import msgpack
+from ai.backend.common import msgpack, redis_helper as redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AbstractEvent,
