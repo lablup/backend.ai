@@ -1,71 +1,36 @@
 import json
 from contextlib import closing
+from typing import Callable, Tuple
 
+from ..conftest import User
 from ...utils.cli import EOF, ClientRunnerFunc
 
 
-def test_add_user(run: ClientRunnerFunc):
+def test_add_user(run: ClientRunnerFunc, users: Tuple[User, ...]):
     """
     Testcase for user addition.
     """
     print("[ Add user ]")
 
-    # Check if test account exists
-    with closing(run(['--output=json', 'admin', 'user', 'list'])) as p:
-        p.expect(EOF)
-        decoded = p.before.decode()
-        loaded = json.loads(decoded)
-        user_list = loaded.get('items')
-
-    test_user1 = get_user_from_list(user_list, 'testaccount1')
-    test_user2 = get_user_from_list(user_list, 'testaccount2')
-    test_user3 = get_user_from_list(user_list, 'testaccount3')
-
-    if not bool(test_user1):
-        # Add user
+    # Add users
+    for i, user in enumerate(users):
         add_arguments = [
-            '--output=json', 'admin', 'user', 'add',
-            '-u', 'testaccount1',
-            '-n', 'John Doe',
-            '--need-password-change', 'default',
-            'testaccount1@lablup.com',
-            '1q2w3e4r',
-        ]
-        with closing(run(add_arguments)) as p:
-            p.expect(EOF)
-            assert 'User testaccount1@lablup.com is created' in p.before.decode(), 'Account add error'
-
-    if not bool(test_user2):
-        # Add user
-        add_arguments = [
-            '--output=json', 'admin', 'user', 'add',
-            '-u', 'testaccount2',
-            '-n', 'John Roe',
-            '-r', 'admin',
-            '-s', 'inactive',
+            '--output=json',
+            'admin', 'user', 'add',
+            '-u', user.username,
+            '-n', user.full_name,
+            '-r', user.role,
+            '-s', user.status,
             'default',
-            'testaccount2@lablup.com',
-            '1q2w3e4r',
+            user.email,
+            user.password,
         ]
+        if user.need_password_change:
+            add_arguments.append('--need-password-change')
         with closing(run(add_arguments)) as p:
             p.expect(EOF)
-            assert 'User testaccount2@lablup.com is created' in p.before.decode(), 'Account add error'
-
-    if not bool(test_user3):
-        # Add user
-        add_arguments = [
-            '--output=json', 'admin', 'user', 'add',
-            '-u', 'testaccount3',
-            '-n', 'Richard Roe',
-            '-r', 'monitor',
-            '-s', 'before-verification',
-            '--need-password-change', 'default',
-            'testaccount3@lablup.com',
-            '1q2w3e4r',
-        ]
-        with closing(run(add_arguments)) as p:
-            p.expect(EOF)
-            assert 'User testaccount3@lablup.com is created' in p.before.decode(), 'Account add error'
+            response = json.loads(p.before.decode())
+            assert response.get('ok') is True, f'Account creation failed: Account#{i+1}'
 
     # Check if user is added
     with closing(run(['--output=json', 'admin', 'user', 'list'])) as p:
@@ -75,63 +40,63 @@ def test_add_user(run: ClientRunnerFunc):
         user_list = loaded.get('items')
 
     assert isinstance(user_list, list), 'Expected user list'
-    added_user1 = get_user_from_list(user_list, 'testaccount1')
-    added_user2 = get_user_from_list(user_list, 'testaccount2')
-    added_user3 = get_user_from_list(user_list, 'testaccount3')
+    added_users = tuple(get_user_from_list(user_list, user.username)
+                        for user in users)
 
-    assert bool(added_user1), 'Added account doesn\'t exist: Account#1'
-    assert added_user1.get('email') == 'testaccount1@lablup.com', 'E-mail mismatch: Account#1'
-    assert added_user1.get('full_name') == 'John Doe', 'Full name mismatch: Account#1'
-    assert added_user1.get('status') == 'active', 'User status mismatch: Account#1'
-    assert added_user1.get('role') == 'user', 'Role mismatch: Account#1'
-    assert added_user1.get('need_password_change') is True, 'Password change status mismatch: Account#1'
-
-    assert bool(added_user2), 'Added account doesn\'t exist: Account#2'
-    assert added_user2.get('email') == 'testaccount2@lablup.com', 'E-mail mismatch: Account#2'
-    assert added_user2.get('full_name') == 'John Roe', 'Full name mismatch: Account#2'
-    assert added_user2.get('status') == 'inactive', 'User status mismatch: Account#2'
-    assert added_user2.get('role') == 'admin', 'Role mismatch: Account#2'
-    assert added_user2.get('need_password_change') is False, 'Password change status mismatch: Account#2'
-
-    assert bool(added_user3), 'Added account doesn\'t exist: Account#3'
-    assert added_user3.get('email') == 'testaccount3@lablup.com', 'E-mail mismatch: Account#3'
-    assert added_user3.get('full_name') == 'Richard Roe', 'Full name mismatch: Account#3'
-    assert added_user3.get('status') == 'before-verification', 'User status mismatch: Account#3'
-    assert added_user3.get('role') == 'monitor', 'Role mismatch: Account#3'
-    assert added_user3.get('need_password_change') is True, 'Password change status mismatch: Account#3'
+    for i, (added_user, user) in enumerate(zip(added_users, users)):
+        assert bool(added_user), f'Added account doesn\'t exist: Account#{i+1}'
+        assert added_user.get('email') == user.email, f'E-mail mismatch: Account#{i+1}'
+        assert added_user.get('full_name') == user.full_name, f'Full name mismatch: Account#{i+1}'
+        assert added_user.get('status') == user.status, f'User status mismatch: Account#{i+1}'
+        assert added_user.get('role') == user.role, f'Role mismatch: Account#{i+1}'
+        assert added_user.get('need_password_change') is user.need_password_change, \
+                                                    f'Password change status mismatch: Account#{i+1}'
 
 
-def test_update_user(run: ClientRunnerFunc):
+def test_update_user(
+    run: ClientRunnerFunc,
+    users: Tuple[User, ...],
+    gen_username: Callable[[], str],
+    gen_fullname: Callable[[], str],
+):
     """
-    Run this testcase after test_update_user.
+    Run this testcase after test_add_user.
     Testcase for user update.
     TODO: User update with roles is not fully covered yet.
     """
     print("[ Update user ]")
 
-    # Check if user exists
-    with closing(run(['--output=json', 'admin', 'user', 'list'])) as p:
-        p.expect(EOF)
-        decoded = p.before.decode()
-        loaded = json.loads(decoded)
-        user_list = loaded.get('items')
-        assert isinstance(user_list, list), 'Expected user list'
+    # updated_users = [user.copy() for user in users]
+    updated_users = (
+        User(
+            username=gen_username(),
+            full_name=gen_fullname(),
+            email=user.email,
+            password=user.password,
+            role=['user', 'admin', 'monitor'][i % 3],
+            status=['inactive', 'active', 'active'][i % 3],
+            domain_name='default',
+            need_password_change=[False, True, False][i % 3],
+        )
+        for i, user in enumerate(users)
+    )
 
     # Update user
-    update_arguments = ['--output=json', 'admin', 'user', 'update', '-u', 'testaccount123', '-n', 'Foo Bar', '-s',
-                        'inactive', '-d', 'default', 'testaccount1@lablup.com']
-    with closing(run(update_arguments)) as p:
-        p.expect(EOF)
-
-    update_arguments = ['--output=json', 'admin', 'user', 'update', '-u', 'testaccount231', '-n', 'Baz Quz', '-s',
-                        'active', '-r', 'admin', '--need-password-change', 'testaccount2@lablup.com']
-    with closing(run(update_arguments)) as p:
-        p.expect(EOF)
-
-    update_arguments = ['--output=json', 'admin', 'user', 'update', '-u', 'testaccount312', '-n', 'Alice B.', '-s',
-                        'active', '-r', 'monitor', 'testaccount3@lablup.com']
-    with closing(run(update_arguments)) as p:
-        p.expect(EOF)
+    for updated_user, user in zip(updated_users, users):
+        update_arguments = [
+            '--output=json',
+            'admin', 'user', 'update',
+            '-u', updated_user.username,
+            '-n', updated_user.full_name,
+            '-s', updated_user.status,
+            '-r', updated_user.role,
+            '-d', updated_user.domain_name,
+            user.email,
+        ]
+        if updated_user.need_password_change:
+            update_arguments.append('--need-password-change')
+        with closing(run(update_arguments)) as p:
+            p.expect(EOF)
 
     # Check if user is updated correctly
     with closing(run(['--output=json', 'admin', 'user', 'list'])) as p:
@@ -141,50 +106,31 @@ def test_update_user(run: ClientRunnerFunc):
         updated_user_list = after_update_loaded.get('items')
         assert isinstance(updated_user_list, list), 'Expected user list'
 
-    test_user1 = get_user_from_list(updated_user_list, 'testaccount123')
-    test_user2 = get_user_from_list(updated_user_list, 'testaccount231')
-    test_user3 = get_user_from_list(updated_user_list, 'testaccount312')
-
-    assert bool(test_user1), 'Account not found - Account#1'
-    assert test_user1.get('full_name') == 'Foo Bar', 'Full name mismatch: Account#1'
-    assert test_user1.get('status') == 'inactive', 'User status mismatch: Account#1'
-    assert test_user1.get('role') == 'user', 'Role mismatch: Account#1'
-    assert test_user1.get('need_password_change') is False, 'Password change status mismatch: Account#1'
-    assert test_user1.get('domain_name') == 'default', 'Domain mismatch: Account#1'
-
-    assert bool(test_user2), 'Account not found - Account#2'
-    assert test_user2.get('full_name') == 'Baz Quz', 'Full name mismatch: Account#2'
-    assert test_user2.get('status') == 'active', 'User status mismatch: Account#2'
-    assert test_user2.get('role') == 'admin', 'Role mismatch: Account#2'
-    assert test_user2.get('need_password_change') is True, 'Password change status mismatch: Account#2'
-
-    assert bool(test_user3), 'Account not found - Account#3'
-    assert test_user3.get('full_name') == 'Alice B.', 'Full name mismatch: Account#3'
-    assert test_user3.get('status') == 'active', 'User status mismatch: Account#3'
-    assert test_user3.get('role') == 'monitor', 'Role mismatch: Account#3'
-    assert test_user3.get('need_password_change') is False, 'Password change status mismatch: Account#3'
+    for i, updated_user in enumerate(updated_users):
+        user_dict: dict = get_user_from_list(updated_user_list, updated_user.username)
+        assert bool(user_dict), f'Account not found - Account#{i+1}'
+        assert user_dict.get('full_name') == updated_user.full_name, f'Full name mismatch: Account#{i+1}'
+        assert user_dict.get('status') == updated_user.status, f'User status mismatch: Account#{i+1}'
+        assert user_dict.get('role') == updated_user.role, f'Role mismatch: Account#{i+1}'
+        assert user_dict.get('need_password_change') is updated_user.need_password_change, \
+                                                        f'Password change status mismatch: Account#{i+1}'
+        assert user_dict.get('domain_name') == updated_user.domain_name, f'Domain mismatch: Account#{i+1}'
 
 
-def test_delete_user(run: ClientRunnerFunc):
+def test_delete_user(run: ClientRunnerFunc, users: Tuple[User, ...]):
     """
     !!Run this testcase after running test_add_user
     Testcase for user deletion.
     """
     print("[ Delete user ]")
-    with closing(run(['admin', 'user', 'purge', 'testaccount1@lablup.com'])) as p:
-        p.sendline('y')
-        p.expect(EOF)
-        assert 'User is deleted:' in p.before.decode(), 'Account deletion failed: Account#1'
 
-    with closing(run(['admin', 'user', 'purge', 'testaccount2@lablup.com'])) as p:
-        p.sendline('y')
-        p.expect(EOF)
-        assert 'User is deleted:' in p.before.decode(), 'Account deletion failed: Account#2'
-
-    with closing(run(['admin', 'user', 'purge', 'testaccount3@lablup.com'])) as p:
-        p.sendline('y')
-        p.expect(EOF)
-        assert 'User is deleted:' in p.before.decode(), 'Account deletion failed: Account#3'
+    for i, fake_user in enumerate(users):
+        with closing(run(['--output=json', 'admin', 'user', 'purge', fake_user.email])) as p:
+            p.sendline('y')
+            p.expect(EOF)
+            before = p.before.decode()
+            response = json.loads(before[before.index('{'):])
+            assert response.get('ok') is True, f'Account deletion failed: Account#{i+1}'
 
 
 def test_list_user(run: ClientRunnerFunc):

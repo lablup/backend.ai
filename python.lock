@@ -40,6 +40,7 @@
 //     "coloredlogs~=15.0",
 //     "cryptography>=2.8",
 //     "etcetra~=0.1.6",
+//     "faker~=13.12.0",
 //     "graphene~=2.1.9",
 //     "humanize>=3.1.0",
 //     "inquirer~=2.9.2",
@@ -1290,6 +1291,27 @@
           ],
           "requires_python": ">=3.9",
           "version": "0.1.6"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "0122b75e7960cbb1e2bbbf10ef9b8c183377878e38466854953539c6d822e7c0",
+              "url": "https://files.pythonhosted.org/packages/5a/65/c0aabfe3343b1699bc7cddcfbfba60177b1ac47bea44f5b5331a15c4d9c9/Faker-13.12.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "fb95f956bac59c90f54543919d5c5ef41625e12a0773e5aa08c9b9c62ba58fb3",
+              "url": "https://files.pythonhosted.org/packages/b9/0f/e73c16b978961ef519982420b9c2827c8efcb814593d95965999409858e8/Faker-13.12.1.tar.gz"
+            }
+          ],
+          "project_name": "faker",
+          "requires_dists": [
+            "python-dateutil>=2.4",
+            "typing-extensions>=3.10.0.2; python_version < \"3.8\""
+          ],
+          "requires_python": ">=3.6",
+          "version": "13.12.1"
         },
         {
           "artifacts": [
@@ -3093,13 +3115,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d1746e7fd520e83bbe210d02fff1aa1a425ad671c7a9da7d246ec2401a087198",
-              "url": "https://files.pythonhosted.org/packages/27/0b/cb81bc3a06a242c7626fca8aa9ce82453af3bc44e72a39666bb4052ac302/setuptools-62.3.3-py3-none-any.whl"
+              "hash": "5a844ad6e190dccc67d6d7411d119c5152ce01f7c76be4d8a1eaa314501bba77",
+              "url": "https://files.pythonhosted.org/packages/d0/12/412167a1f80290555c557a556fb1fc294a6e889924fcf2b2db3a789b11a4/setuptools-62.4.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e7d11f3db616cda0751372244c2ba798e8e56a28e096ec4529010b803485f3fe",
-              "url": "https://files.pythonhosted.org/packages/fb/50/005826d31d58a7b90585b5510f2f597c5406ae34df884f4f5d63abfb6ca7/setuptools-62.3.3.tar.gz"
+              "hash": "bf8a748ac98b09d32c9a64a995a6b25921c96cc5743c1efa82763ba80ff54e91",
+              "url": "https://files.pythonhosted.org/packages/0c/f0/f11edc0efc7b00e26a28225621ce7584636bb3a76b1862829d42bc146fbf/setuptools-62.4.0.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -3147,7 +3169,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "62.3.3"
+          "version": "62.4"
         },
         {
           "artifacts": [
@@ -3590,19 +3612,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "18f6856a7df44fc7a292c2d73093908333e5f7cb858667b8cbefc8ed1e91942e",
-              "url": "https://files.pythonhosted.org/packages/13/d4/ee6b9044aac19e9a3e0463acc0b6c062db54d70294d1885de492c0c399ad/types_six-1.16.15-py3-none-any.whl"
+              "hash": "b40078231175423affc00dd0cbb127a5a2bf3dee915890a47947ebc1ab25eee7",
+              "url": "https://files.pythonhosted.org/packages/b1/66/eee9592ecb7ba62aee8572c4a498342b9f3c78a18787b1aebca426aa66f3/types_six-1.16.16-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d244f0537dab0d0570a5bc6f8a60c4da7f0546d960a8677520e6bff214a64fb8",
-              "url": "https://files.pythonhosted.org/packages/1c/69/1cb7e70583221b1f42147d5d59e43a230e84cebf25e774021a12dfb713fa/types-six-1.16.15.tar.gz"
+              "hash": "0bfbea0ea5780d861f9deab9053e4809f586f5fb3ef0257ce30b938772a4d09c",
+              "url": "https://files.pythonhosted.org/packages/a2/45/d4d0eba2a6c3b838c0fa1d07fb3d358bca2a3f17d0c4e367ae59086936ec/types-six-1.16.16.tar.gz"
             }
           ],
           "project_name": "types-six",
           "requires_dists": [],
           "requires_python": null,
-          "version": "1.16.15"
+          "version": "1.16.16"
         },
         {
           "artifacts": [
@@ -3943,7 +3965,7 @@
       "platform_tag": [
         "cp310",
         "cp310",
-        "macosx_12_0_arm64"
+        "manylinux_2_31_x86_64"
       ]
     }
   ],
@@ -3982,6 +4004,7 @@
     "coloredlogs~=15.0",
     "cryptography>=2.8",
     "etcetra~=0.1.6",
+    "faker~=13.12.0",
     "graphene~=2.1.9",
     "humanize>=3.1.0",
     "inquirer~=2.9.2",

@@ -12,7 +12,7 @@ fi
 LOCKSET=${LOCKSET:-python-default/$PYTHON_VERSION}
 source dist/export/python/virtualenvs/$LOCKSET/bin/activate
 PYTHONPATH="${PYTHONPATH}"
-for plugin_dir in $(ls -d plugins/*/); do
+for plugin_dir in $(ls -d plugins/*/ 2>/dev/null); do
   PYTHONPATH="${plugin_dir}/src:${PYTHONPATH}"
 done
 PYTHONPATH="src:${PYTHONPATH}" python "$@"

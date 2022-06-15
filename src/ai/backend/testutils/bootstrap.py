@@ -35,6 +35,9 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
             'docker', 'run', '-d',
             '-p', ':2379',
             '-p', ':4001',
+            '--health-cmd', 'etcdctl endpoint health',
+            '--health-interval', '2s',
+            '--health-start-period', '1s',
             'quay.io/coreos/etcd:v3.5.4',
             '/usr/local/bin/etcd',
             '-advertise-client-urls', 'http://0.0.0.0:2379',
@@ -43,13 +46,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
-    proc = subprocess.run(
-        [
-            'docker', 'inspect', container_id,
-        ],
-        capture_output=True,
-    )
-    container_info = json.loads(proc.stdout)
+    container_info = wait_health_check(container_id)
     host_port = int(container_info[0]['NetworkSettings']['Ports']['2379/tcp'][0]['HostPort'])
     yield container_id, HostPortPair('127.0.0.1', host_port)
     subprocess.run(
@@ -68,20 +65,13 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
             'docker', 'run', '-d',
             '-p', ':6379',
             '--health-cmd', 'redis-cli ping',
-            '--health-interval', '0.3s',
-            '--health-start-period', '0.2s',
+            '--health-interval', '1s',
+            '--health-start-period', '0.3s',
             'redis:6.2-alpine',
         ],
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
-    proc = subprocess.run(
-        [
-            'docker', 'inspect', container_id,
-        ],
-        capture_output=True,
-    )
-    container_info = json.loads(proc.stdout)
     container_info = wait_health_check(container_id)
     host_port = int(container_info[0]['NetworkSettings']['Ports']['6379/tcp'][0]['HostPort'])
     yield container_id, HostPortPair('127.0.0.1', host_port)
