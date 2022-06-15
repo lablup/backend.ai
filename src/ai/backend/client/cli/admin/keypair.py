@@ -6,6 +6,7 @@ from ai.backend.client.session import Session
 from ai.backend.client.output.fields import keypair_fields
 from . import admin
 from ..types import CLIContext
+from ..extensions import pass_ctx_obj
 
 
 @admin.group()
@@ -16,7 +17,7 @@ def keypair() -> None:
 
 
 @keypair.command()
-@click.pass_obj
+@pass_ctx_obj
 def info(ctx: CLIContext) -> None:
     """
     Show the server-side information of the currently configured access key.
@@ -45,7 +46,7 @@ def info(ctx: CLIContext) -> None:
 
 
 @keypair.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.option('-u', '--user-id', type=str, default=None,
               help='Show keypairs of this given user. [default: show all]')
 @click.option('--is-active', type=bool, default=None,
@@ -100,7 +101,7 @@ def list(ctx: CLIContext, user_id, is_active, filter_, order, offset, limit) -> 
 
 
 @keypair.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('user-id', type=str, default=None, metavar='USERID')
 @click.argument('resource-policy', type=str, default=None, metavar='RESOURCE_POLICY')
 @click.option('-a', '--admin', is_flag=True,
@@ -149,7 +150,7 @@ def add(ctx: CLIContext, user_id, resource_policy, admin, inactive,  rate_limit)
 
 
 @keypair.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('access_key', type=str, default=None, metavar='ACCESSKEY')
 @click.option('--resource-policy', type=str, help='Resource policy for the keypair.')
 @click.option('--is-admin', type=bool, help='Set admin privilege.')
@@ -192,7 +193,7 @@ def update(ctx: CLIContext, access_key, resource_policy, is_admin, is_active,  r
 
 
 @keypair.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('access-key', type=str, metavar='ACCESSKEY')
 def delete(ctx: CLIContext, access_key):
     """
@@ -226,7 +227,7 @@ def delete(ctx: CLIContext, access_key):
 
 
 @keypair.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('access-key', type=str, metavar='ACCESSKEY')
 def activate(ctx: CLIContext, access_key):
     """
@@ -260,7 +261,7 @@ def activate(ctx: CLIContext, access_key):
 
 
 @keypair.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('access-key', type=str, metavar='ACCESSKEY')
 def deactivate(ctx: CLIContext, access_key):
     """
