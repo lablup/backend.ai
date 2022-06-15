@@ -371,6 +371,8 @@ class MemoryPlugin(AbstractComputePlugin):
             per_disk_stat = {}
             for disk_info in psutil.disk_partitions():
                 if disk_info.fstype not in pruned_disk_types:
+                    if '/var/lib/docker/btrfs' == disk_info.mountpoint:
+                        continue
                     dstat = os.statvfs(disk_info.mountpoint)
                     disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
                     disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)
