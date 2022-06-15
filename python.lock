@@ -1405,13 +1405,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "df549a1433108801b11bdcc0e312eaf0d5f0500db42f0523e4d65c78722e8475",
-              "url": "https://files.pythonhosted.org/packages/81/1f/f2e98da9ccf8f94bddecd690dbf2defb6244011874e3b523aa397887d8a9/google_auth-2.7.0-py2.py3-none-any.whl"
+              "hash": "9b1da39ab8731c3061f36fefde9f8bb902dbee9eb28e3a67e8cfa7dc1be76227",
+              "url": "https://files.pythonhosted.org/packages/b3/33/13d090c8f70ff50425426802d100f944dce17a00654706e8c0584b3efc8f/google_auth-2.8.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8a954960f852d5f19e6af14dd8e75c20159609e85d8db37e4013cc8c3824a7e1",
-              "url": "https://files.pythonhosted.org/packages/44/f3/4ee51a2f7d1c262e8bac333338479006b556f97ef9622e81c73460ad72a2/google-auth-2.7.0.tar.gz"
+              "hash": "819b70140d05501739e1387291d39f0de3b4dff3b00ae4aff8e7a05369957f89",
+              "url": "https://files.pythonhosted.org/packages/0a/c8/2df97570bb3185bd2add5309e26dca2d57e5a26b9ffe4c6804e4ecc707ae/google-auth-2.8.0.tar.gz"
             }
           ],
           "project_name": "google-auth",
@@ -1430,7 +1430,7 @@
             "six>=1.9.0"
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "2.7"
+          "version": "2.8"
         },
         {
           "artifacts": [
@@ -3484,19 +3484,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "4915e40fce8df222aa9ef118cdbc3e8eef55caefe32b6ded2cd2dbe21a2e2398",
-              "url": "https://files.pythonhosted.org/packages/fd/47/42a38cf1b57075061b32da942d1401a0e8da07f67f0227c5d235e9287b62/types_cachetools-5.0.1-py3-none-any.whl"
+              "hash": "4291c3b6ae10e7b0d7ae3c4cb7d9daa6b21d4b7deb64d193e44bcec7ca5c4095",
+              "url": "https://files.pythonhosted.org/packages/3e/e7/617ff8215076af6d822fbb5952796f6d8cf02b08553038ea1d719c2916d3/types_cachetools-5.0.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2b9e0b1ace1a0de67bc3ced9c4aa69fff882bac8bfeb0f2aefaf0f99e4571c6b",
-              "url": "https://files.pythonhosted.org/packages/ae/b0/6874d82294165cec3ac31767b5b4005325e3f9f2f699316ce6a41a52b1bc/types-cachetools-5.0.1.tar.gz"
+              "hash": "bf22b2e9f9243983914f6510e43a1873f012afb8c3fc5e09a59b0ccbe3ab0f35",
+              "url": "https://files.pythonhosted.org/packages/39/87/3e499dbef4c6a60715de1144ee55feff3f32efac597872c07a0b4e1343f3/types-cachetools-5.0.2.tar.gz"
             }
           ],
           "project_name": "types-cachetools",
           "requires_dists": [],
           "requires_python": null,
-          "version": "5.0.1"
+          "version": "5.0.2"
         },
         {
           "artifacts": [
@@ -3965,7 +3965,7 @@
       "platform_tag": [
         "cp310",
         "cp310",
-        "manylinux_2_31_x86_64"
+        "macosx_12_0_arm64"
       ]
     }
   ],
