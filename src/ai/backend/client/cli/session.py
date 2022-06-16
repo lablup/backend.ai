@@ -7,7 +7,7 @@ from pathlib import Path
 import secrets
 import subprocess
 import sys
-from typing import IO, List, Literal, Optional, Sequence, Tuple
+from typing import IO, List, Literal, Optional, Sequence
 import uuid
 
 from async_timeout import timeout
@@ -918,7 +918,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 help='The maximum duration to wait until the session starts.')
     @click.option('--output', type=click.Choice(['json', 'console']), default='console',
                 help='Set the output style of the command results.')
-    def watch(session_name_or_id: Tuple[str], owner_access_key: str, scope: str, max_wait: int, output: str):
+    def watch(session_name_or_id: str, owner_access_key: str, scope: str, max_wait: int, output: str):
         """
         Monitor the lifecycle events of a compute session
         and display in human-friendly interface.
@@ -956,7 +956,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 click.echo('No matching items.')
                 return
 
-        async def handle_console_output(session: ComputeSession, scope: str):
+        async def handle_console_output(session: ComputeSession, scope: Literal['*', 'session', 'kernel'] = '*'):
             def print_state(session_name_or_id: str, current_state_idx: int):
                 click.clear()
                 click.echo(click.style(f'session name: {session_name_or_id}', fg='cyan'))
@@ -984,7 +984,7 @@ def _watch_cmd(docs: Optional[str] = None):
                         print_state(session_name_or_id, current_state_idx=len(states))
                         break
 
-        async def handle_json_output(session: ComputeSession, scope: str):
+        async def handle_json_output(session: ComputeSession, scope: Literal['*', 'session', 'kernel'] = '*'):
             click.clear()
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
