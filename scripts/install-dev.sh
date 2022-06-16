@@ -577,16 +577,8 @@ sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.
 sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
 mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
 mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
-case $DISTRO in
-  SUSE)
-    $docker_sudo docker-compose -f "docker-compose.halfstack.current.yml" up -d
-    $docker_sudo docker-compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
-    ;;
-  *)
-    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
-    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
-    ;;
-esac
+$docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+$docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
 check_snappy() {
   pip download python-snappy
@@ -684,14 +676,7 @@ show_info "Setting up virtual folder..."
 mkdir -p "${ROOT_PATH}/${VFOLDER_REL_PATH}"
 ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
 mkdir -p scratches
-case $DISTRO in
-  SUSE)
-    POSTGRES_CONTAINER_ID=$($docker_sudo docker-compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
-    ;;
-  *)
-    POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
-    ;;
-esac
+POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
 $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
@@ -799,23 +784,9 @@ echo " "
 echo "${GREEN}Development environment is now ready.${NC}"
 show_note "How to run docker-compose:"
 if [ ! -z "$docker_sudo" ]; then
-  case $DISTRO in
-    SUSE)
-      echo "    > ${WHITE}${docker_sudo} docker-compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
-      ;;
-    *)
-      echo "    > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
-      ;;
-  esac
+  echo "    > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
 else
-  case $DISTRO in
-    SUSE)
-      echo "    > ${WHITE}docker-compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
-      ;;
-    *)
-      echo "    > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
-      ;;
-  esac
+  echo "    > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
 fi
 show_note "How to reset this setup:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
