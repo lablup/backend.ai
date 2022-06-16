@@ -1832,6 +1832,11 @@ class AgentRegistry:
                                         'status_info': reason,
                                         'status_changed': now,
                                         'terminated_at': now,
+                                        'status_history': sql_json_merge(
+                                            kernels.c.status_history,
+                                            ("kernel",),
+                                            {KernelStatus.CANCELLED.name: now.isoformat()},
+                                        ),
                                     })
                                     .where(kernels.c.id == kernel['id']),
                                 )
@@ -1877,6 +1882,11 @@ class AgentRegistry:
                                     'status_info': reason,
                                     'status_changed': now,
                                     'terminated_at': now,
+                                    'status_history': sql_json_merge(
+                                        kernels.c.status_history,
+                                        ("kernel",),
+                                        {KernelStatus.TERMINATED.name: datetime.now().isoformat()},
+                                    ),
                                 }
                                 if kern_stat:
                                     values['last_stat'] = msgpack.unpackb(kern_stat)
@@ -1915,6 +1925,11 @@ class AgentRegistry:
                                             "kernel": {"exit_code": None},
                                             "session": {"status": "terminating"},
                                         },
+                                        'status_history': sql_json_merge(
+                                            kernels.c.status_history,
+                                            ("kernel",),
+                                            {KernelStatus.TERMINATING.name: now.isoformat()},
+                                        ),
                                     })
                                     .where(kernels.c.id == kernel['id']),
                                 )
@@ -2557,6 +2572,11 @@ class AgentRegistry:
             'status': status,
             'status_info': reason,
             'status_changed': now,
+            'status_history': sql_json_merge(
+                kernels.c.status_history,
+                ("session",),
+                {status.name: now.isoformat()},
+            ),
         }
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data['terminated_at'] = now
@@ -2590,6 +2610,11 @@ class AgentRegistry:
             'status': status,
             'status_info': reason,
             'status_changed': now,
+            'status_history': sql_json_merge(
+                kernels.c.status_history,
+                ("kernel",),
+                {status.name: now.isoformat()},  # ["PULLING", "PREPARING"]
+            ),
         }
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data['terminated_at'] = now
@@ -2725,6 +2750,11 @@ class AgentRegistry:
                         ("kernel",),
                         {"exit_code": exit_code},
                     ),
+                    'status_history': sql_json_merge(
+                        kernels.c.status_history,
+                        ("kernel",),
+                        {KernelStatus.TERMINATED.name: now.isoformat()},
+                    ),
                     'terminated_at': now,
                 }
                 if kern_stat:
@@ -2803,6 +2833,11 @@ class AgentRegistry:
                                 {
                                     "status": "terminated",
                                 },
+                            ),
+                            status_history=sql_json_merge(
+                                kernels.c.status_history,
+                                ("session",),
+                                {"TERMINATED": datetime.now().isoformat()},
                             ),
                         )
                         .where(
