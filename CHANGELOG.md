@@ -16,6 +16,25 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.03.7 (2022-06-16)
+
+### Fixes
+* Update test assertions to utilize the JSON output of mutation commands for forward compatibility ([#442](https://github.com/lablup/backend.ai/issues/442))
+* Cli root passes ctx info and client cmds can create ctx from it. ([#457](https://github.com/lablup/backend.ai/issues/457))
+* Apply health check to the test fixture for creating an etcd container ([#460](https://github.com/lablup/backend.ai/issues/460))
+* Add `export` keyword to set `BACKENDAI_TEST_CLIENT_ENV` as an environment variable. ([#463](https://github.com/lablup/backend.ai/issues/463))
+* Ignore error messages caused in case of plugin-not-found to keep any test case from being interfered. ([#465](https://github.com/lablup/backend.ai/issues/465))
+* Generate dummy data for test cases using `faker`. ([#466](https://github.com/lablup/backend.ai/issues/466))
+* Let it ignore a permission error when calling Python `os.statvfs()` on a btrfs subvolume (e.g., `/var/lib/docker/btrfs`) as the intention of the call is to retrieve filesystem-level disk usage rather than subvolume statistics ([#473](https://github.com/lablup/backend.ai/issues/473))
+* Update PostgreSQL, Redis and etcd versions ([#475](https://github.com/lablup/backend.ai/issues/475))
+   - PostgreSQL: 13.1 -> 13.7 (old versions)12.3 -> 12.11
+   - Redis: 6.2.6 -> 6.2.7
+   - etcd: 3.5.1 -> 3.5.4 (old versions) 3.4.14 -> 3.4.18
+
+### Miscellaneous
+* Publicly open the service IP address of the manager for when installed as development setup on a virtual machine ([#470](https://github.com/lablup/backend.ai/issues/470))
+
+
 ## 22.03.6 (2022-06-10)
 
 ### Fixes
