@@ -22,6 +22,7 @@ from .ssh import container_ssh_ctx
 from .run import format_stats, prepare_env_arg, prepare_resource_arg, prepare_mount_arg
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
+from ..func.session import ComputeSession
 from ..output.fields import session_fields
 from ..output.types import FieldSpec
 from ..session import Session, AsyncSession
@@ -915,7 +916,9 @@ def _watch_cmd(docs: Optional[str] = None):
                 help='Filter the events by kernel-specific ones or session-specific ones.')
     @click.option('--max-wait', metavar='SECONDS', type=int, default=0,
                 help='The maximum duration to wait until the session starts.')
-    def watch(session_name_or_id: Tuple[str], owner_access_key: str, scope: str, max_wait: int):
+    @click.option('--output', type=click.Choice(['json', 'console']), default='console',
+                help='Set the output style of the command results.')
+    def watch(session_name_or_id: Tuple[str], owner_access_key: str, scope: str, max_wait: int, output: str):
         """
         Monitor the lifecycle events of a compute session
         and display in human-friendly interface.
@@ -925,13 +928,14 @@ def _watch_cmd(docs: Optional[str] = None):
             click.echo('No matching items.')
             return
 
+        session_terminated = 'session_terminated'
         states = (
             'kernel_creating',
             'kernel_started',
             'session_started',
             'kernel_terminating',
             'kernel_terminated',
-            'session_terminated',
+            session_terminated,
         )
 
         if not session_name_or_id:
@@ -942,6 +946,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 choices=session_names,
             )]
             session_name_or_id = inquirer.prompt(questions).get('session')
+            click.clear()
         else:
             for session_name in session_names:
                 if session_name.startswith(session_name_or_id[0]):
@@ -951,16 +956,44 @@ def _watch_cmd(docs: Optional[str] = None):
                 click.echo('No matching items.')
                 return
 
-        def print_state(session_name_or_id: str, current_state_idx: int):
+        async def handle_console_output(session: ComputeSession, scope: str):
+            def print_state(session_name_or_id: str, current_state_idx: int):
+                click.clear()
+                click.echo(click.style(f'session name: {session_name_or_id}', fg='cyan'))
+                for i, state in enumerate(states):
+                    if i < current_state_idx:
+                        click.echo(click.style('\u2714 ', fg='green') + state)
+                    elif i == current_state_idx:
+                        click.echo(click.style(f'\u22EF {state}', bold=True))
+                    else:
+                        click.echo(click.style('\u2219 ', fg='yellow') + state)
+
+            print_state(session_name_or_id, current_state_idx=-1)
+            async with session.listen_events(scope=scope) as response:  # AsyncSession
+                async for ev in response:
+                    if ev.event == 'kernel_cancelled':
+                        click.echo(click.style('\u2718 ', fg='red') + ev.event)
+                        break
+
+                    try:
+                        print_state(session_name_or_id, current_state_idx=states.index(ev.event))
+                    except ValueError:
+                        pass
+
+                    if ev.event == session_terminated:
+                        print_state(session_name_or_id, current_state_idx=len(states))
+                        break
+
+        async def handle_json_output(session: ComputeSession, scope: str):
             click.clear()
-            click.echo(click.style(f'session name: {session_name_or_id}', fg='cyan'))
-            for i, state in enumerate(states):
-                if i < current_state_idx:
-                    click.echo(click.style('\u2714 ', fg='green') + state)
-                elif i == current_state_idx:
-                    click.echo(click.style(f'\u22EF {state}', bold=True))
-                else:
-                    click.echo(click.style('\u2219 ', fg='yellow') + state)
+            async with session.listen_events(scope=scope) as response:  # AsyncSession
+                async for ev in response:
+                    event = json.loads(ev.data)
+                    event['event'] = ev.event
+                    click.echo(event)
+
+                    if ev.event == session_terminated:
+                        break
 
         async def _run_events():
             async with AsyncSession() as session:
@@ -969,21 +1002,11 @@ def _watch_cmd(docs: Optional[str] = None):
                     compute_session = session.ComputeSession.from_session_id(session_id)
                 except ValueError:
                     compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
-                print_state(session_name_or_id, current_state_idx=-1)
-                async with compute_session.listen_events(scope=scope) as response:  # AsyncSession
-                    async for ev in response:
-                        if ev.event == 'kernel_cancelled':
-                            click.echo(click.style('\u2718 ', fg='red') + ev.event)
-                            break
 
-                        try:
-                            print_state(session_name_or_id, current_state_idx=states.index(ev.event))
-                        except ValueError:
-                            pass
-
-                        if ev.event == states[-1]:
-                            print_state(session_name_or_id, current_state_idx=len(states))
-                            break
+                if output == 'console':
+                    await handle_console_output(session=compute_session, scope=scope)
+                elif output == 'json':
+                    await handle_json_output(session=compute_session, scope=scope)
 
         async def _run_events_with_timeout(max_wait: int):
             try:
