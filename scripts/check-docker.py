@@ -1,8 +1,8 @@
 import functools
+import json
 import re
 import subprocess
 import sys
-import os
 from pathlib import Path
 from urllib.parse import quote
 
@@ -90,6 +90,8 @@ def main():
     try:
         proc = run(['docker', 'compose', 'version'], capture_output=True, check=True)
     except subprocess.CalledProcessError as e:
+        fail_with_compose_install_request()
+    else:
         m = re.search(r'\d+\.\d+\.\d+', proc.stdout.decode())
         if m is None:
             log("Failed to retrieve the docker-compose version!")
