@@ -882,12 +882,7 @@ class AgentRegistry:
             'id': sa.bindparam('kernel_id'),
             'status': KernelStatus.PENDING,
             'status_history': {
-                'kernel': {
-                    KernelStatus.PENDING.name: now.isoformat(),
-                },
-                'session': {
-                    KernelStatus.PENDING.name: now.isoformat(),
-                },
+                KernelStatus.PENDING.name: now.isoformat(),
             },
             'session_creation_id': session_creation_id,
             'session_id': session_id,
@@ -1359,7 +1354,7 @@ class AgentRegistry:
                             'service_ports': service_ports,
                             'status_history': sql_json_merge(
                                 kernels.c.status_history,
-                                ('kernel',),
+                                [],
                                 {
                                     KernelStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
                                 },
@@ -1850,7 +1845,7 @@ class AgentRegistry:
                                         'terminated_at': now,
                                         'status_history': sql_json_merge(
                                             kernels.c.status_history,
-                                            ("kernel",),
+                                            [],
                                             {KernelStatus.CANCELLED.name: now.isoformat()},
                                         ),
                                     })
@@ -1900,7 +1895,7 @@ class AgentRegistry:
                                     'terminated_at': now,
                                     'status_history': sql_json_merge(
                                         kernels.c.status_history,
-                                        ("kernel",),
+                                        [],
                                         {
                                             KernelStatus.TERMINATED.name: now.isoformat(),
                                         },
@@ -1945,7 +1940,7 @@ class AgentRegistry:
                                         },
                                         'status_history': sql_json_merge(
                                             kernels.c.status_history,
-                                            ("kernel",),
+                                            [],
                                             {
                                                 KernelStatus.TERMINATING.name: now.isoformat(),
                                             },
@@ -2130,7 +2125,7 @@ class AgentRegistry:
                                 'status': KernelStatus.RESTARTING,
                                 'status_history': sql_json_merge(
                                     kernels.c.status_history,
-                                    ('kernel',),
+                                    [],
                                     {
                                         KernelStatus.RESTARTING.name: datetime.now(tzutc()).isoformat(),
                                     },
@@ -2169,7 +2164,7 @@ class AgentRegistry:
                                 'service_ports': kernel_info.get('service_ports', []),
                                 'status_history': sql_json_merge(
                                     kernels.c.status_history,
-                                    ('kernel',),
+                                    [],
                                     {
                                         KernelStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
                                     },
@@ -2608,7 +2603,7 @@ class AgentRegistry:
             'status_changed': now,
             'status_history': sql_json_merge(
                 kernels.c.status_history,
-                ("session",),
+                [],
                 {status.name: now.isoformat()},
             ),
         }
@@ -2646,7 +2641,7 @@ class AgentRegistry:
             'status_changed': now,
             'status_history': sql_json_merge(
                 kernels.c.status_history,
-                ("kernel",),
+                [],
                 {status.name: now.isoformat()},  # ["PULLING", "PREPARING"]
             ),
         }
@@ -2786,7 +2781,7 @@ class AgentRegistry:
                     ),
                     'status_history': sql_json_merge(
                         kernels.c.status_history,
-                        ("kernel",),
+                        [],
                         {KernelStatus.TERMINATED.name: now.isoformat()},
                     ),
                     'terminated_at': now,
@@ -2870,7 +2865,7 @@ class AgentRegistry:
                             ),
                             status_history=sql_json_merge(
                                 kernels.c.status_history,
-                                ("session",),
+                                [],
                                 {
                                     KernelStatus.TERMINATED.name: datetime.now(tzutc()).isoformat(),
                                 },

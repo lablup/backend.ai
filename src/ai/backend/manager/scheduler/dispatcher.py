@@ -292,7 +292,7 @@ class SchedulerDispatcher(aobject):
                         'terminated_at': now,
                         'status_history': sql_json_merge(
                             kernels.c.status_history,
-                            ('kernel',),
+                            [],
                             {
                                 KernelStatus.CANCELLED.name: now.isoformat(),
                             },
@@ -607,7 +607,7 @@ class SchedulerDispatcher(aobject):
                     'status_changed': now,
                     'status_history': sql_json_merge(
                         kernels.c.status_history,
-                        ('kernel',),
+                        [],
                         {
                             KernelStatus.SCHEDULED.name: now.isoformat(),
                         },
@@ -751,7 +751,7 @@ class SchedulerDispatcher(aobject):
                         'status_changed': now,
                         'status_history': sql_json_merge(
                             kernels.c.status_history,
-                            ('kernel',),
+                            [],
                             {
                                 KernelStatus.SCHEDULED.name: now.isoformat(),
                             },
@@ -796,7 +796,7 @@ class SchedulerDispatcher(aobject):
                                 'status_data': {},
                                 'status_history': sql_json_merge(
                                     kernels.c.status_history,
-                                    ('session',),
+                                    [],
                                     {
                                         KernelStatus.PREPARING.name: now.isoformat(),
                                     },
@@ -875,7 +875,7 @@ class SchedulerDispatcher(aobject):
                         'terminated_at': now,
                         'status_history': sql_json_merge(
                             kernels.c.status_history,
-                            ('session',),
+                            [],
                             {
                                 KernelStatus.CANCELLED.name: now.isoformat(),
                             },
