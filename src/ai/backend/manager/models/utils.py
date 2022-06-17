@@ -257,10 +257,10 @@ def sql_json_merge(
             col,
             sa.text("'{}'::jsonb"),
         )
-        for key, value in obj.items():
+        for obj_key, value in obj.items():
             expr = expr.concat(
                 sa.func.jsonb_build_object(
-                    key,
+                    obj_key,
                     sa.func.cast(value, psql.VARCHAR),
                 ),
             )
