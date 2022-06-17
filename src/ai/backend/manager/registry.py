@@ -876,13 +876,17 @@ class AgentRegistry:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
+        now = datetime.now(tzutc())
         kernel_bulk_insert_query = kernels.insert().values({
             'agent': sa.bindparam('mapped_agent'),
             'id': sa.bindparam('kernel_id'),
             'status': KernelStatus.PENDING,
             'status_history': {
+                'kernel': {
+                    KernelStatus.PENDING.name: now.isoformat(),
+                },
                 'session': {
-                    KernelStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+                    KernelStatus.PENDING.name: now.isoformat(),
                 },
             },
             'session_creation_id': session_creation_id,

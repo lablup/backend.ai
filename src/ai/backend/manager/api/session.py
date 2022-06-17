@@ -1264,11 +1264,6 @@ async def handle_kernel_termination_lifecycle(
     elif isinstance(event, KernelTerminatedEvent):
         await root_ctx.registry.mark_kernel_terminated(event.kernel_id, event.reason, event.exit_code)
         await root_ctx.registry.check_session_terminated(event.kernel_id, event.reason)
-        """TODO
-        sa.update(kernels).values(..., status_history=sql_json_merge(
-            kernels.c.status_history, [], {"TERMINATED": datetime.now().isoformat()},
-        ))
-        """
 
 
 async def handle_session_creation_lifecycle(
