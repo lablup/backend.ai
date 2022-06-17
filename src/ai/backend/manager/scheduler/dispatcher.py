@@ -290,6 +290,13 @@ class SchedulerDispatcher(aobject):
                         'status_changed': now,
                         'status_info': "pending-timeout",
                         'terminated_at': now,
+                        'status_history': sql_json_merge(
+                            kernels.c.status_history,
+                            ('kernel',),
+                            {
+                                KernelStatus.CANCELLED.name: now.isoformat(),
+                            },
+                        ),
                     }).where(kernels.c.session_id.in_([
                         item['session_id'] for item in cancelled_session_rows
                     ]))
@@ -589,6 +596,7 @@ class SchedulerDispatcher(aobject):
 
         async def _finalize_scheduled() -> None:
             async with self.db.begin() as kernel_db_conn:
+                now = datetime.now(tzutc())
                 query = kernels.update().values({
                     'agent': agent_alloc_ctx.agent_id,
                     'agent_addr': agent_alloc_ctx.agent_addr,
@@ -596,7 +604,14 @@ class SchedulerDispatcher(aobject):
                     'status': KernelStatus.SCHEDULED,
                     'status_info': 'scheduled',
                     'status_data': {},
-                    'status_changed': datetime.now(tzutc()),
+                    'status_changed': now,
+                    'status_history': sql_json_merge(
+                        kernels.c.status_history,
+                        ('kernel',),
+                        {
+                            KernelStatus.SCHEDULED.name: now.isoformat(),
+                        },
+                    ),
                 }).where(kernels.c.session_id == sess_ctx.session_id)
                 await kernel_db_conn.execute(query)
 
@@ -725,6 +740,7 @@ class SchedulerDispatcher(aobject):
         async def _finalize_scheduled() -> None:
             async with self.db.begin() as kernel_db_conn:
                 for binding in kernel_agent_bindings:
+                    now = datetime.now(tzutc())
                     query = kernels.update().values({
                         'agent': binding.agent_alloc_ctx.agent_id,
                         'agent_addr': binding.agent_alloc_ctx.agent_addr,
@@ -732,7 +748,14 @@ class SchedulerDispatcher(aobject):
                         'status': KernelStatus.SCHEDULED,
                         'status_info': 'scheduled',
                         'status_data': {},
-                        'status_changed': datetime.now(tzutc()),
+                        'status_changed': now,
+                        'status_history': sql_json_merge(
+                            kernels.c.status_history,
+                            ('kernel',),
+                            {
+                                KernelStatus.SCHEDULED.name: now.isoformat(),
+                            },
+                        ),
                     }).where(kernels.c.id == binding.kernel.kernel_id)
                     await kernel_db_conn.execute(query)
 
@@ -771,6 +794,13 @@ class SchedulerDispatcher(aobject):
                                 'status_changed': now,
                                 'status_info': "",
                                 'status_data': {},
+                                'status_history': sql_json_merge(
+                                    kernels.c.status_history,
+                                    ('session',),
+                                    {
+                                        KernelStatus.PREPARING.name: now.isoformat(),
+                                    },
+                                ),
                             })
                             .where(
                                 (kernels.c.status == KernelStatus.SCHEDULED),
@@ -843,6 +873,13 @@ class SchedulerDispatcher(aobject):
                         'status_info': "failed-to-start",
                         'status_data': status_data,
                         'terminated_at': now,
+                        'status_history': sql_json_merge(
+                            kernels.c.status_history,
+                            ('session',),
+                            {
+                                KernelStatus.CANCELLED.name: now.isoformat(),
+                            },
+                        ),
                     }).where(kernels.c.session_id == session.session_id)
                     await db_conn.execute(update_query)
 

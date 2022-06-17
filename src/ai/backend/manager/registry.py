@@ -880,6 +880,11 @@ class AgentRegistry:
             'agent': sa.bindparam('mapped_agent'),
             'id': sa.bindparam('kernel_id'),
             'status': KernelStatus.PENDING,
+            'status_history': {
+                'session': {
+                    KernelStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+                },
+            },
             'session_creation_id': session_creation_id,
             'session_id': session_id,
             'session_name': session_name,
@@ -1348,6 +1353,13 @@ class AgentRegistry:
                             'stdin_port': created_info['stdin_port'],
                             'stdout_port': created_info['stdout_port'],
                             'service_ports': service_ports,
+                            'status_history': sql_json_merge(
+                                kernels.c.status_history,
+                                ('kernel',),
+                                {
+                                    KernelStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
+                                },
+                            ),
                         }
                         actual_allocs = self.convert_resource_spec_to_resource_slot(
                             created_info['resource_spec']['allocations'])
@@ -1885,7 +1897,9 @@ class AgentRegistry:
                                     'status_history': sql_json_merge(
                                         kernels.c.status_history,
                                         ("kernel",),
-                                        {KernelStatus.TERMINATED.name: datetime.now().isoformat()},
+                                        {
+                                            KernelStatus.TERMINATED.name: now.isoformat(),
+                                        },
                                     ),
                                 }
                                 if kern_stat:
@@ -1928,7 +1942,9 @@ class AgentRegistry:
                                         'status_history': sql_json_merge(
                                             kernels.c.status_history,
                                             ("kernel",),
-                                            {KernelStatus.TERMINATING.name: now.isoformat()},
+                                            {
+                                                KernelStatus.TERMINATING.name: now.isoformat(),
+                                            },
                                         ),
                                     })
                                     .where(kernels.c.id == kernel['id']),
@@ -2108,6 +2124,13 @@ class AgentRegistry:
                             kernels.update()
                             .values({
                                 'status': KernelStatus.RESTARTING,
+                                'status_history': sql_json_merge(
+                                    kernels.c.status_history,
+                                    ('kernel',),
+                                    {
+                                        KernelStatus.RESTARTING.name: datetime.now(tzutc()).isoformat(),
+                                    },
+                                ),
                             })
                             .where(kernels.c.id == kernel['id'])
                         )
@@ -2140,6 +2163,13 @@ class AgentRegistry:
                                 'stdin_port': kernel_info['stdin_port'],
                                 'stdout_port': kernel_info['stdout_port'],
                                 'service_ports': kernel_info.get('service_ports', []),
+                                'status_history': sql_json_merge(
+                                    kernels.c.status_history,
+                                    ('kernel',),
+                                    {
+                                        KernelStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
+                                    },
+                                ),
                             })
                             .where(kernels.c.id == kernel['id'])
                         )
@@ -2837,7 +2867,9 @@ class AgentRegistry:
                             status_history=sql_json_merge(
                                 kernels.c.status_history,
                                 ("session",),
-                                {"TERMINATED": datetime.now().isoformat()},
+                                {
+                                    KernelStatus.TERMINATED.name: datetime.now(tzutc()).isoformat(),
+                                },
                             ),
                         )
                         .where(
