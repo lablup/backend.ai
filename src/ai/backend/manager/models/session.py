@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from typing import Callable, Container, Optional, Sequence, Tuple, Union, TYPE_CHECKING
+from typing import Callable, Container, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union, TYPE_CHECKING
 from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -13,11 +13,7 @@ from sqlalchemy.orm import (
 
 from ai.backend.common.types import (
     AccessKey,
-    BinarySize,
     ClusterMode,
-    KernelId,
-    RedisConnectionInfo,
-    SessionId,
     SessionTypes,
     SessionResult,
     VFolderMount,
@@ -25,16 +21,15 @@ from ai.backend.common.types import (
 
 from .base import (
     EnumType, GUID, ForeignKeyIDColumn, SessionIDColumn, KernelIDColumnType,
-    IDColumn, ResourceSlotColumn, URLColumn, StructuredJSONObjectListColumn,
-    KVPair, ResourceLimit, KVPairInput, ResourceLimitInput,
-    Base, StructuredJSONColumn, set_if_set,
+    ResourceSlotColumn, URLColumn, StructuredJSONObjectListColumn, Base,
 )
 
-if TYPE_CHECKING:
-    from ..scheduler.types import PendingSession
+from .kernel import KernelRow, KernelStatus
 
 __all__ = (
     'SessionStatus',
+    'AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES',
+    'USER_RESOURCE_OCCUPYING_SESSION_STATUSES',
     'SessionRow',
     'SessionDependencyRow',
 )
@@ -66,6 +61,43 @@ DEAD_SESSION_STATUSES = (
     SessionStatus.TERMINATED,
 )
 
+# statuses to consider when calculating current resource usage
+AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
+    e for e in SessionStatus
+    if e not in (
+        SessionStatus.TERMINATED,
+        SessionStatus.PENDING,
+        SessionStatus.CANCELLED,
+    )
+)
+
+USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
+    e for e in SessionStatus
+    if e not in (
+        SessionStatus.TERMINATING,
+        SessionStatus.TERMINATED,
+        SessionStatus.PENDING,
+        SessionStatus.CANCELLED,
+    )
+)
+
+_KERNEL_SESSION_STATUS_MAPPING = {
+    KernelStatus.PENDING: SessionStatus.PENDING,
+    KernelStatus.SCHEDULED: SessionStatus.SCHEDULED,
+    KernelStatus.PREPARING: SessionStatus.PREPARING,
+    KernelStatus.BUILDING: SessionStatus.BUILDING,
+    KernelStatus.PULLING: SessionStatus.PULLING,
+    KernelStatus.RUNNING: SessionStatus.RUNNING,
+    KernelStatus.RESTARTING: SessionStatus.RESTARTING,
+    KernelStatus.RESIZING: SessionStatus.RESIZING,
+    KernelStatus.SUSPENDED: SessionStatus.SUSPENDED,
+    KernelStatus.TERMINATING: SessionStatus.TERMINATING,
+    KernelStatus.TERMINATED: SessionStatus.TERMINATED,
+    KernelStatus.ERROR: SessionStatus.ERROR,
+    KernelStatus.CANCELLED: SessionStatus.CANCELLED,
+}
+
+SessionData = TypeVar('SessionData', 'SessionRow', Mapping)
 
 async def _match_sessions(
     db_session: SASession,
@@ -104,13 +136,17 @@ class SessionRow(Base):
               default=ClusterMode.SINGLE_NODE, server_default=ClusterMode.SINGLE_NODE.name)
     cluster_size = sa.Column('cluster_size', sa.Integer, nullable=False, default=1)
     kernels = relationship('KernelRow', back_populates='session', primaryjoin='SessionRow.id==KernelRow.session_id')
+    # kernel data is inserted with a created or existing session id.
+    # main kernel field can be null right after session is created.
     main_kernel_id = sa.Column('main_kernel_id', KernelIDColumnType, sa.ForeignKey('kernels.id'),
-                  nullable=False, unique=True, index=True)
+                  nullable=True, index=True)
     main_kernel = relationship('KernelRow', foreign_keys=[main_kernel_id])
 
     # Resource ownership
     scaling_group_name = sa.Column('scaling_group_name', sa.ForeignKey('scaling_groups.name'), index=True, nullable=True)
     scaling_group = relationship('ScalingGroupRow', back_populates='sessions')
+    target_sgroup_names = sa.Column('target_sgroup_names', sa.ARRAY(sa.String(length=64)),
+              default='{}', server_default='{}', nullable=True)
     domain_name = sa.Column('domain_name', sa.String(length=64), sa.ForeignKey('domains.name'), nullable=False)
     domain = relationship('DomainRow', back_populates='sessions')
     group_id = ForeignKeyIDColumn('group_id', 'groups.id', nullable=False)
@@ -119,6 +155,9 @@ class SessionRow(Base):
     user = relationship('UserRow', back_populates='sessions')
     kp_access_key = sa.Column('kp_access_key', sa.String(length=20), sa.ForeignKey('keypairs.access_key'))
     access_key = relationship('KeyPairRow', back_populates='sessions')
+    # kp_resource_policy = sa.Column(
+    #     'kp_resource_policy', sa.String(length=64), sa.ForeignKey('keypair_resource_policies.name'), nullable=False)
+    # resource_policy = relationship('KeyPairResourcePolicyRow', back_populates='sessions')
 
     # if image_id is null, should find a image field from related kernel row.
     image_id = ForeignKeyIDColumn('image_id', 'images.id')
@@ -131,6 +170,7 @@ class SessionRow(Base):
     requested_slots = sa.Column('requested_slots', ResourceSlotColumn(), nullable=False)
     vfolder_mounts = sa.Column('vfolder_mounts', StructuredJSONObjectListColumn(VFolderMount), nullable=True)
     resource_opts = sa.Column('resource_opts', pgsql.JSONB(), nullable=True, default={})
+    environ = sa.Column('environ', pgsql.JSONB(), nullable=True, default={})
     bootstrap_script= sa.Column('bootstrap_script', sa.String(length=16 * 1024), nullable=True)
 
     # Lifecycle
@@ -179,7 +219,7 @@ class SessionRow(Base):
         allow_prefix: bool=False,
         allow_stale: bool=True,
         max_matches: int=10,
-    ) -> Sequence[SessionRow]:
+    ) -> List[SessionRow]:
         def build_query(base_cond):
             cond = base_cond & (SessionRow.kp_access_key == access_key)
             if not allow_stale:
@@ -209,7 +249,7 @@ class SessionRow(Base):
         max_matches: int=10,
         load_kernels: bool=False,
         load_main_kernel: bool=False,
-    ) -> Sequence[SessionRow]:
+    ) -> List[SessionRow]:
         """
         Match the prefix of session ID or session name among the sessions
         that belongs to the given access key, and return the list of SessionRow.
@@ -246,7 +286,7 @@ class SessionRow(Base):
         info_cols: Sequence,
         *,
         allow_stale=False,
-    ) -> Sequence[SessionRow]:
+    ) -> List[SessionRow]:
         default_cols = [
             SessionRow.id, SessionRow.name, SessionRow.access_key,
         ]
@@ -265,6 +305,61 @@ class SessionRow(Base):
         )
         result = await db_session.execute(query)
         return result.scalars().all()
+
+    @classmethod
+    async def get_sessions_by_status(
+        cls,
+        db_session: SASession,
+        status: SessionStatus | List[SessionStatus],
+        sgroup_name: str | None = None,
+    ) -> List[SessionRow]:
+        if isinstance(status, SessionStatus):
+            cond = (SessionRow.status == status)
+        elif len(status) == 1:
+            cond = (SessionRow.status == status[0])
+        else:
+            cond = (SessionRow.status.in_(status))
+        if sgroup_name:
+            cond = (cond & (SessionRow.scaling_group_name == sgroup_name))
+        query = (
+            sa.select(SessionRow)
+            .where(cond)
+        )
+        result = await db_session.execute(query)
+        return result.scalars().all()
+    
+    @classmethod
+    async def update_kernels(
+        cls,
+        db_session: SASession,
+        session: SessionRow,
+        kernel_data,
+        *,
+        update_session: bool = False,
+    ) -> None:
+        async with db_session.begin_nested():
+            update_query = (
+                sa.update(KernelRow)
+                .values(**kernel_data)
+                .where(KernelRow.session_id == session.id)
+            )
+            await db_session.execute(update_query)
+
+            if not update_session:
+                return
+            try:
+                session_update = {
+                    **kernel_data,
+                    'status': _KERNEL_SESSION_STATUS_MAPPING[kernel_data['status']],
+                }
+            except KeyError:
+                session_update = {**kernel_data}
+            update_query = (
+                sa.update(SessionRow)
+                .values(**session_update)
+                .where(SessionRow.id == session.id)
+            )
+            await db_session.execute(update_query)
 
 
 class SessionDependencyRow(Base):
@@ -287,7 +382,7 @@ class SessionDependencyRow(Base):
     async def check_all_dependencies(
         cls,
         db_session: SASession,
-        sess_ctx: PendingSession,
+        sess_ctx: SessionRow,
     ) -> Tuple[bool, Optional[str]]:
         j = sa.join(
             SessionDependencyRow,
@@ -297,7 +392,7 @@ class SessionDependencyRow(Base):
         query = (
             sa.select(SessionRow.id, SessionRow.name, SessionRow.result)
             .select_from(j)
-            .where(SessionDependencyRow.session_id == sess_ctx.session_id)
+            .where(SessionDependencyRow.session_id == sess_ctx.id)
         )
         result = await db_session.execute(query)
         rows = result.scalars().all()

@@ -4,6 +4,7 @@ import enum
 from typing import (
     Any,
     Dict,
+    List,
     Mapping,
     Sequence,
     TYPE_CHECKING,
@@ -14,9 +15,13 @@ import graphene
 from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
 from sqlalchemy.sql.expression import true
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import (
+    AsyncConnection as SAConnection,
+    AsyncSession as SASession,
+)
 from sqlalchemy.engine.row import Row
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack, redis
 from ai.backend.common.types import (
@@ -26,11 +31,11 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 
-from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels, KernelRow
 from .base import (
     batch_result,
     EnumType, Item,
-    metadata,
+    mapper_registry,
     PaginatedList,
     privileged_mutation,
     ResourceSlotColumn,
@@ -44,7 +49,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
 
 __all__: Sequence[str] = (
-    'agents', 'AgentStatus',
+    'agents', 'AgentStatus', 'AgentRow',
     'AgentList', 'Agent', 'ModifyAgent',
     'recalc_agent_resource_occupancy',
 )
@@ -58,13 +63,13 @@ class AgentStatus(enum.Enum):
 
 
 agents = sa.Table(
-    'agents', metadata,
+    'agents', mapper_registry.metadata,
     sa.Column('id', sa.String(length=64), primary_key=True),
     sa.Column('status', EnumType(AgentStatus), nullable=False, index=True,
               default=AgentStatus.ALIVE),
     sa.Column('status_changed', sa.DateTime(timezone=True), nullable=True),
     sa.Column('region', sa.String(length=64), index=True, nullable=False),
-    sa.Column('scaling_group', sa.ForeignKey('scaling_groups.name'), index=True,
+    sa.Column('scaling_group_name', sa.ForeignKey('scaling_groups.name'), index=True,
               nullable=False, server_default='default', default='default'),
     sa.Column('schedulable', sa.Boolean(),
               nullable=False, server_default=true(), default=True),
@@ -81,6 +86,32 @@ agents = sa.Table(
     sa.Column('architecture', sa.String(length=32), nullable=False),
     sa.Column('compute_plugins', pgsql.JSONB(), nullable=False, default={}),
 )
+
+class AgentRow:
+    
+    @classmethod
+    async def list_agents_by_sgroup(
+        cls,
+        db_sess: SASession,
+        sgroup_name: str,
+    ) -> List[AgentRow]:
+        query = (
+            sa.select(AgentRow)
+            .where(
+                (AgentRow.status == AgentStatus.ALIVE) &
+                (AgentRow.scaling_group == sgroup_name) &
+                (AgentRow.schedulable == true()),
+            )
+        )
+
+        result = await db_sess.execute(query)
+        return result.scalars().all()
+
+
+mapper_registry.map_imperatively(AgentRow, agents, properties={
+    'kernels': relationship('KernelRow', back_populates='agent'),
+    'scaling_group': relationship('ScalingGroupRow', back_populates='agents'),
+})
 
 
 class Agent(graphene.ObjectType):
@@ -338,29 +369,41 @@ class AgentList(graphene.ObjectType):
     items = graphene.List(Agent, required=True)
 
 
-async def recalc_agent_resource_occupancy(db_conn: SAConnection, agent_id: AgentId) -> None:
-    query = (
-        sa.select([
-            kernels.c.occupied_slots,
-        ])
-        .select_from(kernels)
-        .where(
-            (kernels.c.agent == agent_id) &
-            (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
-        )
+async def recalc_agent_resource_occupancy(db_sess: SASession, agent: AgentRow) -> None:
+    # kernel_slots = sum([k.occupied_slots for k in agent.kernels], ResourceSlot())
+    # agent.occupied_slots = kernel_slots
+    # await db_sess.flush()
+
+    kernel_slots = await KernelRow.get_occupancy(
+        db_sess,
+        cond=(KernelRow.agent_id == agent.id),
+        status_choice=AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     )
-    occupied_slots = ResourceSlot()
-    result = await db_conn.execute(query)
-    for row in result:
-        occupied_slots += row['occupied_slots']
-    query = (
-        sa.update(agents)
-        .values({
-            'occupied_slots': occupied_slots,
-        })
-        .where(agents.c.id == agent_id)
-    )
-    await db_conn.execute(query)
+    agent.occupied_slots = kernel_slots
+    await db_sess.flush()
+
+    # query = (
+    #     sa.select([
+    #         kernels.c.occupied_slots,
+    #     ])
+    #     .select_from(kernels)
+    #     .where(
+    #         (kernels.c.agent == agent_id) &
+    #         (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+    #     )
+    # )
+    # occupied_slots = ResourceSlot()
+    # result = await db_sess.execute(query)
+    # for row in result:
+    #     occupied_slots += row['occupied_slots']
+    # query = (
+    #     sa.update(agents)
+    #     .values({
+    #         'occupied_slots': occupied_slots,
+    #     })
+    #     .where(agents.c.id == agent_id)
+    # )
+    # await db_sess.execute(query)
 
 
 class ModifyAgent(graphene.Mutation):

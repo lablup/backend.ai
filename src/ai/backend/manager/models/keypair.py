@@ -87,7 +87,7 @@ keypairs = sa.Table(
     sa.Column('ssh_private_key', sa.String(length=2000), nullable=True),
 
     ForeignKeyIDColumn('user', 'users.uuid', nullable=False),
-    sa.Column('resource_policy', sa.String(length=256),
+    sa.Column('resource_policy_name', sa.String(length=256),
               sa.ForeignKey('keypair_resource_policies.name'),
               nullable=False),
     # dotfiles column, \x90 means empty list in msgpack
@@ -96,10 +96,12 @@ keypairs = sa.Table(
 )
 
 class KeyPairRow:
-    pass
+    def __str__(self) -> str:
+        return str(self.access_key)
 
 mapper_registry.map_imperatively(KeyPairRow, keypairs, properties={
-    'sessions' : relationship('SessionRow', back_populates='access_key'),
+    'sessions': relationship('SessionRow', back_populates='access_key'),
+    'resource_policy': relationship('KeyPairResourcePolicyRow', back_populates='keypairs'),
 })
 
 

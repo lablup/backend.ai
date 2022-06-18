@@ -178,6 +178,7 @@ class ImageRow(Base):
         ),
     ), nullable=False)
     sessions = relationship('SessionRow', back_populates='image')
+    kernels = relationship('KernelRow', back_populates='image')
     aliases: relationship
 
     def __init__(
@@ -314,6 +315,44 @@ class ImageRow(Base):
             except UnknownImageReference:
                 continue
         raise ImageNotFound("Unkown image references: " + ", ".join(searched_refs))
+
+
+    @classmethod
+    async def resolve_all(
+        cls,
+        session: AsyncSession,
+        references: List[Union[ImageAlias, ImageRef]],
+        *,
+        load_aliases: bool = True,
+    ) -> Mapping[str, ImageRow]:
+        refs = []
+        aliases = []
+
+        for ref in references:
+            if isinstance(ref, str):
+                aliases.append(ref)
+            elif isinstance(ref, ImageRef):
+                refs.append(ref.canonical)
+
+        query = sa.select(ImageRow).where(ImageRow.name.in_(refs))
+        if load_aliases:
+            query = query.options(selectinload(ImageRow.aliases))
+        images = (await session.execute(query)).scalars().all()
+        result = {img.name: img for img in images}
+
+        if aliases:
+            query = (
+                sa.select(ImageAliasRow)
+                .where(ImageAliasRow.alias.in_(aliases))
+                .options(selectinload(ImageAliasRow.alias))
+            )
+            image_aliases = (await session.execute(query)).scalars().all()
+            result = {
+                **{a.alias: a.image for a in image_aliases},
+                **result,
+            }
+        return result
+
 
     @classmethod
     async def list(cls, session: AsyncSession, load_aliases=False) -> List[ImageRow]:

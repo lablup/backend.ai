@@ -89,6 +89,7 @@ from ai.backend.common.types import (
     AgentId,
     KernelId,
     ClusterMode,
+    SessionEnqueuingConfig,
     KernelEnqueueingConfig,
     SessionTypes,
     check_typed_dict,
@@ -935,6 +936,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
 
     log.debug('cluster template: {}', template)
 
+    session_config: SessionEnqueuingConfig = {}
     kernel_configs: List[KernelEnqueueingConfig] = []
     for node in template['spec']['nodes']:
         # Resolve session template.
@@ -1019,6 +1021,9 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
                 check_typed_dict(kernel_config, KernelEnqueueingConfig),  # type: ignore
             )
 
+    session_config['kernel_configs'] = kernel_configs
+    session_config['image_ref'] = kernel_configs[0]['image_ref']
+
     session_creation_id = secrets.token_urlsafe(16)
     start_event = asyncio.Event()
     kernel_id: Optional[KernelId] = None
@@ -1036,7 +1041,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
                 session_creation_id,
                 params['session_name'],
                 owner_access_key,
-                kernel_configs,
+                session_config,
                 params['scaling_group'],
                 params['sess_type'],
                 resource_policy,

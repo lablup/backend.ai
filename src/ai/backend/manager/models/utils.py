@@ -198,6 +198,24 @@ async def reenter_txn(
             yield conn
 
 
+@actxmgr
+async def reenter_txn_session(
+    pool: ExtendedAsyncSAEngine,
+    sess: SASession,
+    read_only: bool = False,
+) -> AsyncIterator[SAConnection]:
+    if sess is None:
+        if read_only:
+            async with pool.begin_readonly_session() as sess:
+                yield sess
+        else:
+            async with pool.begin_session() as sess:
+                yield sess
+    else:
+        async with sess.begin_nested():
+            yield sess
+
+
 TQueryResult = TypeVar('TQueryResult')
 
 
@@ -269,6 +287,9 @@ def sql_json_increment(
 
     Note that the existing value of the parent key must be also an object, not a primitive value.
     """
+    print('\n----------------\nsql_json_increment')
+    print(f'{col = }')
+    print(f'{type(col) = }')
     expr = sa.func.coalesce(
         col if _depth == 0 else col[key[:_depth]],
         sa.text("'{}'::jsonb"),

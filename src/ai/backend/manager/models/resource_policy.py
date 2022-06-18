@@ -13,11 +13,14 @@ from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
 from sqlalchemy.engine.row import Row
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.orm import (
+    relationship,
+)
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from .base import (
-    metadata, BigInt, EnumType, ResourceSlotColumn,
+    mapper_registry, BigInt, EnumType, ResourceSlotColumn,
     simple_db_mutate,
     simple_db_mutate_returning_item,
     set_if_set,
@@ -33,6 +36,7 @@ log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.models'))
 
 __all__: Sequence[str] = (
     'keypair_resource_policies',
+    'KeyPairResourcePolicyRow',
     'KeyPairResourcePolicy',
     'DefaultForUnspecified',
     'CreateKeyPairResourcePolicy',
@@ -42,7 +46,7 @@ __all__: Sequence[str] = (
 
 
 keypair_resource_policies = sa.Table(
-    'keypair_resource_policies', metadata,
+    'keypair_resource_policies', mapper_registry.metadata,
     sa.Column('name', sa.String(length=256), primary_key=True),
     sa.Column('created_at', sa.DateTime(timezone=True),
               server_default=sa.func.now()),
@@ -60,6 +64,18 @@ keypair_resource_policies = sa.Table(
     sa.Column('allowed_vfolder_hosts', pgsql.ARRAY(sa.String), nullable=False),
     # TODO: implement with a many-to-many association table
     # sa.Column('allowed_scaling_groups', sa.Array(sa.String), nullable=False),
+)
+
+class KeyPairResourcePolicyRow:
+    pass
+
+mapper_registry.map_imperatively(
+    KeyPairResourcePolicyRow,
+    keypair_resource_policies,
+    properties={
+        'keypairs': relationship('KeyPairResourcePolicyRow', back_populates='resource_policy'),
+        # 'sessions': relationship('SessionRow', back_populates='resource_policy'),
+    }
 )
 
 

@@ -41,7 +41,7 @@ log = BraceStyleAdapter(logging.getLogger(__file__))
 
 
 __all__: Sequence[str] = (
-    'domains',
+    'domains', 'DomainRow',
     'Domain', 'DomainInput', 'ModifyDomainInput',
     'CreateDomain', 'ModifyDomain', 'DeleteDomain',
     'DomainDotfile', 'MAXIMUM_DOTFILE_SIZE',

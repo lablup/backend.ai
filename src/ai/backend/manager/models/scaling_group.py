@@ -4,6 +4,7 @@ from datetime import timedelta
 from typing import (
     Any,
     Dict,
+    List,
     Mapping,
     Sequence,
     Set,
@@ -18,7 +19,10 @@ from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import (
+    AsyncConnection as SAConnection,
+    AsyncSession as SASession
+)
 from sqlalchemy.orm import relationship
 import trafaret as t
 
@@ -111,16 +115,6 @@ scaling_groups = sa.Table(
     ),
 )
 
-class ScalingGroupRow:
-    pass
-
-mapper_registry.map_imperatively(ScalingGroupRow, scaling_groups, properties={
-    'sessions' : relationship('SessionRow', back_populates='scaling_group'),
-})
-
-# When scheduling, we take the union of allowed scaling groups for
-# each domain, group, and keypair.
-
 
 sgroups_for_domains = sa.Table(
     'sgroups_for_domains', mapper_registry.metadata,
@@ -169,13 +163,24 @@ sgroups_for_keypairs = sa.Table(
     sa.UniqueConstraint('scaling_group', 'access_key', name='uq_sgroup_akey'),
 )
 
+class ScalingGroupRow:
+    pass
+
+mapper_registry.map_imperatively(ScalingGroupRow, scaling_groups, properties={
+    'sessions' : relationship('SessionRow', back_populates='scaling_group'),
+    'agents': relationship('AgentRow', back_populates='scaling_group'),
+})
+
+# When scheduling, we take the union of allowed scaling groups for
+# each domain, group, and keypair.
+
 
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
     group: Union[uuid.UUID, str],
     access_key: str,
-) -> Sequence[Row]:
+) -> List[ScalingGroupRow]:
     query = (
         sa.select([sgroups_for_domains])
         .where(sgroups_for_domains.c.domain == domain_name)
@@ -204,15 +209,15 @@ async def query_allowed_sgroups(
 
     sgroups = from_domain | from_group | from_keypair
     query = (
-        sa.select([scaling_groups])
+        sa.select(ScalingGroupRow)
         .where(
-            (scaling_groups.c.name.in_(sgroups)) &
-            (scaling_groups.c.is_active),
+            (ScalingGroupRow.name.in_(sgroups)) &
+            (ScalingGroupRow.is_active),
         )
-        .order_by(scaling_groups.c.name)
+        .order_by(ScalingGroupRow.name)
     )
-    result = await db_conn.execute(query)
-    return [row for row in result]
+    result = await SASession(db_conn).execute(query)
+    return result.scalars().all()
 
 
 class ScalingGroup(graphene.ObjectType):

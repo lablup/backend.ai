@@ -63,6 +63,7 @@ from .base import (
     GUID,
     Item,
     KernelIDColumn,
+    ForeignKeyIDColumn,
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumnType,
@@ -190,13 +191,13 @@ kernels = sa.Table(
 
     # Resource ownership
     sa.Column('scaling_group', sa.ForeignKey('scaling_groups.name'), index=True, nullable=True),
-    sa.Column('agent', sa.String(length=64), sa.ForeignKey('agents.id'), nullable=True),
+    sa.Column('agent_id', sa.String(length=64), sa.ForeignKey('agents.id'), nullable=True),
     sa.Column('agent_addr', sa.String(length=128), nullable=True),
     sa.Column('domain_name', sa.String(length=64), sa.ForeignKey('domains.name'), nullable=False),
     sa.Column('group_id', GUID, sa.ForeignKey('groups.id'), nullable=False),
     sa.Column('user_uuid', GUID, sa.ForeignKey('users.uuid'), nullable=False),
     sa.Column('access_key', sa.String(length=20), sa.ForeignKey('keypairs.access_key')),
-    sa.Column('image', sa.String(length=512)),
+    ForeignKeyIDColumn('image_id', 'images.id'),
     sa.Column('architecture', sa.String(length=32), default='x86_64'),
     sa.Column('registry', sa.String(length=512)),
     sa.Column('tag', sa.String(length=64), nullable=True),
@@ -204,6 +205,7 @@ kernels = sa.Table(
     # Resource occupation
     sa.Column('container_id', sa.String(length=64)),
     sa.Column('occupied_slots', ResourceSlotColumn(), nullable=False),
+    sa.Column('requested_slots', ResourceSlotColumn(), nullable=True),
     sa.Column('occupied_shares', pgsql.JSONB(), nullable=False, default={}),  # legacy
     sa.Column('environ', sa.ARRAY(sa.String), nullable=True),
     sa.Column('mounts', sa.ARRAY(sa.String), nullable=True),  # list of list; legacy since 22.03
@@ -383,20 +385,52 @@ class KernelRow:
         return result.scalars().all()
 
     @classmethod
-    async def update(
+    async def get_occupancy(
         cls,
         db_session: SASession,
-        kernel_id: str,
-        values: Mapping[str, Any],
-    ) -> None:
-        await db_session.execute(
-            sa.update(KernelRow)
-            .values(**values)
-            .where(KernelRow.id == kernel_id)
+        cond,
+        slot_filter = None,
+        status_choice = USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    ) -> ResourceSlot:
+        query = (
+            sa.select(KernelRow.occupied_slots)
+            .where(
+                cond &
+                (KernelRow.status.in_(status_choice)),
+            )
         )
+        zero = ResourceSlot()
+        key_occupied = sum(
+            [
+                row.occupied_slots
+                async for row in (await db_session.stream(query))
+            ],
+            zero,
+        )
+        if slot_filter:
+            key_occupied = ResourceSlot({
+                k: v for k, v in key_occupied.items() if k in slot_filter
+            })
+        return key_occupied
+
+
+    # @classmethod
+    # async def update(
+    #     cls,
+    #     db_session: SASession,
+    #     kernel_id: str,
+    #     values: Mapping[str, Any],
+    # ) -> None:
+    #     await db_session.execute(
+    #         sa.update(KernelRow)
+    #         .values(**values)
+    #         .where(KernelRow.id == kernel_id)
+    #     )
 
 mapper_registry.map_imperatively(KernelRow, kernels, properties={
     'session': relationship('SessionRow', back_populates='kernels', foreign_keys=[kernels.c.session_id]),
+    'image': relationship('ImageRow', back_populates='kernels'),
+    'agent': relationship('AgentRow', back_populates='kernels'),
 })
 
 
@@ -1622,23 +1656,32 @@ class LegacyComputeSessionList(graphene.ObjectType):
 
 
 async def recalc_concurrency_used(
-    db_conn: SAConnection,
+    db_sess: SASession,
     redis_stat: RedisConnectionInfo,
     access_key: AccessKey,
 ) -> None:
 
     concurrency_used: int
-    async with db_conn.begin_nested():
-        query = (
-            sa.select([sa.func.count()])
-            .select_from(kernels)
-            .where(
-                (kernels.c.access_key == access_key) &
-                (kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+    async with db_sess.begin_nested():
+        concurrency_used = (
+            db_sess.query(KernelRow)
+            .filter(
+                (KernelRow.access_key == access_key),
+                (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
             )
+            .count()
         )
-        result = await db_conn.execute(query)
-        concurrency_used = result.first()[0]
+        assert isinstance(concurrency_used, int)
+        # query = (
+        #     sa.select([sa.func.count()])
+        #     .select_from(kernels)
+        #     .where(
+        #         (kernels.c.access_key == access_key) &
+        #         (kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+        #     )
+        # )
+        # result = await db_sess.execute(query)
+        # concurrency_used = result.first()[0]
 
     await redis.execute(
         redis_stat,

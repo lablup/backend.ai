@@ -7,6 +7,7 @@ from collections import defaultdict
 import copy
 from datetime import datetime
 from decimal import Decimal
+from functools import reduce
 import itertools
 import logging
 import secrets
@@ -77,6 +78,7 @@ from ai.backend.common.types import (
     ClusterSSHKeyPair,
     DeviceId,
     HardwareMetadata,
+    SessionEnqueuingConfig,
     KernelEnqueueingConfig,
     KernelId,
     RedisConnectionInfo,
@@ -110,7 +112,7 @@ from .models import (
     agents, kernels,
     keypair_resource_policies,
     SessionDependencyRow,
-    AgentStatus, KernelStatus,
+    AgentStatus, KernelStatus, SessionStatus,
     ImageRow, SessionRow,
     query_allowed_sgroups,
     prepare_dotfiles,
@@ -125,7 +127,8 @@ from .models.kernel import KernelRow, match_session_ids, get_all_kernels, get_ma
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
-    reenter_txn, sql_json_merge,
+    reenter_txn, reenter_txn_session,
+    sql_json_merge,
 )
 
 if TYPE_CHECKING:
@@ -802,7 +805,7 @@ class AgentRegistry:
         session_creation_id: str,
         session_name: str,
         access_key: AccessKey,
-        kernel_enqueue_configs: List[KernelEnqueueingConfig],
+        session_enqueue_configs: SessionEnqueuingConfig,
         scaling_group: Optional[str],
         session_type: SessionTypes,
         resource_policy: dict,
@@ -818,6 +821,7 @@ class AgentRegistry:
         callback_url: URL = None,
     ) -> SessionId:
 
+        kernel_enqueue_configs = session_enqueue_configs['kernel_configs']
         session_id = SessionId(uuid.uuid4())
 
         # Check keypair resource limit
@@ -901,6 +905,39 @@ class AgentRegistry:
             else:
                 raise InvalidAPIParameters("Missing kernel configurations")
 
+        # fetch image data at once.
+        image_map: Mapping[str, ImageRow]
+        async with self.db.begin_readonly_session() as session:
+            image_refs = [conf['image_ref'] for conf in kernel_enqueue_configs]
+            log_msg = [f'image ref => {ref} ({ref.architecture})' for ref in image_refs]
+            log.debug(
+                'enqueue_session(): '
+                ', '.join(log_msg)
+            )
+            image_map = await ImageRow.resolve_all(session, image_refs)
+
+        session_data = {
+            'id': session_id,
+            'status': SessionStatus.PENDING,
+            'creation_id': session_creation_id,
+            'name': session_name,
+            'session_type': session_type,
+            'cluster_mode': cluster_mode.value,
+            'cluster_size': cluster_size,
+            'scaling_group': scaling_group,
+            'domain_name': user_scope.domain_name,
+            'group_id': user_scope.group_id,
+            'user_uuid': user_scope.user_uuid,
+            'kp_access_key': access_key,
+            'tag': session_tag,
+            'starts_at': starts_at,
+            'callback_url': callback_url,
+            'occupying_slots': ResourceSlot(),
+            'requested_slots': ResourceSlot(),
+            'vfolder_mounts': vfolder_mounts,
+            'image_id': image_map[kernel_enqueue_configs[0]].id,
+        }
+
         # Prepare internal data.
         internal_data = {} if internal_data is None else internal_data
         internal_data.update(dotfile_data)
@@ -956,20 +993,19 @@ class AgentRegistry:
         kernel_data = []
 
         for idx, kernel in enumerate(kernel_enqueue_configs):
-            kernel_id: KernelId
+            # kernel_id: KernelId
+            kernel_id = KernelId(uuid.uuid4())
             if kernel['cluster_role'] == DEFAULT_ROLE:
-                kernel_id = cast(KernelId, session_id)
-            else:
-                kernel_id = KernelId(uuid.uuid4())
+                # kernel_id = cast(KernelId, session_id)
+                session_data['main_kernel_id'] = kernel_id
+            # else:
+            #     kernel_id = KernelId(uuid.uuid4())
             creation_config = kernel['creation_config']
-            image_ref = kernel['image_ref']
             resource_opts = creation_config.get('resource_opts') or {}
 
             creation_config['mounts'] = [vfmount.to_json() for vfmount in vfolder_mounts]
-            # TODO: merge into a single call
-            async with self.db.begin_readonly_session() as session:
-                log.debug('enqueue_session(): image ref => {} ({})', image_ref, image_ref.architecture)
-                image_row = await ImageRow.resolve(session, [image_ref])
+            image_ref = kernel['image_ref']
+            image_row = image_map[image_ref]
             image_min_slots, image_max_slots = await image_row.get_slot_ranges(self.shared_config)
             known_slot_types = await self.shared_config.get_resource_slots()
 
@@ -1075,6 +1111,9 @@ class AgentRegistry:
                     .format(str(shmem), str(BinarySize(requested_slots['mem']))),
                 )
 
+            # Add requested resource slot data to session
+            session_data['requested_slots'] += requested_slots
+
             environ = kernel_enqueue_configs[0]['creation_config'].get('environ') or {}
 
             # Create kernel object in PENDING state.
@@ -1104,32 +1143,27 @@ class AgentRegistry:
         try:
             async def _enqueue() -> None:
                 async with self.db.begin() as conn:
-                    await conn.execute(kernel_bulk_insert_query, kernel_data)
+                    db_sess = SASession(conn)
+                    await db_sess.add(SessionRow(**session_data))
                     if dependency_sessions:
                         matched_dependency_session_ids = []
                         for dependency_id in dependency_sessions:
-                            match_info = await match_session_ids(
-                                dependency_id,
-                                access_key,
-                                db_connection=conn,
+                            match_info = await SessionRow.match_sessions(
+                                db_sess, dependency_id, access_key,
                             )
                             if match_info:
-                                matched_dependency_session_ids.append(match_info[0]['session_id'])
+                                matched_dependency_session_ids.append(match_info[0].id)
                             else:
                                 raise InvalidAPIParameters(
                                     "Unknown session ID or name in the dependency list",
                                     extra_data={"session_ref": dependency_id},
                                 )
-                        dependency_bulk_insert_query = SessionDependencyRow.insert().values(
-                            {
-                                'session_id': session_id,
-                                'depends_on': sa.bindparam('dependency_id'),
-                            },
-                        )
-                        await conn.execute(dependency_bulk_insert_query, [
-                            {'dependency_id': dependency_id}
-                            for dependency_id in matched_dependency_session_ids
-                        ])
+                        dependency_rows = [SessionDependencyRow(session_id=session_id, depends_on=sess_id) \
+                            for sess_id in matched_dependency_session_ids]
+                        db_sess.add_all(dependency_rows)
+                    db_sess.commit()
+
+                    await conn.execute(kernel_bulk_insert_query, kernel_data)
 
             await execute_with_retry(_enqueue)
         except DBAPIError as e:
@@ -1153,25 +1187,21 @@ class AgentRegistry:
     async def start_session(
         self,
         sched_ctx: SchedulingContext,
-        scheduled_session: PendingSession,
+        scheduled_session: SessionRow,
     ) -> None:
         from .scheduler.types import KernelAgentBinding, AgentAllocationContext
         kernel_agent_bindings: Sequence[KernelAgentBinding] = [
             KernelAgentBinding(
                 kernel=k,
-                agent_alloc_ctx=AgentAllocationContext(
-                    agent_id=k.agent_id,
-                    agent_addr=k.agent_addr,
-                    scaling_group=scheduled_session.scaling_group,
-                ),
+                agent_alloc_ctx=k.agent,
             )
             for k in scheduled_session.kernels
         ]
-        session_creation_id = scheduled_session.session_creation_id
+        session_creation_id = scheduled_session.creation_id
 
         hook_result = await self.hook_plugin_ctx.dispatch(
             'PRE_START_SESSION',
-            (scheduled_session.session_id, scheduled_session.session_name, scheduled_session.access_key),
+            (scheduled_session.id, scheduled_session.name, str(scheduled_session.access_key)),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -1179,14 +1209,15 @@ class AgentRegistry:
 
         # Get resource policy for the session
         # TODO: memoize with TTL
-        async with self.db.begin_readonly() as conn:
-            query = (
-                sa.select([keypair_resource_policies])
-                .select_from(keypair_resource_policies)
-                .where(keypair_resource_policies.c.name == scheduled_session.resource_policy)
-            )
-            result = await conn.execute(query)
-            resource_policy = result.first()
+        # async with self.db.begin_readonly_session() as sess:
+        #     query = (
+        #         sa.select([keypair_resource_policies])
+        #         .select_from(keypair_resource_policies)
+        #         .where(keypair_resource_policies.c.name == scheduled_session.resource_policy)
+        #     )
+        #     result = await sess.execute(query)
+        #     resource_policy = result.first()
+        resource_policy = scheduled_session.access_key.resource_policy
         auto_pull = await self.shared_config.get_raw('config/docker/image/auto_pull')
 
         # Aggregate image registry information
@@ -1204,22 +1235,22 @@ class AgentRegistry:
             'image_infos': image_infos,
             'registry_url': registry_url,
             'registry_creds': registry_creds,
-            'resource_policy': resource_policy,
+            'resource_policy': resource_policy.name,
             'auto_pull': auto_pull,
         }
 
         network_name: Optional[str] = None
         if scheduled_session.cluster_mode == ClusterMode.SINGLE_NODE:
             if scheduled_session.cluster_size > 1:
-                network_name = f'bai-singlenode-{scheduled_session.session_id}'
+                network_name = f'bai-singlenode-{scheduled_session.id}'
                 assert kernel_agent_bindings[0].agent_alloc_ctx.agent_id is not None
-                assert scheduled_session.session_id is not None
+                assert scheduled_session.id is not None
                 try:
                     async with RPCContext(
                         kernel_agent_bindings[0].agent_alloc_ctx.agent_id,
                         kernel_agent_bindings[0].agent_alloc_ctx.agent_addr,
                         invoke_timeout=None,
-                        order_key=str(scheduled_session.session_id),
+                        order_key=str(scheduled_session.id),
                         keepalive_timeout=self.rpc_keepalive_timeout,
                     ) as rpc:
                         await rpc.call.create_local_network(network_name)
@@ -1230,7 +1261,7 @@ class AgentRegistry:
                 network_name = None
         elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
             # Create overlay network for multi-node sessions
-            network_name = f'bai-multinode-{scheduled_session.session_id}'
+            network_name = f'bai-multinode-{scheduled_session.id}'
             mtu = await self.shared_config.get_raw('config/network/overlay/mtu')
             try:
                 # Overlay networks can only be created at the Swarm manager.
@@ -1267,16 +1298,18 @@ class AgentRegistry:
                 if scheduled_session.cluster_size > 1 else None
             ),
         )
-        scheduled_session.environ.update({
-            'BACKENDAI_SESSION_ID': str(scheduled_session.session_id),
-            'BACKENDAI_SESSION_NAME': str(scheduled_session.session_name),
+        sess_env = scheduled_session.environ
+        scheduled_session.environ = {
+            **sess_env,
+            'BACKENDAI_SESSION_ID': str(scheduled_session.id),
+            'BACKENDAI_SESSION_NAME': str(scheduled_session.name),
             'BACKENDAI_CLUSTER_SIZE': str(scheduled_session.cluster_size),
             'BACKENDAI_CLUSTER_REPLICAS':
                 ",".join(f"{k}:{v}" for k, v in replicas.items()),
             'BACKENDAI_CLUSTER_HOSTS':
                 ",".join(binding.kernel.cluster_hostname for binding in kernel_agent_bindings),
             'BACKENDAI_ACCESS_KEY': scheduled_session.access_key,
-        })
+        }
 
         # Aggregate by agents to minimize RPC calls
         per_agent_tasks = []
@@ -1319,11 +1352,11 @@ class AgentRegistry:
             await self.settle_agent_alloc(kernel_agent_bindings)
         # If all is well, let's say the session is ready.
         await self.event_producer.produce_event(
-            SessionStartedEvent(scheduled_session.session_id, session_creation_id),
+            SessionStartedEvent(scheduled_session.id, session_creation_id),
         )
         await self.hook_plugin_ctx.notify(
             'POST_START_SESSION',
-            (scheduled_session.session_id, scheduled_session.session_name, scheduled_session.access_key),
+            (scheduled_session.id, scheduled_session.name, str(scheduled_session.access_key)),
         )
 
     def convert_resource_spec_to_resource_slot(
@@ -1410,7 +1443,7 @@ class AgentRegistry:
     async def _create_kernels_in_one_agent(
         self,
         agent_alloc_ctx: AgentAllocationContext,
-        scheduled_session: PendingSession,
+        scheduled_session: SessionRow,
         items: Sequence[KernelAgentBinding],
         image_info,
         cluster_info,
@@ -1422,12 +1455,12 @@ class AgentRegistry:
         resource_policy = image_info['resource_policy']
         auto_pull = image_info['auto_pull']
         assert agent_alloc_ctx.agent_id is not None
-        assert scheduled_session.session_id is not None
+        assert scheduled_session.id is not None
         async with RPCContext(
             agent_alloc_ctx.agent_id,
             agent_alloc_ctx.agent_addr,
             invoke_timeout=None,
-            order_key=str(scheduled_session.session_id),
+            order_key=str(scheduled_session.id),
             keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
             kernel_creation_id = secrets.token_urlsafe(16)
@@ -1450,7 +1483,7 @@ class AgentRegistry:
                 # Issue a batched RPC call to create kernels on this agent
                 created_infos = await rpc.call.create_kernels(
                     kernel_creation_id,
-                    str(scheduled_session.session_id),
+                    str(scheduled_session.id),
                     [str(binding.kernel.kernel_id) for binding in items],
                     [
                         {
@@ -1486,9 +1519,9 @@ class AgentRegistry:
                             'resource_opts': binding.kernel.resource_opts,
                             'bootstrap_script': binding.kernel.bootstrap_script,
                             'startup_command': binding.kernel.startup_command,
-                            'internal_data': scheduled_session.internal_data,
+                            'internal_data': scheduled_session.main_kernel.internal_data,
                             'auto_pull': auto_pull,
-                            'preopen_ports': scheduled_session.preopen_ports,
+                            'preopen_ports': scheduled_session.main_kernel.preopen_ports,
                         }
                         for binding in items
                     ],
@@ -1496,7 +1529,7 @@ class AgentRegistry:
                 )
                 log.debug(
                     'start_session(s:{}, ak:{}, k:{}) -> created on ag:{}',
-                    scheduled_session.session_name,
+                    scheduled_session.name,
                     scheduled_session.access_key,
                     [binding.kernel.kernel_id for binding in items],
                     agent_alloc_ctx.agent_id,
@@ -1537,86 +1570,45 @@ class AgentRegistry:
             'public_key': public_key.decode('utf-8'),
         }
 
-    async def get_keypair_occupancy(self, access_key, *, conn=None):
+    async def get_keypair_occupancy(self, access_key, *, sess=None):
         known_slot_types = \
             await self.shared_config.get_resource_slots()
 
         async def _query() -> ResourceSlot:
-            async with reenter_txn(self.db, conn) as _conn:
-                query = (
-                    sa.select([kernels.c.occupied_slots])
-                    .where(
-                        (kernels.c.access_key == access_key) &
-                        (kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
-                    )
+            async with reenter_txn(self.db, sess) as _sess:
+                return await KernelRow.get_occupancy(
+                    _sess,
+                    cond=(KernelRow.access_key == access_key),
+                    slot_filter=known_slot_types,
                 )
-                zero = ResourceSlot()
-                key_occupied = sum([
-                    row['occupied_slots']
-                    async for row in (await _conn.stream(query))], zero)
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
 
         return await execute_with_retry(_query)
 
-    async def get_domain_occupancy(self, domain_name, *, conn=None):
+    async def get_domain_occupancy(self, domain_name, *, sess=None):
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.shared_config.get_resource_slots()
 
         async def _query() -> ResourceSlot:
-            async with reenter_txn(self.db, conn) as _conn:
-                query = (
-                    sa.select([kernels.c.occupied_slots])
-                    .where(
-                        (kernels.c.domain_name == domain_name) &
-                        (kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
-                    )
+            async with reenter_txn(self.db, sess) as _sess:
+                return await KernelRow.get_occupancy(
+                    _sess,
+                    cond=(KernelRow.domain_name == domain_name),
+                    slot_filter=known_slot_types,
                 )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [
-                        row['occupied_slots']
-                        async for row in (await _conn.stream(query))
-                    ],
-                    zero,
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
 
         return await execute_with_retry(_query)
 
-    async def get_group_occupancy(self, group_id, *, conn=None):
+    async def get_group_occupancy(self, group_id, *, sess=None):
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.shared_config.get_resource_slots()
 
         async def _query() -> ResourceSlot:
-            async with reenter_txn(self.db, conn) as _conn:
-                query = (
-                    sa.select([kernels.c.occupied_slots])
-                    .where(
-                        (kernels.c.group_id == group_id) &
-                        (kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
-                    )
+            async with reenter_txn_session(self.db, sess) as _sess:
+                return await KernelRow.get_occupancy(
+                    _sess,
+                    cond=(KernelRow.group_id == group_id),
+                    slot_filter=known_slot_types,
                 )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [
-                        row['occupied_slots']
-                        async for row in (await _conn.stream(query))
-                    ],
-                    zero,
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
 
         return await execute_with_retry(_query)
 
@@ -1758,7 +1750,7 @@ class AgentRegistry:
     async def destroy_session_lowlevel(
         self,
         session_id: SessionId,
-        kernels: Sequence[Row],  # should have (id, agent, agent_addr, container_id) columns
+        kernels: Sequence[Mapping],  # should have (id, agent, agent_addr, container_id) columns
     ) -> None:
         """
         Destroy the kernels that belongs the to given session unconditionally

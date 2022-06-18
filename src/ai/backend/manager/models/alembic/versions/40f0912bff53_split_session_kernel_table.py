@@ -42,128 +42,127 @@ def default_hostname(context) -> str:
     return f"{params['cluster_role']}{params['cluster_idx']}"
 
 
-kernels = sa.Table(
-    'kernels', metadata,
-    KernelIDColumn(),
-    sa.Column('session_id', GUID, nullable=False),
-    sa.Column('session_creation_id', sa.String(length=32), unique=False),
-    sa.Column('session_name', sa.String(length=64), unique=False),
-    sa.Column('session_type', pgsql.ENUM('INTERACTIVE', 'BATCH'), nullable=False,
-                default='INTERACTIVE', server_default='INTERACTIVE'),
-    sa.Column('cluster_role', sa.String(length=16), nullable=False, default='main'),
-    sa.Column('cluster_mode', sa.String(length=16), nullable=False,
-                default='SINGLE_NODE', server_default='SINGLE_NODE'),
-    sa.Column('cluster_size', sa.Integer, nullable=False, default=1),
-
-    # Resource ownership
-    sa.Column('scaling_group', sa.ForeignKey('scaling_groups.name'), nullable=True),
-    sa.Column('domain_name', sa.String(length=64), sa.ForeignKey('domains.name'), nullable=False),
-    sa.Column('group_id', GUID, sa.ForeignKey('groups.id'), nullable=False),
-    sa.Column('user_uuid', GUID, sa.ForeignKey('users.uuid'), nullable=False),
-    sa.Column('access_key', sa.String(length=20), sa.ForeignKey('keypairs.access_key')),
-    sa.Column('image', sa.String(length=512)),
-    sa.Column('tag', sa.String(length=64), nullable=True),
-
-    # Resource occupation
-    sa.Column('occupied_slots', pgsql.JSONB(), nullable=False),
-    sa.Column('vfolder_mounts', pgsql.JSONB(), nullable=True),
-    sa.Column('resource_opts', pgsql.JSONB(), nullable=True, default={}),
-    sa.Column('bootstrap_script', sa.String(length=16 * 1024), nullable=True),
-
-    # Lifecycle
-    sa.Column('created_at', sa.DateTime(timezone=True),
-            server_default=sa.func.now()),
-    sa.Column('terminated_at', sa.DateTime(timezone=True),
-            nullable=True, default=sa.null()),
-    sa.Column('starts_at', sa.DateTime(timezone=True),
-            nullable=True, default=sa.null()),
-    sa.Column('status', sa.Enum(*KernelStatus),
-            default='PENDING',
-            server_default='PENDING',
-            nullable=False),
-    sa.Column('status_changed', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('status_info', sa.Unicode(), nullable=True, default=sa.null()),
-    sa.Column('status_data', pgsql.JSONB(), nullable=True, default=sa.null()),
-    sa.Column('callback_url', sa.types.UnicodeText, nullable=True, default=sa.null()),
-
-    sa.Column('startup_command', sa.Text, nullable=True),
-    sa.Column('result', sa.Enum('UNDEFINED', 'SUCCESS', 'FAILURE'),
-            default='UNDEFINED',
-            server_default='UNDEFINED',
-            nullable=False),
-
-    # Resource metrics measured upon termination
-    sa.Column('num_queries', sa.BigInteger(), default=0),
-    sa.Column('last_stat', pgsql.JSONB(), nullable=True, default=sa.null()),
-)
-
-class KernelRow:
-    pass
-
-mapper_registry.map_imperatively(KernelRow, kernels)
-
 class ImageRow(Base):
     __tablename__ = 'images'
     id = sa.Column('id', GUID(), nullable=False, primary_key=True)
     name = sa.Column('name', sa.String, nullable=False, index=True)
 
 
-class SessionRow(Base):
-    __tablename__ = 'sessions'
-    id = sa.Column('id', GUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False, primary_key=True)
-    creation_id = sa.Column('creation_id', sa.String(length=32), unique=False)
-    name = sa.Column('name', sa.String(length=64), unique=False)
-    session_type = sa.Column('session_type', pgsql.ENUM('INTERACTIVE', 'BATCH', name='sessiontypes', create_type=False), server_default='INTERACTIVE', nullable=False)
-    cluster_mode = sa.Column('cluster_mode', sa.String(length=16), server_default='SINGLE_NODE', nullable=False)
-    cluster_size = sa.Column('cluster_size', sa.Integer(), nullable=False)
-    main_kernel_id = sa.Column('main_kernel_id', GUID(), nullable=False)
-    
-    # Resource ownership
-    scaling_group_name = sa.Column('scaling_group_name', sa.String(length=64), nullable=True)
-    domain_name = sa.Column('domain_name', sa.String(length=64), nullable=False)
-    group_id = sa.Column('group_id', GUID(), nullable=False)
-    user_uuid = sa.Column('user_uuid', GUID(), nullable=False)
-    kp_access_key = sa.Column('kp_access_key', sa.String(length=20), nullable=True)
-
-    # if image_id is null, should find a image field from related kernel row.
-    image_id = sa.Column('image_id', GUID(), nullable=True)
-    tag = sa.Column('tag', sa.String(length=64), nullable=True)
-
-    # Resource occupation
-    occupying_slots = sa.Column('occupying_slots', pgsql.JSONB(), nullable=False)
-    requested_slots = sa.Column('requested_slots', pgsql.JSONB(), nullable=False)
-    vfolder_mounts = sa.Column('vfolder_mounts', pgsql.JSONB(), nullable=True)
-    resource_opts = sa.Column('resource_opts', pgsql.JSONB(), nullable=True, default={})
-    bootstrap_script= sa.Column('bootstrap_script', sa.String(length=16 * 1024), nullable=True)
-
-    # Lifecycle
-    created_at = sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True)
-    terminated_at = sa.Column('terminated_at', sa.DateTime(timezone=True), nullable=True)
-    starts_at = sa.Column('starts_at', sa.DateTime(timezone=True), nullable=True)
-    status = sa.Column(
-        'status',
-        pgsql.ENUM(
-            'PENDING', 'SCHEDULED', 'PREPARING', 'BUILDING', 'PULLING',
-            'RUNNING', 'RESTARTING', 'RESIZING', 'SUSPENDED', 'TERMINATING',
-            'TERMINATED', 'ERROR', 'CANCELLED', name='sessionstatus', create_type=True,
-         ), server_default='PENDING', nullable=False)
-    status_changed = sa.Column('status_changed', sa.DateTime(timezone=True), nullable=True)
-    status_info = sa.Column('status_info', sa.Unicode(), nullable=True)
-    status_data = sa.Column('status_data', pgsql.JSONB(astext_type=sa.Text()), nullable=True)
-    callback_url = sa.Column('callback_url', sa.types.UnicodeText(), nullable=True)
-
-    startup_command = sa.Column('startup_command', sa.Text(), nullable=True)
-    result = sa.Column('result', pgsql.ENUM('UNDEFINED', 'SUCCESS', 'FAILURE', name='sessionresults', create_type=True), server_default='UNDEFINED', nullable=False)
-
-    # Resource metrics measured upon termination
-    num_queries = sa.Column('num_queries', sa.BigInteger(), nullable=True)
-    last_stat = sa.Column('last_stat', pgsql.JSONB(astext_type=sa.Text()), nullable=True)
-
-
 def upgrade():
     # ### commands auto generated by Alembic - please adjust! ###
     connection = op.get_bind()
     db_session = Session(connection)
+
+    kernels = sa.Table(
+        'kernels', metadata,
+        KernelIDColumn(),
+        sa.Column('session_id', GUID, nullable=False),
+        sa.Column('session_creation_id', sa.String(length=32), unique=False),
+        sa.Column('session_name', sa.String(length=64), unique=False),
+        sa.Column('session_type', pgsql.ENUM('INTERACTIVE', 'BATCH'), nullable=False,
+                    default='INTERACTIVE', server_default='INTERACTIVE'),
+        sa.Column('cluster_role', sa.String(length=16), nullable=False, default='main'),
+        sa.Column('cluster_mode', sa.String(length=16), nullable=False,
+                    default='SINGLE_NODE', server_default='SINGLE_NODE'),
+        sa.Column('cluster_size', sa.Integer, nullable=False, default=1),
+
+        # Resource ownership
+        sa.Column('scaling_group', sa.ForeignKey('scaling_groups.name'), nullable=True),
+        sa.Column('domain_name', sa.String(length=64), sa.ForeignKey('domains.name'), nullable=False),
+        sa.Column('group_id', GUID, sa.ForeignKey('groups.id'), nullable=False),
+        sa.Column('user_uuid', GUID, sa.ForeignKey('users.uuid'), nullable=False),
+        sa.Column('access_key', sa.String(length=20), sa.ForeignKey('keypairs.access_key')),
+        sa.Column('image', sa.String(length=512)),
+        sa.Column('tag', sa.String(length=64), nullable=True),
+
+        # Resource occupation
+        sa.Column('occupied_slots', pgsql.JSONB(), nullable=False),
+        sa.Column('vfolder_mounts', pgsql.JSONB(), nullable=True),
+        sa.Column('resource_opts', pgsql.JSONB(), nullable=True, default={}),
+        sa.Column('bootstrap_script', sa.String(length=16 * 1024), nullable=True),
+
+        # Lifecycle
+        sa.Column('created_at', sa.DateTime(timezone=True),
+                server_default=sa.func.now()),
+        sa.Column('terminated_at', sa.DateTime(timezone=True),
+                nullable=True, default=sa.null()),
+        sa.Column('starts_at', sa.DateTime(timezone=True),
+                nullable=True, default=sa.null()),
+        sa.Column('status', sa.Enum(*KernelStatus),
+                default='PENDING',
+                server_default='PENDING',
+                nullable=False),
+        sa.Column('status_changed', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('status_info', sa.Unicode(), nullable=True, default=sa.null()),
+        sa.Column('status_data', pgsql.JSONB(), nullable=True, default=sa.null()),
+        sa.Column('callback_url', sa.types.UnicodeText, nullable=True, default=sa.null()),
+
+        sa.Column('startup_command', sa.Text, nullable=True),
+        sa.Column('result', sa.Enum('UNDEFINED', 'SUCCESS', 'FAILURE'),
+                default='UNDEFINED',
+                server_default='UNDEFINED',
+                nullable=False),
+
+        # Resource metrics measured upon termination
+        sa.Column('num_queries', sa.BigInteger(), default=0),
+        sa.Column('last_stat', pgsql.JSONB(), nullable=True, default=sa.null()),
+    )
+
+
+    class SessionRow(Base):
+        __tablename__ = 'sessions'
+        id = sa.Column('id', GUID(), server_default=sa.text('uuid_generate_v4()'), nullable=False, primary_key=True)
+        creation_id = sa.Column('creation_id', sa.String(length=32), unique=False)
+        name = sa.Column('name', sa.String(length=64), unique=False)
+        session_type = sa.Column('session_type', pgsql.ENUM('INTERACTIVE', 'BATCH', name='sessiontypes', create_type=False), server_default='INTERACTIVE', nullable=False)
+        cluster_mode = sa.Column('cluster_mode', sa.String(length=16), server_default='SINGLE_NODE', nullable=False)
+        cluster_size = sa.Column('cluster_size', sa.Integer(), nullable=False)
+        main_kernel_id = sa.Column('main_kernel_id', GUID(), nullable=True)
+        
+        # Resource ownership
+        scaling_group_name = sa.Column('scaling_group_name', sa.String(length=64), nullable=True)
+        target_sgroup_names = sa.Column('target_sgroup_names', sa.ARRAY(sa.String(length=64)), server_default='{}', nullable=True)
+        domain_name = sa.Column('domain_name', sa.String(length=64), nullable=False)
+        group_id = sa.Column('group_id', GUID(), nullable=False)
+        user_uuid = sa.Column('user_uuid', GUID(), nullable=False)
+        kp_access_key = sa.Column('kp_access_key', sa.String(length=20), nullable=True)
+        # kp_resource_policy = sa.Column(
+        #     'kp_resource_policy', sa.String(length=256), nullable=False)
+
+        # if image_id is null, should find a image field from related kernel row.
+        image_id = sa.Column('image_id', GUID(), nullable=True)
+        tag = sa.Column('tag', sa.String(length=64), nullable=True)
+
+        # Resource occupation
+        occupying_slots = sa.Column('occupying_slots', pgsql.JSONB(), nullable=False)
+        requested_slots = sa.Column('requested_slots', pgsql.JSONB(), nullable=False)
+        vfolder_mounts = sa.Column('vfolder_mounts', pgsql.JSONB(), nullable=True)
+        resource_opts = sa.Column('resource_opts', pgsql.JSONB(), nullable=True, default={})
+        environ = sa.Column('environ', pgsql.JSONB(), nullable=True)
+        bootstrap_script= sa.Column('bootstrap_script', sa.String(length=16 * 1024), nullable=True)
+
+        # Lifecycle
+        created_at = sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True)
+        terminated_at = sa.Column('terminated_at', sa.DateTime(timezone=True), nullable=True)
+        starts_at = sa.Column('starts_at', sa.DateTime(timezone=True), nullable=True)
+        status = sa.Column(
+            'status',
+            pgsql.ENUM(
+                'PENDING', 'SCHEDULED', 'PREPARING', 'BUILDING', 'PULLING',
+                'RUNNING', 'RESTARTING', 'RESIZING', 'SUSPENDED', 'TERMINATING',
+                'TERMINATED', 'ERROR', 'CANCELLED', name='sessionstatus', create_type=True,
+            ), server_default='PENDING', nullable=False)
+        status_changed = sa.Column('status_changed', sa.DateTime(timezone=True), nullable=True)
+        status_info = sa.Column('status_info', sa.Unicode(), nullable=True)
+        status_data = sa.Column('status_data', pgsql.JSONB(astext_type=sa.Text()), nullable=True)
+        callback_url = sa.Column('callback_url', sa.types.UnicodeText(), nullable=True)
+
+        startup_command = sa.Column('startup_command', sa.Text(), nullable=True)
+        result = sa.Column('result', pgsql.ENUM('UNDEFINED', 'SUCCESS', 'FAILURE', name='sessionresults', create_type=True), server_default='UNDEFINED', nullable=False)
+
+        # Resource metrics measured upon termination
+        num_queries = sa.Column('num_queries', sa.BigInteger(), nullable=True)
+        last_stat = sa.Column('last_stat', pgsql.JSONB(astext_type=sa.Text()), nullable=True)
 
     SessionRow.__table__.create(connection)
     op.create_foreign_key(op.f('fk_sessions_access_key_keypairs'), 'sessions', 'keypairs', ['kp_access_key'], ['access_key'])
@@ -176,12 +175,12 @@ def upgrade():
     op.create_index(op.f('ix_sessions_created_at'), 'sessions', ['created_at'], unique=False)
     op.create_index(op.f('ix_sessions_name'), 'sessions', ['name'], unique=False)
     op.create_index(op.f('ix_sessions_result'), 'sessions', ['result'], unique=False)
-    op.create_index(op.f('ix_sessions_scaling_group'), 'sessions', ['scaling_group_name'], unique=False)
+    op.create_index(op.f('ix_sessions_scaling_group_name'), 'sessions', ['scaling_group_name'], unique=False)
     op.create_index(op.f('ix_sessions_session_type'), 'sessions', ['session_type'], unique=False)
     op.create_index(op.f('ix_sessions_status'), 'sessions', ['status'], unique=False)
     op.create_index(op.f('ix_sessions_status_changed'), 'sessions', ['status_changed'], unique=False)
     op.create_index(op.f('ix_sessions_terminated_at'), 'sessions', ['terminated_at'], unique=False)
-    op.create_index(op.f('ix_sessions_main_kernel_id'), 'sessions', ['main_kernel_id'], unique=True)
+    op.create_index(op.f('ix_sessions_main_kernel_id'), 'sessions', ['main_kernel_id'], unique=False)
 
     query = (
         sa.select([kernels])
@@ -284,15 +283,88 @@ def upgrade():
 
     # Kernel table
     op.create_foreign_key(op.f('fk_kernels_session_id_sessions'), 'kernels', 'sessions', ['session_id'], ['id'])
+    op.add_column('kernels', sa.Column('image_id', GUID(), nullable=True))
+    kernels = sa.Table(
+        'kernels', metadata,
+        KernelIDColumn(),
+        sa.Column('image_id', GUID(), nullable=True),
+        extend_existing=True,
+    )
+    query = (
+        sa.update(kernels)
+        .where(kernels.c.id == sa.bindparam('kernel_id'))
+        .values({kernels.c.image_id: sa.bindparam('b_image_id')})
+    )
+    params = []
+    for kern in kernel_rows:
+        try:
+            params.append({
+                'kernel_id': kern['id'],
+                'b_image_id': img_map[kern['image']],
+            })
+        except KeyError:
+            continue
+    connection.execute(query, params)
+
+    op.drop_column('kernels', 'image')
+    op.create_foreign_key(op.f('fk_kernels_image_id_images'), 'kernels', 'images', ['image_id'], ['id'])
+    op.alter_column('kernels', column_name='agent', new_column_name='agent_id')
+    op.add_column('kernels', sa.Column('requested_slots', pgsql.JSONB(), nullable=True))
+    
+    # Agent table
+    op.alter_column('agents', column_name='scaling_group', new_column_name='scaling_group_name')
+
+    # Keypair table
+    op.alter_column('keypairs', column_name='resource_policy', new_column_name='resource_policy_name')
+
     # ### end Alembic commands ###
 
 
 def downgrade():
     # ### commands auto generated by Alembic - please adjust! ###
     connection = op.get_bind()
+    db_session = Session(connection)
+    imgs = db_session.query(ImageRow).all()
+    img_map = {img.id: img.name for img in imgs}
 
     # Kernel table
     op.drop_constraint(op.f('fk_kernels_session_id_sessions'), 'kernels', type_='foreignkey')
+    op.drop_constraint(op.f('fk_kernels_image_id_images'), 'kernels', type_='foreignkey')
+    op.add_column('kernels', sa.Column('image', sa.VARCHAR(length=512), autoincrement=False, nullable=True))
+    kernels = sa.Table(
+        'kernels', metadata,
+        KernelIDColumn(),
+        sa.Column('image_id', GUID(), nullable=True),
+        sa.Column('image', sa.String(length=512), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True),
+                server_default=sa.func.now()),
+    )
+    query = (
+        sa.select(kernels)
+        .select_from(kernels)
+        .order_by(kernels.c.created_at)
+    )
+    kernel_rows = connection.execute(query).fetchall()
+
+    query = (
+        sa.update(kernels)
+        .where(kernels.c.id == sa.bindparam('kernel_id'))
+        .values({kernels.c.image: sa.bindparam('image')})
+    )
+    params = []
+    for kern in kernel_rows:
+        try:
+            params.append({
+                'kernel_id': kern['id'],
+                'image': img_map[kern['image_id']],
+            })
+        except KeyError:
+            continue
+    connection.execute(query, params)
+    op.drop_column('kernels', 'image_id')
+    op.alter_column('kernels', column_name='agent_id', new_column_name='agent')
+    op.drop_column('kernels', 'requested_slots')
+
 
     # Session dependency table
     op.create_foreign_key('fk_session_dependencies_session_id_kernels', 'session_dependencies', 'kernels', ['session_id'], ['id'], onupdate='CASCADE', ondelete='CASCADE')
@@ -305,7 +377,7 @@ def downgrade():
     op.drop_index(op.f('ix_sessions_status_changed'), table_name='sessions')
     op.drop_index(op.f('ix_sessions_status'), table_name='sessions')
     op.drop_index(op.f('ix_sessions_session_type'), table_name='sessions')
-    op.drop_index(op.f('ix_sessions_scaling_group'), table_name='sessions')
+    op.drop_index(op.f('ix_sessions_scaling_group_name'), table_name='sessions')
     op.drop_index(op.f('ix_sessions_result'), table_name='sessions')
     op.drop_index(op.f('ix_sessions_name'), table_name='sessions')
     op.drop_index(op.f('ix_sessions_created_at'), table_name='sessions')
@@ -322,4 +394,11 @@ def downgrade():
 
     sess_statues.drop(op.get_bind())
     sess_results.drop(op.get_bind())
+        
+    # Agent table
+    op.alter_column('agents', column_name='scaling_group_name', new_column_name='scaling_group')
+
+    # Keypair table
+    op.alter_column('keypairs', column_name='resource_policy_name', new_column_name='resource_policy')
+
     ### end Alembic commands ###

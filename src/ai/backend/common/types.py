@@ -792,6 +792,11 @@ class KernelCreationConfig(TypedDict):
     preopen_ports: List[int]
 
 
+class SessionEnqueuingConfig(TypedDict):
+    image_ref: ImageRef     # TODO: resolve image by this field.
+    kernel_configs: List[KernelEnqueueingConfig]
+
+
 class KernelEnqueueingConfig(TypedDict):
     image_ref: ImageRef
     cluster_role: str
