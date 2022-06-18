@@ -19,6 +19,9 @@ from typing import (
     Tuple,
 )
 
+from Crypto.Cipher import AES
+import base64
+
 from aiohttp import web
 import aiohttp_cors
 from aiohttp_session import get_session, setup as setup_session
@@ -282,6 +285,39 @@ async def login_check_handler(request: web.Request) -> web.Response:
         'session_id': session.identity,  # temporary wsproxy interop patch
     })
 
+async def decode_payload(request):
+    config = request.app['config']
+    scheme = config['service'].get('force-endpoint-protocol')
+    if not request.content:
+        return request
+    if scheme is None:
+        scheme = request.scheme
+    api_endpoint = f'{scheme}://{request.host}'
+    #payload = request.content
+
+    payload = await request.text()
+    log.info(api_endpoint)
+    log.info(payload)
+    #body['domain'] = request.app['config']['api']['domain']
+    #content = json.dumps(body).encode('utf8')
+
+    # Let's recombine to have information
+    iv, real_payload = payload.split(':')  # Extract IV and real_payload from payload
+    log.info('1')
+    key =  (base64.b64encode(api_endpoint.encode('ascii')).decode() + iv + iv)[0:32] # Generate key from API endpoint information and IV
+    log.info('2')
+    # Now decrypt the payload.
+    crypt = AES.new(bytes(key,encoding='utf8'), AES.MODE_CBC, bytes(iv,encoding='utf8'))  # Prepare for the AES module
+    b64p = base64.b64decode(real_payload) # Decode the Base64.
+    dec = crypt.decrypt(bytes(b64p)) # And decrypt the payload.
+    log.info('3')
+    result = dec.decode("UTF-8")
+    log.info('4')
+    print(result)
+    return result
+    #request.content = dec.decode("UTF-8")
+    #return request
+    #print(dec.decode("UTF-8")) # Now we have the payload. :D
 
 async def login_handler(request: web.Request) -> web.Response:
     config = request.app['config']
@@ -291,7 +327,13 @@ async def login_handler(request: web.Request) -> web.Response:
             'type': 'https://api.backend.ai/probs/generic-bad-request',
             'title': 'You have already logged in.',
         }), content_type='application/problem+json')
-    creds = await request.json()
+    secure_context = request.headers.get('X-BackendAI-Encoded', None)
+    if secure_context:
+        creds = await decode_payload(request)
+        creds = json.loads(creds)
+    else:
+        creds = await request.json()
+    log.info(creds)
     if 'username' not in creds or not creds['username']:
         return web.HTTPBadRequest(text=json.dumps({
             'type': 'https://api.backend.ai/probs/invalid-api-params',

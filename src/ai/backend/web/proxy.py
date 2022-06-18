@@ -9,6 +9,8 @@ from typing import (
     Tuple,
     cast,
 )
+from Crypto.Cipher import AES
+import base64
 
 import aiohttp
 from aiohttp import web
@@ -114,6 +116,34 @@ class WebSocketProxy:
         if not self.up_conn.closed:
             await self.up_conn.close()
 
+async def decode_payload(request):
+    config = request.app['config']
+    scheme = config['service'].get('force-endpoint-protocol')
+    if not request.content:
+        return request
+    if scheme is None:
+        scheme = request.scheme
+    api_endpoint = f'{scheme}://{request.host}'
+    #payload = request.content
+
+    payload = await request.text()
+    #body['domain'] = request.app['config']['api']['domain']
+    #content = json.dumps(body).encode('utf8')
+
+
+
+    # Let's recombine to have information
+    iv, real_payload = payload.split(':')  # Extract IV and real_payload from payload
+    key =  (base64.b64encode(api_endpoint.encode('ascii')).decode() + iv + iv)[0:32] # Generate key from API endpoint information and IV
+
+    # Now decrypt the payload.
+    crypt = AES.new(bytes(key,encoding='utf8'), AES.MODE_CBC, bytes(iv,encoding='utf8'))  # Prepare for the AES module
+    b64p = base64.b64decode(real_payload) # Decode the Base64.
+    dec = crypt.decrypt(bytes(b64p)) # And decrypt the payload.
+    request.content = dec.decode("UTF-8")
+    return request
+    #print(dec.decode("UTF-8")) # Now we have the payload. :D
+
 
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     path = request.match_info.get('path', '')
@@ -127,6 +157,10 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             # but need to keep the client's version header so that
             # the final clients may perform its own API versioning support.
             request_api_version = request.headers.get('X-BackendAI-Version', None)
+            secure_context = request.headers.get('X-BackendAI-Encoded', None)
+            if secure_context is not None:
+                log.exception('web_handler: SECURE')
+                #request = await decode_payload(request)
             # Send X-Forwarded-For header for token authentication with the client IP.
             client_ip = request.headers.get('X-Forwarded-For')
             if not client_ip:
