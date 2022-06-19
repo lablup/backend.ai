@@ -63,19 +63,8 @@ async def check_reserved_batch_session(
     Check if a batch-type session should not be started for a certain amount of time.
     """
     if sess_ctx.session_type == SessionTypes.BATCH:
-        query = (
-            sa.select(SessionRow.starts_at)
-            .where(SessionRow.id == sess_ctx.id)
-        )
-        starts_at = await db_sess.scalar(query)
+        starts_at = sess_ctx.starts_at
 
-        # starts_at = SessionRow.get_session_by_cond(db_sess, )
-        # query = (
-        #     sa.select([kernels.c.starts_at])
-        #     .select_from(kernels)
-        #     .where(kernels.c.id == sess_ctx.session_id)
-        # )
-        # starts_at = await db_conn.scalar(query)
         if starts_at is not None and datetime.now(tzutc()) < starts_at:
             return PredicateResult(
                 False,
@@ -90,16 +79,7 @@ async def check_concurrency(
     sess_ctx: SessionRow,
 ) -> PredicateResult:
 
-    async def _get_max_concurrent_sessions() -> int:
-        return sess_ctx.access_key.resource_policy.max_concurrent_sessions
-        # select_query = (
-        #     sa.select(KeyPairResourcePolicyRow)
-        #     .where(KeyPairResourcePolicyRow.name == sess_ctx.access_key.resource_policy)
-        # )
-        # result = await db_conn.execute(select_query)
-        # return result.first()['max_concurrent_sessions']
-
-    max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions)
+    max_concurrent_sessions = sess_ctx.access_key.resource_policy.max_concurrent_sessions
     ok, concurrency_used = await redis.execute_script(
         sched_ctx.registry.redis_stat,
         'check_keypair_concurrency_used',
@@ -127,35 +107,6 @@ async def check_dependencies(
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
-    # j = sa.join(
-    #     SessionDependencyRow,
-    #     kernels,
-    #     SessionDependencyRow.depends_on == kernels.c.session_id,
-    # )
-    # query = (
-    #     sa.select([
-    #         kernels.c.session_id,
-    #         kernels.c.session_name,
-    #         kernels.c.result,
-    #     ])
-    #     .select_from(j)
-    #     .where(SessionDependencyRow.session_id == sess_ctx.session_id)
-    # )
-    # result = await db_conn.execute(query)
-    # rows = result.fetchall()
-    # pending_dependencies = []
-    # for row in rows:
-    #     if row['result'] != SessionResult.SUCCESS:
-    #         pending_dependencies.append(row)
-    # all_success = (not pending_dependencies)
-    # if all_success:
-    #     return PredicateResult(True)
-    # return PredicateResult(
-    #     False,
-    #     "Waiting dependency sessions to finish as success. ({})".format(
-    #         ", ".join(f"{row['session_name']} ({row['session_id']})" for row in pending_dependencies),
-    #     ),
-    # )
     check = SessionDependencyRow.check_all_dependencies(db_sess, sess_ctx)
     return PredicateResult(*check)
 
@@ -165,13 +116,6 @@ async def check_keypair_resource_limit(
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
-    # query = (
-    #     sa.select([keypair_resource_policies])
-    #     .select_from(keypair_resource_policies)
-    #     .where(keypair_resource_policies.c.name == sess_ctx.resource_policy)
-    # )
-    # result = await db_conn.execute(query)
-    # resource_policy = result.first()
     resource_policy = sess_ctx.access_key.resource_policy
     total_keypair_allowed = ResourceSlot.from_policy(resource_policy,
                                                      sched_ctx.known_slot_types)
@@ -196,9 +140,6 @@ async def check_group_resource_limit(
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
-    # query = (sa.select([groups.c.total_resource_slots])
-    #            .where(groups.c.id == sess_ctx.group_id))
-    # group_resource_slots = await db_conn.scalar(query)
     group_resource_slots = sess_ctx.group.total_resource_slots
     group_resource_policy = {'total_resource_slots': group_resource_slots,
                              'default_for_unspecified': DefaultForUnspecified.UNLIMITED}
@@ -225,9 +166,6 @@ async def check_domain_resource_limit(
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
-    # query = (sa.select(DomainRow.total_resource_slots)
-    #            .where(DomainRow.name == sess_ctx.domain_name))
-    # domain_resource_slots = await db_conn.scalar(query)
     domain_resource_slots = sess_ctx.domain.total_resource_slots
     domain_resource_policy = {
         'total_resource_slots': domain_resource_slots,

@@ -109,7 +109,7 @@ from .exceptions import MultiAgentError
 from .defs import DEFAULT_ROLE, INTRINSIC_SLOTS
 from .types import SessionGetter, UserScope
 from .models import (
-    agents, kernels,
+    agents, kernels, AgentRow,
     keypair_resource_policies,
     SessionDependencyRow,
     AgentStatus, KernelStatus, SessionStatus,
@@ -1221,7 +1221,7 @@ class AgentRegistry:
         auto_pull = await self.shared_config.get_raw('config/docker/image/auto_pull')
 
         # Aggregate image registry information
-        keyfunc = lambda item: item.kernel.image_ref
+        keyfunc = lambda item: item.kernel.image_id
         image_infos = {}
         async with self.db.begin_readonly_session() as session:
             for image_ref, _ in itertools.groupby(
@@ -1313,7 +1313,7 @@ class AgentRegistry:
 
         # Aggregate by agents to minimize RPC calls
         per_agent_tasks = []
-        keyfunc = lambda item: item.agent_alloc_ctx.agent_id
+        keyfunc = lambda item: item.agent_alloc_ctx.id
         for agent_id, group_iterator in itertools.groupby(
             sorted(kernel_agent_bindings, key=keyfunc), key=keyfunc,
         ):
@@ -1631,7 +1631,7 @@ class AgentRegistry:
         during kernel creation still being reported as used.
         """
 
-        keyfunc = lambda item: item.agent_alloc_ctx.agent_id
+        keyfunc = lambda item: item.agent_alloc_ctx.id
         for agent_id, group_iterator in itertools.groupby(
             sorted(kernel_agent_bindings, key=keyfunc), key=keyfunc,
         ):
@@ -2425,7 +2425,8 @@ class AgentRegistry:
             SlotName(k): Decimal(v[1]) for k, v in
             agent_info['resource_slots'].items()})
         current_addr = agent_info['addr']
-        sgroup = agent_info.get('scaling_group', 'default')
+        sgroup_name = agent_info.get('scaling_group', 'default')
+
         async with self.heartbeat_lock:
 
             instance_rejoin = False
@@ -2439,93 +2440,84 @@ class AgentRegistry:
             # Check and update status of the agent record in DB
             async def _update() -> None:
                 nonlocal instance_rejoin
-                async with self.db.begin() as conn:
-                    fetch_query = (
-                        sa.select([
-                            agents.c.status,
-                            agents.c.addr,
-                            agents.c.scaling_group,
-                            agents.c.available_slots,
-                            agents.c.version,
-                            agents.c.compute_plugins,
-                            agents.c.architecture,
-                        ])
-                        .select_from(agents)
-                        .where(agents.c.id == agent_id)
-                        .with_for_update()
+                async with self.db.begin_session() as db_sess:
+                    agent_row = await AgentRow.get_agent_cols(
+                        db_sess,
+                        agent_id,
+                        cols = [
+                            AgentRow.id,
+                            AgentRow.status,
+                            AgentRow.addr,
+                            AgentRow.scaling_group_name,
+                            AgentRow.available_slots,
+                            AgentRow.version,
+                            AgentRow.compute_plugins,
+                            AgentRow.architecture,
+                        ],
                     )
-                    result = await conn.execute(fetch_query)
-                    row = result.first()
 
-                    if row is None or row['status'] is None:
+                    if agent_row is None or agent_row.status is None:
                         # new agent detected!
                         log.info('agent {0} joined!', agent_id)
                         await self.shared_config.update_resource_slots(slot_key_and_units)
-                        insert_query = sa.insert(agents).values({
-                            'id': agent_id,
-                            'status': AgentStatus.ALIVE,
-                            'region': agent_info['region'],
-                            'scaling_group': sgroup,
-                            'available_slots': available_slots,
-                            'occupied_slots': {},
-                            'addr': agent_info['addr'],
-                            'first_contact': now,
-                            'lost_at': sa.null(),
-                            'version': agent_info['version'],
-                            'compute_plugins': agent_info['compute_plugins'],
-                            'architecture': agent_info.get('architecture', 'x86_64'),
-                        })
-                        result = await conn.execute(insert_query)
-                        assert result.rowcount == 1
-                    elif row['status'] == AgentStatus.ALIVE:
-                        updates = {}
-                        if row['available_slots'] != available_slots:
-                            updates['available_slots'] = available_slots
-                        if row['scaling_group'] != sgroup:
-                            updates['scaling_group'] = sgroup
-                        if row['addr'] != current_addr:
-                            updates['addr'] = current_addr
-                        if row['version'] != agent_info['version']:
-                            updates['version'] = agent_info['version']
-                        if row['compute_plugins'] != agent_info['compute_plugins']:
-                            updates['compute_plugins'] = agent_info['compute_plugins']
-                        if row['architecture'] != agent_info['architecture']:
-                            updates['architecture'] = agent_info['architecture']
-                        # occupied_slots are updated when kernels starts/terminates
-                        if updates:
-                            await self.shared_config.update_resource_slots(slot_key_and_units)
-                            update_query = (
-                                sa.update(agents)
-                                .values(updates)
-                                .where(agents.c.id == agent_id)
+
+                        query = (
+                            sa.insert(AgentRow)
+                            .values(
+                                id=agent_id,
+                                status=AgentStatus.ALIVE,
+                                region=agent_info['region'],
+                                scaling_group_name=sgroup_name,
+                                available_slots=available_slots,
+                                occupied_slots={},
+                                addr=agent_info['addr'],
+                                first_contact=now,
+                                lost_at=sa.null(),
+                                version=agent_info['version'],
+                                compute_plugins=agent_info['compute_plugins'],
+                                architecture=agent_info.get('architecture', 'x86_64'),
                             )
-                            await conn.execute(update_query)
-                    elif row['status'] in (AgentStatus.LOST, AgentStatus.TERMINATED):
+                        )
+                        result = await db_sess.execute(query)
+                        assert result.rowcount == 1
+                    elif agent_row.status == AgentStatus.ALIVE:
+                        is_updated = await AgentRow.update_alive_agent(
+                            db_sess, agent_row,
+                            agent_data = {
+                                **agent_info,
+                                'scaling_group_name': sgroup_name,
+                                'available_slots': available_slots,
+                                'addr': current_addr,
+                            },
+                        )
+                        if is_updated:
+                            await self.shared_config.update_resource_slots(slot_key_and_units)
+                    elif agent_row.status in (AgentStatus.LOST, AgentStatus.TERMINATED):
                         await self.shared_config.update_resource_slots(slot_key_and_units)
                         instance_rejoin = True
-                        update_query = (
-                            sa.update(agents)
-                            .values({
-                                'status': AgentStatus.ALIVE,
-                                'region': agent_info['region'],
-                                'scaling_group': sgroup,
-                                'addr': agent_info['addr'],
-                                'lost_at': sa.null(),
-                                'available_slots': available_slots,
-                                'version': agent_info['version'],
-                                'compute_plugins': agent_info['compute_plugins'],
-                                'architecture': agent_info['architecture'],
-                            })
-                            .where(agents.c.id == agent_id)
+                        query = (
+                            sa.update(AgentRow)
+                            .values(
+                                status=AgentStatus.ALIVE,
+                                region=agent_info['region'],
+                                scaling_group_name=sgroup_name,
+                                addr=agent_info['addr'],
+                                lost_at=sa.null(),
+                                available_slots=available_slots,
+                                version=agent_info['version'],
+                                compute_plugins=agent_info['compute_plugins'],
+                                architecture=agent_info['architecture'],
+                            )
+                            .where(AgentRow.id == agent_id)
                         )
-                        await conn.execute(update_query)
+                        await db_sess.execute(query)
                     else:
-                        log.error('should not reach here! {0}', type(row['status']))
+                        log.error('should not reach here! {0}', type(agent_row.status))
 
             try:
                 await execute_with_retry(_update)
             except sa.exc.IntegrityError:
-                log.error("Scaling group named [{}] does not exist.", sgroup)
+                log.error("Scaling group named [{}] does not exist.", sgroup_name)
                 return
 
             if instance_rejoin:
@@ -2548,7 +2540,7 @@ class AgentRegistry:
 
         await self.hook_plugin_ctx.notify(
             'POST_AGENT_HEARTBEAT',
-            (agent_id, sgroup, available_slots),
+            (agent_id, sgroup_name, available_slots),
         )
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:

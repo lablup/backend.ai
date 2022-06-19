@@ -50,6 +50,7 @@ __all__: Sequence[str] = (
     'sgroups_for_domains',
     'sgroups_for_groups',
     'sgroups_for_keypairs',
+    'ScalingGroupRow',
     # functions
     'query_allowed_sgroups',
     'ScalingGroup',

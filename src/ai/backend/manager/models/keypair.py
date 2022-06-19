@@ -96,8 +96,7 @@ keypairs = sa.Table(
 )
 
 class KeyPairRow:
-    def __str__(self) -> str:
-        return str(self.access_key)
+    pass
 
 mapper_registry.map_imperatively(KeyPairRow, keypairs, properties={
     'sessions': relationship('SessionRow', back_populates='access_key'),

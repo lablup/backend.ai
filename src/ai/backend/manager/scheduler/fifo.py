@@ -21,10 +21,11 @@ from .types import (
     ExistingSession,
     KernelInfo,
 )
+from ..models import SessionRow, AgentRow, KernelRow
 
 
 def key_by_requested_slots(
-    agent: AgentContext,
+    agent: AgentRow,
     requested_slots: ResourceSlot,
 ) -> Tuple[int, ResourceSlot]:
     unused_slot_keys = set()
@@ -50,34 +51,33 @@ class FIFOSlotScheduler(AbstractScheduler):
     def pick_session(
         self,
         total_capacity: ResourceSlot,
-        pending_sessions: Sequence[PendingSession],
-        existing_sessions: Sequence[ExistingSession],
+        pending_sessions: Sequence[SessionRow],
+        existing_sessions: Sequence[SessionRow],
     ) -> Optional[SessionId]:
         local_pending_sessions = list(pending_sessions)
-        skipped_sessions: List[PendingSession] = []
+        skipped_sessions: List[SessionRow] = []
         max_retries = self.config['num_retries_to_skip']
-        while local_pending_sessions:
+        for s in local_pending_sessions:
             # Just pick the first pending session, but skip it
             # if it has more than 3 failures.
-            s = local_pending_sessions.pop(0)
-            if max_retries == 0:  # it's strict FIFO
-                return s.session_id
+            if max_retries == 0:
+                return s
             if s.status_data is not None:
                 sched_data = s.status_data.get('scheduler', {})
                 if sched_data.get('retries', 0) >= max_retries:
                     skipped_sessions.append(s)
                     continue
-            return s.session_id
+            return s
         # But if all sessions are skipped, then choose the first one.
         if skipped_sessions:
-            return skipped_sessions[0].session_id
+            return skipped_sessions[0]
         return None
 
     def _assign_agent(
         self,
-        agents: Sequence[AgentContext],
+        agents: Sequence[AgentRow],
         requested_slots: ResourceSlot,
-    ) -> Optional[AgentId]:
+    ) -> Optional[AgentRow]:
         possible_agents = []
         for agent in agents:
             remaining_slots = agent.available_slots - agent.occupied_slots
@@ -91,13 +91,13 @@ class FIFOSlotScheduler(AbstractScheduler):
                     requested_slots,
                 ),
             )
-            return chosen_agent.agent_id
+            return chosen_agent
         return None
 
     def assign_agent_for_session(
         self,
-        agents: Sequence[AgentContext],
-        pending_session: PendingSession,
+        agents: Sequence[AgentRow],
+        pending_session: SessionRow,
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents, pending_session.requested_slots,
@@ -105,8 +105,8 @@ class FIFOSlotScheduler(AbstractScheduler):
 
     def assign_agent_for_kernel(
         self,
-        agents: Sequence[AgentContext],
-        pending_kernel: KernelInfo,
+        agents: Sequence[AgentRow],
+        pending_kernel: KernelRow,
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents, pending_kernel.requested_slots,
@@ -120,17 +120,17 @@ class LIFOSlotScheduler(AbstractScheduler):
     def pick_session(
         self,
         total_capacity: ResourceSlot,
-        pending_sessions: Sequence[PendingSession],
-        existing_sessions: Sequence[ExistingSession],
-    ) -> Optional[SessionId]:
+        pending_sessions: Sequence[SessionRow],
+        existing_sessions: Sequence[SessionRow],
+    ) -> Optional[SessionRow]:
         # Just pick the last pending session.
-        return SessionId(pending_sessions[-1].session_id)
+        return pending_sessions[-1]
 
     def _assign_agent(
         self,
-        agents: Sequence[AgentContext],
+        agents: Sequence[AgentRow],
         requested_slots: ResourceSlot,
-    ) -> Optional[AgentId]:
+    ) -> Optional[AgentRow]:
         possible_agents = []
         for agent in agents:
             remaining_slots = agent.available_slots - agent.occupied_slots
@@ -144,23 +144,23 @@ class LIFOSlotScheduler(AbstractScheduler):
                     requested_slots,
                 ),
             )
-            return chosen_agent.agent_id
+            return chosen_agent
         return None
 
     def assign_agent_for_session(
         self,
-        agents: Sequence[AgentContext],
-        pending_session: PendingSession,
-    ) -> Optional[AgentId]:
+        agents: Sequence[AgentRow],
+        pending_session: SessionRow,
+    ) -> Optional[AgentRow]:
         return self._assign_agent(
             agents, pending_session.requested_slots,
         )
 
     def assign_agent_for_kernel(
         self,
-        agents: Sequence[AgentContext],
-        pending_kernel: KernelInfo,
-    ) -> Optional[AgentId]:
+        agents: Sequence[AgentRow],
+        pending_kernel: KernelRow,
+    ) -> Optional[AgentRow]:
         return self._assign_agent(
             agents, pending_kernel.requested_slots,
         )

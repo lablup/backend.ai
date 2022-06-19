@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from typing import Callable, Container, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union, TYPE_CHECKING
+from typing import Any, Callable, Container, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union, TYPE_CHECKING
 from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -25,6 +25,7 @@ from .base import (
 )
 
 from .kernel import KernelRow, KernelStatus
+
 
 __all__ = (
     'SessionStatus',
@@ -155,9 +156,6 @@ class SessionRow(Base):
     user = relationship('UserRow', back_populates='sessions')
     kp_access_key = sa.Column('kp_access_key', sa.String(length=20), sa.ForeignKey('keypairs.access_key'))
     access_key = relationship('KeyPairRow', back_populates='sessions')
-    # kp_resource_policy = sa.Column(
-    #     'kp_resource_policy', sa.String(length=64), sa.ForeignKey('keypair_resource_policies.name'), nullable=False)
-    # resource_policy = relationship('KeyPairResourcePolicyRow', back_populates='sessions')
 
     # if image_id is null, should find a image field from related kernel row.
     image_id = ForeignKeyIDColumn('image_id', 'images.id')
@@ -312,6 +310,7 @@ class SessionRow(Base):
         db_session: SASession,
         status: SessionStatus | List[SessionStatus],
         sgroup_name: str | None = None,
+        do_ordering: bool = False,
     ) -> List[SessionRow]:
         if isinstance(status, SessionStatus):
             cond = (SessionRow.status == status)
@@ -325,6 +324,8 @@ class SessionRow(Base):
             sa.select(SessionRow)
             .where(cond)
         )
+        if do_ordering:
+            query = query.order_by(SessionRow.created_at)
         result = await db_session.execute(query)
         return result.scalars().all()
     
@@ -333,33 +334,55 @@ class SessionRow(Base):
         cls,
         db_session: SASession,
         session: SessionRow,
-        kernel_data,
         *,
-        update_session: bool = False,
+        kernel_data: Mapping[str, Any],
+        extra_cond = None,
     ) -> None:
         async with db_session.begin_nested():
+            cond = (KernelRow.session_id == session.id)
+            if extra_cond is not None:
+                cond = cond & extra_cond
             update_query = (
                 sa.update(KernelRow)
                 .values(**kernel_data)
-                .where(KernelRow.session_id == session.id)
+                .where(cond)
             )
             await db_session.execute(update_query)
 
-            if not update_session:
-                return
-            try:
-                session_update = {
-                    **kernel_data,
-                    'status': _KERNEL_SESSION_STATUS_MAPPING[kernel_data['status']],
-                }
-            except KeyError:
-                session_update = {**kernel_data}
+            sess_attr = SessionRow.__dict__
+            session_update = {
+                k: v for k, v in kernel_data.items() if k in sess_attr
+            }
+            if 'status' in kernel_data:
+                session_update['status'] = _KERNEL_SESSION_STATUS_MAPPING[kernel_data['status']]
+
             update_query = (
                 sa.update(SessionRow)
                 .values(**session_update)
                 .where(SessionRow.id == session.id)
             )
             await db_session.execute(update_query)
+
+    @classmethod
+    async def get_managed_sessions(
+        cls,
+        db_sess: SASession,
+        session_ids: List[str],
+        for_update = True,
+    ) -> List[SessionRow]:
+        query = (
+            sa.select(SessionRow)
+            .where(SessionRow.id.in_(session_ids))
+        )
+        if for_update:
+            query = (
+                query
+                .execution_options(populate_existing=True)
+                .with_for_update(nowait=True, of=SessionRow)
+            )
+        result = await db_sess.execute(query)
+        await db_sess
+        return result.scalars().all()
 
 
 class SessionDependencyRow(Base):

@@ -1,13 +1,16 @@
 from __future__ import annotations
+from decimal import Decimal
 
 import enum
 from typing import (
     Any,
+    Callable,
     Dict,
     List,
     Mapping,
     Sequence,
     TYPE_CHECKING,
+    TypeVar,
 )
 
 from dateutil.parser import parse as dtparse
@@ -21,7 +24,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.engine.row import Row
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, selectinload, joinedload
 
 from ai.backend.common import msgpack, redis
 from ai.backend.common.types import (
@@ -29,9 +32,13 @@ from ai.backend.common.types import (
     BinarySize,
     HardwareMetadata,
     ResourceSlot,
+    SlotName,
+    SlotTypes,
 )
 
-from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels, KernelRow
+from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+from .session import SessionStatus, SessionRow, AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES
+from .scaling_group import ScalingGroupRow
 from .base import (
     batch_result,
     EnumType, Item,
@@ -99,13 +106,87 @@ class AgentRow:
             sa.select(AgentRow)
             .where(
                 (AgentRow.status == AgentStatus.ALIVE) &
-                (AgentRow.scaling_group == sgroup_name) &
+                (AgentRow.scaling_group_name == sgroup_name) &
                 (AgentRow.schedulable == true()),
             )
         )
 
         result = await db_sess.execute(query)
         return result.scalars().all()
+    
+    @classmethod
+    async def list_alive_agents_scaling_group(
+        cls, db_sess: SASession,
+    ) -> List[ScalingGroupRow]:
+        # Is it good to limit the number of the rows of sessions in query
+        # for better HA ?
+        candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
+        query = (
+            sa.select(AgentRow)
+            .where(AgentRow.status == AgentStatus.ALIVE)
+            .options(
+                joinedload(AgentRow.scaling_group)
+                .options(
+                    selectinload(
+                        ScalingGroupRow.sessions.and_(SessionRow.status.in_(candidate_statues)),
+                    ),
+                )
+            )
+        )
+        result = await db_sess.execute(query)
+        return [ag.scaling_group for ag in result.scalars().all()]
+
+    @classmethod
+    async def get_agent_cols(
+        cls,
+        db_sess: SASession,
+        agent_id: AgentId,
+        *,
+        cols,
+        for_update = True,
+    ) -> Row:
+
+        query = sa.select(*cols).where(AgentRow.id == agent_id)
+        if for_update:
+            query = (
+                query
+                .execution_options(populate_existing=True)
+                .with_for_update()
+            )
+        result = await db_sess.execute(query)
+        return result.first()
+
+    @classmethod
+    async def update_alive_agent(
+        cls,
+        db_sess: SASession,
+        agent: _AT,
+        agent_data: Mapping[str, Any],
+    ) -> bool:
+        agent_dict = dict(agent)
+        print('\n==================')
+        print(f'{agent_dict["available_slots"] = }')
+        print(f'{type(agent_dict["available_slots"]) = }')
+        print(f'{agent_dict["compute_plugins"] = }')
+        print(f'{type(agent_dict["compute_plugins"]) = }')
+        print('==================')
+        updates = {
+            k: v for k, v in agent_dict.items()
+            if agent_data[k] != v
+        }
+        if updates:
+            query = (
+                sa.update(AgentRow)
+                .values(**updates)
+                .where(AgentRow.id == agent.id)
+            )
+            await db_sess.execute(query)
+            return True
+        return False
+
+
+
+_AT = TypeVar('_AT', AgentRow, Row)
 
 
 mapper_registry.map_imperatively(AgentRow, agents, properties={

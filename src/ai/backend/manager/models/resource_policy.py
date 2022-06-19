@@ -73,7 +73,7 @@ mapper_registry.map_imperatively(
     KeyPairResourcePolicyRow,
     keypair_resource_policies,
     properties={
-        'keypairs': relationship('KeyPairResourcePolicyRow', back_populates='resource_policy'),
+        'keypairs': relationship('KeyPairRow', back_populates='resource_policy'),
         # 'sessions': relationship('SessionRow', back_populates='resource_policy'),
     }
 )

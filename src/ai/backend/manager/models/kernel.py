@@ -84,7 +84,7 @@ if TYPE_CHECKING:
 
 __all__ = (
     'kernels',
-    # 'session_dependencies',
+    'KernelRow',
     'KernelStatistics',
     'KernelStatus',
     'ComputeContainer',

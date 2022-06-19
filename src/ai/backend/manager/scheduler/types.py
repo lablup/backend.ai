@@ -413,7 +413,7 @@ class AbstractScheduler(metaclass=ABCMeta):
         total_capacity: ResourceSlot,
         pending_sessions: Sequence[SessionRow],
         existing_sessions: Sequence[SessionRow],
-    ) -> Optional[SessionId]:
+    ) -> Optional[SessionRow]:
         """
         Pick a session to try schedule.
         This is where the queueing semantics is implemented such as prioritization.
