@@ -31,7 +31,7 @@ class libnuma:
             return 1
 
     @staticmethod
-    def htcpu_info():
+    async def htcpu_info():
         file_path = os.path.join("/sys/devices/system/cpu/cpu0/topology/thread_siblings_list")
         cpu_count = os.cpu_count()
         num_htSiblings = 0
