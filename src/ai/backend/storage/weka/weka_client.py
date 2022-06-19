@@ -12,7 +12,7 @@ from aiohttp import web
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize
 
-from .exceptions import WekaNotFoundError, WekaUnauthorizedError
+from .exceptions import WekaAPIError, WekaInvalidBodyError, WekaNotFoundError, WekaUnauthorizedError
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -87,6 +87,8 @@ def error_handler(inner):
     async def outer(*args, **kwargs):
         try:
             return await inner(*args, **kwargs)
+        except web.HTTPBadRequest:
+            raise WekaInvalidBodyError
         except web.HTTPNotFound:
             raise WekaNotFoundError
 
@@ -156,16 +158,19 @@ class WekaAPIClient:
         path: str,
         body: Optional[Any] = None,
     ) -> aiohttp.ClientResponse:
-        if method == "GET":
-            func = sess.get
-        elif method == "POST":
-            func = sess.post
-        elif method == "PUT":
-            func = sess.put
-        elif method == "PATCH":
-            func = sess.patch
-        else:
-            func = sess.delete
+        match method:
+            case "GET":
+                func = sess.get
+            case "POST":
+                func = sess.post
+            case "PUT":
+                func = sess.put
+            case "PATCH":
+                func = sess.patch
+            case "DELETE":
+                func = sess.delete
+            case _:
+                raise WekaAPIError(f'Unsupported request method {method}')
 
         if not self._is_token_valid:
             await self._login(sess)
