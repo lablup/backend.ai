@@ -2121,10 +2121,10 @@ async def get_actual_resource_alloc_time(request: web.Request, params: Any) -> w
     if (preparing := status_history.get(KernelStatus.PREPARING.name)) is None:
         resp = {'result': {'seconds': 0, 'microseconds': 0}}
     elif (terminated := status_history.get(KernelStatus.TERMINATED.name)) is None:
-        alloc_time = datetime.now(tzutc()) - isoparse(preparing)    # datetime.timedelta
+        alloc_time: timedelta = datetime.now(tzutc()) - isoparse(preparing)
         resp = {'result': {'seconds': alloc_time.seconds, 'microseconds': alloc_time.microseconds}}
     else:
-        alloc_time = isoparse(terminated) - isoparse(preparing)
+        alloc_time: timedelta = isoparse(terminated) - isoparse(preparing)
         resp = {'result': {'seconds': alloc_time.seconds, 'microseconds': alloc_time.microseconds}}
     return web.json_response(resp, status=200)
 
