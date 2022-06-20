@@ -25,16 +25,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from .logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from typing import Protocol, Union
-
-    class HasFileno(Protocol):
-        def fileno(self) -> int: ...    # noqa: E704
-
-    FileDescriptor = int
-    FileDescriptorLike = Union[int, HasFileno]
-
-    def fcntl_flock(__fd: FileDescriptorLike, __operation: int) -> None: ...    # noqa: E704
-
+    def fcntl_flock(__fd: IOBase, __operation: int) -> None: ...    # noqa: E704
 else:
     from fcntl import flock as fcntl_flock
 
