@@ -1,4 +1,5 @@
 import asyncio
+import base64
 from functools import partial
 import logging
 import logging.config
@@ -19,10 +20,6 @@ from typing import (
     Tuple,
 )
 
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import unpad
-import base64
-
 from aiohttp import web
 import aiohttp_cors
 from aiohttp_session import get_session, setup as setup_session
@@ -30,6 +27,8 @@ from aiohttp_session.redis_storage import RedisStorage
 import aiotools
 import aioredis
 import click
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
 import jinja2
 from setproctitle import setproctitle
 import tomli
