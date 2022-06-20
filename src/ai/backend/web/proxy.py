@@ -23,7 +23,7 @@ from ai.backend.client.request import Request
 from .auth import get_api_session, get_anonymous_session
 from .logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger('ai.backend.console.proxy'))
+log = BraceStyleAdapter(logging.getLogger('ai.backend.web.proxy'))
 
 HTTP_HEADERS_TO_FORWARD = [
     'Accept-Language',
@@ -136,7 +136,12 @@ async def decode_payload(request):
     result = dec.decode("UTF-8")
     return result.rstrip('\r\n')
 
-
+class StringStreamReader(asyncio.StreamReader):
+    def __init__(self, s: str, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._buffer = bytearray(s, 'utf-8')
+        self._eof = True
+        
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     path = request.match_info.get('path', '')
     if is_anonymous:
@@ -152,10 +157,12 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             secure_context = request.headers.get('X-BackendAI-Encoded', None)
             if secure_context:
                 payload = await decode_payload(request)
+                payload = StringStreamReader(payload)
+                log.info('payload type secure: {}',  type(payload))
             else:
                 payload = request.content
-
-            log.error('payload: {}', payload)
+                log.info('payload type: {}',  type(request.content))
+            log.info('payload: {}', payload)
             # Send X-Forwarded-For header for token authentication with the client IP.
             client_ip = request.headers.get('X-Forwarded-For')
             if not client_ip:
