@@ -662,6 +662,26 @@ def logs(session_id):
             sys.exit(1)
 
 
+@session.command('resource-allocation-time')
+@click.argument('session_id', metavar='SESSID')
+def resource_allocation_time(session_id):
+    '''
+    Shows the resource allocation time (PREPARING ~ TERMINATED) of a compute session.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    '''
+    with Session() as session:
+        print_wait('Retrieving resource allocation time...')
+        kernel = session.ComputeSession(session_id)
+        try:
+            result = kernel.get_actual_resource_alloc_time().get('result')
+            print_info(f'result: {result}')
+        except Exception as e:
+            print_error(e)
+            sys.exit(1)
+
+
 @session.command()
 @click.argument('session_id', metavar='SESSID')
 @click.argument('new_id', metavar='NEWID')
