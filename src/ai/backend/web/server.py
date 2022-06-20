@@ -1,5 +1,4 @@
 import asyncio
-import base64
 from functools import partial
 import logging
 import logging.config
@@ -282,6 +281,7 @@ async def login_check_handler(request: web.Request) -> web.Response:
         'data': public_data,
         'session_id': session.identity,  # temporary wsproxy interop patch
     })
+
 
 async def login_handler(request: web.Request) -> web.Response:
     config = request.app['config']

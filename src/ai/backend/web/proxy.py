@@ -135,6 +135,7 @@ async def decode_payload(request):
     result = dec.decode("UTF-8")    
     return result
 
+
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     path = request.match_info.get('path', '')
     if is_anonymous:
