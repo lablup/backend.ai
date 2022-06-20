@@ -6,7 +6,7 @@ import fcntl
 import logging
 from io import IOBase
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
 from tenacity import (
     AsyncRetrying,
@@ -23,6 +23,20 @@ from etcetra.client import EtcdConnectionManager, EtcdCommunicator
 from ai.backend.common.etcd import AsyncEtcd
 
 from .logging import BraceStyleAdapter
+
+if TYPE_CHECKING:
+    from typing import Protocol, Union
+
+    class HasFileno(Protocol):
+        def fileno(self) -> int: ...    # noqa: E704
+
+    FileDescriptor = int
+    FileDescriptorLike = Union[int, HasFileno]
+
+    def fcntl_flock(__fd: FileDescriptorLike, __operation: int) -> None: ...    # noqa: E704
+
+else:
+    from fcntl import flock as fcntl_flock
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -87,7 +101,7 @@ class FileLock(AbstractDistributedLock):
                 stop=stop_func,
             ):
                 with attempt:
-                    fcntl.flock(self._fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl_flock(self._fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     self._locked = True
                     if self._lifetime is not None:
                         self._watchdog_task = asyncio.create_task(
@@ -104,7 +118,7 @@ class FileLock(AbstractDistributedLock):
             if not task.done():
                 task.cancel()
         if self._locked:
-            fcntl.flock(self._fp, fcntl.LOCK_UN)
+            fcntl_flock(self._fp, fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
                 log.debug("file lock explicitly released: {}", self._path)
@@ -122,7 +136,7 @@ class FileLock(AbstractDistributedLock):
     async def _watchdog_timer(self, ttl: float):
         await asyncio.sleep(ttl)
         if self._locked:
-            fcntl.flock(self._fp, fcntl.LOCK_UN)
+            fcntl_flock(self._fp, fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
                 log.debug(f"file lock implicitly released by watchdog: {self._path}")
