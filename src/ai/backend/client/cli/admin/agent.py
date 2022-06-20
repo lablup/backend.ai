@@ -8,6 +8,7 @@ from ai.backend.client.session import Session
 from ai.backend.client.output.fields import agent_fields
 from ..types import CLIContext
 from . import admin
+from ..extensions import pass_ctx_obj
 
 
 @admin.group()
@@ -18,7 +19,7 @@ def agent():
 
 
 @agent.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('agent_id')
 def info(ctx: CLIContext, agent_id: str) -> None:
     """
@@ -46,7 +47,7 @@ def info(ctx: CLIContext, agent_id: str) -> None:
 
 
 @agent.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.option('-s', '--status', type=str, default='ALIVE',
               help='Filter agents by the given status.')
 @click.option('--scaling-group', '--sgroup', type=str, default=None,
@@ -115,7 +116,7 @@ def watcher():
 
 
 @watcher.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('agent', type=str)
 def status(ctx: CLIContext, agent: str) -> None:
     """
@@ -135,7 +136,7 @@ def status(ctx: CLIContext, agent: str) -> None:
 
 
 @watcher.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('agent', type=str)
 def agent_start(ctx: CLIContext, agent: str) -> None:
     """
@@ -155,7 +156,7 @@ def agent_start(ctx: CLIContext, agent: str) -> None:
 
 
 @watcher.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('agent', type=str)
 def agent_stop(ctx: CLIContext, agent: str) -> None:
     """
@@ -175,7 +176,7 @@ def agent_stop(ctx: CLIContext, agent: str) -> None:
 
 
 @watcher.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('agent', type=str)
 def agent_restart(ctx: CLIContext, agent: str) -> None:
     """

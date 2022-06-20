@@ -7,3 +7,4 @@ from . import dotfile  # noqa
 from . import server_log  # noqa
 from . import admin  # noqa
 from . import app, logs, proxy, run # noqa
+from . import extensions # noqa
