@@ -193,7 +193,7 @@ class KeyPair(graphene.ObjectType):
             secret_key=row['secret_key'],
             is_active=row['is_active'],
             is_admin=row['is_admin'],
-            resource_policy=row['resource_policy'],
+            resource_policy=row['resource_policy_name'],
             created_at=row['created_at'],
             last_used=row['last_used'],
             rate_limit=row['rate_limit'],
@@ -270,7 +270,7 @@ class KeyPair(graphene.ObjectType):
         "full_name": ("users_full_name", None),
         "is_active": ("keypairs_is_active", None),
         "is_admin": ("keypairs_is_admin", None),
-        "resource_policy": ("keypairs_resource_policy", None),
+        'resource_policy_name': ("keypairs_resource_policy", None),
         "created_at": ("keypairs_created_at", dtparse),
         "last_used": ("keypairs_last_used", dtparse),
         "rate_limit": ("keypairs_rate_limit", None),
@@ -284,7 +284,7 @@ class KeyPair(graphene.ObjectType):
         "full_name": "users_full_name",
         "is_active": "keypairs_is_active",
         "is_admin": "keypairs_is_admin",
-        "resource_policy": "keypairs_resource_policy",
+        'resource_policy_name': "keypairs_resource_policy",
         "created_at": "keypairs_created_at",
         "last_used": "keypairs_last_used",
         "rate_limit": "keypairs_rate_limit",
@@ -485,7 +485,7 @@ class CreateKeyPair(graphene.Mutation):
             'secret_key': sk,
             'is_active': props.is_active,
             'is_admin': props.is_admin,
-            'resource_policy': props.resource_policy,
+            'resource_policy_name': props.resource_policy,
             'rate_limit': props.rate_limit,
             'num_queries': 0,
             'ssh_public_key': pubkey,
@@ -517,7 +517,7 @@ class ModifyKeyPair(graphene.Mutation):
         data: Dict[str, Any] = {}
         set_if_set(props, data, 'is_active')
         set_if_set(props, data, 'is_admin')
-        set_if_set(props, data, 'resource_policy')
+        set_if_set(props, data, 'resource_policy_name')
         set_if_set(props, data, 'rate_limit')
         update_query = (
             sa.update(keypairs)

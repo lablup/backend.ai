@@ -104,7 +104,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app['_root.context']
     try:
         access_key = request['keypair']['access_key']
-        resource_policy = request['keypair']['resource_policy']
+        resource_policy = request['keypair']['resource_policy_name']
         domain_name = request['user']['domain_name']
         # TODO: uncomment when we implement scaling group.
         # scaling_group = request.query.get('scaling_group')
@@ -311,7 +311,7 @@ async def get_container_stats_for_period(request: web.Request, start_date, end_d
                 kernels.c.resource_opts,
                 kernels.c.vfolder_mounts,
                 kernels.c.mounts,
-                kernels.c.image,
+                kernels.c.image_id,
                 kernels.c.status,
                 kernels.c.status_changed,
                 kernels.c.last_stat,

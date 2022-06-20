@@ -249,7 +249,7 @@ class SchedulerDispatcher(aobject):
         self,
         sgroup: ScalingGroupRow,
     ) -> AbstractScheduler:
-        scheduler_name = sgroup.name
+        scheduler_name = sgroup.scheduler
         sgroup_opts: ScalingGroupOpts = sgroup.scheduler_opts
         global_scheduler_opts = {}
         if self.shared_config['plugins']['scheduler']:
@@ -862,7 +862,8 @@ async def _list_managed_sessions(
     """
 
     session_ids = [s.id for s in sgroup.sessions]
-    managed_sessions: List[SessionRow] = SessionRow.get_managed_sessions(db_sess, session_ids)
+    managed_sessions: List[SessionRow]
+    managed_sessions = await SessionRow.get_managed_sessions(db_sess, session_ids)
 
     pending_timeout: timedelta = scheduler.sgroup_opts.pending_timeout
     candidates: List[SessionRow] = []

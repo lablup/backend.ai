@@ -514,7 +514,7 @@ class AgentRegistry:
             kernels.c.access_key,
             kernels.c.agent_addr,
             kernels.c.kernel_host,
-            kernels.c.image,
+            kernels.c.image_id,
             kernels.c.registry,
             kernels.c.service_ports,
         ]
@@ -724,7 +724,7 @@ class AgentRegistry:
                 raise SessionNotFound()
             if len(sess_rows) > 1:
                 raise TooManySessionsMatched(extra_data={'matches': sess_rows})
-            return sess_rows[0]
+            return sess_rows.first()
 
     async def get_session_main_kernel(
         self,
@@ -1235,7 +1235,7 @@ class AgentRegistry:
             'image_infos': image_infos,
             'registry_url': registry_url,
             'registry_creds': registry_creds,
-            'resource_policy': resource_policy.name,
+            'resource_policy': resource_policy,
             'auto_pull': auto_pull,
         }
 
@@ -1503,7 +1503,7 @@ class AgentRegistry:
                             'cluster_role': binding.kernel.cluster_role,
                             'cluster_idx': binding.kernel.cluster_idx,
                             'cluster_hostname': binding.kernel.cluster_hostname,
-                            'idle_timeout': resource_policy['idle_timeout'],
+                            'idle_timeout': resource_policy.idle_timeout,
                             'mounts': [item.to_json() for item in scheduled_session.vfolder_mounts],
                             'environ': {
                                 # inherit per-session environment variables

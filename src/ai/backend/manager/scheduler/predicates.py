@@ -117,7 +117,7 @@ async def check_keypair_resource_limit(
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     resource_policy = sess_ctx.access_key.resource_policy
-    total_keypair_allowed = ResourceSlot.from_policy(resource_policy,
+    total_keypair_allowed = ResourceSlot.from_policy(dict(resource_policy),
                                                      sched_ctx.known_slot_types)
     key_occupied = await sched_ctx.registry.get_keypair_occupancy(
         sess_ctx.access_key, sess=db_sess)

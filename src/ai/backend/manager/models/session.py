@@ -381,7 +381,6 @@ class SessionRow(Base):
                 .with_for_update(nowait=True, of=SessionRow)
             )
         result = await db_sess.execute(query)
-        await db_sess
         return result.scalars().all()
 
 

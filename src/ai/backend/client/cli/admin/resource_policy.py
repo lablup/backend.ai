@@ -104,20 +104,20 @@ def add(ctx: CLIContext, name, default_for_unspecified, total_resource_slots, ma
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='resource_policy',
+                item_name='resource_policy_name',
                 action_name='add',
             )
             sys.exit(1)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
-                item_name='resource_policy',
+                item_name='resource_policy_name',
                 action_name='add',
             )
             sys.exit(1)
         ctx.output.print_mutation_result(
             data,
-            item_name='resource_policy',
+            item_name='resource_policy_name',
         )
 
 
@@ -165,14 +165,14 @@ def update(ctx: CLIContext, name, default_for_unspecified, total_resource_slots,
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='resource_policy',
+                item_name='resource_policy_name',
                 action_name='update',
             )
             sys.exit(1)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
-                item_name='resource_policy',
+                item_name='resource_policy_name',
                 action_name='update',
             )
             sys.exit(1)
@@ -202,14 +202,14 @@ def delete(ctx: CLIContext, name):
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='resource_policy',
+                item_name='resource_policy_name',
                 action_name='deletion',
             )
             sys.exit(1)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
-                item_name='resource_policy',
+                item_name='resource_policy_name',
                 action_name='deletion',
             )
             sys.exit(1)

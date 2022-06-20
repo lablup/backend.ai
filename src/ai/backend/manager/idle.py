@@ -169,7 +169,7 @@ class IdleCheckerHost:
                             sa.join(
                                 keypairs,
                                 keypair_resource_policies,
-                                keypair_resource_policies.c.name == keypairs.c.resource_policy,
+                                keypair_resource_policies.c.name == keypairs.c.resource_policy_name,
                             ),
                         )
                         .where(keypairs.c.access_key == session["access_key"])

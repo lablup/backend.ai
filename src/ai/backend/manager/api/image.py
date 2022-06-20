@@ -353,7 +353,7 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
     session_creation_id = secrets.token_urlsafe(32)
     session_id = f'image-import-{secrets.token_urlsafe(8)}'
     access_key = request['keypair']['access_key']
-    resource_policy = request['keypair']['resource_policy']
+    resource_policy = request['keypair']['resource_policy_name']
 
     async with root_ctx.db.begin() as conn:
         query = (

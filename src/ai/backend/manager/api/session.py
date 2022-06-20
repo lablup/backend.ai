@@ -308,7 +308,7 @@ async def _query_userinfo(
         # Admin or superadmin is creating sessions for another user.
         # The check for admin privileges is already done in get_access_key_scope().
         query = (
-            sa.select([keypairs.c.user, keypairs.c.resource_policy,
+            sa.select([keypairs.c.user, keypairs.c.resource_policy_name,
                         users.c.role, users.c.domain_name])
             .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
             .where(keypairs.c.access_key == owner_access_key)
@@ -321,7 +321,7 @@ async def _query_userinfo(
         query = (
             sa.select([keypair_resource_policies])
             .select_from(keypair_resource_policies)
-            .where(keypair_resource_policies.c.name == row['resource_policy'])
+            .where(keypair_resource_policies.c.name == row['resource_policy_name'])
         )
         result = await conn.execute(query)
         resource_policy = result.first()
@@ -330,7 +330,7 @@ async def _query_userinfo(
         owner_domain = request['user']['domain_name']
         owner_uuid = requester_uuid
         owner_role = UserRole.USER
-        resource_policy = request['keypair']['resource_policy']
+        resource_policy = request['keypair']['resource_policy_name']
 
     query = (
         sa.select([domains.c.name])

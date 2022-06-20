@@ -73,7 +73,7 @@ class KeyPair(BaseFunction):
             'input': {
                 'is_active': is_active,
                 'is_admin': is_admin,
-                'resource_policy': resource_policy,
+                'resource_policy_name': resource_policy,
                 'rate_limit': rate_limit,
             },
         }
@@ -104,7 +104,7 @@ class KeyPair(BaseFunction):
             'input': {
                 'is_active': is_active,
                 'is_admin': is_admin,
-                'resource_policy': resource_policy,
+                'resource_policy_name': resource_policy,
                 'rate_limit': rate_limit,
             },
         }
@@ -231,7 +231,7 @@ class KeyPair(BaseFunction):
             'input': {
                 'is_active': True,
                 'is_admin': None,
-                'resource_policy': None,
+                'resource_policy_name': None,
                 'rate_limit': None,
             },
         }
@@ -257,7 +257,7 @@ class KeyPair(BaseFunction):
             'input': {
                 'is_active': False,
                 'is_admin': None,
-                'resource_policy': None,
+                'resource_policy_name': None,
                 'rate_limit': None,
             },
         }

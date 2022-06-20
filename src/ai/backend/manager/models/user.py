@@ -554,7 +554,7 @@ class CreateUser(graphene.Mutation):
                 graph_ctx.schema.get_type('KeyPairInput').create_container({
                     'is_active': (_status == UserStatus.ACTIVE),
                     'is_admin': (user_data['role'] in [UserRole.SUPERADMIN, UserRole.ADMIN]),
-                    'resource_policy': 'default',
+                    'resource_policy_name': 'default',
                     'rate_limit': 10000,
                 }),
             )

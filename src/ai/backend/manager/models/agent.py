@@ -164,15 +164,9 @@ class AgentRow:
         agent_data: Mapping[str, Any],
     ) -> bool:
         agent_dict = dict(agent)
-        print('\n==================')
-        print(f'{agent_dict["available_slots"] = }')
-        print(f'{type(agent_dict["available_slots"]) = }')
-        print(f'{agent_dict["compute_plugins"] = }')
-        print(f'{type(agent_dict["compute_plugins"]) = }')
-        print('==================')
         updates = {
-            k: v for k, v in agent_dict.items()
-            if agent_data[k] != v
+            k: v for k, v in agent_data.items()
+            if k in agent_dict and agent_dict[k] != v
         }
         if updates:
             query = (
@@ -183,7 +177,6 @@ class AgentRow:
             await db_sess.execute(query)
             return True
         return False
-
 
 
 _AT = TypeVar('_AT', AgentRow, Row)

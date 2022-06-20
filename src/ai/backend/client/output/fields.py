@@ -109,7 +109,7 @@ keypair_fields = FieldSet([
     FieldSpec('created_at'),
     FieldSpec('modified_at'),
     FieldSpec('last_used'),
-    FieldSpec('resource_policy'),
+    FieldSpec('resource_policy_name'),
     FieldSpec('rate_limit'),
     FieldSpec('concurrency_used'),
     FieldSpec('ssh_public_key'),
