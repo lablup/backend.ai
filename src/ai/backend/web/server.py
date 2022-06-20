@@ -27,8 +27,6 @@ from aiohttp_session.redis_storage import RedisStorage
 import aiotools
 import aioredis
 import click
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import unpad
 import jinja2
 from setproctitle import setproctitle
 import tomli
@@ -41,7 +39,7 @@ from ai.backend.client.session import AsyncSession as APISession
 
 from . import __version__, user_agent
 from .logging import BraceStyleAdapter
-from .proxy import web_handler, websocket_handler, web_plugin_handler
+from .proxy import web_handler, websocket_handler, web_plugin_handler, decode_payload
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.web.server'))
 static_path = Path(pkg_resources.resource_filename('ai.backend.web', 'static')).resolve()
@@ -284,25 +282,6 @@ async def login_check_handler(request: web.Request) -> web.Response:
         'data': public_data,
         'session_id': session.identity,  # temporary wsproxy interop patch
     })
-
-async def decode_payload(request):
-    config = request.app['config']
-    scheme = config['service'].get('force-endpoint-protocol')
-    if not request.content:
-        return request
-    if scheme is None:
-        scheme = request.scheme
-    api_endpoint = f'{scheme}://{request.host}'
-    payload = await request.text()
-    # Let's recombine to have information
-    iv, real_payload = payload.split(':')  # Extract IV and real_payload from payload
-    key =  (base64.b64encode(api_endpoint.encode('ascii')).decode() + iv + iv)[0:32] # Generate key from API endpoint information and IV
-    # Now decrypt the payload.
-    crypt = AES.new(bytes(key,encoding='utf8'), AES.MODE_CBC, bytes(iv,encoding='utf8'))  # Prepare for the AES module
-    b64p = base64.b64decode(real_payload) # Decode the Base64.
-    dec = unpad(crypt.decrypt(bytes(b64p)),16)
-    result = dec.decode("UTF-8")
-    return result.rstrip('\r\n')
 
 async def login_handler(request: web.Request) -> web.Response:
     config = request.app['config']
