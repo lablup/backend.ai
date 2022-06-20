@@ -127,7 +127,8 @@ class FileLock(AbstractDistributedLock):
     async def _watchdog_timer(self, ttl: float):
         await asyncio.sleep(ttl)
         if self._locked:
-            fcntl_flock(self._fp, fcntl.LOCK_UN)
+            assert (fp := self._fp) is not None
+            fcntl_flock(fp, fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
                 log.debug(f"file lock implicitly released by watchdog: {self._path}")
