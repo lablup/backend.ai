@@ -117,6 +117,7 @@ class WebSocketProxy:
         if not self.up_conn.closed:
             await self.up_conn.close()
 
+
 async def decode_payload(request):
     config = request.app['config']
     scheme = config['service'].get('force-endpoint-protocol')
@@ -126,12 +127,10 @@ async def decode_payload(request):
         scheme = request.scheme
     api_endpoint = f'{scheme}://{request.host}'
     payload = await request.text()
-    # Let's recombine to have information
     iv, real_payload = payload.split(':')  # Extract IV and real_payload from payload
-    key =  (base64.b64encode(api_endpoint.encode('ascii')).decode() + iv + iv)[0:32] # Generate key from API endpoint information and IV
-    # Now decrypt the payload.
-    crypt = AES.new(bytes(key,encoding='utf8'), AES.MODE_CBC, bytes(iv,encoding='utf8'))  # Prepare for the AES module
-    b64p = base64.b64decode(real_payload) # Decode the Base64.
+    key =  (base64.b64encode(api_endpoint.encode('ascii')).decode() + iv + iv)[0:32]
+    crypt = AES.new(bytes(key,encoding='utf8'), AES.MODE_CBC, bytes(iv,encoding='utf8'))
+    b64p = base64.b64decode(real_payload)
     dec = unpad(crypt.decrypt(bytes(b64p)),16)
     result = dec.decode("UTF-8")    
     return result
