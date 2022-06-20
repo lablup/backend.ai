@@ -20,6 +20,7 @@ from typing import (
 )
 
 from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
 import base64
 
 from aiohttp import web
@@ -300,9 +301,8 @@ async def decode_payload(request):
     # Now decrypt the payload.
     crypt = AES.new(bytes(key,encoding='utf8'), AES.MODE_CBC, bytes(iv,encoding='utf8'))  # Prepare for the AES module
     b64p = base64.b64decode(real_payload) # Decode the Base64.
-    dec = crypt.decrypt(bytes(b64p)) # And decrypt the payload.
-    padding_bytes = dec[-1]
-    result = dec[:-padding_bytes].decode("UTF-8")
+    dec = unpad(crypt.decrypt(bytes(b64p)),16)
+    result = dec.decode("UTF-8")
     return result.rstrip('\r\n')
 
 async def login_handler(request: web.Request) -> web.Response:
