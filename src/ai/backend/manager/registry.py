@@ -1845,7 +1845,9 @@ class AgentRegistry:
                                         'status_history': sql_json_merge(
                                             kernels.c.status_history,
                                             (),
-                                            {KernelStatus.CANCELLED.name: now.isoformat()},
+                                            {
+                                                KernelStatus.CANCELLED.name: now.isoformat(),
+                                            },
                                         ),
                                     })
                                     .where(kernels.c.id == kernel['id']),
@@ -2603,7 +2605,9 @@ class AgentRegistry:
             'status_history': sql_json_merge(
                 kernels.c.status_history,
                 (),
-                {status.name: now.isoformat()},
+                {
+                    status.name: now.isoformat(),
+                },
             ),
         }
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
@@ -2641,7 +2645,9 @@ class AgentRegistry:
             'status_history': sql_json_merge(
                 kernels.c.status_history,
                 (),
-                {status.name: now.isoformat()},  # ["PULLING", "PREPARING"]
+                {
+                    status.name: now.isoformat(),   # ["PULLING", "PREPARING"]
+                },
             ),
         }
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
@@ -2781,7 +2787,9 @@ class AgentRegistry:
                     'status_history': sql_json_merge(
                         kernels.c.status_history,
                         (),
-                        {KernelStatus.TERMINATED.name: now.isoformat()},
+                        {
+                            KernelStatus.TERMINATED.name: now.isoformat(),
+                        },
                     ),
                     'terminated_at': now,
                 }
