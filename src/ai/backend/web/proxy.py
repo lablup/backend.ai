@@ -128,11 +128,11 @@ async def decode_payload(request):
     api_endpoint = f'{scheme}://{request.host}'
     payload = await request.text()
     iv, real_payload = payload.split(':')  # Extract IV and real_payload from payload
-    key =  (base64.b64encode(api_endpoint.encode('ascii')).decode() + iv + iv)[0:32]
-    crypt = AES.new(bytes(key,encoding='utf8'), AES.MODE_CBC, bytes(iv,encoding='utf8'))
+    key = (base64.b64encode(api_endpoint.encode('ascii')).decode() + iv + iv)[0:32]
+    crypt = AES.new(bytes(key, encoding='utf8'), AES.MODE_CBC, bytes(iv, encoding='utf8'))
     b64p = base64.b64decode(real_payload)
-    dec = unpad(crypt.decrypt(bytes(b64p)),16)
-    result = dec.decode("UTF-8")    
+    dec = unpad(crypt.decrypt(bytes(b64p)), 16)
+    result = dec.decode("UTF-8")
     return result
 
 
