@@ -133,15 +133,9 @@ async def decode_payload(request):
     crypt = AES.new(bytes(key,encoding='utf8'), AES.MODE_CBC, bytes(iv,encoding='utf8'))  # Prepare for the AES module
     b64p = base64.b64decode(real_payload) # Decode the Base64.
     dec = unpad(crypt.decrypt(bytes(b64p)),16)
-    result = dec.decode("UTF-8")
-    return result.rstrip('\r\n')
+    result = dec.decode("UTF-8")    
+    return result
 
-class StringStreamReader(asyncio.StreamReader):
-    def __init__(self, s: str, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._buffer = bytearray(s, 'utf-8')
-        self._eof = True
-        
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     path = request.match_info.get('path', '')
     if is_anonymous:
@@ -157,12 +151,9 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             secure_context = request.headers.get('X-BackendAI-Encoded', None)
             if secure_context:
                 payload = await decode_payload(request)
-                payload = StringStreamReader(payload)
-                log.info('payload type secure: {}',  type(payload))
+                payload_length = len(payload)
             else:
                 payload = request.content
-                log.info('payload type: {}',  type(request.content))
-            log.info('payload: {}', payload)
             # Send X-Forwarded-For header for token authentication with the client IP.
             client_ip = request.headers.get('X-Forwarded-For')
             if not client_ip:
@@ -180,8 +171,10 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             if 'Content-Type' in request.headers:
                 api_rqst.content_type = request.content_type                        # set for signing
                 api_rqst.headers['Content-Type'] = request.headers['Content-Type']  # preserve raw value
-            if 'Content-Length' in request.headers:
+            if 'Content-Length' in request.headers and not secure_context:
                 api_rqst.headers['Content-Length'] = request.headers['Content-Length']
+            if 'Content-Length' in request.headers and secure_context:
+                api_rqst.headers['Content-Length'] = str(payload_length)
             for hdr in HTTP_HEADERS_TO_FORWARD:
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
