@@ -16,6 +16,13 @@ import inquirer
 from humanize import naturalsize
 from tabulate import tabulate
 
+from ai.backend.common.events import (
+    KernelCancelledEvent, KernelCreatingEvent,
+    KernelStartedEvent, KernelTerminatedEvent, KernelTerminatingEvent,
+    SessionStartedEvent, SessionTerminatedEvent,
+    SessionSuccessEvent, SessionFailureEvent,
+)
+
 from .main import main
 from .pretty import print_wait, print_done, print_error, print_fail, print_info, print_warn
 from .ssh import container_ssh_ctx
@@ -928,14 +935,13 @@ def _watch_cmd(docs: Optional[str] = None):
             click.echo('No matching items.')
             sys.exit(0)
 
-        session_terminated = 'session_terminated'
         states = (
-            'kernel_creating',
-            'kernel_started',
-            'session_started',
-            'kernel_terminating',
-            'kernel_terminated',
-            session_terminated,
+            KernelCreatingEvent.name,
+            KernelStartedEvent.name,
+            SessionStartedEvent.name,
+            KernelTerminatingEvent.name,
+            KernelTerminatedEvent.name,
+            SessionTerminatedEvent.name,
         )
 
         if not session_name_or_id:
@@ -962,17 +968,23 @@ def _watch_cmd(docs: Optional[str] = None):
                 click.echo(click.style(f'session name: {session_name_or_id}', fg='cyan'))
                 for i, state in enumerate(states):
                     if i < current_state_idx:
-                        click.echo(click.style('\u2714 ', fg='green') + state)
+                        print_done(state)
                     elif i == current_state_idx:
                         click.echo(click.style(f'\u22EF {state}', bold=True))
                     else:
-                        click.echo(click.style('\u2219 ', fg='yellow') + state)
+                        print_warn(state)
 
             print_state(session_name_or_id, current_state_idx=-1)
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
-                    if ev.event == 'kernel_cancelled':
-                        click.echo(click.style('\u2718 ', fg='red') + ev.event)
+                    if ev.event == SessionSuccessEvent.name:
+                        print_done(ev.event)
+                        sys.exit(0)
+                    elif ev.event == SessionFailureEvent.name:
+                        print_fail(ev.event)
+                        sys.exit(1)
+                    if ev.event == KernelCancelledEvent.name:
+                        print_fail(ev.event)
                         break
 
                     try:
@@ -980,7 +992,7 @@ def _watch_cmd(docs: Optional[str] = None):
                     except ValueError:
                         pass
 
-                    if ev.event == session_terminated:
+                    if ev.event == SessionTerminatedEvent.name:
                         print_state(session_name_or_id, current_state_idx=len(states))
                         break
 
@@ -992,7 +1004,7 @@ def _watch_cmd(docs: Optional[str] = None):
                     event['event'] = ev.event
                     click.echo(event)
 
-                    if ev.event == session_terminated:
+                    if ev.event == SessionTerminatedEvent.name:
                         break
 
         async def _run_events():
