@@ -679,17 +679,16 @@ def status_history(session_id):
         print_wait('Retrieving status history...')
         kernel = session.ComputeSession(session_id)
         try:
-            result = kernel.get_status_history().get('result')
-            for key, value in result:
-                print_info(f'key={value}')
-            if (preparing := status_history.get(KernelStatus.PREPARING.name)) is None:
+            status_history = kernel.get_status_history().get('result')
+            print_info(f'status_history: {status_history}')
+            if (preparing := status_history.get(KernelStatus.PREPARING.name.lower())) is None:
                 result = {
                     'result': {
                         'seconds': 0,
                         'microseconds': 0,
                     },
                 }
-            elif (terminated := status_history.get(KernelStatus.TERMINATED.name)) is None:
+            elif (terminated := status_history.get(KernelStatus.TERMINATED.name.lower())) is None:
                 alloc_time_until_now: timedelta = datetime.now(tzutc()) - isoparse(preparing)
                 result = {
                     'result': {
@@ -705,7 +704,7 @@ def status_history(session_id):
                         'microseconds': alloc_time.microseconds,
                     },
                 }
-            print_info(f'Actual Resource Allocation Time: {result}')
+            print_done(f'Actual Resource Allocation Time: {result}')
         except Exception as e:
             print_error(e)
             sys.exit(1)
