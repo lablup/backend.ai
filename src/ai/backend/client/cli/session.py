@@ -926,7 +926,7 @@ def _watch_cmd(docs: Optional[str] = None):
         session_names = _fetch_session_names()
         if not session_names:
             click.echo('No matching items.')
-            return
+            sys.exit(0)
 
         session_terminated = 'session_terminated'
         states = (
@@ -954,7 +954,7 @@ def _watch_cmd(docs: Optional[str] = None):
                     break
             else:
                 click.echo('No matching items.')
-                return
+                sys.exit(0)
 
         async def handle_console_output(session: ComputeSession, scope: Literal['*', 'session', 'kernel'] = '*'):
             def print_state(session_name_or_id: str, current_state_idx: int):
@@ -1022,9 +1022,9 @@ def _watch_cmd(docs: Optional[str] = None):
                 asyncio_run(_run_events())
         except Exception as e:
             print_error(e)
-            return 1
+            sys.exit(1)
 
-        return 0
+        sys.exit(0)
 
     if docs is not None:
         watch.__doc__ = docs
