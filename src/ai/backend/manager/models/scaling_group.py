@@ -30,6 +30,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.types import SessionTypes, JSONSerializableMixin
 
 from .base import (
+    Base,
     mapper_registry,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -123,13 +124,12 @@ sgroups_for_domains = sa.Table(
               sa.ForeignKey('scaling_groups.name',
                             onupdate='CASCADE',
                             ondelete='CASCADE'),
-              index=True, nullable=False),
+              index=True, nullable=False, primary_key=True),
     sa.Column('domain',
               sa.ForeignKey('domains.name',
                             onupdate='CASCADE',
                             ondelete='CASCADE'),
-              index=True, nullable=False),
-    sa.UniqueConstraint('scaling_group', 'domain', name='uq_sgroup_domain'),
+              index=True, nullable=False, primary_key=True),
 )
 
 
@@ -139,13 +139,12 @@ sgroups_for_groups = sa.Table(
               sa.ForeignKey('scaling_groups.name',
                             onupdate='CASCADE',
                             ondelete='CASCADE'),
-              index=True, nullable=False),
+              index=True, nullable=False, primary_key=True),
     sa.Column('group',
               sa.ForeignKey('groups.id',
                             onupdate='CASCADE',
                             ondelete='CASCADE'),
-              index=True, nullable=False),
-    sa.UniqueConstraint('scaling_group', 'group', name='uq_sgroup_ugroup'),
+              index=True, nullable=False, primary_key=True),
 )
 
 
@@ -155,22 +154,27 @@ sgroups_for_keypairs = sa.Table(
               sa.ForeignKey('scaling_groups.name',
                             onupdate='CASCADE',
                             ondelete='CASCADE'),
-              index=True, nullable=False),
+              index=True, nullable=False, primary_key=True),
     sa.Column('access_key',
               sa.ForeignKey('keypairs.access_key',
                             onupdate='CASCADE',
                             ondelete='CASCADE'),
-              index=True, nullable=False),
-    sa.UniqueConstraint('scaling_group', 'access_key', name='uq_sgroup_akey'),
+              index=True, nullable=False, primary_key=True),
 )
 
-class ScalingGroupRow:
-    pass
-
-mapper_registry.map_imperatively(ScalingGroupRow, scaling_groups, properties={
-    'sessions' : relationship('SessionRow', back_populates='scaling_group'),
-    'agents': relationship('AgentRow', back_populates='scaling_group'),
-})
+class ScalingGroupRow(Base):
+    __table__ = scaling_groups
+    sessions = relationship('SessionRow', back_populates='scaling_group')
+    agents = relationship('AgentRow', back_populates='scaling_group')
+    domains = relationship(
+        'DomainRow', secondary=sgroups_for_domains, back_populates='scaling_groups'
+    )
+    groups = relationship(
+        'GroupRow', secondary=sgroups_for_groups, back_populates='scaling_groups'
+    )
+    keypairs = relationship(
+        'KeyPairRow', secondary=sgroups_for_keypairs, back_populates='scaling_groups'
+    )
 
 # When scheduling, we take the union of allowed scaling groups for
 # each domain, group, and keypair.

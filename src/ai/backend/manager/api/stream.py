@@ -85,12 +85,12 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
     api_version = request['api_version']
     try:
         compute_session = await asyncio.shield(
-            database_ptask_group.create_task(root_ctx.registry.get_session(session_name, access_key)),
+            database_ptask_group.create_task(root_ctx.registry.get_session_main_kernel(session_name, access_key)),
         )
     except SessionNotFound:
         raise
     log.info('STREAM_PTY(ak:{0}, s:{1})', access_key, session_name)
-    stream_key = compute_session['id']
+    stream_key = compute_session.id
 
     await asyncio.shield(database_ptask_group.create_task(
         root_ctx.registry.increment_session_usage(session_name, access_key),
@@ -144,7 +144,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                             socks[1].close()
                             kernel = await asyncio.shield(
                                 database_ptask_group.create_task(
-                                    root_ctx.registry.get_session(
+                                    root_ctx.registry.get_session_main_kernel(
                                         session_name,
                                         access_key,
                                     ),
@@ -282,12 +282,12 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     try:
         compute_session = await asyncio.shield(
             database_ptask_group.create_task(
-                registry.get_session(session_name, access_key),  # noqa
+                registry.get_session_main_kernel(session_name, access_key),  # noqa
             ),
         )
     except SessionNotFound:
         raise
-    stream_key = compute_session['id']
+    stream_key = compute_session.id
 
     await asyncio.shield(database_ptask_group.create_task(
         registry.increment_session_usage(session_name, access_key),
@@ -407,19 +407,19 @@ async def stream_proxy(defer, request: web.Request, params: Mapping[str, Any]) -
     assert myself is not None
     try:
         kernel = await asyncio.shield(database_ptask_group.create_task(
-            root_ctx.registry.get_session(session_name, access_key),
+            root_ctx.registry.get_session_main_kernel(session_name, access_key),
         ))
     except (SessionNotFound, TooManySessionsMatched):
         raise
-    stream_key = kernel['id']
+    stream_key = kernel.id
     stream_id = uuid.uuid4().hex
     app_ctx.stream_proxy_handlers[stream_key].add(myself)
     defer(lambda: app_ctx.stream_proxy_handlers[stream_key].discard(myself))
-    if kernel['kernel_host'] is None:
-        kernel_host = urlparse(kernel['agent_addr']).hostname
+    if kernel.kernel_host is None:
+        kernel_host = urlparse(kernel.agent_addr).hostname
     else:
-        kernel_host = kernel['kernel_host']
-    for sport in kernel['service_ports']:
+        kernel_host = kernel.kernel_host
+    for sport in kernel.service_ports:
         if sport['name'] == service:
             if params['port']:
                 # using one of the primary/secondary ports of the app
@@ -457,8 +457,8 @@ async def stream_proxy(defer, request: web.Request, params: Mapping[str, Any]) -
             f"Unsupported service protocol: {sport['protocol']}")
 
     redis_live = root_ctx.redis_live
-    conn_tracker_key = f"session.{kernel['id']}.active_app_connections"
-    conn_tracker_val = f"{kernel['id']}:{service}:{stream_id}"
+    conn_tracker_key = f"session.{kernel.id}.active_app_connections"
+    conn_tracker_val = f"{kernel.id}:{service}:{stream_id}"
 
     _conn_tracker_script = textwrap.dedent('''
         local now = redis.call('TIME')
@@ -570,11 +570,11 @@ async def get_stream_apps(request: web.Request) -> web.Response:
     session_name = request.match_info['session_name']
     access_key = request['keypair']['access_key']
     root_ctx: RootContext = request.app['_root.context']
-    compute_session = await root_ctx.registry.get_session(session_name, access_key)
-    if compute_session['service_ports'] is None:
+    compute_session = await root_ctx.registry.get_session_main_kernel(session_name, access_key)
+    if compute_session.service_ports is None:
         return web.json_response([])
     resp = []
-    for item in compute_session['service_ports']:
+    for item in compute_session.service_ports:
         response_dict = {
             'name': item['name'],
             'protocol': item['protocol'],

@@ -313,9 +313,25 @@ def upgrade():
     
     # Agent table
     op.alter_column('agents', column_name='scaling_group', new_column_name='scaling_group_name')
+    op.drop_index('ix_agents_scaling_group', table_name='agents')
+    op.create_index(op.f('ix_agents_scaling_group_name'), 'agents', ['scaling_group_name'], unique=False)
 
     # Keypair table
     op.alter_column('keypairs', column_name='resource_policy', new_column_name='resource_policy_name')
+
+    ## Association tables
+    # groups_users
+    op.drop_constraint('uq_association_user_id_group_id', 'association_groups_users', type_='unique')
+
+    # scaling_groups_domains
+    op.drop_constraint('uq_sgroup_domain', 'sgroups_for_domains', type_='unique')
+    
+    # scaling_groups_groups
+    op.drop_constraint('uq_sgroup_ugroup', 'sgroups_for_groups', type_='unique')
+
+    # scaling_groups_keypairs
+    op.drop_constraint('uq_sgroup_akey', 'sgroups_for_keypairs', type_='unique')
+
 
     # ### end Alembic commands ###
 
@@ -397,8 +413,23 @@ def downgrade():
         
     # Agent table
     op.alter_column('agents', column_name='scaling_group_name', new_column_name='scaling_group')
+    op.drop_index(op.f('ix_agents_scaling_group_name'), table_name='agents')
+    op.create_index('ix_agents_scaling_group', 'agents', ['scaling_group_name'], unique=False)
 
     # Keypair table
     op.alter_column('keypairs', column_name='resource_policy_name', new_column_name='resource_policy')
+
+    ## Association tables
+    # groups users
+    op.create_unique_constraint('uq_association_user_id_group_id', 'association_groups_users', ['user_id', 'group_id'])
+
+    # scaling groups domains
+    op.create_unique_constraint('uq_sgroup_domain', 'sgroups_for_domains', ['scaling_group', 'domain'])
+
+    # scaling_groups_groups
+    op.create_unique_constraint('uq_sgroup_ugroup', 'sgroups_for_groups', ['scaling_group', 'group'])
+
+    # scaling_groups_keypairs
+    op.create_unique_constraint('uq_sgroup_akey', 'sgroups_for_keypairs', ['scaling_group', 'access_key'])
 
     ### end Alembic commands ###

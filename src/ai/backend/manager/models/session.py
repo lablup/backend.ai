@@ -29,6 +29,7 @@ from .kernel import KernelRow, KernelStatus
 
 __all__ = (
     'SessionStatus',
+    'DEAD_SESSION_STATUSES',
     'AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES',
     'USER_RESOURCE_OCCUPYING_SESSION_STATUSES',
     'SessionRow',

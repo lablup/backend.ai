@@ -34,6 +34,7 @@ from ai.backend.common.types import RedisConnectionInfo
 
 from ..api.exceptions import VFolderOperationFailed
 from .base import (
+    Base,
     EnumValueType,
     IDColumn,
     Item,
@@ -56,7 +57,7 @@ log = BraceStyleAdapter(logging.getLogger(__file__))
 
 
 __all__: Sequence[str] = (
-    'users',
+    'users', 'UserRow',
     'User', 'UserList',
     'UserGroup', 'UserRole',
     'UserInput', 'ModifyUserInput',
@@ -127,12 +128,13 @@ users = sa.Table(
     sa.Column('role', EnumValueType(UserRole), default=UserRole.USER),
 )
 
-class UserRow:
-    pass
-
-mapper_registry.map_imperatively(UserRow, users, properties={
-    'sessions' : relationship('SessionRow', back_populates='user'),
-})
+class UserRow(Base):
+    __table__ = users
+    sessions = relationship('SessionRow', back_populates='user')
+    domain = relationship('DomainRow', back_populates='users')
+    groups = relationship(
+        'GroupRow', secondary='association_groups_users', back_populates='users'
+    )
 
 
 class UserGroup(graphene.ObjectType):

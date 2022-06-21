@@ -654,7 +654,7 @@ class AgentRegistry:
         for_update: bool = False,
         load_kernels: bool = False,
         load_main_kernel: bool = False,
-        db_connection: SAConnection = None,
+        db_session: SASession = None,
     ) -> SessionRow:
         """
         Retrieve the session information by kernel's ID, kernel's session UUID
@@ -673,7 +673,7 @@ class AgentRegistry:
         :param load_main_kernel: Load the main kernel of selected sessions eagerly.
         :param db_connection: Database connection for reuse.
         """
-        async with reenter_txn(self.db, db_connection, _read_only_txn_opts) as conn:
+        async with reenter_txn_session(self.db, db_session, _read_only_txn_opts) as db_sess:
             # sess_rows = await SessionRow.match_sessions(
             #     SASession(conn),
             #     session_name_or_id,
@@ -712,7 +712,7 @@ class AgentRegistry:
             # return kernel_list[0]
 
             sess_rows = await SessionRow.match_sessions(
-                SASession(conn),
+                db_sess,
                 session_name_or_id,
                 AccessKey(access_key),
                 allow_stale=allow_stale,
@@ -1822,28 +1822,6 @@ class AgentRegistry:
             'destroy_session', session.id, session.kp_access_key, set_error=True,
         ):
 
-            # async def _fetch() -> Sequence[Row]:
-            #     async with self.db.begin_readonly() as conn:
-            #         query = (
-            #             sa.select([
-            #                 kernels.c.id,
-            #                 kernels.c.session_id,
-            #                 kernels.c.session_creation_id,
-            #                 kernels.c.status,
-            #                 kernels.c.access_key,
-            #                 kernels.c.cluster_role,
-            #                 kernels.c.agent,
-            #                 kernels.c.agent_addr,
-            #                 kernels.c.container_id,
-            #             ])
-            #             .select_from(kernels)
-            #             .where(kernels.c.session_id == session['id'])
-            #         )
-            #         result = await conn.execute(query)
-            #         kernel_list = result.fetchall()
-            #     return kernel_list
-
-            # kernel_list = await execute_with_retry(_fetch)
             kernel_list: Sequence[KernelRow]
             kernel_list = session.kernels
             main_stat = {}
@@ -1859,19 +1837,6 @@ class AgentRegistry:
                 kernel: KernelRow
                 for kernel in grouped_kernels:
                     if kernel.status == KernelStatus.PENDING:
-
-                        # async def _update() -> None:
-                        #     async with self.db.begin() as conn:
-                        #         await conn.execute(
-                        #             sa.update(kernels)
-                        #             .values({
-                        #                 'status': KernelStatus.CANCELLED,
-                        #                 'status_info': reason,
-                        #                 'status_changed': now,
-                        #                 'terminated_at': now,
-                        #             })
-                        #             .where(kernels.c.id == kernel['id']),
-                        #         )
 
                         async def _update() -> None:
                             values = {

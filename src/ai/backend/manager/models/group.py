@@ -29,7 +29,7 @@ from ai.backend.common.types import ResourceSlot
 from ..api.exceptions import VFolderOperationFailed
 from ..defs import RESERVED_DOTFILES
 from .base import (
-    mapper_registry, GUID, IDColumn, ResourceSlotColumn,
+    Base, mapper_registry, GUID, IDColumn, ResourceSlotColumn,
     privileged_mutation,
     set_if_set,
     simple_db_mutate,
@@ -49,7 +49,8 @@ log = BraceStyleAdapter(logging.getLogger(__file__))
 
 
 __all__: Sequence[str] = (
-    'groups', 'association_groups_users',
+    'groups', 'GroupRow',
+    'association_groups_users',
     'resolve_group_name_or_id',
     'Group', 'GroupInput', 'ModifyGroupInput',
     'CreateGroup', 'ModifyGroup', 'DeleteGroup',
@@ -66,11 +67,10 @@ association_groups_users = sa.Table(
     'association_groups_users', mapper_registry.metadata,
     sa.Column('user_id', GUID,
               sa.ForeignKey('users.uuid', onupdate='CASCADE', ondelete='CASCADE'),
-              nullable=False),
+              nullable=False, primary_key=True),
     sa.Column('group_id', GUID,
               sa.ForeignKey('groups.id', onupdate='CASCADE', ondelete='CASCADE'),
-              nullable=False),
-    sa.UniqueConstraint('user_id', 'group_id', name='uq_association_user_id_group_id'),
+              nullable=False, primary_key=True),
 )
 
 
@@ -97,12 +97,16 @@ groups = sa.Table(
     sa.Column('dotfiles', sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b'\x90'),
 )
 
-class GroupRow:
-    pass
-
-mapper_registry.map_imperatively(GroupRow, groups, properties={
-    'sessions': relationship('SessionRow', back_populates='group'),
-})
+class GroupRow(Base):
+    __table__ = groups
+    sessions = relationship('SessionRow', back_populates='group')
+    domain = relationship('DomainRow', back_populates='groups')
+    scaling_groups = relationship(
+        'ScalingGroupRow', secondary='sgroups_for_groups', back_populates='groups'
+    )
+    users = relationship(
+        'UserRow', secondary=association_groups_users, back_populates='groups'
+    )
 
 
 async def resolve_group_name_or_id(

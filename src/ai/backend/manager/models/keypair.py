@@ -20,7 +20,7 @@ from dateutil.parser import parse as dtparse
 import graphene
 from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection, AsyncSession as SASession
 from sqlalchemy.engine.row import Row
 from sqlalchemy.sql.expression import false
 from sqlalchemy.orm import relationship
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from .vfolder import VirtualFolder
 
 from .base import (
+    Base,
     ForeignKeyIDColumn,
     Item,
     PaginatedList,
@@ -52,7 +53,7 @@ from .user import ModifyUserInput, UserRole
 from ..defs import RESERVED_DOTFILES
 
 __all__: Sequence[str] = (
-    'keypairs',
+    'keypairs', 'KeyPairRow',
     'KeyPair', 'KeyPairList',
     'UserInfo',
     'KeyPairInput',
@@ -68,7 +69,7 @@ MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 keypairs = sa.Table(
     'keypairs', mapper_registry.metadata,
-    sa.Column('user_id', sa.String(length=256), index=True),
+    sa.Column('user_id', sa.String(length=256), index=True),    # user email
     sa.Column('access_key', sa.String(length=20), primary_key=True),
     sa.Column('secret_key', sa.String(length=40)),
     sa.Column('is_active', sa.Boolean, index=True),
@@ -95,13 +96,13 @@ keypairs = sa.Table(
     sa.Column('bootstrap_script', sa.String(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=''),
 )
 
-class KeyPairRow:
-    pass
-
-mapper_registry.map_imperatively(KeyPairRow, keypairs, properties={
-    'sessions': relationship('SessionRow', back_populates='access_key'),
-    'resource_policy': relationship('KeyPairResourcePolicyRow', back_populates='keypairs'),
-})
+class KeyPairRow(Base):
+    __table__ = keypairs
+    sessions = relationship('SessionRow', back_populates='access_key')
+    resource_policy = relationship('KeyPairResourcePolicyRow', back_populates='keypairs')
+    scaling_groups = relationship(
+        'ScalingGroupRow', secondary='sgroups_for_keypairs', back_populates='keypairs'
+    )
 
 
 class UserInfo(graphene.ObjectType):
@@ -607,15 +608,14 @@ async def query_owned_dotfiles(
 
 
 async def query_bootstrap_script(
-    conn: SAConnection,
+    db_sess: SASession,
     access_key: AccessKey,
 ) -> Tuple[str, int]:
     query = (
-        sa.select([keypairs.c.bootstrap_script])
-        .select_from(keypairs)
-        .where(keypairs.c.access_key == access_key)
+        sa.select(KeyPairRow.bootstrap_script)
+        .where(KeyPairRow.access_key == access_key)
     )
-    script = (await conn.execute(query)).scalar()
+    script = (await db_sess.execute(query)).scalar()
     return script, MAXIMUM_DOTFILE_SIZE - len(script)
 
 

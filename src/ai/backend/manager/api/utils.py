@@ -31,7 +31,7 @@ import yaml
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
 
-from ..models import keypairs, users, UserRole
+from ..models import KeyPairRow, UserRole, UserRow
 from .exceptions import InvalidAPIParameters, GenericForbidden, QueryNotImplemented
 
 if TYPE_CHECKING:
@@ -59,20 +59,21 @@ async def get_access_key_scopes(request: web.Request, params: Any = None) -> Tup
         (owner_access_key := params.get('owner_access_key', None)) is not None and
         owner_access_key != requester_access_key
     ):
-        async with root_ctx.db.begin_readonly() as conn:
+        async with root_ctx.db.begin_readonly_session() as db_sess:
             query = (
-                sa.select([users.c.domain_name, users.c.role])
+                sa.select(UserRow.domain_name, UserRow.role)
                 .select_from(
-                    sa.join(keypairs, users,
-                            keypairs.c.user == users.c.uuid))
-                .where(keypairs.c.access_key == owner_access_key)
+                    sa.join(
+                        KeyPairRow, UserRow,
+                        KeyPairRow.user == UserRow.uuid))
+                .where(KeyPairRow.access_key == owner_access_key)
             )
-            result = await conn.execute(query)
+            result = await db_sess.execute(query)
             row = result.first()
             if row is None:
                 raise InvalidAPIParameters("Unknown owner access key")
-            owner_domain = row['domain_name']
-            owner_role = row['role']
+            owner_domain = row.domain_name
+            owner_role = row.role
         if request['is_superadmin']:
             pass
         elif request['is_admin']:
@@ -107,21 +108,18 @@ async def get_user_scopes(
     ):
         if not request['is_superadmin']:
             raise InvalidAPIParameters("Only superadmins may have user scopes.")
-        async with root_ctx.db.begin_readonly() as conn:
-            user_query = (
-                sa.select([users.c.uuid, users.c.role, users.c.domain_name])
-                .select_from(users)
-                .where(
-                    (users.c.email == owner_user_email),
-                )
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(UserRow.uuid, UserRow.role, UserRow.domain_name)
+                .where(UserRow.email == owner_user_email)
             )
-            result = await conn.execute(user_query)
+            result = await db_sess.execute(query)
             row = result.first()
             if row is None:
                 raise InvalidAPIParameters("Cannot delegate an unknown user")
-            owner_user_uuid = row['uuid']
-            owner_user_role = row['role']
-            owner_user_domain = row['domain_name']
+            owner_user_uuid = row.uuid
+            owner_user_role = row.role
+            owner_user_domain = row.domain_name
         if request['is_superadmin']:
             pass
         elif request['is_admin']:

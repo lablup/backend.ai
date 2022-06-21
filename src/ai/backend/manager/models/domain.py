@@ -24,7 +24,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot
 from .base import (
-    mapper_registry, ResourceSlotColumn,
+    Base, mapper_registry, ResourceSlotColumn,
     simple_db_mutate,
     simple_db_mutate_returning_item,
     set_if_set,
@@ -70,12 +70,14 @@ domains = sa.Table(
     sa.Column('dotfiles', sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b'\x90'),
 )
 
-class DomainRow:
-    pass
-
-mapper_registry.map_imperatively(DomainRow, domains, properties={
-    'sessions' : relationship('SessionRow', back_populates='domain'),
-})
+class DomainRow(Base):
+    __table__ = domains
+    sessions = relationship('SessionRow', back_populates='domain')
+    users = relationship('UserRow', back_populates='domain')
+    groups = relationship('GroupRow', back_populates='domain')
+    scaling_groups = relationship(
+        'ScalingGroupRow', secondary='sgroups_for_domains', back_populates='domains'
+    )
 
 
 class Domain(graphene.ObjectType):

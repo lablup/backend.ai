@@ -20,7 +20,7 @@ from sqlalchemy.orm import (
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 from .base import (
-    mapper_registry, BigInt, EnumType, ResourceSlotColumn,
+    Base, mapper_registry, BigInt, EnumType, ResourceSlotColumn,
     simple_db_mutate,
     simple_db_mutate_returning_item,
     set_if_set,
@@ -66,17 +66,9 @@ keypair_resource_policies = sa.Table(
     # sa.Column('allowed_scaling_groups', sa.Array(sa.String), nullable=False),
 )
 
-class KeyPairResourcePolicyRow:
-    pass
-
-mapper_registry.map_imperatively(
-    KeyPairResourcePolicyRow,
-    keypair_resource_policies,
-    properties={
-        'keypairs': relationship('KeyPairRow', back_populates='resource_policy'),
-        # 'sessions': relationship('SessionRow', back_populates='resource_policy'),
-    }
-)
+class KeyPairResourcePolicyRow(Base):
+    __table__ = keypair_resource_policies
+    keypairs = relationship('KeyPairRow', back_populates='resource_policy')
 
 
 class KeyPairResourcePolicy(graphene.ObjectType):

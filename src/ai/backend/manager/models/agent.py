@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.engine.row import Row
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import relationship, selectinload, joinedload
+from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.common import msgpack, redis
 from ai.backend.common.types import (
@@ -40,6 +40,7 @@ from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
 from .session import SessionStatus, SessionRow, AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES
 from .scaling_group import ScalingGroupRow
 from .base import (
+    Base,
     batch_result,
     EnumType, Item,
     mapper_registry,
@@ -94,7 +95,10 @@ agents = sa.Table(
     sa.Column('compute_plugins', pgsql.JSONB(), nullable=False, default={}),
 )
 
-class AgentRow:
+class AgentRow(Base):
+    __table__ = agents
+    kernels = relationship('KernelRow', back_populates='agent')
+    scaling_group = relationship('ScalingGroupRow', back_populates='agents')
     
     @classmethod
     async def list_agents_by_sgroup(
@@ -125,7 +129,7 @@ class AgentRow:
             sa.select(AgentRow)
             .where(AgentRow.status == AgentStatus.ALIVE)
             .options(
-                joinedload(AgentRow.scaling_group)
+                selectinload(AgentRow.scaling_group)
                 .options(
                     selectinload(
                         ScalingGroupRow.sessions.and_(SessionRow.status.in_(candidate_statues)),
@@ -180,12 +184,6 @@ class AgentRow:
 
 
 _AT = TypeVar('_AT', AgentRow, Row)
-
-
-mapper_registry.map_imperatively(AgentRow, agents, properties={
-    'kernels': relationship('KernelRow', back_populates='agent'),
-    'scaling_group': relationship('ScalingGroupRow', back_populates='agents'),
-})
 
 
 class Agent(graphene.ObjectType):

@@ -58,6 +58,7 @@ from ai.backend.common.types import (
 
 from ..defs import DEFAULT_ROLE
 from .base import (
+    Base,
     BigInt,
     EnumType,
     GUID,
@@ -303,19 +304,11 @@ kernels = sa.Table(
 )
 
 
-class KernelRow:
-    id: InstrumentedAttribute
-    session_id: InstrumentedAttribute
-    access_key: InstrumentedAttribute
-    cluster_role: InstrumentedAttribute
-    session: InstrumentedAttribute
-    agent_addr: InstrumentedAttribute
-
-    kernel_host: InstrumentedAttribute
-    service_ports: InstrumentedAttribute
-
-    created_at: InstrumentedAttribute
-    status: InstrumentedAttribute
+class KernelRow(Base):
+    __table__ = kernels
+    session = relationship('SessionRow', back_populates='kernels', foreign_keys=[kernels.c.session_id])
+    image = relationship('ImageRow', back_populates='kernels')
+    agent = relationship('AgentRow', back_populates='kernels')
 
     @classmethod
     async def match_kernels(
@@ -412,26 +405,6 @@ class KernelRow:
                 k: v for k, v in key_occupied.items() if k in slot_filter
             })
         return key_occupied
-
-
-    # @classmethod
-    # async def update(
-    #     cls,
-    #     db_session: SASession,
-    #     kernel_id: str,
-    #     values: Mapping[str, Any],
-    # ) -> None:
-    #     await db_session.execute(
-    #         sa.update(KernelRow)
-    #         .values(**values)
-    #         .where(KernelRow.id == kernel_id)
-    #     )
-
-mapper_registry.map_imperatively(KernelRow, kernels, properties={
-    'session': relationship('SessionRow', back_populates='kernels', foreign_keys=[kernels.c.session_id]),
-    'image': relationship('ImageRow', back_populates='kernels'),
-    'agent': relationship('AgentRow', back_populates='kernels'),
-})
 
 
 DEFAULT_SESSION_ORDERING = [
