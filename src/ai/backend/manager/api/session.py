@@ -2105,11 +2105,11 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
     t.Dict({
         t.Key('owner_access_key', default=None): t.Null | t.String,
     }))
-async def get_actual_resource_alloc_time(request: web.Request, params: Any) -> web.Response:
+async def get_status_history(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app['_root.context']
     session_name: str = request.match_info['session_name']
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
-    log.info('GET_ACTUAL_RESOURCE_ALLOC_TIME (ak:{}/{}, s:{}',
+    log.info('GET_STATUS_HISTORY (ak:{}/{}, s:{}',
              requester_access_key, owner_access_key, session_name)
     async with root_ctx.db.begin_readonly() as conn:
         compute_session = await root_ctx.registry.get_session(
@@ -2118,14 +2118,12 @@ async def get_actual_resource_alloc_time(request: web.Request, params: Any) -> w
             db_connection=conn,
         )
         status_history = compute_session['status_history'] or {}
-    if (preparing := status_history.get(KernelStatus.PREPARING.name)) is None:
-        resp = {'result': {'seconds': 0, 'microseconds': 0}}
-    elif (terminated := status_history.get(KernelStatus.TERMINATED.name)) is None:
-        alloc_time_until_now: timedelta = datetime.now(tzutc()) - isoparse(preparing)
-        resp = {'result': {'seconds': alloc_time_until_now.seconds, 'microseconds': alloc_time_until_now.microseconds}}
-    else:
-        alloc_time: timedelta = isoparse(terminated) - isoparse(preparing)
-        resp = {'result': {'seconds': alloc_time.seconds, 'microseconds': alloc_time.microseconds}}
+    resp = {
+        'result': {
+            status.name.lower(): status_history.get(status.name)
+            for status in KernelStatus
+        },
+    }
     return web.json_response(resp, status=200)
 
 
@@ -2304,5 +2302,5 @@ def create_app(default_cors_options: CORSOptions) -> Tuple[web.Application, Iter
     cors.add(app.router.add_route('GET',  '/{session_name}/download_single', download_single))
     cors.add(app.router.add_route('GET',  '/{session_name}/files', list_files))
     cors.add(app.router.add_route('POST', '/{session_name}/start-service', start_service))
-    cors.add(app.router.add_route('GET',  '/{session_name}/resource_allocation_time/actual', get_actual_resource_alloc_time))
+    cors.add(app.router.add_route('GET',  '/{session_name}/status-history', get_status_history))
     return app, []

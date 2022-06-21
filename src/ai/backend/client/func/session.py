@@ -647,16 +647,16 @@ class ComputeSession(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def get_actual_resource_alloc_time(self):
+    async def get_status_history(self):
         """
-        Retrieves the actual resource allocation time (PREPARING ~ TERMINATED) of the compute session.
+        Retrieves the status transition history of the compute session.
         """
         params = {}
         if self.owner_access_key:
             params['owner_access_key'] = self.owner_access_key
         prefix = get_naming(api_session.get().api_version, 'path')
         rqst = Request(
-            'GET', f'/{prefix}/{self.name}/resource_allocation_time/actual',
+            'GET', f'/{prefix}/{self.name}/status-history',
             params=params,
         )
         async with rqst.fetch() as resp:

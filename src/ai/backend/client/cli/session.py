@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from pathlib import Path
 import secrets
@@ -10,8 +10,12 @@ from typing import IO, Literal, Sequence
 import uuid
 
 import click
+from dateutil.parser import isoparse
+from dateutil.tz import tzutc
 from humanize import naturalsize
 from tabulate import tabulate
+
+from ai.backend.manager.models import KernelStatus
 
 from .main import main
 from .pretty import print_wait, print_done, print_error, print_fail, print_info, print_warn
@@ -662,21 +666,46 @@ def logs(session_id):
             sys.exit(1)
 
 
-@session.command('resource-allocation-time')
+@session.command('status-history')
 @click.argument('session_id', metavar='SESSID')
-def resource_allocation_time(session_id):
+def status_history(session_id):
     '''
-    Shows the resource allocation time (PREPARING ~ TERMINATED) of a compute session.
+    Shows the status transition history of the compute session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
     '''
     with Session() as session:
-        print_wait('Retrieving resource allocation time...')
+        print_wait('Retrieving status history...')
         kernel = session.ComputeSession(session_id)
         try:
-            result = kernel.get_actual_resource_alloc_time().get('result')
-            print_info(f'result: {result}')
+            result = kernel.get_status_history().get('result')
+            for key, value in result:
+                print_info(f'key={value}')
+            if (preparing := status_history.get(KernelStatus.PREPARING.name)) is None:
+                result = {
+                    'result': {
+                        'seconds': 0,
+                        'microseconds': 0,
+                    },
+                }
+            elif (terminated := status_history.get(KernelStatus.TERMINATED.name)) is None:
+                alloc_time_until_now: timedelta = datetime.now(tzutc()) - isoparse(preparing)
+                result = {
+                    'result': {
+                        'seconds': alloc_time_until_now.seconds,
+                        'microseconds': alloc_time_until_now.microseconds,
+                    },
+                }
+            else:
+                alloc_time: timedelta = isoparse(terminated) - isoparse(preparing)
+                result = {
+                    'result': {
+                        'seconds': alloc_time.seconds,
+                        'microseconds': alloc_time.microseconds,
+                    },
+                }
+            print_info(f'Actual Resource Allocation Time: {result}')
         except Exception as e:
             print_error(e)
             sys.exit(1)
