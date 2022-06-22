@@ -977,15 +977,16 @@ def _watch_cmd(docs: Optional[str] = None):
             print_state(session_name_or_id, current_state_idx=-1)
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
-                    if ev.event == SessionSuccessEvent.name:
-                        print_done(ev.event)
-                        sys.exit(0)
-                    elif ev.event == SessionFailureEvent.name:
-                        print_fail(ev.event)
-                        sys.exit(1)
-                    if ev.event == KernelCancelledEvent.name:
-                        print_fail(ev.event)
-                        break
+                    match (event_name := ev.event):
+                        case SessionSuccessEvent.name:
+                            print_done(event_name)
+                            sys.exit(json.loads(ev.data).get('exitCode', 0))
+                        case SessionFailureEvent.name:
+                            print_fail(event_name)
+                            sys.exit(json.loads(ev.data).get('exitCode', 1))
+                        case KernelCancelledEvent.name:
+                            print_fail(event_name)
+                            break
 
                     try:
                         print_state(session_name_or_id, current_state_idx=states.index(ev.event))
@@ -1025,7 +1026,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 async with timeout(max_wait):
                     await _run_events()
             except asyncio.TimeoutError:
-                pass
+                sys.exit(2)
 
         try:
             if max_wait > 0:
