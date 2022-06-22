@@ -8,6 +8,7 @@ from ai.backend.client.session import Session
 from ai.backend.client.output.fields import storage_fields
 from . import admin
 from ..types import CLIContext
+from ..extensions import pass_ctx_obj
 
 
 @admin.group()
@@ -18,7 +19,7 @@ def storage() -> None:
 
 
 @storage.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('vfolder_host')
 def info(ctx: CLIContext, vfolder_host: str) -> None:
     """
@@ -47,7 +48,7 @@ def info(ctx: CLIContext, vfolder_host: str) -> None:
 
 
 @storage.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.option('--filter', 'filter_', default=None,
               help='Set the query filter expression.')
 @click.option('--order', default=None,

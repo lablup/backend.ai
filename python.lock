@@ -40,6 +40,7 @@
 //     "coloredlogs~=15.0",
 //     "cryptography>=2.8",
 //     "etcetra~=0.1.6",
+//     "faker~=13.12.0",
 //     "graphene~=2.1.9",
 //     "humanize>=3.1.0",
 //     "janus>=0.6.1",
@@ -1248,6 +1249,27 @@
           ],
           "requires_python": ">=3.9",
           "version": "0.1.7"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "0122b75e7960cbb1e2bbbf10ef9b8c183377878e38466854953539c6d822e7c0",
+              "url": "https://files.pythonhosted.org/packages/5a/65/c0aabfe3343b1699bc7cddcfbfba60177b1ac47bea44f5b5331a15c4d9c9/Faker-13.12.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "fb95f956bac59c90f54543919d5c5ef41625e12a0773e5aa08c9b9c62ba58fb3",
+              "url": "https://files.pythonhosted.org/packages/b9/0f/e73c16b978961ef519982420b9c2827c8efcb814593d95965999409858e8/Faker-13.12.1.tar.gz"
+            }
+          ],
+          "project_name": "faker",
+          "requires_dists": [
+            "python-dateutil>=2.4",
+            "typing-extensions>=3.10.0.2; python_version < \"3.8\""
+          ],
+          "requires_python": ">=3.6",
+          "version": "13.12.1"
         },
         {
           "artifacts": [
@@ -3841,7 +3863,7 @@
       "platform_tag": [
         "cp310",
         "cp310",
-        "manylinux_2_31_aarch64"
+        "manylinux_2_31_x86_64"
       ]
     }
   ],
@@ -3880,6 +3902,7 @@
     "coloredlogs~=15.0",
     "cryptography>=2.8",
     "etcetra~=0.1.6",
+    "faker~=13.12.0",
     "graphene~=2.1.9",
     "humanize>=3.1.0",
     "janus>=0.6.1",
