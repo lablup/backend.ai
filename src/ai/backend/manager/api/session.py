@@ -2103,34 +2103,6 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @check_api_params(
     t.Dict({
-        t.Key('owner_access_key', default=None): t.Null | t.String,
-    }))
-async def get_status_history(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app['_root.context']
-    session_name: str = request.match_info['session_name']
-    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
-    log.info('GET_STATUS_HISTORY (ak:{}/{}, s:{}',
-             requester_access_key, owner_access_key, session_name)
-    async with root_ctx.db.begin_readonly() as conn:
-        compute_session = await root_ctx.registry.get_session(
-            session_name, owner_access_key,
-            allow_stale=True,
-            db_connection=conn,
-        )
-        status_history = compute_session['status_history'] or {}
-    resp = {
-        'result': {
-            status.name.lower(): status_history.get(status.name)
-            for status in KernelStatus
-        },
-    }
-    return web.json_response(resp, status=200)
-
-
-@server_status_required(READ_ALLOWED)
-@auth_required
-@check_api_params(
-    t.Dict({
         tx.AliasedKey(['session_name', 'sessionName', 'task_id', 'taskId']) >> 'kernel_id': tx.UUID,
     }))
 async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse:
@@ -2302,5 +2274,4 @@ def create_app(default_cors_options: CORSOptions) -> Tuple[web.Application, Iter
     cors.add(app.router.add_route('GET',  '/{session_name}/download_single', download_single))
     cors.add(app.router.add_route('GET',  '/{session_name}/files', list_files))
     cors.add(app.router.add_route('POST', '/{session_name}/start-service', start_service))
-    cors.add(app.router.add_route('GET',  '/{session_name}/status-history', get_status_history))
     return app, []
