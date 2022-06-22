@@ -407,7 +407,7 @@ async def set_quota(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "update_quota", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.set_quota(params["vfid"], params["size_bytes"])
+            await volume.set_quota(UUID(params["vfid"]), params["size_bytes"])
             return web.Response(status=204)
 
 
