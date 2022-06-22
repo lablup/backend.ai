@@ -47,7 +47,6 @@ async def simple_run_cmd(cmdargs: Sequence[Union[str, bytes]], **kwargs) -> asyn
 
 
 async def wait_redis_ready(host: str, port: int, password: str = None) -> None:
-    print('wait_redis_ready:', host, port, password)
     r = Redis.from_url(f"redis://{host}:{port}", password=password, socket_timeout=0.2)
     while True:
         try:

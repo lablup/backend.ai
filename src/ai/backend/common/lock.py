@@ -184,7 +184,6 @@ class RedisLock(AbstractDistributedLock):
         self._debug = debug
 
     async def __aenter__(self) -> None:
-        print('RedisLock.__aenter__()')
         self._lock = AsyncRedisLock(
             self._redis,
             self.lock_name,
@@ -194,13 +193,12 @@ class RedisLock(AbstractDistributedLock):
         )
         await self._lock.acquire()
         if self._debug:
-            print('RedisLock.__aenter__(): lock acquired')
+            log.debug('RedisLock.__aenter__(): lock acquired')
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
-        print('RedisLock.__aexit__()')
         assert self._lock is not None
         await self._lock.release()
         if self._debug:
-            print('RedisLock.__aexit__(): lock released')
+            log.debug('RedisLock.__aexit__(): lock released')
 
         return None

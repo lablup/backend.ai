@@ -74,8 +74,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     )
     container_id = proc.stdout.decode().strip()
     wait_health_check(container_id)
-    # yield container_id, HostPortPair('127.0.0.1', redis_allocated_port)
-    yield container_id, HostPortPair('127.0.0.1', 6379)
+    yield container_id, HostPortPair('127.0.0.1', redis_allocated_port)
     subprocess.run(
         [
             'docker', 'rm', '-v', '-f', container_id,

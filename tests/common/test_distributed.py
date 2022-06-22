@@ -110,6 +110,57 @@ async def run_timer(
         await event_dispatcher.close()
 
 
+def etcd_timer_node_process(
+    queue,
+    stop_event,
+    etcd_ctx: EtcdLockContext,
+    timer_ctx: TimerNodeContext,
+) -> None:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+    async def _main() -> None:
+
+        async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
+            print("_tick")
+            queue.put(time.monotonic())
+
+        redis_config = EtcdRedisConfig(addr=timer_ctx.redis_addr)
+        event_dispatcher = await EventDispatcher.new(
+            redis_config,
+            node_id=timer_ctx.test_ns,
+        )
+        event_producer = await EventProducer.new(
+            redis_config,
+        )
+        event_dispatcher.consume(NoopEvent, None, _tick)
+
+        etcd = AsyncEtcd(
+            addr=etcd_ctx.addr,
+            namespace=etcd_ctx.namespace,
+            scope_prefix_map={
+                ConfigScopes.GLOBAL: 'global',
+                ConfigScopes.SGROUP: 'sgroup/testing',
+                ConfigScopes.NODE: 'node/i-test',
+            },
+        )
+        timer = GlobalTimer(
+            EtcdLock(etcd_ctx.lock_name, etcd, timeout=None, debug=True),
+            event_producer,
+            lambda: NoopEvent(timer_ctx.test_ns),
+            timer_ctx.interval,
+        )
+        try:
+            await timer.join()
+            while not stop_event.is_set():
+                await asyncio.sleep(0)
+        finally:
+            await timer.leave()
+            await event_producer.close()
+            await event_dispatcher.close()
+
+    asyncio.run(_main())
+
+
 class TimerNode(threading.Thread):
 
     def __init__(
@@ -164,24 +215,11 @@ class TimerNode(threading.Thread):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("lock_type", ['file', 'redis'])
-async def test_global_timer(request, test_ns, redis_container, lock_type) -> None:
-    if lock_type == 'file':
-        lock_path = Path(tempfile.gettempdir()) / f'{test_ns}.lock'
-        print('lock path', lock_path)
-        request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
-        lock_factory = lambda: FileLock(lock_path, timeout=0, debug=True)
-    elif lock_type == 'redis':
-        addr = redis_container[1]
-        print('redis addr', addr)
-        r = RedisConnectionInfo(
-            Redis.from_url(url=f'redis://{addr.host}:{addr.port}', socket_timeout=0.5),
-            service_name=None,
-        )
-        assert isinstance(r.client, Redis)
-        lock_factory = lambda: RedisLock(f'{test_ns}lock', r.client, debug=True)
-    else:
-        pytest.fail('should not reach here')
+async def test_global_timer_filelock(request, test_ns, redis_container) -> None:
+    lock_path = Path(tempfile.gettempdir()) / f'{test_ns}.lock'
+    request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
+    lock_factory = lambda: FileLock(lock_path, timeout=0, debug=True)
+
     event_records: List[float] = []
     num_threads = 7
     num_records = 0
@@ -220,7 +258,7 @@ async def test_global_timer(request, test_ns, redis_container, lock_type) -> Non
 
 
 @pytest.mark.asyncio
-async def test_gloal_timer_task(test_ns, redis_container) -> None:
+async def test_gloal_timer_redlock(test_ns, redis_container) -> None:
     redis_addr = redis_container[1]
     r = RedisConnectionInfo(
         Redis.from_url(f'redis://{redis_addr.host}:{redis_addr.port}'),
@@ -257,57 +295,6 @@ async def test_gloal_timer_task(test_ns, redis_container) -> None:
     num_records = len(event_records)
     print(f"{num_records=}")
     assert target_count - 2 <= num_records <= target_count + 2
-
-
-def etcd_timer_node_process(
-    queue,
-    stop_event,
-    etcd_ctx: EtcdLockContext,
-    timer_ctx: TimerNodeContext,
-) -> None:
-    asyncio.set_event_loop(asyncio.new_event_loop())
-
-    async def _main() -> None:
-
-        async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
-            print("_tick")
-            queue.put(time.monotonic())
-
-        redis_config = EtcdRedisConfig(addr=timer_ctx.redis_addr)
-        event_dispatcher = await EventDispatcher.new(
-            redis_config,
-            node_id=timer_ctx.test_ns,
-        )
-        event_producer = await EventProducer.new(
-            redis_config,
-        )
-        event_dispatcher.consume(NoopEvent, None, _tick)
-
-        etcd = AsyncEtcd(
-            addr=etcd_ctx.addr,
-            namespace=etcd_ctx.namespace,
-            scope_prefix_map={
-                ConfigScopes.GLOBAL: 'global',
-                ConfigScopes.SGROUP: 'sgroup/testing',
-                ConfigScopes.NODE: 'node/i-test',
-            },
-        )
-        timer = GlobalTimer(
-            EtcdLock(etcd_ctx.lock_name, etcd, timeout=None, debug=True),
-            event_producer,
-            lambda: NoopEvent(timer_ctx.test_ns),
-            timer_ctx.interval,
-        )
-        try:
-            await timer.join()
-            while not stop_event.is_set():
-                await asyncio.sleep(0)
-        finally:
-            await timer.leave()
-            await event_producer.close()
-            await event_dispatcher.close()
-
-    asyncio.run(_main())
 
 
 @pytest.mark.asyncio

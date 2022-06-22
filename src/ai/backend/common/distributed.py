@@ -36,7 +36,6 @@ class GlobalTimer:
         initial_delay: float = 0.0,
     ) -> None:
         self._dist_lock = dist_lock
-        print(self._dist_lock)
         self._event_producer = event_producer
         self._event_factory = event_factory
         self._stopped = False
