@@ -74,12 +74,12 @@ class NoopEvent(AbstractEvent):
 
 
 async def run_timer(
-    lock_factory: Callable[[None], AbstractDistributedLock],
+    lock_factory: Callable[[], AbstractDistributedLock],
     stop_event: asyncio.Event,
     event_records: List[float],
-    redis_addr: RedisConnectionInfo,
+    redis_addr: HostPortPair,
     test_ns: str,
-    interval: int,
+    interval: int | float,
 ) -> None:
     async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
         print("_tick")
@@ -99,7 +99,7 @@ async def run_timer(
         lock_factory(),
         event_producer,
         lambda: NoopEvent(test_ns),
-        interval,
+        interval=interval,
     )
     try:
         await timer.join()
@@ -166,7 +166,7 @@ class TimerNode(threading.Thread):
     def __init__(
         self,
         event_records: list[float],
-        lock_factory: Callable[[None], AbstractDistributedLock],
+        lock_factory: Callable[[], AbstractDistributedLock],
         thread_idx: int,
         timer_ctx: TimerNodeContext,
     ) -> None:
@@ -200,7 +200,7 @@ class TimerNode(threading.Thread):
             self.lock_factory(),
             event_producer,
             lambda: NoopEvent(self.test_ns),
-            self.interval,
+            interval=self.interval,
         )
         try:
             await timer.join()
@@ -277,7 +277,14 @@ async def test_gloal_timer_redlock(test_ns, redis_container) -> None:
     for thread_idx in range(num_threads):
         stop_event = asyncio.Event()
         task = asyncio.create_task(
-            run_timer(lock_factory, stop_event, event_records, redis_addr, test_ns, interval)
+            run_timer(
+                lock_factory,
+                stop_event,
+                event_records,
+                redis_addr,
+                test_ns,
+                interval
+            ),
         )
         tasks.append((task, stop_event))
     print(f"spawned {num_threads} timers")
