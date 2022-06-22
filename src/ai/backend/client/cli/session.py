@@ -932,8 +932,11 @@ def _watch_cmd(docs: Optional[str] = None):
         """
         session_names = _fetch_session_names()
         if not session_names:
-            click.echo('No matching items.')
-            sys.exit(0)
+            if output == 'json':
+                sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
+            else:
+                click.echo('No matching items.', err=True)
+            sys.exit(4)
 
         states = (
             KernelCreatingEvent.name,
@@ -959,8 +962,11 @@ def _watch_cmd(docs: Optional[str] = None):
                     session_name_or_id = session_name
                     break
             else:
-                click.echo('No matching items.')
-                sys.exit(0)
+                if output == 'json':
+                    sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
+                else:
+                    click.echo('No matching items.', err=True)
+                sys.exit(4)
 
         async def handle_console_output(session: ComputeSession, scope: Literal['*', 'session', 'kernel'] = '*'):
             def print_state(session_name_or_id: str, current_state_idx: int):
