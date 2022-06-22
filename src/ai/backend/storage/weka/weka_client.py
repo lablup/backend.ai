@@ -190,7 +190,7 @@ class WekaAPIClient:
                     return await func(
                         "/api/v2" + path,
                         headers=self._req_header,
-                        data=body,
+                        json=body,
                     )
 
             except web.HTTPUnauthorized:
