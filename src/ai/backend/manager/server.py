@@ -508,7 +508,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
             from ai.backend.common.lock import RedisLock
             return lambda lock_id, lifetime_hint: RedisLock(
                 str(lock_id),
-                root_ctx.redis_lock.client,
+                root_ctx.redis_lock,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
             )
         case 'etcd':

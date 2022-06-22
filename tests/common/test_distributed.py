@@ -264,8 +264,7 @@ async def test_gloal_timer_redlock(test_ns, redis_container) -> None:
         Redis.from_url(f'redis://{redis_addr.host}:{redis_addr.port}'),
         service_name=None,
     )
-    assert isinstance(r.client, Redis)
-    lock_factory = lambda: RedisLock(f'{test_ns}lock', r.client, debug=True)
+    lock_factory = lambda: RedisLock(f'{test_ns}lock', r, debug=True)
 
     event_records: List[float] = []
     num_threads = 7

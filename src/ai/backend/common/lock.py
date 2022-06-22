@@ -25,6 +25,7 @@ from redis.asyncio.lock import Lock as AsyncRedisLock
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.redis_helper import _default_conn_opts
+from ai.backend.common.types import RedisConnectionInfo
 
 from .logging import BraceStyleAdapter
 
@@ -173,9 +174,8 @@ class RedisLock(AbstractDistributedLock):
     def __init__(
         self,
         lock_name: str,
-        redis: Redis | Sentinel,
+        redis: RedisConnectionInfo,
         *,
-        service_name: Optional[str] = None,
         timeout: Optional[float] = None,
         lifetime: Optional[float] = None,
         socket_connect_timeout: float = 0.3,
@@ -183,16 +183,16 @@ class RedisLock(AbstractDistributedLock):
     ):
         super().__init__(lifetime=lifetime)
         self.lock_name = lock_name
-        if isinstance(redis, Redis):
-            self._redis = redis
+        if isinstance(redis.client, Redis):
+            self._redis = redis.client
         else:
+            assert redis.service_name is not None
             _conn_opts = {
                 **_default_conn_opts,
                 'socket_connect_timeout': socket_connect_timeout,
             }
-            assert service_name is not None
-            self._redis = redis.master_for(
-                service_name,
+            self._redis = redis.client.master_for(
+                redis.service_name,
                 redis_class=Redis,
                 connection_pool_class=SentinelConnectionPool,
                 **_conn_opts,
