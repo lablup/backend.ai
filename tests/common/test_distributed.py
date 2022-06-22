@@ -283,7 +283,7 @@ async def test_gloal_timer_redlock(test_ns, redis_container) -> None:
                 event_records,
                 redis_addr,
                 test_ns,
-                interval
+                interval,
             ),
         )
         tasks.append((task, stop_event))
