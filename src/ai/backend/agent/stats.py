@@ -366,7 +366,8 @@ class StatContext:
                     cid = info['container_id']
                 except KeyError:
                     log.warning('collect_container_stat(): no container for kernel {}', kid)
-                kernel_id_map[ContainerId(cid)] = kid
+                else:
+                    kernel_id_map[ContainerId(cid)] = kid
             unused_kernel_ids = set(self.kernel_metrics.keys()) - set(kernel_id_map.values())
             for unused_kernel_id in unused_kernel_ids:
                 log.debug('removing kernel_metric for {}', unused_kernel_id)
