@@ -20,7 +20,7 @@ from tenacity import (
 
 from etcetra.client import EtcdConnectionManager, EtcdCommunicator
 from redis.asyncio import Redis
-from redis.asyncio.sentinel import Sentinel, SentinelConnectionPool
+from redis.asyncio.sentinel import SentinelConnectionPool
 from redis.asyncio.lock import Lock as AsyncRedisLock
 
 from ai.backend.common.etcd import AsyncEtcd
