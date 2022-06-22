@@ -60,6 +60,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
 def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     redis_allocated_port = 36379 + get_parallel_slot() * 10
+    print('spawning redis container on port', redis_allocated_port)
     proc = subprocess.run(
         [
             'docker', 'run', '-d',
@@ -67,13 +68,14 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
             '--health-cmd', 'redis-cli ping',
             '--health-interval', '1s',
             '--health-start-period', '0.3s',
-            'redis:6.2-alpine',
+            'redis:7-alpine',
         ],
         capture_output=True,
     )
     container_id = proc.stdout.decode().strip()
     wait_health_check(container_id)
-    yield container_id, HostPortPair('127.0.0.1', redis_allocated_port)
+    # yield container_id, HostPortPair('127.0.0.1', redis_allocated_port)
+    yield container_id, HostPortPair('127.0.0.1', 6379)
     subprocess.run(
         [
             'docker', 'rm', '-v', '-f', container_id,

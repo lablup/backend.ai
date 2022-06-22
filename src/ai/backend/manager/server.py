@@ -64,7 +64,7 @@ from .config import (
     load as load_config,
     volume_config_iv,
 )
-from .defs import REDIS_STAT_DB, REDIS_LIVE_DB, REDIS_IMAGE_DB, REDIS_STREAM_DB
+from .defs import REDIS_STAT_DB, REDIS_LIVE_DB, REDIS_IMAGE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
 from .idle import init_idle_checkers
 from .models.storage import StorageSessionManager
@@ -304,11 +304,15 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.redis_stream = redis_helper.get_redis_object(
         root_ctx.shared_config.data['redis'], db=REDIS_STREAM_DB,
     )
+    root_ctx.redis_lock = redis_helper.get_redis_object(
+        root_ctx.shared_config.data['redis'], db=REDIS_STREAM_LOCK,
+    )
     yield
     await root_ctx.redis_stream.close()
     await root_ctx.redis_image.close()
     await root_ctx.redis_stat.close()
     await root_ctx.redis_live.close()
+    await root_ctx.redis_lock.close()
 
 
 @actxmgr
@@ -501,7 +505,12 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
             from .pglock import PgAdvisoryLock
             return lambda lock_id, lifetime_hint: PgAdvisoryLock(root_ctx.db, lock_id)
         case 'redlock':
-            raise NotImplementedError("Redlock on redis-py/asyncio v4.3+ is not supported yet.")
+            from ai.backend.common.lock import RedisLock
+            return lambda lock_id, lifetime_hint: RedisLock(
+                str(lock_id),
+                root_ctx.redis_lock,
+                lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
+            )
         case 'etcd':
             from ai.backend.common.lock import EtcdLock
             return lambda lock_id, lifetime_hint: EtcdLock(

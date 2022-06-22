@@ -19,6 +19,8 @@ from tenacity import (
 )
 
 from etcetra.client import EtcdConnectionManager, EtcdCommunicator
+from redis.asyncio import Redis
+from redis.asyncio.lock import Lock as AsyncRedisLock
 
 from ai.backend.common.etcd import AsyncEtcd
 
@@ -154,4 +156,51 @@ class EtcdLock(AbstractDistributedLock):
         if self._debug:
             log.debug('etcd lock released')
         self._con_mgr = None
+        return None
+
+
+class RedisLock(AbstractDistributedLock):
+
+    debug: bool
+    _redis: Redis
+    _timeout: Optional[float]
+    _lock: Optional[AsyncRedisLock]
+
+    default_timeout = 9600
+
+    def __init__(
+        self,
+        lock_name: str,
+        redis: Redis,
+        *,
+        timeout: Optional[float] = None,
+        lifetime: Optional[float] = None,
+        debug: bool = False,
+    ):
+        super().__init__(lifetime=lifetime)
+        self.lock_name = lock_name
+        self._redis = redis
+        self._timeout = timeout if timeout is not None else self.default_timeout
+        self._debug = debug
+
+    async def __aenter__(self) -> None:
+        print('RedisLock.__aenter__()')
+        self._lock = AsyncRedisLock(
+            self._redis,
+            self.lock_name,
+            blocking_timeout=self._timeout,
+            timeout=self._lifetime,
+            thread_local=False,
+        )
+        await self._lock.acquire()
+        if self._debug:
+            print('RedisLock.__aenter__(): lock acquired')
+
+    async def __aexit__(self, *exc_info) -> Optional[bool]:
+        print('RedisLock.__aexit__()')
+        assert self._lock is not None
+        await self._lock.release()
+        if self._debug:
+            print('RedisLock.__aexit__(): lock released')
+
         return None
