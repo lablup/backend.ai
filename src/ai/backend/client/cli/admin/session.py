@@ -18,6 +18,7 @@ from ..main import main
 from ..pretty import print_fail
 from ..session import session as user_session
 from ..types import CLIContext
+from ..extensions import pass_ctx_obj
 
 
 SessionItem = Dict[str, Any]
@@ -32,7 +33,7 @@ def session() -> None:
 
 def _list_cmd(name: str = "list", docs: str = None):
 
-    @click.pass_obj
+    @pass_ctx_obj
     @click.option('-s', '--status', default=None,
                   type=click.Choice([
                       'PENDING', 'SCHEDULED',
@@ -201,7 +202,7 @@ session.command()(_list_cmd())
 
 def _info_cmd(docs: str = None):
 
-    @click.pass_obj
+    @pass_ctx_obj
     @click.argument('session_id', metavar='SESSID')
     def info(ctx: CLIContext, session_id: str) -> None:
         """

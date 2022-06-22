@@ -62,6 +62,7 @@ extra_requirements.add = [
 args = ["-v", "-m", "'not integration'"]
 lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
+timeout_default = 300
 
 [mypy]
 version = "mypy>=0.950"
