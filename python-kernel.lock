@@ -482,13 +482,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1530d04badddc6a73d50b7ee34667d4b96914da352109117b4280cb56523a51b",
-              "url": "https://files.pythonhosted.org/packages/c1/b2/8ee381f21863d496c449ef79dd05962d6970b935ad78f8183381f07808a8/traitlets-5.2.2.post1-py3-none-any.whl"
+              "hash": "65fa18961659635933100db8ca120ef6220555286949774b9cfc106f941d1c7a",
+              "url": "https://files.pythonhosted.org/packages/83/a9/1059771062cb80901c34a4dea020e76269412e69300b4ba12e3356865ad8/traitlets-5.3.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "74803a1baa59af70f023671d86d5c7a834c931186df26d50d362ee6a1ff021fd",
-              "url": "https://files.pythonhosted.org/packages/0b/c2/bb2b6eec33cdccfe16415a979aca248628478e6ac80759e5fbf1cb82d0aa/traitlets-5.2.2.post1.tar.gz"
+              "hash": "0bb9f1f9f017aa8ec187d8b1b2a7a6626a2a1d877116baba52a129bfa124f8e2",
+              "url": "https://files.pythonhosted.org/packages/b2/ed/3c842dbe5a8f0f1ebf3f5b74fc1a46601ed2dfe0a2d256c8488d387b14dd/traitlets-5.3.0.tar.gz"
             }
           ],
           "project_name": "traitlets",
@@ -497,7 +497,7 @@
             "pytest; extra == \"test\""
           ],
           "requires_python": ">=3.7",
-          "version": "5.2.2.post1"
+          "version": "5.3"
         },
         {
           "artifacts": [
