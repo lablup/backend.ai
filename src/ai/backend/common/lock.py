@@ -20,9 +20,11 @@ from tenacity import (
 
 from etcetra.client import EtcdConnectionManager, EtcdCommunicator
 from redis.asyncio import Redis
+from redis.asyncio.sentinel import Sentinel, SentinelConnectionPool
 from redis.asyncio.lock import Lock as AsyncRedisLock
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.redis_helper import _default_conn_opts
 
 from .logging import BraceStyleAdapter
 
@@ -171,15 +173,30 @@ class RedisLock(AbstractDistributedLock):
     def __init__(
         self,
         lock_name: str,
-        redis: Redis,
+        redis: Redis | Sentinel,
         *,
+        service_name: Optional[str] = None,
         timeout: Optional[float] = None,
         lifetime: Optional[float] = None,
+        socket_connect_timeout: float = 0.3,
         debug: bool = False,
     ):
         super().__init__(lifetime=lifetime)
         self.lock_name = lock_name
-        self._redis = redis
+        if isinstance(redis, Redis):
+            self._redis = redis
+        else:
+            _conn_opts = {
+                **_default_conn_opts,
+                'socket_connect_timeout': socket_connect_timeout,
+            }
+            assert service_name is not None
+            self._redis = redis.master_for(
+                service_name,
+                redis_class=Redis,
+                connection_pool_class=SentinelConnectionPool,
+                **_conn_opts,
+            )
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
 
