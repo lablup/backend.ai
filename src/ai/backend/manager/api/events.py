@@ -9,6 +9,7 @@ from typing import (
     Final,
     Iterable,
     Mapping,
+    Optional,
     Set,
     Tuple,
     Union,
@@ -64,7 +65,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 sentinel: Final = Sentinel.token
 
-SessionEventInfo = Tuple[str, dict, str]
+SessionEventInfo = Tuple[str, dict, str, Optional[int]]
 BgtaskEvents = Union[BgtaskUpdatedEvent, BgtaskDoneEvent, BgtaskCancelledEvent, BgtaskFailedEvent]
 
 
