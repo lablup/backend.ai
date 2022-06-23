@@ -243,49 +243,69 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c1ba333b4024c17c7591f0f372e2daa3c31db495a9b2af3cf664aef3c14354f7",
-              "url": "https://files.pythonhosted.org/packages/26/71/5fbd40e87fabaf6f60c2fa8934d93ec1df542b7f978a080ce99f6734934d/msgpack-1.0.3-cp310-cp310-win_amd64.whl"
+              "hash": "4dea20515f660aa6b7e964433b1808d098dcfcabbebeaaad240d11f909298075",
+              "url": "https://files.pythonhosted.org/packages/ef/3f/f20ed47d3a356a556edbd8f9d0515a5a111ffde1e24213a64da948d823a2/msgpack-1.0.4-cp310-cp310-win_amd64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "36a64a10b16c2ab31dcd5f32d9787ed41fe68ab23dd66957ca2826c7f10d0b85",
-              "url": "https://files.pythonhosted.org/packages/06/e5/da31b9be6bed416c29906e0f9eff66af3e08f0b6e11caa7858d649e8ca1f/msgpack-1.0.3-cp310-cp310-win32.whl"
+              "hash": "f5d869c18f030202eb412f08b28d2afeea553d6613aee89e200d7aca7ef01f5f",
+              "url": "https://files.pythonhosted.org/packages/22/44/0829b19ac243211d1d2bd759999aa92196c546518b0be91de9cacc98122a/msgpack-1.0.4.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "1c58cdec1cb5fcea8c2f1771d7b5fec79307d056874f746690bd2bdd609ab147",
-              "url": "https://files.pythonhosted.org/packages/1b/18/61b7462849c31fafd7c7d05a2ae896d495a1c1bf7f25788a4a8af9439153/msgpack-1.0.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "aca0f1644d6b5a73eb3e74d4d64d5d8c6c3d577e753a04c9e9c87d07692c58db",
+              "url": "https://files.pythonhosted.org/packages/29/e3/c596dbeac35a2e14282d95b71851de8fac2ff4ad6cb7e87b1eea04396985/msgpack-1.0.4-cp310-cp310-musllinux_1_1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "96acc674bb9c9be63fa8b6dabc3248fdc575c4adc005c440ad02f87ca7edd079",
-              "url": "https://files.pythonhosted.org/packages/4f/e9/837b5c2209d41ddaf99cc7247598191d6f9f776c017b95abb5ada761ef93/msgpack-1.0.3-cp310-cp310-macosx_10_9_universal2.whl"
+              "hash": "eb514ad14edf07a1dbe63761fd30f89ae79b42625731e1ccf5e1f1092950eaa6",
+              "url": "https://files.pythonhosted.org/packages/4e/77/7a9ec1887d62c16dd2d9d21bf8184af535d1371d75751415871f70f373f1/msgpack-1.0.4-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "51fdc7fb93615286428ee7758cecc2f374d5ff363bdd884c7ea622a7a327a81e",
-              "url": "https://files.pythonhosted.org/packages/61/3c/2206f39880d38ca7ad8ac1b28d2d5ca81632d163b2d68ef90e46409ca057/msgpack-1.0.3.tar.gz"
+              "hash": "49565b0e3d7896d9ea71d9095df15b7f75a035c49be733051c34762ca95bbf7e",
+              "url": "https://files.pythonhosted.org/packages/6c/99/decc145948ac7ecb97ae58eed39e827a289bb8d1e4b471bff158af3bd9a2/msgpack-1.0.4-cp310-cp310-musllinux_1_1_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2f97c0f35b3b096a330bb4a1a9247d0bd7e1f3a2eba7ab69795501504b1c2c39",
-              "url": "https://files.pythonhosted.org/packages/a5/36/3734c798885a93c6e8fe4422184ad089c6e2e44c18d2b18f09cc029c02b8/msgpack-1.0.3-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+              "hash": "c23080fdeec4716aede32b4e0ef7e213c7b1093eede9ee010949f2a418ced6ba",
+              "url": "https://files.pythonhosted.org/packages/70/74/6cfcf4c52e5d69fa2e5e0fc66005db28f1ae613271cfd1c0b4b7ab309553/msgpack-1.0.4-cp310-cp310-musllinux_1_1_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2c3ca57c96c8e69c1a0d2926a6acf2d9a522b41dc4253a8945c4c6cd4981a4e3",
-              "url": "https://files.pythonhosted.org/packages/b9/f4/4d2ee26409739c1a4b1dc3b8e4c50dedd9d5054d1ab5fec9830c42ebb3b6/msgpack-1.0.3-cp310-cp310-macosx_10_9_x86_64.whl"
+              "hash": "0dfe3947db5fb9ce52aaea6ca28112a170db9eae75adf9339a1aec434dc954ef",
+              "url": "https://files.pythonhosted.org/packages/76/19/c84285eacc20a7161962a7a15944364a8310dd7840c3aa57d87c7bb4f6c2/msgpack-1.0.4-cp310-cp310-win32.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b0a792c091bac433dfe0a70ac17fc2087d4595ab835b47b89defc8bbabcf5c73",
-              "url": "https://files.pythonhosted.org/packages/bd/c5/e69b0e5f216191b09261957a75a78078aa2bc90a7138e5186eb641e45d9f/msgpack-1.0.3-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "4ab251d229d10498e9a2f3b1e68ef64cb393394ec477e3370c457f9430ce9250",
+              "url": "https://files.pythonhosted.org/packages/83/69/2f442b38fbba1cedc88bfce381b67d78b59145471a3c9581ec9417a8625b/msgpack-1.0.4-cp310-cp310-macosx_10_9_universal2.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "112b0f93202d7c0fef0b7810d465fde23c746a2d482e1e2de2aafd2ce1492c88",
+              "url": "https://files.pythonhosted.org/packages/91/d2/c6aa033ca5ffd635561d53535af20ac1565b0ea3c1506d12f9a8fdad79af/msgpack-1.0.4-cp310-cp310-macosx_10_9_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "002b5c72b6cd9b4bafd790f364b8480e859b4712e91f43014fe01e4f957b8467",
+              "url": "https://files.pythonhosted.org/packages/bb/99/f4d7081da13af22efb547f305ea563f41d43dbaa1637136bbfd6ee9b2b36/msgpack-1.0.4-cp310-cp310-macosx_11_0_arm64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "35bc0faa494b0f1d851fd29129b2575b2e26d41d177caacd4206d81502d4c6a6",
+              "url": "https://files.pythonhosted.org/packages/dc/16/a8b2de141c4fc536627560b9d3139a6f73bdb2cb5d32ec08a0d875b1210a/msgpack-1.0.4-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "4733359808c56d5d7756628736061c432ded018e7a1dff2d35a02439043321aa",
+              "url": "https://files.pythonhosted.org/packages/ea/18/ef2e84d4ac07262b6ce2ff52cf4f6c97d95b4702a1acbc0da34fdc7701d9/msgpack-1.0.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             }
           ],
           "project_name": "msgpack",
           "requires_dists": [],
           "requires_python": null,
-          "version": "1.0.3"
+          "version": "1.0.4"
         },
         {
           "artifacts": [
@@ -462,13 +482,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f44b708d33d98b0addb40c29d148a761f44af740603a8fd0e2f8b5b27cf0f087",
-              "url": "https://files.pythonhosted.org/packages/84/c5/6a23a8f6acc43150fdc6cfb3bda1cad1f0dbaec0e4f75df77d9c8a62320d/traitlets-5.2.1.post0-py3-none-any.whl"
+              "hash": "65fa18961659635933100db8ca120ef6220555286949774b9cfc106f941d1c7a",
+              "url": "https://files.pythonhosted.org/packages/83/a9/1059771062cb80901c34a4dea020e76269412e69300b4ba12e3356865ad8/traitlets-5.3.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "70815ecb20ec619d1af28910ade523383be13754283aef90528eb3d47b77c5db",
-              "url": "https://files.pythonhosted.org/packages/9b/26/5e5f9002f939d54663d244a260d0453b2baf4f767697da5968aa474f04e7/traitlets-5.2.1.post0.tar.gz"
+              "hash": "0bb9f1f9f017aa8ec187d8b1b2a7a6626a2a1d877116baba52a129bfa124f8e2",
+              "url": "https://files.pythonhosted.org/packages/b2/ed/3c842dbe5a8f0f1ebf3f5b74fc1a46601ed2dfe0a2d256c8488d387b14dd/traitlets-5.3.0.tar.gz"
             }
           ],
           "project_name": "traitlets",
@@ -477,7 +497,7 @@
             "pytest; extra == \"test\""
           ],
           "requires_python": ">=3.7",
-          "version": "5.2.1.post0"
+          "version": "5.3"
         },
         {
           "artifacts": [
@@ -537,12 +557,12 @@
       "platform_tag": [
         "cp310",
         "cp310",
-        "manylinux_2_31_aarch64"
+        "macosx_12_0_x86_64"
       ]
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.84",
+  "pex_version": "2.1.90",
   "prefer_older_binary": false,
   "requirements": [
     "async_timeout~=3.0",
