@@ -31,8 +31,8 @@ HTTP_HEADERS_TO_FORWARD = [
 ]
 
 extra_config_headers = t.Dict({
-    t.Key('X-BackendAI-Version'): t.Null | t.String,
-    t.Key('X-BackendAI-Encoded'): t.Null | t.ToBool,
+    t.Key('X-BackendAI-Version', default=None): t.Null | t.String,
+    t.Key('X-BackendAI-Encoded', default=None): t.Null | t.ToBool,
 }).allow_extra('*')
 
 
