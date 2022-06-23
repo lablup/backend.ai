@@ -148,7 +148,7 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             # but need to keep the client's version header so that
             # the final clients may perform its own API versioning support.
             request_api_version = request.headers.get('X-BackendAI-Version', None)
-            secure_context = request.headers.get('X-BackendAI-Encrypted', None)
+            secure_context = request.headers.get('X-BackendAI-Encoded', None)
             if secure_context:
                 payload = await decrypt_payload(request)
                 payload_length = len(payload)

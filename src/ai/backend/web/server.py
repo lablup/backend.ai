@@ -291,7 +291,7 @@ async def login_handler(request: web.Request) -> web.Response:
             'type': 'https://api.backend.ai/probs/generic-bad-request',
             'title': 'You have already logged in.',
         }), content_type='application/problem+json')
-    secure_context = request.headers.get('X-BackendAI-Encrypted', None)
+    secure_context = request.headers.get('X-BackendAI-Encoded', None)
     if secure_context:
         creds = await decrypt_payload(request)
         creds = json.loads(creds)
