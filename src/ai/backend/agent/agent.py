@@ -114,7 +114,7 @@ from .kernel import (
     KernelFeatures,
     match_distro_data,
 )
-from . import resources as resources_mod
+from . import alloc_map as alloc_map_mod
 from .resources import (
     AbstractComputeDevice,
     AbstractComputePlugin,
@@ -547,7 +547,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
 
         self.zmq_ctx = zmq.asyncio.Context()
 
-        resources_mod.log_alloc_map = self.local_config['debug']['log-alloc-map']
+        alloc_map_mod.log_alloc_map = self.local_config['debug']['log-alloc-map']
         computers, self.slots = await self.detect_resources()
         for name, computer in computers.items():
             devices = await computer.list_devices()
