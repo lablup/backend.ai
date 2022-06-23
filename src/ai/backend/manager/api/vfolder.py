@@ -1608,7 +1608,7 @@ async def delete(request: web.Request) -> web.Response:
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.name == folder_name)
+            extra_vf_conds=(vfolders.c.name == folder_name),
         )
         # for entry in entries:
         #     if entry['name'] == folder_name:
@@ -1627,7 +1627,7 @@ async def delete(request: web.Request) -> web.Response:
         if len(entries) > 1:
             log.error('VFOLDER.DELETE(folder name:{}, hosts:{}', folder_name, [entry['host'] for entry in entries])
             raise VFolderDeletionFailed(
-                extra_msg=f"Found same name of vfolder to delete on multiple storage hosts.",
+                extra_msg="Found same name of vfolder to delete on multiple storage hosts.",
                 extra_data=None,
             )
         elif len(entries) == 0:
