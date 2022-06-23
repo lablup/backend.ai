@@ -16,6 +16,7 @@ from typing import (
 import aiohttp
 from aiohttp import web
 from aiohttp_session import get_session, STORAGE_KEY
+import trafaret as t
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
