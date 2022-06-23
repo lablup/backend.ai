@@ -485,7 +485,7 @@ async def rename_file(request: web.Request) -> web.Response:
                 t.Key("vfid"): tx.UUID(),
                 t.Key("relpath"): tx.PurePath(relative_only=True),
                 t.Key("new_name"): t.String(),
-                t.Key("is_dir"): t.ToBool(),  # ignored since 22.03
+                t.Key("is_dir",default=False): t.ToBool,  # ignored since 22.03
             },
         ),
     ) as params:
