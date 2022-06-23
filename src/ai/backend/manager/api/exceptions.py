@@ -257,7 +257,7 @@ class VFolderCreationFailed(BackendError, web.HTTPBadRequest):
 
 
 class VFolderDeletionFailed(BackendError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/vfolder-deletion-failed"
+    error_type = 'https://api.backend.ai/probs/vfolder-deletion-failed'
     error_title = 'Virtual folder deletion has failed.'
 
 
