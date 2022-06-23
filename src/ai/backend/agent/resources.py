@@ -38,6 +38,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from .alloc_map import (  # Expose legacy import names for plugins  # noqa: F401
     AbstractAllocMap as AbstractAllocMap,
+    AllocationStrategy as AllocationStrategy,
     DiscretePropertyAllocMap as DiscretePropertyAllocMap,
     FractionAllocMap as FractionAllocMap,
     DeviceSlotInfo as DeviceSlotInfo,
