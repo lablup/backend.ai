@@ -15,8 +15,6 @@ from dateutil.tz import tzutc
 from humanize import naturalsize
 from tabulate import tabulate
 
-from ai.backend.manager.models import KernelStatus
-
 from .main import main
 from .pretty import print_wait, print_done, print_error, print_fail, print_info, print_warn
 from .ssh import container_ssh_ctx
@@ -681,14 +679,14 @@ def status_history(session_id):
         try:
             status_history = kernel.get_status_history().get('result')
             print_info(f'status_history: {status_history}')
-            if (preparing := status_history.get(KernelStatus.PREPARING.name.lower())) is None:
+            if (preparing := status_history.get('preparing')) is None:
                 result = {
                     'result': {
                         'seconds': 0,
                         'microseconds': 0,
                     },
                 }
-            elif (terminated := status_history.get(KernelStatus.TERMINATED.name.lower())) is None:
+            elif (terminated := status_history.get('terminated')) is None:
                 alloc_time_until_now: timedelta = datetime.now(tzutc()) - isoparse(preparing)
                 result = {
                     'result': {
