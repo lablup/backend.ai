@@ -63,19 +63,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2",
-              "url": "https://files.pythonhosted.org/packages/44/98/5b86278fbbf250d239ae0ecb724f8572af1c91f4a11edf4d36a206189440/colorama-0.4.4-py2.py3-none-any.whl"
+              "hash": "854bf444933e37f5824ae7bfc1e98d5bce2ebe4160d46b5edf346a89358e99da",
+              "url": "https://files.pythonhosted.org/packages/77/8b/7550e87b2d308a1b711725dfaddc19c695f8c5fa413c640b2be01662f4e6/colorama-0.4.5-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5941b2b48a20143d2267e95b1c2a7603ce057ee39fd88e7329b0c292aa16869b",
-              "url": "https://files.pythonhosted.org/packages/1f/bb/5d3246097ab77fa083a61bd8d3d527b7ae063c7d8e8671b1cf8c4ec10cbe/colorama-0.4.4.tar.gz"
+              "hash": "e6c6b4334fc50988a639d9b98aa429a0b57da6e17b9a44f0451f930b6967b7a4",
+              "url": "https://files.pythonhosted.org/packages/2b/65/24d033a9325ce42ccbfa3ca2d0866c7e89cc68e5b9d92ecaba9feef631df/colorama-0.4.5.tar.gz"
             }
           ],
           "project_name": "colorama",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "0.4.4"
+          "version": "0.4.5"
         },
         {
           "artifacts": [
@@ -368,13 +368,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "68e45d17c9281ba25dc0104eadd2647172b3472d9e01f911efa57965e8d51a36",
-              "url": "https://files.pythonhosted.org/packages/e9/1c/ec080fde54ab30a738c92f794eab7f5d2f354f2b619ee95b2efe353e0766/setuptools-62.3.2-py3-none-any.whl"
+              "hash": "2a5de5d1ed1fd6dfbe4f1a1079af816032e2d8dfc0975265b57a61429511d10c",
+              "url": "https://files.pythonhosted.org/packages/83/ef/d167612e69d6d708d6d1c7932d5731596cc1f7e5285b8b4f6897a867b9bb/setuptools-62.5.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a43bdedf853c670e5fed28e5623403bad2f73cf02f9a2774e91def6bda8265a7",
-              "url": "https://files.pythonhosted.org/packages/4a/25/ec29a23ef38b9456f9965c57a9e1221e6c246d87abbf2a31158799bca201/setuptools-62.3.2.tar.gz"
+              "hash": "a4c782ac58fcc9e3a86e5e1a4c74cf9d24bf21e4f1562043309022e1bb76951c",
+              "url": "https://files.pythonhosted.org/packages/6d/72/4d4b2aa376f39e954be948e3e3e2ce3b6d8e2faa1caabfdb4fec207b5456/setuptools-62.5.0.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -422,7 +422,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "62.3.2"
+          "version": "62.5"
         },
         {
           "artifacts": [
@@ -522,12 +522,12 @@
       "platform_tag": [
         "cp310",
         "cp310",
-        "manylinux_2_31_aarch64"
+        "macosx_12_0_x86_64"
       ]
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.84",
+  "pex_version": "2.1.90",
   "prefer_older_binary": false,
   "requirements": [
     "towncrier>=21.9"
