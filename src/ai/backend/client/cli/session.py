@@ -935,7 +935,7 @@ def _watch_cmd(docs: Optional[str] = None):
             if output == 'json':
                 sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
             else:
-                click.echo('No matching items.', err=True)
+                print_fail('No matching items.')
             sys.exit(4)
 
         states = (
@@ -965,7 +965,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 if output == 'json':
                     sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
                 else:
-                    click.echo('No matching items.', err=True)
+                    print_fail('No matching items.')
                 sys.exit(4)
 
         async def handle_console_output(session: ComputeSession, scope: Literal['*', 'session', 'kernel'] = '*'):
