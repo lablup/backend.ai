@@ -54,7 +54,7 @@ from ..models import (
 )
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
-    VFolderCreationFailed, VFolderNotFound, VFolderAlreadyExists,
+    VFolderCreationFailed, VFolderDeletionFailed, VFolderNotFound, VFolderAlreadyExists,
     GenericForbidden, ObjectNotFound, InvalidAPIParameters, ServerMisconfiguredError,
     BackendAgentError, InternalServerError, GroupNotFound,
 )
@@ -1608,36 +1608,57 @@ async def delete(request: web.Request) -> web.Response:
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
+            extra_vf_conds=(vfolders.c.name == folder_name)
         )
-        for entry in entries:
-            if entry['name'] == folder_name:
-                # Folder owner OR user who have DELETE permission can delete folder.
-                if (
-                    not entry['is_owner']
-                    and entry['permission'] != VFolderPermission.RW_DELETE
-                ):
-                    raise InvalidAPIParameters(
-                        'Cannot delete the vfolder '
-                        'that is not owned by myself.')
-                break
-        else:
+        # for entry in entries:
+        #     if entry['name'] == folder_name:
+        #         # Folder owner OR user who have DELETE permission can delete folder.
+        #         if (
+        #             not entry['is_owner']
+        #             and entry['permission'] != VFolderPermission.RW_DELETE
+        #         ):
+        #             raise InvalidAPIParameters(
+        #                 'Cannot delete the vfolder '
+        #                 'that is not owned by myself.')
+        #         break
+        # FIXME: For now, multiple entries on delete vfolder will raise an error. Will be fixed in 22.06
+        # query_accesible_vfolders returns list
+        entry = entries[0]
+        if len(entries) > 1:
+            log.error('VFOLDER.DELETE(folder name:{}, hosts:{}', folder_name, [entry['host'] for entry in entries])
+            raise VFolderDeletionFailed(
+                extra_msg=f"Found same name of vfolder to delete on multiple storage hosts.",
+                extra_data=None,
+            )
+        elif len(entries) == 0:
             raise InvalidAPIParameters('No such vfolder.')
+        elif entry['name'] == folder_name:
+            # Folder owner OR user who have DELETE permission can delete folder.
+            if (
+                not entry['is_owner']
+                and entry['permission'] != VFolderPermission.RW_DELETE
+            ):
+                raise InvalidAPIParameters(
+                    'Cannot delete the vfolder '
+                    'that is not owned by myself.')
+        else:
+            pass
         folder_host = entry['host']
         folder_id = entry['id']
         query = (sa.delete(vfolders).where(vfolders.c.id == folder_id))
         await conn.execute(query)
-    # fs-level deletion may fail or take longer time
-    # but let's complete the db transaction to reflect that it's deleted.
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
-    async with root_ctx.storage_manager.request(
-        proxy_name, 'POST', 'folder/delete',
-        json={
-            'volume': volume_name,
-            'vfid': str(folder_id),
-        },
-    ):
-        pass
-    return web.Response(status=204)
+        # fs-level deletion may fail or take longer time
+        # but let's complete the db transaction to reflect that it's deleted.
+        proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
+        async with root_ctx.storage_manager.request(
+            proxy_name, 'POST', 'folder/delete',
+            json={
+                'volume': volume_name,
+                'vfid': str(folder_id),
+            },
+        ):
+            pass
+        return web.Response(status=204)
 
 
 @auth_required
