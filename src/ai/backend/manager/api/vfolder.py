@@ -1632,9 +1632,6 @@ async def delete(request: web.Request) -> web.Response:
             )
         elif len(entries) == 0:
             raise InvalidAPIParameters('No such vfolder.')
-        else:
-            pass
-
         # Folder owner OR user who have DELETE permission can delete folder.
         if (
             not entry['is_owner']
