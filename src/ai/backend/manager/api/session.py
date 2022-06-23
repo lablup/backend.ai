@@ -103,7 +103,7 @@ from ..types import UserScope
 from ..models import (
     domains, DomainRow,
     association_groups_users as agus, groups,
-    AssociationGroupUserRow as Agus, GroupRow,
+    AssocGroupUserRow as Agus, GroupRow,
     keypairs, KeyPairRow,
     kernels, AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     query_bootstrap_script,
@@ -119,7 +119,7 @@ from ..models import (
     DEAD_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
 )
-from ..models.kernel import match_session_ids
+from ..models.kernel import KernelRow, match_session_ids
 from ..models.utils import execute_with_retry
 from .exceptions import (
     AppNotFound,
@@ -370,43 +370,60 @@ async def _query_userinfo(
         raise InvalidAPIParameters('Invalid domain')
 
     query = sa.select(GroupRow.id)
+    cond = (
+        (GroupRow.name == params['group']) &
+        (GroupRow.is_active)
+    )
+    print('\n=======================')
+    print(f'{owner_role = }')
     if owner_role == UserRole.SUPERADMIN:
         # superadmin can spawn container in any designated domain/group.
-        query = (
-            query
-            .where(
-                (GroupRow.domain_name == params['domain']) &
-                (GroupRow.name == params['group']) &
-                (GroupRow.is_active),
-            )
-        )
+        # query = (
+        #     query
+        #     .where(
+        #         (GroupRow.domain_name == params['domain']) &
+        #         (GroupRow.name == params['group']) &
+        #         (GroupRow.is_active),
+        #     )
+        # )
+        cond = cond & (GroupRow.domain_name == params['domain'])
     elif owner_role == UserRole.ADMIN:
         # domain-admin can spawn container in any group in the same domain.
         if params['domain'] != owner_domain:
             raise InvalidAPIParameters("You can only set the domain to the owner's domain.")
-        query = (
-            query
-            .where(
-                (GroupRow.domain_name == owner_domain) &
-                (GroupRow.name == params['group']) &
-                (GroupRow.is_active),
-            )
-        )
+        # query = (
+        #     query
+        #     .where(
+        #         (GroupRow.domain_name == owner_domain) &
+        #         (GroupRow.name == params['group']) &
+        #         (GroupRow.is_active),
+        #     )
+        # )
+        cond = cond & (GroupRow.domain_name == owner_domain)
     else:
         # normal users can spawn containers in their group and domain.
         if params['domain'] != owner_domain:
             raise InvalidAPIParameters("You can only set the domain to your domain.")
+        # query = (
+        #     sa.select(Agus.group_id)
+        #     .select_from(sa.join(Agus, GroupRow, Agus.group_id == GroupRow.id))
+        #     .where(
+        #         (Agus.user_id == owner_uuid) &
+        #         (GroupRow.domain_name == owner_domain) &
+        #         (GroupRow.name == params['group']) &
+        #         (GroupRow.is_active),
+        #     )
+        # )
         query = (
             sa.select(Agus.group_id)
             .select_from(sa.join(Agus, GroupRow, Agus.group_id == GroupRow.id))
-            .where(
-                (Agus.user_id == owner_uuid) &
-                (GroupRow.domain_name == owner_domain) &
-                (GroupRow.name == params['group']) &
-                (GroupRow.is_active),
-            )
+        )
+        cond = cond & (
+            (Agus.user_id == owner_uuid) &
+            (GroupRow.domain_name == owner_domain)
         )
 
+    query = query.where(cond)
     qresult = await db_sess.execute(query)
     group_id = qresult.scalar()
     if group_id is None:
@@ -482,7 +499,9 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     try:
         # NOTE: We can reuse the session IDs of TERMINATED sessions only.
         # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-        sess: SessionRow = await root_ctx.registry.get_session_main_kernel(params['session_name'], owner_access_key)
+        sess: SessionRow = await root_ctx.registry.get_session(
+            params['session_name'], owner_access_key, load_intrinsic=True,
+        )
         main_kern = sess.main_kernel
         running_image_ref = ImageRef(sess.image.name, [main_kern.registry], main_kern.architecture)
         if running_image_ref != requested_image_ref:
@@ -538,7 +557,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             params['bootstrap_script'] = script
 
     try:
-        kernel_id = await asyncio.shield(app_ctx.database_ptask_group.create_task(
+        session_id = await asyncio.shield(app_ctx.database_ptask_group.create_task(
             root_ctx.registry.enqueue_session(
                 session_creation_id,
                 params['session_name'], owner_access_key,
@@ -569,7 +588,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 callback_url=params['callback_url'],
             )),
         )
-        resp['sessionId'] = str(kernel_id)  # changed since API v5
+        resp['sessionId'] = str(session_id)  # changed since API v5
         resp['sessionName'] = str(params['session_name'])
         resp['status'] = 'PENDING'
         resp['servicePorts'] = []
@@ -588,20 +607,16 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 resp['status'] = 'TIMEOUT'
             else:
                 await asyncio.sleep(0.5)
-                async with root_ctx.db.begin_readonly() as conn:
+                async with root_ctx.db.begin_readonly_session() as db_sess:
                     query = (
-                        sa.select([
-                            kernels.c.status,
-                            kernels.c.service_ports,
-                        ])
-                        .select_from(kernels)
-                        .where(kernels.c.id == kernel_id)
+                        sa.select(KernelRow.status, KernelRow.service_ports)
+                        .where(KernelRow.session_id == session_id)
                     )
-                    result = await conn.execute(query)
+                    result = await db_sess.execute(query)
                     row = result.first()
-                if row['status'] == KernelStatus.RUNNING:
+                if row.status == KernelStatus.RUNNING:
                     resp['status'] = 'RUNNING'
-                    for item in row['service_ports']:
+                    for item in row.service_ports:
                         response_dict = {
                             'name': item['name'],
                             'protocol': item['protocol'],
@@ -615,7 +630,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                             response_dict['allowed_envs'] = item['allowed_envs']
                         resp['servicePorts'].append(response_dict)
                 else:
-                    resp['status'] = row['status'].name
+                    resp['status'] = row.status.name
     except asyncio.CancelledError:
         raise
     except BackendError:

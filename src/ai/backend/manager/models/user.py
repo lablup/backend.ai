@@ -132,9 +132,7 @@ class UserRow(Base):
     __table__ = users
     sessions = relationship('SessionRow', back_populates='user')
     domain = relationship('DomainRow', back_populates='users')
-    groups = relationship(
-        'GroupRow', secondary='association_groups_users', back_populates='users'
-    )
+    groups = relationship('AssocGroupUserRow', back_populates='user')
 
 
 class UserGroup(graphene.ObjectType):

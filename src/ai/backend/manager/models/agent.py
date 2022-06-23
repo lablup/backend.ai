@@ -167,10 +167,10 @@ class AgentRow(Base):
         agent: _AT,
         agent_data: Mapping[str, Any],
     ) -> bool:
-        agent_dict = dict(agent)
+        agent_map = dict(agent)
         updates = {
             k: v for k, v in agent_data.items()
-            if k in agent_dict and agent_dict[k] != v
+            if k in agent_map and agent_map[k] != v
         }
         if updates:
             query = (

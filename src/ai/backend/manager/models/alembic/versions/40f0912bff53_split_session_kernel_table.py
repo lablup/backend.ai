@@ -312,8 +312,8 @@ def upgrade():
     op.add_column('kernels', sa.Column('requested_slots', pgsql.JSONB(), nullable=True))
     
     # Agent table
-    op.alter_column('agents', column_name='scaling_group', new_column_name='scaling_group_name')
     op.drop_index('ix_agents_scaling_group', table_name='agents')
+    op.alter_column('agents', column_name='scaling_group', new_column_name='scaling_group_name')
     op.create_index(op.f('ix_agents_scaling_group_name'), 'agents', ['scaling_group_name'], unique=False)
 
     # Keypair table
@@ -412,9 +412,9 @@ def downgrade():
     sess_results.drop(op.get_bind())
         
     # Agent table
-    op.alter_column('agents', column_name='scaling_group_name', new_column_name='scaling_group')
     op.drop_index(op.f('ix_agents_scaling_group_name'), table_name='agents')
-    op.create_index('ix_agents_scaling_group', 'agents', ['scaling_group_name'], unique=False)
+    op.alter_column('agents', column_name='scaling_group_name', new_column_name='scaling_group')
+    op.create_index('ix_agents_scaling_group', 'agents', ['scaling_group'], unique=False)
 
     # Keypair table
     op.alter_column('keypairs', column_name='resource_policy_name', new_column_name='resource_policy')

@@ -8,7 +8,7 @@ from typing import (
     TYPE_CHECKING,
 )
 
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 class SessionGetter(Protocol):
 
-    def __call__(self, *, db_connection: SAConnection) -> SessionRow:
+    def __call__(self, *, db_session: SASession) -> SessionRow:
         ...
 
 

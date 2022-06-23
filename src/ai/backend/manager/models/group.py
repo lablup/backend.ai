@@ -51,6 +51,7 @@ log = BraceStyleAdapter(logging.getLogger(__file__))
 __all__: Sequence[str] = (
     'groups', 'GroupRow',
     'association_groups_users',
+    'AssocGroupUserRow',
     'resolve_group_name_or_id',
     'Group', 'GroupInput', 'ModifyGroupInput',
     'CreateGroup', 'ModifyGroup', 'DeleteGroup',
@@ -72,6 +73,11 @@ association_groups_users = sa.Table(
               sa.ForeignKey('groups.id', onupdate='CASCADE', ondelete='CASCADE'),
               nullable=False, primary_key=True),
 )
+
+class AssocGroupUserRow(Base):
+    __table__ = association_groups_users
+    user = relationship('UserRow', back_populates='groups')
+    group = relationship('GroupRow', back_populates='users')
 
 
 groups = sa.Table(
@@ -104,9 +110,7 @@ class GroupRow(Base):
     scaling_groups = relationship(
         'ScalingGroupRow', secondary='sgroups_for_groups', back_populates='groups'
     )
-    users = relationship(
-        'UserRow', secondary=association_groups_users, back_populates='groups'
-    )
+    users = relationship('AssocGroupUserRow', back_populates='group')
 
 
 async def resolve_group_name_or_id(

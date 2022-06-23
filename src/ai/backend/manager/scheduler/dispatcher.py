@@ -273,7 +273,7 @@ class SchedulerDispatcher(aobject):
             async def _apply_cancellation():
                 async with self.db.begin_session() as db_sess:
                     for session in cancelled_sessions:
-                        await SessionRow.update_kernels(
+                        await SessionRow.update_session_kernels(
                             db_sess, session,
                             kernel_data={
                                 'status': KernelStatus.CANCELLED,
@@ -404,7 +404,7 @@ class SchedulerDispatcher(aobject):
                         await _rollback_predicate_mutations(
                             sess, sched_ctx, sess_ctx,
                         )
-                        await SessionRow.update_kernels(
+                        await SessionRow.update_session_kernels(
                             sess, sess_ctx,
                             kernel_data={
                                 'status_info': 'predicate-checks-failed',
@@ -427,7 +427,7 @@ class SchedulerDispatcher(aobject):
             else:
                 async def _update() -> None:
                     async with self.db.begin_session() as sess:
-                        await SessionRow.update_kernels(
+                        await SessionRow.update_session_kernels(
                             sess, sess_ctx,
                             kernel_data={
                                 'status_data': sql_json_merge(
@@ -504,8 +504,8 @@ class SchedulerDispatcher(aobject):
             if available_agent_slots is None:
                 raise InstanceNotAvailable("There is no such agent.")
             if any(
-                sess_ctx.requested_slots[slot] > val
-                for slot, val in available_agent_slots.items()
+                val > available_agent_slots[slot]
+                for slot, val in sess_ctx.requested_slots.items()
             ):
                 raise InstanceNotAvailable(
                     "The resource slot does not have the enough remaining capacity.",
@@ -524,7 +524,7 @@ class SchedulerDispatcher(aobject):
                     await _rollback_predicate_mutations(
                         kernel_db_sess, sched_ctx, sess_ctx,
                     )
-                    await SessionRow.update_kernels(
+                    await SessionRow.update_session_kernels(
                         kernel_db_sess, sess_ctx,
                         kernel_data={
                             'status_info': 'no-available-instances',
@@ -552,7 +552,7 @@ class SchedulerDispatcher(aobject):
                     await _rollback_predicate_mutations(
                         kernel_db_sess, sched_ctx, sess_ctx,
                     )
-                    await SessionRow.update_kernels(
+                    await SessionRow.update_session_kernels(
                         kernel_db_sess, sess_ctx,
                         kernel_data={
                             'status_info': 'scheduler-error',
@@ -565,7 +565,7 @@ class SchedulerDispatcher(aobject):
 
         async def _finalize_scheduled() -> None:
             async with self.db.begin_session() as kernel_db_sess:
-                await SessionRow.update_kernels(
+                await SessionRow.update_session_kernels(
                     kernel_db_sess, sess_ctx,
                     kernel_data={
                         'agent_id': agent_alloc_ctx.id,
@@ -617,8 +617,8 @@ class SchedulerDispatcher(aobject):
                     if available_agent_slots is None:
                         raise InstanceNotAvailable("There is no such agent.")
                     if any(
-                        kernel.requested_slots[slot] > val
-                        for slot, val in available_agent_slots.items()
+                        val > available_agent_slots[slot]
+                        for slot, val in kernel.requested_slots.items()
                     ):
                         raise InstanceNotAvailable(
                             "The resource slot does not have the enough remaining capacity.",
@@ -645,7 +645,7 @@ class SchedulerDispatcher(aobject):
                             await _rollback_predicate_mutations(
                                 kernel_db_sess, sched_ctx, sess_ctx,
                             )
-                            await SessionRow.update_kernels(
+                            await SessionRow.update_session_kernels(
                                 kernel_db_sess, sess_ctx,
                                 kernel_data={
                                     'status_info': 'no-available-instances',
@@ -674,7 +674,7 @@ class SchedulerDispatcher(aobject):
                             await _rollback_predicate_mutations(
                                 kernel_db_sess, sched_ctx, sess_ctx,
                             )
-                            await SessionRow.update_kernels(
+                            await SessionRow.update_session_kernels(
                                 kernel_db_sess, sess_ctx,
                                 kernel_data={
                                     'status_info': 'scheduler-error',
@@ -695,7 +695,7 @@ class SchedulerDispatcher(aobject):
         async def _finalize_scheduled() -> None:
             async with self.db.begin_session() as kernel_db_sess:
                 for binding in kernel_agent_bindings:
-                    await SessionRow.update_kernels(
+                    await SessionRow.update_session_kernels(
                         kernel_db_sess, sess_ctx,
                         kernel_data={
                             'agent_id': binding.agent_alloc_ctx.id,
@@ -741,7 +741,7 @@ class SchedulerDispatcher(aobject):
                             db_sess, status=SessionStatus.SCHEDULED,
                         )
                         for session in target_sessions:
-                            await SessionRow.update_kernels(
+                            await SessionRow.update_session_kernels(
                                 db_sess, session,
                                 kernel_update={
                                     'status': KernelStatus.PREPARING,
@@ -800,7 +800,7 @@ class SchedulerDispatcher(aobject):
                         await recalc_agent_resource_occupancy(db_sess, agent)
                     await _rollback_predicate_mutations(db_sess, sched_ctx, session)
                     now = datetime.now(tzutc())
-                    await SessionRow.update_kernels(
+                    await SessionRow.update_session_kernels(
                         db_sess, session,
                         kernel_data={
                             'status': KernelStatus.CANCELLED,
