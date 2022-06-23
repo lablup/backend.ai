@@ -144,7 +144,6 @@ class StorageSessionManager:
         vfolder_host_or_proxy_name: str,
         method: str,
         request_relpath: str,
-        /,
         *args,
         **kwargs,
     ) -> AsyncIterator[Tuple[yarl.URL, aiohttp.ClientResponse]]:
@@ -165,7 +164,7 @@ class StorageSessionManager:
                 try:
                     error_data = await client_resp.json()
                     raise VFolderOperationFailed(
-                        extra_msg= error_data.pop("msg", None),
+                        extra_msg=error_data.pop("msg", None),
                         extra_data=error_data,
                     )
                 except aiohttp.ClientResponseError:
