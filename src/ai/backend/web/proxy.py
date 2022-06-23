@@ -29,6 +29,11 @@ HTTP_HEADERS_TO_FORWARD = [
     'Accept-Language',
 ]
 
+extra_config_headers = t.Dict({
+    t.Key('X-BackendAI-Version'): t.Null | t.String,
+    t.Key('X-BackendAI-Encoded'): t.Null | t.ToBool,
+}).allow_extra('*')
+
 
 class WebSocketProxy:
     __slots__ = (
@@ -147,8 +152,9 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             # We perform request signing by ourselves using the HTTP session data,
             # but need to keep the client's version header so that
             # the final clients may perform its own API versioning support.
-            request_api_version = request.headers.get('X-BackendAI-Version', None)
-            secure_context = request.headers.get('X-BackendAI-Encoded', None)
+            request_headers = extra_config_headers.check(request.headers)
+            request_api_version = request_headers.get('X-BackendAI-Version', None)
+            secure_context = request_headers.get('X-BackendAI-Encoded', None)
             if secure_context:
                 payload = await decrypt_payload(request)
                 payload_length = len(payload)
