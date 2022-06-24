@@ -134,7 +134,7 @@
       "platform_tag": [
         "cp310",
         "cp310",
-        "macosx_12_0_x86_64"
+        "manylinux_2_31_aarch64"
       ]
     }
   ],
