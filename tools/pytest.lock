@@ -266,21 +266,21 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6881edbebdb17b39b4eaaa821b438bf6eddffb4468cf344f09f89def34a8b1df",
-              "url": "https://files.pythonhosted.org/packages/06/b3/24afc8868eba069a7f03650ac750a778862dc34941a4bebeb58706715726/charset_normalizer-2.0.12-py3-none-any.whl"
+              "hash": "5189b6f22b01957427f35b6a08d9a0bc45b46d3788ef5a92e978433c7a35f8a5",
+              "url": "https://files.pythonhosted.org/packages/94/69/64b11e8c2fb21f08634468caef885112e682b0ebe2908e74d3616eb1c113/charset_normalizer-2.1.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2857e29ff0d34db842cd7ca3230549d1a697f96ee6d3fb071cfa6c7393832597",
-              "url": "https://files.pythonhosted.org/packages/56/31/7bcaf657fafb3c6db8c787a865434290b726653c912085fbd371e9b92e1c/charset-normalizer-2.0.12.tar.gz"
+              "hash": "575e708016ff3a5e3681541cb9d79312c416835686d054a23accb873b254f413",
+              "url": "https://files.pythonhosted.org/packages/93/1d/d9392056df6670ae2a29fcb04cfa5cee9f6fbde7311a1bb511d4115e9b7a/charset-normalizer-2.1.0.tar.gz"
             }
           ],
           "project_name": "charset-normalizer",
           "requires_dists": [
             "unicodedata2; extra == \"unicode_backport\""
           ],
-          "requires_python": ">=3.5.0",
-          "version": "2.0.12"
+          "requires_python": ">=3.6.0",
+          "version": "2.1"
         },
         {
           "artifacts": [
@@ -929,7 +929,7 @@
       "platform_tag": [
         "cp310",
         "cp310",
-        "macosx_12_0_x86_64"
+        "manylinux_2_31_aarch64"
       ]
     }
   ],
