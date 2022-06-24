@@ -54,7 +54,7 @@ from ..models import (
 )
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
-    VFolderCreationFailed, VFolderDeletionFailed, VFolderNotFound, VFolderAlreadyExists,
+    VFolderCreationFailed, TooManyVFoldersFound, VFolderNotFound, VFolderAlreadyExists,
     GenericForbidden, ObjectNotFound, InvalidAPIParameters, ServerMisconfiguredError,
     BackendAgentError, InternalServerError, GroupNotFound,
 )
@@ -1622,16 +1622,16 @@ async def delete(request: web.Request) -> web.Response:
         #                 'that is not owned by myself.')
         #         break
         # FIXME: For now, multiple entries on delete vfolder will raise an error. Will be fixed in 22.06
-        # query_accesible_vfolders returns list
-        entry = entries[0]
         if len(entries) > 1:
             log.error('VFOLDER.DELETE(folder name:{}, hosts:{}', folder_name, [entry['host'] for entry in entries])
-            raise VFolderDeletionFailed(
+            raise TooManyVFoldersFound(
                 extra_msg="Multiple folders with the same name.",
                 extra_data=None,
             )
         elif len(entries) == 0:
             raise InvalidAPIParameters('No such vfolder.')
+        # query_accesible_vfolders returns list
+        entry = entries[0]
         # Folder owner OR user who have DELETE permission can delete folder.
         if (
             not entry['is_owner']
