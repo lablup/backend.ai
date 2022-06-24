@@ -39,7 +39,13 @@ from ai.backend.client.session import AsyncSession as APISession
 
 from . import __version__, user_agent
 from .logging import BraceStyleAdapter
-from .proxy import web_handler, websocket_handler, web_plugin_handler
+from .proxy import (
+    web_handler,
+    websocket_handler,
+    web_plugin_handler,
+    decrypt_payload,
+    extra_config_headers,
+)
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.web.server'))
 static_path = Path(pkg_resources.resource_filename('ai.backend.web', 'static')).resolve()
@@ -292,7 +298,13 @@ async def login_handler(request: web.Request) -> web.Response:
             'type': 'https://api.backend.ai/probs/generic-bad-request',
             'title': 'You have already logged in.',
         }), content_type='application/problem+json')
-    creds = await request.json()
+    request_headers = extra_config_headers.check(request.headers)
+    secure_context = request_headers.get('X-BackendAI-Encoded', None)
+    if secure_context:
+        creds = await decrypt_payload(request)
+        creds = json.loads(creds)
+    else:
+        creds = await request.json()
     if 'username' not in creds or not creds['username']:
         return web.HTTPBadRequest(text=json.dumps({
             'type': 'https://api.backend.ai/probs/invalid-api-params',

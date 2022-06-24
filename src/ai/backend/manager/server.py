@@ -115,6 +115,9 @@ VALID_VERSIONS: Final = frozenset([
     # added session event webhook option to session creation API
     # added architecture option when making image aliases
     'v6.20220315',
+
+    # added payload encryption / decryption on selected transfer
+    'v6.20220615',
 ])
 LATEST_REV_DATES: Final = {
     1: '20160915',
@@ -122,9 +125,9 @@ LATEST_REV_DATES: Final = {
     3: '20181215',
     4: '20190615',
     5: '20191215',
-    6: '20220315',
+    6: '20220615',
 }
-LATEST_API_VERSION: Final = 'v6.20220315'
+LATEST_API_VERSION: Final = 'v6.20220615'
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
