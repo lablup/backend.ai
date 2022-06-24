@@ -89,7 +89,7 @@ convention = {
 }
 metadata = sa.MetaData(naming_convention=convention)
 mapper_registry = registry(metadata=metadata)
-Base: Any = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
+Base = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
 
 pgsql_connect_opts = {
     'server_settings': {
@@ -189,11 +189,13 @@ class ResourceSlotColumn(TypeDecorator):
 
     def process_result_value(self, raw_value: Dict[str, str], dialect):
         # legacy handling
+        if raw_value is None:
+            return ResourceSlot()
         interim_value: Dict[str, Any] = raw_value
         mem = raw_value.get('mem')
         if isinstance(mem, str) and not mem.isdigit():
             interim_value['mem'] = BinarySize.from_str(mem)
-        return ResourceSlot.from_json(interim_value) if raw_value is not None else None
+        return ResourceSlot.from_json(interim_value)
 
     def copy(self):
         return ResourceSlotColumn()

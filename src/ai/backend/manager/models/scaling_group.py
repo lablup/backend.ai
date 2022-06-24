@@ -181,7 +181,7 @@ class ScalingGroupRow(Base):
 
 
 async def query_allowed_sgroups(
-    db_conn: SAConnection,
+    db_sess: SASession,
     domain_name: str,
     group: Union[uuid.UUID, str],
     access_key: str,
@@ -190,10 +190,10 @@ async def query_allowed_sgroups(
         sa.select([sgroups_for_domains])
         .where(sgroups_for_domains.c.domain == domain_name)
     )
-    result = await db_conn.execute(query)
+    result = await db_sess.execute(query)
     from_domain = {row['scaling_group'] for row in result}
 
-    group_id = await resolve_group_name_or_id(db_conn, domain_name, group)
+    group_id = await resolve_group_name_or_id(db_sess, domain_name, group)
     from_group: Set[str]
     if group_id is None:
         from_group = set()  # empty
@@ -204,12 +204,12 @@ async def query_allowed_sgroups(
                 (sgroups_for_groups.c.group == group_id),
             )
         )
-        result = await db_conn.execute(query)
+        result = await db_sess.execute(query)
         from_group = {row['scaling_group'] for row in result}
 
     query = (sa.select([sgroups_for_keypairs])
                .where(sgroups_for_keypairs.c.access_key == access_key))
-    result = await db_conn.execute(query)
+    result = await db_sess.execute(query)
     from_keypair = {row['scaling_group'] for row in result}
 
     sgroups = from_domain | from_group | from_keypair
@@ -221,7 +221,7 @@ async def query_allowed_sgroups(
         )
         .order_by(ScalingGroupRow.name)
     )
-    result = await SASession(db_conn).execute(query)
+    result = await db_sess.execute(query)
     return result.scalars().all()
 
 

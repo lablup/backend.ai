@@ -25,9 +25,10 @@ from ..models import (
     keypair_resource_policies,
     SessionDependencyRow,
     query_allowed_sgroups,
+    check_all_dependencies,
     DefaultForUnspecified,
 )
-from ..models.utils import execute_with_retry, reenter_txn
+from ..models.utils import execute_with_retry, reenter_txn, reenter_txn_session
 from .types import (
     SchedulingContext,
     PendingSession,
@@ -79,12 +80,25 @@ async def check_concurrency(
     sess_ctx: SessionRow,
 ) -> PredicateResult:
 
-    max_concurrent_sessions = sess_ctx.access_key.resource_policy.max_concurrent_sessions
+    resource_policy = sess_ctx.access_key.resource_policy
+    if resource_policy is None:
+        query = (
+            sa.select(KeyPairResourcePolicyRow)
+            .where(KeyPairResourcePolicyRow.name == sess_ctx.access_key.resource_policy_name)
+        )
+        result = await db_sess.execute(query)
+        resource_policy = result.scalar()
+        # print('\n===============================')
+        # print(f'{resource_policy = }')
+        # print(f'{type(resource_policy) = }')
+        # print('===============================')
+    
+    max_concurrent_sessions = resource_policy.max_concurrent_sessions
     ok, concurrency_used = await redis.execute_script(
         sched_ctx.registry.redis_stat,
         'check_keypair_concurrency_used',
         _check_keypair_concurrency_script,
-        [f"keypair.concurrency_used.{sess_ctx.access_key}"],
+        [f"keypair.concurrency_used.{sess_ctx.kp_access_key}"],
         [max_concurrent_sessions],
     )
     if ok == 0:
@@ -95,7 +109,7 @@ async def check_concurrency(
         )
     log.debug(
         'number of concurrent sessions of ak:{0} = {1} / {2}',
-        sess_ctx.access_key,
+        sess_ctx.kp_access_key,
         concurrency_used,
         max_concurrent_sessions,
     )
@@ -107,7 +121,7 @@ async def check_dependencies(
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
-    check = SessionDependencyRow.check_all_dependencies(db_sess, sess_ctx)
+    check = await check_all_dependencies(db_sess, sess_ctx)
     return PredicateResult(*check)
 
 
@@ -117,12 +131,19 @@ async def check_keypair_resource_limit(
     sess_ctx: SessionRow,
 ) -> PredicateResult:
     resource_policy = sess_ctx.access_key.resource_policy
-    total_keypair_allowed = ResourceSlot.from_policy(dict(resource_policy),
+    if resource_policy is None:
+        query = (
+            sa.select(KeyPairResourcePolicyRow)
+            .where(KeyPairResourcePolicyRow.name == sess_ctx.access_key.resource_policy_name)
+        )
+        result = await db_sess.execute(query)
+        resource_policy = result.scalar()
+    total_keypair_allowed = ResourceSlot.from_policy(resource_policy.get_map(),
                                                      sched_ctx.known_slot_types)
     key_occupied = await sched_ctx.registry.get_keypair_occupancy(
-        sess_ctx.access_key, sess=db_sess)
-    log.debug('keypair:{} current-occupancy: {}', sess_ctx.access_key, key_occupied)
-    log.debug('keypair:{} total-allowed: {}', sess_ctx.access_key, total_keypair_allowed)
+        sess_ctx.kp_access_key, sess=db_sess)
+    log.debug('keypair:{} current-occupancy: {}', sess_ctx.kp_access_key, key_occupied)
+    log.debug('keypair:{} total-allowed: {}', sess_ctx.kp_access_key, total_keypair_allowed)
     if not (key_occupied + sess_ctx.requested_slots <= total_keypair_allowed):
         return PredicateResult(
             False,
@@ -196,9 +217,9 @@ async def check_scaling_group(
 ) -> PredicateResult:
 
     async def _query():
-        async with reenter_txn(sched_ctx.registry.db, db_sess) as _conn:
+        async with reenter_txn_session(sched_ctx.registry.db, db_sess) as _db_sess:
             return await query_allowed_sgroups(
-                _conn,
+                _db_sess,
                 sess_ctx.domain_name,
                 sess_ctx.group_id,
                 sess_ctx.kp_access_key,
@@ -212,11 +233,12 @@ async def check_scaling_group(
             permanent=True,
         )
     target_sgroup_names: List[str] = []
-    preferred_sgroup_name = sess_ctx.scaling_group
+    preferred_sgroup_name = sess_ctx.scaling_group_name
     if preferred_sgroup_name is not None:
         # Consider only the preferred scaling group.
         for sgroup in sgroups:
             if preferred_sgroup_name == sgroup.name:
+                preferred_sgroup = sgroup
                 break
         else:
             return PredicateResult(
@@ -224,7 +246,7 @@ async def check_scaling_group(
                 f"You do not have access to the scaling group '{preferred_sgroup_name}'.",
                 permanent=True,
             )
-        allowed_session_types = sgroup.scheduler_opts.allowed_session_types
+        allowed_session_types = preferred_sgroup.scheduler_opts.allowed_session_types
         if sess_ctx.session_type.value.lower() not in allowed_session_types:
             return PredicateResult(
                 False,

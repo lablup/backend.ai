@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     relationship,
     selectinload,
-    joinedload,
+    noload,
 )
 
 from ai.backend.common.types import (
@@ -22,22 +22,31 @@ from ai.backend.common.types import (
     KernelId,
 )
 
-from ..api.exceptions import InvalidAPIParameters
+from ..api.exceptions import InvalidAPIParameters, GenericForbidden
+from ..defs import DEFAULT_ROLE
 from .base import (
     EnumType, GUID, ForeignKeyIDColumn, SessionIDColumn, KernelIDColumnType,
     ResourceSlotColumn, URLColumn, StructuredJSONObjectListColumn, Base,
 )
 
 from .kernel import KernelRow, KernelStatus
+from .keypair import KeyPairRow
 
+if TYPE_CHECKING:
+    from .scaling_group import ScalingGroupRow
 
 __all__ = (
     'SessionStatus',
     'DEAD_SESSION_STATUSES',
     'AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES',
     'USER_RESOURCE_OCCUPYING_SESSION_STATUSES',
-    'SessionRow',
+    'transit_session_lifecycle',
+    'SessionRow', 'enqueue_session', 'get_sgroup_managed_sessions',
+    'update_kernel', 'update_session_kernels',
+    'get_sessions_by_status', 'get_sessions', 'get_schedulerable_session',
+    'match_sessions',
     'SessionDependencyRow',
+    'check_all_dependencies',
 )
 
 
@@ -87,6 +96,7 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
     )
 )
 
+
 _KERNEL_SESSION_STATUS_MAPPING = {
     KernelStatus.PENDING: SessionStatus.PENDING,
     KernelStatus.SCHEDULED: SessionStatus.SCHEDULED,
@@ -103,7 +113,32 @@ _KERNEL_SESSION_STATUS_MAPPING = {
     KernelStatus.CANCELLED: SessionStatus.CANCELLED,
 }
 
-SessionData = TypeVar('SessionData', 'SessionRow', Mapping)
+def _transit_destroy_session(current, forced) -> SessionStatus:
+    match current:
+        case SessionStatus.PENDING:
+            return SessionStatus.CANCELLED
+        case SessionStatus.PULLING:
+            raise GenericForbidden('Cannot destroy kernels in pulling status')
+        case (
+            SessionStatus.SCHEDULED |
+            SessionStatus.PREPARING |
+            SessionStatus.TERMINATING |
+            SessionStatus.ERROR
+        ):
+            if not forced:
+                raise GenericForbidden(
+                    'Cannot destroy kernels in scheduled/preparing/terminating/error status',
+                )
+            return SessionStatus.TERMINATED
+        case _:
+            return SessionStatus.TERMINATING
+
+def transit_session_lifecycle(current, job, forced=False) -> SessionStatus:
+    match job:
+        case 'destory':
+            return _transit_destroy_session(current, forced)
+        case _:
+            raise RuntimeError('No such job is declared.')
 
 
 class SessionRow(Base):
@@ -118,11 +153,6 @@ class SessionRow(Base):
               default=ClusterMode.SINGLE_NODE, server_default=ClusterMode.SINGLE_NODE.name)
     cluster_size = sa.Column('cluster_size', sa.Integer, nullable=False, default=1)
     kernels = relationship('KernelRow', back_populates='session', primaryjoin='SessionRow.id==KernelRow.session_id')
-    # kernel data is inserted with a created or existing session id.
-    # main kernel field can be null right after session is created.
-    main_kernel_id = sa.Column('main_kernel_id', KernelIDColumnType, sa.ForeignKey('kernels.id'),
-                  nullable=True, index=True)
-    main_kernel = relationship('KernelRow', foreign_keys=[main_kernel_id])
 
     # Resource ownership
     scaling_group_name = sa.Column('scaling_group_name', sa.ForeignKey('scaling_groups.name'), index=True, nullable=True)
@@ -165,7 +195,8 @@ class SessionRow(Base):
               nullable=False, index=True)
     status_changed = sa.Column('status_changed', sa.DateTime(timezone=True), nullable=True, index=True)
     status_info = sa.Column('status_info', sa.Unicode(), nullable=True, default=sa.null())
-    status_data = sa.Column('status_data', pgsql.JSONB(), nullable=True, default=sa.null())
+    # TODO: Must set the policy about status_data
+    # status_data = sa.Column('status_data', pgsql.JSONB(), nullable=True, default=sa.null())
     callback_url = sa.Column('callback_url', URLColumn, nullable=True, default=sa.null())
 
     startup_command = sa.Column('startup_command', sa.Text, nullable=True)
@@ -187,299 +218,311 @@ class SessionRow(Base):
         ),
     )
 
-    @classmethod
-    async def match_sessions(
-        cls,
-        db_session: SASession,
-        session_name_or_id: Union[str, UUID],
-        access_key: AccessKey,
-        *,
-        allow_prefix: bool=False,
-        allow_stale: bool=True,
-        for_update: bool=False,
-        max_matches: int=10,
-        load_intrinsic: bool=False,
-    ) -> List[SessionRow]:
-        """
-        Match the prefix of session ID or session name among the sessions
-        that belongs to the given access key, and return the list of SessionRow.
-        """
+    @property
+    def main_kernel(self) -> KernelRow:
+        return tuple(kern for kern in self.kernels if kern.cluster_role == DEFAULT_ROLE)[0]
 
-        def build_query(base_cond):
-            cond = base_cond & (SessionRow.kp_access_key == access_key)
-            if not allow_stale:
-                cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
-            query = (
-                sa.select(SessionRow)
-                .where(cond)
-                .order_by(sa.desc(SessionRow.created_at))
-                .limit(max_matches).offset(0)
-            )
-            if for_update:
-                query = query.with_for_update()
+async def match_sessions(
+    db_session: SASession,
+    session_name_or_id: Union[str, UUID],
+    access_key: AccessKey,
+    *,
+    allow_prefix: bool=False,
+    allow_stale: bool=True,
+    for_update: bool=False,
+    max_matches: int=10,
+    load_intrinsic: bool=False,
+) -> List[SessionRow]:
+    """
+    Match the prefix of session ID or session name among the sessions
+    that belongs to the given access key, and return the list of SessionRow.
+    """
 
-            if load_intrinsic:
-                query = query.options(
-                    selectinload(SessionRow.kernels),
-                    selectinload(SessionRow.main_kernel),
-                    selectinload(SessionRow.image),
-                )
-
-            return query
-
-        id_cond = (sa.sql.expression.cast(SessionRow.id, sa.String).like(f'{session_name_or_id}%'))
-        name_cond = (SessionRow.name == (f'{session_name_or_id}'))
-        id_query = build_query(id_cond)
-        name_query = build_query(name_cond)
-
-        match_queries = [id_query, name_query]
-        if allow_prefix:
-            prefix_name_cond = (SessionRow.name.like(f'{session_name_or_id}%'))
-            prefix_name_query = build_query(prefix_name_cond)
-            match_queries.append(prefix_name_query)
-
-        for query in match_queries:
-            result = await db_session.execute(query)
-            rows = result.scalars().all()
-            if not rows:
-                continue
-            return rows
-        return []
-
-
-    @classmethod
-    async def get_sessions(
-        cls,
-        db_session: SASession,
-        session_names: Container[str],
-        access_key: AccessKey,
-        info_cols: Sequence,
-        *,
-        allow_stale=False,
-    ) -> List[SessionRow]:
-        default_cols = [
-            SessionRow.id, SessionRow.name, SessionRow.access_key,
-        ]
-        cols = set(default_cols + info_cols)
-
-        cond = (
-            (SessionRow.name.in_(session_names)) &
-            (SessionRow.kp_access_key == access_key)
-        )
+    def build_query(base_cond):
+        cond = base_cond & (SessionRow.kp_access_key == access_key)
         if not allow_stale:
             cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
         query = (
-            sa.select(cols)
-            .select_from(SessionRow)
-            .where(cond)
-        )
-        result = await db_session.execute(query)
-        return result.scalars().all()
-
-    @classmethod
-    async def get_sessions_by_status(
-        cls,
-        db_session: SASession,
-        status: SessionStatus | List[SessionStatus],
-        sgroup_name: str | None = None,
-        load_intrinsic: bool = True,
-        do_ordering: bool = True,
-    ) -> List[SessionRow]:
-        if isinstance(status, SessionStatus):
-            cond = (SessionRow.status == status)
-        elif len(status) == 1:
-            cond = (SessionRow.status == status[0])
-        else:
-            cond = (SessionRow.status.in_(status))
-        if sgroup_name:
-            cond = (cond & (SessionRow.scaling_group_name == sgroup_name))
-        query = (
             sa.select(SessionRow)
             .where(cond)
+            .order_by(sa.desc(SessionRow.created_at))
+            .limit(max_matches).offset(0)
         )
+        if for_update:
+            query = query.with_for_update()
+
         if load_intrinsic:
             query = query.options(
                 selectinload(SessionRow.kernels),
-                selectinload(SessionRow.main_kernel),
                 selectinload(SessionRow.image),
             )
-        if do_ordering:
-            query = query.order_by(SessionRow.created_at)
+
+        return query
+
+    id_cond = (sa.sql.expression.cast(SessionRow.id, sa.String).like(f'{session_name_or_id}%'))
+    name_cond = (SessionRow.name == (f'{session_name_or_id}'))
+    id_query = build_query(id_cond)
+    name_query = build_query(name_cond)
+
+    match_queries = [id_query, name_query]
+    if allow_prefix:
+        prefix_name_cond = (SessionRow.name.like(f'{session_name_or_id}%'))
+        prefix_name_query = build_query(prefix_name_cond)
+        match_queries.append(prefix_name_query)
+
+    for query in match_queries:
         result = await db_session.execute(query)
-        return result.scalars().all()
+        rows = result.scalars().all()
+        if not rows:
+            continue
+        return rows
+    return []
+
+
+async def get_sessions(
+    db_session: SASession,
+    session_names: Container[str],
+    access_key: AccessKey,
+    info_cols: Sequence,
+    *,
+    allow_stale=False,
+) -> List[SessionRow]:
+    default_cols = [
+        SessionRow.id, SessionRow.name, SessionRow.access_key,
+    ]
+    cols = set(default_cols + info_cols)
+
+    cond = (
+        (SessionRow.name.in_(session_names)) &
+        (SessionRow.kp_access_key == access_key)
+    )
+    if not allow_stale:
+        cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
+    query = (
+        sa.select(cols)
+        .select_from(SessionRow)
+        .where(cond)
+    )
+    result = await db_session.execute(query)
+    return result.scalars().all()
+
+async def get_sessions_by_status(
+    db_session: SASession,
+    status: SessionStatus | List[SessionStatus],
+    sgroup_name: str | None = None,
+    load_intrinsic: bool = True,
+    do_ordering: bool = True,
+) -> List[SessionRow]:
+    if isinstance(status, SessionStatus):
+        cond = (SessionRow.status == status)
+    elif len(status) == 1:
+        cond = (SessionRow.status == status[0])
+    else:
+        cond = (SessionRow.status.in_(status))
+    if sgroup_name:
+        cond = (cond & (SessionRow.scaling_group_name == sgroup_name))
+    query = (
+        sa.select(SessionRow)
+        .where(cond)
+    )
+    if load_intrinsic:
+        query = query.options(
+            selectinload(SessionRow.kernels),
+            selectinload(SessionRow.image),
+        )
+    if do_ordering:
+        query = query.order_by(SessionRow.created_at)
+    result = await db_session.execute(query)
+    return result.scalars().all()
 
     
-    @classmethod
-    async def update_session_kernels(
-        cls,
-        db_session: SASession,
-        session: Union[SessionRow, SessionId],
-        *,
-        kernel_data: Mapping[str, Any],
-        extra_cond = None,
-        sess_cond = None,
-    ) -> None:
-        """
-        Update kernels which in a specific session first,
-        then update the session those kernels are in.
-        """
+async def update_session_kernels(
+    db_session: SASession,
+    session: Union[SessionRow, SessionId],
+    *,
+    kernel_data: Mapping[str, Any],
+    extra_cond = None,
+    sess_cond = None,
+) -> None:
+    """
+    Update kernels which in a specific session first,
+    then update the session those kernels are in.
+    """
 
-        if isinstance(session, SessionRow):
-            session_id = session.id
-        elif isinstance(session, SessionId):
-            session_id = session
-        else:
-            raise RuntimeError(
-                'Invalid time of session. '
-                f'expect SessionRow, SessionId type, but got {type(session)}')
+    if isinstance(session, SessionRow):
+        session_id = session.id
+    elif isinstance(session, SessionId):
+        session_id = session
+    else:
+        raise RuntimeError(
+            'Invalid time of session. '
+            f'expect SessionRow, SessionId type, but got {type(session)}')
 
-        sess_attr = SessionRow.__dict__
-        session_update = {
-            k: v for k, v in kernel_data.items() if k in sess_attr
-        }
-        if 'status' in kernel_data:
-            session_update['status'] = \
-                _KERNEL_SESSION_STATUS_MAPPING[kernel_data['status']]
+    sess_cols = SessionRow.__mapper__.columns
+    session_update = {
+        k: v for k, v in kernel_data.items() if k in sess_cols
+    }
+    if 'status' in kernel_data:
+        session_update['status'] = \
+            _KERNEL_SESSION_STATUS_MAPPING[kernel_data['status']]
 
-        async with db_session.begin_nested():
-            cond = (KernelRow.session_id == session_id)
-            if extra_cond is not None:
-                cond = cond & extra_cond
-            update_query = (
-                sa.update(KernelRow)
-                .values(**kernel_data)
-                .where(cond)
-            )
-            await db_session.execute(update_query)
-
-            if not session_update:
-                return
-            cond = (SessionRow.id == session_id)
-            if sess_cond is not None:
-                cond = cond & sess_cond
-            update_query = (
-                sa.update(SessionRow)
-                .values(**session_update)
-                .where(cond)
-            )
-            await db_session.execute(update_query)
-            await db_session.commit()
-
-
-    @classmethod
-    async def update_kernel(
-        cls,
-        db_session: SASession,
-        kernel: Union[KernelRow, KernelId],
-        *,
-        kernel_data: Mapping[str, Any],
-        extra_cond = None,
-    ) -> None:
-        if isinstance(kernel, KernelRow):
-            kernel_id = kernel.id
-        elif isinstance(kernel, KernelId):
-            kernel_id = kernel
-        else:
-            raise RuntimeError(
-                'Invalid time of session. '
-                f'expect KernelRow, KernelId type, but got {type(kernel)}')
-        
-        sess_attr = SessionRow.__dict__
-        session_update = {
-            k: v for k, v in kernel_data.items() if k in sess_attr
-        }
-        if 'status' in kernel_data:
-            session_update['status'] = \
-                _KERNEL_SESSION_STATUS_MAPPING[kernel_data['status']]
-
-        async with db_session.begin_nested():
-            cond = (KernelRow.id == kernel_id)
-            if extra_cond is not None:
-                cond = cond & extra_cond
-            update_query = (
-                sa.update(KernelRow)
-                .values(**kernel_data)
-                .where(cond)
-            )
-            await db_session.execute(update_query)
-
-            if not session_update:
-                return
-
-            fetch_query = (
-                sa.select(KernelRow.session_id)
-                .where(cond)
-            )
-            result = await db_session.execute(fetch_query)
-            session_id = result.scalar()
-            update_query = (
-                sa.update(SessionRow)
-                .values(**session_update)
-                .where(SessionRow.id == session_id)
-            )
-            await db_session.execute(update_query)
-            await db_session.commit()
-
-
-    @classmethod
-    async def enqueue_session(
-        cls,
-        db_session: SASession,
-        access_key: AccessKey,
-        session_data: Mapping[str, Any],
-        kernel_data: Sequence[Mapping[str, Any]],
-        dependency_sessions: Sequence[SessionId] = None,
-    ) -> SessionId:
-        session = SessionRow(**session_data)
-        async with db_session.begin_nested():
-            await db_session.add(session)
-            await db_session.add_all((KernelRow(**kernel) for kernel in kernel_data))
-            session_id = SessionId(session.id)
-            
-            if not dependency_sessions:
-                await db_session.commit()
-                return session_id
-
-            matched_dependency_session_ids = []
-            for dependency_id in dependency_sessions:
-                match_info = await SessionRow.match_sessions(
-                    db_session, dependency_id, access_key,
-                )
-                try:
-                    depend_id = match_info[0].id
-                except IndexError:
-                    raise InvalidAPIParameters(
-                        "Unknown session ID or name in the dependency list",
-                        extra_data={"session_ref": dependency_id},
-                    )
-                matched_dependency_session_ids.append(depend_id)
-            dependency_rows = [SessionDependencyRow(session_id=session_id, depends_on=depend_id) \
-                for depend_id in matched_dependency_session_ids]
-            db_session.add_all(dependency_rows)
-
-            await db_session.commit()
-        return session_id
-
-
-    @classmethod
-    async def get_managed_sessions(
-        cls,
-        db_sess: SASession,
-        session_ids: List[str],
-        for_update = True,
-    ) -> List[SessionRow]:
-        query = (
-            sa.select(SessionRow)
-            .where(SessionRow.id.in_(session_ids))
+    async with db_session.begin_nested():
+        cond = (KernelRow.session_id == session_id)
+        if extra_cond is not None:
+            cond = cond & extra_cond
+        update_query = (
+            sa.update(KernelRow)
+            .values(**kernel_data)
+            .where(cond)
         )
-        if for_update:
-            query = (
-                query
-                .execution_options(populate_existing=True)
-                .with_for_update(nowait=True, of=SessionRow)
+        await db_session.execute(update_query)
+        await db_session.flush()
+
+        if not session_update:
+            return
+        cond = (SessionRow.id == session_id)
+        if sess_cond is not None:
+            cond = cond & sess_cond
+
+        update_query = (
+            sa.update(SessionRow)
+            .values(**session_update)
+            .where(cond)
+        )
+        await db_session.execute(update_query)
+        await db_session.commit()
+
+
+async def update_kernel(
+    db_session: SASession,
+    kernel: Union[KernelRow, KernelId],
+    *,
+    kernel_data: Mapping[str, Any],
+    extra_cond = None,
+) -> None:
+    if isinstance(kernel, KernelRow):
+        kernel_id = kernel.id
+    elif isinstance(kernel, KernelId):
+        kernel_id = kernel
+    else:
+        raise RuntimeError(
+            'Invalid time of session. '
+            f'expect KernelRow, KernelId type, but got {type(kernel)}')
+    
+    sess_attr = SessionRow.__dict__
+    session_update = {
+        k: v for k, v in kernel_data.items() if k in sess_attr
+    }
+    if 'status' in kernel_data:
+        session_update['status'] = \
+            _KERNEL_SESSION_STATUS_MAPPING[kernel_data['status']]
+
+    async with db_session.begin_nested():
+        cond = (KernelRow.id == kernel_id)
+        if extra_cond is not None:
+            cond = cond & extra_cond
+        update_query = (
+            sa.update(KernelRow)
+            .values(**kernel_data)
+            .where(cond)
+        )
+        await db_session.execute(update_query)
+
+        if not session_update:
+            return
+
+        fetch_query = (
+            sa.select(KernelRow.session_id)
+            .where(cond)
+        )
+        result = await db_session.execute(fetch_query)
+        session_id = result.scalar()
+        update_query = (
+            sa.update(SessionRow)
+            .values(**session_update)
+            .where(SessionRow.id == session_id)
+        )
+        await db_session.execute(update_query)
+        await db_session.commit()
+
+
+async def enqueue_session(
+    db_session: SASession,
+    access_key: AccessKey,
+    session_data: Mapping[str, Any],
+    kernel_data: Sequence[Mapping[str, Any]],
+    dependency_sessions: Sequence[SessionId] = None,
+) -> SessionId:
+    session = SessionRow(**session_data)
+    async with db_session.begin_nested():
+        db_session.add(session)
+        db_session.add_all((KernelRow(**kernel) for kernel in kernel_data))
+        session_id = SessionId(session.id)
+        
+        if not dependency_sessions:
+            await db_session.commit()
+            return session_id
+
+        matched_dependency_session_ids = []
+        for dependency_id in dependency_sessions:
+            match_info = await match_sessions(
+                db_session, dependency_id, access_key,
             )
-        result = await db_sess.execute(query)
-        return result.scalars().all()
+            try:
+                depend_id = match_info[0].id
+            except IndexError:
+                raise InvalidAPIParameters(
+                    "Unknown session ID or name in the dependency list",
+                    extra_data={"session_ref": dependency_id},
+                )
+            matched_dependency_session_ids.append(depend_id)
+        dependency_rows = [SessionDependencyRow(session_id=session_id, depends_on=depend_id) \
+            for depend_id in matched_dependency_session_ids]
+        db_session.add_all(dependency_rows)
+
+        await db_session.commit()
+    return session_id
+
+
+async def get_sgroup_managed_sessions(
+    db_sess: SASession,
+    sgroup: ScalingGroupRow,
+) -> List[SessionRow]:
+    candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
+    query = (
+        sa.select(SessionRow)
+        .where(
+            (SessionRow.scaling_group_name == sgroup.name) &
+            (SessionRow.status.in_(candidate_statues))
+        )
+        .options(
+            noload('*'),
+            selectinload(SessionRow.group).options(noload('*')),
+            selectinload(SessionRow.domain).options(noload('*')),
+            selectinload(SessionRow.access_key).options(noload('*')),
+        )
+    )
+    result = await db_sess.execute(query)
+    return result.scalars().all()
+
+async def get_schedulerable_session(
+    db_sess: SASession,
+    session_id: SessionId,
+) -> SessionRow:
+    sess = await db_sess.get(
+        SessionRow, session_id,
+        populate_existing=True,
+        options=(
+            noload('*'),
+            selectinload(SessionRow.kernels)
+            .options(
+                noload('*'),
+                selectinload(KernelRow.image),
+                selectinload(KernelRow.agent),
+            ),
+        ),
+    )
+    return sess
 
 
 class SessionDependencyRow(Base):
@@ -498,35 +541,29 @@ class SessionDependencyRow(Base):
             name='sess_dep_pk'),
     )
 
-    @classmethod
-    async def check_all_dependencies(
-        cls,
-        db_session: SASession,
-        sess_ctx: SessionRow,
-    ) -> Tuple[bool, Optional[str]]:
-        j = sa.join(
-            SessionDependencyRow,
-            SessionRow,
-            SessionDependencyRow.depends_on == SessionDependencyRow.session_id,
+async def check_all_dependencies(
+    db_session: SASession,
+    sess_ctx: SessionRow,
+) -> Tuple[bool, Optional[str]]:
+    j = sa.join(
+        SessionDependencyRow,
+        SessionRow,
+        SessionDependencyRow.depends_on == SessionDependencyRow.session_id,
+    )
+    query = (
+        sa.select(SessionRow.id, SessionRow.name, SessionRow.result)
+        .select_from(j)
+        .where(SessionDependencyRow.session_id == sess_ctx.id)
+    )
+    result = await db_session.execute(query)
+    rows = result.scalars().all()
+    pending_dependencies = [sess_row for sess_row in rows if sess_row.result != SessionResult.SUCCESS]
+    all_success = (not pending_dependencies)
+    if all_success:
+        return (True,)
+    return (
+        False,
+        "Waiting dependency sessions to finish as success. ({})".format(
+            ", ".join(f"{sess_row.name} ({sess_row.session_id})" for sess_row in pending_dependencies),
         )
-        query = (
-            sa.select(SessionRow.id, SessionRow.name, SessionRow.result)
-            .select_from(j)
-            .where(SessionDependencyRow.session_id == sess_ctx.id)
-        )
-        result = await db_session.execute(query)
-        rows = result.scalars().all()
-        pending_dependencies = []
-        sess_row: SessionRow
-        for sess_row in rows:
-            if sess_row.result != SessionResult.SUCCESS:
-                pending_dependencies.append(sess_row)
-        all_success = (not pending_dependencies)
-        if all_success:
-            return (True,)
-        return (
-            False,
-            "Waiting dependency sessions to finish as success. ({})".format(
-                ", ".join(f"{sess_row.name} ({sess_row.session_id})" for sess_row in pending_dependencies),
-            )
-        )
+    )

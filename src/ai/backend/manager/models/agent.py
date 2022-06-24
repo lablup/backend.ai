@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.engine.row import Row
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import relationship, noload, selectinload
 
 from ai.backend.common import msgpack, redis
 from ai.backend.common.types import (
@@ -58,6 +58,7 @@ if TYPE_CHECKING:
 
 __all__: Sequence[str] = (
     'agents', 'AgentStatus', 'AgentRow',
+    'list_schedulable_agents_by_sgroup', 'list_alive_agents',
     'AgentList', 'Agent', 'ModifyAgent',
     'recalc_agent_resource_occupancy',
 )
@@ -99,46 +100,7 @@ class AgentRow(Base):
     __table__ = agents
     kernels = relationship('KernelRow', back_populates='agent')
     scaling_group = relationship('ScalingGroupRow', back_populates='agents')
-    
-    @classmethod
-    async def list_agents_by_sgroup(
-        cls,
-        db_sess: SASession,
-        sgroup_name: str,
-    ) -> List[AgentRow]:
-        query = (
-            sa.select(AgentRow)
-            .where(
-                (AgentRow.status == AgentStatus.ALIVE) &
-                (AgentRow.scaling_group_name == sgroup_name) &
-                (AgentRow.schedulable == true()),
-            )
-        )
 
-        result = await db_sess.execute(query)
-        return result.scalars().all()
-    
-    @classmethod
-    async def list_alive_agents_scaling_group(
-        cls, db_sess: SASession,
-    ) -> List[ScalingGroupRow]:
-        # Is it good to limit the number of the rows of sessions in query
-        # for better HA ?
-        candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
-        query = (
-            sa.select(AgentRow)
-            .where(AgentRow.status == AgentStatus.ALIVE)
-            .options(
-                selectinload(AgentRow.scaling_group)
-                .options(
-                    selectinload(
-                        ScalingGroupRow.sessions.and_(SessionRow.status.in_(candidate_statues)),
-                    ),
-                )
-            )
-        )
-        result = await db_sess.execute(query)
-        return [ag.scaling_group for ag in result.scalars().all()]
 
     @classmethod
     async def get_agent_cols(
@@ -181,6 +143,38 @@ class AgentRow(Base):
             await db_sess.execute(query)
             return True
         return False
+
+
+async def list_schedulable_agents_by_sgroup(
+    db_sess: SASession,
+    sgroup_name: str,
+) -> List[AgentRow]:
+    query = (
+        sa.select(AgentRow)
+        .where(
+            (AgentRow.status == AgentStatus.ALIVE) &
+            (AgentRow.scaling_group_name == sgroup_name) &
+            (AgentRow.schedulable == true()),
+        )
+    )
+
+    result = await db_sess.execute(query)
+    return result.scalars().all()
+
+
+async def list_alive_agents(
+    db_sess: SASession,
+) -> List[AgentRow]:
+    query = (
+        sa.select(AgentRow)
+        .where(AgentRow.status == AgentStatus.ALIVE)
+        .options(
+            noload('*'),
+            selectinload(AgentRow.scaling_group).options(noload('*')),
+        )
+    )
+    result = await db_sess.execute(query)
+    return result.scalars().all()
 
 
 _AT = TypeVar('_AT', AgentRow, Row)
@@ -235,7 +229,7 @@ class Agent(graphene.ObjectType):
             status=row['status'].name,
             status_changed=row['status_changed'],
             region=row['region'],
-            scaling_group=row['scaling_group'],
+            scaling_group=row['scaling_group_name'],
             schedulable=row['schedulable'],
             available_slots=row['available_slots'].to_json(),
             occupied_slots=row['occupied_slots'].to_json(),

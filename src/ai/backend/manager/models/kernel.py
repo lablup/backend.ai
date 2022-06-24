@@ -716,7 +716,7 @@ class ComputeContainer(graphene.ObjectType):
             'occupied_slots': row['occupied_slots'].to_json(),
 
             # resources
-            'agent': row['agent'] if not hide_agents else None,
+            'agent': row['agent_id'] if not hide_agents else None,
             'container_id': row['container_id'] if not hide_agents else None,
             'resource_opts': row['resource_opts'],
 
@@ -959,7 +959,7 @@ class ComputeSession(graphene.ObjectType):
             'session_id': row['session_id'],
 
             # image
-            'image': row['image'],
+            'image': row['image_id'],
             'architecture': row['architecture'],
             'registry': row['registry'],
             'cluster_template': None,  # TODO: implement
@@ -1436,7 +1436,7 @@ class LegacyComputeSession(graphene.ObjectType):
             'resource_opts': row['resource_opts'],
             'num_queries': row['num_queries'],
             # optionally hidden
-            'agent': row['agent'] if not hide_agents else None,
+            'agent': row['agent_id'] if not hide_agents else None,
             'container_id': row['container_id'] if not hide_agents else None,
             # live_stat is resolved by Graphene
             # last_stat is resolved by Graphene
@@ -1636,25 +1636,24 @@ async def recalc_concurrency_used(
 
     concurrency_used: int
     async with db_sess.begin_nested():
-        concurrency_used = (
-            db_sess.query(KernelRow)
-            .filter(
+        result = await db_sess.execute(
+            sa.select(sa.func.count())
+            .select_from(KernelRow)
+            .where(
                 (KernelRow.access_key == access_key),
                 (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
             )
-            .count()
         )
-        assert isinstance(concurrency_used, int)
-        # query = (
-        #     sa.select([sa.func.count()])
-        #     .select_from(kernels)
-        #     .where(
-        #         (kernels.c.access_key == access_key) &
-        #         (kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+        concurrency_used = result.scalar()
+        # concurrency_used = (
+        #     db_sess.query(KernelRow)
+        #     .filter(
+        #         (KernelRow.access_key == access_key),
+        #         (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
         #     )
+        #     .count()
         # )
-        # result = await db_sess.execute(query)
-        # concurrency_used = result.first()[0]
+        assert isinstance(concurrency_used, int)
 
     await redis.execute(
         redis_stat,

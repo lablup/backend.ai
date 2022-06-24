@@ -70,6 +70,9 @@ class KeyPairResourcePolicyRow(Base):
     __table__ = keypair_resource_policies
     keypairs = relationship('KeyPairRow', back_populates='resource_policy')
 
+    def get_map(self) -> Dict[str, Any]:
+        return {col: getattr(self, col) for col in self.__mapper__.columns.keys()}
+
 
 class KeyPairResourcePolicy(graphene.ObjectType):
     name = graphene.String()

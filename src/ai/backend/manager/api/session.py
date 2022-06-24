@@ -374,8 +374,6 @@ async def _query_userinfo(
         (GroupRow.name == params['group']) &
         (GroupRow.is_active)
     )
-    print('\n=======================')
-    print(f'{owner_role = }')
     if owner_role == UserRole.SUPERADMIN:
         # superadmin can spawn container in any designated domain/group.
         # query = (
@@ -561,15 +559,18 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             root_ctx.registry.enqueue_session(
                 session_creation_id,
                 params['session_name'], owner_access_key,
-                [{
+                {
                     'image_ref': requested_image_ref,
-                    'cluster_role': DEFAULT_ROLE,
-                    'cluster_idx': 1,
-                    'cluster_hostname': f"{DEFAULT_ROLE}1",
-                    'creation_config': params['config'],
-                    'bootstrap_script': params['bootstrap_script'],
-                    'startup_command': params['startup_command'],
-                }],
+                    'kernel_configs': [{
+                        'image_ref': requested_image_ref,
+                        'cluster_role': DEFAULT_ROLE,
+                        'cluster_idx': 1,
+                        'cluster_hostname': f"{DEFAULT_ROLE}1",
+                        'creation_config': params['config'],
+                        'bootstrap_script': params['bootstrap_script'],
+                        'startup_command': params['startup_command'],
+                    }],
+                },
                 params['config']['scaling_group'],
                 params['session_type'],
                 resource_policy,
@@ -1428,10 +1429,10 @@ async def invoke_session_callback(
         "when": datetime.now(tzutc()).isoformat(),
     }
     try:
-        async with root_ctx.db.begin_readonly() as db:
-            session = await root_ctx.registry.get_session(
+        async with root_ctx.db.begin_readonly_session() as db_sess:
+            session = await root_ctx.registry.get_session_by_id(
                 event.session_id,
-                db_connection=db,
+                db_session=db_sess,
             )
     except SessionNotFound:
         return

@@ -114,7 +114,7 @@ from .models import (
     keypair_resource_policies,
     SessionDependencyRow,
     AgentStatus, KernelStatus, SessionStatus,
-    ImageRow, SessionRow,
+    ImageRow,
     query_allowed_sgroups,
     prepare_dotfiles,
     prepare_vfolder_mounts,
@@ -123,6 +123,11 @@ from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_KERNEL_STATUSES,
+)
+from .models.session import (
+    SessionRow, transit_session_lifecycle,
+    get_sessions, match_sessions, enqueue_session,
+    update_kernel, update_session_kernels,
 )
 from .models.kernel import KernelRow, match_session_ids, get_all_kernels, get_main_kernels
 from .models.utils import (
@@ -675,7 +680,7 @@ class AgentRegistry:
         :param db_connection: Database connection for reuse.
         """
         async with reenter_txn_session(self.db, db_session, _read_only_txn_opts) as db_sess:
-            sess_rows = await SessionRow.match_sessions(
+            sess_rows = await match_sessions(
                 db_sess,
                 session_name_or_id,
                 AccessKey(access_key),
@@ -689,6 +694,18 @@ class AgentRegistry:
             if len(sess_rows) > 1:
                 raise TooManySessionsMatched(extra_data={'matches': sess_rows})
             return sess_rows[0]
+
+
+    async def get_session_by_id(
+        self,
+        session_id: uuid.UUID,
+        db_session: SASession | None = None,
+    ) -> SessionRow:
+        async with reenter_txn_session(self.db, db_session, _read_only_txn_opts) as db_sess:
+            return await db_sess.get(
+                SessionRow, session_id,
+            )
+
 
     async def get_session_main_kernel(
         self,
@@ -759,7 +776,7 @@ class AgentRegistry:
         elif isinstance(field, str):
             cols.append(sa.column(field))
         async with reenter_txn(self.db, db_connection, _read_only_txn_opts) as conn:
-            return await SessionRow.get_sessions(
+            return await get_sessions(
                 SASession(conn), session_names, access_key,
                 info_cols=cols, allow_stale=allow_stale,
             )
@@ -780,12 +797,13 @@ class AgentRegistry:
         session_tag: str = None,
         internal_data: dict = None,
         starts_at: datetime = None,
-        agent_list: Sequence[str] = None,
+        agent_list: Sequence[AgentId] = None,
         dependency_sessions: Sequence[SessionId] = None,
         callback_url: URL = None,
     ) -> SessionId:
 
         kernel_enqueue_configs = session_enqueue_configs['kernel_configs']
+        session_image = session_enqueue_configs['image_ref']
         session_id = SessionId(uuid.uuid4())
 
         # Check keypair resource limit
@@ -801,10 +819,11 @@ class AgentRegistry:
             # the list of allowed scaling groups.
             sgroups: List[ScalingGroupRow]
             sgroups = await query_allowed_sgroups(
-                conn, user_scope.domain_name, user_scope.group_id, access_key,
+                SASession(conn), user_scope.domain_name, user_scope.group_id, access_key,
             )
             if not sgroups:
                 raise ScalingGroupNotFound("You have no scaling groups allowed to use.")
+
             if scaling_group_name is None:
                 scaling_group_name = sgroups[0].name
                 log.warning(
@@ -869,8 +888,8 @@ class AgentRegistry:
 
         # fetch image data at once.
         image_map: Mapping[str, ImageRow]
+        image_refs = [*[conf['image_ref'] for conf in kernel_enqueue_configs], session_image]
         async with self.db.begin_readonly_session() as session:
-            image_refs = [conf['image_ref'] for conf in kernel_enqueue_configs]
             log_msg = [f'image ref => {ref} ({ref.architecture})' for ref in image_refs]
             log.debug(
                 'enqueue_session(): '
@@ -897,7 +916,7 @@ class AgentRegistry:
             'occupying_slots': ResourceSlot(),
             'requested_slots': ResourceSlot(),
             'vfolder_mounts': vfolder_mounts,
-            'image_id': image_map[kernel_enqueue_configs[0]['image_ref']].id,
+            'image_id': image_map[session_image.canonical].id,
         }
 
         # Prepare internal data.
@@ -984,14 +1003,12 @@ class AgentRegistry:
 
         for idx, kernel in enumerate(kernel_enqueue_configs):
             kernel_id = KernelId(uuid.uuid4())
-            if kernel['cluster_role'] == DEFAULT_ROLE:
-                session_data['main_kernel_id'] = kernel_id
             creation_config = kernel['creation_config']
             resource_opts = creation_config.get('resource_opts') or {}
 
             creation_config['mounts'] = [vfmount.to_json() for vfmount in vfolder_mounts]
             image_ref = kernel['image_ref']
-            image_row = image_map[image_ref]
+            image_row = image_map[image_ref.canonical]
             image_min_slots, image_max_slots = await image_row.get_slot_ranges(self.shared_config)
             known_slot_types = await self.shared_config.get_resource_slots()
 
@@ -1111,12 +1128,12 @@ class AgentRegistry:
 
             kernel_data.append({
                 **kernel_shared_data,
-                'mapped_agent': mapped_agent,
-                'kernel_id': kernel_id,
+                'id': kernel_id,
+                'agent_id': mapped_agent,
                 'cluster_role': kernel['cluster_role'],
                 'cluster_idx': kernel['cluster_idx'],
                 'cluster_hostname': f"{kernel['cluster_role']}{kernel['cluster_idx']}",
-                'image': image_ref.canonical,
+                'image_id': image_row.id,
                 'architecture': image_ref.architecture,
                 'registry': image_ref.registry,
                 'startup_command': kernel.get('startup_command'),
@@ -1130,7 +1147,7 @@ class AgentRegistry:
         try:
             async def _enqueue() -> None:
                 async with self.db.begin_session() as db_sess:
-                    await SessionRow.enqueue_session(
+                    await enqueue_session(
                         db_sess, access_key,
                         session_data, kernel_data,
                         dependency_sessions,
@@ -1985,8 +2002,7 @@ class AgentRegistry:
                 await asyncio.gather(*per_agent_tasks, return_exceptions=True)
             if forced:
                 await self.recalc_resource_usage()
-            sess_status = SessionStatus.CANCELLED if main_stat['status'] == 'cancelled' \
-                else SessionStatus.TERMINATED
+            sess_status = transit_session_lifecycle(session.status, 'destroy', forced=forced)
             values = {
                 'status': sess_status,
                 'status_info': reason,
@@ -2613,7 +2629,7 @@ class AgentRegistry:
                     (SessionRow.access_key == access_key) &
                     ~(SessionRow.status.in_(DEAD_SESSION_STATUSES))
                 )
-                await SessionRow.update_session_kernels(
+                await update_session_kernels(
                     db_sess, session_id,
                     kernel_data=data,
                     extra_cond=kern_cond,
@@ -2641,7 +2657,7 @@ class AgentRegistry:
 
         async def _update() -> None:
             async with self.db.begin_session() as db_sess:
-                await SessionRow.update_kernel(
+                await update_kernel(
                     db_sess, kernel_id, kernel_data=data,
                 )
 
@@ -2660,7 +2676,7 @@ class AgentRegistry:
 
         async def _update() -> None:
             async with self.db.begin_session() as db_sess:
-                await SessionRow.update_session_kernels(
+                await update_session_kernels(
                     db_sess, session_id,
                     kernel_data=data,
                 )
@@ -2693,7 +2709,7 @@ class AgentRegistry:
                 # )
                 # params = []
                 for kernel_id, updates in per_kernel_updates.items():
-                    await SessionRow.update_kernel(
+                    await update_kernel(
                         db_sess, kernel_id,
                         kernel_data={
                             'kernel_id': kernel_id,
@@ -2840,7 +2856,7 @@ class AgentRegistry:
                     rows,
                 ))
                 if all_terminated:
-                    await SessionRow.update_session_kernels(
+                    await update_session_kernels(
                         db_sess, SessionId(session_id),
                         kernel_data={
                             'status_data': sql_json_merge(

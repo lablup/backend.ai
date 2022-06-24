@@ -408,26 +408,29 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
         session_creation_id,
         session_id,
         access_key,
-        [{
+        {
             'image_ref': importer_image,
-            'cluster_role': DEFAULT_ROLE,
-            'cluster_idx': 1,
-            'cluster_hostname': f"{DEFAULT_ROLE}1",
-            'creation_config': {
-                'resources': {'cpu': '1', 'mem': '2g'},
-                'scaling_group': params['launchOptions']['scalingGroup'],
-                'environ': {
-                    'SRC_IMAGE': source_image.canonical,
-                    'TARGET_IMAGE': target_image.canonical,
-                    'RUNTIME_PATH': params['runtimePath'],
-                    'BUILD_SCRIPT': (
-                        base64.b64encode(dockerfile_content.encode('utf8')).decode('ascii')
-                    ),
+            'kernel_configs': [{
+                'image_ref': importer_image,
+                'cluster_role': DEFAULT_ROLE,
+                'cluster_idx': 1,
+                'cluster_hostname': f"{DEFAULT_ROLE}1",
+                'creation_config': {
+                    'resources': {'cpu': '1', 'mem': '2g'},
+                    'scaling_group': params['launchOptions']['scalingGroup'],
+                    'environ': {
+                        'SRC_IMAGE': source_image.canonical,
+                        'TARGET_IMAGE': target_image.canonical,
+                        'RUNTIME_PATH': params['runtimePath'],
+                        'BUILD_SCRIPT': (
+                            base64.b64encode(dockerfile_content.encode('utf8')).decode('ascii')
+                        ),
+                    },
                 },
-            },
-            'startup_command': '/root/build-image.sh',
-            'bootstrap_script': '',
-        }],
+                'startup_command': '/root/build-image.sh',
+                'bootstrap_script': '',
+            }],
+        },
         None,
         SessionTypes.BATCH,
         resource_policy,

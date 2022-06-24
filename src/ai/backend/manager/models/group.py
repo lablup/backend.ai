@@ -19,7 +19,10 @@ from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import (
+    AsyncConnection as SAConnection,
+    AsyncSession as SASession,
+)
 from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack
@@ -114,7 +117,7 @@ class GroupRow(Base):
 
 
 async def resolve_group_name_or_id(
-    db_conn: SAConnection,
+    db_sess: SASession,
     domain_name: str,
     value: Union[str, uuid.UUID],
 ) -> Optional[uuid.UUID]:
@@ -127,7 +130,7 @@ async def resolve_group_name_or_id(
                 (groups.c.domain_name == domain_name),
             )
         )
-        return await db_conn.scalar(query)
+        return await db_sess.scalar(query)
     elif isinstance(value, uuid.UUID):
         query = (
             sa.select([groups.c.id])
@@ -137,7 +140,7 @@ async def resolve_group_name_or_id(
                 (groups.c.domain_name == domain_name),
             )
         )
-        return await db_conn.scalar(query)
+        return await db_sess.scalar(query)
     else:
         raise TypeError('unexpected type for group_name_or_id')
 

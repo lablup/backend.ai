@@ -64,6 +64,12 @@ from ..exceptions import convert_to_status_data
 from ..models import (
     agents, kernels, scaling_groups, AgentRow,
     SessionRow, SessionStatus,
+    get_sgroup_managed_sessions,
+    update_session_kernels,
+    get_sessions_by_status,
+    get_schedulerable_session,
+    list_schedulable_agents_by_sgroup,
+    list_alive_agents,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
     AgentStatus, KernelStatus,
@@ -227,7 +233,8 @@ class SchedulerDispatcher(aobject):
             # as its individual steps are composed of many short-lived transactions.
             async with self.lock_factory(LockID.LOCKID_SCHEDULE, 60):
                 async with self.db.begin_session() as db_sess:
-                    schedulable_scaling_groups = await AgentRow.list_alive_agents_scaling_group(db_sess)
+                    alive_agents = await list_alive_agents(db_sess)
+                    schedulable_scaling_groups = set(ag.scaling_group for ag in alive_agents)
                     for sgroup in schedulable_scaling_groups:
                         try:
                             await self._schedule_in_sgroup(
@@ -273,7 +280,7 @@ class SchedulerDispatcher(aobject):
             async def _apply_cancellation():
                 async with self.db.begin_session() as db_sess:
                     for session in cancelled_sessions:
-                        await SessionRow.update_session_kernels(
+                        await update_session_kernels(
                             db_sess, session,
                             kernel_data={
                                 'status': KernelStatus.CANCELLED,
@@ -304,8 +311,9 @@ class SchedulerDispatcher(aobject):
         while pending_sessions:
 
             async with self.db.begin_readonly_session() as sess:
-                candidate_agents = await AgentRow.list_agents_by_sgroup(sess, sgroup_name)
-                total_capacity = sum((ag.available_slots for ag in candidate_agents), zero)
+                candidate_agents = await list_schedulable_agents_by_sgroup(sess, sgroup_name)
+
+            total_capacity = sum((ag.available_slots for ag in candidate_agents), zero)
 
             sess_ctx = scheduler.pick_session(
                 total_capacity,
@@ -323,7 +331,7 @@ class SchedulerDispatcher(aobject):
                 sess_ctx.id,
                 sess_ctx.session_type,
                 sess_ctx.name,
-                sess_ctx.access_key,
+                sess_ctx.kp_access_key,
                 sess_ctx.cluster_mode,
             )
             _log_fmt.set(log_fmt)
@@ -404,12 +412,12 @@ class SchedulerDispatcher(aobject):
                         await _rollback_predicate_mutations(
                             sess, sched_ctx, sess_ctx,
                         )
-                        await SessionRow.update_session_kernels(
+                        await update_session_kernels(
                             sess, sess_ctx,
                             kernel_data={
                                 'status_info': 'predicate-checks-failed',
                                 'status_data': sql_json_increment(
-                                    KernelRow.status_data,
+                                    kernels.c.status_data,
                                     ('scheduler', 'retries'),
                                     parent_updates={
                                         'last_try': datetime.now(tzutc()).isoformat(),
@@ -427,7 +435,7 @@ class SchedulerDispatcher(aobject):
             else:
                 async def _update() -> None:
                     async with self.db.begin_session() as sess:
-                        await SessionRow.update_session_kernels(
+                        await update_session_kernels(
                             sess, sess_ctx,
                             kernel_data={
                                 'status_data': sql_json_merge(
@@ -444,12 +452,14 @@ class SchedulerDispatcher(aobject):
 
                 await execute_with_retry(_update)
 
-            if sess_ctx.cluster_mode == ClusterMode.SINGLE_NODE:
-                requested_architecture = sess_ctx.kernels[0].image.architecture
+            schedulable_sess = await get_schedulerable_session(db_sess, sess_ctx.id)
+
+            if schedulable_sess.cluster_mode == ClusterMode.SINGLE_NODE:
+                requested_architecture = schedulable_sess.main_kernel.image.architecture
                 # Single node session can't have multiple containers with different arch
                 if any(
                     kernel.image.architecture != requested_architecture
-                    for kernel in sess_ctx.kernels
+                    for kernel in schedulable_sess.kernels
                 ):
                     raise GenericBadRequest(
                         'Cannot assign multiple kernels with different architecture'
@@ -461,21 +471,21 @@ class SchedulerDispatcher(aobject):
                     scheduler,
                     sgroup_name,
                     candidate_agents,
-                    sess_ctx,
+                    schedulable_sess,
                     check_results,
                 )
-            elif sess_ctx.cluster_mode == ClusterMode.MULTI_NODE:
+            elif schedulable_sess.cluster_mode == ClusterMode.MULTI_NODE:
                 await self._schedule_multi_node_session(
                     sched_ctx,
                     scheduler,
                     sgroup_name,
                     candidate_agents,
-                    sess_ctx,
+                    schedulable_sess,
                     check_results,
                 )
             else:
                 raise RuntimeError(
-                    f"should not reach here; unknown cluster_mode: {sess_ctx.cluster_mode}",
+                    f"should not reach here; unknown cluster_mode: {schedulable_sess.cluster_mode}",
                 )
             num_scheduled += 1
         if num_scheduled > 0:
@@ -494,15 +504,16 @@ class SchedulerDispatcher(aobject):
         log_fmt = _log_fmt.get("")
         log_args = _log_args.get(tuple())
         try:
+            if not candidate_agents:
+                raise InstanceNotAvailable("There is no candidate agent.")
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
-            agent = None
             agent = sess_ctx.main_kernel.agent
             if agent is None:
                 agent = scheduler.assign_agent_for_session(candidate_agents, sess_ctx)
-            available_agent_slots = agent.available_slots
-            if available_agent_slots is None:
+            if agent.available_slots is None:
                 raise InstanceNotAvailable("There is no such agent.")
+            available_agent_slots = agent.available_slots
             if any(
                 val > available_agent_slots[slot]
                 for slot, val in sess_ctx.requested_slots.items()
@@ -524,12 +535,12 @@ class SchedulerDispatcher(aobject):
                     await _rollback_predicate_mutations(
                         kernel_db_sess, sched_ctx, sess_ctx,
                     )
-                    await SessionRow.update_session_kernels(
+                    await update_session_kernels(
                         kernel_db_sess, sess_ctx,
                         kernel_data={
                             'status_info': 'no-available-instances',
                             'status_data': sql_json_increment(
-                                KernelRow.status_data,
+                                kernels.c.status_data,
                                 ('scheduler', 'retries'),
                                 parent_updates={
                                     'last_try': datetime.now(tzutc()).isoformat(),
@@ -552,7 +563,7 @@ class SchedulerDispatcher(aobject):
                     await _rollback_predicate_mutations(
                         kernel_db_sess, sched_ctx, sess_ctx,
                     )
-                    await SessionRow.update_session_kernels(
+                    await update_session_kernels(
                         kernel_db_sess, sess_ctx,
                         kernel_data={
                             'status_info': 'scheduler-error',
@@ -565,7 +576,7 @@ class SchedulerDispatcher(aobject):
 
         async def _finalize_scheduled() -> None:
             async with self.db.begin_session() as kernel_db_sess:
-                await SessionRow.update_session_kernels(
+                await update_session_kernels(
                     kernel_db_sess, sess_ctx,
                     kernel_data={
                         'agent_id': agent_alloc_ctx.id,
@@ -610,12 +621,14 @@ class SchedulerDispatcher(aobject):
                     if agent is None:
                         # limit agent candidates with requested image architecture
                         candidate_agents = [ag for ag in candidate_agents if ag.architecture == kernel.image.architecture]
+                        if not candidate_agents:
+                            raise InstanceNotAvailable("There is no candidate agent.")
                         agent = scheduler.assign_agent_for_kernel(candidate_agents, kernel)
                     assert agent is not None
 
-                    available_agent_slots = agent.available_slots
-                    if available_agent_slots is None:
+                    if agent is None or agent.available_slots is None:
                         raise InstanceNotAvailable("There is no such agent.")
+                    available_agent_slots = agent.available_slots
                     if any(
                         val > available_agent_slots[slot]
                         for slot, val in kernel.requested_slots.items()
@@ -631,7 +644,7 @@ class SchedulerDispatcher(aobject):
                                 sgroup_name, agent, kernel.requested_slots,
                                 extra_conds=agent_query_extra_conds,
                             )
-                            candidate_agents = await AgentRow.list_agents_by_sgroup(
+                            candidate_agents = await list_schedulable_agents_by_sgroup(
                                 agent_db_sess, sgroup_name,
                             )
                         return allocated_agent, candidate_agents
@@ -645,7 +658,7 @@ class SchedulerDispatcher(aobject):
                             await _rollback_predicate_mutations(
                                 kernel_db_sess, sched_ctx, sess_ctx,
                             )
-                            await SessionRow.update_session_kernels(
+                            await update_session_kernels(
                                 kernel_db_sess, sess_ctx,
                                 kernel_data={
                                     'status_info': 'no-available-instances',
@@ -674,7 +687,7 @@ class SchedulerDispatcher(aobject):
                             await _rollback_predicate_mutations(
                                 kernel_db_sess, sched_ctx, sess_ctx,
                             )
-                            await SessionRow.update_session_kernels(
+                            await update_session_kernels(
                                 kernel_db_sess, sess_ctx,
                                 kernel_data={
                                     'status_info': 'scheduler-error',
@@ -695,7 +708,7 @@ class SchedulerDispatcher(aobject):
         async def _finalize_scheduled() -> None:
             async with self.db.begin_session() as kernel_db_sess:
                 for binding in kernel_agent_bindings:
-                    await SessionRow.update_session_kernels(
+                    await update_session_kernels(
                         kernel_db_sess, sess_ctx,
                         kernel_data={
                             'agent_id': binding.agent_alloc_ctx.id,
@@ -737,11 +750,11 @@ class SchedulerDispatcher(aobject):
 
                 async def _mark_session_preparing() -> Sequence[SessionRow]:
                     async with self.db.begin_session() as db_sess:
-                        target_sessions = await SessionRow.get_sessions_by_status(
+                        target_sessions = await get_sessions_by_status(
                             db_sess, status=SessionStatus.SCHEDULED,
                         )
                         for session in target_sessions:
-                            await SessionRow.update_session_kernels(
+                            await update_session_kernels(
                                 db_sess, session,
                                 kernel_update={
                                     'status': KernelStatus.PREPARING,
@@ -800,7 +813,7 @@ class SchedulerDispatcher(aobject):
                         await recalc_agent_resource_occupancy(db_sess, agent)
                     await _rollback_predicate_mutations(db_sess, sched_ctx, session)
                     now = datetime.now(tzutc())
-                    await SessionRow.update_session_kernels(
+                    await update_session_kernels(
                         db_sess, session,
                         kernel_data={
                             'status': KernelStatus.CANCELLED,
@@ -861,9 +874,8 @@ async def _list_managed_sessions(
     second is pending sessions and third is to-be-cancelled sessions due to pending timeout.
     """
 
-    session_ids = [s.id for s in sgroup.sessions]
     managed_sessions: List[SessionRow]
-    managed_sessions = await SessionRow.get_managed_sessions(db_sess, session_ids)
+    managed_sessions = await get_sgroup_managed_sessions(db_sess, sgroup)
 
     pending_timeout: timedelta = scheduler.sgroup_opts.pending_timeout
     candidates: List[SessionRow] = []
@@ -901,8 +913,8 @@ async def _reserve_agent(
         raise RuntimeError(f"No agent available. condition = `{extra_conds}`")
     agent.occupied_slots = current_occupied_slots + requested_slots
 
-    # Explicitly flush dirty agent data on db session
-    await db_sess.flush()
+    # Explicitly commit dirty agent data on db session
+    await db_sess.commit()
     return agent
 
 

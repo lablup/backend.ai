@@ -117,7 +117,6 @@ def upgrade():
         session_type = sa.Column('session_type', pgsql.ENUM('INTERACTIVE', 'BATCH', name='sessiontypes', create_type=False), server_default='INTERACTIVE', nullable=False)
         cluster_mode = sa.Column('cluster_mode', sa.String(length=16), server_default='SINGLE_NODE', nullable=False)
         cluster_size = sa.Column('cluster_size', sa.Integer(), nullable=False)
-        main_kernel_id = sa.Column('main_kernel_id', GUID(), nullable=True)
         
         # Resource ownership
         scaling_group_name = sa.Column('scaling_group_name', sa.String(length=64), nullable=True)
@@ -171,7 +170,6 @@ def upgrade():
     op.create_foreign_key(op.f('fk_sessions_image_images'), 'sessions', 'images', ['image_id'], ['id'])
     op.create_foreign_key(op.f('fk_sessions_scaling_group_scaling_groups'), 'sessions', 'scaling_groups', ['scaling_group_name'], ['name'])
     op.create_foreign_key(op.f('fk_sessions_user_uuid_users'), 'sessions', 'users', ['user_uuid'], ['uuid'])
-    op.create_foreign_key(op.f('fk_sessions_main_kernel_id_kernels'), 'sessions', 'kernels', ['main_kernel_id'], ['id'])
     op.create_index(op.f('ix_sessions_created_at'), 'sessions', ['created_at'], unique=False)
     op.create_index(op.f('ix_sessions_name'), 'sessions', ['name'], unique=False)
     op.create_index(op.f('ix_sessions_result'), 'sessions', ['result'], unique=False)
@@ -180,7 +178,6 @@ def upgrade():
     op.create_index(op.f('ix_sessions_status'), 'sessions', ['status'], unique=False)
     op.create_index(op.f('ix_sessions_status_changed'), 'sessions', ['status_changed'], unique=False)
     op.create_index(op.f('ix_sessions_terminated_at'), 'sessions', ['terminated_at'], unique=False)
-    op.create_index(op.f('ix_sessions_main_kernel_id'), 'sessions', ['main_kernel_id'], unique=False)
 
     query = (
         sa.select([kernels])
@@ -195,11 +192,9 @@ def upgrade():
     all_kernel_sessions = {}
     for row in kernel_rows:
         sess_id = row['session_id']
-        main_kid = row['id'] if row['cluster_role'] == 'main' else None
         if sess_id not in all_kernel_sessions:
             sess = {
                 'id': sess_id,
-                'main_kernel_id': main_kid,
                 'creation_id': row['session_creation_id'],
                 'name': row['session_name'],
                 'session_type': row['session_type'],
@@ -233,8 +228,6 @@ def upgrade():
             all_kernel_sessions[sess_id] = sess
         else:
             sess = all_kernel_sessions[sess_id]
-            if sess['main_kernel_id'] is None:
-                sess['main_kernel_id'] = main_kid
 
             st_change = sess['status_changed']
 
@@ -271,7 +264,7 @@ def upgrade():
             #     sinfo = {**sinfo, row['id']: row['status_info']}
             #     sess['status_info'] = json.dumps(sinfo)
         
-    creates = [sess for sess in all_kernel_sessions.values() if sess['main_kernel_id'] is not None]
+    creates = tuple(all_kernel_sessions.values())
     if creates:
         connection.execute(SessionRow.__table__.insert(), creates)
 
@@ -397,7 +390,6 @@ def downgrade():
     op.drop_index(op.f('ix_sessions_result'), table_name='sessions')
     op.drop_index(op.f('ix_sessions_name'), table_name='sessions')
     op.drop_index(op.f('ix_sessions_created_at'), table_name='sessions')
-    op.drop_index(op.f('ix_sessions_main_kernel_id'), table_name='sessions')
     op.drop_table('sessions')
 
     # Drop ENUM types
