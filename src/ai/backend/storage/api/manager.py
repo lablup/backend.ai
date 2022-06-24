@@ -382,7 +382,7 @@ async def get_quota(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid", default=None): t.Null | t.String,
+                t.Key("vfid", default=None): t.Null | tx.UUID,
             },
         ),
     ) as params:
@@ -399,7 +399,7 @@ async def set_quota(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid", default=None): t.Null | t.String,
+                t.Key("vfid", default=None): t.Null | tx.UUID,
                 t.Key("size_bytes"): tx.BinarySize,
             },
         ),
