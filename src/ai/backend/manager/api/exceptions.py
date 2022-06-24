@@ -258,7 +258,7 @@ class VFolderCreationFailed(BackendError, web.HTTPBadRequest):
 
 class TooManyVFoldersFound(BackendError, web.HTTPNotFound):
     error_type = 'https://api.backend.ai/probs/too-many-vfolders'
-    error_title = 'Thare are two or more matching vfolders.'
+    error_title = 'There are two or more matching vfolders.'
 
 
 class VFolderNotFound(ObjectNotFound):
