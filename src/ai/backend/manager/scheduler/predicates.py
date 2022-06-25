@@ -88,10 +88,6 @@ async def check_concurrency(
         )
         result = await db_sess.execute(query)
         resource_policy = result.scalar()
-        # print('\n===============================')
-        # print(f'{resource_policy = }')
-        # print(f'{type(resource_policy) = }')
-        # print('===============================')
     
     max_concurrent_sessions = resource_policy.max_concurrent_sessions
     ok, concurrency_used = await redis.execute_script(

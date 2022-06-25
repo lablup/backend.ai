@@ -37,8 +37,10 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import (
     relationship,
+    noload,
     selectinload,
 )
+from dateutil.tz import tzutc
 
 from ai.backend.common import msgpack, redis
 from ai.backend.common.logging import BraceStyleAdapter
@@ -74,13 +76,13 @@ from .base import (
     batch_multiresult,
     mapper_registry,
 )
+from .utils import sql_json_merge
 from .group import groups
 from .minilang.queryfilter import QueryFilterParser
 from .minilang.ordering import QueryOrderParser
 from .user import users
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
-    from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 
 __all__ = (
@@ -99,6 +101,8 @@ __all__ = (
     'RESOURCE_USAGE_KERNEL_STATUSES',
     'DEAD_KERNEL_STATUSES',
     'LIVE_STATUS',
+    'get_occupancy',
+    'update_terminating_kernel',
     'recalc_concurrency_used',
 )
 
@@ -377,34 +381,32 @@ class KernelRow(Base):
         result = await db_session.execute(query)
         return result.scalars().all()
 
-    @classmethod
-    async def get_occupancy(
-        cls,
-        db_session: SASession,
-        cond,
-        slot_filter = None,
-        status_choice = USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    ) -> ResourceSlot:
-        query = (
-            sa.select(KernelRow.occupied_slots)
-            .where(
-                cond &
-                (KernelRow.status.in_(status_choice)),
-            )
+async def get_occupancy(
+    db_session: SASession,
+    cond,
+    slot_filter = None,
+    status_choice = USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+) -> ResourceSlot:
+    query = (
+        sa.select(KernelRow.occupied_slots)
+        .where(
+            cond &
+            (KernelRow.status.in_(status_choice)),
         )
-        zero = ResourceSlot()
-        key_occupied = sum(
-            [
-                row.occupied_slots
-                async for row in (await db_session.stream(query))
-            ],
-            zero,
-        )
-        if slot_filter:
-            key_occupied = ResourceSlot({
-                k: v for k, v in key_occupied.items() if k in slot_filter
-            })
-        return key_occupied
+    )
+    zero = ResourceSlot()
+    key_occupied = sum(
+        [
+            row.occupied_slots
+            async for row in (await db_session.stream(query))
+        ],
+        zero,
+    )
+    if slot_filter:
+        key_occupied = ResourceSlot({
+            k: v for k, v in key_occupied.items() if k in slot_filter
+        })
+    return key_occupied
 
 
 DEFAULT_SESSION_ORDERING = [
@@ -421,6 +423,59 @@ class SessionInfo(TypedDict):
     session_name: str
     status: KernelStatus
     created_at: datetime
+
+
+async def update_terminating_kernel(
+    db_session: SASession,
+    kernel_id: KernelId,
+    kern_stat,
+    reason: str,
+    exit_code: int = None,
+) -> KernelRow | None:
+    select_query = (
+        sa.select(KernelRow)
+        .where(KernelRow.id == kernel_id)
+        .options(
+            noload('*'),
+            selectinload(KernelRow.agent).noload('*'),
+        )
+    )
+    result = await db_session.execute(select_query)
+    kernel = result.scalars().first()
+    if (
+        kernel is None
+        or kernel.status in (
+            KernelStatus.CANCELLED,
+            KernelStatus.TERMINATED,
+            KernelStatus.RESTARTING,
+        )
+    ):
+        # Skip if non-existent, already terminated, or restarting.
+        return None
+
+    # Change the status to TERMINATED.
+    # (we don't delete the row for later logging and billing)
+    now = datetime.now(tzutc())
+    values = {
+        'status': KernelStatus.TERMINATED,
+        'status_info': reason,
+        'status_changed': now,
+        'status_data': sql_json_merge(
+            KernelRow.status_data,
+            ("kernel",),
+            {"exit_code": exit_code},
+        ),
+        'terminated_at': now,
+    }
+    if kern_stat:
+        values['last_stat'] = msgpack.unpackb(kern_stat)
+    update_query = (
+        sa.update(KernelRow)
+        .values(**values)
+        .where(KernelRow.id == kernel_id)
+    )
+    await db_session.execute(update_query)
+    return kernel
 
 
 async def match_session_ids(

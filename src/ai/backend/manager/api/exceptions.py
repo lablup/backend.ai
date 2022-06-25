@@ -244,6 +244,11 @@ class TooManyKernelsFound(BackendError, web.HTTPNotFound):
     error_title = 'There are two or more matching kernels.'
 
 
+class MainKernelNotFound(BackendError, web.HTTPNotFound):
+    error_type  = ''
+    error_title = 'There is no main kernel.'
+
+
 class TaskTemplateNotFound(ObjectNotFound):
     object_name = 'task template'
 
@@ -427,3 +432,7 @@ class KernelExecutionFailed(BackendAgentError, web.HTTPInternalServerError):
 
 class UnknownImageReferenceError(ObjectNotFound):
     object_name = 'image reference'
+
+
+class UnknownDependencySession(Exception):
+    pass

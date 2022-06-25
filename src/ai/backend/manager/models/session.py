@@ -22,7 +22,7 @@ from ai.backend.common.types import (
     KernelId,
 )
 
-from ..api.exceptions import InvalidAPIParameters, GenericForbidden
+from ..api.exceptions import GenericForbidden, UnknownDependencySession, MainKernelNotFound
 from ..defs import DEFAULT_ROLE
 from .base import (
     EnumType, GUID, ForeignKeyIDColumn, SessionIDColumn, KernelIDColumnType,
@@ -31,6 +31,7 @@ from .base import (
 
 from .kernel import KernelRow, KernelStatus
 from .keypair import KeyPairRow
+from .image import ImageRow
 
 if TYPE_CHECKING:
     from .scaling_group import ScalingGroupRow
@@ -43,8 +44,9 @@ __all__ = (
     'transit_session_lifecycle',
     'SessionRow', 'enqueue_session', 'get_sgroup_managed_sessions',
     'update_kernel', 'update_session_kernels',
-    'get_sessions_by_status', 'get_sessions', 'get_schedulerable_session',
+    'get_sessions_by_status', 'get_schedulerable_session',
     'match_sessions',
+    'get_sessions_by_id',
     'SessionDependencyRow',
     'check_all_dependencies',
 )
@@ -135,7 +137,7 @@ def _transit_destroy_session(current, forced) -> SessionStatus:
 
 def transit_session_lifecycle(current, job, forced=False) -> SessionStatus:
     match job:
-        case 'destory':
+        case 'destroy':
             return _transit_destroy_session(current, forced)
         case _:
             raise RuntimeError('No such job is declared.')
@@ -220,7 +222,10 @@ class SessionRow(Base):
 
     @property
     def main_kernel(self) -> KernelRow:
-        return tuple(kern for kern in self.kernels if kern.cluster_role == DEFAULT_ROLE)[0]
+        try:
+            return tuple(kern for kern in self.kernels if kern.cluster_role == DEFAULT_ROLE)[0]
+        except IndexError:
+            raise MainKernelNotFound
 
 async def match_sessions(
     db_session: SASession,
@@ -253,8 +258,14 @@ async def match_sessions(
 
         if load_intrinsic:
             query = query.options(
-                selectinload(SessionRow.kernels),
-                selectinload(SessionRow.image),
+                noload('*'),
+                selectinload(SessionRow.image).noload('*'),
+                selectinload(SessionRow.kernels)
+                .options(
+                    noload('*'),
+                    selectinload(KernelRow.image).noload('*'),
+                    selectinload(KernelRow.agent).noload('*'),
+                ),
             )
 
         return query
@@ -279,39 +290,49 @@ async def match_sessions(
     return []
 
 
-async def get_sessions(
+async def get_sessions_by_id(
     db_session: SASession,
-    session_names: Container[str],
-    access_key: AccessKey,
-    info_cols: Sequence,
+    session_ids: Sequence[SessionId],
+    access_key=None,
     *,
-    allow_stale=False,
-) -> List[SessionRow]:
-    default_cols = [
-        SessionRow.id, SessionRow.name, SessionRow.access_key,
-    ]
-    cols = set(default_cols + info_cols)
-
-    cond = (
-        (SessionRow.name.in_(session_names)) &
-        (SessionRow.kp_access_key == access_key)
-    )
-    if not allow_stale:
-        cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
+    load_intrinsic=False,
+    do_ordering=False,
+) -> SessionRow:
+    cond = (SessionRow.id.in_(session_ids))
+    if access_key is not None:
+        cond = cond & (SessionRow.kp_access_key == access_key)
     query = (
-        sa.select(cols)
-        .select_from(SessionRow)
+        sa.select(SessionRow)
         .where(cond)
     )
+    if load_intrinsic:
+        query = query.options(
+            noload('*'),
+            selectinload(SessionRow.image),
+            selectinload(SessionRow.access_key)
+            .options(
+                noload('*'),
+                selectinload(KeyPairRow.resource_policy).noload('*'),
+            ),
+            selectinload(SessionRow.kernels)
+            .options(
+                noload('*'),
+                selectinload(KernelRow.image).noload('*'),
+                selectinload(KernelRow.agent).noload('*'),
+            ),
+        )
+    if do_ordering:
+        query = query.order_by(SessionRow.created_at)
     result = await db_session.execute(query)
     return result.scalars().all()
+
 
 async def get_sessions_by_status(
     db_session: SASession,
     status: SessionStatus | List[SessionStatus],
     sgroup_name: str | None = None,
-    load_intrinsic: bool = True,
-    do_ordering: bool = True,
+    load_intrinsic: bool = False,
+    do_ordering: bool = False,
 ) -> List[SessionRow]:
     if isinstance(status, SessionStatus):
         cond = (SessionRow.status == status)
@@ -327,15 +348,21 @@ async def get_sessions_by_status(
     )
     if load_intrinsic:
         query = query.options(
-            selectinload(SessionRow.kernels),
-            selectinload(SessionRow.image),
+            noload('*'),
+            selectinload(SessionRow.image).noload('*'),
+            selectinload(SessionRow.kernels)
+            .options(
+                noload('*'),
+                selectinload(KernelRow.image).noload('*'),
+                selectinload(KernelRow.agent).noload('*'),
+            )
         )
     if do_ordering:
         query = query.order_by(SessionRow.created_at)
     result = await db_session.execute(query)
     return result.scalars().all()
 
-    
+
 async def update_session_kernels(
     db_session: SASession,
     session: Union[SessionRow, SessionId],
@@ -351,12 +378,12 @@ async def update_session_kernels(
 
     if isinstance(session, SessionRow):
         session_id = session.id
-    elif isinstance(session, SessionId):
+    elif isinstance(session, UUID):
         session_id = session
     else:
         raise RuntimeError(
             'Invalid time of session. '
-            f'expect SessionRow, SessionId type, but got {type(session)}')
+            f'expect SessionRow, uuid.UUID type, but got {type(session)}')
 
     sess_cols = SessionRow.__mapper__.columns
     session_update = {
@@ -402,12 +429,12 @@ async def update_kernel(
 ) -> None:
     if isinstance(kernel, KernelRow):
         kernel_id = kernel.id
-    elif isinstance(kernel, KernelId):
+    elif isinstance(kernel, UUID):
         kernel_id = kernel
     else:
         raise RuntimeError(
             'Invalid time of session. '
-            f'expect KernelRow, KernelId type, but got {type(kernel)}')
+            f'expect KernelRow, uuid.UUID type, but got {type(kernel)}')
     
     sess_attr = SessionRow.__dict__
     session_update = {
@@ -471,10 +498,7 @@ async def enqueue_session(
             try:
                 depend_id = match_info[0].id
             except IndexError:
-                raise InvalidAPIParameters(
-                    "Unknown session ID or name in the dependency list",
-                    extra_data={"session_ref": dependency_id},
-                )
+                raise UnknownDependencySession(dependency_id)
             matched_dependency_session_ids.append(depend_id)
         dependency_rows = [SessionDependencyRow(session_id=session_id, depends_on=depend_id) \
             for depend_id in matched_dependency_session_ids]
@@ -505,6 +529,7 @@ async def get_sgroup_managed_sessions(
     result = await db_sess.execute(query)
     return result.scalars().all()
 
+
 async def get_schedulerable_session(
     db_sess: SASession,
     session_id: SessionId,
@@ -514,11 +539,12 @@ async def get_schedulerable_session(
         populate_existing=True,
         options=(
             noload('*'),
+            selectinload(SessionRow.image).noload('*'),
             selectinload(SessionRow.kernels)
             .options(
                 noload('*'),
-                selectinload(KernelRow.image),
-                selectinload(KernelRow.agent),
+                selectinload(KernelRow.image).noload('*'),
+                selectinload(KernelRow.agent).noload('*'),
             ),
         ),
     )

@@ -129,6 +129,7 @@ from .exceptions import (
     InsufficientPrivilege,
     ServiceUnavailable,
     SessionNotFound,
+    MainKernelNotFound,
     SessionAlreadyExists,
     TooManySessionsMatched,
     BackendError,
@@ -518,7 +519,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             'service_ports': main_kern.service_ports,
             'created': False,
         }, status=200)
-    except SessionNotFound:
+    except (SessionNotFound, MainKernelNotFound):
         # It's time to create a new session.
         pass
 

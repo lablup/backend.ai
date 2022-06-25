@@ -68,6 +68,7 @@ from ..models import (
     update_session_kernels,
     get_sessions_by_status,
     get_schedulerable_session,
+    get_sessions_by_id,
     list_schedulable_agents_by_sgroup,
     list_alive_agents,
     recalc_agent_resource_occupancy,
@@ -749,21 +750,29 @@ class SchedulerDispatcher(aobject):
                 now = datetime.now(tzutc())
 
                 async def _mark_session_preparing() -> Sequence[SessionRow]:
-                    async with self.db.begin_session() as db_sess:
+                    async with self.db.begin_session(expire_on_commit=False) as db_sess:
                         target_sessions = await get_sessions_by_status(
-                            db_sess, status=SessionStatus.SCHEDULED,
+                            db_sess,
+                            status=SessionStatus.SCHEDULED,
+                            load_intrinsic=False,
+                            do_ordering=False,
                         )
-                        for session in target_sessions:
+                        target_session_ids = [s.id for s in target_sessions]
+                        for sid in target_session_ids:
                             await update_session_kernels(
-                                db_sess, session,
-                                kernel_update={
+                                db_sess, sid,
+                                kernel_data={
                                     'status': KernelStatus.PREPARING,
                                     'status_changed': now,
                                     'status_info': "",
                                     'status_data': {},
                                 },
                             )
-                        return target_sessions
+                        return await get_sessions_by_id(
+                            db_sess, target_session_ids,
+                            load_intrinsic=True,
+                            do_ordering=True,
+                        )
 
                 scheduled_sessions: List[SessionRow]
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
@@ -793,8 +802,8 @@ class SchedulerDispatcher(aobject):
         sched_ctx: SchedulingContext,
         session: SessionRow,
     ) -> None:
-        log_fmt = "prepare(s:{0.session_id}, type:{0.session_type}, name:{0.session_name}, " \
-                  "ak:{0.access_key}, cluster_mode:{0.cluster_mode}): "
+        log_fmt = "prepare(s:{0.id}, type:{0.session_type}, name:{0.name}, " \
+                  "ak:{0.kp_access_key}, cluster_mode:{0.cluster_mode}): "
         log_args = (session, )
         log.debug(log_fmt + 'try-starting', *log_args)
         try:
@@ -839,8 +848,8 @@ class SchedulerDispatcher(aobject):
                         sa.select(KernelRow.id, KernelRow.container_id)
                         .where(KernelRow.session_id == session.id)
                     )
-                    kerns = (await db_sess.execute(query)).scalars().all()
-                    # rows = (await db_sess.execute(query)).fetchall()
+                    result = await db_sess.execute(query)
+                    kerns = result.fetchall()
                     cid_map = {kern.id: kern.container_id for kern in kerns}
                 destroyed_kernels = [
                     {
@@ -883,7 +892,7 @@ async def _list_managed_sessions(
     existings: List[SessionRow] = []
 
     now = datetime.now(tzutc())
-    key_func = lambda s: (s.status, s.created_at)
+    key_func = lambda s: (s.status.value, s.created_at)
     for status, sessions in itertools.groupby(
         sorted(managed_sessions, key=key_func),
         key=lambda s: s.status,

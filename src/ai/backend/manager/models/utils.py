@@ -96,9 +96,9 @@ class ExtendedAsyncSAEngine(SAEngine):
                     self._readonly_txn_count -= 1
 
     @actxmgr
-    async def begin_session(self) -> AsyncIterator[SASession]:
+    async def begin_session(self, expire_on_commit=True) -> AsyncIterator[SASession]:
         async with self.begin() as conn:
-            session = SASession(bind=conn)
+            session = SASession(bind=conn, expire_on_commit=expire_on_commit)
             try:
                 yield session
                 await session.commit()

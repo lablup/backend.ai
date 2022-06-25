@@ -36,7 +36,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 
-from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow, get_occupancy
 from .session import SessionStatus, SessionRow, AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES
 from .scaling_group import ScalingGroupRow
 from .base import (
@@ -435,18 +435,21 @@ class AgentList(graphene.ObjectType):
     items = graphene.List(Agent, required=True)
 
 
-async def recalc_agent_resource_occupancy(db_sess: SASession, agent: AgentRow) -> None:
+async def recalc_agent_resource_occupancy(db_sess: SASession, agent: AgentRow | None) -> None:
     # kernel_slots = sum([k.occupied_slots for k in agent.kernels], ResourceSlot())
     # agent.occupied_slots = kernel_slots
     # await db_sess.flush()
 
-    kernel_slots = await KernelRow.get_occupancy(
+    if agent is None:
+        return
+
+    kernel_slots = await get_occupancy(
         db_sess,
         cond=(KernelRow.agent_id == agent.id),
         status_choice=AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     )
     agent.occupied_slots = kernel_slots
-    await db_sess.flush()
+    await db_sess.commit()
 
     # query = (
     #     sa.select([
