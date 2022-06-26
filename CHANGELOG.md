@@ -16,6 +16,21 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.03.8 (2022-06-26)
+
+### Breaking Changes
+* The manager API version is updated to `v6.20220615`. ([#484](https://github.com/lablup/backend.ai/issues/484))
+
+### Features
+* Add optional handling of encrypted request payloads to webserver for environments without SSL termination for clients ([#484](https://github.com/lablup/backend.ai/issues/484))
+
+### Fixes
+* Skip measuring the stat for an agent registry item if it has not yet assigned container ID to prevent the occasional unhandled `UnboundLocalError`. ([#478](https://github.com/lablup/backend.ai/issues/478))
+* Fix missing str to UUID conversion for `vfid` parameters in `get_quota` and `set_quota` manager-facing APIs in the storage proxy ([#487](https://github.com/lablup/backend.ai/issues/487))
+* Add default value for `is_dir` parameter at rename_file function described in storage-proxy API ([#488](https://github.com/lablup/backend.ai/issues/488))
+* Do not delete a virtual folder if there are other folders with the same name (in other folder hosts) and handle by new relevant exception, `TooManyVFoldersFound`, rather than blindly and dangerously deleting the first-queried one. ([#492](https://github.com/lablup/backend.ai/issues/492))
+
+
 ## 22.03.7 (2022-06-16)
 
 ### Fixes
