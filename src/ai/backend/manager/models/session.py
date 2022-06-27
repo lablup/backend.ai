@@ -1,37 +1,56 @@
 from __future__ import annotations
 
 import enum
-from typing import Any, Callable, Container, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union, TYPE_CHECKING
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Container,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+)
 from uuid import UUID
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import (
-    relationship,
-    selectinload,
-    noload,
-)
+from sqlalchemy.orm import noload, relationship, selectinload
 
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
-    SessionTypes,
-    SessionResult,
-    VFolderMount,
-    SessionId,
     KernelId,
+    SessionId,
+    SessionResult,
+    SessionTypes,
+    VFolderMount,
 )
 
-from ..api.exceptions import GenericForbidden, UnknownDependencySession, MainKernelNotFound
+from ..api.exceptions import (
+    GenericForbidden,
+    MainKernelNotFound,
+    UnknownDependencySession,
+)
 from ..defs import DEFAULT_ROLE
 from .base import (
-    EnumType, GUID, ForeignKeyIDColumn, SessionIDColumn, KernelIDColumnType,
-    ResourceSlotColumn, URLColumn, StructuredJSONObjectListColumn, Base,
+    GUID,
+    Base,
+    EnumType,
+    ForeignKeyIDColumn,
+    KernelIDColumnType,
+    ResourceSlotColumn,
+    SessionIDColumn,
+    StructuredJSONObjectListColumn,
+    URLColumn,
 )
-
+from .image import ImageRow
 from .kernel import KernelRow, KernelStatus
 from .keypair import KeyPairRow
-from .image import ImageRow
 
 if TYPE_CHECKING:
     from .scaling_group import ScalingGroupRow

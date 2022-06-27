@@ -6,6 +6,7 @@ import trafaret as t
 
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId
 
+from ..models import AgentRow, KernelRow, SessionRow
 from .types import (
     AbstractScheduler,
     AgentContext,
@@ -13,7 +14,6 @@ from .types import (
     KernelInfo,
     PendingSession,
 )
-from ..models import SessionRow, AgentRow, KernelRow
 
 
 class MOFScheduler(AbstractScheduler):

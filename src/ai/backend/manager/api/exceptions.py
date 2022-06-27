@@ -12,16 +12,7 @@ future UX improvements.
 from __future__ import annotations
 
 import json
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    Iterable,
-    Optional,
-    Mapping,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Union, cast
 
 from aiohttp import web
 

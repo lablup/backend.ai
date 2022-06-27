@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import enum
+import logging
+import uuid
 from collections import OrderedDict
 from datetime import datetime
 from decimal import Decimal
-import enum
-import logging
 from typing import (
+    TYPE_CHECKING,
     Any,
     Container,
     Dict,
@@ -17,30 +19,22 @@ from typing import (
     Type,
     TypedDict,
     TypeVar,
-    TYPE_CHECKING,
     Union,
 )
 from uuid import UUID
-import uuid
 
 import aioredis
 import aioredis.client
-from dateutil.parser import parse as dtparse
 import graphene
-from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
-from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import (
-    AsyncConnection as SAConnection,
-    AsyncSession as SASession,
-)
-from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import (
-    relationship,
-    noload,
-    selectinload,
-)
+from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
+from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import noload, relationship, selectinload
 
 from ai.backend.common import msgpack, redis
 from ai.backend.common.logging import BraceStyleAdapter
@@ -50,37 +44,38 @@ from ai.backend.common.types import (
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
-    SessionId,
-    SessionTypes,
-    SessionResult,
-    SlotName,
     ResourceSlot,
+    SessionId,
+    SessionResult,
+    SessionTypes,
+    SlotName,
     VFolderMount,
 )
 
 from ..defs import DEFAULT_ROLE
 from .base import (
+    GUID,
     Base,
     BigInt,
     EnumType,
-    GUID,
+    ForeignKeyIDColumn,
     Item,
     KernelIDColumn,
-    ForeignKeyIDColumn,
     PaginatedList,
     ResourceSlotColumn,
     SessionIDColumnType,
     StructuredJSONObjectListColumn,
     URLColumn,
-    batch_result,
     batch_multiresult,
+    batch_result,
     mapper_registry,
 )
-from .utils import sql_json_merge
 from .group import groups
-from .minilang.queryfilter import QueryFilterParser
 from .minilang.ordering import QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
 from .user import users
+from .utils import sql_json_merge
+
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 

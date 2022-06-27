@@ -1,30 +1,19 @@
 from __future__ import annotations
-from decimal import Decimal
 
 import enum
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    List,
-    Mapping,
-    Sequence,
-    TYPE_CHECKING,
-    TypeVar,
-)
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Sequence, TypeVar
 
-from dateutil.parser import parse as dtparse
 import graphene
-from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
-from sqlalchemy.sql.expression import true
-from sqlalchemy.ext.asyncio import (
-    AsyncConnection as SAConnection,
-    AsyncSession as SASession,
-)
-from sqlalchemy.engine.row import Row
+from dateutil.parser import parse as dtparse
+from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import relationship, noload, selectinload
+from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import noload, relationship, selectinload
+from sqlalchemy.sql.expression import true
 
 from ai.backend.common import msgpack, redis
 from ai.backend.common.types import (
@@ -36,23 +25,29 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 
-from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow, get_occupancy
-from .session import SessionStatus, SessionRow, AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES
-from .scaling_group import ScalingGroupRow
 from .base import (
     Base,
-    batch_result,
-    EnumType, Item,
-    mapper_registry,
+    EnumType,
+    Item,
     PaginatedList,
-    privileged_mutation,
     ResourceSlotColumn,
+    batch_result,
+    mapper_registry,
+    privileged_mutation,
     set_if_set,
     simple_db_mutate,
 )
-from .user import UserRole
-from .minilang.queryfilter import QueryFilterParser
+from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow, get_occupancy
 from .minilang.ordering import QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
+from .scaling_group import ScalingGroupRow
+from .session import (
+    AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
+    SessionRow,
+    SessionStatus,
+)
+from .user import UserRole
+
 if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
 

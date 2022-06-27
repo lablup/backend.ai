@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
 import logging
+import uuid
+from abc import ABCMeta, abstractmethod
+from datetime import datetime
 from typing import (
     Any,
     Dict,
@@ -14,39 +16,33 @@ from typing import (
     Sequence,
     Set,
 )
-import uuid
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.kernel import KernelRow
 
 import attr
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.sql import Select, ColumnElement
-from sqlalchemy.engine.row import Row
-from datetime import datetime
 import trafaret as t
+from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.sql import ColumnElement, Select
 
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.docker import (
-    ImageRef,
-)
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
     KernelId,
+    ResourceSlot,
     SessionId,
     SessionTypes,
-    ResourceSlot,
     SlotName,
     SlotTypes,
     VFolderMount,
 )
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.kernel import KernelRow
 
 from ..defs import DEFAULT_ROLE
-from ..models import (
-    kernels, keypairs, SessionRow,
-)
+from ..models import SessionRow, kernels, keypairs
 from ..models.scaling_group import ScalingGroupOpts
 from ..registry import AgentRegistry
 

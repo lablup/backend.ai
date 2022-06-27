@@ -2,31 +2,22 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import (
-    Any,
-    Dict,
-    Iterable,
-    Optional,
-    Sequence,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
 from uuid import UUID, uuid4
 
 import aiohttp
-from dateutil.parser import parse as dtparse
 import graphene
+import sqlalchemy as sa
+from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from passlib.hash import bcrypt
-import sqlalchemy as sa
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import (
-    AsyncConnection as SAConnection,
-    AsyncEngine as SAEngine,
-)
-from sqlalchemy.sql.expression import bindparam
-from sqlalchemy.types import TypeDecorator, VARCHAR
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql.expression import bindparam
+from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis
 from ai.backend.common.logging import BraceStyleAdapter
@@ -39,15 +30,15 @@ from .base import (
     IDColumn,
     Item,
     PaginatedList,
+    batch_multiresult,
+    batch_result,
     mapper_registry,
     set_if_set,
-    batch_result,
-    batch_multiresult,
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .minilang.queryfilter import QueryFilterParser
 from .minilang.ordering import QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
 from .storage import StorageSessionManager
 
 if TYPE_CHECKING:
@@ -151,7 +142,8 @@ class UserGroup(graphene.ObjectType):
     @classmethod
     async def batch_load_by_user_id(cls, ctx: GraphQueryContext, user_ids: Sequence[UUID]):
         async with ctx.db.begin() as conn:
-            from .group import groups, association_groups_users as agus
+            from .group import association_groups_users as agus
+            from .group import groups
             j = agus.join(groups, agus.c.group_id == groups.c.id)
             query = (
                 sa.select([agus.c.user_id, groups.c.name, groups.c.id])
@@ -732,6 +724,7 @@ class ModifyUser(graphene.Mutation):
             # Update user's group if group_ids parameter is provided.
             if props.group_ids and updated_user is not None:
                 from .group import association_groups_users, groups  # noqa
+
                 # Clear previous groups associated with the user.
                 await conn.execute(
                     sa.delete(association_groups_users)
@@ -891,7 +884,8 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import vfolders, vfolder_invitations, vfolder_permissions
+        from . import vfolder_invitations, vfolder_permissions, vfolders
+
         # Gather target user's virtual folders' names.
         query = (
             sa.select([vfolders.c.name])
@@ -972,7 +966,7 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import vfolders, vfolder_permissions
+        from . import vfolder_permissions, vfolders
         await conn.execute(
             vfolder_permissions.delete()
             .where(vfolder_permissions.c.user == user_uuid),
@@ -1018,7 +1012,7 @@ class PurgeUser(graphene.Mutation):
 
         :return: True if a virtual folder is mounted to active kernels.
         """
-        from . import kernels, vfolders, AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels, vfolders
         result = await conn.execute(
             sa.select([vfolders.c.id])
             .select_from(vfolders)
@@ -1055,7 +1049,7 @@ class PurgeUser(graphene.Mutation):
 
         :return: True if the user has some active kernels.
         """
-        from . import kernels, AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
         active_kernel_count = await conn.scalar(
             sa.select([sa.func.count()])
             .select_from(kernels)

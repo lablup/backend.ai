@@ -12,9 +12,12 @@ import re
 import secrets
 import time
 import uuid
-from ai.backend.manager.models.user import UserRow
-import yarl
+from datetime import datetime, timedelta
+from decimal import Decimal
+from io import BytesIO
+from pathlib import PurePosixPath
 from typing import (
+    TYPE_CHECKING,
     Any,
     Dict,
     Iterable,
@@ -25,13 +28,8 @@ from typing import (
     Set,
     Tuple,
     Union,
-    TYPE_CHECKING,
     cast,
 )
-from decimal import Decimal
-from datetime import datetime, timedelta
-from io import BytesIO
-from pathlib import PurePosixPath
 from urllib.parse import urlparse
 
 import aiohttp
@@ -42,24 +40,23 @@ import attr
 import multidict
 import sqlalchemy as sa
 import trafaret as t
-from aiohttp import web, hdrs
+import yarl
+from aiohttp import hdrs, web
 from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
-from sqlalchemy.sql.expression import true, null
 from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.sql.expression import null, true
 
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.user import UserRow
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection, AsyncSession as SASession
 
-from ai.backend.common import redis, validators as tx
+from ai.backend.common import redis
+from ai.backend.common import validators as tx
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.exception import (
-    UnknownImageReference,
-    AliasResolutionFailed,
-)
 from ai.backend.common.events import (
     AgentHeartbeatEvent,
     AgentStartedEvent,
@@ -74,76 +71,88 @@ from ai.backend.common.events import (
     KernelStartedEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
-    SessionEnqueuedEvent,
-    SessionScheduledEvent,
-    SessionPreparingEvent,
     SessionCancelledEvent,
+    SessionEnqueuedEvent,
     SessionFailureEvent,
+    SessionPreparingEvent,
+    SessionScheduledEvent,
     SessionStartedEvent,
     SessionSuccessEvent,
     SessionTerminatedEvent,
 )
+from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.utils import cancel_tasks, str_to_timedelta
+from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    KernelId,
     ClusterMode,
-    SessionEnqueuingConfig,
     KernelEnqueueingConfig,
+    KernelId,
+    SessionEnqueuingConfig,
     SessionTypes,
     check_typed_dict,
 )
-from ai.backend.common.plugin.monitor import GAUGE
+from ai.backend.common.utils import cancel_tasks, str_to_timedelta
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
-from ..types import UserScope
 from ..models import (
-    domains, DomainRow,
-    association_groups_users as agus, groups,
-    AssocGroupUserRow as Agus, GroupRow,
-    keypairs, KeyPairRow,
-    kernels, AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    query_bootstrap_script,
-    keypair_resource_policies,
-    scaling_groups,
-    users, UserRole,
-    vfolders,
-    AgentStatus, KernelStatus,
-    SessionRow, SessionStatus,
-    query_accessible_vfolders,
-    session_templates,
-    verify_vfolder_name,
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
+    AgentStatus,
+)
+from ..models import AssocGroupUserRow as Agus
+from ..models import (
+    DomainRow,
+    GroupRow,
+    KernelStatus,
+    KeyPairRow,
+    SessionRow,
+    SessionStatus,
+    UserRole,
+)
+from ..models import association_groups_users as agus
+from ..models import (
+    domains,
+    groups,
+    kernels,
+    keypair_resource_policies,
+    keypairs,
+    query_accessible_vfolders,
+    query_bootstrap_script,
+    scaling_groups,
+    session_templates,
+    users,
+    verify_vfolder_name,
+    vfolders,
 )
 from ..models.kernel import KernelRow, match_session_ids
 from ..models.utils import execute_with_retry
+from ..types import UserScope
+from .auth import auth_required
 from .exceptions import (
     AppNotFound,
-    InvalidAPIParameters,
-    ObjectNotFound,
+    BackendError,
     ImageNotFound,
     InsufficientPrivilege,
-    ServiceUnavailable,
-    SessionNotFound,
-    MainKernelNotFound,
-    SessionAlreadyExists,
-    TooManySessionsMatched,
-    BackendError,
     InternalServerError,
-    TaskTemplateNotFound,
+    InvalidAPIParameters,
+    MainKernelNotFound,
+    ObjectNotFound,
+    ServiceUnavailable,
+    SessionAlreadyExists,
+    SessionNotFound,
     StorageProxyError,
+    TaskTemplateNotFound,
+    TooManySessionsMatched,
     UnknownImageReferenceError,
 )
-from .auth import auth_required
-from .types import CORSOptions, WebMiddleware
-from .utils import (
-    catch_unexpected, check_api_params, get_access_key_scopes, undefined,
-)
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
+from .types import CORSOptions, WebMiddleware
+from .utils import catch_unexpected, check_api_params, get_access_key_scopes, undefined
+
 if TYPE_CHECKING:
     from .context import RootContext
 

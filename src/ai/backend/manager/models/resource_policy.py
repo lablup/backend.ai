@@ -1,30 +1,28 @@
 from __future__ import annotations
 
 import logging
-from typing import (
-    Any,
-    Dict,
-    Sequence,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Any, Dict, Sequence
 
 import graphene
-from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
-from sqlalchemy.engine.row import Row
+from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import (
-    relationship,
-)
+from sqlalchemy.engine.row import Row
+from sqlalchemy.orm import relationship
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+
 from .base import (
-    Base, mapper_registry, BigInt, EnumType, ResourceSlotColumn,
+    Base,
+    BigInt,
+    EnumType,
+    ResourceSlotColumn,
+    batch_result,
+    mapper_registry,
+    set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
-    set_if_set,
-    batch_result,
 )
 from .keypair import keypairs
 from .user import UserRole

@@ -1,19 +1,17 @@
 from __future__ import annotations
 
-import attr
 import enum
 import uuid
-from typing import (
-    Protocol,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Protocol
 
+import attr
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
-    from .models import SessionRow
+
     from .defs import LockID
+    from .models import SessionRow
 
 
 class SessionGetter(Protocol):

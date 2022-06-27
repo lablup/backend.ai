@@ -10,8 +10,8 @@ import trafaret as t
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId
 
+from ..models import AgentRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
-from ..models import SessionRow, AgentRow
 from .types import (
     AbstractScheduler,
     AgentContext,

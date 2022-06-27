@@ -5,15 +5,13 @@ Revises: 81c264528f20
 Create Date: 2022-06-07 10:51:38.413127
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import registry
 from sqlalchemy.orm.session import Session
 
-from ai.backend.manager.models.base import (
-    GUID, KernelIDColumn, convention
-)
+from ai.backend.manager.models.base import GUID, KernelIDColumn, convention
 
 # revision identifiers, used by Alembic.
 revision = '40f0912bff53'

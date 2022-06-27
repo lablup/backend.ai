@@ -1,39 +1,29 @@
-from datetime import datetime
 import logging
-from typing import (
-    List,
-)
+from datetime import datetime
+from typing import List
 
-from dateutil.tz import tzutc
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import (
-    AsyncSession as SASession,
-)
+from dateutil.tz import tzutc
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    ResourceSlot,
-    SessionResult,
-    SessionTypes,
-)
+from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 from ai.backend.manager.models.session import SessionRow
 
 from ..models import (
-    DomainRow, groups, kernels,
-    KeyPairResourcePolicyRow,
-    keypair_resource_policies,
-    SessionDependencyRow,
-    query_allowed_sgroups,
-    check_all_dependencies,
     DefaultForUnspecified,
+    DomainRow,
+    KeyPairResourcePolicyRow,
+    SessionDependencyRow,
+    check_all_dependencies,
+    groups,
+    kernels,
+    keypair_resource_policies,
+    query_allowed_sgroups,
 )
 from ..models.utils import execute_with_retry, reenter_txn, reenter_txn_session
-from .types import (
-    SchedulingContext,
-    PendingSession,
-    PredicateResult,
-)
+from .types import PendingSession, PredicateResult, SchedulingContext
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.scheduler'))
 
