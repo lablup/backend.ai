@@ -8,7 +8,7 @@ import graphene
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..models.gql import Queries, Mutations
+from ..models.gql import Mutations, Queries
 
 if TYPE_CHECKING:
     from .context import CLIContext

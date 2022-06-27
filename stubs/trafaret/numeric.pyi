@@ -1,5 +1,4 @@
-from .base import TrafaretMeta, Trafaret
-
+from .base import Trafaret, TrafaretMeta
 
 class NumberMeta(TrafaretMeta):
     def __getitem__(cls, slice_): ...

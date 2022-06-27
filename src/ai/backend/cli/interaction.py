@@ -4,7 +4,6 @@ from typing import Optional, Union
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
-
 Numeric = Union[int, float]
 
 

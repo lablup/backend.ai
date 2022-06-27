@@ -20,8 +20,8 @@ from typing import (
 
 import aioredis
 import aioredis.client
-import aioredis.sentinel
 import aioredis.exceptions
+import aioredis.sentinel
 import yarl
 
 from .logging import BraceStyleAdapter

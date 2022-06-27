@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+import ai.backend.manager.api.ratelimit as rlim
 from ai.backend.manager.server import (
     database_ctx,
     event_dispatcher_ctx,
@@ -10,7 +11,6 @@ from ai.backend.manager.server import (
     redis_ctx,
     shared_config_ctx,
 )
-import ai.backend.manager.api.ratelimit as rlim
 
 
 @pytest.mark.asyncio

@@ -5,10 +5,12 @@ Revises: bf4bae8f942e
 Create Date: 2018-06-17 13:52:13.346856
 
 """
-from alembic import op
-import sqlalchemy as sa
-from ai.backend.manager.models.base import convention
 import os
+
+import sqlalchemy as sa
+from alembic import op
+
+from ai.backend.manager.models.base import convention
 
 # revision identifiers, used by Alembic.
 revision = 'f8a71c3bffa2'

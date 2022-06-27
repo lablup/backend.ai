@@ -10,11 +10,12 @@ import aioredis.sentinel
 import aiotools
 import pytest
 
+from ai.backend.common import redis
+from ai.backend.common import validators as tx
+from ai.backend.common.types import HostPortPair
+
 from .types import RedisClusterInfo
 from .utils import interrupt, with_timeout
-
-from ai.backend.common import redis, validators as tx
-from ai.backend.common.types import HostPortPair
 
 if TYPE_CHECKING:
     from typing import Any

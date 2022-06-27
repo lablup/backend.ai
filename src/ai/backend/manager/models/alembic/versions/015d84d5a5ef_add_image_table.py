@@ -5,14 +5,12 @@ Revises: 60a1effa77d2
 Create Date: 2022-02-15 23:45:19.814677
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 from ai.backend.manager.models.base import ForeignKeyIDColumn, IDColumn, convention
-
 from ai.backend.manager.models.image import ImageType
-
 
 # revision identifiers, used by Alembic.
 revision = '015d84d5a5ef'

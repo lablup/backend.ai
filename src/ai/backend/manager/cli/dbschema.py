@@ -3,16 +3,17 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from alembic.config import Config
-from alembic import command
-from alembic.runtime.migration import MigrationContext
-from alembic.script import ScriptDirectory
 import click
 import sqlalchemy as sa
+from alembic import command
+from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 
 from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models.base import metadata
+
 if TYPE_CHECKING:
     from .context import CLIContext
 
