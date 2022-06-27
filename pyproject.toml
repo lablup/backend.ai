@@ -53,3 +53,8 @@ ignore_missing_imports = true
 mypy_path = "stubs:src"
 namespace_packages = true
 explicit_package_bases = true
+
+[tool.isort]
+profile = "black"
+sections = ["FUTURE", "STDLIB", "FIRSTPARTY", "THIRDPARTY", "LOCALFOLDER"]
+known_first_party = ["ai.backend"]
