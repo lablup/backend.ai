@@ -554,15 +554,11 @@
           "version": "0.16"
         }
       ],
-      "platform_tag": [
-        "cp310",
-        "cp310",
-        "manylinux_2_31_aarch64"
-      ]
+      "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.90",
+  "pex_version": "2.1.93",
   "prefer_older_binary": false,
   "requirements": [
     "async_timeout~=3.0",

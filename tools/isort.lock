@@ -66,15 +66,11 @@
           "version": "5.10.1"
         }
       ],
-      "platform_tag": [
-        "cp310",
-        "cp310",
-        "manylinux_2_31_aarch64"
-      ]
+      "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.90",
+  "pex_version": "2.1.93",
   "prefer_older_binary": false,
   "requirements": [
     "isort[colors,pyproject]<6.0,>=5.9.3"
