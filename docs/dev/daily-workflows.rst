@@ -98,6 +98,16 @@ smaller target of files that you work on and `use an option to select the
 targets only changed
 <https://www.pantsbuild.org/docs/advanced-target-selection#running-over-changed-files-with---changed-since>`_ (``--changed-since``).
 
+Running formatters
+------------------
+
+If you encounter failure from ``isort``, you may run the formatter to automatically fix the import ordering issues.
+
+.. code-block:: console
+
+   $ ./pants fmt ::
+   $ ./pants fmt src/ai/backend/common::
+
 Running unit tests
 ------------------
 
