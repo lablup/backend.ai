@@ -796,13 +796,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6cff27cec936bf81dc5ee87f07132b807bcda51106b5ec4b90a04331cba76231",
-              "url": "https://files.pythonhosted.org/packages/11/40/8fcb3c0f72e11dc44e1102b2adf5f160b8a00e84d915798c60aabcd9257a/pytest_mock-3.7.0-py3-none-any.whl"
+              "hash": "d989f11ca4a84479e288b0cd1e6769d6ad0d3d7743dcc75e460d1416a5f2135a",
+              "url": "https://files.pythonhosted.org/packages/c3/ab/76e3a40f0faea13806d0ac8e69b3903cfb7d76e49905a259c0465470963f/pytest_mock-3.8.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5112bd92cc9f186ee96e1a92efc84969ea494939c3aead39c50f421c4cc69534",
-              "url": "https://files.pythonhosted.org/packages/96/e1/fb53b62056e6840a36d9a4beb4e42726155594c567b574103435a7131c60/pytest-mock-3.7.0.tar.gz"
+              "hash": "2c6d756d5d3bf98e2e80797a959ca7f81f479e7d1f5f571611b0fdd6d1745240",
+              "url": "https://files.pythonhosted.org/packages/78/c2/ff2327e36c93d950db089e308a38334717d3378c55afc8d95d1d23ade9c1/pytest-mock-3.8.1.tar.gz"
             }
           ],
           "project_name": "pytest-mock",
@@ -813,7 +813,7 @@
             "tox; extra == \"dev\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.7"
+          "version": "3.8.1"
         },
         {
           "artifacts": [
@@ -926,15 +926,11 @@
           "version": "1.7.2"
         }
       ],
-      "platform_tag": [
-        "cp310",
-        "cp310",
-        "manylinux_2_31_aarch64"
-      ]
+      "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.90",
+  "pex_version": "2.1.93",
   "prefer_older_binary": false,
   "requirements": [
     "aioresponses>=0.7.3",
