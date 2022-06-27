@@ -25,6 +25,7 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
+    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -49,7 +50,7 @@ from .base import (
     URLColumn,
 )
 from .image import ImageRow
-from .kernel import KernelRow, KernelStatus
+from .kernel import KernelRow, KernelStatus, get_kernel_occupancy
 from .keypair import KeyPairRow
 
 if TYPE_CHECKING:

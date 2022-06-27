@@ -128,7 +128,7 @@ from .models import (
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
 )
-from .models.kernel import KernelRow, get_occupancy, update_terminating_kernel
+from .models.kernel import KernelRow, get_kernel_occupancy, update_terminating_kernel
 from .models.session import (
     SessionRow,
     enqueue_session,
@@ -1199,11 +1199,11 @@ class AgentRegistry:
             )
             for k in scheduled_session.kernels
         ]
-        session_creation_id = scheduled_session.creation_id
+        session_id, session_creation_id = scheduled_session.id, scheduled_session.creation_id
 
         hook_result = await self.hook_plugin_ctx.dispatch(
             'PRE_START_SESSION',
-            (scheduled_session.id, scheduled_session.name, scheduled_session.kp_access_key),
+            (session_id, scheduled_session.name, scheduled_session.kp_access_key),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -1245,15 +1245,15 @@ class AgentRegistry:
         network_name: Optional[str] = None
         if scheduled_session.cluster_mode == ClusterMode.SINGLE_NODE:
             if scheduled_session.cluster_size > 1:
-                network_name = f'bai-singlenode-{scheduled_session.id}'
+                network_name = f'bai-singlenode-{session_id}'
                 assert kernel_agent_bindings[0].agent_alloc_ctx.id is not None
-                assert scheduled_session.id is not None
+                assert session_id is not None
                 try:
                     async with RPCContext(
                         kernel_agent_bindings[0].agent_alloc_ctx.id,
                         kernel_agent_bindings[0].agent_alloc_ctx.addr,
                         invoke_timeout=None,
-                        order_key=str(scheduled_session.id),
+                        order_key=str(session_id),
                         keepalive_timeout=self.rpc_keepalive_timeout,
                     ) as rpc:
                         await rpc.call.create_local_network(network_name)
@@ -1264,7 +1264,7 @@ class AgentRegistry:
                 network_name = None
         elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
             # Create overlay network for multi-node sessions
-            network_name = f'bai-multinode-{scheduled_session.id}'
+            network_name = f'bai-multinode-{session_id}'
             mtu = await self.shared_config.get_raw('config/network/overlay/mtu')
             try:
                 # Overlay networks can only be created at the Swarm manager.
@@ -1304,7 +1304,7 @@ class AgentRegistry:
         sess_env = scheduled_session.environ
         scheduled_session.environ = {
             **sess_env,
-            'BACKENDAI_SESSION_ID': str(scheduled_session.id),
+            'BACKENDAI_SESSION_ID': str(session_id),
             'BACKENDAI_SESSION_NAME': str(scheduled_session.name),
             'BACKENDAI_CLUSTER_SIZE': str(scheduled_session.cluster_size),
             'BACKENDAI_CLUSTER_REPLICAS':
@@ -1353,13 +1353,30 @@ class AgentRegistry:
                     errors=agent_errors,
                 )
             await self.settle_agent_alloc(kernel_agent_bindings)
+        
+        async with self.db.begin_session() as db_session:
+            total_resource_occupancy = await get_kernel_occupancy(
+                db_session,
+                (KernelRow.session_id == session_id),
+                status_choice=None,
+            )
+            query = (
+                sa.update(SessionRow)
+                .values(
+                    occupying_slots=total_resource_occupancy,
+                    status=SessionStatus.RUNNING,
+                    status_changed=datetime.now(tzutc()),
+                )
+                .where(SessionRow.id == session_id)
+            )
+            await db_session.execute(query)
         # If all is well, let's say the session is ready.
         await self.event_producer.produce_event(
-            SessionStartedEvent(scheduled_session.id, session_creation_id),
+            SessionStartedEvent(session_id, session_creation_id),
         )
         await self.hook_plugin_ctx.notify(
             'POST_START_SESSION',
-            (scheduled_session.id, scheduled_session.name, scheduled_session.kp_access_key),
+            (session_id, scheduled_session.name, scheduled_session.kp_access_key),
         )
 
     def convert_resource_spec_to_resource_slot(
@@ -1412,6 +1429,7 @@ class AgentRegistry:
                         values = {
                             'scaling_group': agent_alloc_ctx.scaling_group_name,
                             'status': KernelStatus.RUNNING,
+                            'status_changed': datetime.now(tzutc()),
                             'container_id': created_info['container_id'],
                             'occupied_shares': {},
                             'attached_devices': created_info.get('attached_devices', {}),
@@ -1580,7 +1598,7 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn(self.db, sess) as _sess:
-                return await get_occupancy(
+                return await get_kernel_occupancy(
                     _sess,
                     cond=(KernelRow.access_key == access_key),
                     slot_filter=known_slot_types,
@@ -1594,7 +1612,7 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn(self.db, sess) as _sess:
-                return await get_occupancy(
+                return await get_kernel_occupancy(
                     _sess,
                     cond=(KernelRow.domain_name == domain_name),
                     slot_filter=known_slot_types,
@@ -1608,7 +1626,7 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, sess) as _sess:
-                return await get_occupancy(
+                return await get_kernel_occupancy(
                     _sess,
                     cond=(KernelRow.group_id == group_id),
                     slot_filter=known_slot_types,
@@ -1688,7 +1706,12 @@ class AgentRegistry:
                     set(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)
                 )
                 query = (
-                    sa.select(KernelRow.access_key, KernelRow.agent_id, KernelRow.occupied_slots)
+                    sa.select(
+                        KernelRow.access_key,
+                        KernelRow.agent_id,
+                        KernelRow.occupied_slots,
+                        KernelRow.status,
+                    )
                     .where(KernelRow.status.in_(all_filtering_statues))
                     .order_by(sa.asc(KernelRow.access_key))
                 )

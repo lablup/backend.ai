@@ -96,7 +96,7 @@ __all__ = (
     'RESOURCE_USAGE_KERNEL_STATUSES',
     'DEAD_KERNEL_STATUSES',
     'LIVE_STATUS',
-    'get_occupancy',
+    'get_kernel_occupancy',
     'update_terminating_kernel',
     'recalc_concurrency_used',
 )
@@ -376,18 +376,17 @@ class KernelRow(Base):
         result = await db_session.execute(query)
         return result.scalars().all()
 
-async def get_occupancy(
+async def get_kernel_occupancy(
     db_session: SASession,
     cond,
     slot_filter = None,
     status_choice = USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
 ) -> ResourceSlot:
+    if status_choice is not None:
+        cond = cond & (KernelRow.status.in_(status_choice))
     query = (
         sa.select(KernelRow.occupied_slots)
-        .where(
-            cond &
-            (KernelRow.status.in_(status_choice)),
-        )
+        .where(cond)
     )
     zero = ResourceSlot()
     key_occupied = sum(

@@ -37,7 +37,11 @@ from .base import (
     set_if_set,
     simple_db_mutate,
 )
-from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow, get_occupancy
+from .kernel import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
+    get_kernel_occupancy,
+)
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .scaling_group import ScalingGroupRow
@@ -438,7 +442,7 @@ async def recalc_agent_resource_occupancy(db_sess: SASession, agent: AgentRow | 
     if agent is None:
         return
 
-    kernel_slots = await get_occupancy(
+    kernel_slots = await get_kernel_occupancy(
         db_sess,
         cond=(KernelRow.agent_id == agent.id),
         status_choice=AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
