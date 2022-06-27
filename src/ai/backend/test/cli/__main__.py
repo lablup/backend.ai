@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import click
 import subprocess
 import sys
+
+import click
 
 from .context import CLIContext
 from .utils import CommaSeparatedChoice, CustomUsageArgsCommand

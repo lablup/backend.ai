@@ -4,30 +4,26 @@ import asyncio
 import contextlib
 import json
 import logging
-from typing import AsyncIterator, TYPE_CHECKING
 import sys
+from typing import TYPE_CHECKING, AsyncIterator
 
 import click
 
 from ai.backend.common.cli import EnumChoice, MinMaxRange
 from ai.backend.common.config import redis_config_iv
-from ai.backend.common.etcd import (
-    AsyncEtcd, ConfigScopes,
-    quote as etcd_quote,
-    unquote as etcd_unquote,
-)
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd import quote as etcd_quote
+from ai.backend.common.etcd import unquote as etcd_unquote
 from ai.backend.common.logging import BraceStyleAdapter
 
-from .image_impl import (
-    alias as alias_impl,
-    dealias as dealias_impl,
-    forget_image as forget_image_impl,
-    inspect_image as inspect_image_impl,
-    list_images as list_images_impl,
-    rescan_images as rescan_images_impl,
-    set_image_resource_limit as set_image_resource_limit_impl,
-)
 from ..config import SharedConfig
+from .image_impl import alias as alias_impl
+from .image_impl import dealias as dealias_impl
+from .image_impl import forget_image as forget_image_impl
+from .image_impl import inspect_image as inspect_image_impl
+from .image_impl import list_images as list_images_impl
+from .image_impl import rescan_images as rescan_images_impl
+from .image_impl import set_image_resource_limit as set_image_resource_limit_impl
 
 if TYPE_CHECKING:
     from .context import CLIContext

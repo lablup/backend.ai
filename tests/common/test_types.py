@@ -1,14 +1,16 @@
 import asyncio
 from decimal import Decimal
-from ai.backend.common.types import (
-    BinarySize, ResourceSlot,
-    DefaultForUnspecified,
-    aobject,
-    HardwareMetadata,
-    check_typed_dict,
-)
 
 import pytest
+
+from ai.backend.common.types import (
+    BinarySize,
+    DefaultForUnspecified,
+    HardwareMetadata,
+    ResourceSlot,
+    aobject,
+    check_typed_dict,
+)
 
 
 @pytest.mark.asyncio

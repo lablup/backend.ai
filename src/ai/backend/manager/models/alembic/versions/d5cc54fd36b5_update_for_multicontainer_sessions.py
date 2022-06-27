@@ -5,8 +5,8 @@ Revises: 0d553d59f369
 Create Date: 2020-01-06 13:56:50.885635
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 from ai.backend.manager.models.base import GUID
 

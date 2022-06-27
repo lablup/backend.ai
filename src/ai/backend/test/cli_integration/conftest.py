@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-from collections import namedtuple
-from contextlib import closing
 import os
-from pathlib import Path
 import re
 import secrets
+from collections import namedtuple
+from contextlib import closing
+from pathlib import Path
 from typing import Callable, Iterator, Sequence, Tuple
 
-from faker import Faker
 import pexpect
 import pytest
+from faker import Faker
 
 from ai.backend.plugin.entrypoint import find_build_root
-from ai.backend.test.utils.cli import ClientRunnerFunc, EOF, run as _run
+from ai.backend.test.utils.cli import EOF, ClientRunnerFunc
+from ai.backend.test.utils.cli import run as _run
 
 _rx_env_export = re.compile(r"^(export )?(?P<key>\w+)=(?P<val>.*)$")
 

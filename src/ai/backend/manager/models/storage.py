@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager as actxmgr
-from contextvars import ContextVar
 import itertools
 import logging
+from contextlib import asynccontextmanager as actxmgr
+from contextvars import ContextVar
 from pathlib import PurePosixPath
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Final,
@@ -16,23 +17,21 @@ from typing import (
     Sequence,
     Tuple,
     TypedDict,
-    TYPE_CHECKING,
 )
 from uuid import UUID
-
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import HardwareMetadata
 
 import aiohttp
 import attr
 import graphene
 import yarl
 
-from .base import (
-    Item, PaginatedList,
-)
+from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import HardwareMetadata
+
 from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
+from .base import Item, PaginatedList
+
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 

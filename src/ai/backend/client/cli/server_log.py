@@ -1,11 +1,11 @@
-from datetime import datetime
 import sys
+from datetime import datetime
 
 import click
 
+from ..session import Session
 from .main import main
 from .pretty import print_error
-from ..session import Session
 
 
 @main.group()

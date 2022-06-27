@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from collections import defaultdict
-from decimal import Decimal
 import enum
 import logging
 import math
 from abc import ABCMeta, abstractmethod
+from collections import defaultdict
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import (
+    TYPE_CHECKING,
     Any,
     ClassVar,
     DefaultDict,
@@ -17,7 +18,6 @@ from typing import (
     Sequence,
     Set,
     Type,
-    TYPE_CHECKING,
     Union,
 )
 
@@ -27,7 +27,8 @@ from dateutil.tz import tzutc
 from sqlalchemy.engine import Row
 
 import ai.backend.common.validators as tx
-from ai.backend.common import msgpack, redis as redis_helper
+from ai.backend.common import msgpack
+from ai.backend.common import redis as redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AbstractEvent,
@@ -52,11 +53,11 @@ from .models.kernel import LIVE_STATUS
 from .types import DistributedLockFactory
 
 if TYPE_CHECKING:
-    from .config import SharedConfig
+    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+
     from ai.backend.common.types import AgentId, KernelId, SessionId
-    from sqlalchemy.ext.asyncio import (
-        AsyncConnection as SAConnection,
-    )
+
+    from .config import SharedConfig
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.idle"))

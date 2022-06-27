@@ -9,22 +9,17 @@ from decimal import Decimal
 from functools import partial
 from multiprocessing import Event, Process, Queue
 from pathlib import Path
-from typing import (
-    Any,
-    Iterable,
-    List,
-)
+from typing import Any, Iterable, List
 
 import attr
-from etcetra.types import HostPortPair as EtcdHostPortPair
 import pytest
+from etcetra.types import HostPortPair as EtcdHostPortPair
 
 from ai.backend.common.distributed import GlobalTimer
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import AbstractEvent, EventDispatcher, EventProducer
 from ai.backend.common.lock import EtcdLock, FileLock
 from ai.backend.common.types import AgentId, EtcdRedisConfig, HostPortPair
-
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
 
 @dataclass

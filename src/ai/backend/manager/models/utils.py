@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager as actxmgr
 import functools
 import json
 import logging
+from contextlib import asynccontextmanager as actxmgr
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -21,11 +21,9 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.engine import create_engine as _create_engine
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import (
-    AsyncConnection as SAConnection,
-    AsyncEngine as SAEngine,
-    AsyncSession as SASession,
-)
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -40,6 +38,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
     from ..config import LocalConfig
+
 from ..defs import LockID
 from ..types import Sentinel
 

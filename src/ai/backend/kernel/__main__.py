@@ -5,9 +5,9 @@ The kernel main program.
 import argparse
 import importlib
 import os
-from pathlib import Path
 import signal
 import sys
+from pathlib import Path
 
 import uvloop
 

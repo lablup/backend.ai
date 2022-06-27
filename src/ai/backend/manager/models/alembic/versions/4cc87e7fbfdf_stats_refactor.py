@@ -5,17 +5,16 @@ Revises: e18ed5fcfedf
 Create Date: 2019-05-30 18:40:17.669756
 
 """
+import math
 from datetime import timedelta
 from decimal import Decimal
-import math
 
-from alembic import op
 import sqlalchemy as sa
-from ai.backend.manager.models.base import (
-    convention, IDColumn, ResourceSlotColumn,
-)
+from alembic import op
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.expression import bindparam
+
+from ai.backend.manager.models.base import IDColumn, ResourceSlotColumn, convention
 
 # revision identifiers, used by Alembic.
 revision = '4cc87e7fbfdf'

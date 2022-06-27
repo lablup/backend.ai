@@ -2,7 +2,7 @@ import pickle
 
 import tomli
 
-from ai.backend.common.config import override_key, merge
+from ai.backend.common.config import merge, override_key
 
 
 def test_override_key():

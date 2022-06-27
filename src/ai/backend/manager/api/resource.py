@@ -3,51 +3,49 @@ Resource preset APIs.
 """
 
 import copy
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
-from decimal import Decimal
 import functools
 import json
 import logging
 import re
-from typing import (
-    Any,
-    Iterable,
-    TYPE_CHECKING,
-    Tuple,
-    MutableMapping,
-)
+from datetime import datetime, timedelta
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Tuple
 
 import aiohttp
-from aiohttp import web
 import aiohttp_cors
-from aioredis import Redis
-from aioredis.client import Pipeline as RedisPipeline
-from async_timeout import timeout as _timeout
-from dateutil.tz import tzutc
 import msgpack
 import sqlalchemy as sa
 import trafaret as t
 import yarl
+from aiohttp import web
+from aioredis import Redis
+from aioredis.client import Pipeline as RedisPipeline
+from async_timeout import timeout as _timeout
+from dateutil.relativedelta import relativedelta
+from dateutil.tz import tzutc
 
-from ai.backend.common import redis, validators as tx
+from ai.backend.common import redis
+from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.utils import nmget
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.common.utils import nmget
 
 from ..models import (
-    agents, resource_presets,
-    domains, groups, kernels, users,
-    AgentStatus,
-    association_groups_users,
-    query_allowed_sgroups,
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    RESOURCE_USAGE_KERNEL_STATUSES, LIVE_STATUS,
+    LIVE_STATUS,
+    RESOURCE_USAGE_KERNEL_STATUSES,
+    AgentStatus,
+    agents,
+    association_groups_users,
+    domains,
+    groups,
+    kernels,
+    query_allowed_sgroups,
+    resource_presets,
+    users,
 )
 from .auth import auth_required, superadmin_required
-from .exceptions import (
-    InvalidAPIParameters,
-)
+from .exceptions import InvalidAPIParameters
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params

@@ -7,12 +7,11 @@ Create Date: 2019-09-16 02:08:41.396372
 """
 import textwrap
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 from ai.backend.manager.models.base import GUID
-
 
 # revision identifiers, used by Alembic.
 revision = '405aa2c39458'

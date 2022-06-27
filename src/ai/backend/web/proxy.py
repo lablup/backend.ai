@@ -2,26 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import unpad
-import logging
 import json
+import logging
 import random
-from typing import (
-    Optional, Union,
-    Tuple,
-    cast,
-)
+from typing import Optional, Tuple, Union, cast
 
 import aiohttp
-from aiohttp import web
-from aiohttp_session import get_session, STORAGE_KEY
 import trafaret as t
+from aiohttp import web
+from aiohttp_session import STORAGE_KEY, get_session
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
 
-from .auth import get_api_session, get_anonymous_session
+from .auth import get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__name__))

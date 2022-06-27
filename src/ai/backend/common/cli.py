@@ -1,10 +1,10 @@
+import functools
+import re
 from decimal import Decimal
 from enum import Enum
-import functools
 from importlib import import_module
-import re
 from types import FunctionType
-from typing import Any, Optional, Union, Type
+from typing import Any, Optional, Type, Union
 
 import click
 

@@ -1,40 +1,27 @@
 import base64
 import secrets
-from typing import (
-    Any,
-    Iterable,
-    TYPE_CHECKING,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
-from aiohttp import web
 import aiohttp_cors
 import jinja2
 import sqlalchemy as sa
 import trafaret as t
+from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.etcd import (
-    quote as etcd_quote,
-)
-from ai.backend.common.types import (
-    SessionTypes,
-)
+from ai.backend.common.etcd import quote as etcd_quote
+from ai.backend.common.types import SessionTypes
 
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
-from ..models import (
-    domains, groups, query_allowed_sgroups,
-    association_groups_users as agus,
-)
+from ..models import association_groups_users as agus
+from ..models import domains, groups, query_allowed_sgroups
 from ..types import UserScope
 from .auth import admin_required
 from .exceptions import InvalidAPIParameters
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
-from .utils import (
-    check_api_params,
-)
+from .utils import check_api_params
 
 if TYPE_CHECKING:
     from .context import RootContext

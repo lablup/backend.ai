@@ -1,19 +1,14 @@
-import functools
-from io import StringIO
-from pathlib import Path
-import uuid
-
-import aiotools
-from ai.backend.common.asyncio import current_loop
-from ai.backend.common.docker import ImageRef
 import asyncio
-from decimal import Decimal
+import functools
 import hashlib
 import logging
-import pkg_resources
 import random
 import shutil
 import signal
+import uuid
+from decimal import Decimal
+from io import StringIO
+from pathlib import Path
 from typing import (
     Any,
     FrozenSet,
@@ -26,35 +21,17 @@ from typing import (
     Tuple,
     Union,
 )
-from ai.backend.common.logging_utils import BraceStyleAdapter
 
+import aiotools
 import cattr
-from kubernetes_asyncio import (
-    client as kube_client,
-    config as kube_config,
-)
+import pkg_resources
+from kubernetes_asyncio import client as kube_client
+from kubernetes_asyncio import config as kube_config
 
-from .resources import detect_resources
-from .kernel import KubernetesKernel
-from .kube_object import (
-    ConfigMap, HostPathPersistentVolume, KubernetesAbstractVolume,
-    KubernetesConfigMapVolume, KubernetesHostPathVolume,
-    KubernetesPVCVolume, KubernetesVolumeMount, NFSPersistentVolume,
-    PersistentVolumeClaim, Service,
-)
-
-from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
-from ..exception import K8sError, UnsupportedResource
-from ..kernel import AbstractKernel, KernelFeatures
-from ..resources import (
-    AbstractComputePlugin,
-    KernelResourceSpec,
-    Mount,
-    known_slot_types,
-)
-from ..types import Container, ContainerStatus, Port
-
+from ai.backend.common.asyncio import current_loop
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -71,6 +48,36 @@ from ai.backend.common.types import (
     VFolderMount,
     current_resource_slots,
 )
+
+from ..agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    ComputerContext,
+)
+from ..exception import K8sError, UnsupportedResource
+from ..kernel import AbstractKernel, KernelFeatures
+from ..resources import (
+    AbstractComputePlugin,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
+from ..types import Container, ContainerStatus, Port
+from .kernel import KubernetesKernel
+from .kube_object import (
+    ConfigMap,
+    HostPathPersistentVolume,
+    KubernetesAbstractVolume,
+    KubernetesConfigMapVolume,
+    KubernetesHostPathVolume,
+    KubernetesPVCVolume,
+    KubernetesVolumeMount,
+    NFSPersistentVolume,
+    PersistentVolumeClaim,
+    Service,
+)
+from .resources import detect_resources
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.agent.kubernetes.agent'))
 

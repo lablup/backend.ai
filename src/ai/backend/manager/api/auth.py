@@ -1,55 +1,44 @@
-from collections import ChainMap
-from datetime import datetime, timedelta
 import functools
-import hashlib, hmac
+import hashlib
+import hmac
 import logging
 import secrets
-from typing import (
-    Any,
-    Final,
-    Iterable,
-    Mapping,
-    TYPE_CHECKING,
-    Tuple,
-    cast,
-)
+from collections import ChainMap
+from datetime import datetime, timedelta
+from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple, cast
 
-from aiohttp import web
 import aiohttp_cors
-from aioredis import Redis
-from aioredis.client import Pipeline as RedisPipeline
-from dateutil.tz import tzutc
-from dateutil.parser import parse as dtparse
 import sqlalchemy as sa
 import trafaret as t
+from aiohttp import web
+from aioredis import Redis
+from aioredis.client import Pipeline as RedisPipeline
+from dateutil.parser import parse as dtparse
+from dateutil.tz import tzutc
 
-from ai.backend.common import redis, validators as tx
+from ai.backend.common import redis
+from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.plugin.hook import (
-    ALL_COMPLETED,
-    FIRST_COMPLETED,
-    PASSED,
-)
+from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 
-from ..models import (
-    keypairs, keypair_resource_policies, users,
-)
-from ..models.user import UserRole, UserStatus, INACTIVE_USER_STATUSES, check_credential
-from ..models.keypair import generate_keypair as _gen_keypair, generate_ssh_keypair
+from ..models import keypair_resource_policies, keypairs, users
 from ..models.group import association_groups_users, groups
+from ..models.keypair import generate_keypair as _gen_keypair
+from ..models.keypair import generate_ssh_keypair
+from ..models.user import INACTIVE_USER_STATUSES, UserRole, UserStatus, check_credential
 from ..models.utils import execute_with_retry
 from .exceptions import (
     AuthorizationFailed,
     GenericBadRequest,
     GenericForbidden,
-    ObjectNotFound,
     InternalServerError,
-    InvalidAuthParameters,
     InvalidAPIParameters,
+    InvalidAuthParameters,
+    ObjectNotFound,
     RejectedByHook,
 )
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, set_handler_attr, get_handler_attr
+from .utils import check_api_params, get_handler_attr, set_handler_attr
 
 if TYPE_CHECKING:
     from .context import RootContext
