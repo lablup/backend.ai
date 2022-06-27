@@ -256,6 +256,11 @@ class VFolderCreationFailed(BackendError, web.HTTPBadRequest):
     error_title = 'Virtual folder creation has failed.'
 
 
+class TooManyVFoldersFound(BackendError, web.HTTPNotFound):
+    error_type = 'https://api.backend.ai/probs/too-many-vfolders'
+    error_title = 'There are two or more matching vfolders.'
+
+
 class VFolderNotFound(ObjectNotFound):
     object_name = 'virtual folder'
 
