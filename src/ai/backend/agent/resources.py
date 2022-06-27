@@ -42,13 +42,14 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 
-from .alloc_map import (  # Expose legacy import names for plugins  # noqa: F401
-    AbstractAllocMap as AbstractAllocMap,
+# Expose legacy import names for plugins
+from .alloc_map import AbstractAllocMap as AbstractAllocMap  # noqa: F401
+from .alloc_map import AllocationStrategy as AllocationStrategy  # noqa: F401
+from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
+from .alloc_map import (  # noqa: F401
+    DiscretePropertyAllocMap as DiscretePropertyAllocMap,
 )
-from .alloc_map import AllocationStrategy as AllocationStrategy
-from .alloc_map import DeviceSlotInfo as DeviceSlotInfo
-from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap
-from .alloc_map import FractionAllocMap as FractionAllocMap
+from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
 from .stats import ContainerMeasurement, NodeMeasurement, StatContext
 from .types import Container as SessionContainer
 
