@@ -1,45 +1,36 @@
 from __future__ import annotations
 
 import enum
-from typing import (
-    Any,
-    Dict,
-    Mapping,
-    Sequence,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence
 
-from dateutil.parser import parse as dtparse
 import graphene
-from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
-from sqlalchemy.sql.expression import true
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.engine.row import Row
+from dateutil.parser import parse as dtparse
+from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.sql.expression import true
 
 from ai.backend.common import msgpack, redis
-from ai.backend.common.types import (
-    AgentId,
-    BinarySize,
-    HardwareMetadata,
-    ResourceSlot,
-)
+from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata, ResourceSlot
 
-from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from .base import (
-    batch_result,
-    EnumType, Item,
-    metadata,
+    EnumType,
+    Item,
     PaginatedList,
-    privileged_mutation,
     ResourceSlotColumn,
+    batch_result,
+    metadata,
+    privileged_mutation,
     set_if_set,
     simple_db_mutate,
 )
-from .user import UserRole
-from .minilang.queryfilter import QueryFilterParser
+from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from .minilang.ordering import QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
+from .user import UserRole
+
 if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
 

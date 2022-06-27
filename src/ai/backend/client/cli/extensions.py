@@ -1,13 +1,13 @@
-from typing import Any, Callable, Mapping, TypeVar, cast
-from functools import update_wrapper
 import warnings
+from functools import update_wrapper
+from typing import Any, Callable, Mapping, TypeVar, cast
 
 from click import get_current_context
 
 from ai.backend.cli.types import CliContextInfo
-from ai.backend.client.output import get_output_handler
-from ai.backend.client.config import APIConfig, set_config
 from ai.backend.client.cli.types import CLIContext, OutputMode
+from ai.backend.client.config import APIConfig, set_config
+from ai.backend.client.output import get_output_handler
 
 
 def set_client_config(info: Mapping) -> CLIContext:

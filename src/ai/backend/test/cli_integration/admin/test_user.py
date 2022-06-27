@@ -2,8 +2,8 @@ import json
 from contextlib import closing
 from typing import Callable, Tuple
 
-from ..conftest import User
 from ...utils.cli import EOF, ClientRunnerFunc
+from ..conftest import User
 
 
 def test_add_user(run: ClientRunnerFunc, users: Tuple[User, ...]):

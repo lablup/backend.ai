@@ -8,7 +8,8 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 
-import aioredis, aioredis.client
+import aioredis
+import aioredis.client
 import click
 import psycopg2
 import sqlalchemy as sa
@@ -19,7 +20,6 @@ from ai.backend.common import redis as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.validators import TimeDuration
-
 from ai.backend.manager.models import kernels
 from ai.backend.manager.models.utils import connect_database
 

@@ -1,11 +1,12 @@
 import asyncio
-from typing import Type
 from types import TracebackType
+from typing import Type
 
 import aiotools
 import attr
 import pytest
 
+from ai.backend.common import redis
 from ai.backend.common.events import (
     AbstractEvent,
     CoalescingOptions,
@@ -13,11 +14,7 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.types import (
-    AgentId,
-    EtcdRedisConfig,
-)
-from ai.backend.common import redis
+from ai.backend.common.types import AgentId, EtcdRedisConfig
 
 
 @attr.s(slots=True, frozen=True)

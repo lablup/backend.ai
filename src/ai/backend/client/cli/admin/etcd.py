@@ -3,9 +3,9 @@ import sys
 
 import click
 
-from . import admin
-from ..pretty import print_pretty, print_error, print_fail
 from ...session import Session
+from ..pretty import print_error, print_fail, print_pretty
+from . import admin
 
 
 @admin.group()

@@ -1,8 +1,8 @@
 import json
 import pickle
 
-from ai.backend.manager.api.exceptions import BackendError, BackendAgentError
 from ai.backend.common.utils import odict
+from ai.backend.manager.api.exceptions import BackendAgentError, BackendError
 
 
 def test_backend_error_obj():

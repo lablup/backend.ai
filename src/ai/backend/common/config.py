@@ -1,18 +1,13 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import sys
-from typing import (
-    Any, Optional, Union,
-    Dict, Mapping, MutableMapping,
-    Tuple,
-    cast,
-)
+from pathlib import Path
+from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, cast
 
 import toml
-from toml.decoder import InlineTableDict
 import trafaret as t
+from toml.decoder import InlineTableDict
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes

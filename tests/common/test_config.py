@@ -3,7 +3,7 @@ import pickle
 import toml
 from toml.decoder import InlineTableDict
 
-from ai.backend.common.config import override_key, merge, _sanitize_inline_dicts
+from ai.backend.common.config import _sanitize_inline_dicts, merge, override_key
 
 
 def test_override_key():

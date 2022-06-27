@@ -3,14 +3,17 @@ from __future__ import annotations
 import asyncio
 import functools
 import importlib
-from ipaddress import ip_network, _BaseAddress as BaseIPAddress
-import logging, logging.config
-import os, os.path
-from pathlib import Path
-from pprint import pformat, pprint
+import logging
+import logging.config
+import os
+import os.path
 import shutil
 import signal
 import sys
+from ipaddress import _BaseAddress as BaseIPAddress
+from ipaddress import ip_network
+from pathlib import Path
+from pprint import pformat, pprint
 from typing import (
     Any,
     AsyncGenerator,
@@ -29,39 +32,41 @@ from uuid import UUID
 
 import aiomonitor
 import aiotools
-from aiotools import aclosing
-from callosum.rpc import Peer, RPCMessage
-from callosum.ordering import ExitOrderedAsyncScheduler
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 import click
+import tomlkit
+from aiotools import aclosing
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
+from callosum.ordering import ExitOrderedAsyncScheduler
+from callosum.rpc import Peer, RPCMessage
 from etcetra.types import WatchEventType
 from setproctitle import setproctitle
-import tomlkit
 from trafaret.dataerror import DataError as TrafaretDataError
 
-from ai.backend.common import config, utils, identity, msgpack
+from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.logging import Logger, BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
-    HardwareMetadata, aobject,
     ClusterInfo,
+    HardwareMetadata,
     HostPortPair,
-    KernelId,
     KernelCreationConfig,
+    KernelId,
     SessionId,
+    aobject,
 )
 from ai.backend.common.utils import current_loop
+
 from . import __version__ as VERSION
 from .agent import AbstractAgent
 from .config import (
-    agent_local_config_iv,
     agent_etcd_config_iv,
-    docker_extra_config_iv,
+    agent_local_config_iv,
     container_etcd_config_iv,
+    docker_extra_config_iv,
 )
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
-from .types import AgentBackend, VolumeInfo, LifecycleEvent
+from .types import AgentBackend, LifecycleEvent, VolumeInfo
 from .utils import get_subnet_ip
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.agent.server'))

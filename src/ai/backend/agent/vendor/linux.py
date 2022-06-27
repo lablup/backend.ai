@@ -1,4 +1,5 @@
-import ctypes, ctypes.util
+import ctypes
+import ctypes.util
 import os
 import sys
 

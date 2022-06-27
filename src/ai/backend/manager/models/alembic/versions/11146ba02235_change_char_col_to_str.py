@@ -5,8 +5,8 @@ Revises: 0f7a4b643940
 Create Date: 2022-03-25 12:32:05.637628
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.sql.expression import bindparam
 
 # revision identifiers, used by Alembic.

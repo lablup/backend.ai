@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from pathlib import PurePosixPath
-from typing import Any, Mapping, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
 import sqlalchemy as sa
+
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import (
         AsyncConnection as SAConnection,
@@ -14,9 +15,9 @@ from ai.backend.common.types import VFolderMount
 
 from ..api.exceptions import BackendError
 from ..types import UserScope
-from .keypair import keypairs
 from .domain import query_domain_dotfiles
 from .group import query_group_dotfiles
+from .keypair import keypairs
 
 __all__ = (
     'prepare_dotfiles',

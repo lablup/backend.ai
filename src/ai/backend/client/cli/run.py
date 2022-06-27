@@ -1,6 +1,5 @@
 import asyncio
 import collections
-from decimal import Decimal
 import getpass
 import itertools
 import json
@@ -8,29 +7,30 @@ import secrets
 import string
 import sys
 import traceback
-from typing import (
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-)
+from decimal import Decimal
+from typing import Mapping, Optional, Sequence, Tuple
 
 import aiohttp
 import click
-from humanize import naturalsize
 import tabulate as tabulate_mod
+from humanize import naturalsize
 from tabulate import tabulate
 
-from .main import main
-from ..config import local_cache_path
 from ..compat import asyncio_run, current_loop
+from ..config import local_cache_path
 from ..exceptions import BackendError
 from ..session import AsyncSession
+from .main import main
+from .params import CommaSeparatedListType, RangeExprOptionType
 from .pretty import (
-    print_info, print_wait, print_done, print_error, print_fail, print_warn,
     format_info,
+    print_done,
+    print_error,
+    print_fail,
+    print_info,
+    print_wait,
+    print_warn,
 )
-from .params import RangeExprOptionType, CommaSeparatedListType
 
 tabulate_mod.PRESERVE_WHITESPACE = True
 range_expr = RangeExprOptionType()

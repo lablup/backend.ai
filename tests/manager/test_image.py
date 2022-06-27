@@ -1,25 +1,14 @@
-from pathlib import Path
 import uuid
+from pathlib import Path
 
 import pytest
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import (
-    selectinload,
-    sessionmaker,
-)
+from sqlalchemy.orm import selectinload, sessionmaker
 
 from ai.backend.common.docker import ImageRef
-
-from ai.backend.manager.models import (
-    update_aliases_from_file,
-    ImageAliasRow,
-    ImageRow,
-)
+from ai.backend.manager.models import ImageAliasRow, ImageRow, update_aliases_from_file
 from ai.backend.manager.models.base import metadata as old_metadata
 from ai.backend.manager.models.utils import regenerate_table
 

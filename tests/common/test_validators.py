@@ -1,15 +1,15 @@
-from datetime import datetime, timedelta
 import enum
-from ipaddress import IPv4Address, ip_address
-import multidict
-import pickle
 import os
+import pickle
 import pwd
+from datetime import datetime, timedelta
+from ipaddress import IPv4Address, ip_address
 
-from dateutil.relativedelta import relativedelta
+import multidict
 import pytest
 import trafaret as t
 import yarl
+from dateutil.relativedelta import relativedelta
 
 from ai.backend.common import validators as tx
 

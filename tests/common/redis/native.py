@@ -3,22 +3,14 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-from pathlib import Path
 import signal
 import textwrap
-from typing import (
-    AsyncIterator,
-    Sequence,
-    Tuple,
-)
+from pathlib import Path
+from typing import AsyncIterator, Sequence, Tuple
 
 from ai.backend.testutils.pants import get_parallel_slot
 
-from .types import (
-    AbstractRedisSentinelCluster,
-    AbstractRedisNode,
-    RedisClusterInfo,
-)
+from .types import AbstractRedisNode, AbstractRedisSentinelCluster, RedisClusterInfo
 
 
 class NativeRedisNode(AbstractRedisNode):

@@ -3,15 +3,11 @@ from __future__ import annotations
 import secrets
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import (
-    Any,
-    Mapping,
-    Sequence,
-)
+from pprint import pprint
+from typing import Any, Mapping, Sequence
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4, UUID
-from pprint import pprint
+from uuid import UUID, uuid4
 
 import attr
 import pytest
@@ -20,28 +16,32 @@ from dateutil.parser import parse as dtparse
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
-    AccessKey, AgentId, KernelId, SessionId,
-    ResourceSlot, SessionTypes,
+    AccessKey,
+    AgentId,
     ClusterMode,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
 )
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
-from ai.backend.manager.scheduler.types import (
-    KernelInfo,
-    PendingSession,
-    ExistingSession,
-    AgentContext,
-)
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.scheduler.dispatcher import (
-    load_scheduler,
     SchedulerDispatcher,
     _list_pending_sessions,
+    load_scheduler,
 )
-from ai.backend.manager.scheduler.fifo import FIFOSlotScheduler, LIFOSlotScheduler
 from ai.backend.manager.scheduler.drf import DRFScheduler
+from ai.backend.manager.scheduler.fifo import FIFOSlotScheduler, LIFOSlotScheduler
 from ai.backend.manager.scheduler.mof import MOFScheduler
 from ai.backend.manager.scheduler.predicates import check_reserved_batch_session
+from ai.backend.manager.scheduler.types import (
+    AgentContext,
+    ExistingSession,
+    KernelInfo,
+    PendingSession,
+)
 
 
 def test_load_intrinsic():

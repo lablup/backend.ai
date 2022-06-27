@@ -5,12 +5,11 @@ Revises: 4b7b650bc30e
 Create Date: 2019-12-12 07:19:48.052928
 
 """
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
+from cryptography.hazmat.backends import default_backend as crypto_default_backend
 from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.backends import default_backend as crypto_default_backend
 
 from ai.backend.manager.models.base import convention
 
