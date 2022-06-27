@@ -51,6 +51,9 @@ extra_requirements.add = [
 ]
 lockfile = "tools/flake8.lock"
 
+[isort]
+lockfile = "tools/isort.lock"
+
 [pytest]
 version = "pytest>=7.0"
 extra_requirements.add = [

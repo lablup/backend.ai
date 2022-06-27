@@ -56,5 +56,5 @@ explicit_package_bases = true
 
 [tool.isort]
 profile = "black"
-sections = ["FUTURE", "STDLIB", "FIRSTPARTY", "THIRDPARTY", "LOCALFOLDER"]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 known_first_party = ["ai.backend"]
