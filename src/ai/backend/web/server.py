@@ -1,49 +1,45 @@
 import asyncio
-from functools import partial
+import json
 import logging
 import logging.config
-import json
 import os
-from pathlib import Path
-import pkg_resources
-from pprint import pprint
 import re
 import socket
 import ssl
 import sys
 import time
-from typing import (
-    Any,
-    AsyncIterator,
-    MutableMapping,
-    Tuple,
-)
+from functools import partial
+from pathlib import Path
+from pprint import pprint
+from typing import Any, AsyncIterator, MutableMapping, Tuple
 
-from aiohttp import web
 import aiohttp_cors
-from aiohttp_session import get_session, setup as setup_session
-from aiohttp_session.redis_storage import RedisStorage
-import aiotools
 import aioredis
+import aiotools
 import click
 import jinja2
-from setproctitle import setproctitle
+import pkg_resources
 import tomli
 import uvloop
 import yarl
+from aiohttp import web
+from aiohttp_session import get_session
+from aiohttp_session import setup as setup_session
+from aiohttp_session.redis_storage import RedisStorage
+from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
-from ai.backend.client.exceptions import BackendClientError, BackendAPIError
+from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 
 from . import __version__, user_agent
 from .logging import BraceStyleAdapter
 from .proxy import (
-    web_handler,
-    websocket_handler,
-    web_plugin_handler,
     decrypt_payload,
     extra_config_headers,
+    web_handler,
+    web_plugin_handler,
+    websocket_handler,
 )
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.web.server'))

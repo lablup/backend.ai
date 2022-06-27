@@ -1,11 +1,10 @@
 import logging
 import os
-from pathlib import Path
 import threading
 import time
+from pathlib import Path
 
-from ai.backend.common.logging import Logger, BraceStyleAdapter
-
+from ai.backend.common.logging import BraceStyleAdapter, Logger
 
 test_log_config = {
     'level': 'DEBUG',

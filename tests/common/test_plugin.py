@@ -1,32 +1,22 @@
 import asyncio
 import functools
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Callable,
-    Iterator,
-    Mapping,
-    Type,
-    overload,
-)
+from typing import Any, Callable, Iterator, Mapping, Type, overload
 from unittest.mock import AsyncMock
 
-from ai.backend.common.plugin import (
-    AbstractPlugin,
-    BasePluginContext,
-)
+import pytest
+
+from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.plugin.hook import (
+    ALL_COMPLETED,
+    ERROR,
+    FIRST_COMPLETED,
+    PASSED,
+    REJECTED,
     HookPlugin,
     HookPluginContext,
     Reject,
-    PASSED,
-    REJECTED,
-    ERROR,
-    ALL_COMPLETED,
-    FIRST_COMPLETED,
 )
-
-import pytest
 
 
 class DummyPlugin(AbstractPlugin):

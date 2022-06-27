@@ -1,10 +1,9 @@
 from six.moves import builtins
 
 from ..types import MediaRecord
+from .color import Colors
 from .encoding import encode_commands
 from .turtle import Turtle
-from .color import Colors
-
 
 _canvas_id_counter = 0
 

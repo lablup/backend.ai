@@ -1,8 +1,8 @@
 import click
 
-from . import admin
 from ...session import Session
 from ..pretty import print_error
+from . import admin
 
 
 @admin.group()

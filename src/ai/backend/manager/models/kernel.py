@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import enum
+import uuid
 from collections import OrderedDict
 from datetime import datetime
 from decimal import Decimal
-import enum
 from typing import (
+    TYPE_CHECKING,
     Any,
     Dict,
     Iterable,
@@ -15,21 +17,19 @@ from typing import (
     Type,
     TypedDict,
     TypeVar,
-    TYPE_CHECKING,
     Union,
 )
 from uuid import UUID
-import uuid
 
 import aioredis
 import aioredis.client
-from dateutil.parser import parse as dtparse
 import graphene
-from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
+from dateutil.parser import parse as dtparse
+from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.dialects import postgresql as pgsql
 
 from ai.backend.common import msgpack, redis
 from ai.backend.common.types import (
@@ -38,19 +38,19 @@ from ai.backend.common.types import (
     ClusterMode,
     KernelId,
     RedisConnectionInfo,
-    SessionId,
-    SessionTypes,
-    SessionResult,
-    SlotName,
     ResourceSlot,
+    SessionId,
+    SessionResult,
+    SessionTypes,
+    SlotName,
     VFolderMount,
 )
 
 from ..defs import DEFAULT_ROLE
 from .base import (
+    GUID,
     BigInt,
     EnumType,
-    GUID,
     Item,
     KernelIDColumn,
     PaginatedList,
@@ -58,14 +58,15 @@ from .base import (
     SessionIDColumnType,
     StructuredJSONObjectListColumn,
     URLColumn,
-    batch_result,
     batch_multiresult,
+    batch_result,
     metadata,
 )
 from .group import groups
-from .minilang.queryfilter import QueryFilterParser
 from .minilang.ordering import QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
 from .user import users
+
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 

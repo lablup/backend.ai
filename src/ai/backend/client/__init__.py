@@ -1,7 +1,6 @@
 from pathlib import Path
 
-from . import exceptions
-from . import session
+from . import exceptions, session
 
 __all__ = (
     *exceptions.__all__,

@@ -3,17 +3,15 @@ import sys
 import click
 
 from ai.backend.cli.interaction import ask_yn
+from ai.backend.client.func.domain import _default_detail_fields, _default_list_fields
 from ai.backend.client.session import Session
-from ai.backend.client.func.domain import (
-    _default_list_fields,
-    _default_detail_fields,
-)
+
+from ..extensions import pass_ctx_obj
+from ..pretty import print_info
+from ..types import CLIContext
+
 # from ai.backend.client.output.fields import domain_fields
 from . import admin
-from ..pretty import print_info
-
-from ..types import CLIContext
-from ..extensions import pass_ctx_obj
 
 
 @admin.group()

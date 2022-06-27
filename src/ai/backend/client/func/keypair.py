@@ -1,15 +1,11 @@
-from typing import (
-    Any,
-    Dict,
-    Sequence,
-    Union,
-)
+from typing import Any, Dict, Sequence, Union
 
-from ai.backend.client.pagination import generate_paginated_results
-from ai.backend.client.session import api_session
 from ai.backend.client.output.fields import keypair_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from .base import api_function, BaseFunction
+from ai.backend.client.pagination import generate_paginated_results
+from ai.backend.client.session import api_session
+
+from .base import BaseFunction, api_function
 
 __all__ = (
     'KeyPair',

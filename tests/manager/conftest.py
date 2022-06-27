@@ -1,5 +1,6 @@
 import asyncio
-import hashlib, hmac
+import hashlib
+import hmac
 import json
 import os
 import secrets
@@ -20,49 +21,44 @@ from typing import (
     Tuple,
     Type,
 )
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import quote_plus as urlquote
 
 import aiohttp
+import pytest
+import sqlalchemy as sa
 from aiohttp import web
 from dateutil.tz import tzutc
-import sqlalchemy as sa
-import pytest
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.api.context import RootContext
+from ai.backend.manager.api.types import CleanupContext
 from ai.backend.manager.cli.context import CLIContext, init_logger
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
-from ai.backend.manager.cli.etcd import (
-    put_json as cli_etcd_put_json,
-    delete as cli_etcd_delete,
-)
-from ai.backend.manager.config import LocalConfig, SharedConfig, load as load_config
-from ai.backend.manager.server import (
-    build_root_app,
-)
-from ai.backend.manager.api.types import (
-    CleanupContext,
-)
-from ai.backend.manager.models.base import populate_fixture, pgsql_connect_opts
+from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
+from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
+from ai.backend.manager.config import LocalConfig, SharedConfig
+from ai.backend.manager.config import load as load_config
 from ai.backend.manager.models import (
-    domains,
-    scaling_groups,
     agents,
+    domains,
     kernels,
     keypairs,
+    scaling_groups,
     users,
     vfolders,
 )
+from ai.backend.manager.models.base import pgsql_connect_opts, populate_fixture
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.server import build_root_app
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
-    redis_container,
     postgres_container,
+    redis_container,
 )
 from ai.backend.testutils.pants import get_parallel_slot
 

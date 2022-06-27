@@ -1,7 +1,7 @@
 import logging
 import os
-from pathlib import Path
 import tempfile
+from pathlib import Path
 from typing import List
 
 from .. import BaseRunner

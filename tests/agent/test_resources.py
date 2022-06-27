@@ -2,8 +2,8 @@ import json
 from unittest import mock
 
 import pytest
-
 from aioresponses import aioresponses
+
 from ai.backend.agent.vendor import linux
 
 # TODO: write tests for KernelResourceSpec (read/write consistency)

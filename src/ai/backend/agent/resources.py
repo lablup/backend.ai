@@ -1,54 +1,61 @@
 from __future__ import annotations
 
+import json
+import logging
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from decimal import Decimal
-import logging
-import json
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Collection,
+    FrozenSet,
     Iterator,
     List,
     Mapping,
     MutableMapping,
     Optional,
-    FrozenSet,
     Sequence,
     Set,
     TextIO,
     Tuple,
     Type,
     cast,
-    TYPE_CHECKING,
 )
 
-import attr
 import aiodocker
+import attr
 
-from ai.backend.common.types import (
-    ResourceSlot, SlotName, SlotTypes,
-    DeviceId, DeviceName, DeviceModelInfo,
-    MountPermission, MountTypes,
-    BinarySize,
-    HardwareMetadata,
-)
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
+from ai.backend.common.types import (
+    BinarySize,
+    DeviceId,
+    DeviceModelInfo,
+    DeviceName,
+    HardwareMetadata,
+    MountPermission,
+    MountTypes,
+    ResourceSlot,
+    SlotName,
+    SlotTypes,
+)
+
 from .alloc_map import (  # Expose legacy import names for plugins  # noqa: F401
     AbstractAllocMap as AbstractAllocMap,
-    AllocationStrategy as AllocationStrategy,
-    DiscretePropertyAllocMap as DiscretePropertyAllocMap,
-    FractionAllocMap as FractionAllocMap,
-    DeviceSlotInfo as DeviceSlotInfo,
 )
-from .stats import StatContext, NodeMeasurement, ContainerMeasurement
+from .alloc_map import AllocationStrategy as AllocationStrategy
+from .alloc_map import DeviceSlotInfo as DeviceSlotInfo
+from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap
+from .alloc_map import FractionAllocMap as FractionAllocMap
+from .stats import ContainerMeasurement, NodeMeasurement, StatContext
 from .types import Container as SessionContainer
 
 if TYPE_CHECKING:
-    from aiofiles.threadpool.text import AsyncTextIOWrapper
     from io import TextIOWrapper
+
+    from aiofiles.threadpool.text import AsyncTextIOWrapper
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

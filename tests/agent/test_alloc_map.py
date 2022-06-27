@@ -1,28 +1,23 @@
-from decimal import Decimal, ROUND_DOWN
+import random
+from decimal import ROUND_DOWN, Decimal
 
 import attr
 import pytest
-import random
 
-from ai.backend.agent.resources import (
-    AbstractComputeDevice,
-)
 from ai.backend.agent.alloc_map import (
+    AllocationStrategy,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
     FractionAllocMap,
-    AllocationStrategy,
 )
 from ai.backend.agent.exception import (
     InsufficientResource,
     InvalidResourceArgument,
-    InvalidResourceCombination, NotMultipleOfQuantum,
+    InvalidResourceCombination,
+    NotMultipleOfQuantum,
 )
-from ai.backend.common.types import (
-    DeviceId,
-    SlotName,
-    SlotTypes,
-)
+from ai.backend.agent.resources import AbstractComputeDevice
+from ai.backend.common.types import DeviceId, SlotName, SlotTypes
 
 
 @attr.s(auto_attribs=True)

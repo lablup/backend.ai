@@ -1,8 +1,6 @@
 import pytest
 
-from ai.backend.agent.kernel import (
-    match_distro_data,
-)
+from ai.backend.agent.kernel import match_distro_data
 
 
 def test_match_distro_data():

@@ -3,21 +3,17 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from typing import (
-    Union,
-    Tuple,
-    AsyncIterator,
-)
+from typing import AsyncIterator, Tuple, Union
 
 import aiohttp
-from aiohttp import web
 import click
+from aiohttp import web
 
-from .main import main
-from .pretty import print_info, print_error, print_fail
 from ..exceptions import BackendAPIError, BackendClientError
 from ..request import Request
 from ..session import AsyncSession
+from .main import main
+from .pretty import print_error, print_fail, print_info
 
 
 class WebSocketProxy:

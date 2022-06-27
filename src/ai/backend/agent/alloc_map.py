@@ -6,24 +6,13 @@ import logging
 import operator
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-from decimal import Decimal, ROUND_DOWN
-from typing import (
-    FrozenSet,
-    Iterable,
-    Mapping,
-    MutableMapping,
-    TypeVar,
-    Sequence,
-)
+from decimal import ROUND_DOWN, Decimal
+from typing import FrozenSet, Iterable, Mapping, MutableMapping, Sequence, TypeVar
 
 import attr
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    DeviceId,
-    SlotName,
-    SlotTypes,
-)
+from ai.backend.common.types import DeviceId, SlotName, SlotTypes
 
 from .exception import (
     InsufficientResource,

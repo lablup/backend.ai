@@ -1,23 +1,14 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
 import enum
 import logging
-from typing import (
-    Any,
-    Final,
-    List,
-    Optional,
-    Protocol,
-    Sequence,
-    Tuple,
-    Union,
-)
+from abc import ABCMeta, abstractmethod
+from typing import Any, Final, List, Optional, Protocol, Sequence, Tuple, Union
 
 import attr
 
-from . import AbstractPlugin, BasePluginContext
 from ..logging_utils import BraceStyleAdapter
+from . import AbstractPlugin, BasePluginContext
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

@@ -1,14 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import closing
 import socket
-from typing import (
-    Callable,
-    Mapping,
-    TYPE_CHECKING,
-    TypeVar,
-)
+from contextlib import closing
+from typing import TYPE_CHECKING, Callable, Mapping, TypeVar
 
 import aiohttp
 from async_timeout import timeout as _timeout

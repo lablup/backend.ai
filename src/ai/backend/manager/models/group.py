@@ -3,20 +3,13 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from typing import (
-    Any,
-    Dict,
-    Optional,
-    Sequence, TYPE_CHECKING,
-    TypedDict,
-    Union,
-)
 import uuid
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, TypedDict, Union
 
 import aiohttp
 import graphene
-from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
+from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -28,13 +21,16 @@ from ai.backend.common.types import ResourceSlot
 from ..api.exceptions import VFolderOperationFailed
 from ..defs import RESERVED_DOTFILES
 from .base import (
-    metadata, GUID, IDColumn, ResourceSlotColumn,
+    GUID,
+    IDColumn,
+    ResourceSlotColumn,
+    batch_multiresult,
+    batch_result,
+    metadata,
     privileged_mutation,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
-    batch_result,
-    batch_multiresult,
 )
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserRole
@@ -572,7 +568,7 @@ class PurgeGroup(graphene.Mutation):
 
         :return: True if a virtual folder is mounted to active kernels.
         """
-        from . import kernels, vfolders, AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels, vfolders
         query = (
             sa.select([vfolders.c.id])
             .select_from(vfolders)
@@ -613,7 +609,7 @@ class PurgeGroup(graphene.Mutation):
 
         :return: True if the group has some active kernels.
         """
-        from . import kernels, AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
         query = (
             sa.select([sa.func.count()])
             .select_from(kernels)

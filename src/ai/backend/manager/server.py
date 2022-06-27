@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager as actxmgr, closing
-from datetime import datetime
 import functools
+import grp
 import importlib
 import logging
 import os
-import pwd, grp
+import pwd
 import ssl
 import sys
 import traceback
+from contextlib import asynccontextmanager as actxmgr
+from contextlib import closing
+from datetime import datetime
+from pathlib import Path
 from typing import (
     Any,
     AsyncIterator,
@@ -23,56 +26,43 @@ from typing import (
     cast,
 )
 
-from aiohttp import web
 import aiohttp_cors
+import aiomonitor
 import aiotools
 import click
-from pathlib import Path
+from aiohttp import web
 from setproctitle import setproctitle
-import aiomonitor
 
 from ai.backend.common import redis
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
+from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.utils import env_info
-from ai.backend.common.logging import Logger, BraceStyleAdapter
-from ai.backend.common.plugin.hook import HookPluginContext, ALL_COMPLETED, PASSED
-from ai.backend.common.plugin.monitor import (
-    INCREMENT,
-)
 
 from . import __version__
 from .api.context import RootContext
 from .api.exceptions import (
     BackendError,
-    MethodNotAllowed,
-    URLNotFound,
     GenericBadRequest,
     InternalServerError,
     InvalidAPIParameters,
+    MethodNotAllowed,
+    URLNotFound,
 )
 from .api.manager import ManagerStatus
-from .api.types import (
-    AppCreator,
-    WebRequestHandler, WebMiddleware,
-    CleanupContext,
-)
-from .config import (
-    LocalConfig,
-    SharedConfig,
-    load as load_config,
-    volume_config_iv,
-)
-from .defs import REDIS_STAT_DB, REDIS_LIVE_DB, REDIS_IMAGE_DB, REDIS_STREAM_DB
+from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHandler
+from .config import LocalConfig, SharedConfig
+from .config import load as load_config
+from .config import volume_config_iv
+from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
 from .exceptions import InvalidArgument
 from .idle import init_idle_checkers
 from .models.storage import StorageSessionManager
 from .models.utils import connect_database
-from .plugin.monitor import (
-    ManagerErrorPluginContext,
-    ManagerStatsPluginContext,
-)
+from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 from .plugin.webapp import WebappPluginContext
 from .registry import AgentRegistry
 from .scheduler.dispatcher import SchedulerDispatcher

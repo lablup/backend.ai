@@ -3,18 +3,15 @@ from __future__ import annotations
 import asyncio
 import sys
 import traceback
-from typing import (
-    Dict,
-    List,
-)
+from typing import Dict, List
 
 import aioredis
 import aioredis.client
 import aioredis.exceptions
 import aioredis.sentinel
 import aiotools
-from aiotools.context import aclosing
 import pytest
+from aiotools.context import aclosing
 
 from ai.backend.common import redis
 from ai.backend.common.types import RedisConnectionInfo

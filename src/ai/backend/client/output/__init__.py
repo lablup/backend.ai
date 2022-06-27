@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ai.backend.client.cli.types import CLIContext, OutputMode
+
     from .types import BaseOutputHandler
 
 

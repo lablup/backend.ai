@@ -1,11 +1,11 @@
-from datetime import datetime, timedelta
 import json
-from unittest.mock import MagicMock
 import uuid
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock
 
-from aiohttp import web
-from dateutil.tz import tzutc, gettz
 import pytest
+from aiohttp import web
+from dateutil.tz import gettz, tzutc
 
 from ai.backend.manager.api.auth import _extract_auth_params, check_date
 from ai.backend.manager.api.exceptions import InvalidAuthParameters
@@ -16,7 +16,6 @@ from ai.backend.manager.server import (
     monitoring_ctx,
     redis_ctx,
     shared_config_ctx,
-
 )
 
 
