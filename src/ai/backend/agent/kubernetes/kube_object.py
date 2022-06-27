@@ -1,5 +1,6 @@
-import attr
 from typing import Any, Dict, Mapping, Optional
+
+import attr
 
 '''This file contains API templates for Python K8s Client.
 Since I don't prefer using templates provided from vanila k8s client,

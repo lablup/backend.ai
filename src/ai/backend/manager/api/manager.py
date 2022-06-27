@@ -6,22 +6,15 @@ import functools
 import json
 import logging
 import socket
-import sqlalchemy as sa
-import trafaret as t
-from typing import (
-    Any,
-    Final,
-    FrozenSet,
-    Iterable,
-    Tuple,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Any, Final, FrozenSet, Iterable, Tuple
 
-from aiohttp import web
 import aiohttp_cors
-from aiotools import aclosing
 import attr
 import graphene
+import sqlalchemy as sa
+import trafaret as t
+from aiohttp import web
+from aiotools import aclosing
 
 from ai.backend.common import validators as tx
 from ai.backend.common.events import DoScheduleEvent
@@ -29,13 +22,13 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from .. import __version__
 from ..defs import DEFAULT_ROLE
-from ..models import agents, kernels, AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
+from ..models import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, agents, kernels
 from . import ManagerStatus
 from .auth import superadmin_required
 from .exceptions import (
+    GenericBadRequest,
     InstanceNotFound,
     InvalidAPIParameters,
-    GenericBadRequest,
     ServerFrozen,
     ServiceUnavailable,
 )
@@ -43,8 +36,9 @@ from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
 
 if TYPE_CHECKING:
-    from .context import RootContext
     from ai.backend.manager.models.gql import GraphQueryContext
+
+    from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

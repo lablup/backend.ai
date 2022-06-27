@@ -1,6 +1,6 @@
 from typing import Any as _Any
-from .base import Trafaret, Key
 
+from .base import Key, Trafaret
 
 class ConstructMeta(type):
     def __or__(self, other): ...

@@ -1,25 +1,18 @@
 from __future__ import annotations
+
 from decimal import Decimal
-from typing import (
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-)
+from typing import List, Optional, Sequence, Tuple
 
 import trafaret as t
 
-from ai.backend.common.types import (
-    AgentId,
-    ResourceSlot,
-    SessionId,
-)
+from ai.backend.common.types import AgentId, ResourceSlot, SessionId
+
 from .types import (
     AbstractScheduler,
     AgentContext,
-    PendingSession,
     ExistingSession,
     KernelInfo,
+    PendingSession,
 )
 
 

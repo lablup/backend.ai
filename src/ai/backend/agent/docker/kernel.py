@@ -2,31 +2,26 @@ import asyncio
 import logging
 import lzma
 import os
-from pathlib import Path, PurePosixPath
-import pkg_resources
 import re
 import shutil
 import subprocess
 import textwrap
-from typing import (
-    Any, Optional,
-    Mapping, Dict,
-    FrozenSet,
-    Sequence, Tuple,
-)
+from pathlib import Path, PurePosixPath
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
 
+import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
 
+from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import KernelId
 from ai.backend.common.utils import current_loop
 
-from ai.backend.agent.docker.utils import PersistentServiceContainer
+from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
-from ..kernel import AbstractKernel, AbstractCodeRunner
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__name__))

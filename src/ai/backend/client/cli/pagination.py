@@ -1,19 +1,12 @@
 import shutil
 import sys
-from typing import (
-    Any,
-    Callable,
-    Iterator,
-    List,
-    Literal,
-    MutableMapping,
-    Sequence,
-)
+from typing import Any, Callable, Iterator, List, Literal, MutableMapping, Sequence
 
 import click
 from tabulate import tabulate
 
 from ai.backend.client.output.types import FieldSpec
+
 from ..pagination import MAX_PAGE_SIZE
 
 

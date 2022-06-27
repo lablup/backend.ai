@@ -1,34 +1,26 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import json
+import logging
+from abc import ABCMeta, abstractmethod
 from contextvars import ContextVar
-from typing import (
-    Any,
-    AsyncIterator,
-    Dict,
-    Mapping,
-    Optional,
-    cast,
-)
+from typing import Any, AsyncIterator, Dict, Mapping, Optional, cast
 
 import aiohttp
 import aiotools
 import sqlalchemy as sa
 import yarl
 
-from abc import ABCMeta, abstractmethod
-
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import (
+    MAX_KERNELSPEC,
+    MIN_KERNELSPEC,
     ImageRef,
-    MIN_KERNELSPEC, MAX_KERNELSPEC,
     arch_name_aliases,
-    login as registry_login,
 )
+from ai.backend.common.docker import login as registry_login
 from ai.backend.common.logging import BraceStyleAdapter
-
 from ai.backend.manager.models.image import ImageRow, ImageType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 

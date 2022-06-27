@@ -5,13 +5,14 @@ Revises: 01456c812164
 Create Date: 2019-03-30 01:45:07.525096
 
 """
-from alembic import op
 from decimal import Decimal
-import sqlalchemy as sa
-from ai.backend.manager.models.base import ResourceSlotColumn
-from ai.backend.manager.models import keypair_resource_policies
-from ai.backend.common.types import BinarySize, ResourceSlot
 
+import sqlalchemy as sa
+from alembic import op
+
+from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.manager.models import keypair_resource_policies
+from ai.backend.manager.models.base import ResourceSlotColumn
 
 # revision identifiers, used by Alembic.
 revision = '8e660aa31fe3'

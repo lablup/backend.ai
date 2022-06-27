@@ -1,9 +1,10 @@
-from abc import ABC, abstractmethod
-import sqlalchemy as sa
 import uuid
+from abc import ABC, abstractmethod
 
-from ai.backend.manager.api.context import RootContext
+import sqlalchemy as sa
+
 import ai.backend.manager.models as models
+from ai.backend.manager.api.context import RootContext
 
 
 def get_random_string(length=10):

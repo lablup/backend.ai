@@ -1,5 +1,5 @@
-from subprocess import CalledProcessError
 import asyncio
+from subprocess import CalledProcessError
 
 
 async def create_scratch_filesystem(scratch_dir, size):

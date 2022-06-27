@@ -1,11 +1,8 @@
 from typing import Union
 from uuid import UUID
 
+from ..request import Request, SSEContextManager
 from .base import BaseFunction
-from ..request import (
-    Request,
-    SSEContextManager,
-)
 
 
 class BackgroundTask(BaseFunction):

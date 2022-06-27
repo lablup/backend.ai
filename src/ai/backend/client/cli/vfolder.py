@@ -1,7 +1,7 @@
-from datetime import datetime
 import json
-from pathlib import Path
 import sys
+from datetime import datetime
+from pathlib import Path
 
 import click
 import humanize
@@ -15,8 +15,19 @@ from ai.backend.client.session import Session
 from ..compat import asyncio_run
 from ..session import AsyncSession
 from .main import main
-from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
-from .params import ByteSizeParamType, ByteSizeParamCheckType, CommaSeparatedKVListParamType
+from .params import (
+    ByteSizeParamCheckType,
+    ByteSizeParamType,
+    CommaSeparatedKVListParamType,
+)
+from .pretty import (
+    print_done,
+    print_error,
+    print_fail,
+    print_info,
+    print_wait,
+    print_warn,
+)
 
 
 @main.group()

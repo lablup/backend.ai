@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-import attr
 import enum
 import uuid
-from typing import (
-    Protocol,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Protocol
 
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+import attr
 from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
+
     from .defs import LockID
 
 

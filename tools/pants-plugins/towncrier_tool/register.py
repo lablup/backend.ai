@@ -1,23 +1,21 @@
 from __future__ import annotations
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
-from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
+from pants.backend.python.subsystems.python_tool_base import (
+    ExportToolOption,
+    PythonToolBase,
+)
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
 from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.console import Console
 from pants.engine.goal import Goal
-from pants.engine.rules import collect_rules, rule, goal_rule
+from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import (
-    ArgsListOption,
-    BoolOption,
-    FileOption,
-    SkipOption,
-)
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 

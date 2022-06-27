@@ -1,10 +1,10 @@
+import random
 import secrets
 import socket
-import random
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-import pytest
 import aiodns
+import pytest
 from aioresponses import aioresponses
 
 import ai.backend.common.identity

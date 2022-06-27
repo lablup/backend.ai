@@ -1,34 +1,44 @@
 from __future__ import annotations
 
 import asyncio
+import functools
+import io
+import json as modjson
+import logging
+import sys
 from collections import OrderedDict, namedtuple
 from datetime import datetime
 from decimal import Decimal
-import functools
-import io
-import logging
-import json as modjson
 from pathlib import Path
-import sys
 from typing import (
-    Any, Callable, Optional, Union,
-    Awaitable, AsyncIterator, Type, TypeVar,
-    Mapping, Sequence, List,
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+    Union,
     cast,
 )
 
 import aiohttp
-from aiohttp.client import _RequestContextManager, _WSRequestContextManager
 import aiohttp.web
 import appdirs
 import attr
+from aiohttp.client import _RequestContextManager, _WSRequestContextManager
 from dateutil.tz import tzutc
 from multidict import CIMultiDict
 from yarl import URL
 
 from .auth import generate_signature
-from .exceptions import BackendClientError, BackendAPIError
-from .session import BaseSession, Session as SyncSession, AsyncSession, api_session
+from .exceptions import BackendAPIError, BackendClientError
+from .session import AsyncSession, BaseSession
+from .session import Session as SyncSession
+from .session import api_session
 
 log = logging.getLogger('ai.backend.client.request')
 
