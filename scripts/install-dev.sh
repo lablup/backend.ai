@@ -75,6 +75,10 @@ usage() {
   echo "    features without real GPUs."
   echo "    (default: main)"
   echo ""
+  echo "  ${LWHITE}--editable-webui${NC}"
+  echo "    Install the webui as an editable repository instead of"
+  echo "    the submodule in the src/ai/backend/web/static directory."
+  echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC}"
   echo "    The port to bind the PostgreSQL container service."
   echo "    (default: 8100)"
@@ -188,6 +192,7 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
 CUDA_BRANCH="main"
+EDITABLE_WEBUI=0
 # POSTGRES_PORT="8100"
 # REDIS_PORT="8110"
 # ETCD_PORT="8120"
@@ -220,6 +225,7 @@ while [ $# -gt 0 ]; do
     --download-big-images) DOWNLOAD_BIG_IMAGES=1 ;;
     --cuda-branch)         CUDA_BRANCH=$2; shift ;;
     --cuda-branch=*)       CUDA_BRANCH="${1#*=}" ;;
+    --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
     --redis-port)          REDIS_PORT=$2; shift ;;
@@ -228,8 +234,8 @@ while [ $# -gt 0 ]; do
     --etcd-port=*)         ETCD_PORT="${1#*=}" ;;
     --manager-port)         MANAGER_PORT=$2; shift ;;
     --manager-port=*)       MANAGER_PORT="${1#*=}" ;;
-    --webserver-port)         WEBSERVER_PORT=$2; shift ;;
-    --webserver-port=*)       WEBSERVER_PORT="${1#*=}" ;;
+    --webserver-port)       WEBSERVER_PORT=$2; shift ;;
+    --webserver-port=*)     WEBSERVER_PORT="${1#*=}" ;;
     --agent-rpc-port)       AGENT_RPC_PORT=$2; shift ;;
     --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
     --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
