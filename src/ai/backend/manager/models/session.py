@@ -530,13 +530,13 @@ async def enqueue_session(
 
 async def get_sgroup_managed_sessions(
     db_sess: SASession,
-    sgroup: ScalingGroupRow,
+    sgroup_name: str,
 ) -> List[SessionRow]:
     candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
     query = (
         sa.select(SessionRow)
         .where(
-            (SessionRow.scaling_group_name == sgroup.name) &
+            (SessionRow.scaling_group_name == sgroup_name) &
             (SessionRow.status.in_(candidate_statues))
         )
         .options(

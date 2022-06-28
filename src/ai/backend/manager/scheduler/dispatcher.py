@@ -267,8 +267,9 @@ class SchedulerDispatcher(aobject):
         sgroup: ScalingGroupRow,
     ) -> None:
         scheduler = await self._load_scheduler(sgroup)
+        sgroup_name = sgroup.name
         existing_sessions, pending_sessions, cancelled_sessions = \
-            await _list_managed_sessions(db_sess, scheduler, sgroup)
+            await _list_managed_sessions(db_sess, scheduler, sgroup_name)
 
         if cancelled_sessions:
             now = datetime.now(tzutc())
@@ -296,7 +297,6 @@ class SchedulerDispatcher(aobject):
                     ),
                 )
 
-        sgroup_name = sgroup.name
         log.debug(
             "running scheduler (sgroup:{}, pending:{}, existing:{}, cancelled:{})",
             sgroup_name, len(pending_sessions), len(existing_sessions), len(cancelled_sessions),
@@ -396,6 +396,12 @@ class SchedulerDispatcher(aobject):
                     has_failure = True
                     if result.permanent:
                         has_permanent_failure = True  # noqa
+
+            status_update_data={
+                'last_try': datetime.now(tzutc()).isoformat(),
+                'failed_predicates': failed_predicates,
+                'passed_predicates': passed_predicates,
+            },
             if has_failure:
                 log.debug(log_fmt + 'predicate-checks-failed (temporary)', *log_args)
                 # TODO: handle has_permanent_failure as cancellation
@@ -415,11 +421,7 @@ class SchedulerDispatcher(aobject):
                                 'status_data': sql_json_increment(
                                     kernels.c.status_data,
                                     ('scheduler', 'retries'),
-                                    parent_updates={
-                                        'last_try': datetime.now(tzutc()).isoformat(),
-                                        'failed_predicates': failed_predicates,
-                                        'passed_predicates': passed_predicates,
-                                    },
+                                    parent_updates=status_update_data,
                                 ),
                             },
                         )
@@ -435,13 +437,9 @@ class SchedulerDispatcher(aobject):
                             sess, sess_ctx,
                             kernel_data={
                                 'status_data': sql_json_merge(
-                                    KernelRow.status_data,
+                                    kernels.c.status_data,
                                     ('scheduler',),
-                                    {
-                                        'last_try': datetime.now(tzutc()).isoformat(),
-                                        'failed_predicates': failed_predicates,
-                                        'passed_predicates': passed_predicates,
-                                    },
+                                    parent_updates=status_update_data,
                                 ),
                             },
                         )
@@ -870,7 +868,7 @@ class SchedulerDispatcher(aobject):
 async def _list_managed_sessions(
     db_sess: SASession,
     scheduler: AbstractScheduler,
-    sgroup: ScalingGroupRow,
+    sgroup_name: str,
 ) -> Tuple[List[SessionRow], List[SessionRow], List[SessionRow]]:
     """
     Return three lists of sessions.
@@ -879,7 +877,7 @@ async def _list_managed_sessions(
     """
 
     managed_sessions: List[SessionRow]
-    managed_sessions = await get_sgroup_managed_sessions(db_sess, sgroup)
+    managed_sessions = await get_sgroup_managed_sessions(db_sess, sgroup_name)
 
     pending_timeout: timedelta = scheduler.sgroup_opts.pending_timeout
     candidates: List[SessionRow] = []
