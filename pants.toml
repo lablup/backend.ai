@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.12.0rc2"
+pants_version = "2.12.0rc3"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
@@ -42,6 +42,15 @@ python-kernel = "python-kernel.lock"
 
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
+
+[pex-cli]
+version = "v2.1.93"
+known_versions = [
+    "v2.1.93|macos_arm64|80fc6b94f5db253a71061974cb8d8ce520932aef44d989e9057917cc33a30fd6|3802280",
+    "v2.1.93|macos_x86_64|80fc6b94f5db253a71061974cb8d8ce520932aef44d989e9057917cc33a30fd6|3802280",
+    "v2.1.93|linux_arm64|80fc6b94f5db253a71061974cb8d8ce520932aef44d989e9057917cc33a30fd6|3802280",
+    "v2.1.93|linux_x86_64|80fc6b94f5db253a71061974cb8d8ce520932aef44d989e9057917cc33a30fd6|3802280",
+]
 
 [flake8]
 version = "flake8>=4.0"
