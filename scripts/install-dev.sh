@@ -510,6 +510,9 @@ install_git_lfs
 show_info "Ensuring checkout of LFS files..."
 git lfs pull
 
+show_info "Ensuring checkout of submodules..."
+git submodule update --checkout --recursive
+
 show_info "Installing Python..."
 install_python
 
