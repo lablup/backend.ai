@@ -150,6 +150,11 @@ Open yet another terminal for client and run:
    $ export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
    $ ./backend.ai config
    $ ./backend.ai run python -c 'print("hello world")'
+   ∙ Session token prefix: fb05c73953
+   ✔ [0] Session fb05c73953 is ready.
+   hello world
+   ✔ [0] Execution finished. (exit code = 0)
+   ✔ [0] Cleaned up the session.
    $ ./backend.ai ps
 
 
