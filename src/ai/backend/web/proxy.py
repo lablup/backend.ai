@@ -1,30 +1,35 @@
 from __future__ import annotations
 
 import asyncio
-import logging
+import base64
 import json
+import logging
 import random
-from typing import (
-    Optional, Union,
-    Tuple,
-    cast,
-)
+from typing import Optional, Tuple, Union, cast
 
 import aiohttp
+import trafaret as t
 from aiohttp import web
-from aiohttp_session import get_session, STORAGE_KEY
+from aiohttp_session import STORAGE_KEY, get_session
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
 
-from .auth import get_api_session, get_anonymous_session
+from .auth import get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger('ai.backend.console.proxy'))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 HTTP_HEADERS_TO_FORWARD = [
     'Accept-Language',
 ]
+
+extra_config_headers = t.Dict({
+    t.Key('X-BackendAI-Version', default=None): t.Null | t.String,
+    t.Key('X-BackendAI-Encoded', default=None): t.Null | t.ToBool,
+}).allow_extra('*')
 
 
 class WebSocketProxy:
@@ -115,6 +120,24 @@ class WebSocketProxy:
             await self.up_conn.close()
 
 
+async def decrypt_payload(request):
+    config = request.app['config']
+    scheme = config['service'].get('force-endpoint-protocol')
+    if not request.content:
+        return request
+    if scheme is None:
+        scheme = request.scheme
+    api_endpoint = f'{scheme}://{request.host}'
+    payload = await request.text()
+    iv, real_payload = payload.split(':')  # Extract initial vector and actual payload
+    key = (base64.b64encode(api_endpoint.encode('ascii')).decode() + iv + iv)[0:32]
+    crypt = AES.new(bytes(key, encoding='utf8'), AES.MODE_CBC, bytes(iv, encoding='utf8'))
+    b64p = base64.b64decode(real_payload)
+    dec = unpad(crypt.decrypt(bytes(b64p)), 16)
+    result = dec.decode("UTF-8")
+    return result
+
+
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     path = request.match_info.get('path', '')
     if is_anonymous:
@@ -126,7 +149,14 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             # We perform request signing by ourselves using the HTTP session data,
             # but need to keep the client's version header so that
             # the final clients may perform its own API versioning support.
-            request_api_version = request.headers.get('X-BackendAI-Version', None)
+            request_headers = extra_config_headers.check(request.headers)
+            request_api_version = request_headers.get('X-BackendAI-Version', None)
+            secure_context = request_headers.get('X-BackendAI-Encoded', None)
+            if secure_context:
+                payload = await decrypt_payload(request)
+                payload_length = len(payload)
+            else:
+                payload = request.content
             # Send X-Forwarded-For header for token authentication with the client IP.
             client_ip = request.headers.get('X-Forwarded-For')
             if not client_ip:
@@ -138,14 +168,16 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             # We treat all requests and responses as streaming universally
             # to be a transparent proxy.
             api_rqst = Request(
-                request.method, path, request.content,
+                request.method, path, payload,
                 params=request.query,
                 override_api_version=request_api_version)
             if 'Content-Type' in request.headers:
                 api_rqst.content_type = request.content_type                        # set for signing
                 api_rqst.headers['Content-Type'] = request.headers['Content-Type']  # preserve raw value
-            if 'Content-Length' in request.headers:
+            if 'Content-Length' in request.headers and not secure_context:
                 api_rqst.headers['Content-Length'] = request.headers['Content-Length']
+            if 'Content-Length' in request.headers and secure_context:
+                api_rqst.headers['Content-Length'] = str(payload_length)
             for hdr in HTTP_HEADERS_TO_FORWARD:
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]

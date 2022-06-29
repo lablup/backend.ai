@@ -1,4 +1,4 @@
-import click            # noqa: E402
+import click  # noqa: E402
 
 from ai.backend.plugin.entrypoint import scan_entrypoints
 

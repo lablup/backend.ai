@@ -1,22 +1,20 @@
-from decimal import Decimal
 import logging
+from decimal import Decimal
 from pathlib import Path
-from typing import (
-    Any, Optional,
-    Mapping, MutableMapping,
-    Tuple,
-)
+from typing import Any, Mapping, MutableMapping, Optional, Tuple
 
 import aiofiles
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    DeviceName, SlotName,
-)
+from ai.backend.common.types import DeviceName, SlotName
+
 from ..exception import InitializationError
 from ..resources import (
-    AbstractComputePlugin, ComputePluginContext, KernelResourceSpec, known_slot_types,
+    AbstractComputePlugin,
+    ComputePluginContext,
+    KernelResourceSpec,
+    known_slot_types,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))

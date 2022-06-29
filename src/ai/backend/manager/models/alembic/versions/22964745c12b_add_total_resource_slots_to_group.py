@@ -6,8 +6,9 @@ Create Date: 2019-06-17 15:57:39.442741
 
 """
 import textwrap
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.

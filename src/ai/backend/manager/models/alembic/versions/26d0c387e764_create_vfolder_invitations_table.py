@@ -5,10 +5,10 @@ Revises: f8a71c3bffa2
 Create Date: 2018-07-04 14:57:46.517587
 
 """
-from alembic import op
 import sqlalchemy as sa
-from ai.backend.manager.models.base import GUID
+from alembic import op
 
+from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = '26d0c387e764'

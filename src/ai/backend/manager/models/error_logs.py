@@ -1,7 +1,8 @@
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-from .base import metadata, IDColumn, GUID
+from .base import GUID, IDColumn, metadata
+
 __all__ = [
     'error_logs',
 ]

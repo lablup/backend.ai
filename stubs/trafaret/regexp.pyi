@@ -1,5 +1,4 @@
-from .base import Trafaret, String
-
+from .base import String, Trafaret
 
 class RegexpRaw(Trafaret):
     def __init__(self, regexp: str, re_flags: int = 0): ...

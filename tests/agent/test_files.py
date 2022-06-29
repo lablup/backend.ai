@@ -1,10 +1,8 @@
 import os
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
-from ai.backend.agent.docker.files import (
-    scandir, diff_file_stats,
-)
+from ai.backend.agent.docker.files import diff_file_stats, scandir
 
 
 def test_scandir():

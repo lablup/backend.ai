@@ -1,7 +1,7 @@
 import json
-from pathlib import Path
 import sys
 import time
+from pathlib import Path
 
 import appdirs
 import click
@@ -9,9 +9,9 @@ from tabulate import tabulate
 
 from ai.backend.cli.interaction import ask_yn
 
-from . import admin
 from ..pretty import print_done, print_error, print_fail, print_info, print_wait
 from ..session import Session
+from . import admin
 
 
 @admin.group()

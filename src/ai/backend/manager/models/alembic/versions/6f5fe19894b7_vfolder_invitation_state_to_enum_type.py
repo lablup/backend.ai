@@ -5,11 +5,11 @@ Revises: 48ab2dfefba9
 Create Date: 2019-09-28 21:05:55.409422
 
 """
-from alembic import op
 import sqlalchemy as sa
-from ai.backend.manager.models import VFolderInvitationState
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from ai.backend.manager.models import VFolderInvitationState
 
 # revision identifiers, used by Alembic.
 revision = '6f5fe19894b7'

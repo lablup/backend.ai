@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 import textwrap
-from typing import (
-    Any,
-    Dict,
-    Final,
-    Sequence,
-    Tuple,
-    TypeVar,
-)
+from typing import Any, Dict, Final, Sequence, Tuple, TypeVar
 
-from .output.types import FieldSpec, PaginatedResult
 from .exceptions import BackendAPIVersionError
+from .output.types import FieldSpec, PaginatedResult
 from .session import api_session
 
 MAX_PAGE_SIZE: Final = 100

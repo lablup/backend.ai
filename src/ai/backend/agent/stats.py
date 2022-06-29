@@ -5,12 +5,13 @@ Reference: https://www.datadoghq.com/blog/how-to-collect-docker-metrics/
 """
 
 import asyncio
-from decimal import Decimal
 import enum
 import logging
 import sys
 import time
+from decimal import Decimal
 from typing import (
+    TYPE_CHECKING,
     Callable,
     Dict,
     FrozenSet,
@@ -21,23 +22,25 @@ from typing import (
     Sequence,
     Set,
     Tuple,
-    TYPE_CHECKING,
 )
-import aioredis
 
+import aioredis
 import attr
 
-from ai.backend.common import redis
+from ai.backend.common import msgpack, redis
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common import msgpack
 from ai.backend.common.types import (
-    ContainerId, DeviceId, KernelId,
-    MetricKey, MetricValue, MovingStatValue,
+    ContainerId,
+    DeviceId,
+    KernelId,
+    MetricKey,
+    MetricValue,
+    MovingStatValue,
 )
-from .utils import (
-    remove_exponent,
-)
+
+from .utils import remove_exponent
+
 if TYPE_CHECKING:
     from .agent import AbstractAgent
 

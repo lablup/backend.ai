@@ -1,7 +1,6 @@
 from .base import OnError, WithRepr
 from .regexp import Regexp, RegexpString
 
-
 Email: WithRepr
 URL: WithRepr
 IPv4: WithRepr

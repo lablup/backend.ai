@@ -1,23 +1,18 @@
 from __future__ import annotations
 
 import sys
-from typing import (
-    Any,
-    Callable,
-    Mapping,
-    Optional,
-    Sequence,
-)
+from typing import Any, Callable, Mapping, Optional, Sequence
 
 from tabulate import tabulate
 
-from ai.backend.client.cli.pretty import print_error, print_fail
 from ai.backend.client.cli.pagination import (
     echo_via_pager,
     get_preferred_page_size,
     tabulate_items,
 )
-from .types import FieldSpec, PaginatedResult, BaseOutputHandler
+from ai.backend.client.cli.pretty import print_error, print_fail
+
+from .types import BaseOutputHandler, FieldSpec, PaginatedResult
 
 
 class NoItems(Exception):

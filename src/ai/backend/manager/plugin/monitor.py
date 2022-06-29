@@ -1,7 +1,4 @@
-from ai.backend.common.plugin.monitor import (
-    ErrorPluginContext,
-    StatsPluginContext,
-)
+from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 
 
 class ManagerErrorPluginContext(ErrorPluginContext):

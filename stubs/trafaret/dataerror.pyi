@@ -1,4 +1,5 @@
 from typing import Any
+
 from trafaret.base import Trafaret
 
 class DataError(ValueError):

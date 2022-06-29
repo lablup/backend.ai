@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import abc
 import asyncio
-from contextvars import Context, ContextVar, copy_context
 import inspect
+import queue
 import threading
+import warnings
+from contextvars import Context, ContextVar, copy_context
 from typing import (
     Any,
     AsyncIterator,
@@ -13,18 +15,16 @@ from typing import (
     Iterator,
     Literal,
     Tuple,
-    Union,
     TypeVar,
+    Union,
 )
-import queue
-import warnings
 
 import aiohttp
 from multidict import CIMultiDict
-from .config import APIConfig, MIN_API_VERSION, get_config, parse_api_version
+
+from .config import MIN_API_VERSION, APIConfig, get_config, parse_api_version
 from .exceptions import APIVersionWarning, BackendAPIError, BackendClientError
 from .types import Sentinel, sentinel
-
 
 __all__ = (
     'BaseSession',
@@ -265,27 +265,27 @@ class BaseSession(metaclass=abc.ABCMeta):
         self._proxy_mode = proxy_mode
         self.api_version = parse_api_version(self._config.version)
 
-        from .func.system import System
         from .func.admin import Admin
         from .func.agent import Agent, AgentWatcher
-        from .func.storage import Storage
         from .func.auth import Auth
         from .func.bgtask import BackgroundTask
         from .func.domain import Domain
+        from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
         from .func.group import Group
         from .func.image import Image
-        from .func.session import ComputeSession
         from .func.keypair import KeyPair
+        from .func.keypair_resource_policy import KeypairResourcePolicy
         from .func.manager import Manager
         from .func.resource import Resource
-        from .func.keypair_resource_policy import KeypairResourcePolicy
         from .func.scaling_group import ScalingGroup
+        from .func.server_log import ServerLog
+        from .func.session import ComputeSession
         from .func.session_template import SessionTemplate
+        from .func.storage import Storage
+        from .func.system import System
         from .func.user import User
         from .func.vfolder import VFolder
-        from .func.dotfile import Dotfile
-        from .func.server_log import ServerLog
 
         self.System = System
         self.Admin = Admin

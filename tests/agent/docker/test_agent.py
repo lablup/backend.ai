@@ -1,18 +1,15 @@
 import platform
 import signal
-from typing import (
-    Any,
-    Mapping,
-)
+from typing import Any, Mapping
 from unittest.mock import AsyncMock, MagicMock
 
-from aiodocker.exceptions import DockerError
 import pytest
+from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.docker.agent import DockerAgent
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.types import AutoPullBehavior
-from ai.backend.common.docker import ImageRef
 
 
 class DummyEtcd:

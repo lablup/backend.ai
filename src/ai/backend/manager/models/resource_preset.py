@@ -1,12 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import (
-    Any,
-    Dict,
-    Sequence,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Any, Dict, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -14,12 +9,16 @@ from sqlalchemy.engine.row import Row
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot
+
 from .base import (
-    metadata, BigInt, BinarySize, ResourceSlotColumn,
+    BigInt,
+    BinarySize,
+    ResourceSlotColumn,
+    batch_result,
+    metadata,
+    set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
-    set_if_set,
-    batch_result,
 )
 from .user import UserRole
 

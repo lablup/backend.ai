@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from typing import (
-    AsyncIterator,
-)
+from typing import AsyncIterator
 
 import pytest
 
-from .types import RedisClusterInfo
 from .docker import DockerComposeRedisSentinelCluster
 from .native import NativeRedisSentinelCluster
+from .types import RedisClusterInfo
 from .utils import wait_redis_ready
-
 
 # A simple "redis_container" fixture is defined in ai.backend.testutils.bootstrap.
 
