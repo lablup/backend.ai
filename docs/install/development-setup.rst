@@ -100,6 +100,16 @@ the CUDA mockup plugin together, etc.
    TensorFlow CPU-only kernel.  To try out other images, you have to pull them
    manually afterwards.
 
+.. note::
+
+   Currently there are many limitations on running deep learning images on ARM64 platforms,
+   because users need to rebuild the whole computation library stack, although more supported
+   images will come in the future.
+
+.. note::
+
+   To install the webui in an editable state, try ``--editable-webui`` flag option when running ``scripts/install-dev.sh``.
+
 .. tip::
 
    **Using the agent's cgroup-based statistics without the root privilege (Linux-only)**
