@@ -183,11 +183,15 @@
           "version": "62.6"
         }
       ],
-      "platform_tag": null
+      "platform_tag": [
+        "cp310",
+        "cp310",
+        "manylinux_2_31_aarch64"
+      ]
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.93",
+  "pex_version": "2.1.90",
   "prefer_older_binary": false,
   "requirements": [
     "flake8-commas>=2.1",
