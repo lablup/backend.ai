@@ -42,6 +42,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx_rtd_theme',
     'sphinxcontrib_trio',
+    'sphinxcontrib.mermaid',
     'sphinx_autodoc_typehints',
 ]
 
