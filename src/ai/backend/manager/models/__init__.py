@@ -1,4 +1,5 @@
 from . import agent as _agent
+from . import audit_logs as _audit_logs
 from . import domain as _domain
 from . import dotfile as _dotfile
 from . import error_logs as _errorlogs
@@ -32,9 +33,11 @@ __all__ = (
     *_sessiontemplate.__all__,
     *_storage.__all__,
     *_errorlogs.__all__,
+    *_audit_logs.__all__,
 )
 
 from .agent import *  # noqa
+from .audit_logs import * # noqa
 from .domain import *  # noqa
 from .dotfile import *  # noqa
 from .error_logs import *  # noqa

@@ -246,6 +246,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         'Resource', 'KeypairResourcePolicy',
         'VFolder', 'Dotfile',
         'ServerLog',
+        'AuditLog',
     )
 
     aiohttp_session: aiohttp.ClientSession
@@ -286,6 +287,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.system import System
         from .func.user import User
         from .func.vfolder import VFolder
+        from .func.audit_logs import AuditLog
 
         self.System = System
         self.Admin = Admin
@@ -309,6 +311,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.VFolder = VFolder
         self.Dotfile = Dotfile
         self.ServerLog = ServerLog
+        self.AuditLog = AuditLog
 
     @property
     def proxy_mode(self) -> bool:

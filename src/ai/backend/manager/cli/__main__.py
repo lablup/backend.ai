@@ -133,8 +133,18 @@ def generate_keypair(cli_ctx: CLIContext):
                     'If set True, it will run VACUUM FULL.'
                     'When VACUUM FULL is being processed, the database is locked.'
                     '[default: False]')
+@click.option('-e', '--entry', type=click.Choice(['kernels', 'audit_logs'], case_sensitive=False),
+                default='kernels',
+                help='Which table to run the operation on. Options available are kernels and audit_logs. '                    
+                'If not set or set to kernels, it will run the operation on kernels table. '
+                'If set to audit_logs, it will run on audit_logs table. '
+                '[default: kernels]')
+@click.option('--target', type=str, default=None,
+                help='For audit_logs you can chose which audit target object you would like the operation to run on. '
+                'To run on a desired target between user, keypairs or vfolder use respectively user.uuid, keypairs.access_key, or vfolders.name. '
+                'If not set, it will run on all targets. ')
 @click.pass_obj
-def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
+def clear_history(cli_ctx: CLIContext, retention, vacuum_full, entry, target) -> None:
     """
     Delete old records from the kernels table and
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
@@ -220,23 +230,48 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                 vacuum_sql = "VACUUM FULL"
             else:
                 vacuum_sql = "VACUUM"
-
-            curs.execute(f"""
-            SELECT COUNT(*) FROM kernels WHERE terminated_at < '{expiration_date}';
-            """)
+            if entry == 'audit_logs':
+                if target is not None:
+                    curs.execute(f"""
+                    SELECT COUNT(*) FROM {entry} WHERE created_at < '{expiration_date}'
+                    AND target = '{target}';
+                    """)
+                else:
+                    curs.execute(f"""
+                    SELECT COUNT(*) FROM {entry} WHERE created_at < '{expiration_date}';
+                    """)
+            else:
+                curs.execute(f"""
+                SELECT COUNT(*) FROM kernels WHERE terminated_at < '{expiration_date}';
+                """)
             deleted_count = curs.fetchone()[0]
 
             conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
             log.info('Deleting old records...')
-            curs.execute(f"""
-            DELETE FROM kernels WHERE terminated_at < '{expiration_date}';
-            """)
+            if entry == 'audit_logs':
+                if target is not None:
+                    curs.execute(f"""
+                    DELETE FROM {entry} WHERE created_at < '{expiration_date}'
+                    AND target = '{target}';
+                    """)
+                    log.info(
+                        f'Perfoming {vacuum_sql} operation on {entry} where target object is {target}...')
+                else:
+                    curs.execute(f"""
+                    DELETE FROM {entry} WHERE created_at < '{expiration_date}';
+                    """)
+                    log.info(
+                        f'Perfoming {vacuum_sql} operation on {entry}...')
+            else:
+                curs.execute(f"""
+                DELETE FROM kernels WHERE terminated_at < '{expiration_date}';
+                """)
             log.info(f'Perfoming {vacuum_sql} operation...')
             curs.execute(vacuum_sql)
             conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
 
-            curs.execute("""
-            SELECT COUNT(*) FROM kernels;
+            curs.execute(f"""
+            SELECT COUNT(*) FROM {entry};
             """)
             table_size = curs.fetchone()[0]
             log.info(f'kernels table size: {table_size}')

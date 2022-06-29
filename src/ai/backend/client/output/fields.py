@@ -256,3 +256,14 @@ vfolder_fields = FieldSet([
     FieldSpec('cur_size'),
     FieldSpec('cloneable'),
 ])
+
+auditlog_fields = FieldSet([
+    FieldSpec('type'),
+    FieldSpec('user_id'),
+    FieldSpec('access_key'),
+    FieldSpec('email'),
+    FieldSpec('action'),
+    FieldSpec('data'),
+    FieldSpec('target'),
+    FieldSpec('created_at'),
+])
