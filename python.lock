@@ -1692,13 +1692,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "895af56cfc63e1d453df6899d3f13861ecdef23e02407d2a84741561210416da",
-              "url": "https://files.pythonhosted.org/packages/4f/fd/dd6a8f629227945f3f2f70e8c87148edd47a31764f4e7323597a2923564f/humanize-4.2.1-py3-none-any.whl"
+              "hash": "fd36c627eee0d2cea22a1dee6d4ff8d4ad5a0b03d3184a4c42967945fa350215",
+              "url": "https://files.pythonhosted.org/packages/7f/51/92d69a10dd61f8ad1ae01e13feca0b7faee25fa17ee8bd181cc1dd459d4f/humanize-4.2.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c8caa86a3e35fa60a6f31674bed2dcaf3a8495958880a00ad836226e0e6755b3",
-              "url": "https://files.pythonhosted.org/packages/08/8f/1783c57498eb39201fb688a131f73a784a77e8045ae3b8f96a5e53f78a35/humanize-4.2.1.tar.gz"
+              "hash": "a45cb64bb7387b3f0f5d69c2d74376ecc1549eb89bc619dfb22c7e98b6e8c164",
+              "url": "https://files.pythonhosted.org/packages/ed/9c/54786362617dd69f624deb05ca0081de9d337c982b61b05d82a69a69d4b5/humanize-4.2.2.tar.gz"
             }
           ],
           "project_name": "humanize",
@@ -1709,7 +1709,7 @@
             "pytest; extra == \"tests\""
           ],
           "requires_python": ">=3.7",
-          "version": "4.2.1"
+          "version": "4.2.2"
         },
         {
           "artifacts": [
@@ -2475,38 +2475,38 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "496cc499980d9be6b151f5028aef9e735a4881d8c2eaa32b2562678dce463787",
-              "url": "https://files.pythonhosted.org/packages/34/09/951e7e45947aa631a4992eed1e47dbe2d11ded7c3b24d9b10b083ef809a7/pycares-4.2.0-cp310-cp310-win_amd64.whl"
+              "hash": "1a9506d496efeb809a1b63647cb2f3f33c67fcf62bf80a2359af692fef2c1755",
+              "url": "https://files.pythonhosted.org/packages/d1/b4/7230e92658d0623b78fdc48610ab04cb30b93b508b3dcb9493c98dafbda6/pycares-4.2.1-cp310-cp310-win_amd64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1857631b448925aabc2b306baa27fbedb27ca49036ce5c083ae21eef7850adfa",
-              "url": "https://files.pythonhosted.org/packages/07/89/b2ea55b7708fdd7c78f5b9b104b14517ce89eea322f43778b3ac4a7d65d5/pycares-4.2.0-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+              "hash": "1f37f762414680063b4dfec5be809a84f74cd8e203d939aaf3ba9c807a9e7013",
+              "url": "https://files.pythonhosted.org/packages/32/55/e86ffd38be82c4b4ce4b3d82e01c1e8db7ec259fc6303eb98df5eb5177da/pycares-4.2.1-cp310-cp310-win32.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4a491bb6c9c6420f3547e89898902e6f67a11ba42ff39026cc94aa238bcc2e67",
-              "url": "https://files.pythonhosted.org/packages/7d/d8/6749cc8da07f53befcf4c1b23ebee8ecb324cd184c0e3aec47ba2bf67478/pycares-4.2.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "3b78bdee2f2f1351d5fccc2d1b667aea2d15a55d74d52cb9fd5bea8b5e74c4dc",
+              "url": "https://files.pythonhosted.org/packages/5c/1a/a87c3df27137553323234571aa526d7d31dfea33cc127bf53fef37a278c6/pycares-4.2.1-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_12_i686.manylinux2010_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b286649597791cd53072b2f3383cc38fc14a8ab016b78cb04bdcaa6ecce3b8ce",
-              "url": "https://files.pythonhosted.org/packages/8b/88/f6f157d757b873ff20c64001cd44d0f9d90bf665be7d9e71322fcc9c4cf3/pycares-4.2.0.tar.gz"
+              "hash": "735b4f75fd0f595c4e9184da18cd87737f46bc81a64ea41f4edce2b6b68d46d2",
+              "url": "https://files.pythonhosted.org/packages/99/da/d3d20bc7bd5baadeea04ee84db16f1f07557138c313bd6200e1cffab5bee/pycares-4.2.1.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "b076d5d8a3f94bc38efeb7a5ac9772190e13515a510f96d600d58b12d25b2ae7",
-              "url": "https://files.pythonhosted.org/packages/ab/15/0ea2322835a9f2ec3ae6001e93d4fee5200ecd9ece000355998aef7c6c9d/pycares-4.2.0-cp310-cp310-win32.whl"
+              "hash": "b03f69df69f0ab3bfb8dbe54444afddff6ff9389561a08aade96b4f91207a655",
+              "url": "https://files.pythonhosted.org/packages/c8/52/ca6c5a05455350dfa1b2e1020218e8197c50d81550bc308543bd532a7674/pycares-4.2.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e6bbf663d89a93df0386050db430a26d98155d1c6d9f1e522ac8b01d38016c10",
-              "url": "https://files.pythonhosted.org/packages/af/71/37204c6f427db4e8256c41f001b303fc8f79902562813eb6ea5df2737fc6/pycares-4.2.0-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_12_i686.manylinux2010_i686.whl"
+              "hash": "d83f193563b42360528167705b1c7bb91e2a09f990b98e3d6378835b72cd5c96",
+              "url": "https://files.pythonhosted.org/packages/c9/f7/905f7ea4492e9f3063b66056d29870338bd2a3db830f8e453082318a1c26/pycares-4.2.1-cp310-cp310-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "48c733b8087f618d64b05c5807264ea94987b599cf37688ba59d23c57e197ff1",
-              "url": "https://files.pythonhosted.org/packages/e9/a8/5b89b17e78f2030173b3597e0adb16b5f72a0d0f2d4b7ae93316d853efe1/pycares-4.2.0-cp310-cp310-macosx_10_9_x86_64.whl"
+              "hash": "f05223de13467bb26f9a1594a1799ce2d08ad8ea241489fecd9d8ed3bbbfc672",
+              "url": "https://files.pythonhosted.org/packages/e9/7b/34741f784f6c4813766898c4476042ffc315a1c55f4c872699db7a6b0577/pycares-4.2.1-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
             }
           ],
           "project_name": "pycares",
@@ -2515,7 +2515,7 @@
             "idna>=2.1; extra == \"idna\""
           ],
           "requires_python": null,
-          "version": "4.2"
+          "version": "4.2.1"
         },
         {
           "artifacts": [
@@ -2857,13 +2857,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f57f8df5d238a8ecf92f499b6b21467bfee6c13d89953c27edf1e2bc673622e7",
-              "url": "https://files.pythonhosted.org/packages/39/a6/022ed2fb6d4526c60e7b7e8830e6d5797cd2711719aa4392f99eda787706/redis-4.3.3-py3-none-any.whl"
+              "hash": "a52d5694c9eb4292770084fa8c863f79367ca19884b329ab574d5cb2036b3e54",
+              "url": "https://files.pythonhosted.org/packages/e6/b3/4020cf6172bfd8a75fa2a8fa478bae7a842cf0d7173f2f77305b0c98052b/redis-4.3.4-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2f7a57cf4af15cd543c4394bcbe2b9148db2606a37edba755368836e3a1d053e",
-              "url": "https://files.pythonhosted.org/packages/09/37/d58ce17fed05620b3ebfe6dff2b94367347b2fd01491b1a38bd4e74d9eeb/redis-4.3.3.tar.gz"
+              "hash": "ddf27071df4adf3821c4f2ca59d67525c3a82e5f268bed97b813cb4fabf87880",
+              "url": "https://files.pythonhosted.org/packages/8f/d4/78ef2d3f316041fa6c92daa7ac2c8056c39858c3775fad35fd84b9b3a6fb/redis-4.3.4.tar.gz"
             }
           ],
           "project_name": "redis",
@@ -2879,7 +2879,7 @@
             "typing-extensions; python_version < \"3.8\""
           ],
           "requires_python": ">=3.6",
-          "version": "4.3.3"
+          "version": "4.3.4"
         },
         {
           "artifacts": [
@@ -3932,11 +3932,15 @@
           "version": "1.1.8"
         }
       ],
-      "platform_tag": null
+      "platform_tag": [
+        "cp310",
+        "cp310",
+        "manylinux_2_31_aarch64"
+      ]
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.93",
+  "pex_version": "2.1.90",
   "prefer_older_binary": false,
   "requirements": [
     "Jinja2~=3.0.1",
