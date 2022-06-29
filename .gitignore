@@ -118,6 +118,9 @@ ENV/
 /vfroot/
 /*.pid
 
+# Additional clones for editable components
+/src/webui/
+
 # Release artifacts
 /CHANGELOG_RELEASE.md
 

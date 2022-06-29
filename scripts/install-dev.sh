@@ -442,6 +442,15 @@ bootstrap_pants() {
   set +e
 }
 
+install_editable_webui() {
+  show_info "Installing editable version of Web UI..."
+  git clone https://github.com/lablup/backend.ai-webui ./src/webui
+  cd src/webui
+  npm i
+  make compile_wsproxy
+  cd ../..
+}
+
 # BEGIN!
 
 echo " "
@@ -729,6 +738,10 @@ echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.use
 echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 
+if [ $EDITABLE_WEBUI -eq 1 ]; then
+  install_editable_webui
+fi
+
 # TODO: Update tester env script
 ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-admin.sh
 ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_ADMIN_CONF_FOR_API}@" ./env-tester-admin.sh
@@ -782,8 +795,13 @@ if [ ! -z "$docker_sudo" ]; then
 else
   echo "    > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
 fi
+if [ $EDITABLE_WEBUI -eq 1 ]; then
+  show_note "How to run the editable checkout of webui:"
+  echo "  > ${WHITE}cd src/webui; npm run server:d${Nc}"
+  echo " "
+fi
 show_note "How to reset this setup:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
 echo " "
 
-# vim: tw=0
+# vim: tw=0 sts=2 sw=2 et
