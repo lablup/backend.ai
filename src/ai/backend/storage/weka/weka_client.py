@@ -12,7 +12,12 @@ from aiohttp import web
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize
 
-from .exceptions import WekaAPIError, WekaInvalidBodyError, WekaNotFoundError, WekaUnauthorizedError
+from .exceptions import (
+    WekaAPIError,
+    WekaInvalidBodyError,
+    WekaNotFoundError,
+    WekaUnauthorizedError,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

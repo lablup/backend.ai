@@ -10,11 +10,7 @@ from uuid import UUID
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 from ai.backend.storage.abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
-from ai.backend.storage.types import (
-    FSPerfMetric,
-    FSUsage,
-    VFolderCreationOptions,
-)
+from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptions
 from ai.backend.storage.vfs import BaseVolume
 
 from .exceptions import (
