@@ -527,6 +527,7 @@ install_python
 
 show_info "Checking Python features..."
 check_python
+pyenv shell "${PYTHON_VERSION}"
 
 show_info "Bootstrapping the Pants build system..."
 bootstrap_pants
