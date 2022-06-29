@@ -165,3 +165,9 @@ Shutdown all docker containers using ``docker compose -f docker-compose.halfstac
 
 You may need ``sudo`` to remove the directories mounted as halfstack container volumes
 because Docker auto-creates them with the root privilege.
+
+
+Daily Workflows
+~~~~~~~~~~~~~~~
+
+Check out :doc:`/dev/daily-workflows` for your reference.
