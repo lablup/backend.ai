@@ -24,7 +24,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 HTTP_HEADERS_TO_FORWARD = [
     'Accept-Language',
-    'Authorization'
+    'Authorization',
 ]
 
 extra_config_headers = t.Dict({
