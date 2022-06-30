@@ -798,7 +798,12 @@ else
 fi
 if [ $EDITABLE_WEBUI -eq 1 ]; then
   show_note "How to run the editable checkout of webui:"
-  echo "  > ${WHITE}cd src/webui; npm run server:d${Nc}"
+  echo "(Terminal 1)"
+  echo "  > ${WHITE}cd src/webui; npm run build:d${NC}"
+  echo "(Terminal 2)"
+  echo "  > ${WHITE}cd src/webui; npm run server:d${NC}"
+  echo "(Terminal 3)"
+  echo "  > ${WHITE}cd src/webui; npm run wsproxy${NC}"
   echo " "
 fi
 show_note "How to reset this setup:"
