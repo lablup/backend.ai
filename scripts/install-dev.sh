@@ -451,6 +451,7 @@ install_editable_webui() {
   else
     git clone https://github.com/lablup/backend.ai-webui ./src/webui
     cd src/webui
+    cp configs/default.toml config.toml
   fi
   npm i
   make compile_wsproxy
