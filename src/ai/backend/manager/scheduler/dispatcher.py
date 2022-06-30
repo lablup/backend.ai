@@ -269,7 +269,8 @@ class SchedulerDispatcher(aobject):
         scheduler = await self._load_scheduler(sgroup)
         sgroup_name = sgroup.name
         existing_sessions, pending_sessions, cancelled_sessions = \
-            await _list_managed_sessions(db_sess, scheduler, sgroup_name)
+            await _list_managed_sessions(
+                db_sess, sgroup_name, scheduler.sgroup_opts.pending_timeout)
 
         if cancelled_sessions:
             now = datetime.now(tzutc())
@@ -867,8 +868,8 @@ class SchedulerDispatcher(aobject):
 
 async def _list_managed_sessions(
     db_sess: SASession,
-    scheduler: AbstractScheduler,
     sgroup_name: str,
+    pending_timeout: timedelta,
 ) -> Tuple[List[SessionRow], List[SessionRow], List[SessionRow]]:
     """
     Return three lists of sessions.
@@ -879,7 +880,6 @@ async def _list_managed_sessions(
     managed_sessions: List[SessionRow]
     managed_sessions = await get_sgroup_managed_sessions(db_sess, sgroup_name)
 
-    pending_timeout: timedelta = scheduler.sgroup_opts.pending_timeout
     candidates: List[SessionRow] = []
     cancelleds: List[SessionRow] = []
     existings: List[SessionRow] = []

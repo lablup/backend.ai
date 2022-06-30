@@ -217,8 +217,42 @@ class SessionRow(Base):
               nullable=False, index=True)
     status_changed = sa.Column('status_changed', sa.DateTime(timezone=True), nullable=True, index=True)
     status_info = sa.Column('status_info', sa.Unicode(), nullable=True, default=sa.null())
-    # TODO: Must set the policy about status_data
-    # status_data = sa.Column('status_data', pgsql.JSONB(), nullable=True, default=sa.null())
+    status_data = sa.Column('status_data', pgsql.JSONB(), nullable=True, default=sa.null())
+    # status_data contains a JSON object that contains detailed data for the last status change.
+    # During scheduling (as PENDING + ("no-available-instances" | "predicate-checks-failed")):
+    # {
+    #   "scheduler": {
+    #     // shceudler attempt information
+    #     // NOTE: the whole field may be NULL before the first attempt!
+    #     "retries": 5,
+    #         // the number of scheudling attempts (used to avoid HoL blocking as well)
+    #     "last_try": "2021-05-01T12:34:56.123456+09:00",
+    #         // an ISO 8601 formatted timestamp of the last attempt
+    #     "failed_predicates": [
+    #       { "name": "concurrency", "msg": "You cannot run more than 30 concurrent sessions." },
+    #           // see the manager.scheduler.predicates module for possible messages
+    #       ...
+    #     ],
+    #     "passed_predicates": [ {"name": "reserved_time"}, ... ],  // names only
+    #   }
+    # }
+    #
+    # While running: the field is NULL.
+    #
+    # After termination:
+    # {
+    #   "kernel": {
+    #     // termination info for the individual kernel
+    #     "exit_code": 123,
+    #         // maybe null during termination
+    #   },
+    #   "session": {
+    #     // termination info for the session
+    #     "status": "terminating" | "terminated"
+    #         // "terminated" means all kernels that belong to the same session has terminated.
+    #         // used to prevent duplication of SessionTerminatedEvent
+    #   }
+    # }
     callback_url = sa.Column('callback_url', URLColumn, nullable=True, default=sa.null())
 
     startup_command = sa.Column('startup_command', sa.Text, nullable=True)

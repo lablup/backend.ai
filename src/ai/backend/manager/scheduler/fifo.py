@@ -46,7 +46,7 @@ class FIFOSlotScheduler(AbstractScheduler):
         total_capacity: ResourceSlot,
         pending_sessions: Sequence[SessionRow],
         existing_sessions: Sequence[SessionRow],
-    ) -> Optional[SessionId]:
+    ) -> Optional[SessionRow]:
         local_pending_sessions = list(pending_sessions)
         skipped_sessions: List[SessionRow] = []
         max_retries = self.config['num_retries_to_skip']
@@ -91,7 +91,7 @@ class FIFOSlotScheduler(AbstractScheduler):
         self,
         agents: Sequence[AgentRow],
         pending_session: SessionRow,
-    ) -> Optional[AgentId]:
+    ) -> Optional[AgentRow]:
         return self._assign_agent(
             agents, pending_session.requested_slots,
         )
@@ -100,7 +100,7 @@ class FIFOSlotScheduler(AbstractScheduler):
         self,
         agents: Sequence[AgentRow],
         pending_kernel: KernelRow,
-    ) -> Optional[AgentId]:
+    ) -> Optional[AgentRow]:
         return self._assign_agent(
             agents, pending_kernel.requested_slots,
         )

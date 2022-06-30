@@ -56,12 +56,17 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
 
 __all__: Sequence[str] = (
-    'agents', 'AgentStatus', 'AgentRow',
+    'agents', 'AgentStatus', 'AGENT_UPDATE_FIELDS', 'AgentRow',
     'list_schedulable_agents_by_sgroup', 'list_alive_agents',
     'AgentList', 'Agent', 'ModifyAgent',
     'recalc_agent_resource_occupancy',
 )
 
+
+AGENT_UPDATE_FIELDS = (
+    'available_slots', 'scaling_group_name', 'addr',
+    'version', 'compute_plugins', 'architecture',
+)
 
 class AgentStatus(enum.Enum):
     ALIVE = 0
@@ -121,28 +126,6 @@ class AgentRow(Base):
         result = await db_sess.execute(query)
         return result.first()
 
-    @classmethod
-    async def update_alive_agent(
-        cls,
-        db_sess: SASession,
-        agent: _AT,
-        agent_data: Mapping[str, Any],
-    ) -> bool:
-        agent_map = dict(agent)
-        updates = {
-            k: v for k, v in agent_data.items()
-            if k in agent_map and agent_map[k] != v
-        }
-        if updates:
-            query = (
-                sa.update(AgentRow)
-                .values(**updates)
-                .where(AgentRow.id == agent.id)
-            )
-            await db_sess.execute(query)
-            return True
-        return False
-
 
 async def list_schedulable_agents_by_sgroup(
     db_sess: SASession,
@@ -174,9 +157,6 @@ async def list_alive_agents(
     )
     result = await db_sess.execute(query)
     return result.scalars().all()
-
-
-_AT = TypeVar('_AT', AgentRow, Row)
 
 
 class Agent(graphene.ObjectType):

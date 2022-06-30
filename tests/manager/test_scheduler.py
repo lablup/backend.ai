@@ -1,9 +1,8 @@
 from __future__ import annotations
-from abc import ABC
-from platform import architecture
 
 import secrets
 from datetime import datetime, timedelta
+from dateutil.tz import tzutc
 from decimal import Decimal
 from pprint import pprint
 from typing import Any, Mapping, Sequence
@@ -12,8 +11,6 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import attr
-from sqlalchemy.inspection import inspect
-from ai.backend.manager.models import kernel
 import pytest
 import trafaret as t
 from dateutil.parser import parse as dtparse
@@ -30,10 +27,11 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
-from ai.backend.manager.models.session import SessionRow, SessionStatus
+from ai.backend.manager.models.session import SessionStatus, SessionRow
 from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.scheduler.dispatcher import (
     SchedulerDispatcher,
@@ -52,36 +50,21 @@ from ai.backend.manager.scheduler.predicates import check_reserved_batch_session
 # )
 
 
-class TableAttributeNotMatch(Exception):
-    pass
+# class RowAttributeNotMatch(Exception):
+#     pass
 
 
-class MockTable(ABC):
-    table = None
+# class MockRow(ABC):
+#     table = None
 
-    def __init__(self, **kwargs) -> None:
-        inspected = inspect(self.table)
-        related_clss = [rel.mapper.class_.__tablename__ for rel in inspected.relationships]
-        cols = [c_attr.key for c_attr in inspected.mapper.column_attrs]
-        for attr_ in kwargs:
-            if attr_ not in related_clss and attr_ not in cols:
-                raise TableAttributeNotMatch(f'attribute `{attr_}` not found in table `{self.table}`.')
-        super.__init__()
-
-
-class ImageTable(MockTable):
-    table = ImageRow
-
-class SessionTable(MockTable):
-    table = SessionRow
-
-
-class AgentTable(MockTable):
-    table = AgentRow
-
-
-class KernelTable(MockTable):
-    table = KernelRow
+#     def __init__(self, **kwargs) -> None:
+#         inspected = inspect(self.table)
+#         related_clss = [rel.mapper.class_.__table__.name for rel in inspected.relationships]
+#         cols = [c_attr.key for c_attr in inspected.mapper.column_attrs]
+#         for attr_ in kwargs:
+#             if attr_ not in related_clss and attr_ not in cols:
+#                 raise RowAttributeNotMatch(f'attribute `{attr_}` not found in table `{self.table}`.')
+#         # self.
 
 
 
@@ -117,15 +100,18 @@ example_group_id = uuid4()
 
 example_total_capacity = ResourceSlot({'cpu': '4.0', 'mem': '4096'})
 
+example_sgroup_name1 = 'sg01'
+example_sgroup_name2 = 'sg02'
+
 
 @pytest.fixture
 def example_agents():
     return [
-        AgentTable(
+        AgentRow(
             id=AgentId('i-001'),
             addr='10.0.1.1:6001',
             architecture=DEFAULT_IMAGE_ARCH,
-            scaling_group_name='sg01',
+            scaling_group_name=example_sgroup_name1,
             available_slots=ResourceSlot({
                 'cpu': Decimal('4.0'),
                 'mem': Decimal('4096'),
@@ -139,11 +125,11 @@ def example_agents():
                 'rocm.devices': Decimal('0'),
             }),
         ),
-        AgentTable(
+        AgentRow(
             id=AgentId('i-101'),
             addr='10.0.2.1:6001',
             architecture=DEFAULT_IMAGE_ARCH,
-            scaling_group_name='sg02',
+            scaling_group_name=example_sgroup_name2,
             available_slots=ResourceSlot({
                 'cpu': Decimal('3.0'),
                 'mem': Decimal('2560'),
@@ -157,53 +143,17 @@ def example_agents():
                 'rocm.devices': Decimal('0'),
             }),
         ),
-        # AgentContext(
-        #     agent_id=AgentId('i-001'),
-        #     agent_addr='10.0.1.1:6001',
-        #     architecture=DEFAULT_IMAGE_ARCH,
-        #     scaling_group='sg01',
-        #     available_slots=ResourceSlot({
-        #         'cpu': Decimal('4.0'),
-        #         'mem': Decimal('4096'),
-        #         'cuda.shares': Decimal('4.0'),
-        #         'rocm.devices': Decimal('2'),
-        #     }),
-        #     occupied_slots=ResourceSlot({
-        #         'cpu': Decimal('0'),
-        #         'mem': Decimal('0'),
-        #         'cuda.shares': Decimal('0'),
-        #         'rocm.devices': Decimal('0'),
-        #     }),
-        # ),
-        # AgentContext(
-        #     agent_id=AgentId('i-101'),
-        #     agent_addr='10.0.2.1:6001',
-        #     architecture=DEFAULT_IMAGE_ARCH,
-        #     scaling_group='sg02',
-        #     available_slots=ResourceSlot({
-        #         'cpu': Decimal('3.0'),
-        #         'mem': Decimal('2560'),
-        #         'cuda.shares': Decimal('1.0'),
-        #         'rocm.devices': Decimal('8'),
-        #     }),
-        #     occupied_slots=ResourceSlot({
-        #         'cpu': Decimal('0'),
-        #         'mem': Decimal('0'),
-        #         'cuda.shares': Decimal('0'),
-        #         'rocm.devices': Decimal('0'),
-        #     }),
-        # ),
     ]
 
 
 @pytest.fixture
 def example_mixed_agents():
     return [
-        AgentTable(
+        AgentRow(
             id=AgentId('i-gpu'),
             addr='10.0.1.1:6001',
             architecture=DEFAULT_IMAGE_ARCH,
-            scaling_group_name='sg01',
+            scaling_group_name=example_sgroup_name1,
             available_slots=ResourceSlot({
                 'cpu': Decimal('4.0'),
                 'mem': Decimal('4096'),
@@ -215,11 +165,11 @@ def example_mixed_agents():
                 'cuda.shares': Decimal('0'),
             }),
         ),
-        AgentTable(
+        AgentRow(
             id=AgentId('i-cpu'),
             addr='10.0.2.1:6001',
             architecture=DEFAULT_IMAGE_ARCH,
-            scaling_group='sg02',
+            scaling_group_name=example_sgroup_name2,
             available_slots=ResourceSlot({
                 'cpu': Decimal('3.0'),
                 'mem': Decimal('2560'),
@@ -231,49 +181,17 @@ def example_mixed_agents():
                 'cuda.shares': Decimal('0'),
             }),
         ),
-        # AgentContext(
-        #     agent_id=AgentId('i-gpu'),
-        #     agent_addr='10.0.1.1:6001',
-        #     architecture=DEFAULT_IMAGE_ARCH,
-        #     scaling_group='sg01',
-        #     available_slots=ResourceSlot({
-        #         'cpu': Decimal('4.0'),
-        #         'mem': Decimal('4096'),
-        #         'cuda.shares': Decimal('4.0'),
-        #     }),
-        #     occupied_slots=ResourceSlot({
-        #         'cpu': Decimal('0'),
-        #         'mem': Decimal('0'),
-        #         'cuda.shares': Decimal('0'),
-        #     }),
-        # ),
-        # AgentContext(
-        #     agent_id=AgentId('i-cpu'),
-        #     agent_addr='10.0.2.1:6001',
-        #     architecture=DEFAULT_IMAGE_ARCH,
-        #     scaling_group='sg02',
-        #     available_slots=ResourceSlot({
-        #         'cpu': Decimal('3.0'),
-        #         'mem': Decimal('2560'),
-        #         'cuda.shares': Decimal('0'),
-        #     }),
-        #     occupied_slots=ResourceSlot({
-        #         'cpu': Decimal('0'),
-        #         'mem': Decimal('0'),
-        #         'cuda.shares': Decimal('0'),
-        #     }),
-        # ),
     ]
 
 
 @pytest.fixture
 def example_agents_first_one_assigned():
     return [
-        AgentTable(
+        AgentRow(
             id=AgentId('i-001'),
             addr='10.0.1.1:6001',
             architecture=DEFAULT_IMAGE_ARCH,
-            scaling_group_name='sg01',
+            scaling_group_name=example_sgroup_name1,
             available_slots=ResourceSlot({
                 'cpu': Decimal('2.0'),
                 'mem': Decimal('2048'),
@@ -287,11 +205,11 @@ def example_agents_first_one_assigned():
                 'rocm.devices': Decimal('1'),
             }),
         ),
-        AgentTable(
+        AgentRow(
             id=AgentId('i-101'),
             addr='10.0.2.1:6001',
             architecture=DEFAULT_IMAGE_ARCH,
-            scaling_group_name='sg02',
+            scaling_group_name=example_sgroup_name2,
             available_slots=ResourceSlot({
                 'cpu': Decimal('3.0'),
                 'mem': Decimal('2560'),
@@ -305,53 +223,17 @@ def example_agents_first_one_assigned():
                 'rocm.devices': Decimal('0'),
             }),
         ),
-        # AgentContext(
-        #     agent_id=AgentId('i-001'),
-        #     agent_addr='10.0.1.1:6001',
-        #     architecture=DEFAULT_IMAGE_ARCH,
-        #     scaling_group='sg01',
-        #     available_slots=ResourceSlot({
-        #         'cpu': Decimal('2.0'),
-        #         'mem': Decimal('2048'),
-        #         'cuda.shares': Decimal('2.0'),
-        #         'rocm.devices': Decimal('1'),
-        #     }),
-        #     occupied_slots=ResourceSlot({
-        #         'cpu': Decimal('2.0'),
-        #         'mem': Decimal('2048'),
-        #         'cuda.shares': Decimal('2.0'),
-        #         'rocm.devices': Decimal('1'),
-        #     }),
-        # ),
-        # AgentContext(
-        #     agent_id=AgentId('i-101'),
-        #     agent_addr='10.0.2.1:6001',
-        #     architecture=DEFAULT_IMAGE_ARCH,
-        #     scaling_group='sg02',
-        #     available_slots=ResourceSlot({
-        #         'cpu': Decimal('3.0'),
-        #         'mem': Decimal('2560'),
-        #         'cuda.shares': Decimal('1.0'),
-        #         'rocm.devices': Decimal('8'),
-        #     }),
-        #     occupied_slots=ResourceSlot({
-        #         'cpu': Decimal('0'),
-        #         'mem': Decimal('0'),
-        #         'cuda.shares': Decimal('0'),
-        #         'rocm.devices': Decimal('0'),
-        #     }),
-        # ),
     ]
 
 
 @pytest.fixture
 def example_agents_no_valid():
     return [
-        AgentTable(
+        AgentRow(
             id=AgentId('i-001'),
             addr='10.0.1.1:6001',
             architecture=DEFAULT_IMAGE_ARCH,
-            scaling_group_name='sg01',
+            scaling_group_name=example_sgroup_name1,
             available_slots=ResourceSlot({
                 'cpu': Decimal('0'),
                 'mem': Decimal('0'),
@@ -365,11 +247,11 @@ def example_agents_no_valid():
                 'rocm.devices': Decimal('2'),
             }),
         ),
-        AgentTable(
+        AgentRow(
             id=AgentId('i-101'),
             addr='10.0.2.1:6001',
             architecture=DEFAULT_IMAGE_ARCH,
-            scaling_group_name='sg02',
+            scaling_group_name=example_sgroup_name2,
             available_slots=ResourceSlot({
                 'cpu': Decimal('0'),
                 'mem': Decimal('0'),
@@ -383,42 +265,6 @@ def example_agents_no_valid():
                 'rocm.devices': Decimal('8'),
             }),
         ),
-        # AgentContext(
-        #     id=AgentId('i-001'),
-        #     addr='10.0.1.1:6001',
-        #     architecture=DEFAULT_IMAGE_ARCH,
-        #     scaling_group_name='sg01',
-        #     available_slots=ResourceSlot({
-        #         'cpu': Decimal('0'),
-        #         'mem': Decimal('0'),
-        #         'cuda.shares': Decimal('0'),
-        #         'rocm.devices': Decimal('0'),
-        #     }),
-        #     occupied_slots=ResourceSlot({
-        #         'cpu': Decimal('4.0'),
-        #         'mem': Decimal('4096'),
-        #         'cuda.shares': Decimal('4.0'),
-        #         'rocm.devices': Decimal('2'),
-        #     }),
-        # ),
-        # AgentContext(
-        #     id=AgentId('i-101'),
-        #     addr='10.0.2.1:6001',
-        #     architecture=DEFAULT_IMAGE_ARCH,
-        #     scaling_group_name='sg02',
-        #     available_slots=ResourceSlot({
-        #         'cpu': Decimal('0'),
-        #         'mem': Decimal('0'),
-        #         'cuda.shares': Decimal('0'),
-        #         'rocm.devices': Decimal('0'),
-        #     }),
-        #     occupied_slots=ResourceSlot({
-        #         'cpu': Decimal('3.0'),
-        #         'mem': Decimal('2560'),
-        #         'cuda.shares': Decimal('1.0'),
-        #         'rocm.devices': Decimal('8'),
-        #     }),
-        # ),
     ]
 
 
@@ -427,6 +273,9 @@ class SessionKernelIdPair:
     session_id: UUID
     kernel_ids: Sequence[KernelId]
 
+cancelled_session_ids = [
+    UUID('251907d9-1290-4126-bc6c-000000000999'),
+]
 
 pending_session_kernel_ids = [
     SessionKernelIdPair(
@@ -465,8 +314,7 @@ existing_session_kernel_ids = [
 ]
 
 common_image_ref = ImageRef('lablup/python:3.6-ubunt18.04')
-common_image = ImageTable(
-    id=uuid4(),
+common_image = ImageRow(
     name=common_image_ref.canonical,
     image=common_image_ref.name,
     tag=common_image_ref.tag,
@@ -477,14 +325,11 @@ common_image = ImageTable(
 _common_dummy_for_pending_session: Mapping[str, Any] = dict(
     domain_name='default',
     group_id=example_group_id,
-    resource_policy={},
     resource_opts={},
     vfolder_mounts=[],
     environ={},
     bootstrap_script=None,
     startup_command=None,
-    internal_data=None,
-    preopen_ports=[],
 )
 
 _common_dummy_for_existing_session: Mapping[str, Any] = dict(
@@ -492,14 +337,38 @@ _common_dummy_for_existing_session: Mapping[str, Any] = dict(
     group_id=example_group_id,
 )
 
+@pytest.fixture
+def example_cancelled_sessions():
+    return [
+        SessionRow(
+            kp_access_key=AccessKey('user01'),
+            id=cancelled_session_ids[0],
+            creation_id='aaa100',
+            name='ecs01',
+            session_type=SessionTypes.BATCH,
+            status=SessionStatus.PENDING,
+            cluster_mode='single-node',
+            cluster_size=1,
+            scaling_group_name=example_sgroup_name1,
+            requested_slots=ResourceSlot({
+                'cpu': Decimal('2.0'),
+                'mem': Decimal('1024'),
+                'cuda.shares': Decimal('0'),
+                'rocm.devices': Decimal('1'),
+            }),
+            target_sgroup_names=[],
+            **_common_dummy_for_pending_session,
+            created_at=dtparse('2021-12-28T23:59:59+00:00'),
+        )
+    ]
 
 @pytest.fixture
 def example_pending_sessions():
     # lower indicies are enqueued first.
     return [
-        SessionTable(   # rocm
+        SessionRow(   # rocm
             kernels=[
-                KernelTable(
+                KernelRow(
                     id=pending_session_kernel_ids[0].kernel_ids[0],
                     session_id=pending_session_kernel_ids[0].session_id,
                     access_key='dummy-access-key',
@@ -524,11 +393,12 @@ def example_pending_sessions():
             kp_access_key=AccessKey('user01'),
             id=pending_session_kernel_ids[0].session_id,
             creation_id='aaa100',
-            name='es01',
+            name='eps01',
             session_type=SessionTypes.BATCH,
+            status=SessionStatus.PENDING,
             cluster_mode='single-node',
             cluster_size=1,
-            scaling_group_name='sg01',
+            scaling_group_name=example_sgroup_name1,
             requested_slots=ResourceSlot({
                 'cpu': Decimal('2.0'),
                 'mem': Decimal('1024'),
@@ -539,9 +409,9 @@ def example_pending_sessions():
             **_common_dummy_for_pending_session,
             created_at=dtparse('2021-12-28T23:59:59+00:00'),
         ),
-        SessionTable(   # cuda
+        SessionRow(   # cuda
             kernels=[
-                KernelTable(
+                KernelRow(
                     id=pending_session_kernel_ids[1].kernel_ids[0],
                     session_id=pending_session_kernel_ids[1].session_id,
                     access_key='dummy-access-key',
@@ -566,11 +436,12 @@ def example_pending_sessions():
             kp_access_key=AccessKey('user02'),
             id=pending_session_kernel_ids[1].session_id,
             creation_id='aaa101',
-            name='es01',
+            name='eps02',
             session_type=SessionTypes.BATCH,
+            status=SessionStatus.PENDING,
             cluster_mode='single-node',
             cluster_size=1,
-            scaling_group_name='sg01',
+            scaling_group_name=example_sgroup_name1,
             requested_slots=ResourceSlot({
                 'cpu': Decimal('1.0'),
                 'mem': Decimal('2048'),
@@ -581,9 +452,9 @@ def example_pending_sessions():
             **_common_dummy_for_pending_session,
             created_at=dtparse('2022-02-01T23:59:59+00:00'),
         ),
-        SessionTable(   # cpu-only
+        SessionRow(   # cpu-only
             kernels=[
-                KernelTable(
+                KernelRow(
                     id=pending_session_kernel_ids[2].kernel_ids[0],
                     session_id=pending_session_kernel_ids[2].session_id,
                     access_key='dummy-access-key',
@@ -604,7 +475,7 @@ def example_pending_sessions():
                     startup_command=None,
                     created_at=dtparse('2021-12-01T23:59:59+00:00'),
                 ),
-                KernelTable(
+                KernelRow(
                     id=pending_session_kernel_ids[2].kernel_ids[1],
                     session_id=pending_session_kernel_ids[2].session_id,
                     access_key='dummy-access-key',
@@ -625,7 +496,7 @@ def example_pending_sessions():
                     startup_command=None,
                     created_at=dtparse('2021-12-01T23:59:59+00:00'),
                 ),
-                KernelTable(
+                KernelRow(
                     id=pending_session_kernel_ids[2].kernel_ids[2],
                     session_id=pending_session_kernel_ids[2].session_id,
                     access_key='dummy-access-key',
@@ -649,13 +520,14 @@ def example_pending_sessions():
             ],
             kp_access_key=AccessKey('user03'),
             status_data={},
-            session_id=pending_session_kernel_ids[2].session_id,
+            id=pending_session_kernel_ids[2].session_id,
             creation_id='aaa102',
-            name='es01',
+            name='eps03',
             session_type=SessionTypes.BATCH,
+            status=SessionStatus.PENDING,
             cluster_mode='single-node',
             cluster_size=3,
-            scaling_group_name='sg01',
+            scaling_group_name=example_sgroup_name1,
             requested_slots=ResourceSlot({
                 'cpu': Decimal('1.0'),
                 'mem': Decimal('1024'),
@@ -666,192 +538,15 @@ def example_pending_sessions():
             **_common_dummy_for_pending_session,
             created_at=dtparse('2021-12-01T23:59:59+00:00'),
         ),
-        # PendingSession(  # rocm
-        #     kernels=[
-        #         KernelInfo(
-        #             kernel_id=pending_session_kernel_ids[0].kernel_ids[0],
-        #             session_id=pending_session_kernel_ids[0].session_id,
-        #             access_key='dummy-access-key',
-        #             agent_id=None,
-        #             agent_addr=None,
-        #             cluster_role=DEFAULT_ROLE,
-        #             cluster_idx=1,
-        #             cluster_hostname=f"{DEFAULT_ROLE}0",
-        #             image_ref=common_image_ref,
-        #             resource_opts={},
-        #             requested_slots=ResourceSlot({
-        #                 'cpu': Decimal('2.0'),
-        #                 'mem': Decimal('1024'),
-        #                 'cuda.shares': Decimal('0'),
-        #                 'rocm.devices': Decimal('1'),
-        #             }),
-        #             bootstrap_script=None,
-        #             startup_command=None,
-        #             created_at=dtparse('2021-12-28T23:59:59+00:00'),
-        #         ),
-        #     ],
-        #     access_key=AccessKey('user01'),
-        #     agent_id=None,
-        #     agent_addr=None,
-        #     status_data={},
-        #     session_id=pending_session_kernel_ids[0].session_id,
-        #     session_creation_id='aaa100',
-        #     session_name='es01',
-        #     session_type=SessionTypes.BATCH,
-        #     cluster_mode='single-node',
-        #     cluster_size=1,
-        #     scaling_group='sg01',
-        #     requested_slots=ResourceSlot({
-        #         'cpu': Decimal('2.0'),
-        #         'mem': Decimal('1024'),
-        #         'cuda.shares': Decimal('0'),
-        #         'rocm.devices': Decimal('1'),
-        #     }),
-        #     target_sgroup_names=[],
-        #     **_common_dummy_for_pending_session,
-        #     created_at=dtparse('2021-12-28T23:59:59+00:00'),
-        # ),
-        # PendingSession(  # cuda
-        #     kernels=[
-        #         KernelInfo(
-        #             kernel_id=pending_session_kernel_ids[1].kernel_ids[0],
-        #             session_id=pending_session_kernel_ids[1].session_id,
-        #             access_key='dummy-access-key',
-        #             agent_id=None,
-        #             agent_addr=None,
-        #             cluster_role=DEFAULT_ROLE,
-        #             cluster_idx=1,
-        #             cluster_hostname=f"{DEFAULT_ROLE}0",
-        #             image_ref=common_image_ref,
-        #             resource_opts={},
-        #             requested_slots=ResourceSlot({
-        #                 'cpu': Decimal('1.0'),
-        #                 'mem': Decimal('2048'),
-        #                 'cuda.shares': Decimal('0.5'),
-        #                 'rocm.devices': Decimal('0'),
-        #             }),
-        #             bootstrap_script=None,
-        #             startup_command=None,
-        #             created_at=dtparse('2022-02-01T23:59:59+00:00'),
-        #         ),
-        #     ],
-        #     access_key=AccessKey('user02'),
-        #     agent_id=None,
-        #     agent_addr=None,
-        #     status_data={},
-        #     session_id=pending_session_kernel_ids[1].session_id,
-        #     session_creation_id='aaa101',
-        #     session_name='es01',
-        #     session_type=SessionTypes.BATCH,
-        #     cluster_mode='single-node',
-        #     cluster_size=1,
-        #     scaling_group='sg01',
-        #     requested_slots=ResourceSlot({
-        #         'cpu': Decimal('1.0'),
-        #         'mem': Decimal('2048'),
-        #         'cuda.shares': Decimal('0.5'),
-        #         'rocm.devices': Decimal('0'),
-        #     }),
-        #     target_sgroup_names=[],
-        #     **_common_dummy_for_pending_session,
-        #     created_at=dtparse('2022-02-01T23:59:59+00:00'),
-        # ),
-        # PendingSession(  # cpu-only
-        #     kernels=[
-        #         KernelInfo(
-        #             kernel_id=pending_session_kernel_ids[2].kernel_ids[0],
-        #             session_id=pending_session_kernel_ids[2].session_id,
-        #             access_key='dummy-access-key',
-        #             agent_id=None,
-        #             agent_addr=None,
-        #             cluster_role=DEFAULT_ROLE,
-        #             cluster_idx=1,
-        #             cluster_hostname=f"{DEFAULT_ROLE}0",
-        #             image_ref=common_image_ref,
-        #             resource_opts={},
-        #             requested_slots=ResourceSlot({
-        #                 'cpu': Decimal('0.4'),
-        #                 'mem': Decimal('512'),
-        #                 'cuda.shares': Decimal('0'),
-        #                 'rocm.devices': Decimal('0'),
-        #             }),
-        #             bootstrap_script=None,
-        #             startup_command=None,
-        #             created_at=dtparse('2021-12-01T23:59:59+00:00'),
-        #         ),
-        #         KernelInfo(
-        #             kernel_id=pending_session_kernel_ids[2].kernel_ids[1],
-        #             session_id=pending_session_kernel_ids[2].session_id,
-        #             access_key='dummy-access-key',
-        #             agent_id=None,
-        #             agent_addr=None,
-        #             cluster_role='sub',
-        #             cluster_idx=2,
-        #             cluster_hostname="sub1",
-        #             image_ref=common_image_ref,
-        #             resource_opts={},
-        #             requested_slots=ResourceSlot({
-        #                 'cpu': Decimal('0.3'),
-        #                 'mem': Decimal('256'),
-        #                 'cuda.shares': Decimal('0'),
-        #                 'rocm.devices': Decimal('0'),
-        #             }),
-        #             bootstrap_script=None,
-        #             startup_command=None,
-        #             created_at=dtparse('2021-12-01T23:59:59+00:00'),
-        #         ),
-        #         KernelInfo(
-        #             kernel_id=pending_session_kernel_ids[2].kernel_ids[2],
-        #             session_id=pending_session_kernel_ids[2].session_id,
-        #             access_key='dummy-access-key',
-        #             agent_id=None,
-        #             agent_addr=None,
-        #             cluster_role='sub',
-        #             cluster_idx=3,
-        #             cluster_hostname="sub2",
-        #             image_ref=common_image_ref,
-        #             resource_opts={},
-        #             requested_slots=ResourceSlot({
-        #                 'cpu': Decimal('0.3'),
-        #                 'mem': Decimal('256'),
-        #                 'cuda.shares': Decimal('0'),
-        #                 'rocm.devices': Decimal('0'),
-        #             }),
-        #             bootstrap_script=None,
-        #             startup_command=None,
-        #             created_at=dtparse('2021-12-01T23:59:59+00:00'),
-        #         ),
-        #     ],
-        #     access_key=AccessKey('user03'),
-        #     agent_id=None,
-        #     agent_addr=None,
-        #     status_data={},
-        #     session_id=pending_session_kernel_ids[2].session_id,
-        #     session_creation_id='aaa102',
-        #     session_name='es01',
-        #     session_type=SessionTypes.BATCH,
-        #     cluster_mode='single-node',
-        #     cluster_size=3,
-        #     scaling_group='sg01',
-        #     requested_slots=ResourceSlot({
-        #         'cpu': Decimal('1.0'),
-        #         'mem': Decimal('1024'),
-        #         'cuda.shares': Decimal('0'),
-        #         'rocm.devices': Decimal('0'),
-        #     }),
-        #     target_sgroup_names=[],
-        #     **_common_dummy_for_pending_session,
-        #     created_at=dtparse('2021-12-01T23:59:59+00:00'),
-        # ),
     ]
 
 
 @pytest.fixture
 def example_existing_sessions():
     return [
-        SessionTable(
+        SessionRow(
             kernels=[
-                KernelTable(
+                KernelRow(
                     id=existing_session_kernel_ids[0].kernel_ids[0],
                     session_id=existing_session_kernel_ids[0].session_id,
                     access_key='dummy-access-key',
@@ -872,7 +567,7 @@ def example_existing_sessions():
                     startup_command=None,
                     created_at=dtparse('2022-02-05T00:00:00+00:00'),
                 ),
-                KernelTable(
+                KernelRow(
                     id=existing_session_kernel_ids[0].kernel_ids[1],
                     session_id=existing_session_kernel_ids[0].session_id,
                     access_key='dummy-access-key',
@@ -896,8 +591,9 @@ def example_existing_sessions():
             ],
             kp_access_key=AccessKey('user01'),
             id=existing_session_kernel_ids[0].session_id,
-            name='es01',
+            name='ees01',
             session_type=SessionTypes.BATCH,
+            status=SessionStatus.RUNNING,
             cluster_mode='single-node',
             cluster_size=2,
             occupying_slots=ResourceSlot({
@@ -906,12 +602,12 @@ def example_existing_sessions():
                 'cuda.shares': Decimal('0'),
                 'rocm.devices': Decimal('1'),
             }),
-            scaling_group_name='sg01',
+            scaling_group_name=example_sgroup_name1,
             **_common_dummy_for_existing_session,
         ),
-        SessionTable(
+        SessionRow(
             kernels=[
-                KernelTable(
+                KernelRow(
                     id=existing_session_kernel_ids[1].kernel_ids[0],
                     session_id=existing_session_kernel_ids[1].session_id,
                     access_key='dummy-access-key',
@@ -936,7 +632,8 @@ def example_existing_sessions():
             kp_access_key=AccessKey('user02'),
             id=existing_session_kernel_ids[1].session_id,
             session_type=SessionTypes.BATCH,
-            name='es01',
+            status=SessionStatus.RUNNING,
+            name='ees02',
             cluster_mode='single-node',
             cluster_size=1,
             occupying_slots=ResourceSlot({
@@ -945,12 +642,12 @@ def example_existing_sessions():
                 'cuda.shares': Decimal('0.5'),
                 'rocm.devices': Decimal('0'),
             }),
-            scaling_group_name='sg01',
+            scaling_group_name=example_sgroup_name1,
             **_common_dummy_for_existing_session,
         ),
-        SessionTable(
+        SessionRow(
             kernels=[
-                KernelTable(
+                KernelRow(
                     id=existing_session_kernel_ids[2].kernel_ids[0],
                     session_id=existing_session_kernel_ids[2].session_id,
                     access_key='dummy-access-key',
@@ -975,7 +672,8 @@ def example_existing_sessions():
             kp_access_key=AccessKey('user03'),
             id=existing_session_kernel_ids[2].session_id,
             session_type=SessionTypes.BATCH,
-            name='es01',
+            status=SessionStatus.RUNNING,
+            name='ees03',
             cluster_mode='single-node',
             cluster_size=1,
             occupying_slots=ResourceSlot({
@@ -984,153 +682,15 @@ def example_existing_sessions():
                 'cuda.shares': Decimal('0'),
                 'rocm.devices': Decimal('0'),
             }),
-            scaling_group_name='sg01',
+            scaling_group_name=example_sgroup_name1,
             **_common_dummy_for_existing_session,
         ),
-        # ExistingSession(
-        #     kernels=[
-        #         KernelInfo(
-        #             kernel_id=existing_session_kernel_ids[0].kernel_ids[0],
-        #             session_id=existing_session_kernel_ids[0].session_id,
-        #             access_key='dummy-access-key',
-        #             agent_id=None,
-        #             agent_addr=None,
-        #             cluster_role=DEFAULT_ROLE,
-        #             cluster_idx=1,
-        #             cluster_hostname=f"{DEFAULT_ROLE}0",
-        #             image_ref=common_image_ref,
-        #             resource_opts={},
-        #             requested_slots=ResourceSlot({
-        #                 'cpu': Decimal('1.0'),
-        #                 'mem': Decimal('512'),
-        #                 'cuda.shares': Decimal('0'),
-        #                 'rocm.devices': Decimal('0'),
-        #             }),
-        #             bootstrap_script=None,
-        #             startup_command=None,
-        #             created_at=dtparse('2022-02-05T00:00:00+00:00'),
-        #         ),
-        #         KernelInfo(
-        #             kernel_id=existing_session_kernel_ids[0].kernel_ids[1],
-        #             session_id=existing_session_kernel_ids[0].session_id,
-        #             access_key='dummy-access-key',
-        #             agent_id=None,
-        #             agent_addr=None,
-        #             cluster_role='sub',
-        #             cluster_idx=2,
-        #             cluster_hostname="sub1",
-        #             image_ref=common_image_ref,
-        #             resource_opts={},
-        #             requested_slots=ResourceSlot({
-        #                 'cpu': Decimal('2.0'),
-        #                 'mem': Decimal('512'),
-        #                 'cuda.shares': Decimal('0'),
-        #                 'rocm.devices': Decimal('1'),
-        #             }),
-        #             bootstrap_script=None,
-        #             startup_command=None,
-        #             created_at=dtparse('2022-02-05T00:00:00+00:00'),
-        #         ),
-        #     ],
-        #     access_key=AccessKey('user01'),
-        #     session_id=existing_session_kernel_ids[0].session_id,
-        #     session_name='es01',
-        #     session_type=SessionTypes.BATCH,
-        #     cluster_mode='single-node',
-        #     cluster_size=2,
-        #     occupying_slots=ResourceSlot({
-        #         'cpu': Decimal('3.0'),
-        #         'mem': Decimal('1024'),
-        #         'cuda.shares': Decimal('0'),
-        #         'rocm.devices': Decimal('1'),
-        #     }),
-        #     scaling_group='sg01',
-        #     **_common_dummy_for_existing_session,
-        # ),
-        # ExistingSession(
-        #     kernels=[
-        #         KernelInfo(
-        #             kernel_id=existing_session_kernel_ids[1].kernel_ids[0],
-        #             session_id=existing_session_kernel_ids[1].session_id,
-        #             access_key='dummy-access-key',
-        #             agent_id=None,
-        #             agent_addr=None,
-        #             cluster_role=DEFAULT_ROLE,
-        #             cluster_idx=1,
-        #             cluster_hostname=f"{DEFAULT_ROLE}0",
-        #             image_ref=common_image_ref,
-        #             resource_opts={},
-        #             requested_slots=ResourceSlot({
-        #                 'cpu': Decimal('1.0'),
-        #                 'mem': Decimal('2048'),
-        #                 'cuda.shares': Decimal('0.5'),
-        #                 'rocm.devices': Decimal('0'),
-        #             }),
-        #             bootstrap_script=None,
-        #             startup_command=None,
-        #             created_at=dtparse('2021-09-03T00:00:00+00:00'),
-        #         ),
-        #     ],
-        #     access_key=AccessKey('user02'),
-        #     session_id=existing_session_kernel_ids[1].session_id,
-        #     session_type=SessionTypes.BATCH,
-        #     session_name='es01',
-        #     cluster_mode='single-node',
-        #     cluster_size=1,
-        #     occupying_slots=ResourceSlot({
-        #         'cpu': Decimal('1.0'),
-        #         'mem': Decimal('2048'),
-        #         'cuda.shares': Decimal('0.5'),
-        #         'rocm.devices': Decimal('0'),
-        #     }),
-        #     scaling_group='sg01',
-        #     **_common_dummy_for_existing_session,
-        # ),
-        # ExistingSession(
-        #     kernels=[
-        #         KernelInfo(
-        #             kernel_id=existing_session_kernel_ids[2].kernel_ids[0],
-        #             session_id=existing_session_kernel_ids[2].session_id,
-        #             access_key='dummy-access-key',
-        #             agent_id=None,
-        #             agent_addr=None,
-        #             cluster_role=DEFAULT_ROLE,
-        #             cluster_idx=1,
-        #             cluster_hostname=f"{DEFAULT_ROLE}0",
-        #             image_ref=common_image_ref,
-        #             resource_opts={},
-        #             requested_slots=ResourceSlot({
-        #                 'cpu': Decimal('4.0'),
-        #                 'mem': Decimal('4096'),
-        #                 'cuda.shares': Decimal('0'),
-        #                 'rocm.devices': Decimal('0'),
-        #             }),
-        #             bootstrap_script=None,
-        #             startup_command=None,
-        #             created_at=dtparse('2022-01-15T00:00:00+00:00'),
-        #         ),
-        #     ],
-        #     access_key=AccessKey('user03'),
-        #     session_id=existing_session_kernel_ids[2].session_id,
-        #     session_type=SessionTypes.BATCH,
-        #     session_name='es01',
-        #     cluster_mode='single-node',
-        #     cluster_size=1,
-        #     occupying_slots=ResourceSlot({
-        #         'cpu': Decimal('4.0'),
-        #         'mem': Decimal('4096'),
-        #         'cuda.shares': Decimal('0'),
-        #         'rocm.devices': Decimal('0'),
-        #     }),
-        #     scaling_group='sg01',
-        #     **_common_dummy_for_existing_session,
-        # ),
     ]
 
 
-def _find_and_pop_picked_session(pending_sessions, picked_session_id):
+def _find_and_pop_picked_session(pending_sessions, picked_session):
     for picked_idx, pending_sess in enumerate(pending_sessions):
-        if pending_sess.session_id == picked_session_id:
+        if pending_sess.id == picked_session.id:
             break
     else:
         # no matching entry for picked session?
@@ -1138,39 +698,40 @@ def _find_and_pop_picked_session(pending_sessions, picked_session_id):
     return pending_sessions.pop(picked_idx)
 
 
-def test_fifo_scheduler(example_agents, example_pending_sessions, example_existing_sessions):
+async def test_fifo_scheduler(example_agents, example_pending_sessions, example_existing_sessions):
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
-    picked_session_id = scheduler.pick_session(
+
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         example_pending_sessions,
         example_existing_sessions,
     )
-    assert picked_session_id == example_pending_sessions[0].session_id
+    assert picked_session == example_pending_sessions[0]
     picked_session = _find_and_pop_picked_session(
         example_pending_sessions,
-        picked_session_id,
+        picked_session,
     )
-    agent_id = scheduler.assign_agent_for_session(
+    agent = scheduler.assign_agent_for_session(
         example_agents,
         picked_session,
     )
-    assert agent_id == AgentId('i-001')
+    assert agent.id == AgentId('i-001')
 
 
 def test_lifo_scheduler(example_agents, example_pending_sessions, example_existing_sessions):
     scheduler = LIFOSlotScheduler(ScalingGroupOpts(), {})
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         example_pending_sessions,
         example_existing_sessions,
     )
-    assert picked_session_id == example_pending_sessions[2].session_id
+    assert picked_session.id == example_pending_sessions[2].id
     picked_session = _find_and_pop_picked_session(
         example_pending_sessions,
-        picked_session_id,
+        picked_session,
     )
-    agent_id = scheduler.assign_agent_for_session(example_agents, picked_session)
-    assert agent_id == 'i-001'
+    agent = scheduler.assign_agent_for_session(example_agents, picked_session)
+    assert agent.id == 'i-001'
 
 
 def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
@@ -1179,42 +740,40 @@ def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators(
 ):
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
     for idx in range(3):
-        picked_session_id = scheduler.pick_session(
+        picked_session = scheduler.pick_session(
             example_total_capacity,
             example_pending_sessions,
             [],
         )
-        assert picked_session_id == example_pending_sessions[0].session_id
+        assert picked_session.id == example_pending_sessions[0].id
         picked_session = _find_and_pop_picked_session(
             example_pending_sessions,
-            picked_session_id,
+            picked_session,
         )
-        agent_id = scheduler.assign_agent_for_session(example_mixed_agents, picked_session)
+        agent = scheduler.assign_agent_for_session(example_mixed_agents, picked_session)
         if idx == 0:
             # example_mixed_agents do not have any agent with ROCM accelerators.
-            assert agent_id is None
+            assert agent is None
         elif idx == 1:
-            assert agent_id == AgentId('i-gpu')
+            assert agent.id == AgentId('i-gpu')
         elif idx == 2:
             # It should favor the CPU-only agent if the requested slots
             # do not include accelerators.
-            assert agent_id == AgentId('i-cpu')
+            assert agent.id == AgentId('i-cpu')
 
 
-def gen_pending_for_holb_tests(session_id: str, status_data: Mapping[str, Any]) -> PendingSession:
-    return PendingSession(
-        session_id=SessionId(session_id),  # type: ignore
-        session_name=secrets.token_hex(8),
-        access_key=AccessKey('ak1'),
-        agent_id=AgentId('i-001'),
-        agent_addr='10.0.1.1:6001',
+def gen_pending_for_holb_tests(session_id: str, status_data: Mapping[str, Any]) -> SessionRow:
+    return SessionRow(
+        id=SessionId(session_id),  # type: ignore
         status_data=status_data,
-        session_creation_id=secrets.token_urlsafe(8),
+        name=secrets.token_hex(8),
+        kp_access_key=AccessKey('ak1'),
+        creation_id=secrets.token_urlsafe(8),
         kernels=[],
         session_type=SessionTypes.INTERACTIVE,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,
-        scaling_group='sg01',
+        scaling_group_name=example_sgroup_name1,
         requested_slots=ResourceSlot({'cpu': Decimal(1), 'mem': Decimal(1024)}),
         target_sgroup_names=[],
         **_common_dummy_for_pending_session,
@@ -1232,11 +791,11 @@ def test_fifo_scheduler_hol_blocking_avoidance_empty_status_data():
         gen_pending_for_holb_tests("s1", {}),
         gen_pending_for_holb_tests("s2", {}),
     ]
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         pending_sessions,
         [])
-    assert picked_session_id == 's0'
+    assert picked_session.id == 's0'
 
 
 def test_fifo_scheduler_hol_blocking_avoidance_config():
@@ -1250,11 +809,11 @@ def test_fifo_scheduler_hol_blocking_avoidance_config():
         gen_pending_for_holb_tests("s1", {}),
         gen_pending_for_holb_tests("s2", {}),
     ]
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         pending_sessions,
         [])
-    assert picked_session_id == 's0'
+    assert picked_session.id == 's0'
 
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {'num_retries_to_skip': 5})
     pending_sessions = [
@@ -1262,11 +821,11 @@ def test_fifo_scheduler_hol_blocking_avoidance_config():
         gen_pending_for_holb_tests("s1", {'scheduler': {'retries': 4}}),
         gen_pending_for_holb_tests("s2", {'scheduler': {'retries': 3}}),
     ]
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         pending_sessions,
         [])
-    assert picked_session_id == 's1'
+    assert picked_session.id == 's1'
 
 
 def test_fifo_scheduler_hol_blocking_avoidance_skips():
@@ -1280,22 +839,22 @@ def test_fifo_scheduler_hol_blocking_avoidance_skips():
         gen_pending_for_holb_tests("s1", {}),
         gen_pending_for_holb_tests("s2", {}),
     ]
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         pending_sessions,
         [])
-    assert picked_session_id == 's1'
+    assert picked_session.id == 's1'
 
     pending_sessions = [
         gen_pending_for_holb_tests("s0", {'scheduler': {'retries': 5}}),
         gen_pending_for_holb_tests("s1", {'scheduler': {'retries': 10}}),
         gen_pending_for_holb_tests("s2", {}),
     ]
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         pending_sessions,
         [])
-    assert picked_session_id == 's2'
+    assert picked_session.id == 's2'
 
 
 def test_fifo_scheduler_hol_blocking_avoidance_all_skipped():
@@ -1309,11 +868,11 @@ def test_fifo_scheduler_hol_blocking_avoidance_all_skipped():
         gen_pending_for_holb_tests("s1", {'scheduler': {'retries': 5}}),
         gen_pending_for_holb_tests("s2", {'scheduler': {'retries': 5}}),
     ]
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         pending_sessions,
         [])
-    assert picked_session_id == 's0'
+    assert picked_session.id == 's0'
 
 
 def test_fifo_scheduler_hol_blocking_avoidance_no_skip():
@@ -1327,11 +886,11 @@ def test_fifo_scheduler_hol_blocking_avoidance_no_skip():
         gen_pending_for_holb_tests("s1", {'scheduler': {'retries': 10}}),
         gen_pending_for_holb_tests("s2", {}),
     ]
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         pending_sessions,
         [])
-    assert picked_session_id == 's0'
+    assert picked_session.id == 's0'
 
 
 def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
@@ -1342,23 +901,23 @@ def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators(
     # The result must be same.
     scheduler = LIFOSlotScheduler(ScalingGroupOpts(), {})
     for idx in range(3):
-        picked_session_id = scheduler.pick_session(
+        picked_session = scheduler.pick_session(
             example_total_capacity,
             example_pending_sessions,
             [])
-        assert picked_session_id == example_pending_sessions[-1].session_id
+        assert picked_session.id == example_pending_sessions[-1].id
         picked_session = _find_and_pop_picked_session(
-            example_pending_sessions, picked_session_id)
-        agent_id = scheduler.assign_agent_for_session(example_mixed_agents, picked_session)
+            example_pending_sessions, picked_session)
+        agent = scheduler.assign_agent_for_session(example_mixed_agents, picked_session)
         if idx == 2:
             # example_mixed_agents do not have any agent with ROCM accelerators.
-            assert agent_id is None
+            assert agent is None
         elif idx == 1:
-            assert agent_id == AgentId('i-gpu')
+            assert agent.id == AgentId('i-gpu')
         elif idx == 0:
             # It should favor the CPU-only agent if the requested slots
             # do not include accelerators.
-            assert agent_id == AgentId('i-cpu')
+            assert agent.id == AgentId('i-cpu')
 
 
 def test_drf_scheduler(
@@ -1367,19 +926,19 @@ def test_drf_scheduler(
     example_existing_sessions,
 ):
     scheduler = DRFScheduler(ScalingGroupOpts(), {})
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         example_pending_sessions,
         example_existing_sessions,
     )
     pprint(example_pending_sessions)
-    assert picked_session_id == example_pending_sessions[1].session_id
+    assert picked_session.id == example_pending_sessions[1].id
     picked_session = _find_and_pop_picked_session(
         example_pending_sessions,
-        picked_session_id,
+        picked_session,
     )
-    agent_id = scheduler.assign_agent_for_session(example_agents, picked_session)
-    assert agent_id == 'i-001'
+    agent = scheduler.assign_agent_for_session(example_agents, picked_session)
+    assert agent.id == 'i-001'
 
 
 def test_mof_scheduler_first_assign(
@@ -1388,16 +947,16 @@ def test_mof_scheduler_first_assign(
     example_existing_sessions,
 ):
     scheduler = MOFScheduler(ScalingGroupOpts(), {})
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         example_pending_sessions,
         example_existing_sessions)
-    assert picked_session_id == example_pending_sessions[0].session_id
+    assert picked_session.id == example_pending_sessions[0].id
     picked_session = _find_and_pop_picked_session(
-        example_pending_sessions, picked_session_id)
+        example_pending_sessions, picked_session)
 
-    agent_id = scheduler.assign_agent_for_session(example_agents, picked_session)
-    assert agent_id == 'i-001'
+    agent = scheduler.assign_agent_for_session(example_agents, picked_session)
+    assert agent.id == 'i-001'
 
 
 def test_mof_scheduler_second_assign(
@@ -1406,17 +965,17 @@ def test_mof_scheduler_second_assign(
     example_existing_sessions,
 ):
     scheduler = MOFScheduler(ScalingGroupOpts(), {})
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         example_pending_sessions,
         example_existing_sessions)
-    assert picked_session_id == example_pending_sessions[0].session_id
+    assert picked_session.id == example_pending_sessions[0].id
     picked_session = _find_and_pop_picked_session(
-        example_pending_sessions, picked_session_id)
+        example_pending_sessions, picked_session)
 
-    agent_id = scheduler.assign_agent_for_session(
+    agent = scheduler.assign_agent_for_session(
         example_agents_first_one_assigned, picked_session)
-    assert agent_id == 'i-101'
+    assert agent.id == 'i-101'
 
 
 def test_mof_scheduler_no_valid_agent(
@@ -1425,81 +984,71 @@ def test_mof_scheduler_no_valid_agent(
     example_existing_sessions,
 ):
     scheduler = MOFScheduler(ScalingGroupOpts(), {})
-    picked_session_id = scheduler.pick_session(
+    picked_session = scheduler.pick_session(
         example_total_capacity,
         example_pending_sessions,
         example_existing_sessions)
-    assert picked_session_id == example_pending_sessions[0].session_id
+    assert picked_session.id == example_pending_sessions[0].id
     picked_session = _find_and_pop_picked_session(
-        example_pending_sessions, picked_session_id)
+        example_pending_sessions, picked_session)
 
-    agent_id = scheduler.assign_agent_for_session(example_agents_no_valid, picked_session)
-    assert agent_id is None
+    agent = scheduler.assign_agent_for_session(example_agents_no_valid, picked_session)
+    assert agent is None
 
 
 @pytest.mark.asyncio
 async def test_pending_timeout(mocker):
 
-    class MockDatetime:
-        @classmethod
-        def now(cls, tzinfo):
-            return datetime(2021, 1, 1, 0, 0, 0)
+    # class MockDatetime:
+    #     @classmethod
+    #     def now(cls, tzinfo):
+    #         return datetime(2021, 1, 1, 0, 0, 0)
     
-    class MockSession:
+    class DummySession:
         def __init__(self, id, created_at, status) -> None:
             self.id = id
             self.created_at = created_at
             self.status = status
 
-    mocker.patch('ai.backend.manager.scheduler.dispatcher.datetime', MockDatetime)
+    # mocker.patch('ai.backend.manager.scheduler.dispatcher.datetime', MockDatetime)
+    now = datetime.now(tzutc())
     mock_query_result = MagicMock()
     mock_query_result.scalars = MagicMock()
-    mock_query_result.scalars.all = MagicMock(return_value=[
-        MockSession(
+    mock_query_result.scalars().all = MagicMock(return_value=[
+        DummySession(
             id='session3',
-            created_at=datetime(2020, 12, 31, 23, 59, 59),
+            # created_at=datetime(2020, 12, 31, 23, 59, 59),
+            created_at=now,
             status=SessionStatus.PENDING,
         ),
-        MockSession(
+        DummySession(
             id='session2',
-            created_at=datetime(2020, 12, 30, 23, 59, 59),
+            # created_at=datetime(2020, 12, 30, 23, 59, 59),
+            created_at=now - timedelta(seconds=86400),
             status=SessionStatus.PENDING,
         ),
-        MockSession(
+        DummySession(
             id='session1',
-            created_at=datetime(2020, 12, 29, 23, 59, 59),
+            # created_at=datetime(2020, 12, 29, 23, 59, 59),
+            created_at=now - timedelta(seconds=86400 * 3),
             status=SessionStatus.PENDING,
         ),
     ])
-    # mock_query_result.fetchall = MagicMock(return_value=[
-    #     {
-    #         'id': 'session3',
-    #         'created_at': datetime(2020, 12, 31, 23, 59, 59),
-    #     },
-    #     {
-    #         'id': 'session2',
-    #         'created_at': datetime(2020, 12, 30, 23, 59, 59)
-    #     },
-    #     {
-    #         'id': 'session1',
-    #         'created_at': datetime(2020, 12, 29, 23, 59, 59)
-    #     },
-    # ])
-    mock_execute = AsyncMock(return_value=mock_query_result)
     mock_dbsess = MagicMock()
-    mock_dbsess.execute = mock_execute
+    mock_dbsess.execute = AsyncMock(return_value=mock_query_result)
 
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(pending_timeout=timedelta(seconds=86400 * 2)), {})
     _, candidate_session_rows, cancelled_session_rows = await _list_managed_sessions(
-        mock_dbsess, scheduler, 'default',
+        mock_dbsess, 'default', pending_timeout=scheduler.sgroup_opts.pending_timeout,
     )
+    assert len(candidate_session_rows) + len(cancelled_session_rows) == 3
     assert len(candidate_session_rows) == 2
     assert len(cancelled_session_rows) == 1
-    assert cancelled_session_rows[0]['id'] == 'session1'
+    assert cancelled_session_rows[0].id == 'session1'
 
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(pending_timeout=timedelta(seconds=0)), {})
     _, candidate_session_rows, cancelled_session_rows = await _list_managed_sessions(
-        mock_dbsess, scheduler, 'default',
+        mock_dbsess, 'default', pending_timeout=scheduler.sgroup_opts.pending_timeout,
     )
     assert len(candidate_session_rows) == 3
     assert len(cancelled_session_rows) == 0
@@ -1513,15 +1062,16 @@ class DummyEtcd:
 @pytest.mark.asyncio
 async def test_manually_assign_agent_available(
     file_lock_factory,
-    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
+    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
     example_agents,
     example_pending_sessions,
 ):
     mock_local_config = MagicMock()
-    registry, mock_db, mock_dbresult, mock_shared_config, mock_event_dispatcher, mock_event_producer = \
+    registry, mock_db, mock_dbsess, mock_dbresult, mock_shared_config, mock_event_dispatcher, mock_event_producer = \
         registry_ctx
     sess_ctx = example_pending_sessions[0]
     mock_sched_ctx = MagicMock()
+    mock_sched_ctx.db = MagicMock()
     mock_check_result = MagicMock()
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
     sgroup_name = example_agents[0].scaling_group
@@ -1593,7 +1143,7 @@ async def test_manually_assign_agent_available(
 @pytest.mark.asyncio
 @mock.patch('ai.backend.manager.scheduler.predicates.datetime')
 async def test_multiple_timezones_for_reserved_batch_session_predicate(mock_dt):
-    mock_db_conn = MagicMock()
+    mock_db_sess = None
     mock_sched_ctx = MagicMock()
     mock_sess_ctx = MagicMock()
     mock_sess_ctx.session_type = SessionTypes.BATCH
@@ -1604,35 +1154,35 @@ async def test_multiple_timezones_for_reserved_batch_session_predicate(mock_dt):
 
     # Start time is not yet reached (now < start time)
     start_time = '2020-06-29T00:00:01+00:00'
-    mock_db_conn.scalar = AsyncMock(return_value=dtparse(start_time))
-    result = await check_reserved_batch_session(mock_db_conn, mock_sched_ctx, mock_sess_ctx)
+    mock_sess_ctx.starts_at = dtparse(start_time)
+    result = await check_reserved_batch_session(mock_db_sess, mock_sched_ctx, mock_sess_ctx)
     assert not result.passed, (now, start_time)
 
     # Start time is reached (now > start time)
     start_time = '2020-06-28T23:59:59+00:00'
-    mock_db_conn.scalar = AsyncMock(return_value=dtparse(start_time))
-    result = await check_reserved_batch_session(mock_db_conn, mock_sched_ctx, mock_sess_ctx)
+    mock_sess_ctx.starts_at = dtparse(start_time)
+    result = await check_reserved_batch_session(mock_db_sess, mock_sched_ctx, mock_sess_ctx)
     assert result.passed, (now, start_time)
 
     # Start time is not yet reached by timezone (now < start time)
     # Note that 6/29 00:00 (UTC) < 6/29 00:00 (-09:00) == 6/29 09:00 (UTC)
     for i in range(1, 12):
         start_time = f'2020-06-29T00:00:00-{i:02d}:00'
-        mock_db_conn.scalar = AsyncMock(return_value=dtparse(start_time))
-        result = await check_reserved_batch_session(mock_db_conn, mock_sched_ctx, mock_sess_ctx)
+        mock_sess_ctx.starts_at = dtparse(start_time)
+        result = await check_reserved_batch_session(mock_db_sess, mock_sched_ctx, mock_sess_ctx)
         assert not result.passed, (now, start_time)
 
     # Start time is reached by timezone (now > start time)
     # Note that 6/29 00:00 (UTC) > 6/29 00:00 (+09:00) == 6/28 15:00 (UTC)
     for i in range(1, 12):
         start_time = f'2020-06-29T00:00:00+{i:02d}:00'
-        mock_db_conn.scalar = AsyncMock(return_value=dtparse(start_time))
-        result = await check_reserved_batch_session(mock_db_conn, mock_sched_ctx, mock_sess_ctx)
+        mock_sess_ctx.starts_at = dtparse(start_time)
+        result = await check_reserved_batch_session(mock_db_sess, mock_sched_ctx, mock_sess_ctx)
         assert result.passed, (now, start_time)
 
     # Should pass if start time is not specified (start immediately).
-    mock_db_conn.scalar = AsyncMock(return_value=None)
-    result = await check_reserved_batch_session(mock_db_conn, mock_sched_ctx, mock_sess_ctx)
+    mock_sess_ctx.starts_at = dtparse(start_time)
+    result = await check_reserved_batch_session(mock_db_sess, mock_sched_ctx, mock_sess_ctx)
     assert result.passed
 
 

@@ -16,7 +16,7 @@ from ai.backend.manager.registry import AgentRegistry
 
 @pytest.mark.asyncio
 async def test_handle_heartbeat(
-    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
+    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
     mocker,
 ) -> None:
     mock_get_known_registries = AsyncMock(return_value=[
@@ -32,7 +32,7 @@ async def test_handle_heartbeat(
 
     mocker.patch('ai.backend.common.plugin.scan_entrypoints', mocked_entrypoints)
 
-    registry, mock_dbconn, mock_dbresult, mock_shared_config, _, _ = registry_ctx
+    registry, mock_dbconn, mock_dbsess, mock_dbresult, mock_shared_config, _, _ = registry_ctx
     image_data = snappy.compress(msgpack.packb([
         ('index.docker.io/lablup/python:3.6-ubuntu18.04', ),
     ]))
@@ -41,6 +41,38 @@ async def test_handle_heartbeat(
     _4 = Decimal('4')
     _1g = Decimal('1073741824')
     _2g = Decimal('2147483648')
+
+
+    class DummyAgent:
+        def __init__(
+            self, id, status, addr, architecture, scaling_group_name,
+            available_slots, version, compute_plugins,
+        ) -> None:
+            self.id = id
+            self.status = status
+            self.addr = addr
+            self.architecture = architecture
+            self.scaling_group_name = scaling_group_name
+            self.available_slots = available_slots
+            self.version = version
+            self.compute_plugins = compute_plugins
+
+        def __dict__(self) -> dict:
+            return {
+                'id': self.id,
+                'status': self.status,
+                'addr': self.addr,
+                'architecture': self.architecture,
+                'scaling_group_name': self.scaling_group_name,
+                'available_slots': self.available_slots,
+                'version': self.version,
+                'compute_plugins': self.compute_plugins,
+            }
+
+        def __iter__(self):
+            for item in self.__dict__().items():
+                yield item
+
 
     # Join
     mock_dbresult.first = MagicMock(return_value=None)
@@ -55,21 +87,22 @@ async def test_handle_heartbeat(
         'images': image_data,
     })
     mock_shared_config.update_resource_slots.assert_awaited_once()
-    q = mock_dbconn.execute.await_args_list[1].args[0]
+    q = mock_dbsess.execute.await_args_list[1].args[0]
     assert isinstance(q, Insert)
 
     # Update alive instance
     mock_shared_config.update_resource_slots.reset_mock()
-    mock_dbconn.execute.reset_mock()
-    mock_dbresult.first = MagicMock(return_value={
-        'status': AgentStatus.ALIVE,
-        'addr': '10.0.0.5',
-        'architecture': DEFAULT_IMAGE_ARCH,
-        'scaling_group': 'sg-testing',
-        'available_slots': ResourceSlot({'cpu': _1, 'mem': _1g}),
-        'version': '19.12.0',
-        'compute_plugins': [],
-    })
+    mock_dbsess.execute.reset_mock()
+    mock_dbresult.first = MagicMock(return_value=DummyAgent(
+        id='i-001',
+        status=AgentStatus.ALIVE,
+        addr='10.0.0.5',
+        architecture=DEFAULT_IMAGE_ARCH,
+        scaling_group_name='sg-testing',
+        available_slots=ResourceSlot({'cpu': _1, 'mem': _1g}),
+        version='19.12.0',
+        compute_plugins=[],
+    ))
     await registry.handle_heartbeat('i-001', {
         'scaling_group': 'sg-testing',
         'resource_slots': {'cpu': ('count', _1), 'mem': ('bytes', _2g)},
@@ -81,25 +114,35 @@ async def test_handle_heartbeat(
         'images': image_data,
     })
     mock_shared_config.update_resource_slots.assert_awaited_once()
-    q = mock_dbconn.execute.await_args_list[1].args[0]
+    q = mock_dbsess.execute.await_args_list[1].args[0]
     assert isinstance(q, Update)
     q_params = q.compile().params
     assert q_params['addr'] == '10.0.0.6'
     assert q_params['available_slots'] == ResourceSlot({'cpu': _1, 'mem': _2g})
-    assert 'scaling_group' not in q_params
+    assert 'scaling_group_name' not in q_params
 
     # Rejoin
     mock_shared_config.update_resource_slots.reset_mock()
-    mock_dbconn.execute.reset_mock()
-    mock_dbresult.first = MagicMock(return_value={
-        'status': AgentStatus.LOST,
-        'addr': '10.0.0.5',
-        'architecture': DEFAULT_IMAGE_ARCH,
-        'scaling_group': 'sg-testing',
-        'available_slots': ResourceSlot({'cpu': _1, 'mem': _1g}),
-        'version': '19.12.0',
-        'compute_plugins': [],
-    })
+    mock_dbsess.execute.reset_mock()
+    mock_dbresult.first = MagicMock(return_value=DummyAgent(
+        id='i-001',
+        status=AgentStatus.LOST,
+        addr='10.0.0.5',
+        architecture=DEFAULT_IMAGE_ARCH,
+        scaling_group_name='sg-testing',
+        available_slots=ResourceSlot({'cpu': _1, 'mem': _1g}),
+        version='19.12.0',
+        compute_plugins=[],
+    ))
+    # mock_dbresult.first = MagicMock(return_value={
+    #     'status': AgentStatus.LOST,
+    #     'addr': '10.0.0.5',
+    #     'architecture': DEFAULT_IMAGE_ARCH,
+    #     'scaling_group': 'sg-testing',
+    #     'available_slots': ResourceSlot({'cpu': _1, 'mem': _1g}),
+    #     'version': '19.12.0',
+    #     'compute_plugins': [],
+    # })
     await registry.handle_heartbeat('i-001', {
         'scaling_group': 'sg-testing2',
         'resource_slots': {'cpu': ('count', _4), 'mem': ('bytes', _2g)},
@@ -111,23 +154,23 @@ async def test_handle_heartbeat(
         'images': image_data,
     })
     mock_shared_config.update_resource_slots.assert_awaited_once()
-    q = mock_dbconn.execute.await_args_list[1].args[0]
+    q = mock_dbsess.execute.await_args_list[1].args[0]
     assert isinstance(q, Update)
     q_params = q.compile().params
     assert q_params['status'] == AgentStatus.ALIVE
     assert q_params['addr'] == '10.0.0.6'
     assert "lost_at=NULL" in str(q)  # stringified and removed from bind params
     assert q_params['available_slots'] == ResourceSlot({'cpu': _4, 'mem': _2g})
-    assert q_params['scaling_group'] == 'sg-testing2'
+    assert q_params['scaling_group_name'] == 'sg-testing2'
     assert 'compute_plugins' in q_params
     assert 'version' in q_params
 
 
 @pytest.mark.asyncio
 async def test_convert_resource_spec_to_resource_slot(
-    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
+    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
 ):
-    registry, _, _, _, _, _ = registry_ctx
+    registry, _, _, _, _, _, _ = registry_ctx
     allocations = {
         'cuda': {
             SlotName('cuda.shares'): {

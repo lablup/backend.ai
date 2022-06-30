@@ -113,6 +113,7 @@ from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    AGENT_UPDATE_FIELDS,
     AgentRow,
     AgentStatus,
     ImageRow,
@@ -2528,17 +2529,24 @@ class AgentRegistry:
                         result = await db_sess.execute(query)
                         assert result.rowcount == 1
                     elif agent_row.status == AgentStatus.ALIVE:
-                        is_updated = await AgentRow.update_alive_agent(
-                            db_sess, agent_row,
-                            agent_data = {
-                                **agent_info,
-                                'scaling_group_name': sgroup_name,
-                                'available_slots': available_slots,
-                                'addr': current_addr,
-                            },
-                        )
-                        if is_updated:
+                        agent_map = dict(agent_row)
+                        agent_current_data = {
+                            **agent_info,
+                            'scaling_group_name': sgroup_name,
+                            'available_slots': available_slots,
+                        }
+                        updates = {
+                            k: agent_current_data[k] for k in AGENT_UPDATE_FIELDS
+                            if agent_current_data[k] != agent_map[k]
+                        }
+                        if updates:
                             await self.shared_config.update_resource_slots(slot_key_and_units)
+                            query = (
+                                sa.update(AgentRow)
+                                .values(**updates)
+                                .where(AgentRow.id == agent_id)
+                            )
+                            await db_sess.execute(query)
                     elif agent_row.status in (AgentStatus.LOST, AgentStatus.TERMINATED):
                         await self.shared_config.update_resource_slots(slot_key_and_units)
                         instance_rejoin = True
