@@ -729,7 +729,7 @@ chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
 if ["$(uname -m)" = "arm64" -o "$(uname -m)" = "aarch64" ]; then
-  $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
+  $docker_sudo docker pull "cr.backend.ai/multiarch/python:3.9-ubuntu20.04"
 else
   $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
   if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
