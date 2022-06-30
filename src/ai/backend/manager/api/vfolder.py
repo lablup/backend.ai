@@ -43,6 +43,7 @@ from ..models import (
     VFolderPermissionValidator,
     VFolderUsageMode,
     agents,
+    audit_logs,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
     groups,
@@ -55,7 +56,6 @@ from ..models import (
     vfolder_invitations,
     vfolder_permissions,
     vfolders,
-    audit_logs,
 )
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (

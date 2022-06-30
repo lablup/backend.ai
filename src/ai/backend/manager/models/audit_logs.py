@@ -1,25 +1,18 @@
 from __future__ import annotations
 
+import logging
+from typing import TYPE_CHECKING, Optional, Sequence
 
+import graphene
 import sqlalchemy as sa
+from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
-from .base import (
-    metadata, Item,
-    PaginatedList,
-    simple_db_mutate)
-from typing import (
-    Sequence,
-    Optional,
-    TYPE_CHECKING)
-import logging
-from .user import UserRole
-
-from graphene.types.datetime import DateTime as GQLDateTime
-import graphene
 
 from ai.backend.common.logging import BraceStyleAdapter
 
+from .base import Item, PaginatedList, metadata, simple_db_mutate
+from .user import UserRole
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext

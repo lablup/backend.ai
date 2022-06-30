@@ -268,6 +268,7 @@ class BaseSession(metaclass=abc.ABCMeta):
 
         from .func.admin import Admin
         from .func.agent import Agent, AgentWatcher
+        from .func.audit_logs import AuditLog
         from .func.auth import Auth
         from .func.bgtask import BackgroundTask
         from .func.domain import Domain
@@ -287,7 +288,6 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.system import System
         from .func.user import User
         from .func.vfolder import VFolder
-        from .func.audit_logs import AuditLog
 
         self.System = System
         self.Admin = Admin

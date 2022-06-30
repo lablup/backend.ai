@@ -37,7 +37,7 @@ __all__ = (
 )
 
 from .agent import *  # noqa
-from .audit_logs import * # noqa
+from .audit_logs import *  # noqa
 from .domain import *  # noqa
 from .dotfile import *  # noqa
 from .error_logs import *  # noqa
