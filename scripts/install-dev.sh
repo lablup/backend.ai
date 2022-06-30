@@ -20,6 +20,9 @@ LBLUE="\033[1;34m"
 LCYAN="\033[1;36m"
 LWHITE="\033[1;37m"
 LG="\033[0;37m"
+BOLD="\033[1m"
+UNDL="\033[4m"
+RVRS="\033[7m"
 NC="\033[0m"
 REWRITELN="\033[A\r\033[K"
 
@@ -90,6 +93,10 @@ usage() {
   echo "  ${LWHITE}--etcd-port PORT${NC}"
   echo "    The port to bind the etcd container service."
   echo "    (default: 8120)"
+  echo ""
+  echo "  ${LWHITE}--webserver-port PORT${NC}"
+  echo "    The port to expose the web server."
+  echo "    (default: 8080)"
   echo ""
   echo "  ${LWHITE}--manager-port PORT${NC}"
   echo "    The port to expose the manager API service."
@@ -209,6 +216,7 @@ REDIS_PORT="8111"
 ETCD_PORT="8121"
 MANAGER_PORT="8091"
 WEBSERVER_PORT="8090"
+WSPROXY_PORT="5050"  # TODO: make it customizable
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
 VFOLDER_REL_PATH="vfroot/local"
@@ -452,6 +460,8 @@ install_editable_webui() {
     git clone https://github.com/lablup/backend.ai-webui ./src/webui
     cd src/webui
     cp configs/default.toml config.toml
+    sed_inplace "s@webServerURL =@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
+    sed_inplace "s@proxyURL =@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
   fi
   npm i
   make compile_wsproxy
@@ -812,13 +822,13 @@ if [ $EDITABLE_WEBUI -eq 1 ]; then
   echo "(Terminal 3)"
   echo "  > ${WHITE}cd src/webui; npm run wsproxy${NC}"
 fi
-show_note "Manual configuration for storage-proxy's client accessible hostname"
+show_note "Manual configuration for storage-proxy's client accessible hostname and webserver URL"
 echo " "
 echo "If you use a VM for this development setup but access it from a web browser outside the VM or remote nodes,"
 echo "you must manually modify the ${YELLOW}volumes/proxies/local/client_api${CYAN} etcd key${NC} to use an IP address or a DNS hostname"
 echo "that can be accessible from both the client SDK and the web browser."
 echo " "
-echo "We recommend setting ${YELLOW}/etc/hosts${WHITE} in both the VM and your web browser's host${NC} to keep a consistent DNS hostname"
+echo "We recommend setting ${BOLD}/etc/hosts${NC}${WHITE} in both the VM and your web browser's host${NC} to keep a consistent DNS hostname"
 echo "of the storage-proxy's client API endpoint."
 echo " "
 echo "An example command to change the value of that key:"
@@ -827,6 +837,8 @@ echo "where /etc/hosts in the VM contains:"
 echo "  ${WHITE}127.0.0.1      my-dev-machine${NC}"
 echo "and where /etc/hosts in the web browser host contains:"
 echo "  ${WHITE}192.168.99.99  my-dev-machine${NC}"
+echo " "
+echo "Also, you should set the hostname of the ${YELLOW}webServerURL${NC}, ${YELLOW}proxyURL${NC} fields of ${BOLD}src/webui/config.toml${NC} in the same way."
 show_note "How to reset this setup:"
 echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
 echo " "
