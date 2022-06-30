@@ -641,7 +641,7 @@ show_info "Setting up databases..."
 show_info "Configuring the Lablup's official image registry..."
 ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
 ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-if ["$(uname -m)" = "arm64" -o "$(uname -m)" = "aarch64" ]; then
+if ["$(uname -m)" = "arm64"]||["$(uname -m)" = "aarch64"]; then
   ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
 else
   ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
@@ -650,7 +650,7 @@ fi
 # Scan the container image registry
 show_info "Scanning the image registry..."
 ./backend.ai mgr etcd rescan-images cr.backend.ai
-if ["$(uname -m)" = "arm64" -o "$(uname -m)" = "aarch64" ]; then
+if ["$(uname -m)" = "arm64"]||["$(uname -m)" = "aarch64"]; then
   ./backend.ai mgr etcd alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
 else
   ./backend.ai mgr etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
@@ -728,7 +728,7 @@ chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
-if ["$(uname -m)" = "arm64" -o "$(uname -m)" = "aarch64" ]; then
+if ["$(uname -m)" = "arm64"]||["$(uname -m)" = "aarch64"]; then
   $docker_sudo docker pull "cr.backend.ai/multiarch/python:3.9-ubuntu20.04"
 else
   $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
