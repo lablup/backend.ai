@@ -105,6 +105,10 @@ class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
 
 
+class DoLeaderElectionEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_leader_election"
+
+
 @attr.s(slots=True, frozen=True)
 class DoTerminateSessionEvent(AbstractEvent):
     name = "do_terminate_session"

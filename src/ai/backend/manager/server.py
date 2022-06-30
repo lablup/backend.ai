@@ -23,6 +23,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    Optional,
     Sequence,
     cast,
 )
@@ -37,13 +38,14 @@ from setproctitle import setproctitle
 from ai.backend.common import redis
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.distributed import GlobalTimer
+from ai.backend.common.events import EventDispatcher, EventProducer, DoLeaderElectionEvent
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.utils import env_info
 from raft.client import AsyncGrpcRaftClient
-from raft.fsm import RaftFiniteStateMachine
+from raft.fsm import RaftFiniteStateMachine, RaftState
 from raft.server import GrpcRaftServer
 
 from . import __version__
@@ -61,7 +63,7 @@ from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHand
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
-from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
+from .defs import LockID, REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
 from .exceptions import InvalidArgument
 from .idle import init_idle_checkers
 from .models.storage import StorageSessionManager
@@ -292,7 +294,9 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    # Raft
+    """
+    We are using `Raft` algorithm for leader election.
+    """
     base_grpc_port = root_ctx.local_config['manager']['grpc-port']
     grpc_port = base_grpc_port + root_ctx.pidx
     num_proc = root_ctx.local_config['manager']['num-proc']
@@ -300,15 +304,34 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     _cleanup_coroutines: List[Coroutine] = []
 
+    loop = asyncio.get_running_loop()
+    global_timer: Optional[GlobalTimer] = None
+
+    def _on_state_changed(state: RaftState):
+        nonlocal global_timer
+        match state:
+            case RaftState.LEADER:
+                global_timer = GlobalTimer(
+                    root_ctx.distributed_lock_factory(lock_id=LockID.LOCKID_LEADER_ELECTION_TIMER, lifetime_hint=10.0),
+                    root_ctx.event_producer,
+                    lambda: DoLeaderElectionEvent(),
+                    interval=10.0,
+                )
+                loop.create_task(global_timer.join())
+            case _:
+                if timer := global_timer:
+                    loop.create_task(timer.leave())
+                global_timer = None
+
     client = AsyncGrpcRaftClient()
     server = GrpcRaftServer()
     raft = RaftFiniteStateMachine(
         peers=tuple(f'0.0.0.0:{x}' for x in grpc_ports),
         server=server,
         client=client,
+        on_state_changed=_on_state_changed,
     )
 
-    loop = asyncio.get_running_loop()
     _ = (
         loop.create_task(
             GrpcRaftServer.run(
