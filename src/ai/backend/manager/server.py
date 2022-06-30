@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import (
     Any,
     AsyncIterator,
+    Coroutine,
     Final,
     Iterable,
     List,
@@ -41,6 +42,9 @@ from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.utils import env_info
+from raft.client import AsyncGrpcRaftClient
+from raft.fsm import RaftFiniteStateMachine
+from raft.server import GrpcRaftServer
 
 from . import __version__
 from .api.context import RootContext
@@ -284,6 +288,41 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         tz = root_ctx.shared_config['system']['timezone']
         log.info('Configured timezone: {}', tz.tzname(datetime.now()))
     yield
+
+
+@actxmgr
+async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    # Raft
+    base_grpc_port = root_ctx.local_config['manager']['grpc-port']
+    grpc_port = base_grpc_port + root_ctx.pidx
+    num_proc = root_ctx.local_config['manager']['num-proc']
+    grpc_ports = [base_grpc_port + i for i in range(num_proc) if i != root_ctx.pidx]
+
+    _cleanup_coroutines: List[Coroutine] = []
+
+    client = AsyncGrpcRaftClient()
+    server = GrpcRaftServer()
+    raft = RaftFiniteStateMachine(
+        peers=tuple(f'0.0.0.0:{x}' for x in grpc_ports),
+        server=server,
+        client=client,
+    )
+
+    loop = asyncio.get_running_loop()
+    _ = (
+        loop.create_task(
+            GrpcRaftServer.run(
+                server,
+                cleanup_coroutines=_cleanup_coroutines,
+                port=grpc_port,
+            ),
+        ),
+        loop.create_task(raft.main()),
+    )
+
+    yield
+
+    await asyncio.gather(*_cleanup_coroutines)
 
 
 @actxmgr
@@ -544,6 +583,7 @@ def build_root_app(
     if cleanup_contexts is None:
         cleanup_contexts = [
             manager_status_ctx,
+            raft_ctx,
             redis_ctx,
             database_ctx,
             distributed_lock_ctx,
