@@ -444,8 +444,14 @@ bootstrap_pants() {
 
 install_editable_webui() {
   show_info "Installing editable version of Web UI..."
-  git clone https://github.com/lablup/backend.ai-webui ./src/webui
-  cd src/webui
+  if [ -d "./src/webui" ]; then
+    echo "src/webui already exists, so running 'make clean' on it..."
+    cd src/webui
+    make clean
+  else
+    git clone https://github.com/lablup/backend.ai-webui ./src/webui
+    cd src/webui
+  fi
   npm i
   make compile_wsproxy
   cd ../..
@@ -792,9 +798,9 @@ echo " "
 echo "${GREEN}Development environment is now ready.${NC}"
 show_note "How to run docker-compose:"
 if [ ! -z "$docker_sudo" ]; then
-  echo "    > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+  echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
 else
-  echo "    > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+  echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
 fi
 if [ $EDITABLE_WEBUI -eq 1 ]; then
   show_note "How to run the editable checkout of webui:"
@@ -804,10 +810,24 @@ if [ $EDITABLE_WEBUI -eq 1 ]; then
   echo "  > ${WHITE}cd src/webui; npm run server:d${NC}"
   echo "(Terminal 3)"
   echo "  > ${WHITE}cd src/webui; npm run wsproxy${NC}"
-  echo " "
 fi
+show_note "Manual configuration for storage-proxy's client accessible hostname"
+echo " "
+echo "If you use a VM for this development setup but access it from a web browser outside the VM or remote nodes,"
+echo "you must manually modify the ${YELLOW}volumes/proxies/local/client_api${CYAN} etcd key${NC} to use an IP address or a DNS hostname"
+echo "that can be accessible from both the client SDK and the web browser."
+echo " "
+echo "We recommend setting ${YELLOW}/etc/hosts${WHITE} in both the VM and your web browser's host${NC} to keep a consistent DNS hostname"
+echo "of the storage-proxy's client API endpoint."
+echo " "
+echo "An example command to change the value of that key:"
+echo "  > ${WHITE}./backend.ai mgr etcd put volumes/proxies/local/client_api http://my-dev-machine:6021${NC}"
+echo "where /etc/hosts in the VM contains:"
+echo "  ${WHITE}127.0.0.1      my-dev-machine${NC}"
+echo "and where /etc/hosts in the web browser host contains:"
+echo "  ${WHITE}192.168.99.99  my-dev-machine${NC}"
 show_note "How to reset this setup:"
-echo "    > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
+echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
 echo " "
 
 # vim: tw=0 sts=2 sw=2 et
