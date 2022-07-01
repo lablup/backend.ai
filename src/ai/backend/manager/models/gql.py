@@ -1052,7 +1052,9 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         id: str,
     ) -> Optional[VirtualFolder]:
-        return await VirtualFolder.load_by_id(info.context, id)
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, 'VirtualFolder.by_id')
+        return await loader.load(id)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key='user_id')

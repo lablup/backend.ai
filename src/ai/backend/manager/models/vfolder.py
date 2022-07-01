@@ -31,6 +31,7 @@ from .base import (
     Item,
     PaginatedList,
     batch_multiresult,
+    batch_result,
     metadata,
 )
 from .minilang.ordering import QueryOrderParser
@@ -793,13 +794,13 @@ class VirtualFolder(graphene.ObjectType):
             ]
 
     @classmethod
-    async def load_by_id(
+    async def batch_load_by_id(
         cls,
         graph_ctx: GraphQueryContext,
-        id: str,
+        ids: Sequence[str],
     ) -> Optional[VirtualFolder]:
-        from .user import users
         from .group import groups
+        from .user import users
         j = (
             vfolders
             .join(users, vfolders.c.user == users.c.uuid, isouter=True)
@@ -808,11 +809,13 @@ class VirtualFolder(graphene.ObjectType):
         query = (
             sa.select([vfolders, users.c.email, groups.c.name.label('groups_name')])
             .select_from(j)
-            .where(vfolders.c.id == id)
+            .where(vfolders.c.id.in_(ids))
         )
         async with graph_ctx.db.begin_readonly() as conn:
-            result = await conn.execute(query)
-            return cls.from_row(graph_ctx, result.fetchone())
+            return await batch_result(
+                graph_ctx, conn, query, cls,
+                ids, lambda row: row['id'],
+            )
 
     @classmethod
     async def batch_load_by_user(
