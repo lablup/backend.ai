@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import secrets
 from datetime import datetime, timedelta
-from dateutil.tz import tzutc
 from decimal import Decimal
 from pprint import pprint
 from typing import Any, Mapping, Sequence
@@ -14,6 +13,7 @@ import attr
 import pytest
 import trafaret as t
 from dateutil.parser import parse as dtparse
+from dateutil.tz import tzutc
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
@@ -26,11 +26,11 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts
-from ai.backend.manager.models.session import SessionStatus, SessionRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.scheduler.dispatcher import (
@@ -42,6 +42,7 @@ from ai.backend.manager.scheduler.drf import DRFScheduler
 from ai.backend.manager.scheduler.fifo import FIFOSlotScheduler, LIFOSlotScheduler
 from ai.backend.manager.scheduler.mof import MOFScheduler
 from ai.backend.manager.scheduler.predicates import check_reserved_batch_session
+
 # from ai.backend.manager.scheduler.types import (
 #     AgentContext,
 #     ExistingSession,

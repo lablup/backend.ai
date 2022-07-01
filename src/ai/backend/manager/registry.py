@@ -111,9 +111,9 @@ from .defs import DEFAULT_ROLE, INTRINSIC_SLOTS
 from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    AGENT_UPDATE_FIELDS,
     DEAD_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    AGENT_UPDATE_FIELDS,
     AgentRow,
     AgentStatus,
     ImageRow,
