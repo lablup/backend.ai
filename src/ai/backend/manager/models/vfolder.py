@@ -798,7 +798,7 @@ class VirtualFolder(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         ids: Sequence[str],
-    ) -> Optional[VirtualFolder]:
+    ) -> Sequence[VirtualFolder | None]:
         from .group import groups
         from .user import users
         j = (
