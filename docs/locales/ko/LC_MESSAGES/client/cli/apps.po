@@ -1,0 +1,129 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../client/cli/apps.rst:2 acfe99985b364bfaa18b197019e1a1d6
+msgid "Container Applications"
+msgstr ""
+
+#: ../../client/cli/apps.rst:6 24635703028247cfadecca9402a5bbc8
+msgid ""
+"Please consult the detailed usage in the help of each command (use ``-h`` or "
+"``--help`` argument to display the manual)."
+msgstr ""
+
+#: ../../client/cli/apps.rst:11 ccea7db530234eecbcd945b452179ed5
+msgid "Starting a session and connecting to its Jupyter Notebook"
+msgstr ""
+
+#: ../../client/cli/apps.rst:13 41436bc3a6a648f28d4030b0647cb9d6
+msgid ""
+"The following command first spawns a Python session named \"mysession\" "
+"without running any code immediately, and then executes a local proxy which "
+"connects to the \"jupyter\" service running inside the session via the local "
+"TCP port 9900. The ``start`` command shows application services provided by "
+"the created compute session so that you can choose one in the subsequent "
+"``app`` command. In the ``start`` command, you can specify detailed resource "
+"options using ``-r`` and storage mounts using ``-m`` parameter."
+msgstr ""
+
+#: ../../client/cli/apps.rst:28 afffa59d950d42a9baf1f89a0a564e4d
+msgid ""
+"Once executed, the ``app`` command waits for the user to open the displayed "
+"address using appropriate application. For the jupyter service, use your "
+"favorite web browser just like the way you use Jupyter Notebooks. To stop "
+"the ``app`` command, press ``Ctrl+C`` or send the ``SIGINT`` signal."
+msgstr ""
+
+#: ../../client/cli/apps.rst:35 97dd9701ae3c4c33accf598f406c0bad
+msgid "Accessing sessions via a web terminal"
+msgstr ""
+
+#: ../../client/cli/apps.rst:37 354b58c9b186464f84b9abcb6c1ead90
+msgid ""
+"All Backend.AI sessions expose an intrinsic application named ``\"ttyd\"``. "
+"It is an web application that embeds xterm.js-based full-screen terminal "
+"that runs on web browsers."
+msgstr ""
+
+#: ../../client/cli/apps.rst:46 6e509dcf8b284d97b8c79e0b580b0047
+msgid ""
+"Then open ``http://localhost:9900`` to access the shell in a fully "
+"functional web terminal using browsers. The default shell is ``/bin/bash`` "
+"for Ubuntu/CentOS-based images and ``/bin/ash`` for Alpine-based images with "
+"a fallback to ``/bin/sh``."
+msgstr ""
+
+#: ../../client/cli/apps.rst:53 b8a5ef28c469484598dcebce1e28fa8e
+msgid ""
+"This shell access does *NOT* grant your root access. All compute session "
+"processes are executed as the user privilege."
+msgstr ""
+
+#: ../../client/cli/apps.rst:58 c4d48e3e5a62401c9798448c2223abd8
+msgid "Accessing sessions via native SSH/SFTP"
+msgstr ""
+
+#: ../../client/cli/apps.rst:60 c9a163a6cc534de2beea38a2ca7a45a4
+msgid ""
+"Backend.AI offers direct access to compute sessions (containers) via SSH and "
+"SFTP, by auto-generating host identity and user keypairs for all sessions. "
+"All Baceknd.AI sessions expose an intrinsic application named ``\"sshd\"`` "
+"like ``\"ttyd\"``."
+msgstr ""
+
+#: ../../client/cli/apps.rst:66 9be99a6cf2314d65bb3d21fb1e637a75
+msgid ""
+"To connect your sessions with SSH, first prepare your session and download "
+"an auto-generated SSH keypair named ``id_container``. Then start the service "
+"port proxy (\"app\" command) to open a local TCP port that proxies the SSH/"
+"SFTP traffic to the compute sessions:"
+msgstr ""
+
+#: ../../client/cli/apps.rst:78 3f722472139e4bc390f0467abdeea509
+msgid "In another terminal on the same PC, run your ssh client like:"
+msgstr ""
+
+#: ../../client/cli/apps.rst:89 906494eb1a3548d4967b352a841ef1e3
+msgid ""
+"This SSH port is also compatible with SFTP to browse the container's "
+"filesystem and to upload/download large-sized files."
+msgstr ""
+
+#: ../../client/cli/apps.rst:92 2cf1a24c67354b438389d2abee3b3158
+msgid ""
+"You could add the following to your ``~/.ssh/config`` to avoid type extra "
+"options every time."
+msgstr ""
+
+#: ../../client/cli/apps.rst:109 95173d8d9d5a4896bf813b9fbd00643c
+msgid ""
+"Since the SSH keypair is auto-generated every time when your launch a new "
+"compute session, you need to download and keep it separately for each "
+"session."
+msgstr ""
+
+#: ../../client/cli/apps.rst:113 ae2dc710ae144713849b150afa6a3238
+msgid ""
+"To use your own SSH private key across all your sessions without downloading "
+"the auto-generated one every time, create a vfolder named ``.ssh`` and put "
+"the ``authorized_keys`` file that includes the public key. The keypair and "
+"``.ssh`` directory permissions will be automatically updated by Backend.AI "
+"when the session launches."
+msgstr ""

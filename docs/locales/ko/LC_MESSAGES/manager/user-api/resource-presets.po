@@ -1,0 +1,234 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/user-api/resource-presets.rst:2
+#: f6432f5d000b46f297f55a3a0f464025
+msgid "Resource Presets"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:4
+#: a880cc479eaa451dbcf09aad0680ea8b
+msgid ""
+"Resource presets provide a simple storage for pre-configured resource slots "
+"and a dynamic checker for allocatability of given presets before actually "
+"calling the kernel creation API."
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:8
+#: b98924a8b808492bba29242e8e41a455
+msgid ""
+"To add/modify/delete resource presets, you need to use the admin GraphQL API."
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:14
+#: 2a6458d6478b4e0b99f58dc059342b4d
+msgid "Listing Resource Presets"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:16
+#: f9d997b335764933a53ea8e82fde750f
+msgid "Returns the list of admin-configured resource presets."
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:18
+#: d4340edf12f542639f16543e150550cd
+msgid "URI: ``/resource/presets``"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:19
+#: b05e5d83e7d84e08af07aaba4be3cf23
+msgid "Method: ``GET``"
+msgstr "메소드 : ``GET``"
+
+#: ../../manager/user-api/resource-presets.rst:22
+#: ../../manager/user-api/resource-presets.rst:62
+#: 5a917e7706d64bb29c66f4224e32ec18 aca5e9b3ba594aa4af15cefbbc47b529
+msgid "Parameters"
+msgstr "매개변수들"
+
+#: ../../manager/user-api/resource-presets.rst:24
+#: ../../manager/user-api/resource-presets.rst:64
+#: 8f24337bc9004adca61ea2b2eeb9ef8f c157a3516a28466298257f40afb3b404
+msgid "None."
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:27
+#: ../../manager/user-api/resource-presets.rst:67
+#: 3166fb63de6d4cbb8a613354e59e7bcb 364c26c6842c49ec913df1be63304ba5
+msgid "Response"
+msgstr "응답"
+
+#: ../../manager/user-api/resource-presets.rst:33
+#: ../../manager/user-api/resource-presets.rst:73
+#: 7f16876162de4c3e87e4ccbc6c22abb9 debd385fbcec48ceb075e473f7a3ac8b
+msgid "HTTP Status Code"
+msgstr "HTTP Status Code"
+
+#: ../../manager/user-api/resource-presets.rst:34
+#: ../../manager/user-api/resource-presets.rst:74
+#: 72560b19c4684050b75e4814be4c7d91 b93a418a4a79487299fb789e86b3f2e2
+msgid "Description"
+msgstr "설명"
+
+#: ../../manager/user-api/resource-presets.rst:35
+#: ../../manager/user-api/resource-presets.rst:75
+#: 2b0174dfb9f640f38d2d623ef4794a3d b265959ad2e14af2aebf12ea5af312c0
+msgid "200 OK"
+msgstr "200 OK"
+
+#: ../../manager/user-api/resource-presets.rst:36
+#: ../../manager/user-api/resource-presets.rst:76
+#: 431230db15934568b9a2889b9e68c954 d9073c2252214eb08ea26e5a1f851421
+msgid "The preset list is returned."
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:42
+#: ../../manager/user-api/resource-presets.rst:84
+#: 51059509bfdc433c909b007595099317 9aebee0684b14c47b604fc925e5d9d89
+msgid "Fields"
+msgstr "필드"
+
+#: ../../manager/user-api/resource-presets.rst:43
+#: ../../manager/user-api/resource-presets.rst:85
+#: 42ba546717d5442c92b417b8fc332f17 4f31b7ea91ca4896875f2d7c2517e86c
+msgid "Type"
+msgstr "타입"
+
+#: ../../manager/user-api/resource-presets.rst:44
+#: ../../manager/user-api/resource-presets.rst:86
+#: 5a5a2aa3588e4426a25962c558eb99c5 d6c6d084fc2e4f4f809f5f72eb7a9b4f
+msgid "Values"
+msgstr "값"
+
+#: ../../manager/user-api/resource-presets.rst:45
+#: ../../manager/user-api/resource-presets.rst:103
+#: cd7fef78c1104aea86a95524c55fb435 f178b87d5c234cafbf8eda0326b581dc
+msgid "``presets``"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:46
+#: ../../manager/user-api/resource-presets.rst:104
+#: 98fbab3da57e4afea8e3c114cfd5a309 c009cead02a74fc6866748ef9f18fc72
+msgid "``list[object]``"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:47
+#: 81231e5f5864465fb40072bc9e9cea12
+msgid "The list of :ref:`resource-preset-object`"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:51
+#: 3777724632984deeabad2787e0b1873c
+msgid "Checking Allocatability of Resource Presets"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:53
+#: 69199e0cbb0c4c74bf5b05fee20c39cc
+msgid ""
+"Returns current keypair and scaling-group's resource limits in addition to "
+"the list of admin-configured resource presets. It also checks the "
+"allocatability of the resource presets and adds ``allocatable`` boolean "
+"field to each preset item."
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:58
+#: 20903059ef4042b7aeae0b745aa94d54
+msgid "URI: ``/resource/check-presets``"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:59
+#: 034e17c32a4c4ef88c530c7ea3ddf170
+msgid "Method: ``POST``"
+msgstr "Method: ``POST``"
+
+#: ../../manager/user-api/resource-presets.rst:77
+#: 669ff96a9b604ee8b6727f377245301a
+msgid "401 Unauthorized"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:78
+#: 1123b8a31d40438cb504a41930ab2c01
+msgid "The client is not authorized."
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:87
+#: 8a8ad8c25eef47d18f2f9e41002513f7
+msgid "``keypair_limits``"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:88
+#: ../../manager/user-api/resource-presets.rst:92
+#: ../../manager/user-api/resource-presets.rst:95
+#: ../../manager/user-api/resource-presets.rst:99
+#: 4b976ce8f0e44d2698ca84df3e82a614 4ef86a5549b6427eab2db92980d024e7
+#: e6c739ad60f24c2e82a2a7112197573d ea1b6ffbb49945e2b6e4f92b3c6f88e6
+msgid ":ref:`resource-slot-object`"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:89
+#: e6e03e6d31d34ce184805eeae46488e5
+msgid ""
+"The maximum amount of total resource slots allowed for the current access "
+"key. It may contain infinity values as the string \"Infinity\"."
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:91
+#: 958dbcd7455948bebb908404e76a720e
+msgid "``keypair_using``"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:93
+#: 9c7c12b732e2427fad8b69804c5d9516
+msgid "The amount of total resource slots used by the current access key."
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:94
+#: 94bf6b75383a4c619a0a90983025034f
+msgid "``keypair_remaining``"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:96
+#: 4c6dd565eeec4f47b360d041b0dcb2a9
+msgid ""
+"The amount of total resource slots remaining for the current access key. It "
+"may contain infinity values as the string \"Infinity\"."
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:98
+#: 76f72b790f1f4c458a8d299b65b3863d
+msgid "``scaling_group_remaining``"
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:100
+#: f05cffc785ab4948923b433df9efec40
+msgid ""
+"The amount of total resource slots remaining for the current scaling group. "
+"It may contain infinity values as the string \"Infinity\" if the server is "
+"configured for auto-scaling."
+msgstr ""
+
+#: ../../manager/user-api/resource-presets.rst:105
+#: abdaaa59423f44a58c54df48847a4124
+msgid ""
+"The list of :ref:`resource-preset-object`, but with an extra boolean field "
+"``allocatable`` which indicates if the given resource slot is actually "
+"allocatable considering the keypair's resrouce limits and the scaling "
+"group's current usage."
+msgstr ""

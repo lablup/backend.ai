@@ -1,0 +1,67 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/install-cuda.md:2 79300824c25a49549ea59c8f4ef891fe
+msgid "Install CUDA"
+msgstr ""
+
+#: ../../install/_archive/install-cuda.md:4 1b31197effb04becab53ed7470b1e18e
+msgid ""
+"On the clouds, we highly recommend using vendor-provided GPU-optimized "
+"instance types (e.g., p2/p3 series on AWS) and GPU-optimized virtual machine "
+"images which include ready-to-use CUDA drivers and configurations."
+msgstr ""
+
+#: ../../install/_archive/install-cuda.md:6 15a7d8f2c21a4c3fb8f9289e74246ecc
+msgid ""
+"Since Backend.AI's kernel container images ship all the necessary libraries "
+"and 3rd-party computation packages, you may choose the light-weight \"base\" "
+"image (e.g., Amazon Deep Learning *Base* AMI) instead of full-featured "
+"images (e.g., Amazon Deep Learning Conda AMI)."
+msgstr ""
+
+#: ../../install/_archive/install-cuda.md:8 bbdcbc5b338b4e1794c610c46a6d6a3e
+msgid "## Manually install CUDA at on-premise GPU servers"
+msgstr ""
+
+#: ../../install/_archive/install-cuda.md:10 735d652011604e3eba76f8efebe56ba9
+msgid ""
+"Please search for this topic on the Internet, as Linux distributions often "
+"provide their own driver packages and optimized method to install CUDA."
+msgstr ""
+
+#: ../../install/_archive/install-cuda.md:12 46acc4f32d0442fe8ebc57012a3fdd0a
+msgid ""
+"To download the driver and CUDA toolkit directly from NVIDIA, [visit here]"
+"(https://developer.nvidia.com/cuda-downloads)."
+msgstr ""
+
+#: ../../install/_archive/install-cuda.md:14 42b8a5e5c4884eb3adec5f4815cb9942
+msgid "## Let Backend.AI to utilize GPUs"
+msgstr ""
+
+#: ../../install/_archive/install-cuda.md:16 835258841ee64e43882e77d8fef4f80b
+msgid ""
+"If an agent server has properly configured nvidia-docker (ref: [[Install "
+"Docker]]) with working host-side drivers and the agent's Docker daemon has "
+"GPU-enabled kernel images, there is *nothing* to do special. Backend.AI "
+"tracks the GPU capacity just like CPU cores and RAM, and uses that "
+"information to schedule and assign GPU-enabled kernels."
+msgstr ""

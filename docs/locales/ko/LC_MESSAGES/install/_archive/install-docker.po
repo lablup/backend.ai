@@ -1,0 +1,79 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/install-docker.md:1 ca1c09a96b0b492bab2db7dccd3099fb
+msgid ""
+"[![asciicast](https://asciinema.org/a/dCkoIy27EwVvO6sVVXNaAWcCp.png)]"
+"(https://asciinema.org/a/dCkoIy27EwVvO6sVVXNaAWcCp)"
+msgstr ""
+
+#: ../../install/_archive/install-docker.md:3 35789076e40b41a9a8c94e31fbd3cfd9
+msgid ""
+"For platform-specific instructions, please consult [the official "
+"documentation](https://docs.docker.com/engine/installation/)."
+msgstr ""
+
+#: ../../install/_archive/install-docker.md:5 726653cacf1549dcb2eff0a0d5ddcfac
+msgid "Alternative way of docker installation on Linux (Ubuntu, CentOS, ...)"
+msgstr ""
+
+#: ../../install/_archive/install-docker.md:7 86fc9366c0724fedb796bb29c3aaaf4d
+msgid ""
+"```console $ curl -fsSL https://get.docker.io | sh ``` type your password to "
+"install docker."
+msgstr ""
+
+#: ../../install/_archive/install-docker.md:12 188791ebe6184dec8e78f54638fbd338
+msgid "## Run docker commands without sudo (required)"
+msgstr ""
+
+#: ../../install/_archive/install-docker.md:14 44e1966b681e4c958c605af24030bd85
+msgid ""
+"By default, you need sudo to execute docker commands. To do so without sudo, "
+"add yourself to the system `docker` group."
+msgstr ""
+
+#: ../../install/_archive/install-docker.md:17 6a58d099aa974b7c9ac7d8f1e4f08141
+msgid "```console $ sudo usermod -aG docker $USER ```"
+msgstr ""
+
+#: ../../install/_archive/install-docker.md:21 4c36ed94f0f44b0db8ac9f3470e4b694
+msgid "It will work after restarting your login session."
+msgstr ""
+
+#: ../../install/_archive/install-docker.md:23 b5e3dac0c0d141bfb227b4fdb8fae8a1
+msgid "## Install docker-compose (only for development/single-server setup)"
+msgstr ""
+
+#: ../../install/_archive/install-docker.md:25 b36bb32796bc41ceacc06dab92571918
+msgid ""
+"You need to install docker-compose separately. Check out [the official "
+"documentation](https://docs.docker.com/compose/install/)."
+msgstr ""
+
+#: ../../install/_archive/install-docker.md:28 50655cc25a834846af3d863599a9aefa
+msgid "## Install nvidia-docker (only for GPU-enabled agents)"
+msgstr ""
+
+#: ../../install/_archive/install-docker.md:30 56e9f975e45b41608db64ca1c76687cb
+msgid ""
+"Check out [the official repository](https://github.com/NVIDIA/nvidia-docker) "
+"for instructions."
+msgstr ""

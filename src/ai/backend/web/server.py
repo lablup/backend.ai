@@ -1,44 +1,46 @@
 import asyncio
-from functools import partial
+import json
 import logging
 import logging.config
-import json
 import os
-from pathlib import Path
-import pkg_resources
-from pprint import pprint
 import re
 import socket
 import ssl
 import sys
 import time
-from typing import (
-    Any,
-    AsyncIterator,
-    MutableMapping,
-    Tuple,
-)
+from functools import partial
+from pathlib import Path
+from pprint import pprint
+from typing import Any, AsyncIterator, MutableMapping, Tuple
 
-from aiohttp import web
 import aiohttp_cors
-from aiohttp_session import get_session, setup as setup_session
-from aiohttp_session.redis_storage import RedisStorage
-import aiotools
 import aioredis
+import aiotools
 import click
 import jinja2
-from setproctitle import setproctitle
-import toml
+import pkg_resources
+import tomli
 import uvloop
 import yarl
+from aiohttp import web
+from aiohttp_session import get_session
+from aiohttp_session import setup as setup_session
+from aiohttp_session.redis_storage import RedisStorage
+from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
-from ai.backend.client.exceptions import BackendClientError, BackendAPIError
+from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 
 from . import __version__, user_agent
 from .logging import BraceStyleAdapter
-from .proxy import web_handler, websocket_handler, web_plugin_handler
+from .proxy import (
+    decrypt_payload,
+    extra_config_headers,
+    web_handler,
+    web_plugin_handler,
+    websocket_handler,
+)
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.web.server'))
 static_path = Path(pkg_resources.resource_filename('ai.backend.web', 'static')).resolve()
@@ -291,7 +293,13 @@ async def login_handler(request: web.Request) -> web.Response:
             'type': 'https://api.backend.ai/probs/generic-bad-request',
             'title': 'You have already logged in.',
         }), content_type='application/problem+json')
-    creds = await request.json()
+    request_headers = extra_config_headers.check(request.headers)
+    secure_context = request_headers.get('X-BackendAI-Encoded', None)
+    if secure_context:
+        creds = await decrypt_payload(request)
+        creds = json.loads(creds)
+    else:
+        creds = await request.json()
     if 'username' not in creds or not creds['username']:
         return web.HTTPBadRequest(text=json.dumps({
             'type': 'https://api.backend.ai/probs/invalid-api-params',
@@ -630,7 +638,7 @@ async def server_main(
               default=False,
               help='Use more verbose logging.')
 def main(config_path: str, debug: bool) -> None:
-    config = toml.loads(Path(config_path).read_text(encoding='utf-8'))
+    config = tomli.loads(Path(config_path).read_text(encoding='utf-8'))
     config['debug'] = debug
     if config['debug']:
         debugFlag = 'DEBUG'

@@ -12,10 +12,10 @@ from typing import (
     Final,
     Literal,
     Optional,
-    TypeAlias,
-    Union,
     Set,
     Type,
+    TypeAlias,
+    Union,
 )
 
 import aioredis

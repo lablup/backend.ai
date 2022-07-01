@@ -4,6 +4,7 @@ python_sources(
     dependencies=[
         "src/ai/backend/client:lib",
         ":resources",
+        "//:reqs#coloredlogs",  # indirectly referred by logging config string
     ],
 )
 

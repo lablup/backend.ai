@@ -1,37 +1,54 @@
-Client SDK Libraries and Tools
-==============================
+Backend.AI Client SDK for Python
+================================
 
-We provide official client SDKs for popular programming languages that abstract
-the low-level REST/GraphQL APIs via functional and object-oriented interfaces.
+Python 3.8 or higher is required.
 
-Python
-------
+You can download `its official installer from python.org
+<https://www.python.org/downloads/>`_, or use a 3rd-party package/version manager
+such as `homebrew <http://brew.sh/index_ko.html>`_, `miniconda
+<http://conda.pydata.org/miniconda.html>`_, or `pyenv
+<https://github.com/pyenv/pyenv>`_.  It works on Linux, macOS, and Windows.
 
-Python is the most extensively supported client programming language.
-The SDK also includes the official command-line interface.
+We recommend to create a virtual environment for isolated, unobtrusive installation
+of the client SDK library and tools.
 
-* :doc:`Documentation for Backend.AI Client SDK for Python <client-py:index>`
-* `Source repository for Backend.AI Client SDK for Python <https://github.com/lablup/backend.ai-client-py>`_
+.. code-block:: console
 
-Javascript
-----------
+   $ python3 -m venv venv-backend-ai
+   $ source venv-backend-ai/bin/activate
+   (venv-backend-ai) $
 
-The Javascript SDK is for writing client apps on both NodeJS and web browsers.
-It is also used for our Atom/VSCode plugins.
+Then install the client library from PyPI.
 
-* :doc:`Documentation for Backend.AI Client SDK for Javascript <client-js:index>` (under construction)
-* `Source repository for Backend.AI Client SDK for Javascript <https://github.com/lablup/backend.ai-client-js>`_
+.. code-block:: console
 
-Java
-----
+   (venv-backend-ai) $ pip install -U pip setuptools
+   (venv-backend-ai) $ pip install backend.ai-client
 
-The Java SDK is used for implementing our IntelliJ/PyCharm plugins.
+Set your API keypair as environment variables:
 
-* :doc:`Documentation for Backend.AI Client SDK for Java <client-java:index>` (under construction)
-* `Source repository for Backend.AI Client SDK for Java <https://github.com/lablup/backend.ai-client-java>`_
+.. code-block:: console
 
-PHP
----
+   (venv-backend-ai) $ export BACKEND_ACCESS_KEY=AKIA...
+   (venv-backend-ai) $ export BACKEND_SECRET_KEY=...
 
-* :doc:`Documentation for Backend.AI Client SDK for PHP <client-js:index>` (under construction)
-* `Source repository for Backend.AI Client SDK for PHP <https://github.com/lablup/backend.ai-client-php>`_ (under construction)
+And then try the first commands:
+
+.. code-block:: console
+
+   (venv-backend-ai) $ backend.ai --help
+   ...
+   (venv-backend-ai) $ backend.ai ps
+   ...
+
+Check out more details with the below table of contents.
+
+.. toctree::
+   :maxdepth: 2
+
+   gsg/installation
+   gsg/config
+   cli/index
+   dev/index
+   func/index
+   lowlevel/index

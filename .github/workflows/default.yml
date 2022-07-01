@@ -9,7 +9,8 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
-    - uses: actions/cache@v3
+    - name: Apply cache for Pants
+      uses: actions/cache@v3
       id: cache
       with:
         # pants-specific cache
@@ -17,18 +18,18 @@ jobs:
           ~/.cache/pants/setup
           ~/.cache/pants/lmdb_store
           ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-
+        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: "3.10"
+        python-version: "3.10.4"
         cache: pip
     - name: Bootstrap Pants
       run: |
         mkdir .tmp
         ./pants --no-verify-config version
     - name: Check BUILD files
-      run: ./pants tailor --check update-build-files --check
+      run: ./pants tailor --check update-build-files --check # '::' # to add in 2.13+
     - name: Lint
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
@@ -57,7 +58,8 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
-    - uses: actions/cache@v3
+    - name: Apply cache for Pants
+      uses: actions/cache@v3
       id: cache
       with:
         # pants-specific cache
@@ -65,18 +67,16 @@ jobs:
           ~/.cache/pants/setup
           ~/.cache/pants/lmdb_store
           ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-
+        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: "3.10"
+        python-version: "3.10.4"
         cache: pip
     - name: Bootstrap Pants
       run: |
         mkdir .tmp
         ./pants --no-verify-config version
-    - name: Check BUILD files
-      run: ./pants tailor --check update-build-files --check
     - name: Typecheck
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
@@ -105,7 +105,8 @@ jobs:
       with:
         fetch-depth: 2
         submodules: true
-    - uses: actions/cache@v3
+    - name: Apply cache for Pants
+      uses: actions/cache@v3
       id: cache
       with:
         # pants-specific cache
@@ -113,7 +114,7 @@ jobs:
           ~/.cache/pants/setup
           ~/.cache/pants/lmdb_store
           ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-
+        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -127,14 +128,12 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: "3.10"
+        python-version: "3.10.4"
         cache: pip
     - name: Bootstrap Pants
       run: |
         mkdir .tmp
         ./pants --no-verify-config version
-    - name: Check BUILD files
-      run: ./pants tailor --check update-build-files --check
     - name: Test
       run: |
         if [ -n "$GITHUB_BASE_REF" ]; then
@@ -159,7 +158,8 @@ jobs:
     - uses: actions/checkout@v2
       with:
         submodules: true
-    - uses: actions/cache@v3
+    - name: Apply cache for Pants
+      uses: actions/cache@v3
       id: cache
       with:
         # pants-specific cache
@@ -167,7 +167,7 @@ jobs:
           ~/.cache/pants/setup
           ~/.cache/pants/lmdb_store
           ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-
+        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -181,7 +181,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: "3.10"
+        python-version: "3.10.4"
         cache: pip
     - name: Bootstrap Pants
       run: |
@@ -213,19 +213,25 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
-    - name: Publish
+    - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       # We don't use `./pants publish ::` because we manually rename the
       # wheels after buildling them to add arch-specific tags.
       run: |
-        twine upload dist/*.whl
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+        twine upload dist/*.whl dist/*.tar.gz
+    - name: Extract the release changelog
+      run: |
+        python ./scripts/extract-release-changelog.py
+        python ./scripts/determine-release-type.py
+    - name: Release to GitHub
+      uses: softprops/action-gh-release@v1
       with:
-        name: dist
-        path: dist
+        body_path: "CHANGELOG_RELEASE.md"
+        prerelease: ${{ env.IS_PRERELEASE }}
+        files: |
+          dist/*.whl
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:

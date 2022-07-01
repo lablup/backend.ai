@@ -1,37 +1,29 @@
 from __future__ import annotations
 
-from datetime import timedelta
-from typing import (
-    Any,
-    Dict,
-    Mapping,
-    Sequence,
-    Set,
-    TYPE_CHECKING,
-    Union,
-)
 import uuid
+from datetime import timedelta
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence, Set, Union
 
 import attr
 import graphene
-from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
+import trafaret as t
+from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-import trafaret as t
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import SessionTypes, JSONSerializableMixin
+from ai.backend.common.types import JSONSerializableMixin, SessionTypes
 
 from .base import (
+    StructuredJSONObjectColumn,
+    batch_multiresult,
+    batch_result,
     metadata,
+    set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
-    set_if_set,
-    batch_result,
-    batch_multiresult,
-    StructuredJSONObjectColumn,
 )
 from .group import resolve_group_name_or_id
 from .user import UserRole

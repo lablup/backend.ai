@@ -8,6 +8,7 @@ from io import IOBase
 from pathlib import Path
 from typing import Any, Optional
 
+from etcetra.client import EtcdCommunicator, EtcdConnectionManager
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -17,8 +18,6 @@ from tenacity import (
     wait_exponential,
     wait_random,
 )
-
-from etcetra.client import EtcdConnectionManager, EtcdCommunicator
 
 from ai.backend.common.etcd import AsyncEtcd
 

@@ -1,21 +1,23 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
 import asyncio
-from collections import defaultdict
-from decimal import Decimal
-from io import BytesIO, SEEK_END
 import json
 import logging
-from pathlib import Path
 import pickle
-import pkg_resources
 import re
 import signal
 import sys
+import time
 import traceback
+import weakref
+from abc import ABCMeta, abstractmethod
+from collections import defaultdict
+from decimal import Decimal
+from io import SEEK_END, BytesIO
+from pathlib import Path
 from types import TracebackType
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Awaitable,
@@ -24,67 +26,41 @@ from typing import (
     Dict,
     FrozenSet,
     Generic,
-    Optional,
     List,
     Literal,
     Mapping,
     MutableMapping,
     MutableSequence,
+    Optional,
     Sequence,
     Set,
     Tuple,
     Type,
     TypeVar,
     Union,
-    TYPE_CHECKING,
     cast,
 )
-import weakref
 
 import aioredis
 import aiotools
-from async_timeout import timeout
 import attr
-from cachetools import cached, LRUCache
+import pkg_resources
 import snappy
+import zmq
+import zmq.asyncio
+from async_timeout import timeout
+from cachetools import LRUCache, cached
 from tenacity import (
     AsyncRetrying,
+    retry_if_exception_type,
     stop_after_attempt,
     stop_after_delay,
-    retry_if_exception_type,
     wait_fixed,
 )
-import time
-import zmq, zmq.asyncio
 
 from ai.backend.common import msgpack, redis
-from ai.backend.common.docker import (
-    ImageRef,
-    MIN_KERNELSPEC,
-    MAX_KERNELSPEC,
-)
-from ai.backend.common.logging import BraceStyleAdapter, pretty
-from ai.backend.common.types import (
-    AutoPullBehavior,
-    ContainerId,
-    KernelId,
-    SessionId,
-    DeviceName,
-    SlotName,
-    HardwareMetadata,
-    ImageRegistry,
-    ClusterInfo,
-    KernelCreationConfig,
-    KernelCreationResult,
-    MountTypes,
-    MountPermission,
-    Sentinel,
-    ServicePortProtocols,
-    VFolderMount,
-    aobject,
-)
+from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
-    EventProducer,
     AbstractEvent,
     AgentErrorEvent,
     AgentHeartbeatEvent,
@@ -92,6 +68,7 @@ from ai.backend.common.events import (
     AgentTerminatedEvent,
     DoSyncKernelLogsEvent,
     DoSyncKernelStatsEvent,
+    EventProducer,
     ExecutionCancelledEvent,
     ExecutionFinishedEvent,
     ExecutionStartedEvent,
@@ -104,37 +81,44 @@ from ai.backend.common.events import (
     SessionFailureEvent,
     SessionSuccessEvent,
 )
-from ai.backend.common.utils import cancel_tasks, current_loop
+from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
-from . import __version__ as VERSION
-from .exception import AgentError, ResourceError
-from .kernel import (
-    AbstractKernel,
-    KernelFeatures,
-    match_distro_data,
+from ai.backend.common.types import (
+    AutoPullBehavior,
+    ClusterInfo,
+    ContainerId,
+    DeviceName,
+    HardwareMetadata,
+    ImageRegistry,
+    KernelCreationConfig,
+    KernelCreationResult,
+    KernelId,
+    MountPermission,
+    MountTypes,
+    Sentinel,
+    ServicePortProtocols,
+    SessionId,
+    SlotName,
+    VFolderMount,
+    aobject,
 )
+from ai.backend.common.utils import cancel_tasks, current_loop
+
+from . import __version__ as VERSION
 from . import resources as resources_mod
+from .exception import AgentError, ResourceError
+from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
+    AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
-    AbstractAllocMap,
     KernelResourceSpec,
     Mount,
 )
-from .stats import (
-    StatContext, StatModes,
-)
-from .types import (
-    Container,
-    ContainerStatus,
-    ContainerLifecycleEvent,
-    LifecycleEvent,
-)
-from .utils import (
-    generate_local_instance_id,
-    get_arch_name,
-)
+from .stats import StatContext, StatModes
+from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent
+from .utils import generate_local_instance_id, get_arch_name
 
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
@@ -632,6 +616,8 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
                             await t
                         except asyncio.CancelledError:
                             continue
+        if isinstance(event, KernelStartedEvent) or isinstance(event, KernelTerminatedEvent):
+            await self.save_last_registry()
         await self.event_producer.produce_event(event, source=self.local_config['agent']['id'])
 
     async def produce_error_event(
@@ -888,16 +874,10 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
         async with aiotools.PersistentTaskGroup(
             exception_handler=lifecycle_task_exception_handler,
         ) as tg:
-            ipc_base_path = self.local_config['agent']['ipc-base-path']
             while True:
                 ev = await self.container_lifecycle_queue.get()
-                now = time.monotonic()
-                if now > self.last_registry_written_time + 60 or isinstance(ev, Sentinel):
-                    self.last_registry_written_time = now
-                    with open(ipc_base_path / f'last_registry.{self.local_instance_id}.dat', 'wb') as f:
-                        pickle.dump(self.kernel_registry, f)
-                    log.debug(f'saved last_registry.{self.local_instance_id}.dat')
                 if isinstance(ev, Sentinel):
+                    await self.save_last_registry(force=True)
                     return
                 # attr currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
@@ -1805,3 +1785,17 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
 
     async def list_files(self, kernel_id: KernelId, path: str):
         return await self.kernel_registry[kernel_id].list_files(path)
+
+    async def save_last_registry(self, force=False) -> None:
+        now = time.monotonic()
+        if (not force) and (now <= self.last_registry_written_time + 60):
+            return  # don't save too frequently
+        try:
+            ipc_base_path = self.local_config["agent"]["ipc-base-path"]
+            last_registry_file = f"last_registry.{self.local_instance_id}.dat"
+            with open(ipc_base_path / last_registry_file, "wb") as f:
+                pickle.dump(self.kernel_registry, f)
+            self.last_registry_written_time = now
+            log.debug("saved {}", last_registry_file)
+        except Exception as e:
+            log.exception("unable to save {}", last_registry_file, exc_info=e)

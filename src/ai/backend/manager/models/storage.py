@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import asynccontextmanager as actxmgr
-from contextvars import ContextVar
 import itertools
 import logging
+from contextlib import asynccontextmanager as actxmgr
+from contextvars import ContextVar
 from pathlib import PurePosixPath
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Final,
@@ -16,23 +17,21 @@ from typing import (
     Sequence,
     Tuple,
     TypedDict,
-    TYPE_CHECKING,
 )
 from uuid import UUID
-
-from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import HardwareMetadata
 
 import aiohttp
 import attr
 import graphene
 import yarl
 
-from .base import (
-    Item, PaginatedList,
-)
-from ..api.exceptions import VFolderOperationFailed
+from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import HardwareMetadata
+
+from ..api.exceptions import InvalidAPIParameters, VFolderOperationFailed
 from ..exceptions import InvalidArgument
+from .base import Item, PaginatedList
+
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
@@ -144,7 +143,6 @@ class StorageSessionManager:
         vfolder_host_or_proxy_name: str,
         method: str,
         request_relpath: str,
-        /,
         *args,
         **kwargs,
     ) -> AsyncIterator[Tuple[yarl.URL, aiohttp.ClientResponse]]:
@@ -165,7 +163,7 @@ class StorageSessionManager:
                 try:
                     error_data = await client_resp.json()
                     raise VFolderOperationFailed(
-                        extra_msg=error_data.pop("msg"),
+                        extra_msg=error_data.pop("msg", None),
                         extra_data=error_data,
                     )
                 except aiohttp.ClientResponseError:
@@ -173,7 +171,10 @@ class StorageSessionManager:
                     raise VFolderOperationFailed(
                         extra_msg=f"Storage proxy responded with "
                                   f"{client_resp.status} {client_resp.reason}",
+                        extra_data=None,
                     )
+                except VFolderOperationFailed as e:
+                    raise InvalidAPIParameters(e.extra_msg, e.extra_data)
             yield proxy_info.client_api_url, client_resp
 
 

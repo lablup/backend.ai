@@ -4,9 +4,9 @@ import click
 
 from ai.backend.cli.extensions import ExtendedCommandGroup
 from ai.backend.client import __version__
-from ai.backend.client.output import get_output_handler
-from ai.backend.client.config import APIConfig, set_config
 from ai.backend.client.cli.types import CLIContext, OutputMode
+from ai.backend.client.config import APIConfig, set_config
+from ai.backend.client.output import get_output_handler
 
 
 @click.group(

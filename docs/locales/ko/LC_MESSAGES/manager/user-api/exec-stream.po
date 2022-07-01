@@ -1,0 +1,243 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/user-api/exec-stream.rst:4 1368422dd5c0492e9aba134a884a23b2
+msgid "Code Execution (Streaming)"
+msgstr "코드 실행(스트리밍)"
+
+#: ../../manager/user-api/exec-stream.rst:6 a68d7664875c4edda9237cd7ff7ecc3a
+#, fuzzy
+msgid ""
+"The streaming mode provides a lightweight and interactive method to connect "
+"with the session containers."
+msgstr ""
+"스트리밍 모드는 커널 컨테이너와 연결할 수 있는 가볍고 상호호환적인 방법을 제"
+"공합니다."
+
+#: ../../manager/user-api/exec-stream.rst:10 ad8351b1b2284dedb710cf7c49d6e20c
+msgid "Code Execution"
+msgstr "코드 실행"
+
+#: ../../manager/user-api/exec-stream.rst:12 c26da03363104d48b2c639eea32fb0c8
+#, fuzzy
+msgid "URI: ``/stream/session/:id/execute``"
+msgstr "URI: ``/stream/kernel/:id/execute``"
+
+#: ../../manager/user-api/exec-stream.rst:13
+#: ../../manager/user-api/exec-stream.rst:29 adeb8c8692c54d1a870f6d8075747b2d
+#: c97fbb9bc38742b68a4934406ded1497
+msgid "Method: ``GET`` upgraded to WebSockets"
+msgstr "Method: ``GET`` Websocket으로 업그레이드"
+
+#: ../../manager/user-api/exec-stream.rst:15 d2c049dd9035476b8ab83884bce6aad6
+msgid ""
+"This is a real-time streaming version of :doc:`exec-batch` and :doc:`exec-"
+"query` which uses long polling via HTTP."
+msgstr ""
+":HTTP를 통해 긴 폴링 방식을 사용하는 doc:`exec-batch`와 :doc:`exec-query`실시"
+"간 스트리밍 버전이다."
+
+#: ../../manager/user-api/exec-stream.rst:18 8d363b892dbb4d1ca96d84153ee48db2
+msgid "(under construction)"
+msgstr "(구성 중)"
+
+#: ../../manager/user-api/exec-stream.rst:26 ea00536230104c74b9e5067a05d2f39d
+msgid "Terminal Emulation"
+msgstr "터미널 에뮬레이션"
+
+#: ../../manager/user-api/exec-stream.rst:28 3f2f3451d93e40cfb83896772f8b83db
+#, fuzzy
+msgid "URI: ``/stream/session/:id/pty?app=:service``"
+msgstr "URI: ``/stream/kernel/:id/pty?app=:service``"
+
+#: ../../manager/user-api/exec-stream.rst:31 431ccf6ae2f945dbbede046e6e74593f
+msgid ""
+"This endpoint provides a duplex continuous stream of JSON objects via the "
+"native WebSocket. Although WebSocket supports binary streams, we currently "
+"rely on TEXT messages only conveying JSON payloads to avoid quirks in typed "
+"array support in Javascript across different browsers."
+msgstr ""
+"이 엔드포인트는 네이티브 웹소켓을 통해 Json 객체의 이중 연속 스트림을 제공한"
+"다.웹소켓은 바이너리 스트림을 지원하지만, 서로 다른 브라우저를 통한 "
+"Javascript의 타이핑된 배열 지원에서 이상한 점을 방지하기 위해 현재는 JSON 페"
+"이로드만 전달하는 TEXT 메시지에 의존하고 있다."
+
+#: ../../manager/user-api/exec-stream.rst:36 d10f101562404d529a2af56ff4ac6160
+msgid ""
+"The service name should be taken from the list of :ref:`service port objects "
+"<service-port-object>` returned by :ref:`the session creation API <create-"
+"session-api>`."
+msgstr ""
+"서비스 이름은 :ref:`the session creation API <create-session-api>`가 반환한 :"
+"ref:`service port objects <service-port-object>`의 리스트에서 가져와야 합니"
+"다."
+
+#: ../../manager/user-api/exec-stream.rst:42 a8657a4e2d524f98ba15fc79c14d416b
+msgid ""
+"We do *not* provide any legacy WebSocket emulation interfaces such as socket."
+"io or SockJS. You need to set up your own proxy if you want to support "
+"legacy browser users."
+msgstr ""
+"우리는 socket.io나 SockJS같은 기존 웹소켓 에뮬레이션 인터페이스를 제공하지 *"
+"않습니다.*기존 브라우저 사용자를 지원하려면 자신의 프록시를 설정해야 합니다."
+
+#: ../../manager/user-api/exec-stream.rst:47 05f3ea25ca7642da994e0a4ab10ce4a9
+msgid "Added the ``service`` query parameter."
+msgstr "``service`` 쿼리 매개변수를 추가하십시오."
+
+#: ../../manager/user-api/exec-stream.rst:50 2c3d2ad1b116431dab1820e7fcc257e5
+msgid "Parameters"
+msgstr "매개변수들"
+
+#: ../../manager/user-api/exec-stream.rst:56 1d857a9fce944fd29b2fc40315832dea
+msgid "Parameter"
+msgstr "매개변수"
+
+#: ../../manager/user-api/exec-stream.rst:57 a1b8c147043143f8a4c815e0c17fe9e1
+msgid "Type"
+msgstr "타입"
+
+#: ../../manager/user-api/exec-stream.rst:58 9bef91a532004a24a66e08e49e674955
+msgid "Description"
+msgstr "설명"
+
+#: ../../manager/user-api/exec-stream.rst:59 a9b87ae4489a4509ab37bb227e0a17d2
+msgid "``:id``"
+msgstr "``:id``"
+
+#: ../../manager/user-api/exec-stream.rst:60
+#: ../../manager/user-api/exec-stream.rst:63 10b0bac904a14852953992382b5fa833
+#: efc33e7eaaeb48f3b3c20ce7a58f7230
+msgid "``slug``"
+msgstr "``slug``"
+
+#: ../../manager/user-api/exec-stream.rst:61 d3c28fc297904ee19fbc118599dce9a2
+#, fuzzy
+msgid "The session ID."
+msgstr "세션 ID."
+
+#: ../../manager/user-api/exec-stream.rst:62 cec7cde8846d4caba1750f16f5fde963
+msgid "``:service``"
+msgstr "``:service``"
+
+#: ../../manager/user-api/exec-stream.rst:64 9096c6e3cb804480b381173c5f87ae95
+msgid "The service name to connect."
+msgstr "연결할 서비스 명"
+
+#: ../../manager/user-api/exec-stream.rst:67 3f9767bb0e464d2290b7a039fce2701f
+msgid "Client-to-Server Protocol"
+msgstr "클라이언트-대-서버 프로토콜"
+
+#: ../../manager/user-api/exec-stream.rst:69 17c86271903e4263876147575cc40312
+msgid "The endpoint accepts the following four types of input messages."
+msgstr "엔드포인트에서 다음 네 가지 유형의 입력 메시지를 수락합니다."
+
+#: ../../manager/user-api/exec-stream.rst:72 5e05324db9624e0da2af42e23f0d0fb9
+msgid "Standard input stream"
+msgstr "표준 입력 스트림"
+
+#: ../../manager/user-api/exec-stream.rst:74 28030f4393374f3ca2dc55041027cdf2
+msgid ""
+"All ASCII (and UTF-8) inputs must be encoded as base64 strings. The "
+"characters may include control characters as well."
+msgstr ""
+"모든 ASCII (및 UTF-8) 입력은 반드시 base64 문자열로 인코딩되어야 합니다.문자"
+"에는 제어 문자도 포함될 수 있습니다."
+
+#: ../../manager/user-api/exec-stream.rst:85 ff03f1d50bb749e7b8e6dfe313b9317b
+msgid "Terminal resize"
+msgstr "터미널 크기 조정"
+
+#: ../../manager/user-api/exec-stream.rst:87 140ca47999104c35a81ac13f60a1d36c
+msgid ""
+"Set the terminal size to the given number of rows and columns. You should "
+"calculate them by yourself."
+msgstr ""
+"터미널 크기를 주어진 행과 열 수로 설정하십시오. 스스로 계산을 해야 합니다."
+
+#: ../../manager/user-api/exec-stream.rst:90 f007b282d4de43e48571b05bfcabc015
+msgid ""
+"For instance, for web-browsers, you may do a simple math by measuring the "
+"width and height of a temporarily created, invisible HTML element with the "
+"(monospace) font styles same to the terminal container element that contains "
+"only a single ASCII character."
+msgstr ""
+"예를 들어, 웹브라우저의 경우, ASCII 문자 하나만 포함된 터미널 컨테이너 요소"
+"와 동일한 (monospace) 글꼴 스타일을 이용해서, 임시로 생성된 보이지 않는 HTML "
+"너비와 높이를 측정하여 간단한 계산을 할 수 있다."
+
+#: ../../manager/user-api/exec-stream.rst:104 2d8c12db798142649e1053f8452b6dac
+msgid "Ping"
+msgstr "핑"
+
+#: ../../manager/user-api/exec-stream.rst:106 76a8f72a5a804b319dfd83a641b76d6b
+#, fuzzy
+msgid ""
+"Use this to keep the session alive (preventing it from auto-terminated by "
+"idle timeouts) by sending pings periodically while the user-side browser is "
+"open."
+msgstr ""
+"사용자측 브라우저가 열려있는 동안 주기적으로 ping을 전송하여 이 커널을 계속 "
+"유지하려면 "
+
+#: ../../manager/user-api/exec-stream.rst:116 44c3a61cb37c45768e30e9bba0299dab
+msgid "Restart"
+msgstr "재시작"
+
+#: ../../manager/user-api/exec-stream.rst:118 405be78790344aacbca26e4506502362
+#, fuzzy
+msgid ""
+"Use this to restart the session without affecting the working directory and "
+"usage counts. Useful when your foreground terminal program does not respond "
+"for whatever reasons."
+msgstr ""
+"작업 디렉토리 및 사용 수에 영향을 주지 않고 커널을 다시 시작하려면 이것을 사"
+"용하십시오. 어떤 이유로든 포그라운드 터미널이 응답하지 않을 때 유용합니다."
+
+#: ../../manager/user-api/exec-stream.rst:129 d99ee7494427440fb9b186ae321685b3
+msgid "Server-to-Client Protocol"
+msgstr "서버-대-고객 프로토콜"
+
+#: ../../manager/user-api/exec-stream.rst:132 684cd7aa7a044c3cb34b08b7f4a6b4ce
+msgid "Standard output/error stream"
+msgstr "표준 결과/에러 스트림"
+
+#: ../../manager/user-api/exec-stream.rst:134 0015e36524004bbb9aa5bdd0f1f0e28e
+#, fuzzy
+msgid ""
+"Since the terminal is an output device, all stdout/stderr outputs are merged "
+"into a single stream as we see in real terminals. This means there is no way "
+"to distinguish stdout and stderr in the client-side, unless your session "
+"applies some special formatting to distinguish them (e.g., make all stderr "
+"otuputs red)."
+msgstr ""
+"터미널은 출력 장치이기 때문에 모든 stdout/stderr 출력은 실제 터미널에서 보는 "
+"것과 같이 하나의 스트림으로 통합됩니다. 이것은 당신의 커널이 이들을 구별하기 "
+"위해 특별한 포맷을 적용하지 않는 한(예시, 모든 stderr 출력을 빨갛게 해라) 클"
+"라이언트 측에서 stdout과 stderr을 구별할 수 없다는 것을 의미합니다."
+
+#: ../../manager/user-api/exec-stream.rst:140 ca1e476a0c084a71b5d3f52f64e0d59b
+msgid ""
+"The terminal output is compatible with xterm (including 256-color support)."
+msgstr ""
+
+#: ../../manager/user-api/exec-stream.rst:150 3699f73c760348f8bd1cd0597cd80348
+msgid "Server-side errors"
+msgstr ""

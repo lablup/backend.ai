@@ -1,0 +1,208 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/development-setup.rst:6 21726f4ce74f4ddbb6c41fe4c68747ca
+msgid "Development Setup"
+msgstr "개발 환경 설치"
+
+#: ../../install/development-setup.rst:8 0f382e89e41042e8894437e83524d0be
+msgid ""
+"Currently Backend.AI is developed and tested under only \\*NIX-compatible "
+"platforms (Linux or macOS)."
+msgstr ""
+"현재 Backend.AI는 \\*NIX계열(Linux 혹은 MacOS)상에서 개발 및 테스트 되었습니"
+"다."
+
+#: ../../install/development-setup.rst:12 617d8b2ffdb44150bda63fcbe194154e
+msgid "Installation from Source"
+msgstr ""
+
+#: ../../install/development-setup.rst:14 3fda633c33754e60bcee9490f43561fb
+msgid ""
+"For the ease of on-boarding developer experience, we provide an automated "
+"script that installs all server-side components in editable states with just "
+"one command."
+msgstr ""
+
+#: ../../install/development-setup.rst:19 4a72e8a9bdee4d249fbebaae1a23985f
+msgid "Prerequisites"
+msgstr "필수 선행 사항"
+
+#: ../../install/development-setup.rst:21 25ba0f43515d4317913abca2ee843629
+msgid "Install the followings accordingly to your host operating system."
+msgstr "사용자 OS에 맞는 설치 방법을 확인 후 진행해주세요."
+
+#: ../../install/development-setup.rst:23 67da258956a143ef9ca070b47db73ad1
+msgid ""
+"`pyenv <https://github.com/pyenv/pyenv>`_ and `pyenv-virtualenv <https://"
+"github.com/pyenv/pyenv-virtualenv>`_"
+msgstr ""
+"`pyenv <https://github.com/pyenv/pyenv>`_ 와 `pyenv-virtualenv <https://"
+"github.com/pyenv/pyenv-virtualenv>`_"
+
+#: ../../install/development-setup.rst:25 d9198306d00040f9b458b1743151b98c
+msgid ""
+"Ensure that you have the Python version specified in ``pants.toml`` on your "
+"``PATH``."
+msgstr ""
+
+#: ../../install/development-setup.rst:27 f68be2b565a44ba1ab57be78a3c4c347
+msgid "`docker <https://docs.docker.com/install/>`_"
+msgstr "`docker <https://docs.docker.com/install/>`_"
+
+#: ../../install/development-setup.rst:29 82e967bddc8e41608b65fe6fce017214
+#, fuzzy
+msgid ""
+"`docker-compose <https://docs.docker.com/compose/install/>`_ (v2 required)"
+msgstr "`docker-compose <https://docs.docker.com/compose/install/>`_"
+
+#: ../../install/development-setup.rst:31 28ce1f09f60e43c98e44e81df877d5ef
+msgid "`rust <https://rustup.rs/>`_ (for bootstrapping Pants)"
+msgstr ""
+
+#: ../../install/development-setup.rst:35 7ce6b014c19e49c1a960d52f95933882
+msgid ""
+"In some cases, locale conflicts between the terminal client and the remote "
+"host may cause encoding errors when installing Backend.AI components due to "
+"Unicode characters in README files.  Please keep correct locale "
+"configurations to prevent such errors."
+msgstr ""
+"상황에 따라 터미널 클라이언트와 원격 호스트 사이에 locale 충돌이 발생할 수 있"
+"습니다. 특히 Backend.AI 컴포넌트를 설치할 때에 README 파일의 유니코드 문자로 "
+"인해 이런 충돌이 발생할 수 있습니다. 이런 오류를 미연에 방지하기 위해 올바른 "
+"locale 설정을 유지해주세요."
+
+#: ../../install/development-setup.rst:40 15fb3019a14b411f830a224ceb80eeeb
+#, fuzzy
+msgid "Running the install-dev script"
+msgstr "스크립트 실행"
+
+#: ../../install/development-setup.rst:50 916fe4cb0b524e1a95471e72939973a3
+msgid ""
+"The script requires ``sudo`` to check and install several system packages "
+"such as ``build-essential``."
+msgstr ""
+
+#: ../../install/development-setup.rst:53 371c0fc44ccc4ee0a3c2466f7ede9ed4
+msgid ""
+"This script will bootstrap `Pants <https://pantsbuild.org>`_ and creates the "
+"halfstack containers using ``docker compose`` with fixture population. At "
+"the end of execution, the script will show several command examples about "
+"launching the service daemons such as manager and agent. You may execute "
+"this script multiple times when you encounter prerequisite errors and "
+"resolve them. Also check out additional options using ``-h`` / ``--help`` "
+"option, such as installing the CUDA mockup plugin together, etc."
+msgstr ""
+
+#: ../../install/development-setup.rst:64 a053853eac744efca24c4863647a49ce
+msgid ""
+"We have migrated to per-package repositories to a semi-mono repository that "
+"contains all Python-based components except plugins.  This has changed the "
+"installation instruction completely with introduction of Pants."
+msgstr ""
+
+#: ../../install/development-setup.rst:70 60dc7965a823466a95810ce9962efada
+msgid ""
+"To install multiple instances/versions of development environments using "
+"this script, just clone the repository in another location and run ``scripts/"
+"install-dev.sh`` inside that directory."
+msgstr ""
+
+#: ../../install/development-setup.rst:74 09094a985752436ba336cde256b6069d
+msgid ""
+"It is important to name these working-copy directories *differently* not to "
+"confuse ``docker compose`` so that it can distinguish the containers for "
+"each setup."
+msgstr ""
+
+#: ../../install/development-setup.rst:77 559744ea5da54f7084b2958394e44f09
+msgid ""
+"Unless you customize all port numbers by the options of ``scripts/install-"
+"dev.sh``, you should ``docker compose -f docker-compose.halfstack.current."
+"yml down`` and ``docker compose -f docker-compose.halfstack.current.yml up -"
+"d`` when switching between multiple working copies."
+msgstr ""
+
+#: ../../install/development-setup.rst:83 8a22f1d61da2416d807c76ea2758656b
+msgid ""
+"By default, the script pulls the docker images for our standard Python "
+"kernel and TensorFlow CPU-only kernel.  To try out other images, you have to "
+"pull them manually afterwards."
+msgstr ""
+
+#: ../../install/development-setup.rst:89 0d9de87b25de425bbb1d1db441265977
+msgid ""
+"**Using the agent's cgroup-based statistics without the root privilege "
+"(Linux-only)**"
+msgstr ""
+
+#: ../../install/development-setup.rst:91 2aee6f6fb1664e12b2a4ae2431eb1911
+msgid ""
+"To allow Backend.AI to collect sysfs/cgroup resource usage statistics, the "
+"Python executable must have the following Linux capabilities: "
+"``CAP_SYS_ADMIN``, ``CAP_SYS_PTRACE``, and ``CAP_DAC_OVERRIDE``."
+msgstr ""
+
+#: ../../install/development-setup.rst:101 fda22483a4a4499a845d515f0280e0db
+msgid "Verifying Installation"
+msgstr ""
+
+#: ../../install/development-setup.rst:103 61c8755e4c454f259d5bc552103a835c
+msgid ""
+"Refer the instructions displayed after running ``scripts/install-dev.sh``. "
+"We recommend to use `tmux <https://github.com/tmux/tmux/wiki>`_ to open "
+"multiple terminals in a single SSH session. Your terminal app may provide a "
+"tab interface, but when using remote servers, tmux is more convenient "
+"because you don't have to setup a new SSH connection whenever adding a new "
+"terminal."
+msgstr ""
+
+#: ../../install/development-setup.rst:110 20ff8347f6064009b59de59242b232b1
+msgid "Ensure the halfstack containers are running:"
+msgstr ""
+
+#: ../../install/development-setup.rst:116 1d851cff89e04c06accb8b94b498808d
+msgid "Open a terminal for manager and run:"
+msgstr ""
+
+#: ../../install/development-setup.rst:122 e2804c27c5ef4f55bd1fad5c059c6752
+msgid "Open another terminal for agent and run:"
+msgstr ""
+
+#: ../../install/development-setup.rst:128 bf8fc9a127fc41b28e3a6779c66cbb9b
+msgid "Open yet another terminal for client and run:"
+msgstr ""
+
+#: ../../install/development-setup.rst:141 6e2cb0d321944fc08fdc3e18bed0e571
+msgid "Resetting the environment"
+msgstr "환경 다시 설정하기"
+
+#: ../../install/development-setup.rst:143 ea3234f805894eac9d15afae7c4fbf20
+msgid ""
+"Shutdown all docker containers using ``docker compose -f docker-compose."
+"halfstack.current.yml down`` and delete the entire working copy directory.  "
+"That's all."
+msgstr ""
+
+#: ../../install/development-setup.rst:145 a7a860d4cd264fcb8658f3fead6da37c
+msgid ""
+"You may need ``sudo`` to remove the directories mounted as halfstack "
+"container volumes because Docker auto-creates them with the root privilege."
+msgstr ""

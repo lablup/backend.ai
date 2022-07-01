@@ -6,8 +6,10 @@ import click
 import humanize
 from tabulate import tabulate
 
-from ai.backend.client.session import Session
 from ai.backend.client.func.vfolder import _default_list_fields
+from ai.backend.client.session import Session
+
+from ..extensions import pass_ctx_obj
 from ..pretty import print_error
 from ..types import CLIContext
 from ..vfolder import vfolder as user_vfolder
@@ -23,7 +25,7 @@ def vfolder() -> None:
 
 def _list_cmd(docs: str = None):
 
-    @click.pass_obj
+    @pass_ctx_obj
     @click.option('-g', '--group', type=str, default=None,
                 help='Filter by group ID.')
     @click.option('--filter', 'filter_', default=None,

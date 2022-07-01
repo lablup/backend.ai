@@ -1,0 +1,97 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/install-on-clouds.rst:3 39341191c84642b5bda521c78794138a
+msgid "Install on Clouds"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:6 b7f998fcbd25403293e6129b4e57a822
+msgid "Prepare the instances and databases."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:9 78ac590873244b059a99370921767098
+msgid ""
+"1x SSL certificate with a private key for your own domain (for production)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:10 8f6ea6fda5bd4a3f810fc2a0d32be45f
+msgid "1x gateway instance (e.g., t2.xlarge on AWS)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:11 9d1c202dbb6f4c0b9fac571ebab5be8f
+msgid ""
+"1x agent instances (e.g., t2.medium / p2.xlarge on AWS -- for minimal "
+"testing)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:12 faad5ef4cc794082a51713c0bd7a4730
+msgid "1x PostgreSQL instance (e.g., AWS RDS)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:13 997cea863eac4b1ea245eeebacde8d0b
+msgid "1x Redis instance (e.g., AWS ElasticCache)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:14 5522e9310a3449269cbb16f1f77f2103
+msgid "1x etcd cluster"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:16 28804e67be6b4a25a9a73d22497218e9
+msgid ""
+"It is up to you whether to setup a HA-enabled multi-instance cluster or a "
+"single-instance cluster with storage backups."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:17 e9983ef5a4ad4f4d9245931b24ee40ce
+msgid ""
+"Check out [[this page|Install etcd]] for details. If you install etcd on the "
+"same instance where the manager runs, you could try using docker-compose "
+"configuration in this meta-repository's code."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:19 7bff63c554704e138e6126e58c324493
+msgid "1x cloud file system (e.g., AWS EFS, Azure FileShare)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:20 3ea039e3f17f4f5db56bd6a7d809c1da
+msgid "All should be in the same virtual private network."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:22 b4a2c593336640d6b672317f3112798e
+msgid ":doc:`Install Manager </install/install-manager>`"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:24 1b20e5f42c5c4ee799cf0617bc9ea2ab
+msgid "After done, create an image of this instance as a backup."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:26 04d68253ceda4b419a29e229f1f27629
+msgid ":doc:`Install Agent </install/install-agent>`"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:29 f8e2ace744864feb9648d76ccf17d52f
+msgid ""
+"After done, create an image of this instance for ease of manual/autoamtic "
+"scaling."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:31 1e18bcea507a4b63aa27409ed7b3a434
+msgid ":doc:`Configure Autoscaling </install/configure-autoscaling>`"
+msgstr ""

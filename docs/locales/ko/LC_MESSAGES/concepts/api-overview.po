@@ -1,0 +1,97 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../concepts/api-overview.rst:2 d402740be3654961964d10c75cc75beb
+msgid "API Overview"
+msgstr "API 개괄"
+
+#: ../../concepts/api-overview.rst:4 c41cae658e2d49bda5ee7e4207d959f5
+msgid "Backend.AI API v3 consists of two parts: User APIs and Admin APIs."
+msgstr ""
+"Backend.AI API v3는 두 가지로 구성 되어있습니다: 사용자 API와 관리자 API."
+
+#: ../../concepts/api-overview.rst:8 c489d07c833141da994bb2e2d893a702
+msgid ""
+"APIv3 breaks backward compatibility a lot, and we will primarily support v3 "
+"after June 2017. Please upgrade your clients immediately."
+msgstr ""
+"API v3는 하위 호환성이 많이 떨어져서 2017년 6월 이후로 주로 보충할 예정입니"
+"다.클라이언트를 바로 업그레이드 시켜주시기 바랍니다."
+
+#: ../../concepts/api-overview.rst:12 4e6afa1ff1a349d497938f714d56ff61
+msgid "API KeyPair Registration"
+msgstr "API 키페어 생성"
+
+#: ../../concepts/api-overview.rst:14 f4027455eb42484696716659775de486
+msgid ""
+"For managed, best-experience service, you may register to our cloud version "
+"of Backend.AI API service instead of installing it to your own machines. "
+"Simply create an account at `cloud.backend.ai <https://cloud.backend.ai>`_ "
+"and generate a new API keypair. You may also use social accounts for log-ins "
+"such as Twitter, Facebook, and GitHub."
+msgstr ""
+"클라우드 버전의 Backend.AI API 서비스를 설치하면 개인 장비에 설치하는 것보다 "
+"훨씬 더 용이하고 나은 서비스로 이용할 수 있습니다.`cloud.backend.ai <https://"
+"cloud.backend.ai>`_ 에서 계정을 만들고 새 API 키페어를 생성하세요.트위터, 페"
+"이스북, 깃허브와 같은 소셜 아이디로도 로그인할 수 있습니다."
+
+#: ../../concepts/api-overview.rst:18 1a062d5057174fe7a0155c1f4a736f7d
+msgid ""
+"An API keypair is composed of a 20-characters access key (``AKIA...``) and a "
+"40-characters secret key, in a similar form to AWS access keys."
+msgstr ""
+"API 키페어는 20 글자의 액세스 키(``AKIA...``)와 AWS액세스 키와 비슷한형태인 "
+"40 글자의 시크릿 키로 구성되어 있습니다."
+
+#: ../../concepts/api-overview.rst:20 bf76061d03884b418a8115e77e596cef
+msgid ""
+"Currently, the service is BETA: it is free of charge but each user is "
+"limited to have only one keypair and have up to 5 concurrent sessions for a "
+"given keypair. Keep you eyes on further announcements for upgraded paid "
+"plans."
+msgstr ""
+"현재 서비스는 베타 버전으로, 무료입니다.다만 1인당 1개의 키 쌍을 받고, 최대 5"
+"개의 병렬 세션을 만들 수 있습니다.정기 이용료에 대한 안내는 추후에 공지할 예"
+"정입니다."
+
+#: ../../concepts/api-overview.rst:24 7ad514abb9c84e2ab94c3ed2b783800e
+msgid "Accessing Admin APIs"
+msgstr "관리자 API 접속하기"
+
+#: ../../concepts/api-overview.rst:26 171836f1b3e649d6a52283ec1cc6aa05
+msgid "The admin APIs require a special keypair with the admin privilege:"
+msgstr "관리자 API는 관리자 권한의 특별한 키 쌍을 요구합니다."
+
+#: ../../concepts/api-overview.rst:28 00495308431f4a3a8e04b367f0be6b8d
+msgid ""
+"The public cloud service (``api.backend.ai``): It currently does *not* offer "
+"any admin privileges to the end-users, as its functionality is already "
+"available via our management console at `cloud.backend.ai <https://cloud."
+"backend.ai>`_."
+msgstr ""
+"공용 클라우드 서비스 (``api.backend.ai``)는 현재 사용자에게 어떠한 관리자 권"
+"한을 제공하지 않습니다.이미 `cloud.backend.ai <https://cloud.backend.ai>`_ 에"
+"서 매니저 콘솔을 통해 충분히 기능을 사용할 수 있기 때문입니다."
+
+#: ../../concepts/api-overview.rst:29 c8d3db15a5a34bc5b06d72d03ade7c79
+msgid ""
+"On-premise installation: You will get an auto-generated admin keypair during "
+"installation."
+msgstr "온프레미스 설치: 설치 중에 자동 생성된 키 쌍을 받게 됩니다."

@@ -1,51 +1,48 @@
 import asyncio
-from decimal import Decimal
 import logging
 import os
-from pathlib import Path
 import platform
-from typing import (
-    cast,
-    Any,
-    Collection,
-    Dict,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-)
+from decimal import Decimal
+from pathlib import Path
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, cast
 
 import aiohttp
-from aiodocker.docker import Docker, DockerContainer
-from aiodocker.exceptions import DockerError
 import async_timeout
 import psutil
+from aiodocker.docker import Docker, DockerContainer
+from aiodocker.exceptions import DockerError
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.utils import current_loop, nmget
 from ai.backend.common.types import (
-    DeviceName, DeviceId,
+    DeviceId,
     DeviceModelInfo,
-    SlotName, SlotTypes,
+    DeviceName,
     MetricKey,
+    SlotName,
+    SlotTypes,
 )
-from .agent import Container
-from .resources import (
-    get_resource_spec_from_container,
-)
+from ai.backend.common.utils import current_loop, nmget
+
 from .. import __version__
 from ..resources import (
-    AbstractAllocMap, DeviceSlotInfo,
-    DiscretePropertyAllocMap,
+    AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
 )
 from ..stats import (
-    StatContext, NodeMeasurement, ContainerMeasurement,
-    StatModes, MetricTypes, Measurement,
+    ContainerMeasurement,
+    Measurement,
+    MetricTypes,
+    NodeMeasurement,
+    StatContext,
+    StatModes,
 )
 from ..utils import closing_async, read_sysfs
 from ..vendor.linux import libnuma
+from .agent import Container
+from .resources import get_resource_spec_from_container
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -371,6 +368,8 @@ class MemoryPlugin(AbstractComputePlugin):
             per_disk_stat = {}
             for disk_info in psutil.disk_partitions():
                 if disk_info.fstype not in pruned_disk_types:
+                    if '/var/lib/docker/btrfs' == disk_info.mountpoint:
+                        continue
                     dstat = os.statvfs(disk_info.mountpoint)
                     disk_usage = Decimal(dstat.f_frsize * (dstat.f_blocks - dstat.f_bavail))
                     disk_capacity = Decimal(dstat.f_frsize * dstat.f_blocks)

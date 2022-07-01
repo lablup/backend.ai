@@ -1,0 +1,179 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/user-api/service-ports.rst:2 67009c69c86049f0a460abb5d9cb6905
+msgid "Service Ports (aka Service Proxies)"
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:4 e3f4e792e35045ce9ba8947c6203e928
+msgid ""
+"The service ports API provides WebSocket-based authenticated and encrypted "
+"tunnels to network-facing services (\"container services\") provided by the "
+"kernel container. The main advantage of this feature is that all application-"
+"specific network traffic are wrapped as a standard WebSocket API (no need to "
+"open extra ports of the manager). It also hides the container from the "
+"client and the client from the container, offerring an extra level of "
+"security."
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:14 c252cf97fe514c7fb54c99c1fc6c734c
+msgid ""
+"The diagram showing how tunneling of TCP connections via WebSockets works."
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:16 55a4f5d7ae224269a0f2eb3799cee829
+msgid ""
+"As :numref:`service-port-diagram` shows, all TCP traffic to a container "
+"service could be sent to a WebSocket connection to the following API "
+"endpoints.  A single WebSocket connection corresponds to a single TCP "
+"connection to the service, and there may be multiple concurrent WebSocket "
+"connections to represent multiple TCP connections to the service.  It is the "
+"client's responsibility to accept arbitrary TCP connections from users (e."
+"g., web browsers) with proper authorization for multi-user setups and wrap "
+"those as WebSocket connections to the following APIs."
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:25 1932e1b681e2493eb1679c6078ea3c88
+msgid ""
+"When the first connection is initiated, the Backend.AI Agent running the "
+"designated kernel container signals the kernel runner daemon in the "
+"container to start the designated service.  It shortly waits for the in-"
+"container port opening and then delivers the first packet to the service.  "
+"After initialization, all WebSocket payloads are delivered back and forth "
+"just like normal TCP packets. Note that the WebSocket message type must be "
+"``BINARY``."
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:32 991ebb05a54442819e14fe7f167e4ff2
+msgid ""
+"The container service will see the packets from the manager and it never "
+"knows the real origin of packets unless the service-level protocol enforces "
+"to state such client-side information.  Likewise, the client never knows the "
+"container's IP address (though the port numbers are included in :ref:"
+"`service port objects <service-port-object>` returned by :ref:`the session "
+"creation API <create-session-api>`)."
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:39 f01da9500f7a46c0b3bc25cbb6da3342
+msgid "Currently non-TCP (e.g., UDP) services are not supported."
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:43 4192c15a8a0340a2b87aae205d085d0f
+msgid "Service Proxy (HTTP)"
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:45 7c3416c47f0a4cc39f2d9d86ec643729
+msgid "URI: ``/stream/kernel/:id/httpproxy?app=:service``"
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:46
+#: ../../manager/user-api/service-ports.rst:79 54c46733faf7499b99a61810917a841a
+#: 66f31f9c1477449aa723863e10e4599b
+msgid "Method: ``GET`` upgraded to WebSockets"
+msgstr "Method: ``GET`` Websocket으로 업그레이드"
+
+#: ../../manager/user-api/service-ports.rst:48 15b84ea02acf4db4bd33356656d6ab14
+msgid ""
+"The service proxy API allows clients to directly connect to service daemons "
+"running *inside* compute sessions, such as Jupyter and TensorBoard."
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:51
+#: ../../manager/user-api/service-ports.rst:84 26ed908968d841bba3ead2acb5f31172
+#: 928eea64637342ccb5d20379c9a5979e
+msgid ""
+"The service name should be taken from the list of :ref:`service port objects "
+"<service-port-object>` returned by :ref:`the session creation API <create-"
+"session-api>`."
+msgstr ""
+"서비스 이름은 :ref:`the session creation API <create-session-api>`가 반환한 :"
+"ref:`service port objects <service-port-object>`의 리스트에서 가져와야 합니"
+"다."
+
+#: ../../manager/user-api/service-ports.rst:58
+#: ../../manager/user-api/service-ports.rst:91 29659fe241c64ed4815de59c8b93f1ed
+#: ab900a0135c745059824956b744dbb88
+msgid "Parameters"
+msgstr "매개변수들"
+
+#: ../../manager/user-api/service-ports.rst:64
+#: ../../manager/user-api/service-ports.rst:97 426acb2eec794dcb89bbf3b1b8aa47d0
+#: 63e47c312ded43fd9b30a21a158881dd
+msgid "Parameter"
+msgstr "매개변수"
+
+#: ../../manager/user-api/service-ports.rst:65
+#: ../../manager/user-api/service-ports.rst:98 e29892e7918b43dda604f72082968d67
+#: f4f35942131e40e18b771042d2de083b
+msgid "Type"
+msgstr "타입"
+
+#: ../../manager/user-api/service-ports.rst:66
+#: ../../manager/user-api/service-ports.rst:99 85541a35ef9c4052b391ec30497beb9e
+#: 929fb2d7bc254f8ebda6d5d5fbde3215
+msgid "Description"
+msgstr "설명"
+
+#: ../../manager/user-api/service-ports.rst:67
+#: ../../manager/user-api/service-ports.rst:100
+#: b47c739abebe4a8fb56b8e4baf9ca70c e5687c44e48c4b99a23984985a7afaf5
+msgid "``:id``"
+msgstr "``:id``"
+
+#: ../../manager/user-api/service-ports.rst:68
+#: ../../manager/user-api/service-ports.rst:71
+#: ../../manager/user-api/service-ports.rst:101
+#: ../../manager/user-api/service-ports.rst:104
+#: 3579fc9fd14747e6a16698fdff46336d 56fd710227454cdcae95a80cb0721081
+#: 6bcb08d6f73e40208017b3eb6563e8ce 9e8b6a204f904301b32bc53f0be62af0
+msgid "``slug``"
+msgstr "``slug``"
+
+#: ../../manager/user-api/service-ports.rst:69
+#: ../../manager/user-api/service-ports.rst:102
+#: 52e5d014ccb5444d8c0059002188d214 c9c204118bd7433b8d67fc0a483e6988
+msgid "The kernel ID."
+msgstr "커널 ID"
+
+#: ../../manager/user-api/service-ports.rst:70
+#: ../../manager/user-api/service-ports.rst:103
+#: 36abf4d5c60649b0bb055e387ee821ab d2fd7519525f4cf29d268b15e34afabd
+msgid "``:service``"
+msgstr "``:service``"
+
+#: ../../manager/user-api/service-ports.rst:72
+#: ../../manager/user-api/service-ports.rst:105
+#: 1319153f2b5e449197c2d4340699016b a513ed9e375c48a5b5e42bc5aebbdbf4
+msgid "The service name to connect."
+msgstr "연결할 서비스 명"
+
+#: ../../manager/user-api/service-ports.rst:76 18f3c41f13444b3281e60289383d6358
+msgid "Service Proxy (TCP)"
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:78 4f2d9ad6195d48368e687ac3a3ebb2e5
+msgid "URI: ``/stream/kernel/:id/tcpproxy?app=:service``"
+msgstr ""
+
+#: ../../manager/user-api/service-ports.rst:81 a94cde8a1fe3422a9a8cbfe1d5e4f871
+msgid ""
+"This is the TCP version of service proxy, so that client users can connect "
+"to native services running inside compute sessions, such as SSH."
+msgstr ""

@@ -1,0 +1,172 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/demo-setup-centos.rst:3 eed67bfde2e94c51a31e5aefcb7a3bd2
+msgid "Demo Setup"
+msgstr "데모 설치"
+
+#: ../../install/demo-setup-centos.rst:5 ebe11a366d9141d8848c7e37b792a2fb
+msgid ""
+"`This meta-repository <https://github.com/lablup/backend.ai>`_ provides a "
+"docker-compose configuration to fire up a single-node Backend.AI cluster "
+"running on your PC (http://localhost:8081)."
+msgstr ""
+"`이 메타 저장소 <https://github.com/lablup/backend.ai>`_ 는 당신의 PC "
+"(http://localhost:8081)에서 실행 중인 단일 노드 Backend.AI 클러스터를 시작하"
+"기 위한 docker-compose 환경 설정을 제공합니다."
+
+#: ../../install/demo-setup-centos.rst:8 489b301947f14c688ed61a71c2ffb526
+msgid "Prerequisites"
+msgstr "필수 선행 사항"
+
+#: ../../install/demo-setup-centos.rst:11 7e78fecf599c46a491649d14f01c0e26
+msgid ""
+"All: `install Docker 17.06 or later <https://docs.docker.com/install/>`_ "
+"with `docker-compose v1.21 or later <https://docs.docker.com/compose/install/"
+">`_"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:12 36088120732a4e4eb65fff64cdf20903
+msgid ""
+"Linux users: change \"docker.for.mac.localhost\" in docker-compose.yml to "
+"\"172.17.0.1\""
+msgstr ""
+"리눅스 유저의 경우 docker-compose.yml 내 \"docker.for.mac.localhost\" 를  "
+"\"172.17.0.1\" 로 변경해 주세요."
+
+#: ../../install/demo-setup-centos.rst:14 fbbb8278510f4a0592450d97da399918
+msgid "intstall docker-ce at Centos 7.5"
+msgstr "Centos 7.5버전 용 docker-ce 설치"
+
+#: ../../install/demo-setup-centos.rst:21 1d7975b4bcd94f2cbdecddc8ddc0dbc9
+msgid "install pre-requirement package"
+msgstr "선행 필수 패키지 설치"
+
+#: ../../install/demo-setup-centos.rst:27 dc9b41b25c6a4bb3b75aa3ff002870f2
+msgid "install pyenv that support enviroment for Python"
+msgstr "Python 환경을 위한 pyenv 설치"
+
+#: ../../install/demo-setup-centos.rst:37 f5c6cfaf52db411e9e2574ca1e15fae0
+msgid "install pyenv that support virtual enviroment for Python"
+msgstr "Python 가상환경을 위한 pyenv 설치"
+
+#: ../../install/demo-setup-centos.rst:45 85a6b9ec738148aa95b3c93b7874d9fe
+msgid "install python 3.6.x to run backend.ai"
+msgstr "Backend.AI 실행을 위한 Python 3.6.x 버전 설치"
+
+#: ../../install/demo-setup-centos.rst:52 c0a088a87f0d4f3daee1464c770283ea
+msgid ""
+"install requirement packer of python and docker * Clone the repository * "
+"Check out the prerequisites above"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:65 63d3fd6399434d2da3932c42edff0fdc
+msgid "Notes"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:67 f3f389ff21bf44c2a92ac6820d664fc9
+msgid "This demo setup does *not* support GPUs."
+msgstr "이 데모는 GPU를 지원하지 *않습니다*."
+
+#: ../../install/demo-setup-centos.rst:70 cc02465cd718410fb8130d59f809e7fa
+msgid "All you have to do"
+msgstr "당신이 해야 할 일"
+
+#: ../../install/demo-setup-centos.rst:72 a5af85f1093d4eb0968e46a596be03b7
+msgid "``docker-compose up -d``"
+msgstr "``docker-compose up -d``"
+
+#: ../../install/demo-setup-centos.rst:74 4c59030d31244d49b8ab0a0156732f72
+msgid "Pull some kernel images to try out"
+msgstr "원하는 커널 이미지를 가져옵니다"
+
+#: ../../install/demo-setup-centos.rst:77 47581fc5987e438e95e9a08f41a04005
+msgid "Pulling kernel images"
+msgstr "커널 이미지 가져오기"
+
+#: ../../install/demo-setup-centos.rst:79 478658af79ad49e3b3b2fe97324bcc73
+msgid "Pull the images on your host Docker daemon like:"
+msgstr "다음과 같이 호스트 Docker 데몬에서 이미지를 가져옵니다."
+
+#: ../../install/demo-setup-centos.rst:87 d8a694ef89b04edea7de6ec340fb40fe
+msgid ""
+"By default this demo cluster already has metadata/alias information for `all "
+"publicly available Backend.AI kernels <https://github.com/lablup/backend.ai-"
+"kernels>`_\\ , so you don't have to manually register the pulled kernel "
+"information to the cluster but only have to *pull* those you want to try out."
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:90 fdc6e6952b184d3c99a8aab194934860
+msgid "Using Clients"
+msgstr "클라이언트 사용"
+
+#: ../../install/demo-setup-centos.rst:92 cd7585f338e6479f9e4f90eccef0b831
+msgid ""
+"To access this local cluster, set the following configurations to your "
+"favoriate Backend.AI client:"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:100 f5e5da0aa6fb4aaba6794f25f7c516ca
+msgid ""
+"With `our official Python client <http://pypi.python.org/pypi/backend.ai-"
+"client>`_\\ , you can do:"
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:114 42c88ee49ea44ec29f4e28e494e0edaa
+msgid ""
+"WARNING: This demo configuration is highly insecure. DO NOT USE in "
+"production!"
+msgstr ""
+"경고: 이 데모 구성은 보안에 매우 취약합니다.*실제 서비스환경에서 사용하지 마"
+"십시오*"
+
+#: ../../install/demo-setup-centos.rst:117 248d8119852d42cc9d47bd61ee8181ae
+msgid "FAQ"
+msgstr "FAQ"
+
+#: ../../install/demo-setup-centos.rst:120 3297a07f1de04c508b51a072f4f44a90
+msgid "When launching a kernel, it says \"Service Unavailable\"!"
+msgstr "kernel을 실행할 때, \"Service Unavailable\"! 가 표시됩니다"
+
+#: ../../install/demo-setup-centos.rst:122 cd0bdb01ba664c46b3b8fa0b03e88cca
+msgid ""
+"Each image has different default resource requirements and your Docker "
+"daemon may have a too small amount of resources. For example, TensorFlow "
+"images require 8 GiB or more RAM for your Docker daemon."
+msgstr ""
+
+#: ../../install/demo-setup-centos.rst:123 901d5c5bada64ddaad0656df98047fba
+msgid ""
+"Or, you might have launched 30 sessions already, which is the default limit "
+"for this demo setup."
+msgstr ""
+"또는, 이 데모 설정의 기본 제한인 30개의 세션을 이미 시작했을 수도 있습니다."
+
+#: ../../install/demo-setup-centos.rst:125 04757e05e1cf4ba89468afc9805c943d
+msgid "What does the \"dense\" tag mean in the TensorFlow kernel images?"
+msgstr "Tensorflow 커널 이미지에서 \"dense\"는 뭘 의미하는 건가요?"
+
+#: ../../install/demo-setup-centos.rst:127 1fd3ba219ccd425ab4028b22f8735c7f
+msgid ""
+"Images with \"dense\" tags are optimized for shared multi-tenancy "
+"environments. There is no difference in functionalities."
+msgstr ""
+"\"dense\" 태그가 있는 이미지들은 공유 멀티 테넌시 환경에 최적화되어 있습니다."
+"기능에는 차이가 없습니다."

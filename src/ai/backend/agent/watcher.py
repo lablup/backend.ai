@@ -1,24 +1,26 @@
 import asyncio
 import logging
 import os
-from pathlib import Path
-from pprint import pprint, pformat
 import signal
 import ssl
 import subprocess
 import sys
+from pathlib import Path
+from pprint import pformat, pprint
 
 import aiofiles
-from aiohttp import web
 import aiotools
 import click
-from setproctitle import setproctitle
 import trafaret as t
+from aiohttp import web
+from setproctitle import setproctitle
 
-from ai.backend.common import config, utils, validators as tx
+from ai.backend.common import config, utils
+from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.logging import Logger, BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.utils import Fstab
+
 from . import __version__ as VERSION
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.agent.watcher'))

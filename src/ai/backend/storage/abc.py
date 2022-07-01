@@ -8,13 +8,7 @@ from uuid import UUID
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from .exception import InvalidSubpathError, VFolderNotFoundError
-from .types import (
-    DirEntry,
-    FSPerfMetric,
-    FSUsage,
-    VFolderCreationOptions,
-    VFolderUsage,
-)
+from .types import DirEntry, FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderUsage
 
 # Available capabilities of a volume implementation
 CAP_VFOLDER: Final = "vfolder"

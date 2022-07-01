@@ -3,16 +3,15 @@ import sys
 import click
 
 from ai.backend.cli.interaction import ask_yn
+from ai.backend.client.func.domain import _default_detail_fields, _default_list_fields
 from ai.backend.client.session import Session
-from ai.backend.client.func.domain import (
-    _default_list_fields,
-    _default_detail_fields,
-)
+
+from ..extensions import pass_ctx_obj
+from ..pretty import print_info
+from ..types import CLIContext
+
 # from ai.backend.client.output.fields import domain_fields
 from . import admin
-from ..pretty import print_info
-
-from ..types import CLIContext
 
 
 @admin.group()
@@ -23,7 +22,7 @@ def domain():
 
 
 @domain.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str)
 def info(ctx: CLIContext, name: str) -> None:
     """
@@ -40,7 +39,7 @@ def info(ctx: CLIContext, name: str) -> None:
 
 
 @domain.command()
-@click.pass_obj
+@pass_ctx_obj
 def list(ctx: CLIContext) -> None:
     """
     List and manage domains.
@@ -56,7 +55,7 @@ def list(ctx: CLIContext) -> None:
 
 
 @domain.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str, metavar='NAME')
 @click.option('-d', '--description', type=str, default='',
               help='Description of new domain')
@@ -106,7 +105,7 @@ def add(ctx: CLIContext, name, description, inactive, total_resource_slots,
 
 
 @domain.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str, metavar='NAME')
 @click.option('--new-name', type=str, help='New name of the domain')
 @click.option('--description', type=str, help='Description of the domain')
@@ -158,7 +157,7 @@ def update(ctx: CLIContext, name, new_name, description, is_active, total_resour
 
 
 @domain.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str, metavar='NAME')
 def delete(ctx: CLIContext, name):
     """
@@ -192,7 +191,7 @@ def delete(ctx: CLIContext, name):
 
 
 @domain.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str, metavar='NAME')
 def purge(ctx: CLIContext, name):
     """

@@ -1,27 +1,22 @@
 import asyncio
 from pathlib import Path
-from typing import (
-    Mapping,
-    Optional,
-    Sequence,
-    Union,
-)
+from typing import Mapping, Optional, Sequence, Union
 
 import aiohttp
 import janus
-from tqdm import tqdm
-
-from yarl import URL
 from aiotusclient import client
+from tqdm import tqdm
+from yarl import URL
 
 from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from .base import api_function, BaseFunction
+
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE, MAX_INFLIGHT_CHUNKS
 from ..exceptions import BackendClientError
 from ..pagination import generate_paginated_results
 from ..request import Request
+from .base import BaseFunction, api_function
 
 __all__ = (
     'VFolder',
@@ -287,11 +282,18 @@ class VFolder(BaseFunction):
             return await uploader.upload()
 
     @api_function
-    async def mkdir(self, path: Union[str, Path]):
+    async def mkdir(
+        self,
+        path: Union[str, Path],
+        parents: Optional[bool] = False,
+        exist_ok: Optional[bool] = False,
+    ):
         rqst = Request('POST',
                        '/folders/{}/mkdir'.format(self.name))
         rqst.set_json({
             'path': path,
+            'parents': parents,
+            'exist_ok': exist_ok,
         })
         async with rqst.fetch() as resp:
             return await resp.text()

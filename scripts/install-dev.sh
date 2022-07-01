@@ -3,6 +3,10 @@
 # Set "echo -e" as default
 shopt -s xpg_echo
 
+# For CentOS 7 or older versions of Linux only
+# - To make old gcc to allow declaring a vairiable inside a for loop.
+# PANTS_PYTHON_NATIVE_CODE_CPP_FLAGS="-std=gnu99"
+
 RED="\033[0;91m"
 GREEN="\033[0;92m"
 YELLOW="\033[0;93m"
@@ -57,10 +61,6 @@ usage() {
   echo "${LWHITE}OPTIONS${NC}"
   echo "  ${LWHITE}-h, --help${NC}"
   echo "    Show this help message and exit"
-  echo ""
-  echo "  ${LWHITE}--branch NAME${NC}"
-  echo "    The branch of git clones for server components"
-  echo "    (default: main)"
   echo ""
   echo "  ${LWHITE}--enable-cuda${NC}"
   echo "    Install CUDA accelerator plugin and pull a"
@@ -166,10 +166,10 @@ else
   show_info "Please send us a pull request or file an issue to support your environment!"
   exit 1
 fi
-if [ $(has_python "python") -eq 1 ]; then
-  bpython=$(which "python")
-elif [ $(has_python "python3") -eq 1 ]; then
+if [ $(has_python "python3") -eq 1 ]; then
   bpython=$(which "python3")
+elif [ $(has_python "python") -eq 1 ]; then
+  bpython=$(which "python")
 elif [ $(has_python "python2") -eq 1 ]; then
   bpython=$(which "python2")
 else
@@ -184,7 +184,7 @@ PLUGIN_PATH="${ROOT_PATH}/plugins"
 HALFSTACK_VOLUME_PATH="${ROOT_PATH}/volumes"
 PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
 PYTHON_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("CPython==([^\"]+)", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
-MONO_BRANCH="main"
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
 CUDA_BRANCH="main"
@@ -216,8 +216,6 @@ while [ $# -gt 0 ]; do
     -h | --help)           usage; exit 1 ;;
     --python-version)      PYTHON_VERSION=$2; shift ;;
     --python-version=*)    PYTHON_VERSION="${1#*=}" ;;
-    --branch)              MONO_BRANCH=$2; shift ;;
-    --branch=*)            MONO_BRANCH="${1#*=}" ;;
     --enable-cuda)         ENABLE_CUDA=1 ;;
     --download-big-images) DOWNLOAD_BIG_IMAGES=1 ;;
     --cuda-branch)         CUDA_BRANCH=$2; shift ;;
@@ -261,7 +259,7 @@ install_script_deps() {
     ;;
   RedHat)
     $sudo yum clean expire-cache  # next yum invocation will update package metadata cache
-    $sudo yum install -y git jq gcc make g++
+    $sudo yum install -y git jq gcc make gcc-c++
     ;;
   Darwin)
     if ! type "brew" >/dev/null 2>&1; then
@@ -282,7 +280,7 @@ install_pybuild_deps() {
     $sudo apt-get install -y libssl-dev libreadline-dev libgdbm-dev zlib1g-dev libbz2-dev libsqlite3-dev libffi-dev liblzma-dev
     ;;
   RedHat)
-    $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel libsqlite-devel libffi-devel lzma-devel xz-devel
+    $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel sqlite-devel libffi-devel xz-devel
     ;;
   Darwin)
     brew install openssl
@@ -404,10 +402,10 @@ bootstrap_pants() {
   set +e
   PANTS="./pants"
   ./pants version
-  # Note that pants 2.11 requires Python 3.9 (not Python 3.10!) to work properly.
+  # Note that Pants requires Python 3.9 (not Python 3.10!) to work properly.
   if [ $? -eq 1 ]; then
     show_info "Downloading and building Pants for the current setup"
-    _PYENV_PYVER=$(pyenv versions --bare | grep '^3\.9\.' | grep -v '/envs/' | sort -t. -k1,1r -k 2,2nr -k 3,3nr | head -n 1)
+    local _PYENV_PYVER=$(pyenv versions --bare | grep '^3\.9\.' | grep -v '/envs/' | sort -t. -k1,1r -k 2,2nr -k 3,3nr | head -n 1)
     if [ -z "$_PYENV_PYVER" ]; then
       echo "No Python 3.9 available via pyenv!"
       echo "Please install Python 3.9 using pyenv,"
@@ -418,14 +416,16 @@ bootstrap_pants() {
       echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
     fi
     echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
+    if [ -d tools/pants-src ]; then
+      rm -rf tools/pants-src
+    fi
+    local PANTS_CLONE_VERSION="release_${PANTS_VERSION}"
     set -e
-    # FIXME: The branch name uses the "MAJOR.MINOR.x" format. Until Pants is officially released with Linux arm64 support,
-    #        we need to fallback to the main branch for custom patches.
-    ## local PANTS_CLONE_VERSION="$(echo $PANTS_VERSION | cut -d. -f1).$(echo $PANTS_VERSION | cut -d. -f2).x"
-    local PANTS_CLONE_VERSION="main"
-    git clone --branch=$PANTS_CLONE_VERSION --depth=1 https://github.com/pantsbuild/pants tools/pants-src
+    git -c advice.detachedHead=false clone --branch=$PANTS_CLONE_VERSION --depth=1 https://github.com/pantsbuild/pants tools/pants-src
+    # TODO: remove the manual patch after pants 2.13 or later is released.
     cd tools/pants-src
-    if [ "$(uname -p)" = "arm" -a "$DISTRO" != "Darwin" ]; then
+    local arch_name=$(uname -p)
+    if [ "$arch_name" = "arm64" -o "$arch_name" = "aarch64" ] && [ "$DISTRO" != "Darwin" ]; then
       git apply ../pants-linux-aarch64.patch
     fi
     cd ../..
@@ -444,7 +444,7 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-$bpython -m pip --disable-pip-version-check install -q requests requests_unixsocket
+$bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
 $bpython scripts/check-docker.py
 if [ $? -ne 0 ]; then
   exit 1
@@ -501,6 +501,9 @@ install_pybuild_deps
 show_info "Checking and installing git lfs support..."
 install_git_lfs
 
+show_info "Ensuring checkout of LFS files..."
+git lfs pull
+
 show_info "Installing Python..."
 install_python
 
@@ -518,7 +521,9 @@ show_info "Using the current working-copy directory as the installation path..."
 mkdir -p ./wheelhouse
 if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
   show_info "Prebuild grpcio wheels for Apple Silicon..."
-  pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
+  if [ -z "$(pyenv virtualenvs | grep "tmp-grpcio-build")" ]; then
+    pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
+  fi
   pyenv shell tmp-grpcio-build
   if [ $(python -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)') -eq 0 ]; then
     # ref: https://github.com/grpc/grpc/issues/25082
@@ -547,7 +552,11 @@ fi
 # Install postgresql, etcd packages via docker
 show_info "Launching the docker compose \"halfstack\"..."
 mkdir -p "$HALFSTACK_VOLUME_PATH"
-cp "docker-compose.halfstack-${MONO_BRANCH//.}.yml" "docker-compose.halfstack.current.yml"
+SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
+if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
+  SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
+fi
+cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
 sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
 sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
 sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
@@ -619,9 +628,8 @@ sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./w
 sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
 sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
 
-# TODO
-## cp configs/testers/sample-env-tester.sh ./env-tester-admin.sh
-## cp configs/testers/sample-env-tester.sh ./env-tester-user.sh
+echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-admin-api.sh" > ./env-tester-admin.sh
+echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user-api.sh" > ./env-tester-user.sh
 
 # DB schema
 show_info "Setting up databases..."
@@ -633,7 +641,7 @@ show_info "Setting up databases..."
 show_info "Configuring the Lablup's official image registry..."
 ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
 ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-if [ "$(uname -p)" = "arm" ]; then
+if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
   ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
 else
   ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
@@ -642,7 +650,7 @@ fi
 # Scan the container image registry
 show_info "Scanning the image registry..."
 ./backend.ai mgr etcd rescan-images cr.backend.ai
-if [ "$(uname -p)" = "arm" ]; then
+if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
   ./backend.ai mgr etcd alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
 else
   ./backend.ai mgr etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
@@ -720,8 +728,8 @@ chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
-if [ "$(uname -p)" = "arm" ]; then
-  $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
+if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
+  $docker_sudo docker pull "cr.backend.ai/multiarch/python:3.9-ubuntu20.04"
 else
   $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
   if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then

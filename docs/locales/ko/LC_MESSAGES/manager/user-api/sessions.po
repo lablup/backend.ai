@@ -1,0 +1,523 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/user-api/sessions.rst:2 3bfe142c164f4c4db853a415f7b8b2a6
+msgid "Session Management"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:4 e3f68023012648bbb4d568adbbfa0932
+msgid "Here are the API calls to create and manage compute sessions."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:9 774c5841ea14482895ffed6e59424c04
+msgid "Creating Session"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:11 3f9ef9f5631447b4a634c31e9e04237e
+msgid "URI: ``/session`` (``/session/create`` also works for legacy)"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:12 f4bd76097fd8429b849e835ac4299aa5
+msgid "Method: ``POST``"
+msgstr "Method: ``POST``"
+
+#: ../../manager/user-api/sessions.rst:14 0b848257da95467d82cc08929bb39d87
+msgid ""
+"Creates a new session or returns an existing session, depending on the "
+"parameters."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:17
+#: ../../manager/user-api/sessions.rst:206
+#: ../../manager/user-api/sessions.rst:266
+#: ../../manager/user-api/sessions.rst:316 1150ddb0c1564c3a8ec584d63aef0a1e
+#: 18ff557c0e4045abb9fc0d106aae86d1 772eedb3a2894899baf974f85ded0a38
+#: 8ca669cc56704c1085a6725144c8b297
+msgid "Parameters"
+msgstr "매개변수들"
+
+#: ../../manager/user-api/sessions.rst:23
+#: ../../manager/user-api/sessions.rst:212
+#: ../../manager/user-api/sessions.rst:272
+#: ../../manager/user-api/sessions.rst:322 163bdb68fe8947b1abea9abf1ebb3cd6
+#: 79f9fc21df744222ae58d86daacf7b97 7b8dd453c4184e289551388d7004a8bb
+#: a91f961c221a4625ab14075c266ce069
+msgid "Parameter"
+msgstr "매개변수"
+
+#: ../../manager/user-api/sessions.rst:24
+#: ../../manager/user-api/sessions.rst:147
+#: ../../manager/user-api/sessions.rst:213
+#: ../../manager/user-api/sessions.rst:238
+#: ../../manager/user-api/sessions.rst:273
+#: ../../manager/user-api/sessions.rst:298
+#: ../../manager/user-api/sessions.rst:323 24e7eecf7a3b46a6b1d4b4ca966273fe
+#: 5bdc204be2cd4f0dbb4af3ff78d24f53 9a289a9df13441388b2a20c2a5f4a2ff
+#: ac851ccb881c4bce83e720ac9cebe065 b5c47c68302941e6a1a136fe4ad5fc53
+#: bde3d88b7c824258ba77898a6dc02afe ff660a4aa37644b48006946400294d97
+msgid "Type"
+msgstr "타입"
+
+#: ../../manager/user-api/sessions.rst:25
+#: ../../manager/user-api/sessions.rst:132
+#: ../../manager/user-api/sessions.rst:214
+#: ../../manager/user-api/sessions.rst:227
+#: ../../manager/user-api/sessions.rst:239
+#: ../../manager/user-api/sessions.rst:274
+#: ../../manager/user-api/sessions.rst:287
+#: ../../manager/user-api/sessions.rst:299
+#: ../../manager/user-api/sessions.rst:324
+#: ../../manager/user-api/sessions.rst:337 0a2ec3ab69b84538aea0ed0b6b1c207b
+#: 1363a475f122477eaeae8eb1d811474e 52a5f41107684c3192d942daabec0416
+#: 61f80a0970c646ed8920d58bddbd0316 61fab10065254345b6843274d976932b
+#: 896bf591bfce43a8b09414e108f5f10e a9985f310d3446c5b7513ceb56f1577f
+#: c5e199e350434ef9a6033ed8d7422f42 dcf8cee8c48743e5bd0c7b7e1e37abfd
+#: f7c91361fb3e48d6852c5b75f3229846
+msgid "Description"
+msgstr "설명"
+
+#: ../../manager/user-api/sessions.rst:27 68b2151d4e1142008436f86bab31a91d
+msgid "``image``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:28
+#: ../../manager/user-api/sessions.rst:73
+#: ../../manager/user-api/sessions.rst:79
+#: ../../manager/user-api/sessions.rst:92
+#: ../../manager/user-api/sessions.rst:154
+#: ../../manager/user-api/sessions.rst:241 225e89283ae34f69a6105fb6144c5a73
+#: 3ac3f2584ce44c619bfcc81fb656c387 56363ddd4c344a3c93d8caf269824c82
+#: 9c83cc82243946b2a561a350efe3d3e1 b9b425745e224493811af0aed736b967
+#: f21f132c353a4602b8cf0d1f354fa1cf
+msgid "``str``"
+msgstr "``str``"
+
+#: ../../manager/user-api/sessions.rst:29 2c3f223d94014573b412a715a8fcde03
+msgid ""
+"The kernel runtime type in the form of the Docker image name and tag. For "
+"legacy, the API also recognizes the ``lang`` field when ``image`` is not "
+"present."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:34 e045a83d4de54483aa21f7ed9bec9d77
+msgid "``clientSessionToken``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:35
+#: ../../manager/user-api/sessions.rst:150
+#: ../../manager/user-api/sessions.rst:216
+#: ../../manager/user-api/sessions.rst:276
+#: ../../manager/user-api/sessions.rst:326 16759363cef44380bce9479cd06b24a8
+#: 62f960200cbe42689d9230743cfea7b4 897bd7b29fe749968383ecb6677a1006
+#: dc811f4272804e99b3805b301ed05d7c faa5d141cd804a96a30cea7e05dffd50
+msgid "``slug``"
+msgstr "``slug``"
+
+#: ../../manager/user-api/sessions.rst:36 a82215e1b93b4e6f86c1575b3cf06715
+msgid ""
+"A client-provided session token, which must be unique among the currently "
+"non-terminated sessions owned by the requesting access key. Clients may "
+"reuse the token if the previous session with the same token has been "
+"terminated."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:41 c6cf56d1a69940b2bf0a2c4cd6b1be02
+msgid ""
+"It may contain ASCII alphabets, numbers, and hyphens in the middle. The "
+"length must be between 4 to 64 characters inclusively. It is useful for "
+"aliasing the session with a human-friendly name."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:45 76fe77de223c4173989b6efd23c19f69
+msgid "``enqueueOnly``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:46
+#: ../../manager/user-api/sessions.rst:62
+#: ../../manager/user-api/sessions.rst:176 5c0afa6a169f4348831557d57b0b7f6e
+#: d77719ea88f6442993ab185a1db3fb46 f4e0afc257f24ae082eb3b1421e1b630
+msgid "``bool``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:47 53e3371db65048928762f8cf36c9ebd8
+msgid ""
+"*(optional)* If set true, the API returns immediately after queueing the "
+"session creation request to the scheduler. Otherwise, the manager will wait "
+"until the session gets started actually. (default: ``false``)"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:53 5a35af4be05647baa537becd77a772f4
+msgid "``maxWaitSeconds``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:54
+#: ../../manager/user-api/sessions.rst:250 0bd22f56f9ed4d6d8fde6dbf6a577c10
+#: 86e60adf70c94e8bbd530b796c82ef44
+msgid "``int``"
+msgstr "``int``"
+
+#: ../../manager/user-api/sessions.rst:55 6f9f8dad0e514f039ff8a635c53a6379
+msgid ""
+"*(optional)* Set the maximum duration to wait until the session starts after "
+"queued, in seconds.  If zero, the manager will wait indefinitely. (default: "
+"``0``)"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:61 e7a7a9c5efe54cb29e042b0e3d8b3048
+msgid "``reuseIfExists``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:63 88f474717f77499698596511366c6631
+msgid ""
+"*(optional)* If set true, the API returns *without* creating a new session "
+"if a session with the same ID and the same image already exists and not "
+"terminated. In this case ``config`` options are *ignored*. If set false but "
+"a session with the same ID and image exists, the manager returns an error: "
+"\"session already exists\". (default: ``true``)"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:72 c197a2b52ab642df936144cf15ccb5fd
+msgid "``group``"
+msgstr "``group``"
+
+#: ../../manager/user-api/sessions.rst:74 b10ad7c8755b42708108f1e95ac1ea4d
+msgid ""
+"*(optional)* The name of a user group (aka \"project\") to launch the "
+"session within.  (default: ``\"default\"``)"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:78 395bf231737f418298a7f6d1bcbfd488
+msgid "``domain``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:80 a0cb7abd234b4e74b5c8c8eca69ed622
+msgid ""
+"*(optional)* The name of a domain to launch the session within  (default: ``"
+"\"default\"``)"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:84 748ea36b49354ea199da5e598ae95357
+msgid "``config``"
+msgstr "``config``"
+
+#: ../../manager/user-api/sessions.rst:85
+#: ../../manager/user-api/sessions.rst:301 7a9e964324bb4f84a3027079dd951ee1
+#: d75bd0fe47b0442987ad2b03c7023977
+msgid "``object``"
+msgstr "``object``"
+
+#: ../../manager/user-api/sessions.rst:86 2a8bb4f6109347b29a9afbf25dcb5ad7
+msgid ""
+"*(optional)* A :ref:`creation-config-object` to specify kernel configuration "
+"including resource requirements. If not given, the kernel is created with "
+"the minimum required resource slots defined by the target image."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:91 3a851f3b3ea841a194338b915a63b3b7
+msgid "``tag``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:93 dc25cf5583b343728a6ec8ed051b5b28
+msgid ""
+"*(optional)* A per-session, user-provided tag for administrators to keep "
+"track of additional information of each session, such as which sessions are "
+"from which users."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:96
+#: ../../manager/user-api/sessions.rst:180 1b066e45ed394641a4a5842f78c56d2e
+#: 58cecf864666407fa6a484421454a21f
+msgid "Example:"
+msgstr "예시:"
+
+#: ../../manager/user-api/sessions.rst:125
+#: ../../manager/user-api/sessions.rst:220
+#: ../../manager/user-api/sessions.rst:280
+#: ../../manager/user-api/sessions.rst:330 8c5f569d1d3245ca838c0e0db60a8da5
+#: cc137418308944d7a80d6d5baa58188b dc66e6b1d3484165977072a551fe9a01
+#: eafdd569fe08444b95aba2c498890dcf
+msgid "Response"
+msgstr "응답"
+
+#: ../../manager/user-api/sessions.rst:131
+#: ../../manager/user-api/sessions.rst:226
+#: ../../manager/user-api/sessions.rst:286
+#: ../../manager/user-api/sessions.rst:336 2270b40c2525435bbcf70cfca44e1f8a
+#: 66b358fcf345498bb2fd1f7d20aeba3e b8e1f73f353b455b953f20b4322eb849
+#: fae45118dbd64eb1b0d116c1cef07948
+msgid "HTTP Status Code"
+msgstr "HTTP Status Code"
+
+#: ../../manager/user-api/sessions.rst:133
+#: ../../manager/user-api/sessions.rst:228 712f0487a592481fa4e70308b1d5155e
+#: e3a75e0b46564a58b19ce9a75708704e
+msgid "200 OK"
+msgstr "200 OK"
+
+#: ../../manager/user-api/sessions.rst:134 9e7e3119b32a41c78b36f66ce6d0ed42
+msgid "The session is already running and you are okay to reuse it."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:135 85ae318d81b141f9b36a8274f0c68373
+msgid "201 Created"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:136 a03f19cc9c954787bf7072923e27989d
+#, fuzzy
+msgid "The session is successfully created."
+msgstr "세션이 종료되었습니다."
+
+#: ../../manager/user-api/sessions.rst:137 2f68992c4f51430c96a878f4a94afbc3
+msgid "401 Invalid API parameters"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:138 547ce2e3629a486cae159820a6b20c5c
+msgid "There are invalid or malformed values in the API parameters."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:139 7b8f1aa51c1e43379b84b6cc0333a658
+msgid "406 Not acceptable"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:140 d4b13e320b964ec8bbaad305062ae120
+msgid "The requested resource limits exceed the server's own limits."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:146 1f7ee8e3a8f04f529aaf3e3a16ed6ca4
+msgid "Fields"
+msgstr "필드"
+
+#: ../../manager/user-api/sessions.rst:148 10525a83668d4978b21aa5ecb5f771a1
+msgid "Values"
+msgstr "값"
+
+#: ../../manager/user-api/sessions.rst:149 dbbccc23c9fc430fa556530510d2d1c7
+msgid "``sessId``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:151 36681f07a97c4f52b32535aa87c3b551
+msgid ""
+"The session ID used for later API calls, which is same to the value of "
+"``clientSessionToken``. This will be random-generated by the server if "
+"``clientSessionToken`` is not provided."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:153 5ba53b72086d43989ac36354f1d5b016
+msgid "``status``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:155 e69aa18340c24b35ab89964ec6c8048c
+msgid ""
+"The status of the created kernel. This is always ``\"PENDING\"`` if "
+"``enqueueOnly`` is set true. In other cases, it may be either ``\"RUNNING"
+"\"`` (normal case), ``\"ERROR\"``, or even ``\"TERMINATED\"`` depending on "
+"what happens during session startup."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:162 957e7595afcf4db6a11dea7c15bdda64
+msgid "``servicePorts``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:163 d607648c444a4c86ba8178d3882cdffb
+msgid "``list[object]``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:164 b2a0441624f846c095bf981b5a475e6d
+msgid ""
+"The list of :ref:`service-port-object`. This field becomes an empty list if "
+"``enqueueOnly`` is set true, because the final service ports are determined "
+"when the session becomes ready after scheduling."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:170 c004d79d7b79404f9f3878f8a0703d63
+msgid ""
+"In most cases the service ports are same to what specified in the image "
+"metadata, but the agent may add shared services for all sessions."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:175 a694044d2e5245f1bfada6a2b1ec48f2
+msgid "``created``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:177 da630d242c1a4e82b71c9717da01353e
+#, fuzzy
+msgid "True if the session is freshly created."
+msgstr "세션이 종료되었습니다."
+
+#: ../../manager/user-api/sessions.rst:196 56b73ef3d8d74454850d0ab08a32dbe0
+msgid "Getting Session Information"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:198
+#: ../../manager/user-api/sessions.rst:260
+#: ../../manager/user-api/sessions.rst:308 5bc4c18a738a43ef912fdd6016718d02
+#: 72d56309db5e42c78423f7a205519a9c e214b7c131a64157ac642e04d910d0cd
+msgid "URI: ``/session/:id``"
+msgstr "URI: ``/session/:id``"
+
+#: ../../manager/user-api/sessions.rst:199 3d8f412e915641b4851eb20c56a34860
+msgid "Method: ``GET``"
+msgstr "메소드 : ``GET``"
+
+#: ../../manager/user-api/sessions.rst:201 3db26e1d53104697aafb08e44af56678
+msgid ""
+"Retrieves information about a session. For performance reasons, the returned "
+"information may not be real-time; usually they are updated every a few "
+"seconds in the server-side."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:215
+#: ../../manager/user-api/sessions.rst:275
+#: ../../manager/user-api/sessions.rst:325 97a902d6487a43bd9cd1122595c80c45
+#: b5747df8ba4843eb935fa0b14bc11d23 e2b6ec3a5e6b44ba8c4752623b08e014
+msgid "``:id``"
+msgstr "``:id``"
+
+#: ../../manager/user-api/sessions.rst:217
+#: ../../manager/user-api/sessions.rst:277
+#: ../../manager/user-api/sessions.rst:327 0df168c27d4b4670ad46375367e2a658
+#: a3b53e1c295f486dac8319f7fa560326 bdeccf27229f48bda3c50988b3144093
+#, fuzzy
+msgid "The session ID."
+msgstr "세션 ID."
+
+#: ../../manager/user-api/sessions.rst:229 7f31566704f241ba8732e342e3234324
+msgid "The information is successfully returned."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:230
+#: ../../manager/user-api/sessions.rst:290
+#: ../../manager/user-api/sessions.rst:340 7514f291b3f744cbb8d43f7aec61ff9e
+#: 8693bc9a628d4a3c9eb5a3733672f385 c49fbc1d9407454aa6d5ef8a72cac301
+msgid "404 Not Found"
+msgstr "404 Not Found"
+
+#: ../../manager/user-api/sessions.rst:231
+#: ../../manager/user-api/sessions.rst:291
+#: ../../manager/user-api/sessions.rst:341 201f85f472344020b438d0378e023f3d
+#: be3b8d6e4a51405b9260921db816d0ab dcb7298df422418bb4fc12fa811072d6
+#, fuzzy
+msgid "There is no such session."
+msgstr "소스 세션 아이디"
+
+#: ../../manager/user-api/sessions.rst:237
+#: ../../manager/user-api/sessions.rst:297 527f8b9e08b14dd08c4e049d5f81701a
+#: 93ff465d7419405ebfaeaad1c67c969c
+msgid "Key"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:240 58cb58a5418d47b197f8126712fb6665
+msgid "``lang``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:242 1b7bf87b29094c148c7fda1d65152df4
+msgid "The kernel's programming language"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:243 cd876183ef4047d3a3b2a00e4bf6c7f9
+msgid "``age``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:244
+#: ../../manager/user-api/sessions.rst:253 2a74e99c67344058830f8f30ca03dc94
+#: 82fd7d45f71b42049e110d617375f5fc
+msgid "``int`` (msec)"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:245 a3ed101a88ec4cb79c712a107ef1fcfb
+msgid "The time elapsed since the kernel has started."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:246 a80e9b81bd294a3cac4e60aa59fc2a3e
+msgid "``memoryLimit``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:247 26937145bdbf4eeba5b0493ab89d25f9
+msgid "``int`` (KiB)"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:248 c8c95c41095e4e008cf286be92334e03
+msgid "The memory limit of the kernel in KiB."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:249 cb9a005250a14c6a93afe1d400b3ca31
+msgid "``numQueriesExecuted``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:251 c71cfa4868f44952a475b39372aa37f0
+msgid "The number of times the kernel has been accessed."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:252 4bbc6601fabf42ea801e29138b041772
+msgid "``cpuCreditUsed``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:254 69115bc847b54108b880be41bf41e902
+msgid "The total time the kernel was running."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:258 baad9d7bd85d4cc3a75dacb2cf2d54b7
+msgid "Destroying Session"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:261 714d53ff862743598ee5b7cb48f9f3bb
+msgid "Method: ``DELETE``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:263 2d547ed172334bf2bdbd2ae3ee766570
+msgid "Terminates a session."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:288
+#: ../../manager/user-api/sessions.rst:338 5b81535b4309451ea3a8b654be8bb6e2
+#: c4f6300d35324fa2a4feae60bd379e70
+msgid "204 No Content"
+msgstr "204 내용 없음"
+
+#: ../../manager/user-api/sessions.rst:289 cff63a3f168c4053b1f6c474520de708
+msgid "The session is successfully destroyed."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:300 acfcdbdce9a24033b3b0f5487d2d18ad
+msgid "``stats``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:302 f046f05d5d7341caa735905f73090521
+msgid "The :ref:`container-stats-object` of the kernel when deleted."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:306 5fd49f6b34464269aa8bda0179271235
+msgid "Restarting Session"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:309 00f1a71f137f4a54ad396ad168e2047e
+msgid "Method: ``PATCH``"
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:311 b8cb76146017427a9c3264ef20ad1692
+msgid ""
+"Restarts a session. The idle time of the session will be reset, but other "
+"properties such as the age and CPU credit will continue to accumulate. All "
+"global states such as global variables and modules imports are also reset."
+msgstr ""
+
+#: ../../manager/user-api/sessions.rst:339 85178ddfe6374f69b2ba55924064a35c
+msgid "The session is successfully restarted."
+msgstr ""

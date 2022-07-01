@@ -1,20 +1,23 @@
 [GLOBAL]
-pants_version = "2.11.0"
+pants_version = "2.12.0rc3"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.flake8",
+    "pants.backend.python.lint.isort",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.experimental.python",
     "setupgen",
     "platform_resources",
+    "towncrier_tool",
 ]
 pants_ignore = [
     "scripts",
     "plugins",
     "docs",  # TODO: docs build config
 ]
+# use_deprecated_directory_cli_args_semantics = false  # for 2.13 or later
 
 [anonymous-telemetry]
 enabled = false
@@ -40,6 +43,18 @@ python-kernel = "python-kernel.lock"
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
 
+# Temporarily reverted due to pantsbuild/pants#15990
+## [pex-cli]
+## version = "v2.1.93"
+## known_versions = [
+##     "v2.1.93|macos_arm64|80fc6b94f5db253a71061974cb8d8ce520932aef44d989e9057917cc33a30fd6|3802280",
+##     "v2.1.93|macos_x86_64|80fc6b94f5db253a71061974cb8d8ce520932aef44d989e9057917cc33a30fd6|3802280",
+##     "v2.1.93|linux_arm64|80fc6b94f5db253a71061974cb8d8ce520932aef44d989e9057917cc33a30fd6|3802280",
+##     "v2.1.93|linux_x86_64|80fc6b94f5db253a71061974cb8d8ce520932aef44d989e9057917cc33a30fd6|3802280",
+## ]
+# When trying a new pex version, you could find out the hash and size-in-bytes as follows:
+# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.94/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
+
 [flake8]
 version = "flake8>=4.0"
 extra_requirements.add = [
@@ -47,6 +62,9 @@ extra_requirements.add = [
     "setuptools>=60.0",
 ]
 lockfile = "tools/flake8.lock"
+
+[isort]
+lockfile = "tools/isort.lock"
 
 [pytest]
 version = "pytest>=7.0"
@@ -60,9 +78,16 @@ extra_requirements.add = [
 args = ["-v", "-m", "'not integration'"]
 lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
+timeout_default = 300
 
 [mypy]
 version = "mypy>=0.950"
 extra_requirements.add = [
 ]
 lockfile = "tools/mypy.lock"
+
+[towncrier]
+version = "towncrier>=21.9"
+extra_requirements.add = [
+]
+lockfile = "tools/towncrier.lock"

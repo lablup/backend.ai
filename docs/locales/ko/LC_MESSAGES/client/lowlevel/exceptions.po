@@ -1,0 +1,52 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+# a6e6df2f9a3a475888eb594517eba401
+#: ../../client/lowlevel/exceptions.rst:2 7cf2fef41bcf4960ba354220dcd3b142
+msgid "Exceptions"
+msgstr "예외 클래스들"
+
+# 28ed6a551ed3437d8ddd7affd55eda48
+#: 00ff6671732c4fd4a1c71a4f29a78740 ai.backend.client.exceptions.BackendError:1
+#: of
+msgid "Exception type to catch all ai.backend-related errors."
+msgstr ""
+
+#: 89abe32e782d411094d69dc09e3c879b 8b05bf0d4dd44542bbd1d17d11fe56e3
+#: ai.backend.client.exceptions.BackendAPIError.with_traceback:1
+#: ai.backend.client.exceptions.BackendClientError.with_traceback:1
+#: ai.backend.client.exceptions.BackendError.with_traceback:1
+#: de56ed18bce54ad7be8064129d2b4209 of
+msgid ""
+"Exception.with_traceback(tb) -- set self.__traceback__ to tb and return self."
+msgstr ""
+
+# c622535b9c744e85b654d279b0297566
+#: 18e4e061be32498cb2a67cb17004e5ef
+#: ai.backend.client.exceptions.BackendAPIError:1 of
+msgid "Exceptions returned by the API gateway."
+msgstr ""
+
+#: ai.backend.client.exceptions.BackendClientError:1
+#: b8f2538fe4004addbe3a1aa25122bd01 of
+msgid ""
+"Exceptions from the client library, such as argument validation errors and "
+"connection failures."
+msgstr ""

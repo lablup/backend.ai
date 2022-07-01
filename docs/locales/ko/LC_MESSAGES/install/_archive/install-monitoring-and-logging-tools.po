@@ -1,0 +1,90 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/install-monitoring-and-logging-tools.md:3
+#: 9b99531494724f76ba3d4e22e8437e1e
+msgid "Install Monitoring and Logging Tools"
+msgstr ""
+
+#: ../../install/_archive/install-monitoring-and-logging-tools.md:5
+#: 25f5c1d61b72490cba437e443166a37c
+msgid ""
+"The Backend.AI can use several 3rd-party monitoring and logging services. "
+"Using them is completely optional."
+msgstr ""
+
+#: ../../install/_archive/install-monitoring-and-logging-tools.md:8
+#: a790906c139a4baba04f42ffb25bf5ce
+msgid "## Guide variables"
+msgstr ""
+
+#: ../../install/_archive/install-monitoring-and-logging-tools.md:10
+#: ec30ae96ba1a47f1846253698c96f16f
+msgid ""
+"⚠️ Prepare the values of the following variables before working with this "
+"page and replace their occurrences with the values when you follow the guide."
+msgstr ""
+
+#: ../../install/_archive/install-monitoring-and-logging-tools.md:12
+#: 464a87997e6f45dd9136afb872e54614
+msgid ""
+"<table> <tr><td><code>{DDAPIKEY}</code></td><td>The Datadog API key</td></"
+"tr> <tr><td><code>{DDAPPKEY}</code></td><td>The Datadog application key</"
+"td></tr> <tr><td><code>{SENTRYURL}</code></td><td>The private Sentry report "
+"URL</td></tr> </table>"
+msgstr ""
+
+#: ../../install/_archive/install-monitoring-and-logging-tools.md:18
+#: 9c79ecbe9e4e434e878086aa69e66726
+msgid "## Install Datadog agent"
+msgstr ""
+
+#: ../../install/_archive/install-monitoring-and-logging-tools.md:20
+#: eed9b7e8d97540f59194cf6441a34817
+msgid ""
+"[Datadog](https://www.datadoghq.com) is a 3rd-party service to monitor the "
+"server resource usage."
+msgstr ""
+
+#: ../../install/_archive/install-monitoring-and-logging-tools.md:22
+#: f229f86c466b4521a97840e4bb493239
+msgid ""
+"```console $ DD_API_KEY={DDAPIKEY} bash -c \"$(curl -L https://raw."
+"githubusercontent.com/DataDog/dd-agent/master/packaging/datadog-agent/source/"
+"install_agent.sh)\" ```"
+msgstr ""
+
+#: ../../install/_archive/install-monitoring-and-logging-tools.md:26
+#: 7611eefab440492a9a649ca19c3f41ca
+msgid "## Install Raven (Sentry client)"
+msgstr ""
+
+#: ../../install/_archive/install-monitoring-and-logging-tools.md:28
+#: c18152c3368e44aa92387a9fc3ee0769
+msgid ""
+"Raven is the official client package name of [Sentry](https://sentry.io), "
+"which reports detailed contextual information such as stack and package "
+"versions when an unhandled exception occurs."
+msgstr ""
+
+#: ../../install/_archive/install-monitoring-and-logging-tools.md:30
+#: e037d456da99496999e7139fcfcc0307
+msgid "```console $ pip install \"raven>=6.1\" ```"
+msgstr ""

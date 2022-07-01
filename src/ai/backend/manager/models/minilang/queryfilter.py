@@ -1,11 +1,7 @@
-from typing import (
-    Any,
-    Mapping,
-    Union,
-)
+from typing import Any, Mapping, Union
 
-from lark import Lark, LarkError, Transformer, Tree
 import sqlalchemy as sa
+from lark import Lark, LarkError, Transformer, Tree
 
 from . import FieldSpecItem
 

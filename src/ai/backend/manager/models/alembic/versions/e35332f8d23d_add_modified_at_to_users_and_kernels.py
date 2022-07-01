@@ -5,12 +5,12 @@ Revises: da24ff520049
 Create Date: 2020-07-01 14:02:11.022032
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.expression import bindparam
 
-from ai.backend.manager.models.base import convention, IDColumn
+from ai.backend.manager.models.base import IDColumn, convention
 
 # revision identifiers, used by Alembic.
 revision = 'e35332f8d23d'

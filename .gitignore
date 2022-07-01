@@ -5,18 +5,17 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-env/
-build/
-develop-eggs/
-dist/
+/build/
+/dist/
 downloads/
+develop-eggs/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -32,7 +31,7 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # Unit test / coverage reports
-htmlcov/
+/htmlcov/
 .tox/
 .coverage
 .coverage.*
@@ -62,9 +61,6 @@ instance/
 # Sphinx documentation
 docs/_build/
 
-# PyBuilder
-target/
-
 # IPython Notebook
 .ipynb_checkpoints
 
@@ -91,7 +87,8 @@ ENV/
 
 # IDE/vim
 .idea
-.*.swp
+*.swp
+*.swo
 .vscode
 
 # Pants
@@ -119,3 +116,10 @@ ENV/
 /tmp/
 /volumes/
 /vfroot/
+/*.pid
+
+# Release artifacts
+/CHANGELOG_RELEASE.md
+
+# Kernel scratches
+/scratches/

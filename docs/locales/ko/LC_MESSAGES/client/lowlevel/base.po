@@ -1,0 +1,39 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+# 0b788e50d59148028f5eaf3c79026397
+#: ../../client/lowlevel/base.rst:2 90cbef188e6c4fb7a56d7432b45f8fe6
+msgid "Base Function"
+msgstr "기반 함수"
+
+# a57a0432907645d792bbed4f799c2c79
+#: ../../client/lowlevel/base.rst:6 bd1a62482dd447bdafb65a3e61b6eb9a
+msgid ""
+"This module defines a few utilities that ease complexities to support both "
+"synchronous and asynchronous API functions, using some tricks with Python "
+"metaclasses."
+msgstr ""
+
+# 599f394282b24508a7703d57ba1f1d24
+#: ../../client/lowlevel/base.rst:10 6cc845faa90b48ab8c7ff88e40422744
+msgid ""
+"Unless your are contributing to the client SDK, probably you won't have to "
+"use this module directly."
+msgstr ""

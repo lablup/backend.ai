@@ -1,10 +1,5 @@
 import re
-from typing import (
-    List,
-    Sequence,
-    Set,
-    Type,
-)
+from typing import List, Sequence, Set, Type
 
 from .types import ServicePort, ServicePortProtocols
 

@@ -98,6 +98,16 @@ smaller target of files that you work on and `use an option to select the
 targets only changed
 <https://www.pantsbuild.org/docs/advanced-target-selection#running-over-changed-files-with---changed-since>`_ (``--changed-since``).
 
+Running formatters
+------------------
+
+If you encounter failure from ``isort``, you may run the formatter to automatically fix the import ordering issues.
+
+.. code-block:: console
+
+   $ ./pants fmt ::
+   $ ./pants fmt src/ai/backend/common::
+
 Running unit tests
 ------------------
 
@@ -182,6 +192,12 @@ specified in ``pants.toml``.
 
    For Vim, you also need to explicitly activate the exported venv.
 
+Switching between branches
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When each branch has different external package requirements, you should run ``./pants export ::``
+before running codes after ``git switch``-ing between such branches.
+
 Running entrypoints
 -------------------
 
@@ -198,6 +214,28 @@ Examples:
     $ ./py -m ai.backend.storage.server
     $ ./backend.ai mgr start-server
     $ ./backend.ai ps
+
+Working with plugins
+--------------------
+
+To develop Backend.AI plugins together, the repository offers a special location
+``./plugins`` where you can clone plugin repositories and a shortcut script
+``scripts/install-plugin.sh`` that does this for you.
+
+.. code-block:: console
+
+    $ scripts/install-plugin.sh lablup/backend.ai-accelerator-cuda-mock
+
+This is equivalent to:
+
+.. code-block:: console
+
+    $ git clone \
+    >   https://github.com/lablup/backend.ai-accelerator-cuda-mock \
+    >   plugins/backend.ai-accelerator-cuda-mock
+
+These plugins are auto-detected by scanning ``setup.cfg`` of plugin subdirectories
+by the ``ai.backend.plugin.entrypoint`` module, even without explicit editable installations.
 
 Writing test cases
 ------------------
@@ -312,6 +350,38 @@ Adding new external dependencies
      $ ./pants generate-lockfiles
      $ ./pants export ::
 
+Merging lockfile conflicts
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you work on a branch that adds a new external dependency and the main branch has also
+another external dependency addition, merging the main branch into your branch is likely to
+make a merge conflict on ``python.lock`` file.
+
+In this case, you can just do the followings since we can just *regenerate* the lockfile
+after merging ``requirements.txt`` and ``BUILD`` files.
+
+.. code-block:: console
+
+   $ git merge main
+   ... it says a conflict on python.lock ...
+   $ git checkout --theirs python.lock
+   $ ./pants generate-lockfiles --resolve=python-default
+   $ git add python.lock
+   $ git commit
+
+Resetting Pants
+~~~~~~~~~~~~~~~
+
+If Pants behaves strangely, you could simply reset all its runtime-generated files by:
+
+.. code-block:: console
+
+   $ killall pantsd
+   $ rm -r .tmp .pants.d ~/.cache/pants
+
+After this, re-running any Pants command will automatically reinitialize itself and
+all cached data as necessary.
+
 .. _debugging-tests:
 
 Debugging test cases (or interactively running test cases)
@@ -361,9 +431,12 @@ Making a new release
   line, e.g., using ``set noeol`` in Vim.  This is also configured in
   ``./editorconfig``)
 
-* Run ``./pants towncrier`` to auto-generate the changelog.
+* Run ``LOCKSET=tools/towncrier ./py -m towncrier`` to auto-generate the changelog.
 
-  - (TODO: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
+  - You may append ``--draft`` to see a preview of the changelog update without
+    actually modifying the filesytem.
+
+  - (WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
 
 * Make a new git commit with the commit message: "release: <version>".
 

@@ -1,0 +1,186 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI Client
+# SDK for Python package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2018.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2018-12-20 01:55+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.6.0\n"
+
+# 3c6b2d9f5ba24d96b3b1f74a07799564
+#: ../../cli/examples.rst:2
+msgid "Examples"
+msgstr "예제"
+
+# 9c26a9829abf4388baab5c17581ff780
+#: ../../cli/examples.rst:6
+msgid ""
+"Please consult the detailed usage in the help of each command (use ``-h`` or "
+"``--help`` argument to display the manual)."
+msgstr ""
+"자세한 명령어 사용법들은 ``-h``, ``--help`` 인자를 사용하여 각 명령어의 세부 "
+"도움말을 참고하십시오."
+
+# d0a12b992d484a1689f118f4169de3e5
+#: ../../cli/examples.rst:10
+msgid "Listing currently running sessions"
+msgstr "현재 실행 중인 세션 목록 보기"
+
+# ce8f1e52958549c686d190664340f844
+#: ../../cli/examples.rst:16
+msgid "This command is actually an alias of the following command:"
+msgstr "이 명령은 사실 다음 명령어의 짧은 별칭입니다:"
+
+# ba4ba0c9fe804fafb0c5ef026cf3cc01
+#: ../../cli/examples.rst:24
+msgid "Running simple sessions"
+msgstr "간단한 코드 실행하기"
+
+# 410bc719274d4d5d9b753464de88568d
+#: ../../cli/examples.rst:26
+msgid ""
+"The following command spawns a Python session and executes the code passed "
+"as ``-c`` argument immediately. ``--rm`` option states that the client "
+"automatically terminates the session after execution finishes."
+msgstr ""
+"다음 명령어는 Python 세션을 띄우고 그 안에서 ``-c`` 옵션으로 넘겨진 코드를 바"
+"로 실행합니다. ``--rm`` 옵션은 실행이 완료되자마자 클라이언트가 자동으로 세션"
+"을 종료시키도록 지시합니다."
+
+# 410bc719274d4d5d9b753464de88568d
+#: ../../cli/examples.rst:35
+msgid ""
+"The following command spawns a Python session and execute the code passed as "
+"``./myscript.py`` file, using the shell command specified in the ``--exec`` "
+"option."
+msgstr ""
+"다음 명령어는 Python 세션을 띄우고 ``./myscript.py`` 파일로 전달된 코드를 그 "
+"안에서 실행합니다. 이때 ``--exec`` 옵션으로 지정한 shell 명령어를 이용하여 실"
+"행합니다."
+
+# 0c18dbeff1714645b14726d97d0705f1
+#: ../../cli/examples.rst:46
+msgid "Running sessions with accelerators"
+msgstr "가속기를 활용한 세션 사용하기"
+
+# 90ba274270334997ab2f47ed5b3f82d5
+#: ../../cli/examples.rst:48
+msgid ""
+"The following command spawns a Python TensorFlow session using a half of "
+"virtual GPU device and executes ``./mygpucode.py`` file inside it."
+msgstr ""
+"다음 명령어는 Python TensorFlow 세션을 가상 GPU 0.5개를 활용하도록 지정하여 "
+"띄우고, 그 안에서 ``./mygpucode.py`` 파일을 실행합니다."
+
+# d0a12b992d484a1689f118f4169de3e5
+#: ../../cli/examples.rst:58
+msgid "Terminating running sessions"
+msgstr "실행 중인 세션 종료하기"
+
+# ffe3b56dbb2349e09ec2f7ab6149975a
+#: ../../cli/examples.rst:60
+msgid ""
+"Without ``--rm`` option, your session remains alive for a configured amount "
+"of idle timeout (default is 30 minutes). You can see such sessions using the "
+"``backend.ai ps`` command. Use the following command to manually terminate "
+"them via their session IDs.  You may specifcy multiple session IDs to "
+"terminate them at once."
+msgstr ""
+"``--rm`` 옵션 없이 ``run`` 명령을 실행하거나 ``start`` 명령을 사용한 경우 여"
+"러분의 연산 세션은 미리 설정된 시간(기본 30분) 동안 계속 떠있습니다.그렇게 대"
+"기 중인 세션들은 ``backend.ai ps`` 명령으로 조회할 수 있습니다. 다음 명령어"
+"를 활용하여 그러한 세션들을 세션 ID를 이용해 종료합니다. 세션 ID를 여러 개 적"
+"어서 여러 세션을 한꺼번에 종료할 수도 있습니다."
+
+# 83634813d2b24281a8d62cb921a91f2a
+#: ../../cli/examples.rst:72
+msgid "Starting a session and connecting to its Jupyter Notebook"
+msgstr "Jupyter Notebook용 세션을 만들고 접속하기"
+
+# 6cf1d9f2a95142abb3ed4a4fff834aad
+#: ../../cli/examples.rst:74
+msgid ""
+"The following command first spawns a Python session named \"mysession\" "
+"without running any code immediately, and then executes a local proxy which "
+"connects to the \"jupyter\" service running inside the session via the local "
+"TCP port 9900. The ``start`` command shows application services provided by "
+"the created compute session so that you can choose one in the subsequent "
+"``app`` command."
+msgstr ""
+"다음 명령어는 \"mysession\"이라 이름붙여진 Python 세션을 띄웁니다. 이때 띄우"
+"기만 하고 코드를 바로 실행하지는 않습니다. 이어서, 그 안에서 실행되는 "
+"\"jupyter\" 서비스에 접속하는 로컬 프록시를 TCP 포트 9900번에 실행합니다. "
+"``start`` 명령은 생성된 연산 세션이 제공하는 응용 서비스들을 보여주므로, 여러"
+"분은 이어서 ``app``\\ 을 실행할 때 어떤 것으로 접속할지 선택할 수 있습니다."
+
+# 9ed07bb5f43942418b547267c89709a1
+#: ../../cli/examples.rst:85
+msgid ""
+"Once executed, the ``app`` command waits for the user to open the displayed "
+"address using appropriate application. For the jupyter service, use your "
+"favorite web browser just like the way you use Jupyter Notebooks. To stop "
+"the ``app`` command, press ``Ctrl+C`` or send the ``SIGINT`` signal."
+msgstr ""
+"``app`` 명령은 한번 실행되면 사용자가 적절한 소프트웨어로 접속하기를 기다립니"
+"다. Jupyter 서비스의 경우, 여러분이 선호하는 웹브라우저를 이용하여 원래 "
+"Jupyter Notebook 환경을 사용하듯이 해당 주소로 접속하면 됩니다. ``app`` 명령"
+"을 중지하려면 ``Ctrl+C`` 단축키를 누르거나 ``SIGINT`` 시그널을 보냅니다."
+
+# 442490e1fae6469cbf31b7bdc8a441f8
+#: ../../cli/examples.rst:93
+msgid "Running sessions with vfolders"
+msgstr "가상폴더를 사용한 연산 세션 실행하기"
+
+# 591f65762b084f9db1ad21f493564be6
+#: ../../cli/examples.rst:95
+msgid ""
+"The following command creates a virtual folder named \"mydata1\", and then "
+"uploads ``./bigdata.csv`` file into it."
+msgstr ""
+"다음 명령어는 \"mydata1\"이라는 이름의 가상 폴더를 생성하고, 그 안에 ``./"
+"bigdata.csv``\\ 라는 이름의 파일을 업로드합니다."
+
+# f574bba420a7493185edd5108d8f5d7f
+#: ../../cli/examples.rst:103
+msgid ""
+"The following command spawns a Python session where the virtual folder "
+"\"mydata1\" is mounted.  The execution options are omitted in this example. "
+"Then, it downloads ``./bigresult.txt`` file (generated by your code) from "
+"the \"mydata1\" virtual folder."
+msgstr ""
+"다음 명령어는 \"mydata1\"이란 가상 폴더가 탑재된 Python 세션을 하나 띄웁니"
+"다. 코드 실행 옵션은 편의상 생략되었습니다. 이어서 두번째 명령은 여러분의 코"
+"드가 생성한 ``./bigresult.txt`` 파일을 \"mydata1\" 가상폴더로부터 다운로드합"
+"니다."
+
+# 1f7815d82b334dbca2f7617c3dcbb297
+#: ../../cli/examples.rst:113
+msgid ""
+"In your code, you may access the virtual folder via ``/home/work/mydata1`` "
+"(where the default current working directory is ``/home/work``) just like a "
+"normal directory."
+msgstr ""
+"세션 안에서 실행되는 여러분의 코드에서는 가상폴더를 ``/home/work/mydata1`` 이"
+"라는 일반 디렉토리처럼 그대로 사용할 수 있습니다. (이때 기본 활성 작업 디렉토"
+"리는 ``/home/work``\\ 입니다.)"
+
+# d0a12b992d484a1689f118f4169de3e5
+#: ../../cli/examples.rst:119
+msgid "Running parallel experiment sessions"
+msgstr "병렬 실험을 위한 연산 세션 실행하기"
+
+# b5a00579cf40463a864851a475f94e4f
+#: ../../cli/examples.rst:121
+msgid "(TODO)"
+msgstr "(준비 중입니다)"

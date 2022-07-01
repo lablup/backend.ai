@@ -1,0 +1,94 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/common-api/ratelimit.rst:2 d725fff9cf1749cba7a30153d23a05e3
+msgid "Rate Limiting"
+msgstr ""
+
+#: ../../manager/common-api/ratelimit.rst:4 1d557cb5a2854d389151e94c5a67f648
+msgid ""
+"The API server imposes a rate limit to prevent clients from overloading the "
+"server. The limit is applied to the last *N* minutes at ANY moment (*N* is "
+"15 minutes by default)."
+msgstr ""
+
+#: ../../manager/common-api/ratelimit.rst:7 3e7015e3f39e474fa3ab2c369acdb522
+msgid ""
+"For public non-authorized APIs such as version checks, the server uses the "
+"client's IP address seen by the server to impose rate limits. Due to this, "
+"please keep in mind that large-scale NAT-based deployments may encounter the "
+"rate limits sooner than expected. For authorized APIs, it uses the access "
+"key in the authorization header to impose rate limits. The rate limit "
+"includes both all successful and failed requests."
+msgstr ""
+
+#: ../../manager/common-api/ratelimit.rst:12 55f9c47c1253459783706e915532ef56
+msgid ""
+"Upon a valid request, the HTTP response contains the following header fields "
+"to help the clients flow-control their requests."
+msgstr ""
+
+#: ../../manager/common-api/ratelimit.rst:18 889bf4bf3d53460baa41b8226b547b5a
+msgid "HTTP Headers"
+msgstr "HTTP 헤더"
+
+#: ../../manager/common-api/ratelimit.rst:19 5c2850adc89b4b069d051622480c7d54
+msgid "Values"
+msgstr "값"
+
+#: ../../manager/common-api/ratelimit.rst:20 6a9b2fee48784a76a84b7e4744a94cbc
+msgid "``X-RateLimit-Limit``"
+msgstr ""
+
+#: ../../manager/common-api/ratelimit.rst:21 51727c2d73c148aab2d5271ce7ba7e73
+msgid "The maximum allowed number of requests during the rate-limit window."
+msgstr ""
+
+#: ../../manager/common-api/ratelimit.rst:22 a8f51beead164863b75031915b35c660
+msgid "``X-RateLimit-Remaining``"
+msgstr ""
+
+#: ../../manager/common-api/ratelimit.rst:23 6755976e9c5a44c78e8e331f4e16349a
+msgid "The number of further allowed requests left for the moment."
+msgstr ""
+
+#: ../../manager/common-api/ratelimit.rst:24 2d71d24a05484fbf9ef2603cd7ff8f7c
+msgid "``X-RateLimit-Window``"
+msgstr ""
+
+#: ../../manager/common-api/ratelimit.rst:25 d30f5befbe0b459e99284f938754514c
+msgid ""
+"The constant value representing the window size in seconds. (e.g., 900 means "
+"15 minutes)"
+msgstr ""
+
+#: ../../manager/common-api/ratelimit.rst:30 e348c8f0a7a1469d913bb5f48f8c4f36
+msgid ""
+"Deprecated ``X-RateLimit-Reset`` and transitional ``X-Retry-After`` as we "
+"have implemented a rolling counter that measures last 15 minutes API call "
+"counts at any moment."
+msgstr ""
+
+#: ../../manager/common-api/ratelimit.rst:32 ab5f8dbe6f7d4a76a9b9ac5e83bcf027
+msgid ""
+"When the limit is exceeded, further API calls will get HTTP 429 \"Too Many "
+"Requests\". If the client seems to be DDoS-ing, the server may block the "
+"client forever without prior notice."
+msgstr ""

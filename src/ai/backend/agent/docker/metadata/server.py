@@ -1,18 +1,16 @@
 import logging
 from typing import Any, Mapping
 from uuid import UUID
-from ai.backend.common.types import KernelId
 
 from aiodocker.docker import Docker
 from aiohttp import web
-
-from ai.backend.agent.utils import closing_async
-from ai.backend.common.logging import BraceStyleAdapter
+from aiohttp.typedefs import Handler
 
 from ai.backend.agent.docker.kernel import DockerKernel
-
 from ai.backend.agent.kernel import AbstractKernel
-from aiohttp.typedefs import Handler
+from ai.backend.agent.utils import closing_async
+from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import KernelId
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

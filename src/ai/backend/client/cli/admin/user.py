@@ -5,8 +5,10 @@ import sys
 import click
 
 from ai.backend.cli.interaction import ask_yn
-from ai.backend.client.session import Session
 from ai.backend.client.output.fields import user_fields
+from ai.backend.client.session import Session
+
+from ..extensions import pass_ctx_obj
 from ..pretty import print_info
 from ..types import CLIContext
 from . import admin
@@ -20,7 +22,7 @@ def user() -> None:
 
 
 @user.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.option('-e', '--email', type=str, default=None,
               help='Email of a user to display.')
 def info(ctx: CLIContext, email: str) -> None:
@@ -51,7 +53,7 @@ def info(ctx: CLIContext, email: str) -> None:
 
 
 @user.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.option('-s', '--status', type=str, default=None,
               help='Filter users in a specific state (active, inactive, deleted, before-verification).')
 @click.option('-g', '--group', type=str, default=None,
@@ -103,7 +105,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
 
 
 @user.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('domain_name', type=str, metavar='DOMAIN_NAME')
 @click.argument('email', type=str, metavar='EMAIL')
 @click.argument('password', type=str, metavar='PASSWORD')
@@ -157,7 +159,7 @@ def add(ctx: CLIContext, domain_name, email, password, username, full_name, role
 
 
 @user.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('email', type=str, metavar='EMAIL')
 @click.option('-p', '--password', type=str, help='Password.')
 @click.option('-u', '--username', type=str, help='Username.')
@@ -210,7 +212,7 @@ def update(ctx: CLIContext, email, password, username, full_name, domain_name, r
 
 
 @user.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('email', type=str, metavar='EMAIL')
 def delete(ctx: CLIContext, email):
     """
@@ -244,7 +246,7 @@ def delete(ctx: CLIContext, email):
 
 
 @user.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('email', type=str, metavar='EMAIL')
 @click.option('--purge-shared-vfolders', is_flag=True, default=False,
               help='Delete user\'s all virtual folders. '

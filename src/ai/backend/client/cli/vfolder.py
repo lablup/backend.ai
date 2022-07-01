@@ -1,7 +1,7 @@
-from datetime import datetime
 import json
-from pathlib import Path
 import sys
+from datetime import datetime
+from pathlib import Path
 
 import click
 import humanize
@@ -15,8 +15,19 @@ from ai.backend.client.session import Session
 from ..compat import asyncio_run
 from ..session import AsyncSession
 from .main import main
-from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
-from .params import ByteSizeParamType, ByteSizeParamCheckType, CommaSeparatedKVListParamType
+from .params import (
+    ByteSizeParamCheckType,
+    ByteSizeParamType,
+    CommaSeparatedKVListParamType,
+)
+from .pretty import (
+    print_done,
+    print_error,
+    print_fail,
+    print_info,
+    print_wait,
+    print_warn,
+)
 
 
 @main.group()
@@ -287,7 +298,11 @@ def cp(filenames):
 @vfolder.command()
 @click.argument('name', type=str)
 @click.argument('path', type=str)
-def mkdir(name, path):
+@click.option('-p', '--parents', default=False, is_flag=True,
+              help='Make missing parents of this path as needed')
+@click.option('-e', '--exist-ok', default=False, is_flag=True,
+              help='Skip an error caused by file not found')
+def mkdir(name, path, parents, exist_ok):
     '''Create an empty directory in the virtual folder.
 
     \b
@@ -297,7 +312,7 @@ def mkdir(name, path):
     '''
     with Session() as session:
         try:
-            session.VFolder(name).mkdir(path)
+            session.VFolder(name).mkdir(path, parents=parents, exist_ok=exist_ok)
             print_done('Done.')
         except Exception as e:
             print_error(e)

@@ -1,0 +1,183 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2015-2022, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../install/_archive/install-python-via-pyenv.md:1
+#: 90b09014a7114a30950e9718a7fcc2d5
+msgid ""
+"We highly recommend [pyenv](https://github.com/pyenv/pyenv) to install "
+"multiple Python versions side-by-side, which does not interfere with system-"
+"default Pythons."
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:4
+#: b5e8d203c83d49268230efc748b29b17
+msgid ""
+"[![asciicast](https://asciinema.org/a/ow9AdNDqjGnkN5ky2dyxMaQmQ.png)]"
+"(https://asciinema.org/a/ow9AdNDqjGnkN5ky2dyxMaQmQ)"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:6
+#: bb5ceeca1a1a498481e17479443e1722
+msgid "## Install dependencies for building Python"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:8
+#: 0791d066de0f4e73bc9fecd103e3b1f3
+msgid "### Ubuntu"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:10
+#: b516bc4aca26418d9cbe2e16196be702
+msgid ""
+"```console $ sudo apt-get update -y $ sudo apt-get dist-upgrade -y $ sudo "
+"apt-get install -y \\ > build-essential git-core "
+"\\                                     # for generic C/C++ builds > "
+"libreadline-dev libsqlite3-dev libssl-dev libbz2-dev tk-dev \\  # for Python "
+"builds > libzmq3-dev libsnappy-dev                                      # "
+"for Backend.AI dependency builds ```"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:19
+#: f487f20a59c54466b38d408fdc991df4
+msgid "### CentOS / RHEL"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:21
+#: 0f1af9fc5c814b6f9fde6ff091534328
+msgid "(TODO)"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:23
+#: 52775a4ab4e34c7e8a80c3d3650daeea
+msgid "## Install pyenv"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:25
+#: 6fa839c3871b4295a94082c8810dbed1
+msgid ""
+"**NOTE:** Change `~/.profile` accroding to your shell/system (e.g., `~/."
+"bashrc`, `~/.bash_profile`, `~/.zshrc`, ...) -- whichever loaded at startup "
+"of your shell!"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:27
+#: e60cffecde3348c6b7011abea5de75f1
+msgid ""
+"```console $ git clone https://github.com/pyenv/pyenv.git ~/.pyenv ... $ "
+"echo 'export PYENV_ROOT=\"$HOME/.pyenv\"' >> ~/.profile $ echo 'export PATH="
+"\"$PYENV_ROOT/bin:$PATH\"' >> ~/.profile $ echo 'eval \"$(pyenv init -)\"' "
+">> ~/.profile $ exec $SHELL -l $ pyenv  # check installation pyenv 1.2.0-6-"
+"g9619e6b Usage: pyenv <command> [<args>]"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:38
+#: 05c5011fc66d4c9db2f4aa74450faf56
+msgid "Some useful pyenv commands are:"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:39
+#: e24bfbd6d57349f4873d073b9a31925c
+msgid "..."
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:40
+#: f24ac5948b734d29afb8e2861c0335ea
+msgid "```"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:42
+#: e1c1ca52757643a098e57f216e70f375
+msgid "## Install pyenv's virtualenv plugin"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:44
+#: 054ce4f2ebfd411eacfaeb09198e07a5
+msgid ""
+"```console $ git clone https://github.com/pyenv/pyenv-virtualenv.git ~/."
+"pyenv/plugins/pyenv-virtualenv ... $ echo 'eval \"$(pyenv virtualenv-init "
+"-)\"' >> ~/.profile $ exec $SHELL -l $ pyenv virtualenv  # check "
+"installation pyenv-virtualenv: no virtualenv name given. ```"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:53
+#: 49fe5de951c0479ba89370a3363070ee
+msgid ""
+"## Install Python via pyenv Install Python 3.6 latest version. **NOTE:** "
+"Currently Python 3.7 is not supported yet."
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:57
+#: 11212a718cc7408c90ee874f332832b6
+msgid "```console $ pyenv install 3.6.6 ```"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:61
+#: 72840c1bc514448caa4f7c1f38b18ffa
+msgid "## Create a virtualenv using a specific Python version"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:63
+#: 801c5bacd1444379a39dbf9e0eb11ba2
+msgid "Change `myvenv` to specific names required in other guide pages."
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:65
+#: 44361bea8cf64f09a50424282afafd61
+msgid "```console $ pyenv virtualenv 3.6.6 myvenv ```"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:69
+#: 23268b03390440dcb1fda34789e152f6
+msgid "## Activate the virtualenv for the current shell"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:71
+#: 2ffbdfb06b6b4492bab1b175dcb928e8
+msgid "```console $ pyenv shell myvenv ```"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:75
+#: 5dde31509cdf4c0aac47021752bd2498
+msgid "## Activate the virtualenv when your shell goes into a directory"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:77
+#: 5163faff08ab428ab50de3f9f0c39a42
+msgid "```console $ cd some-directory $ pyenv local myvenv ```"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:82
+#: 31a2b520bdd94afeb15f2c65e3f0848c
+msgid "<table><tr><td>💡</td><td>"
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:84
+#: 088296c0a8a746ed826c9b3161fdea7d
+msgid ""
+"`pyenv local` creates a hidden `.python-version` file at each directory "
+"specifying the Python version/virtualenv recongnized by pyenv. Any pyenv-"
+"enabled shells will automagically activate/deactivate this version/"
+"virtualenv when going in/out such directories."
+msgstr ""
+
+#: ../../install/_archive/install-python-via-pyenv.md:87
+#: c61f1b32e76846fd86c0303114a028f4
+msgid "</td></tr></table>"
+msgstr ""

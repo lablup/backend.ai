@@ -1,17 +1,11 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import sys
-from typing import (
-    Any, Optional, Union,
-    Dict, Mapping, MutableMapping,
-    Tuple,
-    cast,
-)
+from pathlib import Path
+from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, cast
 
-import toml
-from toml.decoder import InlineTableDict
+import tomli
 import trafaret as t
 
 from . import validators as tx
@@ -88,8 +82,7 @@ def read_from_file(toml_path: Optional[Union[Path, str]], daemon_name: str) -> T
     else:
         discovered_path = Path(toml_path)
     try:
-        config = cast(Dict[str, Any], toml.loads(discovered_path.read_text()))
-        config = _sanitize_inline_dicts(config)
+        config = cast(Dict[str, Any], tomli.loads(discovered_path.read_text()))
     except IOError:
         raise ConfigurationError({
             'read_from_file()': f"Could not read config from: {discovered_path}",
@@ -106,8 +99,7 @@ async def read_from_etcd(etcd_config: Mapping[str, Any],
     if raw_value is None:
         return None
     config: Dict[str, Any]
-    config = cast(Dict[str, Any], toml.loads(raw_value))
-    config = _sanitize_inline_dicts(config)
+    config = cast(Dict[str, Any], tomli.loads(raw_value))
     return config
 
 
@@ -142,22 +134,6 @@ def merge(table: Mapping[str, Any], updates: Mapping[str, Any]) -> Mapping[str, 
             orig = result.get(k, {})
             assert isinstance(orig, Mapping)
             result[k] = merge(orig, v)
-        else:
-            result[k] = v
-    return result
-
-
-def _sanitize_inline_dicts(table: Dict[str, Any] | InlineTableDict) -> Dict[str, Any]:
-    result: Dict[str, Any] = {}
-    # Due to the way of toml.decoder to use Python class hierarchy to annotate
-    # inline or non-inline tables of TOML, we need to skip type checking here.
-    for k, v in table.items():  # type: ignore
-        if isinstance(v, InlineTableDict):
-            # Since this function always returns a copied dict,
-            # this automatically converts InlineTableDict to dict.
-            result[k] = _sanitize_inline_dicts(cast(Dict[str, Any], v))
-        elif isinstance(v, Dict):
-            result[k] = _sanitize_inline_dicts(v)
         else:
             result[k] = v
     return result

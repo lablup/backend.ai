@@ -1,0 +1,94 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) 2016-2018, Lablup Inc.
+# This file is distributed under the same license as the Backend.AI API
+# Documentation package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: Backend.AI API Documentation 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.10.1\n"
+
+#: ../../manager/admin-api/images.rst:2 b326c46f763a4da39439855c0277daf2
+#, fuzzy
+msgid "Image Management"
+msgstr "키 쌍 관리"
+
+#: ../../manager/admin-api/images.rst:5 50419324b716496395b73556b9a17cc6
+msgid "Query Schema"
+msgstr "쿼리 스키마"
+
+#: ../../manager/admin-api/images.rst:38 935015e598b34e5a8ebbc153a7984a13
+msgid ""
+"The image list is automatically filtered by: 1) the allowed docker "
+"registries of the current user's domain, 2) whether at least one agent in "
+"the union of all agents from the allowed scaling groups for the current "
+"user's group has the image or not. The second condition applies only when "
+"the value of ``group`` is given explicitly. If ``scaling_group`` is not "
+"``null``, then only the agents in the given scaling group are checked for "
+"image availability instead of taking the union of all agents from the "
+"allowed scaling groups."
+msgstr ""
+
+#: ../../manager/admin-api/images.rst:44 7fb4f036b090448d80b4eb1ec7814398
+msgid ""
+"If the requesting user is a super-admin, clients may set the filter "
+"conditions as they want. If the filter conditions are not specified by the "
+"super-admin, clients work like v19.09 and prior versions"
+msgstr ""
+
+#: ../../manager/admin-api/images.rst:49 533aca939ddb46d0a58a37ac5bbc415b
+msgid ""
+"``domain``, ``group``, and ``scaling_group`` filters are added to the "
+"``images`` root query field."
+msgstr ""
+
+#: ../../manager/admin-api/images.rst:53 2ab959c404fb454ea83e63fadd795ff4
+msgid ""
+"``images`` query returns the images currently usable by the requesting user "
+"as described above. Previously, it returned all etcd-registered images."
+msgstr ""
+
+#: ../../manager/admin-api/images.rst:57 24ea8c30155742ebbec03b82f7aa6d15
+msgid "Mutation Schema"
+msgstr "뮤테이션 스키마"
+
+#: ../../manager/admin-api/images.rst:103 a46b80f0c82043daaf4cf7c9477470c5
+msgid "All these mutations are only allowed for super-admins."
+msgstr ""
+
+#: ../../manager/admin-api/images.rst:105 934588f4094e44f2b1412586e840d383
+msgid ""
+"The query parameter ``target_agents`` takes a special expression to indicate "
+"a set of agents."
+msgstr ""
+
+#: ../../manager/admin-api/images.rst:107 a445e742ff864117a0842437013d6f71
+msgid ""
+"The mutations that returns ``task_id`` may take an arbitrarily long time to "
+"complete. This means that getting the response does not necessarily mean "
+"that the requested task is complete. To monitor the progress and actual "
+"completion, clients should use :ref:`the background task API <bgtask-"
+"progress-events>` using the ``task_id`` value."
+msgstr ""
+
+#: ../../manager/admin-api/images.rst:113 246631f448e54fd79b2b434bc0e6e3ec
+msgid ""
+"``forget_image``, ``preload_image`` and ``unload_image`` are added to the "
+"root mutation."
+msgstr ""
+
+#: ../../manager/admin-api/images.rst:117 8627cc9d4c164bbea1d1d3dee8bcf6c0
+msgid ""
+"``rescan_images`` now returns immediately and its completion must be "
+"monitored using the new background task API."
+msgstr ""
