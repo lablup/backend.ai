@@ -14,13 +14,11 @@ from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from datetime import datetime
 from decimal import Decimal
-from functools import reduce
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
     Callable,
-    Container,
     Dict,
     List,
     Mapping,
@@ -118,11 +116,9 @@ from .models import (
     AgentStatus,
     ImageRow,
     KernelStatus,
-    SessionDependencyRow,
     SessionStatus,
     agents,
     kernels,
-    keypair_resource_policies,
     prepare_dotfiles,
     prepare_vfolder_mounts,
     query_allowed_sgroups,
@@ -155,12 +151,7 @@ if TYPE_CHECKING:
 
     from .models import ScalingGroupRow
     from .models.storage import StorageSessionManager
-    from .scheduler.types import (
-        AgentAllocationContext,
-        KernelAgentBinding,
-        PendingSession,
-        SchedulingContext,
-    )
+    from .scheduler.types import KernelAgentBinding, SchedulingContext
 
 __all__ = ['AgentRegistry', 'InstanceNotFound']
 
@@ -667,7 +658,7 @@ class AgentRegistry:
         *,
         allow_stale: bool = False,
         for_update: bool = False,
-        load_intrinsic: bool=False,
+        load_intrinsic: bool = False,
         db_session: SASession = None,
     ) -> SessionRow:
         """
@@ -687,7 +678,7 @@ class AgentRegistry:
                                 such as kernels or main kernel.
         :param db_connection: Database connection for reuse.
         """
-        async with reenter_txn_session(self.db, db_session, _read_only_txn_opts) as db_sess:
+        async with reenter_txn_session(self.db, db_session, read_only=True) as db_sess:
             sess_rows = await match_sessions(
                 db_sess,
                 session_name_or_id,
@@ -703,17 +694,15 @@ class AgentRegistry:
                 raise TooManySessionsMatched(extra_data={'matches': sess_rows})
             return sess_rows[0]
 
-
     async def get_session_by_id(
         self,
         session_id: uuid.UUID,
         db_session: SASession | None = None,
     ) -> SessionRow:
-        async with reenter_txn_session(self.db, db_session, _read_only_txn_opts) as db_sess:
+        async with reenter_txn_session(self.db, db_session, read_only=True) as db_sess:
             return await db_sess.get(
                 SessionRow, session_id,
             )
-
 
     async def get_session_main_kernel(
         self,
@@ -901,7 +890,7 @@ class AgentRegistry:
             log_msg = [f'image ref => {ref} ({ref.architecture})' for ref in image_refs]
             log.debug(
                 'enqueue_session(): '
-                ', '.join(log_msg)
+                ', '.join(log_msg),
             )
             image_map = await ImageRow.resolve_all(session, image_refs)
 
@@ -1192,7 +1181,7 @@ class AgentRegistry:
         sched_ctx: SchedulingContext,
         scheduled_session: SessionRow,
     ) -> None:
-        from .scheduler.types import AgentAllocationContext, KernelAgentBinding
+        from .scheduler.types import KernelAgentBinding
         kernel_agent_bindings: Sequence[KernelAgentBinding] = [
             KernelAgentBinding(
                 kernel=k,
@@ -1354,7 +1343,7 @@ class AgentRegistry:
                     errors=agent_errors,
                 )
             await self.settle_agent_alloc(kernel_agent_bindings)
-        
+
         async with self.db.begin_session() as db_session:
             total_resource_occupancy = await get_kernel_occupancy(
                 db_session,
@@ -1687,7 +1676,7 @@ class AgentRegistry:
                     update_query = (
                         sa.update(AgentRow)
                         .values(
-                            occupied_slots = ResourceSlot.from_json(occupied_slots) + diff,
+                            occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
                         )
                         .where(AgentRow.id == agent_id)
                     )
@@ -1937,7 +1926,7 @@ class AgentRegistry:
                                     -1,
                                 ),
                             )
-                        
+
                         async def _update() -> None:
                             kern_stat = await redis.execute(
                                 self.redis_stat,
@@ -1975,7 +1964,7 @@ class AgentRegistry:
                                     -1,
                                 ),
                             )
-                        
+
                         async def _update() -> None:
                             value = {
                                 'status': KernelStatus.TERMINATING,
@@ -2472,7 +2461,6 @@ class AgentRegistry:
         available_slots = ResourceSlot({
             SlotName(k): Decimal(v[1]) for k, v in
             agent_info['resource_slots'].items()})
-        current_addr = agent_info['addr']
         sgroup_name = agent_info.get('scaling_group', 'default')
 
         async with self.heartbeat_lock:
@@ -2492,7 +2480,7 @@ class AgentRegistry:
                     agent_row = await AgentRow.get_agent_cols(
                         db_sess,
                         agent_id,
-                        cols = [
+                        cols=[
                             AgentRow.id,
                             AgentRow.status,
                             AgentRow.addr,

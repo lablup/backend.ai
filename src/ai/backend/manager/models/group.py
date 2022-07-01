@@ -72,6 +72,7 @@ association_groups_users = sa.Table(
               nullable=False, primary_key=True),
 )
 
+
 class AssocGroupUserRow(Base):
     __table__ = association_groups_users
     user = relationship('UserRow', back_populates='groups')
@@ -101,12 +102,13 @@ groups = sa.Table(
     sa.Column('dotfiles', sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b'\x90'),
 )
 
+
 class GroupRow(Base):
     __table__ = groups
     sessions = relationship('SessionRow', back_populates='group')
     domain = relationship('DomainRow', back_populates='groups')
     scaling_groups = relationship(
-        'ScalingGroupRow', secondary='sgroups_for_groups', back_populates='groups'
+        'ScalingGroupRow', secondary='sgroups_for_groups', back_populates='groups',
     )
     users = relationship('AssocGroupUserRow', back_populates='group')
 

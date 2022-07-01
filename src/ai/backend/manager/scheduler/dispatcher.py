@@ -5,26 +5,13 @@ import itertools
 import logging
 from contextvars import ContextVar
 from datetime import datetime, timedelta
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Final,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Sequence, Tuple, Union
 
 import aiotools
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from sqlalchemy.engine.row import Row
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.sql.expression import true
 
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
@@ -56,13 +43,10 @@ from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
 from ..defs import LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
-    AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
-    AgentStatus,
     KernelStatus,
     SessionRow,
     SessionStatus,
-    agents,
     get_schedulerable_session,
     get_sessions_by_id,
     get_sessions_by_status,
@@ -72,7 +56,7 @@ from ..models import (
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
-    scaling_groups,
+    update_kernel,
     update_session_kernels,
 )
 from ..models.scaling_group import ScalingGroupOpts, ScalingGroupRow
@@ -89,9 +73,6 @@ from .predicates import (
 )
 from .types import (
     AbstractScheduler,
-    AgentAllocationContext,
-    AgentContext,
-    ExistingSession,
     KernelAgentBinding,
     PendingSession,
     PredicateResult,
@@ -304,7 +285,7 @@ class SchedulerDispatcher(aobject):
         )
         zero = ResourceSlot()
         num_scheduled = 0
-        
+
         while pending_sessions:
 
             async with self.db.begin_readonly_session() as sess:
@@ -321,6 +302,7 @@ class SchedulerDispatcher(aobject):
                 # no session is picked.
                 # continue to next sgroup.
                 return
+            assert sess_ctx is not None
             pending_sessions = [s for s in pending_sessions if s is not sess_ctx]
 
             log_fmt = 'schedule(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): '
@@ -337,6 +319,7 @@ class SchedulerDispatcher(aobject):
 
             async def _check_predicates() -> List[Tuple[str, Union[Exception, PredicateResult]]]:
                 check_results: List[Tuple[str, Union[Exception, PredicateResult]]] = []
+                assert sess_ctx is not None
                 async with self.db.begin_session() as kernel_db_sess:
                     predicates: Sequence[Tuple[str, Awaitable[PredicateResult]]] = [
                         (
@@ -398,11 +381,11 @@ class SchedulerDispatcher(aobject):
                     if result.permanent:
                         has_permanent_failure = True  # noqa
 
-            status_update_data={
+            status_update_data = {
                 'last_try': datetime.now(tzutc()).isoformat(),
                 'failed_predicates': failed_predicates,
                 'passed_predicates': passed_predicates,
-            },
+            }
             if has_failure:
                 log.debug(log_fmt + 'predicate-checks-failed (temporary)', *log_args)
                 # TODO: handle has_permanent_failure as cancellation
@@ -411,6 +394,7 @@ class SchedulerDispatcher(aobject):
                 #    Let's fix it.
 
                 async def _update() -> None:
+                    assert sess_ctx is not None
                     async with self.db.begin_session() as sess:
                         await _rollback_predicate_mutations(
                             sess, sched_ctx, sess_ctx,
@@ -433,6 +417,7 @@ class SchedulerDispatcher(aobject):
                 continue
             else:
                 async def _update() -> None:
+                    assert sess_ctx is not None
                     async with self.db.begin_session() as sess:
                         await update_session_kernels(
                             sess, sess_ctx,
@@ -440,7 +425,7 @@ class SchedulerDispatcher(aobject):
                                 'status_data': sql_json_merge(
                                     kernels.c.status_data,
                                     ('scheduler',),
-                                    parent_updates=status_update_data,
+                                    obj=status_update_data,
                                 ),
                             },
                         )
@@ -682,13 +667,12 @@ class SchedulerDispatcher(aobject):
                             await _rollback_predicate_mutations(
                                 kernel_db_sess, sched_ctx, sess_ctx,
                             )
-                            await update_session_kernels(
-                                kernel_db_sess, sess_ctx,
+                            await update_kernel(
+                                kernel_db_sess, kernel,
                                 kernel_data={
                                     'status_info': 'scheduler-error',
                                     'status_data': exc_data,
                                 },
-                                updated_kernel=kernel,
                             )
 
                     await execute_with_retry(_update)
@@ -714,7 +698,7 @@ class SchedulerDispatcher(aobject):
                             'status_data': {},
                             'status_changed': datetime.now(tzutc()),
                         },
-                        extra_cond=(KernelRow.agent_id == binding.agent_alloc_ctx.id)
+                        extra_cond=(KernelRow.agent_id == binding.agent_alloc_ctx.id),
                     )
 
         await execute_with_retry(_finalize_scheduled)
@@ -768,7 +752,6 @@ class SchedulerDispatcher(aobject):
                             do_ordering=True,
                         )
 
-                scheduled_sessions: List[SessionRow]
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
                 async with aiotools.TaskGroup() as tg:
@@ -902,13 +885,14 @@ async def _list_managed_sessions(
 
     return existings, candidates, cancelleds
 
+
 async def _reserve_agent(
     db_sess: SASession,
     sched_ctx: SchedulingContext,
     scaling_group: str,
     agent: AgentRow,
     requested_slots: ResourceSlot,
-    extra_conds = None,
+    extra_conds=None,
 ) -> AgentRow:
     current_occupied_slots = agent.occupied_slots
     if current_occupied_slots is None:

@@ -315,12 +315,11 @@ class ImageRow(Base):
                 continue
         raise ImageNotFound("Unkown image references: " + ", ".join(searched_refs))
 
-
     @classmethod
     async def resolve_all(
         cls,
         session: AsyncSession,
-        references: List[Union[ImageAlias, ImageRef]],
+        references: Sequence[ImageRef],
         *,
         load_aliases: bool = True,
     ) -> Mapping[str, ImageRow]:
@@ -351,7 +350,6 @@ class ImageRow(Base):
                 **result,
             }
         return result
-
 
     @classmethod
     async def list(cls, session: AsyncSession, load_aliases=False) -> List[ImageRow]:

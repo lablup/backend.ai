@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import enum
-from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Mapping, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -10,20 +9,12 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, relationship, selectinload
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import msgpack, redis
-from ai.backend.common.types import (
-    AgentId,
-    BinarySize,
-    HardwareMetadata,
-    ResourceSlot,
-    SlotName,
-    SlotTypes,
-)
+from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata
 
 from .base import (
     Base,
@@ -44,12 +35,6 @@ from .kernel import (
 )
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
-from .scaling_group import ScalingGroupRow
-from .session import (
-    AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    SessionRow,
-    SessionStatus,
-)
 from .user import UserRole
 
 if TYPE_CHECKING:
@@ -67,6 +52,7 @@ AGENT_UPDATE_FIELDS = (
     'available_slots', 'scaling_group_name', 'addr',
     'version', 'compute_plugins', 'architecture',
 )
+
 
 class AgentStatus(enum.Enum):
     ALIVE = 0
@@ -100,11 +86,11 @@ agents = sa.Table(
     sa.Column('compute_plugins', pgsql.JSONB(), nullable=False, default={}),
 )
 
+
 class AgentRow(Base):
     __table__ = agents
     kernels = relationship('KernelRow', back_populates='agent')
     scaling_group = relationship('ScalingGroupRow', back_populates='agents')
-
 
     @classmethod
     async def get_agent_cols(
@@ -113,7 +99,7 @@ class AgentRow(Base):
         agent_id: AgentId,
         *,
         cols,
-        for_update = True,
+        for_update=True,
     ) -> Row:
 
         query = sa.select(*cols).where(AgentRow.id == agent_id)

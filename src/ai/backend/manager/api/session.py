@@ -45,14 +45,14 @@ from aiohttp import hdrs, web
 from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
-from sqlalchemy.orm import relationship, selectinload
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.user import UserRow
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection, AsyncSession as SASession
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis
 from ai.backend.common import validators as tx
@@ -99,7 +99,6 @@ from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    DEAD_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
     AgentStatus,
 )
@@ -112,19 +111,14 @@ from ..models import (
     SessionRow,
     SessionStatus,
     UserRole,
-)
-from ..models import association_groups_users as agus
-from ..models import (
     domains,
     groups,
     kernels,
-    keypair_resource_policies,
     keypairs,
     query_accessible_vfolders,
     query_bootstrap_script,
     scaling_groups,
     session_templates,
-    users,
     verify_vfolder_name,
     vfolders,
 )
@@ -552,7 +546,6 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 
     session_creation_id = secrets.token_urlsafe(16)
     start_event = asyncio.Event()
-    kernel_id: Optional[KernelId] = None
     session_creation_tracker = app_ctx.session_creation_tracker
     session_creation_tracker[session_creation_id] = start_event
 
@@ -986,7 +979,6 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
 
     log.debug('cluster template: {}', template)
 
-    session_config: SessionEnqueuingConfig = {}
     kernel_configs: List[KernelEnqueueingConfig] = []
     for node in template['spec']['nodes']:
         # Resolve session template.
@@ -1071,8 +1063,10 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
                 check_typed_dict(kernel_config, KernelEnqueueingConfig),  # type: ignore
             )
 
-    session_config['kernel_configs'] = kernel_configs
-    session_config['image_ref'] = kernel_configs[0]['image_ref']
+    session_config: SessionEnqueuingConfig = {
+        'kernel_configs': kernel_configs,
+        'image_ref': kernel_configs[0]['image_ref'],
+    }
 
     session_creation_id = secrets.token_urlsafe(16)
     start_event = asyncio.Event()
@@ -1660,7 +1654,7 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
             .values(name=new_name)
             .where(SessionRow.id == compute_session.id)
         )
-        
+
         await db_sess.execute(update_query)
 
     return web.Response(status=204)
@@ -2132,12 +2126,12 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
     log.info('GET_CONTAINER_LOG (ak:{}/{}, s:{})',
              requester_access_key, owner_access_key, session_name)
     resp = {'result': {'logs': ''}}
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.db.begin_readonly_session() as db_sess:
         compute_session: SessionRow
         compute_session = await root_ctx.registry.get_session(
             session_name, owner_access_key,
             allow_stale=True,
-            db_connection=conn,
+            db_session=db_sess,
         )
         container_log = compute_session.main_kernel.container_log
         if (

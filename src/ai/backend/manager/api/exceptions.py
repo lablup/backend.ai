@@ -215,11 +215,11 @@ class TooManySessionsMatched(BackendError, web.HTTPNotFound):
     error_title = 'Too many sessions matched.'
 
     def __init__(self, extra_msg: str = None, extra_data: Dict[str, Any] = None, **kwargs):
+        matches: Iterable[SessionRow]
         if (
             extra_data is not None and
             (matches := extra_data.get('matches', None)) is not None
         ):
-            matches: Iterable[SessionRow]
             serializable_matches = [{
                 'id': str(item.id),
                 'name': item.name,

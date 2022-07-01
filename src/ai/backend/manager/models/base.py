@@ -79,7 +79,7 @@ convention = {
 }
 metadata = sa.MetaData(naming_convention=convention)
 mapper_registry = registry(metadata=metadata)
-Base = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
+Base: Any = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
 
 pgsql_connect_opts = {
     'server_settings': {

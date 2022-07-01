@@ -19,7 +19,6 @@ async def test_allowed_session_types_check(mock_query):
             self.name = name
             self.scheduler_opts = scheduler_opts
 
-
     mock_query.return_value = [
         DummyScalingGroup(
             name='a',

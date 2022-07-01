@@ -1,19 +1,7 @@
 from __future__ import annotations
 
 import enum
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Container,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -25,7 +13,6 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -43,18 +30,13 @@ from .base import (
     Base,
     EnumType,
     ForeignKeyIDColumn,
-    KernelIDColumnType,
     ResourceSlotColumn,
     SessionIDColumn,
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from .image import ImageRow
-from .kernel import KernelRow, KernelStatus, get_kernel_occupancy
+from .kernel import KernelRow, KernelStatus
 from .keypair import KeyPairRow
-
-if TYPE_CHECKING:
-    from .scaling_group import ScalingGroupRow
 
 __all__ = (
     'SessionStatus',
@@ -135,18 +117,14 @@ _KERNEL_SESSION_STATUS_MAPPING = {
     KernelStatus.CANCELLED: SessionStatus.CANCELLED,
 }
 
+
 def _transit_destroy_session(current, forced) -> SessionStatus:
     match current:
         case SessionStatus.PENDING:
             return SessionStatus.CANCELLED
         case SessionStatus.PULLING:
             raise GenericForbidden('Cannot destroy kernels in pulling status')
-        case (
-            SessionStatus.SCHEDULED |
-            SessionStatus.PREPARING |
-            SessionStatus.TERMINATING |
-            SessionStatus.ERROR
-        ):
+        case SessionStatus.SCHEDULED | SessionStatus.PREPARING | SessionStatus.TERMINATING | SessionStatus.ERROR:
             if not forced:
                 raise GenericForbidden(
                     'Cannot destroy kernels in scheduled/preparing/terminating/error status',
@@ -154,6 +132,7 @@ def _transit_destroy_session(current, forced) -> SessionStatus:
             return SessionStatus.TERMINATED
         case _:
             return SessionStatus.TERMINATING
+
 
 def transit_session_lifecycle(current, job, forced=False) -> SessionStatus:
     match job:
@@ -202,7 +181,7 @@ class SessionRow(Base):
     vfolder_mounts = sa.Column('vfolder_mounts', StructuredJSONObjectListColumn(VFolderMount), nullable=True)
     resource_opts = sa.Column('resource_opts', pgsql.JSONB(), nullable=True, default={})
     environ = sa.Column('environ', pgsql.JSONB(), nullable=True, default={})
-    bootstrap_script= sa.Column('bootstrap_script', sa.String(length=16 * 1024), nullable=True)
+    bootstrap_script = sa.Column('bootstrap_script', sa.String(length=16 * 1024), nullable=True)
 
     # Lifecycle
     created_at = sa.Column('created_at', sa.DateTime(timezone=True),
@@ -281,16 +260,17 @@ class SessionRow(Base):
         except IndexError:
             raise MainKernelNotFound
 
+
 async def match_sessions(
     db_session: SASession,
     session_name_or_id: Union[str, UUID],
     access_key: AccessKey,
     *,
-    allow_prefix: bool=False,
-    allow_stale: bool=True,
-    for_update: bool=False,
-    max_matches: int=10,
-    load_intrinsic: bool=False,
+    allow_prefix: bool = False,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    max_matches: int = 10,
+    load_intrinsic: bool = False,
 ) -> List[SessionRow]:
     """
     Match the prefix of session ID or session name among the sessions
@@ -409,7 +389,7 @@ async def get_sessions_by_status(
                 noload('*'),
                 selectinload(KernelRow.image).noload('*'),
                 selectinload(KernelRow.agent).noload('*'),
-            )
+            ),
         )
     if do_ordering:
         query = query.order_by(SessionRow.created_at)
@@ -422,8 +402,8 @@ async def update_session_kernels(
     session: Union[SessionRow, SessionId],
     *,
     kernel_data: Mapping[str, Any],
-    extra_cond = None,
-    sess_cond = None,
+    extra_cond=None,
+    sess_cond=None,
 ) -> None:
     """
     Update kernels which in a specific session first,
@@ -479,7 +459,7 @@ async def update_kernel(
     kernel: Union[KernelRow, KernelId],
     *,
     kernel_data: Mapping[str, Any],
-    extra_cond = None,
+    extra_cond=None,
 ) -> None:
     if isinstance(kernel, KernelRow):
         kernel_id = kernel.id
@@ -489,7 +469,7 @@ async def update_kernel(
         raise RuntimeError(
             'Invalid time of session. '
             f'expect KernelRow, uuid.UUID type, but got {type(kernel)}')
-    
+
     sess_attr = SessionRow.__dict__
     session_update = {
         k: v for k, v in kernel_data.items() if k in sess_attr
@@ -539,7 +519,7 @@ async def enqueue_session(
         db_session.add(session)
         db_session.add_all((KernelRow(**kernel) for kernel in kernel_data))
         session_id = SessionId(session.id)
-        
+
         if not dependency_sessions:
             await db_session.commit()
             return session_id
@@ -554,7 +534,7 @@ async def enqueue_session(
             except IndexError:
                 raise UnknownDependencySession(dependency_id)
             matched_dependency_session_ids.append(depend_id)
-        dependency_rows = [SessionDependencyRow(session_id=session_id, depends_on=depend_id) \
+        dependency_rows = [SessionDependencyRow(session_id=session_id, depends_on=depend_id)
             for depend_id in matched_dependency_session_ids]
         db_session.add_all(dependency_rows)
 
@@ -569,10 +549,7 @@ async def get_sgroup_managed_sessions(
     candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
     query = (
         sa.select(SessionRow)
-        .where(
-            (SessionRow.scaling_group_name == sgroup_name) &
-            (SessionRow.status.in_(candidate_statues))
-        )
+        .where((SessionRow.scaling_group_name == sgroup_name) & (SessionRow.status.in_(candidate_statues)))
         .options(
             noload('*'),
             selectinload(SessionRow.group).options(noload('*')),
@@ -621,6 +598,7 @@ class SessionDependencyRow(Base):
             name='sess_dep_pk'),
     )
 
+
 async def check_all_dependencies(
     db_session: SASession,
     sess_ctx: SessionRow,
@@ -640,10 +618,10 @@ async def check_all_dependencies(
     pending_dependencies = [sess_row for sess_row in rows if sess_row.result != SessionResult.SUCCESS]
     all_success = (not pending_dependencies)
     if all_success:
-        return (True,)
+        return (True, None)
     return (
         False,
         "Waiting dependency sessions to finish as success. ({})".format(
             ", ".join(f"{sess_row.name} ({sess_row.session_id})" for sess_row in pending_dependencies),
-        )
+        ),
     )

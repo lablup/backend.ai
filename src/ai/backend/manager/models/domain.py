@@ -65,13 +65,14 @@ domains = sa.Table(
     sa.Column('dotfiles', sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b'\x90'),
 )
 
+
 class DomainRow(Base):
     __table__ = domains
     sessions = relationship('SessionRow', back_populates='domain')
     users = relationship('UserRow', back_populates='domain')
     groups = relationship('GroupRow', back_populates='domain')
     scaling_groups = relationship(
-        'ScalingGroupRow', secondary='sgroups_for_domains', back_populates='domains'
+        'ScalingGroupRow', secondary='sgroups_for_domains', back_populates='domains',
     )
 
 

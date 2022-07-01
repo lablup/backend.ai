@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Coroutine, Protocol
 
 import attr
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 class SessionGetter(Protocol):
 
-    def __call__(self, *, db_session: SASession) -> SessionRow:
+    def __call__(self, *, load_intrinsic: bool, db_session: SASession) -> Coroutine[Any, Any, SessionRow]:
         ...
 
 

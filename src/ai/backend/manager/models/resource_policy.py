@@ -64,6 +64,7 @@ keypair_resource_policies = sa.Table(
     # sa.Column('allowed_scaling_groups', sa.Array(sa.String), nullable=False),
 )
 
+
 class KeyPairResourcePolicyRow(Base):
     __table__ = keypair_resource_policies
     keypairs = relationship('KeyPairRow', back_populates='resource_policy')

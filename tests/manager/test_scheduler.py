@@ -31,7 +31,6 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.session import SessionRow, SessionStatus
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.scheduler.dispatcher import (
     SchedulerDispatcher,
@@ -66,7 +65,6 @@ from ai.backend.manager.scheduler.predicates import check_reserved_batch_session
 #             if attr_ not in related_clss and attr_ not in cols:
 #                 raise RowAttributeNotMatch(f'attribute `{attr_}` not found in table `{self.table}`.')
 #         # self.
-
 
 
 def test_load_intrinsic():
@@ -274,6 +272,7 @@ class SessionKernelIdPair:
     session_id: UUID
     kernel_ids: Sequence[KernelId]
 
+
 cancelled_session_ids = [
     UUID('251907d9-1290-4126-bc6c-000000000999'),
 ]
@@ -338,6 +337,7 @@ _common_dummy_for_existing_session: Mapping[str, Any] = dict(
     group_id=example_group_id,
 )
 
+
 @pytest.fixture
 def example_cancelled_sessions():
     return [
@@ -360,8 +360,9 @@ def example_cancelled_sessions():
             target_sgroup_names=[],
             **_common_dummy_for_pending_session,
             created_at=dtparse('2021-12-28T23:59:59+00:00'),
-        )
+        ),
     ]
+
 
 @pytest.fixture
 def example_pending_sessions():
@@ -1000,11 +1001,6 @@ def test_mof_scheduler_no_valid_agent(
 @pytest.mark.asyncio
 async def test_pending_timeout(mocker):
 
-    # class MockDatetime:
-    #     @classmethod
-    #     def now(cls, tzinfo):
-    #         return datetime(2021, 1, 1, 0, 0, 0)
-    
     class DummySession:
         def __init__(self, id, created_at, status) -> None:
             self.id = id

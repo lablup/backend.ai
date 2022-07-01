@@ -269,7 +269,7 @@ class PendingSession:
             group_id=row['group_id'],
             status_data=row['status_data'],
             scaling_group=row['scaling_group'],
-            resource_policy_name=row['resource_policy_name'],
+            resource_policy=row['resource_policy_name'],
             resource_opts={},
             requested_slots=ResourceSlot(),
             internal_data=row['internal_data'],

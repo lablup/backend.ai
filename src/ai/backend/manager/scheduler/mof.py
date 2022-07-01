@@ -4,16 +4,10 @@ from typing import Optional, Sequence
 
 import trafaret as t
 
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId
+from ai.backend.common.types import AccessKey, ResourceSlot
 
 from ..models import AgentRow, KernelRow, SessionRow
-from .types import (
-    AbstractScheduler,
-    AgentContext,
-    ExistingSession,
-    KernelInfo,
-    PendingSession,
-)
+from .types import AbstractScheduler
 
 
 class MOFScheduler(AbstractScheduler):

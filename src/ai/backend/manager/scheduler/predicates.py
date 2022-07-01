@@ -8,22 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
+from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.models.session import SessionRow
 
 from ..models import (
     DefaultForUnspecified,
-    DomainRow,
     KeyPairResourcePolicyRow,
-    SessionDependencyRow,
     check_all_dependencies,
-    groups,
-    kernels,
-    keypair_resource_policies,
     query_allowed_sgroups,
 )
-from ..models.utils import execute_with_retry, reenter_txn, reenter_txn_session
-from .types import PendingSession, PredicateResult, SchedulingContext
+from ..models.utils import execute_with_retry, reenter_txn_session
+from .types import PredicateResult, SchedulingContext
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.scheduler'))
 
@@ -78,7 +73,7 @@ async def check_concurrency(
         )
         result = await db_sess.execute(query)
         resource_policy = result.scalar()
-    
+
     max_concurrent_sessions = resource_policy.max_concurrent_sessions
     ok, concurrency_used = await redis.execute_script(
         sched_ctx.registry.redis_stat,

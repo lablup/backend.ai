@@ -42,7 +42,6 @@ async def test_handle_heartbeat(
     _1g = Decimal('1073741824')
     _2g = Decimal('2147483648')
 
-
     class DummyAgent:
         def __init__(
             self, id, status, addr, architecture, scaling_group_name,
@@ -57,7 +56,8 @@ async def test_handle_heartbeat(
             self.version = version
             self.compute_plugins = compute_plugins
 
-        def __dict__(self) -> dict:
+        @property
+        def map(self) -> dict:
             return {
                 'id': self.id,
                 'status': self.status,
@@ -70,9 +70,8 @@ async def test_handle_heartbeat(
             }
 
         def __iter__(self):
-            for item in self.__dict__().items():
+            for item in self.map.items():
                 yield item
-
 
     # Join
     mock_dbresult.first = MagicMock(return_value=None)

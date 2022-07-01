@@ -8,18 +8,12 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Set
 import trafaret as t
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId
+from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.models.kernel import KernelRow
 
 from ..models import AgentRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
-from .types import (
-    AbstractScheduler,
-    AgentContext,
-    ExistingSession,
-    KernelInfo,
-    PendingSession,
-)
+from .types import AbstractScheduler
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.scheduler'))
 

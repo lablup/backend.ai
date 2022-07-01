@@ -124,7 +124,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
         keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
-        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(access_key, conn=conn)
+        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(access_key)
         keypair_remaining = keypair_limits - keypair_occupied
 
         # Check group resource limit and get group_id.
@@ -152,7 +152,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             'default_for_unspecified': DefaultForUnspecified.UNLIMITED,
         }
         group_limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
-        group_occupied = await root_ctx.registry.get_group_occupancy(group_id, conn=conn)
+        group_occupied = await root_ctx.registry.get_group_occupancy(group_id)
         group_remaining = group_limits - group_occupied
 
         # Check domain resource limit.
@@ -164,7 +164,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             'default_for_unspecified': DefaultForUnspecified.UNLIMITED,
         }
         domain_limits = ResourceSlot.from_policy(domain_resource_policy, known_slot_types)
-        domain_occupied = await root_ctx.registry.get_domain_occupancy(domain_name, conn=conn)
+        domain_occupied = await root_ctx.registry.get_domain_occupancy(domain_name)
         domain_remaining = domain_limits - domain_occupied
 
         # Take minimum remaining resources. There's no need to merge limits and occupied.

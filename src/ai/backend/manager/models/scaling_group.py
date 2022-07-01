@@ -11,7 +11,6 @@ import trafaret as t
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
 
@@ -151,18 +150,19 @@ sgroups_for_keypairs = sa.Table(
               index=True, nullable=False, primary_key=True),
 )
 
+
 class ScalingGroupRow(Base):
     __table__ = scaling_groups
     sessions = relationship('SessionRow', back_populates='scaling_group')
     agents = relationship('AgentRow', back_populates='scaling_group')
     domains = relationship(
-        'DomainRow', secondary=sgroups_for_domains, back_populates='scaling_groups'
+        'DomainRow', secondary=sgroups_for_domains, back_populates='scaling_groups',
     )
     groups = relationship(
-        'GroupRow', secondary=sgroups_for_groups, back_populates='scaling_groups'
+        'GroupRow', secondary=sgroups_for_groups, back_populates='scaling_groups',
     )
     keypairs = relationship(
-        'KeyPairRow', secondary=sgroups_for_keypairs, back_populates='scaling_groups'
+        'KeyPairRow', secondary=sgroups_for_keypairs, back_populates='scaling_groups',
     )
 
 # When scheduling, we take the union of allowed scaling groups for

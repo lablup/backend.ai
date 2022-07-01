@@ -5,16 +5,10 @@ from typing import List, Optional, Sequence, Tuple
 
 import trafaret as t
 
-from ai.backend.common.types import AgentId, ResourceSlot, SessionId
+from ai.backend.common.types import ResourceSlot
 
 from ..models import AgentRow, KernelRow, SessionRow
-from .types import (
-    AbstractScheduler,
-    AgentContext,
-    ExistingSession,
-    KernelInfo,
-    PendingSession,
-)
+from .types import AbstractScheduler
 
 
 def key_by_requested_slots(

@@ -86,12 +86,13 @@ keypairs = sa.Table(
     sa.Column('bootstrap_script', sa.String(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=''),
 )
 
+
 class KeyPairRow(Base):
     __table__ = keypairs
     sessions = relationship('SessionRow', back_populates='access_key')
     resource_policy = relationship('KeyPairResourcePolicyRow', back_populates='keypairs')
     scaling_groups = relationship(
-        'ScalingGroupRow', secondary='sgroups_for_keypairs', back_populates='keypairs'
+        'ScalingGroupRow', secondary='sgroups_for_keypairs', back_populates='keypairs',
     )
 
 

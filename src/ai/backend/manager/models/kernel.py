@@ -104,6 +104,7 @@ __all__ = (
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
+
 class KernelStatus(enum.Enum):
     # values are only meaningful inside the manager
     PENDING = 0
@@ -316,10 +317,10 @@ class KernelRow(Base):
         kernel_id: Union[str, UUID],
         access_key: AccessKey,
         *,
-        allow_stale: bool=False,
-        for_update: bool=False,
-        max_matches: int=10,
-        load_session: bool=False,
+        allow_stale: bool = False,
+        for_update: bool = False,
+        max_matches: int = 10,
+        load_session: bool = False,
     ) -> Sequence[KernelRow]:
         """
         Match the prefix of kernel ID among the kernels
@@ -360,7 +361,7 @@ class KernelRow(Base):
             KernelRow.id, KernelRow.session, KernelRow.agent_addr,
             KernelRow.kernel_host, KernelRow.access_key, KernelRow.service_ports,
         ]
-        cols = set(default_cols + info_cols)
+        cols = set((*default_cols, *info_cols))
 
         cond = (
             (KernelRow.name.in_(kernel_ids)) &
@@ -376,11 +377,12 @@ class KernelRow(Base):
         result = await db_session.execute(query)
         return result.scalars().all()
 
+
 async def get_kernel_occupancy(
     db_session: SASession,
     cond,
-    slot_filter = None,
-    status_choice = USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    slot_filter=None,
+    status_choice=USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
 ) -> ResourceSlot:
     if status_choice is not None:
         cond = cond & (KernelRow.status.in_(status_choice))
@@ -1691,7 +1693,7 @@ async def recalc_concurrency_used(
             .where(
                 (KernelRow.access_key == access_key),
                 (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
-            )
+            ),
         )
         concurrency_used = result.scalar()
         # concurrency_used = (

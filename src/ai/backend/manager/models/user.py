@@ -119,6 +119,7 @@ users = sa.Table(
     sa.Column('role', EnumValueType(UserRole), default=UserRole.USER),
 )
 
+
 class UserRow(Base):
     __table__ = users
     sessions = relationship('SessionRow', back_populates='user')
