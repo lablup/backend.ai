@@ -10,6 +10,7 @@ def admin():
 
 from . import (  # noqa
     agent,
+    audit_logs,
     domain,
     etcd,
     group,

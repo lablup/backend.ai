@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 
 import click
@@ -205,3 +206,23 @@ def umount_host(name, edit_fstab):
             print(' ', aid)
             for k, v in data.items():
                 print('   ', k, ':', v)
+        try:
+            access_key = session.config.access_key
+            user_info = session.User.detail()
+            data_before = {
+                'name': name,
+                'edit_fstab': edit_fstab}
+
+            data_after = {}
+
+            session.AuditLog.create(
+                user_info['uuid'],
+                access_key,
+                user_info['email'],
+                json.dumps(data_before),
+                json.dumps(data_after),
+                name,
+                'DELETE',
+            )
+        except Exception as e:
+            print_error(e)

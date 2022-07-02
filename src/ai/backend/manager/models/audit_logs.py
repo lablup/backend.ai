@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
+from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
@@ -12,6 +13,8 @@ from sqlalchemy.engine.row import Row
 from ai.backend.common.logging import BraceStyleAdapter
 
 from .base import Item, PaginatedList, metadata, simple_db_mutate
+from .minilang.ordering import QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
 from .user import UserRole
 
 if TYPE_CHECKING:
@@ -70,6 +73,24 @@ class AuditLog(graphene.ObjectType):
 
         )
 
+    _queryfilter_fieldspec = {
+        "user_id": ("user_id", None),
+        "email": ("email", None),
+        "access_key": ("access_key", None),
+        "action": ("action", None),
+        "target": ("target", None),
+        "created_at": ("created_at", dtparse),
+    }
+
+    _queryorder_colmap = {
+        "user_id": "user_id",
+        "access_key": "access_key",
+        "email": "email",
+        "action": "action",
+        "target": "target",
+        "created_at": "created_at",
+    }
+
     @classmethod
     async def load_slice(
         cls,
@@ -78,6 +99,8 @@ class AuditLog(graphene.ObjectType):
         offset: int,
         *,
         user_id: str = None,
+        filter: str = None,
+        order: str = None,
     ) -> Sequence[AuditLog]:
         """
         Load Audit Logs
@@ -87,11 +110,20 @@ class AuditLog(graphene.ObjectType):
             query = (
                 sa.select([audit_logs])
                 .select_from(audit_logs)
-                .where(audit_logs.c.user_id == user_id)
+                .where((audit_logs.c.email == user_id) | (audit_logs.c.user_id == user_id))
                 .limit(limit)
                 .offset(offset)
             )
-
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        if order is not None:
+            qoparser = QueryOrderParser(cls._queryorder_colmap)
+            query = qoparser.append_ordering(query, order)
+        else:
+            query = query.order_by(
+                audit_logs.c.created_at.desc(),
+            )
         async with ctx.db.begin_readonly() as conn:
             b = [
                 obj async for row in (await conn.stream(query))
@@ -111,10 +143,13 @@ class AuditLog(graphene.ObjectType):
             sa.select([sa.func.count()])
             .select_from(audit_logs)
             .where(
-                audit_logs.c.user_id == user_id,
+                (audit_logs.c.user_id == user_id) | (audit_logs.c.email == user_id),
             )
 
         )
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
         async with graph_ctx.db.begin_readonly() as conn:
             result = await conn.execute(query)
             return result.scalar()
@@ -147,7 +182,7 @@ class CreateAuditLog(graphene.Mutation):
     msg = graphene.String()
     audit_logs = graphene.Field(lambda: AuditLog, required=False)
 
-    @classmethod
+    @ classmethod
     async def mutate(
         cls,
         # root,

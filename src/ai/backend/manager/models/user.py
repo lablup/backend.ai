@@ -585,7 +585,7 @@ class CreateUser(graphene.Mutation):
                                     })
                 await CreateAuditLog.mutate(info, auditlog_data_keypair)
             except Exception as e:
-                log.error(str(e))
+                log.error('Something went wrong when creating an audit log: {}', str(e))
             # Add user to groups if group_ids parameter is provided.
             from .group import association_groups_users, groups
             if props.group_ids:
