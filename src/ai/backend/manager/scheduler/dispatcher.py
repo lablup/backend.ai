@@ -47,9 +47,8 @@ from ..models import (
     KernelStatus,
     SessionRow,
     SessionStatus,
-    get_schedulerable_session,
+    get_scheduled_sessions,
     get_sessions_by_id,
-    get_sessions_by_status,
     get_sgroup_managed_sessions,
     kernels,
     list_alive_agents,
@@ -254,6 +253,7 @@ class SchedulerDispatcher(aobject):
                 db_sess, sgroup_name, scheduler.sgroup_opts.pending_timeout)
 
         if cancelled_sessions:
+            # Cancel the time-out sessions.
             now = datetime.now(tzutc())
 
             async def _apply_cancellation():
@@ -293,16 +293,17 @@ class SchedulerDispatcher(aobject):
 
             total_capacity = sum((ag.available_slots for ag in candidate_agents), zero)
 
-            sess_ctx = scheduler.pick_session(
+            picked_sess = scheduler.pick_session(
                 total_capacity,
                 pending_sessions,
                 existing_sessions,
             )
-            if sess_ctx is None:
+            if picked_sess is None:
                 # no session is picked.
                 # continue to next sgroup.
                 return
-            assert sess_ctx is not None
+            assert picked_sess is not None  # To avoid linter's argue that sess_ctx can be None
+            sess_ctx = picked_sess
             pending_sessions = [s for s in pending_sessions if s is not sess_ctx]
 
             log_fmt = 'schedule(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): '
@@ -319,7 +320,6 @@ class SchedulerDispatcher(aobject):
 
             async def _check_predicates() -> List[Tuple[str, Union[Exception, PredicateResult]]]:
                 check_results: List[Tuple[str, Union[Exception, PredicateResult]]] = []
-                assert sess_ctx is not None
                 async with self.db.begin_session() as kernel_db_sess:
                     predicates: Sequence[Tuple[str, Awaitable[PredicateResult]]] = [
                         (
@@ -394,7 +394,6 @@ class SchedulerDispatcher(aobject):
                 #    Let's fix it.
 
                 async def _update() -> None:
-                    assert sess_ctx is not None
                     async with self.db.begin_session() as sess:
                         await _rollback_predicate_mutations(
                             sess, sched_ctx, sess_ctx,
@@ -417,7 +416,6 @@ class SchedulerDispatcher(aobject):
                 continue
             else:
                 async def _update() -> None:
-                    assert sess_ctx is not None
                     async with self.db.begin_session() as sess:
                         await update_session_kernels(
                             sess, sess_ctx,
@@ -432,20 +430,11 @@ class SchedulerDispatcher(aobject):
 
                 await execute_with_retry(_update)
 
-            schedulable_sess = await get_schedulerable_session(db_sess, sess_ctx.id)
+            schedulable_sess = await get_sessions_by_id(
+                db_sess, sess_ctx.id, load_kernels=True,
+            )
 
             if schedulable_sess.cluster_mode == ClusterMode.SINGLE_NODE:
-                requested_architecture = schedulable_sess.main_kernel.image.architecture
-                # Single node session can't have multiple containers with different arch
-                if any(
-                    kernel.image.architecture != requested_architecture
-                    for kernel in schedulable_sess.kernels
-                ):
-                    raise GenericBadRequest(
-                        'Cannot assign multiple kernels with different architecture'
-                        'on single node session',
-                    )
-                candidate_agents = [ag for ag in candidate_agents if ag.architecture == requested_architecture]
                 await self._schedule_single_node_session(
                     sched_ctx,
                     scheduler,
@@ -481,6 +470,19 @@ class SchedulerDispatcher(aobject):
         check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
         # Assign agent resource per session.
+
+        requested_architecture = sess_ctx.main_kernel.image.architecture
+        # Single node session can't have multiple containers with different arch
+        if any(
+            kernel.image.architecture != requested_architecture
+            for kernel in sess_ctx.kernels
+        ):
+            raise GenericBadRequest(
+                'Cannot assign multiple kernels with different architecture'
+                'on single node session',
+            )
+        candidate_agents = [ag for ag in candidate_agents if ag.architecture == requested_architecture]
+
         log_fmt = _log_fmt.get("")
         log_args = _log_args.get(tuple())
         try:
@@ -728,29 +730,8 @@ class SchedulerDispatcher(aobject):
                 now = datetime.now(tzutc())
 
                 async def _mark_session_preparing() -> Sequence[SessionRow]:
-                    async with self.db.begin_session(expire_on_commit=False) as db_sess:
-                        target_sessions = await get_sessions_by_status(
-                            db_sess,
-                            status=SessionStatus.SCHEDULED,
-                            load_intrinsic=False,
-                            do_ordering=False,
-                        )
-                        target_session_ids = [s.id for s in target_sessions]
-                        for sid in target_session_ids:
-                            await update_session_kernels(
-                                db_sess, sid,
-                                kernel_data={
-                                    'status': KernelStatus.PREPARING,
-                                    'status_changed': now,
-                                    'status_info': "",
-                                    'status_data': {},
-                                },
-                            )
-                        return await get_sessions_by_id(
-                            db_sess, target_session_ids,
-                            load_intrinsic=True,
-                            do_ordering=True,
-                        )
+                    async with self.db.begin_session() as db_sess:
+                        return await get_scheduled_sessions(db_sess)
 
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
@@ -860,7 +841,6 @@ async def _list_managed_sessions(
     second is pending sessions and third is to-be-cancelled sessions due to pending timeout.
     """
 
-    managed_sessions: List[SessionRow]
     managed_sessions = await get_sgroup_managed_sessions(db_sess, sgroup_name)
 
     candidates: List[SessionRow] = []

@@ -97,7 +97,6 @@ from .api.exceptions import (
     KernelDestructionFailed,
     KernelExecutionFailed,
     KernelRestartFailed,
-    QuotaExceeded,
     RejectedByHook,
     ScalingGroupNotFound,
     SessionNotFound,
@@ -119,6 +118,7 @@ from .models import (
     SessionStatus,
     agents,
     kernels,
+    get_agent_cols,
     prepare_dotfiles,
     prepare_vfolder_mounts,
     query_allowed_sgroups,
@@ -658,12 +658,12 @@ class AgentRegistry:
         *,
         allow_stale: bool = False,
         for_update: bool = False,
-        load_intrinsic: bool = False,
+        load_kernels: bool = False,
         db_session: SASession = None,
     ) -> SessionRow:
         """
-        Retrieve the session information by kernel's ID, kernel's session UUID
-        (session_id), or kernel's name (session_id) paired with access_key.
+        Retrieve the session information by session's ID, kernel's session UUID
+        (session_id), or session's name (session_id) paired with access_key.
         If the session is composed of multiple containers, this will return
         the information of the main kernel.
 
@@ -674,8 +674,7 @@ class AgentRegistry:
         :param allow_stale: If True, filter "inactive" kernels as well as "active" ones.
                             If False, filter "active" kernels only.
         :param for_update: Apply for_update during select query.
-        :param load_intrinsic: Load intrinsic relations of selected sessions eagerly
-                                such as kernels or main kernel.
+        :param load_kernels: Load related kernels eagerly.
         :param db_connection: Database connection for reuse.
         """
         async with reenter_txn_session(self.db, db_session, read_only=True) as db_sess:
@@ -686,7 +685,7 @@ class AgentRegistry:
                 allow_prefix=True,
                 allow_stale=allow_stale,
                 for_update=for_update,
-                load_intrinsic=load_intrinsic,
+                load_kernels=load_kernels,
             )
             if not sess_rows:
                 raise SessionNotFound()
@@ -716,7 +715,7 @@ class AgentRegistry:
         sess = await self.get_session(
             session_name_or_id, access_key,
             allow_stale=allow_stale, for_update=for_update,
-            load_intrinsic=True, db_session=db_session,
+            load_kernels=True, db_session=db_session,
         )
         return sess.main_kernel
 
@@ -752,32 +751,6 @@ class AgentRegistry:
             cluster_role=cluster_role,
         )
 
-    # async def get_sessions(
-    #     self,
-    #     session_names: Container[str],
-    #     access_key: AccessKey,
-    #     field=None,
-    #     allow_stale=False,
-    #     db_connection=None,
-    # ):
-    #     """
-    #     Batched version of :meth:`get_session() <AgentRegistry.get_session>`.
-    #     The related `kernels` field is loaded lazily.
-    #     """
-
-    #     cols = []
-    #     if isinstance(field, (tuple, list)):
-    #         cols.extend(field)
-    #     elif isinstance(field, (sa.Column, sa.sql.elements.ColumnClause)):
-    #         cols.append(field)
-    #     elif isinstance(field, str):
-    #         cols.append(sa.column(field))
-    #     async with reenter_txn(self.db, db_connection, _read_only_txn_opts) as conn:
-    #         return await get_sessions(
-    #             SASession(conn), session_names, access_key,
-    #             info_cols=cols, allow_stale=allow_stale,
-    #         )
-
     async def enqueue_session(
         self,
         session_creation_id: str,
@@ -786,7 +759,6 @@ class AgentRegistry:
         session_enqueue_configs: SessionEnqueuingConfig,
         scaling_group_name: Optional[str],
         session_type: SessionTypes,
-        resource_policy: dict,
         *,
         user_scope: UserScope,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
@@ -800,15 +772,9 @@ class AgentRegistry:
     ) -> SessionId:
 
         kernel_enqueue_configs = session_enqueue_configs['kernel_configs']
+        session_creation_config = session_enqueue_configs['creation_config']
         session_image = session_enqueue_configs['image_ref']
         session_id = SessionId(uuid.uuid4())
-
-        # Check keypair resource limit
-        if cluster_size > int(resource_policy['max_containers_per_session']):
-            raise QuotaExceeded(
-                f"You cannot create session with more than "
-                f"{resource_policy['max_containers_per_session']} containers.",
-            )
 
         async with self.db.begin_readonly() as conn:
             # Check scaling group availability if scaling_group parameter is given.
@@ -834,8 +800,8 @@ class AgentRegistry:
             assert scaling_group_name is not None
 
             # Translate mounts/mount_map into vfolder mounts
-            requested_mounts = kernel_enqueue_configs[0]['creation_config'].get('mounts') or []
-            requested_mount_map = kernel_enqueue_configs[0]['creation_config'].get('mount_map') or {}
+            requested_mounts = session_creation_config.get('mounts') or []
+            requested_mount_map = session_creation_config.get('mount_map') or {}
             allowed_vfolder_types = await self.shared_config.get_vfolder_types()
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
@@ -862,24 +828,27 @@ class AgentRegistry:
                     cluster_size,
                 )
                 # the first kernel_config is repliacted to sub-containers
-                assert kernel_enqueue_configs[0]['cluster_role'] == DEFAULT_ROLE
-                kernel_enqueue_configs[0]['cluster_idx'] = 1
+                replicated = kernel_enqueue_configs[0]
+                assert replicated['cluster_role'] == DEFAULT_ROLE
+                replicated['cluster_idx'] = 1
                 for i in range(cluster_size - 1):
-                    sub_kernel_config = cast(KernelEnqueueingConfig, {**kernel_enqueue_configs[0]})
-                    sub_kernel_config['cluster_role'] = 'sub'
-                    sub_kernel_config['cluster_idx'] = i + 1
-                    sub_kernel_config['cluster_hostname'] = sub_kernel_config['cluster_role'] + \
-                                                            str(sub_kernel_config['cluster_idx'])
+                    sub_kernel_config = {
+                        **replicated,
+                        'cluster_role': 'sub',
+                        'cluster_idx': i + 1,
+                        'cluster_hostname': f'sub{i + 1}',
+                    }
+                    sub_kernel_config = cast(KernelEnqueueingConfig, sub_kernel_config)
                     kernel_enqueue_configs.append(sub_kernel_config)
             elif len(kernel_enqueue_configs) > 1:
                 # each container should have its own kernel_config
+                if len(kernel_enqueue_configs) != cluster_size:
+                    raise InvalidAPIParameters(
+                        "The number of kernel configs differs from the cluster size")
                 log.debug(
                     'enqueue_session(): using given kernel_enqueue_configs with cluster_size={}',
                     cluster_size,
                 )
-                if len(kernel_enqueue_configs) != cluster_size:
-                    raise InvalidAPIParameters(
-                        "The number of kernel configs differs from the cluster size")
             else:
                 raise InvalidAPIParameters("Missing kernel configurations")
 
@@ -928,47 +897,6 @@ class AgentRegistry:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
-        # kernel_bulk_insert_query = kernels.insert().values({
-        #     'agent': sa.bindparam('mapped_agent'),
-        #     'id': sa.bindparam('kernel_id'),
-        #     'status': KernelStatus.PENDING,
-        #     'session_creation_id': session_creation_id,
-        #     'session_id': session_id,
-        #     'session_name': session_name,
-        #     'session_type': session_type,
-        #     'cluster_mode': cluster_mode.value,
-        #     'cluster_size': cluster_size,
-        #     'cluster_role': sa.bindparam('cluster_role'),
-        #     'cluster_idx': sa.bindparam('cluster_idx'),
-        #     'cluster_hostname': sa.bindparam('cluster_hostname'),
-        #     'scaling_group': scaling_group,
-        #     'domain_name': user_scope.domain_name,
-        #     'group_id': user_scope.group_id,
-        #     'user_uuid': user_scope.user_uuid,
-        #     'access_key': access_key,
-        #     'image': sa.bindparam('image'),
-        #     'registry': sa.bindparam('registry'),
-        #     'tag': session_tag,
-        #     'starts_at': starts_at,
-        #     'internal_data': internal_data,
-        #     'callback_url': callback_url,
-        #     'startup_command': sa.bindparam('startup_command'),
-        #     'occupied_slots': sa.bindparam('occupied_slots'),
-        #     'occupied_shares': {},
-        #     'resource_opts': sa.bindparam('resource_opts'),
-        #     'environ': sa.bindparam('environ'),
-        #     'mounts': [  # TODO: keep for legacy?
-        #         mount.name for mount in vfolder_mounts
-        #     ],
-        #     'vfolder_mounts': vfolder_mounts,
-        #     'bootstrap_script': sa.bindparam('bootstrap_script'),
-        #     'repl_in_port': 0,
-        #     'repl_out_port': 0,
-        #     'stdin_port': 0,
-        #     'stdout_port': 0,
-        #     'preopen_ports': sa.bindparam('preopen_ports'),
-        # })
-
         kernel_shared_data = {
             'status': KernelStatus.PENDING,
             'session_creation_id': session_creation_id,
@@ -1003,7 +931,6 @@ class AgentRegistry:
             creation_config = kernel['creation_config']
             resource_opts = creation_config.get('resource_opts') or {}
 
-            creation_config['mounts'] = [vfmount.to_json() for vfmount in vfolder_mounts]
             image_ref = kernel['image_ref']
             image_row = image_map[image_ref.canonical]
             image_min_slots, image_max_slots = await image_row.get_slot_ranges(self.shared_config)
@@ -1114,7 +1041,7 @@ class AgentRegistry:
             # Add requested resource slot data to session
             session_data['requested_slots'] += requested_slots
 
-            environ = kernel_enqueue_configs[0]['creation_config'].get('environ') or {}
+            environ = session_creation_config.get('environ') or {}
 
             # Create kernel object in PENDING state.
             mapped_agent = None
@@ -1129,7 +1056,8 @@ class AgentRegistry:
                 'agent_id': mapped_agent,
                 'cluster_role': kernel['cluster_role'],
                 'cluster_idx': kernel['cluster_idx'],
-                'cluster_hostname': f"{kernel['cluster_role']}{kernel['cluster_idx']}",
+                'cluster_hostname': f"{kernel['cluster_role']}{kernel['cluster_idx']}" \
+                    if not kernel['cluster_hostname'] else kernel['cluster_hostname'],
                 'image_id': image_row.id,
                 'architecture': image_ref.architecture,
                 'registry': image_ref.registry,
@@ -1838,7 +1766,7 @@ class AgentRegistry:
         async with self.db.begin_readonly_session() as db_sess:
             session: SessionRow
             session = await session_getter(
-                load_intrinsic=True,
+                load_kernels=True,
                 db_session=db_sess,
             )
         if forced:
@@ -2133,7 +2061,7 @@ class AgentRegistry:
             session = await self.get_session(
                 session_name_or_id,
                 access_key,
-                load_intrinsic=True,
+                load_kernels=True,
                 db_session=db_sess,
             )
         session_id = session.id
@@ -2234,7 +2162,7 @@ class AgentRegistry:
         *,
         flush_timeout: float = None,
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key, load_intrinsic=True)
+        session = await self.get_session(session_name_or_id, access_key, load_kernels=True)
         kernel = session.main_kernel
         async with self.handle_kernel_exception('execute', session.id, access_key):
             # The agent aggregates at most 2 seconds of outputs
@@ -2261,7 +2189,7 @@ class AgentRegistry:
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key, load_intrinsic=True)
+        session = await self.get_session(session_name_or_id, access_key, load_kernels=True)
         kernel = session.main_kernel
         async with self.handle_kernel_exception('execute', session.id, access_key):
             async with RPCContext(
@@ -2280,7 +2208,7 @@ class AgentRegistry:
         text: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key, load_intrinsic=True)
+        session = await self.get_session(session_name_or_id, access_key, load_kernels=True)
         kernel = session.main_kernel
         async with self.handle_kernel_exception('execute', session.id, access_key):
             async with RPCContext(
@@ -2299,7 +2227,7 @@ class AgentRegistry:
         service: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key, load_intrinsic=True)
+        session = await self.get_session(session_name_or_id, access_key, load_kernels=True)
         kernel = session.main_kernel
         async with self.handle_kernel_exception('execute', session.id, access_key):
             async with RPCContext(
@@ -2317,7 +2245,7 @@ class AgentRegistry:
         access_key: AccessKey,
         service: str,
     ) -> None:
-        session = await self.get_session(session_name_or_id, access_key, load_intrinsic=True)
+        session = await self.get_session(session_name_or_id, access_key, load_kernels=True)
         kernel = session.main_kernel
         async with self.handle_kernel_exception('shutdown_service', session.id, access_key):
             async with RPCContext(
@@ -2336,7 +2264,7 @@ class AgentRegistry:
         filename: str,
         payload: bytes,
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key, load_intrinsic=True)
+        session = await self.get_session(session_name_or_id, access_key, load_kernels=True)
         kernel = session.main_kernel
         async with self.handle_kernel_exception('upload_file', session.id, access_key):
             async with RPCContext(
@@ -2354,7 +2282,7 @@ class AgentRegistry:
         access_key: AccessKey,
         filepath: str,
     ) -> bytes:
-        session = await self.get_session(session_name_or_id, access_key, load_intrinsic=True)
+        session = await self.get_session(session_name_or_id, access_key, load_kernels=True)
         kernel = session.main_kernel
         async with self.handle_kernel_exception('download_file', session.id,
                                                 access_key):
@@ -2373,7 +2301,7 @@ class AgentRegistry:
         access_key: AccessKey,
         path: str,
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key, load_intrinsic=True)
+        session = await self.get_session(session_name_or_id, access_key, load_kernels=True)
         kernel = session.main_kernel
         async with self.handle_kernel_exception('list_files', session.id, access_key):
             async with RPCContext(
@@ -2390,7 +2318,7 @@ class AgentRegistry:
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
     ) -> str:
-        session = await self.get_session(session_name_or_id, access_key, load_intrinsic=True)
+        session = await self.get_session(session_name_or_id, access_key, load_kernels=True)
         kernel = session.main_kernel
         async with self.handle_kernel_exception('get_logs_from_agent', session.id, access_key):
             async with RPCContext(
@@ -2477,7 +2405,7 @@ class AgentRegistry:
             async def _update() -> None:
                 nonlocal instance_rejoin
                 async with self.db.begin_session() as db_sess:
-                    agent_row = await AgentRow.get_agent_cols(
+                    agent_row = await get_agent_cols(
                         db_sess,
                         agent_id,
                         cols=[
@@ -2677,6 +2605,7 @@ class AgentRegistry:
                     (SessionRow.kp_access_key == access_key) &
                     ~(SessionRow.status.in_(DEAD_SESSION_STATUSES))
                 )
+                # DO NOT UPDATE ALL SESSION RELATED KERNELS !!!
                 await update_session_kernels(
                     db_sess, session_id,
                     kernel_data=data,

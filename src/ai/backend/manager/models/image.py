@@ -323,14 +323,14 @@ class ImageRow(Base):
         *,
         load_aliases: bool = True,
     ) -> Mapping[str, ImageRow]:
-        refs = []
-        aliases = []
+        refs = set()
+        aliases = set()
 
         for ref in references:
             if isinstance(ref, str):
-                aliases.append(ref)
+                aliases.add(ref)
             elif isinstance(ref, ImageRef):
-                refs.append(ref.canonical)
+                refs.add(ref.canonical)
 
         query = sa.select(ImageRow).where(ImageRow.name.in_(refs))
         if load_aliases:

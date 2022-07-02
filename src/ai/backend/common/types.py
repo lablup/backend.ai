@@ -244,6 +244,19 @@ class SessionTypes(str, enum.Enum):
     BATCH = 'batch'
 
 
+class SessionOp(str, enum.Enum):
+    CREATE = 'create_session'
+    DESTROY = 'destroy_session'
+    RESTART = 'restart_session'
+    EXECUTE = 'execute'
+    REFRESH = 'refresh_session'
+    SHUTDOWN_SERVICE = 'shutdown_service'
+    UPLOAD_FILE = 'upload_file'
+    DOWNLOAD_FILE = 'download_file'
+    LIST_FILE = 'list_files'
+    GET_AGENT_LOGS = 'get_logs_from_agent'
+
+
 class SessionResult(str, enum.Enum):
     UNDEFINED = 'undefined'
     SUCCESS = 'success'
@@ -794,6 +807,7 @@ class KernelCreationConfig(TypedDict):
 
 class SessionEnqueuingConfig(TypedDict):
     image_ref: ImageRef     # TODO: resolve image by this field.
+    creation_config: Mapping[str, Any]
     kernel_configs: List[KernelEnqueueingConfig]
 
 

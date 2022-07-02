@@ -102,8 +102,12 @@ async def check_dependencies(
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
-    check = await check_all_dependencies(db_sess, sess_ctx)
-    return PredicateResult(*check)
+    pending_dependencies = await check_all_dependencies(db_sess, sess_ctx)
+    err_msg = "Waiting dependency sessions to finish as success. ({})".format(
+        ", ".join(f"{sess_row.name} ({sess_row.session_id})" for sess_row in pending_dependencies),
+    ) if pending_dependencies else None
+    all_success = not pending_dependencies
+    return PredicateResult(all_success, err_msg)
 
 
 async def check_keypair_resource_limit(

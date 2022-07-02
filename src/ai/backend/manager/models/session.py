@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import enum
+import functools
 from typing import Any, List, Mapping, Optional, Sequence, Tuple, Union
+from datetime import datetime
+from dateutil.tz import tzutc
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -22,6 +25,7 @@ from ai.backend.common.types import (
 from ..api.exceptions import (
     GenericForbidden,
     MainKernelNotFound,
+    TooManyKernelsFound,
     UnknownDependencySession,
 )
 from ..defs import DEFAULT_ROLE
@@ -46,7 +50,7 @@ __all__ = (
     'transit_session_lifecycle',
     'SessionRow', 'enqueue_session', 'get_sgroup_managed_sessions',
     'update_kernel', 'update_session_kernels',
-    'get_sessions_by_status', 'get_schedulerable_session',
+    'get_scheduled_sessions', 'get_schedulerable_session',
     'match_sessions',
     'get_sessions_by_id',
     'SessionDependencyRow',
@@ -118,7 +122,7 @@ _KERNEL_SESSION_STATUS_MAPPING = {
 }
 
 
-def _transit_destroy_session(current, forced) -> SessionStatus:
+def _transit_to_destroy_session(current, forced) -> SessionStatus:
     match current:
         case SessionStatus.PENDING:
             return SessionStatus.CANCELLED
@@ -134,10 +138,16 @@ def _transit_destroy_session(current, forced) -> SessionStatus:
             return SessionStatus.TERMINATING
 
 
+def _transit_to_cancel_session(current, forced):
+    return SessionStatus.CANCELLED
+
+
 def transit_session_lifecycle(current, job, forced=False) -> SessionStatus:
     match job:
         case 'destroy':
-            return _transit_destroy_session(current, forced)
+            return _transit_to_destroy_session(current, forced)
+        case 'cancel':
+            return _transit_to_cancel_session(current, forced)
         case _:
             raise RuntimeError('No such job is declared.')
 
@@ -255,10 +265,12 @@ class SessionRow(Base):
 
     @property
     def main_kernel(self) -> KernelRow:
-        try:
-            return tuple(kern for kern in self.kernels if kern.cluster_role == DEFAULT_ROLE)[0]
-        except IndexError:
+        kerns = tuple(kern for kern in self.kernels if kern.cluster_role == DEFAULT_ROLE)
+        if len(kerns) > 1:
+            raise TooManyKernelsFound
+        if len(kerns) == 0:
             raise MainKernelNotFound
+        return kerns[0]
 
 
 async def match_sessions(
@@ -270,79 +282,156 @@ async def match_sessions(
     allow_stale: bool = True,
     for_update: bool = False,
     max_matches: int = 10,
-    load_intrinsic: bool = False,
+    load_kernels: bool = False,
 ) -> List[SessionRow]:
     """
     Match the prefix of session ID or session name among the sessions
     that belongs to the given access key, and return the list of SessionRow.
     """
 
-    def build_query(base_cond):
-        cond = base_cond & (SessionRow.kp_access_key == access_key)
-        if not allow_stale:
-            cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
-        query = (
-            sa.select(SessionRow)
-            .where(cond)
-            .order_by(sa.desc(SessionRow.created_at))
-            .limit(max_matches).offset(0)
+    fetch_by_id = functools.partial(get_sessions_by_id, allow_prefix=True)
+    fetch_by_name = functools.partial(get_sessions_by_name, allow_prefix=allow_prefix)
+    for fetch_func in (fetch_by_id, fetch_by_name):
+        rows = await fetch_func(
+            db_session, session_name_or_id, access_key,
+            allow_stale=allow_stale, for_update=for_update,
+            max_matches=max_matches, load_kernels=load_kernels,
         )
-        if for_update:
-            query = query.with_for_update()
-
-        if load_intrinsic:
-            query = query.options(
-                noload('*'),
-                selectinload(SessionRow.image).noload('*'),
-                selectinload(SessionRow.kernels)
-                .options(
-                    noload('*'),
-                    selectinload(KernelRow.image).noload('*'),
-                    selectinload(KernelRow.agent).noload('*'),
-                ),
-            )
-
-        return query
-
-    id_cond = (sa.sql.expression.cast(SessionRow.id, sa.String).like(f'{session_name_or_id}%'))
-    name_cond = (SessionRow.name == (f'{session_name_or_id}'))
-    id_query = build_query(id_cond)
-    name_query = build_query(name_cond)
-
-    match_queries = [id_query, name_query]
-    if allow_prefix:
-        prefix_name_cond = (SessionRow.name.like(f'{session_name_or_id}%'))
-        prefix_name_query = build_query(prefix_name_cond)
-        match_queries.append(prefix_name_query)
-
-    for query in match_queries:
-        result = await db_session.execute(query)
-        rows = result.scalars().all()
         if not rows:
             continue
         return rows
     return []
 
 
-async def get_sessions_by_id(
-    db_session: SASession,
-    session_ids: Sequence[SessionId],
-    access_key=None,
+def _build_session_fetch_query(
+    base_cond,
+    access_key: AccessKey,
     *,
-    load_intrinsic=False,
-    do_ordering=False,
-) -> SessionRow:
-    cond = (SessionRow.id.in_(session_ids))
-    if access_key is not None:
-        cond = cond & (SessionRow.kp_access_key == access_key)
+    max_matches: int | None,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    do_ordering: bool = False,
+    load_kernels: bool = False,
+):
+    cond = base_cond & (SessionRow.kp_access_key == access_key)
+    if not allow_stale:
+        cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
     query = (
         sa.select(SessionRow)
         .where(cond)
+        .order_by(sa.desc(SessionRow.created_at))
     )
-    if load_intrinsic:
+    if max_matches:
+        query = query.limit(max_matches).offset(0)
+    if for_update:
+        query = query.with_for_update()
+    if do_ordering:
+        query = query.order_by(SessionRow.created_at)
+
+    query = query.options(
+        noload('*'),
+        selectinload(SessionRow.image).noload('*')
+    )
+    if load_kernels:
         query = query.options(
             noload('*'),
-            selectinload(SessionRow.image),
+            selectinload(SessionRow.kernels)
+            .options(
+                noload('*'),
+                selectinload(KernelRow.image).noload('*'),
+                selectinload(KernelRow.agent).noload('*'),
+            ),
+        )
+
+    return query
+
+
+async def get_sessions_by_id(
+    db_session: SASession,
+    session_id: SessionId,
+    access_key: AccessKey,
+    *,
+    max_matches: int | None,
+    allow_prefix: bool = False,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    load_kernels: bool = False,
+) -> SessionRow:
+    if allow_prefix:
+        cond = (sa.sql.expression.cast(SessionRow.id, sa.String).like(f'{session_id}%'))
+    else:
+        cond = (SessionRow.id == session_id)
+    query = _build_session_fetch_query(
+        cond, access_key,
+        max_matches=max_matches,
+        allow_stale=allow_stale,
+        for_update=for_update,
+        load_kernels=load_kernels,
+    )
+    result = await db_session.execute(query)
+    return result.scalars().all()
+
+
+async def get_sessions_by_name(
+    db_session: SASession,
+    session_name: str,
+    access_key: AccessKey,
+    *,
+    max_matches: int | None,
+    allow_prefix: bool = False,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    load_kernels: bool = False,
+) -> SessionRow:
+    if allow_prefix:
+        cond = (sa.sql.expression.cast(SessionRow.name, sa.String).like(f'{session_name}%'))
+    else:
+        cond = (SessionRow.name == session_name)
+    query = _build_session_fetch_query(
+        cond, access_key,
+        max_matches=max_matches,
+        allow_stale=allow_stale,
+        for_update=for_update,
+        load_kernels=load_kernels,
+    )
+    result = await db_session.execute(query)
+    return result.scalars().all()
+
+
+async def get_scheduled_sessions(
+    db_session: SASession,
+) -> SessionRow:
+    now = datetime.now(tzutc())
+    update_data = {
+        'status': SessionStatus.PREPARING,
+        'status_changed': now,
+        'status_info': "",
+        'status_data': {},
+    }
+    query = (
+        sa.update(SessionRow)
+        .where(SessionStatus.SCHEDULED)
+        .values(**update_data)
+        .returning(SessionRow.id)
+    )
+    result = await db_session.execute(query)
+    session_ids = result.all()
+    
+    update_data['status'] = KernelStatus.PREPARING
+
+    query = (
+        sa.update(KernelRow)
+        .where(KernelRow.session_id.in_(session_ids))
+        .values(**update_data)
+    )
+    await db_session.execute(query)
+
+    query = (
+        sa.select(SessionRow)
+        .where(SessionRow.id.in_(session_ids))
+        .order_by(SessionRow.created_at)
+        .options(
+            noload('*'),
             selectinload(SessionRow.access_key)
             .options(
                 noload('*'),
@@ -355,44 +444,7 @@ async def get_sessions_by_id(
                 selectinload(KernelRow.agent).noload('*'),
             ),
         )
-    if do_ordering:
-        query = query.order_by(SessionRow.created_at)
-    result = await db_session.execute(query)
-    return result.scalars().all()
-
-
-async def get_sessions_by_status(
-    db_session: SASession,
-    status: SessionStatus | List[SessionStatus],
-    sgroup_name: str | None = None,
-    load_intrinsic: bool = False,
-    do_ordering: bool = False,
-) -> List[SessionRow]:
-    if isinstance(status, SessionStatus):
-        cond = (SessionRow.status == status)
-    elif len(status) == 1:
-        cond = (SessionRow.status == status[0])
-    else:
-        cond = (SessionRow.status.in_(status))
-    if sgroup_name:
-        cond = (cond & (SessionRow.scaling_group_name == sgroup_name))
-    query = (
-        sa.select(SessionRow)
-        .where(cond)
     )
-    if load_intrinsic:
-        query = query.options(
-            noload('*'),
-            selectinload(SessionRow.image).noload('*'),
-            selectinload(SessionRow.kernels)
-            .options(
-                noload('*'),
-                selectinload(KernelRow.image).noload('*'),
-                selectinload(KernelRow.agent).noload('*'),
-            ),
-        )
-    if do_ordering:
-        query = query.order_by(SessionRow.created_at)
     result = await db_session.execute(query)
     return result.scalars().all()
 
@@ -515,30 +567,29 @@ async def enqueue_session(
     dependency_sessions: Sequence[SessionId] = None,
 ) -> SessionId:
     session = SessionRow(**session_data)
-    async with db_session.begin_nested():
-        db_session.add(session)
-        db_session.add_all((KernelRow(**kernel) for kernel in kernel_data))
-        session_id = SessionId(session.id)
+    db_session.add(session)
+    db_session.add_all([KernelRow(**kernel) for kernel in kernel_data])
+    session_id = SessionId(session.id)
 
-        if not dependency_sessions:
-            await db_session.commit()
-            return session_id
-
-        matched_dependency_session_ids = []
-        for dependency_id in dependency_sessions:
-            match_info = await match_sessions(
-                db_session, dependency_id, access_key,
-            )
-            try:
-                depend_id = match_info[0].id
-            except IndexError:
-                raise UnknownDependencySession(dependency_id)
-            matched_dependency_session_ids.append(depend_id)
-        dependency_rows = [SessionDependencyRow(session_id=session_id, depends_on=depend_id)
-            for depend_id in matched_dependency_session_ids]
-        db_session.add_all(dependency_rows)
-
+    if not dependency_sessions:
         await db_session.commit()
+        return session_id
+
+    matched_dependency_session_ids = []
+    for dependency_id in dependency_sessions:
+        match_info = await match_sessions(
+            db_session, dependency_id, access_key,
+        )
+        try:
+            depend_id = match_info[0].id
+        except IndexError:
+            raise UnknownDependencySession(dependency_id)
+        matched_dependency_session_ids.append(depend_id)
+    dependency_rows = [SessionDependencyRow(session_id=session_id, depends_on=depend_id)
+        for depend_id in matched_dependency_session_ids]
+    db_session.add_all(dependency_rows)
+
+    await db_session.commit()
     return session_id
 
 
@@ -602,7 +653,7 @@ class SessionDependencyRow(Base):
 async def check_all_dependencies(
     db_session: SASession,
     sess_ctx: SessionRow,
-) -> Tuple[bool, Optional[str]]:
+) -> List[SessionRow]:
     j = sa.join(
         SessionDependencyRow,
         SessionRow,
@@ -616,12 +667,4 @@ async def check_all_dependencies(
     result = await db_session.execute(query)
     rows = result.scalars().all()
     pending_dependencies = [sess_row for sess_row in rows if sess_row.result != SessionResult.SUCCESS]
-    all_success = (not pending_dependencies)
-    if all_success:
-        return (True, None)
-    return (
-        False,
-        "Waiting dependency sessions to finish as success. ({})".format(
-            ", ".join(f"{sess_row.name} ({sess_row.session_id})" for sess_row in pending_dependencies),
-        ),
-    )
+    return pending_dependencies

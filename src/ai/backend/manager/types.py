@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 class SessionGetter(Protocol):
 
-    def __call__(self, *, load_intrinsic: bool, db_session: SASession) -> Coroutine[Any, Any, SessionRow]:
+    def __call__(self, *, db_session: SASession) -> Coroutine[Any, Any, SessionRow]:
         ...
 
 

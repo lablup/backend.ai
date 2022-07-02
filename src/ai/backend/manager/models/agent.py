@@ -41,8 +41,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
 
 __all__: Sequence[str] = (
-    'agents', 'AgentStatus', 'AGENT_UPDATE_FIELDS', 'AgentRow',
-    'list_schedulable_agents_by_sgroup', 'list_alive_agents',
+    'agents', 'AgentStatus', 'AGENT_UPDATE_FIELDS',
+    'AgentRow', 'list_schedulable_agents_by_sgroup',
+    'list_alive_agents', 'get_agent_cols',
     'AgentList', 'Agent', 'ModifyAgent',
     'recalc_agent_resource_occupancy',
 )
@@ -92,25 +93,23 @@ class AgentRow(Base):
     kernels = relationship('KernelRow', back_populates='agent')
     scaling_group = relationship('ScalingGroupRow', back_populates='agents')
 
-    @classmethod
-    async def get_agent_cols(
-        cls,
-        db_sess: SASession,
-        agent_id: AgentId,
-        *,
-        cols,
-        for_update=True,
-    ) -> Row:
+async def get_agent_cols(
+    db_sess: SASession,
+    agent_id: AgentId,
+    *,
+    cols,
+    for_update=True,
+) -> Row:
 
-        query = sa.select(*cols).where(AgentRow.id == agent_id)
-        if for_update:
-            query = (
-                query
-                .execution_options(populate_existing=True)
-                .with_for_update()
-            )
-        result = await db_sess.execute(query)
-        return result.first()
+    query = sa.select(*cols).where(AgentRow.id == agent_id)
+    if for_update:
+        query = (
+            query
+            .execution_options(populate_existing=True)
+            .with_for_update()
+        )
+    result = await db_sess.execute(query)
+    return result.first()
 
 
 async def list_schedulable_agents_by_sgroup(

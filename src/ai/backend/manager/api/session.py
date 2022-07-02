@@ -135,6 +135,7 @@ from .exceptions import (
     InvalidAPIParameters,
     MainKernelNotFound,
     ObjectNotFound,
+    QuotaExceeded,
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
@@ -324,24 +325,9 @@ async def _query_userinfo(
         result = await db_sess.execute(query)
         row = result.first()
 
-        # query = (
-        #     sa.select([keypairs.c.user, keypairs.c.resource_policy_name,
-        #                 users.c.role, users.c.domain_name])
-        #     .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
-        #     .where(keypairs.c.access_key == owner_access_key)
-        # )
-        # result = await conn.execute(query)
-        # row = result.first()
-
         owner_domain = row.domain_name
         owner_uuid = row.user
         owner_role = row.role
-        # query = (
-        #     sa.select([keypair_resource_policies])
-        #     .select_from(keypair_resource_policies)
-        #     .where(keypair_resource_policies.c.name == row['resource_policy_name'])
-        # )
-        # result = await conn.execute(query)
         resource_policy = row.resource_policy
     else:
         # Normal case when the user is creating her/his own session.
@@ -360,16 +346,6 @@ async def _query_userinfo(
     qresult = await db_sess.execute(query)
     domain_name = qresult.scalar()
 
-    # query = (
-    #     sa.select([domains.c.name])
-    #     .select_from(domains)
-    #     .where(
-    #         (domains.c.name == owner_domain) &
-    #         (domains.c.is_active),
-    #     )
-    # )
-    # qresult = await conn.execute(query)
-    # domain_name = qresult.scalar()
     if domain_name is None:
         raise InvalidAPIParameters('Invalid domain')
 
@@ -379,42 +355,16 @@ async def _query_userinfo(
         (GroupRow.is_active)
     )
     if owner_role == UserRole.SUPERADMIN:
-        # superadmin can spawn container in any designated domain/group.
-        # query = (
-        #     query
-        #     .where(
-        #         (GroupRow.domain_name == params['domain']) &
-        #         (GroupRow.name == params['group']) &
-        #         (GroupRow.is_active),
-        #     )
-        # )
         cond = cond & (GroupRow.domain_name == params['domain'])
     elif owner_role == UserRole.ADMIN:
         # domain-admin can spawn container in any group in the same domain.
         if params['domain'] != owner_domain:
             raise InvalidAPIParameters("You can only set the domain to the owner's domain.")
-        # query = (
-        #     query
-        #     .where(
-        #         (GroupRow.domain_name == owner_domain) &
-        #         (GroupRow.name == params['group']) &
-        #         (GroupRow.is_active),
-        #     )
-        # )
         cond = cond & (GroupRow.domain_name == owner_domain)
     else:
         # normal users can spawn containers in their group and domain.
         if params['domain'] != owner_domain:
             raise InvalidAPIParameters("You can only set the domain to your domain.")
-        # query = (
-        #     sa.select(Agus.group_id)
-        #     .select_from(sa.join(Agus, GroupRow, Agus.group_id == GroupRow.id))
-        #     .where(
-        #         (Agus.user_id == owner_uuid) &
-        #         (GroupRow.domain_name == owner_domain) &
-        #         (GroupRow.name == params['group']) &
-        #         (GroupRow.is_active),
-        #     )
         # )
         query = (
             sa.select(Agus.group_id)
@@ -502,7 +452,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         # NOTE: We can reuse the session IDs of TERMINATED sessions only.
         # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
         sess: SessionRow = await root_ctx.registry.get_session(
-            params['session_name'], owner_access_key, load_intrinsic=True,
+            params['session_name'], owner_access_key, load_kernels=True,
         )
         main_kern = sess.main_kernel
         running_image_ref = ImageRef(sess.image.name, [main_kern.registry], main_kern.architecture)
@@ -557,6 +507,13 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             script, _ = await query_bootstrap_script(db_sess, owner_access_key)
             params['bootstrap_script'] = script
 
+    # Check keypair resource limit
+    if params['cluster_size'] > int(resource_policy['max_containers_per_session']):
+        raise QuotaExceeded(
+            f"You cannot create session with more than "
+            f"{resource_policy['max_containers_per_session']} containers.",
+        )
+
     try:
         session_id = await asyncio.shield(app_ctx.database_ptask_group.create_task(
             root_ctx.registry.enqueue_session(
@@ -564,6 +521,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 params['session_name'], owner_access_key,
                 {
                     'image_ref': requested_image_ref,
+                    'creation_config': params['config'],
                     'kernel_configs': [{
                         'image_ref': requested_image_ref,
                         'cluster_role': DEFAULT_ROLE,
@@ -576,7 +534,6 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 },
                 params['config']['scaling_group'],
                 params['session_type'],
-                resource_policy,
                 user_scope=UserScope(
                     domain_name=params['domain'],  # type: ignore  # params always have it
                     group_id=group_id,
@@ -1709,17 +1666,17 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
     log.info('MATCH_SESSIONS(ak:{0}/{1}, prefix:{2})',
              requester_access_key, owner_access_key, id_or_name_prefix)
     matches: List[Dict[str, Any]] = []
-    async with root_ctx.db.begin_readonly() as conn:
-        session_infos = await match_session_ids(
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        session_infos = await root_ctx.registry.get_session(
             id_or_name_prefix,
             owner_access_key,
-            db_connection=conn,
+            db_session=db_sess,
         )
     if session_infos:
         matches.extend({
-            'id': str(item['session_id']),
-            'name': item['session_name'],
-            'status': item['status'].name,
+            'id': str(item.id),
+            'name': item.name,
+            'status': item.status.name,
         } for item in session_infos)
     return web.json_response({
         'matches': matches,
@@ -1738,7 +1695,7 @@ async def get_info(request: web.Request) -> web.Response:
              requester_access_key, owner_access_key, session_name)
     try:
         await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
-        sess: SessionRow = await root_ctx.registry.get_session(session_name, owner_access_key)
+        sess: SessionRow = await root_ctx.registry.get_session(session_name, owner_access_key, load_kernels=True)
         resp['domainName'] = sess.domain_name
         resp['groupId'] = str(sess.group_id)
         resp['userId'] = str(sess.user_uuid)
@@ -2131,6 +2088,7 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
         compute_session = await root_ctx.registry.get_session(
             session_name, owner_access_key,
             allow_stale=True,
+            load_kernels=True,
             db_session=db_sess,
         )
         container_log = compute_session.main_kernel.container_log

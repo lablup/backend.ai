@@ -30,6 +30,7 @@ from typing import (
     Union,
 )
 from urllib.parse import urlparse
+from ai.backend.manager.models.kernel import KernelRow
 
 import aiohttp
 import aiohttp_cors
@@ -101,7 +102,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
     app_ctx.stream_pty_handlers[stream_key].add(myself)
     defer(lambda: app_ctx.stream_pty_handlers[stream_key].discard(myself))
 
-    async def connect_streams(compute_session) -> Tuple[zmq.asyncio.Socket, zmq.asyncio.Socket]:
+    async def connect_streams(compute_session: KernelRow) -> Tuple[zmq.asyncio.Socket, zmq.asyncio.Socket]:
         # TODO: refactor as custom row/table method
         if compute_session.kernel_host is None:
             kernel_host = urlparse(compute_session.agent_addr).hostname
@@ -409,7 +410,8 @@ async def stream_proxy(defer, request: web.Request, params: Mapping[str, Any]) -
         ))
     except (SessionNotFound, TooManySessionsMatched):
         raise
-    stream_key = kernel.id
+    kernel_id = kernel.id
+    stream_key = kernel_id
     stream_id = uuid.uuid4().hex
     app_ctx.stream_proxy_handlers[stream_key].add(myself)
     defer(lambda: app_ctx.stream_proxy_handlers[stream_key].discard(myself))
@@ -455,8 +457,8 @@ async def stream_proxy(defer, request: web.Request, params: Mapping[str, Any]) -
             f"Unsupported service protocol: {sport['protocol']}")
 
     redis_live = root_ctx.redis_live
-    conn_tracker_key = f"session.{kernel.id}.active_app_connections"
-    conn_tracker_val = f"{kernel.id}:{service}:{stream_id}"
+    conn_tracker_key = f"session.{kernel_id}.active_app_connections"
+    conn_tracker_val = f"{kernel_id}:{service}:{stream_id}"
 
     _conn_tracker_script = textwrap.dedent('''
         local now = redis.call('TIME')
@@ -478,11 +480,9 @@ async def stream_proxy(defer, request: web.Request, params: Mapping[str, Any]) -
             ),
         ))
 
-    down_cb = apartial(refresh_cb, kernel['id'])
-    up_cb = apartial(refresh_cb, kernel['id'])
-    ping_cb = apartial(refresh_cb, kernel['id'])
-
-    kernel_id = kernel['id']
+    down_cb = apartial(refresh_cb, kernel_id)
+    up_cb = apartial(refresh_cb, kernel_id)
+    ping_cb = apartial(refresh_cb, kernel_id)
 
     async def add_conn_track() -> None:
         async with app_ctx.conn_tracker_lock:
