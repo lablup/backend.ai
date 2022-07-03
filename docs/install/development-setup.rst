@@ -12,64 +12,64 @@ In contrast, the production setup uses per-service independent virtual environme
 
 .. currently the layout of the mermaid C4 diagrams has too large space and too small fonts....
 
-.. mermaid::
+   .. mermaid::
 
-    C4Component
-    title Component Diagram of Development Setup
+       C4Component
+       title Component Diagram of Development Setup
 
-    Person(user, "User")
-    Boundary(backend, "Backend Stack from Mono-repo") {
-       Container(manager, "Manager", "Python", "Independent daemon")
-       Container(webserver, "Web server", "Python", "Independent daemon")
-       Container(agent, "Agent", "Python", "Independent daemon")
-       Container(storage_proxy, "Storage Proxy", "Python", "Independent daemon")
-       ContainerDb(halfstack, "Halfstack", "Docker", "Set of containers")
-    }
-    Boundary(frontend, "Frontend Stack") {
-       Container(wsproxy, "Embedded wsproxy", "NodeJS", "Running on a NodeJS server")
-       Container(webui, "Web UI", "NodeJS", "Running on a NodeJS server")
-    }
-    Rel(user, manager, "HTTP", "")
-    Rel(user, webui, "HTTP", "")
-    Rel(user, wsproxy, "HTTP", "")
-    Rel(user, storage_proxy, "HTTP", "")
-    Rel(webui, webserver, "HTTP", "")
-    Rel(wsproxy, agent, "Native protocols", "")
-    Rel(webserver, manager, "HTTP", "")
-    Rel(manager, agent, "Callosum", "")
-    Rel(manager, storage_proxy, "HTTP", "")
-    Rel(manager, halfstack, "Native protocols", "")
-    Rel(agent, halfstack, "Native protocols", "")
+       Person(user, "User")
+       Boundary(backend, "Backend Stack from Mono-repo") {
+          Container(manager, "Manager", "Python", "Independent daemon")
+          Container(webserver, "Web server", "Python", "Independent daemon")
+          Container(agent, "Agent", "Python", "Independent daemon")
+          Container(storage_proxy, "Storage Proxy", "Python", "Independent daemon")
+          ContainerDb(halfstack, "Halfstack", "Docker", "Set of containers")
+       }
+       Boundary(frontend, "Frontend Stack") {
+          Container(wsproxy, "Embedded wsproxy", "NodeJS", "Running on a NodeJS server")
+          Container(webui, "Web UI", "NodeJS", "Running on a NodeJS server")
+       }
+       Rel(user, manager, "HTTP", "")
+       Rel(user, webui, "HTTP", "")
+       Rel(user, wsproxy, "HTTP", "")
+       Rel(user, storage_proxy, "HTTP", "")
+       Rel(webui, webserver, "HTTP", "")
+       Rel(wsproxy, agent, "Native protocols", "")
+       Rel(webserver, manager, "HTTP", "")
+       Rel(manager, agent, "Callosum", "")
+       Rel(manager, storage_proxy, "HTTP", "")
+       Rel(manager, halfstack, "Native protocols", "")
+       Rel(agent, halfstack, "Native protocols", "")
 
 
-.. mermaid::
+   .. mermaid::
 
-    C4Component
-    title Component Diagram of Production Setup
+       C4Component
+       title Component Diagram of Production Setup
 
-    Person(user, "User")
-    Boundary(backend, "Backend Services") {
-       Container(manager, "Manager", "Python", "Independent service")
-       Container(webserver, "Web server", "Python", "Independent service with embedded Web UI")
-       Container(agent, "Agent", "Python", "Independent service")
-       Container(storage_proxy, "Storage Proxy", "Python", "Independent service")
-    }
-    Boundary(frontend, "External App Proxy Pool") {
-       Container(wsproxy, "Scalable wsproxy", "NodeJS", "Independent service")
-    }
-    Boundary(database, "Databases") {
-       ContainerDb(halfstack, "Halfstack", "Docker", "Set of containers")
-    }
-    Rel(user, manager, "HTTP", "")
-    Rel(user, webserver, "HTTP", "")
-    Rel(user, wsproxy, "HTTP", "")
-    Rel(user, storage_proxy, "HTTP", "")
-    Rel(wsproxy, agent, "Native protocols", "")
-    Rel(webserver, manager, "HTTP", "")
-    Rel(manager, agent, "Callosum", "")
-    Rel(manager, storage_proxy, "HTTP", "")
-    Rel(manager, halfstack, "Native protocols", "")
-    Rel(agent, halfstack, "Native protocols", "")
+       Person(user, "User")
+       Boundary(backend, "Backend Services") {
+          Container(manager, "Manager", "Python", "Independent service")
+          Container(webserver, "Web server", "Python", "Independent service with embedded Web UI")
+          Container(agent, "Agent", "Python", "Independent service")
+          Container(storage_proxy, "Storage Proxy", "Python", "Independent service")
+       }
+       Boundary(frontend, "External App Proxy Pool") {
+          Container(wsproxy, "Scalable wsproxy", "NodeJS", "Independent service")
+       }
+       Boundary(database, "Databases") {
+          ContainerDb(halfstack, "Halfstack", "Docker", "Set of containers")
+       }
+       Rel(user, manager, "HTTP", "")
+       Rel(user, webserver, "HTTP", "")
+       Rel(user, wsproxy, "HTTP", "")
+       Rel(user, storage_proxy, "HTTP", "")
+       Rel(wsproxy, agent, "Native protocols", "")
+       Rel(webserver, manager, "HTTP", "")
+       Rel(manager, agent, "Callosum", "")
+       Rel(manager, storage_proxy, "HTTP", "")
+       Rel(manager, halfstack, "Native protocols", "")
+       Rel(agent, halfstack, "Native protocols", "")
 
 
 Installation from Source
