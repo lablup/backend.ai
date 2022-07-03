@@ -180,6 +180,10 @@ Then configure your IDEs/editors to use
 interpreter for your code, where ``VERSION`` is the interpreter version
 specified in ``pants.toml``.
 
+To make LSP (language server protocol) services like PyLance to detect our source packages correctly,
+you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
+``plugins/*/`` directories if you have added Backend.AI plugin checkouts.
+
 .. tip::
 
    To activate flake8/mypy checks (in Vim) and get proper intelli-sense support
