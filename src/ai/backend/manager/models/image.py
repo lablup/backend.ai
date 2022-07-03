@@ -1,53 +1,52 @@
 from __future__ import annotations
 
-from decimal import Decimal
 import enum
 import functools
 import logging
+from decimal import Decimal
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     List,
     Mapping,
     MutableMapping,
     Optional,
     Sequence,
-    TYPE_CHECKING,
     Tuple,
     Union,
 )
-import aiotools
 
+import aiotools
 import graphene
-from graphql.execution.executors.asyncio import AsyncioExecutor
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import (
-    relationship,
-    selectinload,
-)
 import trafaret as t
 import yaml
+from graphql.execution.executors.asyncio import AsyncioExecutor
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.common import redis
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    BinarySize,
-    ImageAlias,
-    ResourceSlot,
-)
-
-from ai.backend.manager.container_registry import get_container_registry
+from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
 from ai.backend.manager.api.exceptions import ImageNotFound
+from ai.backend.manager.container_registry import get_container_registry
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
 from .base import (
-    BigInt, ForeignKeyIDColumn, IDColumn,
-    KVPair, ResourceLimit, KVPairInput, ResourceLimitInput,
-    Base, StructuredJSONColumn, set_if_set,
+    Base,
+    BigInt,
+    ForeignKeyIDColumn,
+    IDColumn,
+    KVPair,
+    KVPairInput,
+    ResourceLimit,
+    ResourceLimitInput,
+    StructuredJSONColumn,
+    set_if_set,
 )
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine

@@ -1,15 +1,17 @@
 from __future__ import annotations
-from abc import ABCMeta, abstractmethod
+
 import asyncio
 import concurrent.futures
-from functools import partial
 import json
 import logging
 import os
-from pathlib import Path
 import signal
 import sys
 import time
+import uuid
+from abc import ABCMeta, abstractmethod
+from functools import partial
+from pathlib import Path
 from typing import (
     Awaitable,
     ClassVar,
@@ -21,19 +23,14 @@ from typing import (
     Sequence,
     Union,
 )
-import uuid
 
-from async_timeout import timeout
 import janus
-from jupyter_client import KernelManager
-from jupyter_client.kernelspec import KernelSpecManager
 import msgpack
 import zmq
+from async_timeout import timeout
+from jupyter_client import KernelManager
+from jupyter_client.kernelspec import KernelSpecManager
 
-from .service import ServiceParser
-from .jupyter_client import aexecute_interactive
-from .logging import BraceStyleAdapter, setup_logger
-from .utils import wait_local_port_open
 from .compat import current_loop
 from .intrinsic import (
     init_sshd_service,
@@ -41,6 +38,10 @@ from .intrinsic import (
     prepare_ttyd_service,
     prepare_vscode_service,
 )
+from .jupyter_client import aexecute_interactive
+from .logging import BraceStyleAdapter, setup_logger
+from .service import ServiceParser
+from .utils import wait_local_port_open
 
 log = BraceStyleAdapter(logging.getLogger())
 

@@ -1,6 +1,5 @@
 import enum
 
-
 class StringSetFlag(enum.Flag):
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...

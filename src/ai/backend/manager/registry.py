@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import asyncio
-from contextvars import ContextVar
-from contextlib import asynccontextmanager as actxmgr
-from collections import defaultdict
 import copy
-from datetime import datetime
-from decimal import Decimal
 import itertools
 import logging
+import re
 import secrets
 import time
-import re
+import uuid
+import weakref
+from collections import defaultdict
+from contextlib import asynccontextmanager as actxmgr
+from contextvars import ContextVar
+from datetime import datetime
+from decimal import Decimal
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Callable,
@@ -24,32 +27,29 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
-    TYPE_CHECKING,
     Union,
     cast,
 )
-import uuid
-import weakref
 
 import aiodocker
 import aioredis
 import aiotools
-from async_timeout import timeout as _timeout
-from callosum.rpc import Peer, RPCUserError
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.backends import default_backend
-from dateutil.tz import tzutc
 import snappy
 import sqlalchemy as sa
+import zmq
+from async_timeout import timeout as _timeout
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
+from callosum.rpc import Peer, RPCUserError
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from dateutil.tz import tzutc
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.sql.expression import true
 from yarl import URL
-import zmq
 
 from ai.backend.common import msgpack, redis
-from ai.backend.common.docker import get_registry_info, get_known_registries, ImageRef
+from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentStartedEvent,
     KernelCancelledEvent,
@@ -61,11 +61,7 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.plugin.hook import (
-    HookPluginContext,
-    ALL_COMPLETED,
-    PASSED,
-)
+from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AccessKey,
@@ -90,48 +86,53 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import nmget
 
 from .api.exceptions import (
-    BackendError, InvalidAPIParameters,
-    RejectedByHook,
-    InstanceNotFound,
-    SessionNotFound, TooManySessionsMatched,
-    KernelCreationFailed, KernelDestructionFailed,
-    KernelExecutionFailed, KernelRestartFailed,
-    ScalingGroupNotFound,
     AgentError,
+    BackendError,
     GenericForbidden,
+    InstanceNotFound,
+    InvalidAPIParameters,
+    KernelCreationFailed,
+    KernelDestructionFailed,
+    KernelExecutionFailed,
+    KernelRestartFailed,
     QuotaExceeded,
+    RejectedByHook,
+    ScalingGroupNotFound,
+    SessionNotFound,
+    TooManySessionsMatched,
 )
 from .config import SharedConfig
-from .exceptions import MultiAgentError
 from .defs import DEFAULT_ROLE, INTRINSIC_SLOTS
-from .types import SessionGetter, UserScope
+from .exceptions import MultiAgentError
 from .models import (
-    agents, kernels,
-    keypair_resource_policies,
-    session_dependencies,
-    AgentStatus, KernelStatus,
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    DEAD_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    AgentStatus,
     ImageRow,
-    query_allowed_sgroups,
+    KernelStatus,
+    agents,
+    kernels,
+    keypair_resource_policies,
     prepare_dotfiles,
     prepare_vfolder_mounts,
+    query_allowed_sgroups,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    DEAD_KERNEL_STATUSES,
+    session_dependencies,
 )
-from .models.kernel import match_session_ids, get_all_kernels, get_main_kernels
+from .models.kernel import get_all_kernels, get_main_kernels, match_session_ids
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
-    reenter_txn, sql_json_merge,
+    reenter_txn,
+    sql_json_merge,
 )
+from .types import SessionGetter, UserScope
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import (
-        AsyncConnection as SAConnection,
-    )
     from sqlalchemy.engine.row import Row
+    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.events import EventDispatcher, EventProducer
 
@@ -139,8 +140,8 @@ if TYPE_CHECKING:
     from .scheduler.types import (
         AgentAllocationContext,
         KernelAgentBinding,
-        SchedulingContext,
         PendingSession,
+        SchedulingContext,
     )
 
 __all__ = ['AgentRegistry', 'InstanceNotFound']
@@ -1118,7 +1119,7 @@ class AgentRegistry:
         sched_ctx: SchedulingContext,
         scheduled_session: PendingSession,
     ) -> None:
-        from .scheduler.types import KernelAgentBinding, AgentAllocationContext
+        from .scheduler.types import AgentAllocationContext, KernelAgentBinding
         kernel_agent_bindings: Sequence[KernelAgentBinding] = [
             KernelAgentBinding(
                 kernel=k,

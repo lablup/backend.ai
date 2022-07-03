@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Optional, Mapping, Sequence, TYPE_CHECKING
 import uuid
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 import attr
 import graphene
@@ -28,103 +28,75 @@ if TYPE_CHECKING:
     from ..models.utils import ExtendedAsyncSAEngine
     from .storage import StorageSessionManager
 
-from .base import DataLoaderManager, privileged_query, scoped_query
-from .agent import (
-    Agent,
-    AgentList,
-    ModifyAgent,
-)
-from .domain import (
-    Domain,
-    CreateDomain,
-    ModifyDomain,
-    DeleteDomain,
-    PurgeDomain,
-)
-from .group import (
-    Group,
-    CreateGroup,
-    ModifyGroup,
-    DeleteGroup,
-    PurgeGroup,
-)
-from .image import (
-    ClearImages,
-    Image,
-    ModifyImage,
-    RescanImages,
-    PreloadImage,
-    UnloadImage,
-    ForgetImage,
-    AliasImage,
-    DealiasImage,
-)
-from .kernel import (
-    ComputeSession,
-    ComputeSessionList,
-    ComputeContainer,
-    ComputeContainerList,
-    LegacyComputeSession,
-    LegacyComputeSessionList,
-)
-from .keypair import (
-    KeyPair,
-    KeyPairList,
-    CreateKeyPair,
-    ModifyKeyPair,
-    DeleteKeyPair,
-)
-from .resource_policy import (
-    KeyPairResourcePolicy,
-    CreateKeyPairResourcePolicy,
-    ModifyKeyPairResourcePolicy,
-    DeleteKeyPairResourcePolicy,
-)
-from .resource_preset import (
-    ResourcePreset,
-    CreateResourcePreset,
-    ModifyResourcePreset,
-    DeleteResourcePreset,
-)
-from .scaling_group import (
-    ScalingGroup,
-    CreateScalingGroup,
-    ModifyScalingGroup,
-    DeleteScalingGroup,
-    AssociateScalingGroupWithDomain,
-    DisassociateScalingGroupWithDomain,
-    DisassociateAllScalingGroupsWithDomain,
-    AssociateScalingGroupWithUserGroup,
-    DisassociateScalingGroupWithUserGroup,
-    DisassociateAllScalingGroupsWithGroup,
-    AssociateScalingGroupWithKeyPair,
-    DisassociateScalingGroupWithKeyPair,
-)
-from .storage import (
-    StorageVolume,
-    StorageVolumeList,
-)
-from .user import (
-    User,
-    UserList,
-    CreateUser,
-    ModifyUser,
-    DeleteUser,
-    PurgeUser,
-    UserRole,
-    UserStatus,
-)
-from .vfolder import (
-    VirtualFolder,
-    VirtualFolderList,
-)
 from ..api.exceptions import (
-    ObjectNotFound,
     ImageNotFound,
     InsufficientPrivilege,
     InvalidAPIParameters,
+    ObjectNotFound,
     TooManyKernelsFound,
 )
+from .agent import Agent, AgentList, ModifyAgent
+from .base import DataLoaderManager, privileged_query, scoped_query
+from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
+from .group import CreateGroup, DeleteGroup, Group, ModifyGroup, PurgeGroup
+from .image import (
+    AliasImage,
+    ClearImages,
+    DealiasImage,
+    ForgetImage,
+    Image,
+    ModifyImage,
+    PreloadImage,
+    RescanImages,
+    UnloadImage,
+)
+from .kernel import (
+    ComputeContainer,
+    ComputeContainerList,
+    ComputeSession,
+    ComputeSessionList,
+    LegacyComputeSession,
+    LegacyComputeSessionList,
+)
+from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
+from .resource_policy import (
+    CreateKeyPairResourcePolicy,
+    DeleteKeyPairResourcePolicy,
+    KeyPairResourcePolicy,
+    ModifyKeyPairResourcePolicy,
+)
+from .resource_preset import (
+    CreateResourcePreset,
+    DeleteResourcePreset,
+    ModifyResourcePreset,
+    ResourcePreset,
+)
+from .scaling_group import (
+    AssociateScalingGroupWithDomain,
+    AssociateScalingGroupWithKeyPair,
+    AssociateScalingGroupWithUserGroup,
+    CreateScalingGroup,
+    DeleteScalingGroup,
+    DisassociateAllScalingGroupsWithDomain,
+    DisassociateAllScalingGroupsWithGroup,
+    DisassociateScalingGroupWithDomain,
+    DisassociateScalingGroupWithKeyPair,
+    DisassociateScalingGroupWithUserGroup,
+    ModifyScalingGroup,
+    ScalingGroup,
+)
+from .storage import StorageVolume, StorageVolumeList
+from .user import (
+    CreateUser,
+    DeleteUser,
+    ModifyUser,
+    PurgeUser,
+    User,
+    UserList,
+    UserRole,
+    UserStatus,
+)
+from .vfolder import VirtualFolder, VirtualFolderList
 
 
 @attr.s(auto_attribs=True, slots=True)

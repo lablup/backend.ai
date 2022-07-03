@@ -3,9 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import time
-from typing import (
-    Iterator,
-)
+from typing import Iterator
 
 import pytest
 

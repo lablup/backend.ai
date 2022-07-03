@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from collections import UserDict
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Generic,
@@ -10,7 +11,6 @@ from typing import (
     Optional,
     Sequence,
     TypeVar,
-    TYPE_CHECKING,
 )
 
 import attr

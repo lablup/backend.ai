@@ -1,13 +1,13 @@
 import asyncio
-from decimal import Decimal
 import hashlib
 import io
 import ipaddress
 import json
 import logging
-from pathlib import Path
 import platform
 import re
+from decimal import Decimal
+from pathlib import Path
 from typing import (
     Any,
     AsyncContextManager,
@@ -23,20 +23,18 @@ from typing import (
     Union,
     overload,
 )
-from typing_extensions import Final
 from uuid import UUID
 
 import aiodocker
-from aiodocker.docker import DockerContainer
 import netifaces
 import trafaret as t
+from aiodocker.docker import DockerContainer
+from typing_extensions import Final
 
 from ai.backend.common import identity
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    PID, HostPID, ContainerPID, KernelId,
-)
+from ai.backend.common.types import PID, ContainerPID, HostPID, KernelId
 from ai.backend.common.utils import current_loop
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.agent.utils'))

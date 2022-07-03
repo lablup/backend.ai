@@ -2,18 +2,22 @@ from __future__ import annotations
 
 import atexit
 import contextlib
-import attr
 import os
 from typing import TYPE_CHECKING, AsyncIterator
+
+import attr
 
 from ai.backend.common import redis
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.logging import AbstractLogger, Logger, NoopLogger
 from ai.backend.common.types import RedisConnectionInfo
-
 from ai.backend.manager.config import SharedConfig
-from ai.backend.manager.defs import REDIS_STAT_DB, REDIS_LIVE_DB, REDIS_IMAGE_DB, REDIS_STREAM_DB
-
+from ai.backend.manager.defs import (
+    REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
+    REDIS_STAT_DB,
+    REDIS_STREAM_DB,
+)
 
 if TYPE_CHECKING:
     from ..config import LocalConfig

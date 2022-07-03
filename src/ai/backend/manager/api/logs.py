@@ -1,29 +1,28 @@
 from __future__ import annotations
 
 import datetime as dt
-from datetime import datetime
 import logging
 import uuid
-from ai.backend.common.events import EventHandler
+from datetime import datetime
+from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
 
-from aiohttp import web
 import aiohttp_cors
 import attr
 import sqlalchemy as sa
 import trafaret as t
-from typing import Any, TYPE_CHECKING, Tuple, MutableMapping
+from aiohttp import web
 
-from ai.backend.common import redis, validators as tx
+from ai.backend.common import redis
+from ai.backend.common import validators as tx
 from ai.backend.common.distributed import GlobalTimer
-from ai.backend.common.events import AbstractEvent, EmptyEventArgs
+from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, LogSeverity, RedisConnectionInfo
 
 from ..defs import REDIS_LIVE_DB, LockID
-from ..models import (
-    error_logs, UserRole, groups,
-    association_groups_users as agus,
-)
+from ..models import UserRole
+from ..models import association_groups_users as agus
+from ..models import error_logs, groups
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware

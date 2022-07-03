@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import (
-    List,
-)
+from typing import List
 
 import aioredis
 import aioredis.client
@@ -11,11 +9,11 @@ import aioredis.exceptions
 import aiotools
 import pytest
 
-from .docker import DockerRedisNode
-from .utils import interrupt
-
 from ai.backend.common import redis
 from ai.backend.common.types import RedisConnectionInfo
+
+from .docker import DockerRedisNode
+from .utils import interrupt
 
 
 @pytest.mark.redis

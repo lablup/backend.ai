@@ -1,7 +1,10 @@
 from __future__ import with_statement
+
+from logging.config import fileConfig
+
 from alembic import context
 from sqlalchemy import engine_from_config, pool
-from logging.config import fileConfig
+
 from ai.backend.common.logging import is_active as logging_active
 
 # this is the Alembic Config object, which provides
@@ -15,14 +18,15 @@ if not logging_active.get():
     assert config.config_file_name is not None
     fileConfig(config.config_file_name)
 
+import ai.backend.manager.models.agent
+import ai.backend.manager.models.kernel
+import ai.backend.manager.models.keypair
+import ai.backend.manager.models.vfolder
+
 # Import the shared metadata and all models.
 # (We need to explicilty import models because model modules
 # should be executed to add table definitions to the metadata.)
 from ai.backend.manager.models.base import metadata
-import ai.backend.manager.models.agent
-import ai.backend.manager.models.keypair
-import ai.backend.manager.models.kernel
-import ai.backend.manager.models.vfolder
 
 target_metadata = metadata
 

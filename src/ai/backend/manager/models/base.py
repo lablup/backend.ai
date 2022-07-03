@@ -5,8 +5,10 @@ import collections
 import enum
 import functools
 import logging
-import trafaret as t
+import sys
+import uuid
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -20,54 +22,42 @@ from typing import (
     Optional,
     Protocol,
     Sequence,
-    TYPE_CHECKING,
     Type,
     TypeVar,
     Union,
     cast,
 )
-import sys
-import uuid
 
+import graphene
+import sqlalchemy as sa
+import trafaret as t
+import yarl
 from aiodataloader import DataLoader
 from aiotools import apartial
-import graphene
 from graphene.types import Scalar
+from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql.language import ast
-from graphene.types.scalars import MIN_INT, MAX_INT
-import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import (
-    AsyncConnection as SAConnection,
-    AsyncEngine as SAEngine,
-)
-from sqlalchemy.orm import (
-    registry,
-)
-from sqlalchemy.types import (
-    SchemaType,
-    TypeDecorator,
-    CHAR,
-)
-from sqlalchemy.dialects.postgresql import UUID, ENUM, JSONB
-import yarl
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
+from sqlalchemy.orm import registry
+from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     BinarySize,
+    JSONSerializableMixin,
     KernelId,
     ResourceSlot,
     SessionId,
-    JSONSerializableMixin,
 )
-
 from ai.backend.manager.models.utils import execute_with_retry
 
 from .. import models
-from ..api.exceptions import (
-    GenericForbidden, InvalidAPIParameters,
-)
+from ..api.exceptions import GenericForbidden, InvalidAPIParameters
+
 if TYPE_CHECKING:
     from graphql.execution.executors.asyncio import AsyncioExecutor
 
@@ -646,8 +636,8 @@ def privileged_mutation(required_role, target_func=None):
 
         @functools.wraps(func)
         async def wrapped(cls, root, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
-            from .user import UserRole
             from .group import groups  # , association_groups_users
+            from .user import UserRole
             ctx: GraphQueryContext = info.context
             permitted = False
             if required_role == UserRole.SUPERADMIN:

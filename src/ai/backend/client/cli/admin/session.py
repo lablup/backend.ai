@@ -1,25 +1,21 @@
 from __future__ import annotations
 
 import sys
-from typing import (
-    Any,
-    Dict,
-    List,
-)
 import uuid
+from typing import Any, Dict, List
 
 import click
 
-from ai.backend.client.session import Session
 from ai.backend.client.output.fields import session_fields, session_fields_v5
 from ai.backend.client.output.types import FieldSpec
-from . import admin
+from ai.backend.client.session import Session
+
+from ..extensions import pass_ctx_obj
 from ..main import main
 from ..pretty import print_fail
 from ..session import session as user_session
 from ..types import CLIContext
-from ..extensions import pass_ctx_obj
-
+from . import admin
 
 SessionItem = Dict[str, Any]
 

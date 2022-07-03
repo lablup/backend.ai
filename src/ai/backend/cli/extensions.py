@@ -3,7 +3,7 @@ import signal
 import sys
 
 import click
-from click.exceptions import ClickException, Abort
+from click.exceptions import Abort, ClickException
 
 
 class InterruptAwareCommandMixin(click.BaseCommand):

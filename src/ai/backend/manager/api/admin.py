@@ -3,36 +3,33 @@ from __future__ import annotations
 import inspect
 import logging
 import re
-from typing import (
-    Any,
-    Iterable,
-    TYPE_CHECKING,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
-from aiohttp import web
 import aiohttp_cors
 import attr
 import graphene
-from graphql.execution.executors.asyncio import AsyncioExecutor
-from graphql.execution import ExecutionResult
-from graphql.error import GraphQLError, format_error
 import trafaret as t
+from aiohttp import web
+from graphql.error import GraphQLError, format_error
+from graphql.execution import ExecutionResult
+from graphql.execution.executors.asyncio import AsyncioExecutor
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common import validators as tx
+from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models.base import DataLoaderManager
 from ..models.gql import (
-    Mutations, Queries,
-    GraphQueryContext,
     GQLMutationPrivilegeCheckMiddleware,
+    GraphQueryContext,
+    Mutations,
+    Queries,
 )
-from .manager import GQLMutationUnfrozenRequiredMiddleware
-from .exceptions import GraphQLError as BackendGQLError
 from .auth import auth_required
+from .exceptions import GraphQLError as BackendGQLError
+from .manager import GQLMutationUnfrozenRequiredMiddleware
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
+
 if TYPE_CHECKING:
     from .context import RootContext
 

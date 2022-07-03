@@ -5,9 +5,7 @@ from typing import AsyncIterator, Optional, cast
 import aiohttp
 import yarl
 
-from ai.backend.common.docker import (
-    login as registry_login,
-)
+from ai.backend.common.docker import login as registry_login
 from ai.backend.common.logging import BraceStyleAdapter
 
 from .base import BaseContainerRegistry

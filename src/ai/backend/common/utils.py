@@ -1,24 +1,25 @@
 from __future__ import annotations
 
 import base64
-from collections import OrderedDict
-from datetime import timedelta
-from itertools import chain
 import numbers
 import random
 import re
 import sys
+import uuid
+from collections import OrderedDict
+from datetime import timedelta
+from itertools import chain
 from typing import (
+    TYPE_CHECKING,
     Any,
     Iterable,
     Iterator,
     Mapping,
     Tuple,
-    TYPE_CHECKING,
     TypeVar,
     Union,
 )
-import uuid
+
 if TYPE_CHECKING:
     from decimal import Decimal
 
@@ -35,12 +36,8 @@ from .asyncio import (  # for legacy imports  # noqa
 )
 from .enum_extension import StringSetFlag  # for legacy imports  # noqa
 from .files import AsyncFileWriter  # for legacy imports  # noqa
-from .networking import (  # for legacy imports  # noqa
-    curl,
-    find_free_port,
-)
+from .networking import curl, find_free_port  # for legacy imports  # noqa
 from .types import BinarySize
-
 
 KT = TypeVar('KT')
 VT = TypeVar('VT')

@@ -1,11 +1,11 @@
 import asyncio
 import gzip
 import logging
-from pathlib import Path
-import pkg_resources
 import subprocess
+from pathlib import Path
 from typing import Any, BinaryIO, Mapping, Tuple, cast
 
+import pkg_resources
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 

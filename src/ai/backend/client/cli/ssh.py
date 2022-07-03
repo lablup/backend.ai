@@ -1,13 +1,13 @@
 import contextlib
 import os
-from pathlib import Path
 import secrets
 import signal
 import subprocess
 import sys
+from pathlib import Path
 from typing import Iterator, List
 
-from .pretty import print_info, print_fail
+from .pretty import print_fail, print_info
 
 
 @contextlib.contextmanager
