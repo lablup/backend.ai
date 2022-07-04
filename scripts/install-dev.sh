@@ -465,7 +465,8 @@ install_editable_webui() {
     sed_inplace "s@debug = true@debug = false" config.toml
     sed_inplace "s@#apiEndpoint =@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
     sed_inplace "s@#apiEndpointText =@apiEndpointText = "'"'"${site_name}"'"' config.toml
-    sed_inplace "s@webServerURL =@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
+    # We should NOT set webServerURL as its non-empty value will let the electron app
+    # use the prebuilt static resources from the web server, instead of local editable sources.
     sed_inplace "s@proxyURL =@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
   fi
   npm i
@@ -847,7 +848,7 @@ echo "  ${WHITE}127.0.0.1      my-dev-machine${NC}"
 echo "and where /etc/hosts in the web browser host contains:"
 echo "  ${WHITE}192.168.99.99  my-dev-machine${NC}"
 echo " "
-echo "Also, you should set the hostname of the ${YELLOW}apiEndpoint${NC}, ${YELLOW}webServerURL${NC}, ${YELLOW}proxyURL${NC} fields of ${BOLD}src/webui/config.toml${NC} in the same way."
+echo "Also, you should set the hostname of the ${YELLOW}apiEndpoint${NC}, ${YELLOW}proxyURL${NC} fields of ${BOLD}src/webui/config.toml${NC} in the same way."
 show_note "How to reset this setup:"
 echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
 echo " "
