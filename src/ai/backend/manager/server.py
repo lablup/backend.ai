@@ -7,7 +7,9 @@ import importlib
 import logging
 import os
 import pwd
+import socket
 import ssl
+import subprocess
 import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
@@ -297,36 +299,65 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     """
     We are using `Raft` algorithm for leader election.
     """
-    base_grpc_port = root_ctx.local_config['manager']['grpc-port']
-    grpc_port = base_grpc_port + root_ctx.pidx
+    # base_grpc_port = root_ctx.local_config['manager']['grpc-port']
+    # grpc_port = base_grpc_port + root_ctx.pidx
     num_proc = root_ctx.local_config['manager']['num-proc']
-    grpc_ports = [base_grpc_port + i for i in range(num_proc) if i != root_ctx.pidx]
+    # grpc_ports = [base_grpc_port + i for i in range(num_proc) if i != root_ctx.pidx]
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('0.0.0.0', 0))
+        _, port = sock.getsockname()
+
+    if os.environ.get('AWS_DEFAULT_REGION'):
+        public_ip = subprocess.run(
+            # dig: domain information groper
+            ['dig', '+short', 'myip.opendns.com', '@resolver1.opendns.com'],
+            capture_output=True,
+        ).stdout.decode('utf-8').replace('\n', '')
+    else:
+        public_ip = '127.0.0.1'
+
+    gid = root_ctx.local_config['manager']['group']
+    await root_ctx.shared_config.etcd.put(
+        f'manager/group/{gid}/{root_ctx.pidx}',
+        f'{public_ip}:{port}',
+    )
+
+    peers = ()
+    while len(peers) < num_proc-1:
+        dicts = await root_ctx.shared_config.etcd.get_prefix(f'manager/group/{gid}')
+        peers = tuple(peer for peer in dicts.values() if peer != f'{public_ip}:{port}')
+        await asyncio.sleep(1.0)
 
     _cleanup_coroutines: List[Coroutine] = []
 
     loop = asyncio.get_running_loop()
     global_timer: Optional[GlobalTimer] = None
 
+    # TODO: Decoupling
     def _on_state_changed(state: RaftState):
         nonlocal global_timer
         match state:
             case RaftState.LEADER:
+                log.warning(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] LEADER')
                 global_timer = GlobalTimer(
                     root_ctx.distributed_lock_factory(lock_id=LockID.LOCKID_LEADER_ELECTION_TIMER, lifetime_hint=10.0),
                     root_ctx.event_producer,
                     lambda: DoLeaderElectionEvent(),
                     interval=10.0,
                 )
+                log.debug(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] global_timer.join(): {global_timer}')
                 loop.create_task(global_timer.join())
             case _:
                 if timer := global_timer:
+                    log.debug(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] global_timer.leave(): {global_timer}')
                     loop.create_task(timer.leave())
                 global_timer = None
 
     client = AsyncGrpcRaftClient()
     server = GrpcRaftServer()
     raft = RaftFiniteStateMachine(
-        peers=tuple(f'0.0.0.0:{x}' for x in grpc_ports),
+        peers=peers,
         server=server,
         client=client,
         on_state_changed=_on_state_changed,
@@ -337,7 +368,7 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             GrpcRaftServer.run(
                 server,
                 cleanup_coroutines=_cleanup_coroutines,
-                port=grpc_port,
+                port=port,
             ),
         ),
         loop.create_task(raft.main()),
@@ -725,7 +756,7 @@ async def server_main(
 
             if os.geteuid() == 0:
                 uid = root_ctx.local_config['manager']['user']
-                gid = root_ctx.local_config['manager']['group']
+                gid = root_ctx.local_config['manager']['group'] # TODO: MUST BE AN INTEGER
                 os.setgroups([
                     g.gr_gid for g in grp.getgrall()
                     if pwd.getpwuid(uid).pw_name in g.gr_mem

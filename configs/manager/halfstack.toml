@@ -15,10 +15,10 @@ password = "develove"
 
 [manager]
 num-proc = 4
-grpc-port = 50051
+# grpc-port = 50051
 service-addr = { host = "0.0.0.0", port = 8081 }
 #user = "nobody"
-#group = "nobody"
+group = "nobody"
 ssl-enabled = false
 #ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"   # env: BACKNED_SSL_CERT
 #ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
