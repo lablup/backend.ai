@@ -624,7 +624,7 @@ if [ $ENABLE_CUDA -eq 1 ]; then
   fi
 fi
 
-# Copy default configurations
+# configure manager
 show_info "Copy default configuration files to manager / agent root..."
 cp configs/manager/halfstack.toml ./manager.toml
 sed_inplace "s/num-proc = .*/num-proc = 1/" ./manager.toml
@@ -639,11 +639,13 @@ MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="
 sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
 sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
 
+# configure halfstack ports
 cp configs/agent/halfstack.toml ./agent.toml
 sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 
+# configure storage-proxy
 cp configs/storage-proxy/sample.toml ./storage-proxy.toml
 STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
 sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
@@ -654,20 +656,26 @@ sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
 sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
 sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
 sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
-
 # add LOCAL_STORAGE_VOLUME vfs volume
 echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
+# configure webserver
 cp configs/webserver/sample.conf ./webserver.conf
 sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
 sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
 sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
 sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
 
+# install and configure webui
+if [ $EDITABLE_WEBUI -eq 1 ]; then
+  install_editable_webui
+fi
+
+# configure tester
 echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-admin-api.sh" > ./env-tester-admin.sh
 echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user-api.sh" > ./env-tester-user.sh
 
-# DB schema
+# initialize the DB schema
 show_info "Setting up databases..."
 ./backend.ai mgr schema oneshot
 ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
@@ -755,10 +763,6 @@ echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_
 echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
 chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
-
-if [ $EDITABLE_WEBUI -eq 1 ]; then
-  install_editable_webui
-fi
 
 # TODO: Update tester env script
 ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-admin.sh
