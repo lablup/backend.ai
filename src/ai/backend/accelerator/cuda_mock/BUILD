@@ -1,6 +1,6 @@
 python_sources(
     name="lib",
-    sources=["**/*.py", "**/*.pyi"],
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
     ],

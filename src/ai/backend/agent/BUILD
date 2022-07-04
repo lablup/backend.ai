@@ -2,8 +2,6 @@ python_sources(
     name="service",
     sources=["**/*.py"],
     dependencies=[
-        "src/ai/backend/accelerator/cuda_mock:lib",
-        "src/ai/backend/accelerator/cuda_open:lib",
         "src/ai/backend/cli:lib",
         "src/ai/backend/common:lib",
         "src/ai/backend/runner:lib",
