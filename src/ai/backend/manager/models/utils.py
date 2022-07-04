@@ -237,11 +237,12 @@ def sql_json_merge(
 
     Note that the existing value must be also an object, not a primitive value.
     """
+    expr = sa.func.coalesce(
+        col if (not key or _depth == 0) else col[key[:_depth]],
+        sa.text("'{}'::jsonb"),
+    )
     if key:
-        expr = sa.func.coalesce(
-            col if _depth == 0 else col[key[:_depth]],
-            sa.text("'{}'::jsonb"),
-        ).concat(
+        expr = expr.concat(
             sa.func.jsonb_build_object(
                 key[_depth],
                 (
@@ -253,10 +254,6 @@ def sql_json_merge(
             ),
         )
     else:
-        expr = sa.func.coalesce(
-            col,
-            sa.text("'{}'::jsonb"),
-        )
         for obj_key, value in obj.items():
             expr = expr.concat(
                 sa.func.jsonb_build_object(
