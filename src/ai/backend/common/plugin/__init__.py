@@ -106,6 +106,7 @@ class BasePluginContext(Generic[P]):
     local_config: Mapping[str, Any]
     plugins: Dict[str, P]
     plugin_group: ClassVar[str] = 'backendai_XXX_v10'
+    allowlist: ClassVar[Optional[set[str]]] = None
     blocklist: ClassVar[Optional[set[str]]] = None
 
     _config_watchers: WeakSet[asyncio.Task]
@@ -127,16 +128,39 @@ class BasePluginContext(Generic[P]):
     def discover_plugins(
         cls,
         plugin_group: str,
+        allowlist: set[str] = None,
         blocklist: set[str] = None,
     ) -> Iterator[Tuple[str, Type[P]]]:
+        combined_allowlist: Optional[set] = None
+        if cls.allowlist is not None:
+            if combined_allowlist is None:
+                combined_allowlist = set()
+            combined_allowlist |= cls.allowlist
+        if allowlist is not None:
+            if combined_allowlist is None:
+                combined_allowlist = set()
+            combined_allowlist |= allowlist
         cls_blocklist = set() if cls.blocklist is None else cls.blocklist
         arg_blocklist = set() if blocklist is None else blocklist
-        for entrypoint in scan_entrypoints(plugin_group, cls_blocklist | arg_blocklist):
+        for entrypoint in scan_entrypoints(
+            plugin_group,
+            combined_allowlist,
+            cls_blocklist | arg_blocklist
+        ):
             log.info('loading plugin (group:{}): {}', plugin_group, entrypoint.name)
             yield entrypoint.name, entrypoint.load()
 
-    async def init(self, context: Any = None) -> None:
-        scanned_plugins = self.discover_plugins(self.plugin_group)
+    async def init(
+        self,
+        context: Any = None,
+        allowlist: Optional[set] = None,
+        blocklist: Optional[set] = None
+    ) -> None:
+        scanned_plugins = self.discover_plugins(
+            self.plugin_group,
+            allowlist=allowlist,
+            blocklist=blocklist
+        )
         for plugin_name, plugin_entry in scanned_plugins:
             plugin_config = await self.etcd.get_prefix(
                 f"config/plugins/{self._group_key}/{plugin_name}/",

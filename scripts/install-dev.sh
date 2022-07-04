@@ -67,13 +67,10 @@ usage() {
   echo "    TenosrFlow CUDA kernel for testing/demo."
   echo "    (default: false)"
   echo ""
-  echo "  ${LWHITE}--cuda-branch NAME${NC}"
-  echo "    The branch of git clone for the CUDA accelerator "
-  echo "    plugin; only valid if ${LWHITE}--enable-cuda${NC} is specified."
-  echo "    If set as ${LWHITE}\"mock\"${NC}, it will install the mockup version "
-  echo "    plugin so that you may develop and test CUDA integration "
-  echo "    features without real GPUs."
-  echo "    (default: main)"
+  echo "  ${LWHITE}--enable-cuda-mock${NC}"
+  echo "    Install CUDA accelerator mock plugin and pull a"
+  echo "    TenosrFlow CUDA kernel for testing/demo."
+  echo "    (default: false)"
   echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC}"
   echo "    The port to bind the PostgreSQL container service."
@@ -180,14 +177,13 @@ else
 fi
 
 ROOT_PATH="$(pwd)"
-PLUGIN_PATH="${ROOT_PATH}/plugins"
 HALFSTACK_VOLUME_PATH="${ROOT_PATH}/volumes"
 PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
 PYTHON_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("CPython==([^\"]+)", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
-CUDA_BRANCH="main"
+ENABLE_CUDA_MOCK=0
 # POSTGRES_PORT="8100"
 # REDIS_PORT="8110"
 # ETCD_PORT="8120"
@@ -217,9 +213,8 @@ while [ $# -gt 0 ]; do
     --python-version)      PYTHON_VERSION=$2; shift ;;
     --python-version=*)    PYTHON_VERSION="${1#*=}" ;;
     --enable-cuda)         ENABLE_CUDA=1 ;;
+    --enable-cuda-mock)    ENABLE_CUDA_MOCK=1 ;;
     --download-big-images) DOWNLOAD_BIG_IMAGES=1 ;;
-    --cuda-branch)         CUDA_BRANCH=$2; shift ;;
-    --cuda-branch=*)       CUDA_BRANCH="${1#*=}" ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
     --redis-port)          REDIS_PORT=$2; shift ;;
@@ -467,6 +462,12 @@ if [ "$DISTRO" = "Darwin" ]; then
   echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
 fi
 
+if [ $ENABLE_CUDA -eq 1 ] & [ $ENABLE_CUDA_MOCK -eq 1 ]; then
+  show_error "You can't use both CUDA and CUDA mock plugins at once!"
+  show_error "Please remove --enable-cuda or --enable-cuda-mock flag to continue."
+  exit -1
+fi
+
 # Install pyenv
 read -r -d '' pyenv_init_script <<"EOS"
 export PYENV_ROOT="$HOME/.pyenv"
@@ -579,13 +580,8 @@ show_info "Creating the unified virtualenv for IDEs..."
 check_snappy
 $PANTS export '::'
 
-if [ $ENABLE_CUDA -eq 1 ]; then
-  if [ "$CUDA_BRANCH" == "mock" ]; then
-    PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda-mock"
-    cp "${PLUGIN_PATH}/backend.ai-accelerator-cuda-mock/configs/sample-mig.toml" cuda-mock.toml
-  else
-    PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda"
-  fi
+if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
+  cp "configs/accelerator/cuda-mock-enterprise.toml" cuda-mock.toml
 fi
 
 # Copy default configurations
@@ -607,6 +603,12 @@ cp configs/agent/halfstack.toml ./agent.toml
 sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
+if [ $ENABLE_CUDA -eq 1 ]; then
+  sed_inplace "s/# allow-plugins/allow-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
+fi
+if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
+  sed_inplace "s/# allow-plugins/allow-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
+fi
 
 cp configs/storage-proxy/sample.toml ./storage-proxy.toml
 STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
