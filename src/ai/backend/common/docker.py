@@ -2,26 +2,29 @@ import ipaddress
 import itertools
 import json
 import logging
-from packaging import version
 import re
 from typing import (
-    Any, Final, Optional, Union,
-    Dict, Mapping,
+    Any,
+    Dict,
+    Final,
     Iterable,
-    Tuple, Sequence,
+    Mapping,
     MutableMapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
 )
 
 import aiohttp
 import yarl
+from packaging import version
 
-from .logging import BraceStyleAdapter
-from .etcd import (
-    AsyncEtcd,
-    quote as etcd_quote,
-    unquote as etcd_unquote,
-)
+from .etcd import AsyncEtcd
+from .etcd import quote as etcd_quote
+from .etcd import unquote as etcd_unquote
 from .exception import UnknownImageRegistry
+from .logging import BraceStyleAdapter
 
 __all__ = (
     'arch_name_aliases',

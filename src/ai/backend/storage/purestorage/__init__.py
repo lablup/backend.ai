@@ -11,14 +11,7 @@ from aiotools import aclosing
 from ai.backend.common.types import BinarySize, HardwareMetadata
 
 from ..abc import CAP_FAST_SCAN, CAP_METRIC, CAP_VFOLDER
-from ..types import (
-    DirEntry,
-    DirEntryType,
-    FSPerfMetric,
-    FSUsage,
-    Stat,
-    VFolderUsage,
-)
+from ..types import DirEntry, DirEntryType, FSPerfMetric, FSUsage, Stat, VFolderUsage
 from ..utils import fstime2datetime
 from ..vfs import BaseVolume
 from .purity import PurityClient

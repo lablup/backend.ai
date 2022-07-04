@@ -98,6 +98,16 @@ smaller target of files that you work on and `use an option to select the
 targets only changed
 <https://www.pantsbuild.org/docs/advanced-target-selection#running-over-changed-files-with---changed-since>`_ (``--changed-since``).
 
+Running formatters
+------------------
+
+If you encounter failure from ``isort``, you may run the formatter to automatically fix the import ordering issues.
+
+.. code-block:: console
+
+   $ ./pants fmt ::
+   $ ./pants fmt src/ai/backend/common::
+
 Running unit tests
 ------------------
 
@@ -169,6 +179,10 @@ Then configure your IDEs/editors to use
 ``dist/export/python/virtualenvs/python-default/VERSION/bin/python`` as the
 interpreter for your code, where ``VERSION`` is the interpreter version
 specified in ``pants.toml``.
+
+To make LSP (language server protocol) services like PyLance to detect our source packages correctly,
+you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
+``plugins/*/`` directories if you have added Backend.AI plugin checkouts.
 
 .. tip::
 

@@ -1,7 +1,7 @@
 import functools
 import inspect
 
-from ..session import api_session, AsyncSession
+from ..session import AsyncSession, api_session
 
 __all__ = (
     'APIFunctionMeta',

@@ -5,12 +5,13 @@ import sys
 import click
 
 from ai.backend.cli.interaction import ask_yn
-from ai.backend.client.session import Session
 from ai.backend.client.output.fields import user_fields
+from ai.backend.client.session import Session
+
+from ..extensions import pass_ctx_obj
 from ..pretty import print_info
 from ..types import CLIContext
 from . import admin
-from ..extensions import pass_ctx_obj
 
 
 @admin.group()

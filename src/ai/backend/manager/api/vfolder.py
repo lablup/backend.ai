@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -19,51 +20,60 @@ from typing import (
     MutableMapping,
     Sequence,
     Set,
-    TYPE_CHECKING,
     Tuple,
 )
 
 import aiohttp
-from aiohttp import web
 import aiohttp_cors
 import sqlalchemy as sa
 import trafaret as t
+from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models import (
-    agents,
-    kernels,
-    users, groups, keypairs,
-    vfolders, vfolder_invitations, vfolder_permissions,
     AgentStatus,
     KernelStatus,
+    UserRole,
     VFolderInvitationState,
     VFolderOwnershipType,
     VFolderPermission,
     VFolderPermissionValidator,
     VFolderUsageMode,
-    UserRole,
-    query_accessible_vfolders,
-    query_owned_dotfiles,
+    agents,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
+    groups,
+    kernels,
+    keypairs,
+    query_accessible_vfolders,
+    query_owned_dotfiles,
+    users,
     verify_vfolder_name,
+    vfolder_invitations,
+    vfolder_permissions,
+    vfolders,
 )
 from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
-    VFolderCreationFailed, VFolderNotFound, VFolderAlreadyExists,
-    GenericForbidden, ObjectNotFound, InvalidAPIParameters, ServerMisconfiguredError,
-    BackendAgentError, InternalServerError, GroupNotFound,
+    BackendAgentError,
+    GenericForbidden,
+    GroupNotFound,
+    InternalServerError,
+    InvalidAPIParameters,
+    ObjectNotFound,
+    ServerMisconfiguredError,
+    TooManyVFoldersFound,
+    VFolderAlreadyExists,
+    VFolderCreationFailed,
+    VFolderNotFound,
 )
-from .manager import (
-    READ_ALLOWED, ALL_ALLOWED,
-    server_status_required,
-)
+from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
 from .utils import check_api_params, get_user_scopes
+
 if TYPE_CHECKING:
     from .context import RootContext
 
@@ -1608,20 +1618,38 @@ async def delete(request: web.Request) -> web.Response:
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
+            extra_vf_conds=(vfolders.c.name == folder_name),
         )
-        for entry in entries:
-            if entry['name'] == folder_name:
-                # Folder owner OR user who have DELETE permission can delete folder.
-                if (
-                    not entry['is_owner']
-                    and entry['permission'] != VFolderPermission.RW_DELETE
-                ):
-                    raise InvalidAPIParameters(
-                        'Cannot delete the vfolder '
-                        'that is not owned by myself.')
-                break
-        else:
+        # for entry in entries:
+        #     if entry['name'] == folder_name:
+        #         # Folder owner OR user who have DELETE permission can delete folder.
+        #         if (
+        #             not entry['is_owner']
+        #             and entry['permission'] != VFolderPermission.RW_DELETE
+        #         ):
+        #             raise InvalidAPIParameters(
+        #                 'Cannot delete the vfolder '
+        #                 'that is not owned by myself.')
+        #         break
+        # FIXME: For now, multiple entries on delete vfolder will raise an error. Will be fixed in 22.06
+        if len(entries) > 1:
+            log.error('VFOLDER.DELETE(folder name:{}, hosts:{}', folder_name, [entry['host'] for entry in entries])
+            raise TooManyVFoldersFound(
+                extra_msg="Multiple folders with the same name.",
+                extra_data=None,
+            )
+        elif len(entries) == 0:
             raise InvalidAPIParameters('No such vfolder.')
+        # query_accesible_vfolders returns list
+        entry = entries[0]
+        # Folder owner OR user who have DELETE permission can delete folder.
+        if (
+            not entry['is_owner']
+            and entry['permission'] != VFolderPermission.RW_DELETE
+        ):
+            raise InvalidAPIParameters(
+                'Cannot delete the vfolder '
+                'that is not owned by myself.')
         folder_host = entry['host']
         folder_id = entry['id']
         query = (sa.delete(vfolders).where(vfolders.c.id == folder_id))

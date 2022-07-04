@@ -1,9 +1,7 @@
-from typing import (
-    Mapping,
-)
+from typing import Mapping
 
-from lark import Lark, LarkError, Transformer
 import sqlalchemy as sa
+from lark import Lark, LarkError, Transformer
 
 __all__ = (
     'QueryOrderParser',

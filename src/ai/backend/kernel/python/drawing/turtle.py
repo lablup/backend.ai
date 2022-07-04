@@ -1,5 +1,6 @@
-from .color import Colors
 import math
+
+from .color import Colors
 
 
 class Vec2D(tuple):

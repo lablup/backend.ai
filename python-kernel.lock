@@ -6,7 +6,7 @@
 // {
 //   "version": 2,
 //   "valid_for_interpreter_constraints": [
-//     "CPython==3.10.4"
+//     "CPython==3.10.5"
 //   ],
 //   "generated_with_requirements": [
 //     "async_timeout~=3.0",
@@ -104,53 +104,63 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5e069f72d497312b24fcc02073d70cb989045d1c91cbd53979366077959933e0",
-              "url": "https://files.pythonhosted.org/packages/c9/06/3dc78a8537fba6d442d45a2d9c0d71679d2bfc88e82452780874256cf883/cffi-1.15.0-cp310-cp310-win_amd64.whl"
+              "hash": "ce4bcc037df4fc5e3d184794f27bdaab018943698f4ca31630bc7f84a7b69c6d",
+              "url": "https://files.pythonhosted.org/packages/0e/e2/a23af3d81838c577571da4ff01b799b0c2bbde24bd924d97e228febae810/cffi-1.15.1-cp310-cp310-win_amd64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "920f0d66a896c2d99f0adbb391f990a84091179542c205fa53ce5787aff87954",
-              "url": "https://files.pythonhosted.org/packages/00/9e/92de7e1217ccc3d5f352ba21e52398372525765b2e0c4530e6eb2ba9282a/cffi-1.15.0.tar.gz"
+              "hash": "59c0b02d0a6c384d453fece7566d1c7e6b7bae4fc5874ef2ef46d56776d61c9e",
+              "url": "https://files.pythonhosted.org/packages/0e/65/0d7b5dad821ced4dcd43f96a362905a68ce71e6b5f5cfd2fada867840582/cffi-1.15.1-cp310-cp310-musllinux_1_1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c21c9e3896c23007803a875460fb786118f0cdd4434359577ea25eb556e34c55",
-              "url": "https://files.pythonhosted.org/packages/2a/fb/7f52b10940eb31b32410fe016cad5b379961be0eac1d40ba4afa1e7819ad/cffi-1.15.0-cp310-cp310-win32.whl"
+              "hash": "d400bfb9a37b1351253cb402671cea7e89bdecc294e8016a707f6d1d8ac934f9",
+              "url": "https://files.pythonhosted.org/packages/2b/a8/050ab4f0c3d4c1b8aaa805f70e26e84d0e27004907c5b8ecc1d31815f92a/cffi-1.15.1.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "abb9a20a72ac4e0fdb50dae135ba5e77880518e742077ced47eb1499e29a443c",
-              "url": "https://files.pythonhosted.org/packages/6d/cc/e45ad6277cd0675c4fbfc25cacc29f5760b9a4c150fd902b18abf85e4672/cffi-1.15.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "fa6693661a4c91757f4412306191b6dc88c1703f780c8234035eac011922bc01",
+              "url": "https://files.pythonhosted.org/packages/32/bd/d0809593f7976828f06a492716fbcbbfb62798bbf60ea1f65200b8d49901/cffi-1.15.1-cp310-cp310-musllinux_1_1_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "91ec59c33514b7c7559a6acda53bbfe1b283949c34fe7440bcf917f96ac0723e",
-              "url": "https://files.pythonhosted.org/packages/7f/96/126f39cbb6d7c87cb7de2e5f74a2a707c282c357055be641d3ae6075d0a5/cffi-1.15.0-cp310-cp310-macosx_11_0_arm64.whl"
+              "hash": "dd86c085fae2efd48ac91dd7ccffcfc0571387fe1193d33b6394db7ef31fe2a4",
+              "url": "https://files.pythonhosted.org/packages/88/89/c34caf63029fb7628ec2ebd5c88ae0c9bd17db98c812e4065a4d020ca41f/cffi-1.15.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f54a64f8b0c8ff0b64d18aa76675262e1700f3995182267998c31ae974fbc382",
-              "url": "https://files.pythonhosted.org/packages/ac/40/9cf45d01320987075d3156e96741b5de2395005070b571c0c9498093b905/cffi-1.15.0-cp310-cp310-manylinux_2_17_s390x.manylinux2014_s390x.whl"
+              "hash": "cba9d6b9a7d64d4bd46167096fc9d2f835e25d7e4c121fb2ddfc6528fb0413b2",
+              "url": "https://files.pythonhosted.org/packages/9f/52/1e2b43cfdd7d9a39f48bc89fcaee8d8685b1295e205a4f1044909ac14d89/cffi-1.15.1-cp310-cp310-win32.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "00c878c90cb53ccfaae6b8bc18ad05d2036553e6d9d1d9dbcf323bbe83854ca3",
-              "url": "https://files.pythonhosted.org/packages/ae/27/a99335833b6c4d356bdeaadd87d0e9e83969761513dba6dc2a8123d95ca1/cffi-1.15.0-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+              "hash": "2012c72d854c2d03e45d06ae57f40d78e5770d252f195b93f581acf3ba44496e",
+              "url": "https://files.pythonhosted.org/packages/aa/02/ab15b3aa572759df752491d5fa0f74128cd14e002e8e3257c1ab1587810b/cffi-1.15.1-cp310-cp310-manylinux_2_17_s390x.manylinux2014_s390x.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a5263e363c27b653a90078143adb3d076c1a748ec9ecc78ea2fb916f9b861962",
-              "url": "https://files.pythonhosted.org/packages/bb/7d/8e2ef3d009d801e02e18fb995c06ad788b5ed42c534c9c737260d54ddec7/cffi-1.15.0-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl"
+              "hash": "5635bd9cb9731e6d4a1132a498dd34f764034a8ce60cef4f5319c0541159392f",
+              "url": "https://files.pythonhosted.org/packages/af/da/9441d56d7dd19d07dcc40a2a5031a1f51c82a27cee3705edf53dadcac398/cffi-1.15.1-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f5c7150ad32ba43a07c4479f40241756145a1f03b43480e058cfd862bf5041c7",
-              "url": "https://files.pythonhosted.org/packages/c3/54/4587212a3a2340d41a40a903c92ce3590f78ca75a56fd608e6889cba98d1/cffi-1.15.0-cp310-cp310-manylinux_2_12_i686.manylinux2010_i686.whl"
+              "hash": "39d39875251ca8f612b6f33e6b1195af86d1b3e60086068be9cc053aa4376e21",
+              "url": "https://files.pythonhosted.org/packages/e8/ff/c4b7a358526f231efa46a375c959506c87622fb4a2c5726e827c55e6adf2/cffi-1.15.1-cp310-cp310-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0104fb5ae2391d46a4cb082abdd5c69ea4eab79d8d44eaaf79f1b1fd806ee4c2",
-              "url": "https://files.pythonhosted.org/packages/f0/00/3003a6f8c20bc349cc7c307432dcbd3711135a1ce12b763e7b09726674f0/cffi-1.15.0-cp310-cp310-macosx_10_9_x86_64.whl"
+              "hash": "285d29981935eb726a4399badae8f0ffdff4f5050eaa6d0cfc3f64b857b77185",
+              "url": "https://files.pythonhosted.org/packages/ea/be/c4ad40ad441ac847b67c7a37284ae3c58f39f3e638c6b0f85fb662233825/cffi-1.15.1-cp310-cp310-macosx_11_0_arm64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "3eb6971dcff08619f8d91607cfc726518b6fa2a9eba42856be181c6d0d9515fd",
+              "url": "https://files.pythonhosted.org/packages/ed/a3/c5f01988ddb70a187c3e6112152e01696188c9f8a4fa4c68aa330adbb179/cffi-1.15.1-cp310-cp310-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "21157295583fe8943475029ed5abdcf71eb3911894724e360acff1d61c1d54bc",
+              "url": "https://files.pythonhosted.org/packages/ef/41/19da352d341963d29a33bdb28433ba94c05672fb16155f794fad3fd907b0/cffi-1.15.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             }
           ],
           "project_name": "cffi",
@@ -158,7 +168,7 @@
             "pycparser"
           ],
           "requires_python": null,
-          "version": "1.15"
+          "version": "1.15.1"
         },
         {
           "artifacts": [
@@ -554,15 +564,11 @@
           "version": "0.16"
         }
       ],
-      "platform_tag": [
-        "cp310",
-        "cp310",
-        "macosx_12_0_x86_64"
-      ]
+      "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.90",
+  "pex_version": "2.1.94",
   "prefer_older_binary": false,
   "requirements": [
     "async_timeout~=3.0",
@@ -574,7 +580,7 @@
     "uvloop~=0.16"
   ],
   "requires_python": [
-    "==3.10.4"
+    "==3.10.5"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

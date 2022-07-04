@@ -8,8 +8,8 @@ Create Date: 2019-05-29 23:17:17.762968
 import textwrap
 
 from alembic import op
-from ai.backend.manager.models import UserRole
 
+from ai.backend.manager.models import UserRole
 
 # revision identifiers, used by Alembic.
 revision = 'e18ed5fcfedf'

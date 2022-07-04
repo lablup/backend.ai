@@ -1,32 +1,22 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from decimal import Decimal
-import logging
-from typing import (
-    Any, Optional,
-    Dict,
-    Sequence,
-    Mapping,
-    Set,
-)
+from typing import Any, Dict, Mapping, Optional, Sequence, Set
 
 import trafaret as t
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    AccessKey, AgentId,
-    ResourceSlot,
-    SessionId,
-)
+from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId
 
 from ..models.scaling_group import ScalingGroupOpts
 from .types import (
     AbstractScheduler,
     AgentContext,
-    PendingSession,
     ExistingSession,
     KernelInfo,
+    PendingSession,
 )
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.scheduler'))

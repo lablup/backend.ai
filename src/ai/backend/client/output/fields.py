@@ -2,21 +2,17 @@ from __future__ import annotations
 
 from .formatters import (
     AgentStatFormatter,
-    GroupListFormatter,
     ContainerListFormatter,
     DependencyListFormatter,
-    SubFieldOutputFormatter,
+    GroupListFormatter,
     KernelStatFormatter,
-    nested_dict_formatter,
+    SubFieldOutputFormatter,
     mibytes_output_formatter,
+    nested_dict_formatter,
     resource_slot_formatter,
     sizebytes_output_formatter,
 )
-from .types import (
-    FieldSet,
-    FieldSpec,
-)
-
+from .types import FieldSet, FieldSpec
 
 container_fields = FieldSet([
     FieldSpec('id', "Kernel ID", alt_name='kernel_id'),

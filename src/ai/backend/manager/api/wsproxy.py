@@ -4,21 +4,14 @@ WebSocket-based streaming kernel interaction APIs.
 
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
 import asyncio
 import logging
-from typing import (
-    Any,
-    Awaitable,
-    Callable,
-    Optional,
-    Union,
-)
+from abc import ABCMeta, abstractmethod
+from typing import Any, Awaitable, Callable, Optional, Union
 
 import aiohttp
 import aiotools
-from aiohttp import WSCloseCode
-from aiohttp import web
+from aiohttp import WSCloseCode, web
 
 from ai.backend.common.logging import BraceStyleAdapter
 

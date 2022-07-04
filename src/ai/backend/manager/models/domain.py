@@ -2,36 +2,30 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    TYPE_CHECKING,
-    TypedDict,
-)
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, TypedDict
 
 import graphene
-from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.engine.row import Row
+from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot
+
+from ..defs import RESERVED_DOTFILES
 from .base import (
-    metadata, ResourceSlotColumn,
+    ResourceSlotColumn,
+    batch_result,
+    metadata,
+    set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
-    set_if_set,
-    batch_result,
 )
 from .scaling_group import ScalingGroup
 from .user import UserRole
-from ..defs import RESERVED_DOTFILES
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -278,7 +272,7 @@ class PurgeDomain(graphene.Mutation):
 
     @classmethod
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
-        from . import users, groups
+        from . import groups, users
         ctx: GraphQueryContext = info.context
 
         async def _pre_func(conn: SAConnection) -> None:
@@ -342,7 +336,7 @@ class PurgeDomain(graphene.Mutation):
 
         :return: True if the domain has some active kernels.
         """
-        from . import kernels, AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
+        from . import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
         query = (
             sa.select([sa.func.count()])
             .select_from(kernels)

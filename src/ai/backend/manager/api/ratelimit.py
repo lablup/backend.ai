@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from decimal import Decimal
 import logging
 import time
-from typing import (
-    Iterable,
-    Final,
-    Tuple,
-)
+from decimal import Decimal
+from typing import Final, Iterable, Tuple
 
+import attr
 from aiohttp import web
 from aiotools import apartial
-import attr
 
 from ai.backend.common import redis
 from ai.backend.common.logging import BraceStyleAdapter
@@ -20,7 +16,7 @@ from ai.backend.common.types import RedisConnectionInfo
 from ..defs import REDIS_RLIM_DB
 from .context import RootContext
 from .exceptions import RateLimitExceeded
-from .types import CORSOptions, WebRequestHandler, WebMiddleware
+from .types import CORSOptions, WebMiddleware, WebRequestHandler
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

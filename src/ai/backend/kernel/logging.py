@@ -1,6 +1,6 @@
+import logging
 from contextlib import closing
 from io import StringIO
-import logging
 from logging.handlers import QueueHandler
 
 

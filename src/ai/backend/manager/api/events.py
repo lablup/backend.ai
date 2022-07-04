@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import json
+import logging
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Final,
@@ -13,16 +14,15 @@ from typing import (
     Set,
     Tuple,
     Union,
-    TYPE_CHECKING,
 )
 
-from aiohttp import web
 import aiohttp_cors
-from aiohttp_sse import sse_response
-from aiotools import adefer
 import attr
 import sqlalchemy as sa
 import trafaret as t
+from aiohttp import web
+from aiohttp_sse import sse_response
+from aiotools import adefer
 
 from ai.backend.common import validators as tx
 from ai.backend.common.events import (
@@ -49,11 +49,11 @@ from ai.backend.common.events import (
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
-from ..models import kernels, groups, UserRole
+from ..models import UserRole, groups, kernels
 from ..models.utils import execute_with_retry
 from ..types import Sentinel
 from .auth import auth_required
-from .exceptions import ObjectNotFound, GenericForbidden, GroupNotFound
+from .exceptions import GenericForbidden, GroupNotFound, ObjectNotFound
 from .manager import READ_ALLOWED, server_status_required
 from .utils import check_api_params
 

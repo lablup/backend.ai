@@ -2,10 +2,10 @@ import sys
 
 import click
 
-from .main import main
-from .pretty import print_error
 from ..compat import asyncio_run
 from ..session import AsyncSession
+from .main import main
+from .pretty import print_error
 
 
 @main.command()

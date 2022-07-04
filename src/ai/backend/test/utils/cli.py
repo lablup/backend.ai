@@ -1,13 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import (
-    Protocol,
-    Sequence,
-)
+from typing import Protocol, Sequence
 
 import pexpect
-
 
 EOF = pexpect.EOF
 TIMEOUT = pexpect.TIMEOUT

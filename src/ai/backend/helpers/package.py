@@ -1,9 +1,10 @@
-from collections import namedtuple
-from pathlib import Path
-import pkg_resources
 import site
 import subprocess
 import sys
+from collections import namedtuple
+from pathlib import Path
+
+import pkg_resources
 
 Package = namedtuple('Package', 'name version is_user')
 

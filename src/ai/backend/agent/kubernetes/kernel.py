@@ -1,30 +1,28 @@
 import asyncio
 import logging
 import lzma
-from pathlib import Path
-import shutil
-from ai.backend.agent.utils import get_arch_name
-import pkg_resources
 import re
+import shutil
 import textwrap
-from typing import (
-    Any, Optional,
-    Mapping, Dict,
-    FrozenSet,
-    Sequence, Tuple,
-)
+from pathlib import Path
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
 
-from kubernetes_asyncio import client as kube_client, config as kube_config, watch
+import pkg_resources
+import zmq
 from aiodocker.docker import Docker
 from aiotools import TaskGroup
+from kubernetes_asyncio import client as kube_client
+from kubernetes_asyncio import config as kube_config
+from kubernetes_asyncio import watch
 
+from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import KernelId
 from ai.backend.common.utils import current_loop
-import zmq
+
+from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
-from ..kernel import AbstractKernel, AbstractCodeRunner
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

@@ -5,11 +5,10 @@ Revises: a7ca9f175d5f
 Create Date: 2022-03-31 07:22:28.426046
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 from ai.backend.manager.models.base import URLColumn
-
 
 # revision identifiers, used by Alembic.
 revision = 'd727b5da20e6'

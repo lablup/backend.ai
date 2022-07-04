@@ -81,13 +81,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c58c8eb8a762858f49e18436ff552e83914778e50e9d2f1660535ffb364552ec",
-              "url": "https://files.pythonhosted.org/packages/ab/b5/1bd220dd470b0b912fc31499e0d9c652007a60caf137995867ccc4b98cb6/importlib_metadata-4.11.4-py3-none-any.whl"
+              "hash": "7401a975809ea1fdc658c3aa4f78cc2195a0e019c5cbc4c06122884e9ae80c23",
+              "url": "https://files.pythonhosted.org/packages/d2/a2/8c239dc898138f208dd14b441b196e7b3032b94d3137d9d8453e186967fc/importlib_metadata-4.12.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5d26852efe48c0a32b0509ffbc583fda1a2266545a78d104a6f4aff3db17d700",
-              "url": "https://files.pythonhosted.org/packages/35/a8/f2bd0d488c2bf932b4dda0fb91cbb687c0b1132b33130d1cfad4e2b4b963/importlib_metadata-4.11.4.tar.gz"
+              "hash": "637245b8bab2b6502fcbc752cc4b7a6f6243bb02b31c5c26156ad103d3d45670",
+              "url": "https://files.pythonhosted.org/packages/1a/16/441080c907df829016729e71d8bdd42d99b9bdde48b01492ed08912c0aa9/importlib_metadata-4.12.0.tar.gz"
             }
           ],
           "project_name": "importlib-metadata",
@@ -101,7 +101,7 @@
             "pytest-black>=0.3.7; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-checkdocs>=2.4; extra == \"testing\"",
             "pytest-cov; extra == \"testing\"",
-            "pytest-enabler>=1.0.1; extra == \"testing\"",
+            "pytest-enabler>=1.3; extra == \"testing\"",
             "pytest-flake8; extra == \"testing\"",
             "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-perf>=0.9.2; extra == \"testing\"",
@@ -112,7 +112,7 @@
             "zipp>=0.5"
           ],
           "requires_python": ">=3.7",
-          "version": "4.11.4"
+          "version": "4.12"
         },
         {
           "artifacts": [
@@ -368,13 +368,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "2a5de5d1ed1fd6dfbe4f1a1079af816032e2d8dfc0975265b57a61429511d10c",
-              "url": "https://files.pythonhosted.org/packages/83/ef/d167612e69d6d708d6d1c7932d5731596cc1f7e5285b8b4f6897a867b9bb/setuptools-62.5.0-py3-none-any.whl"
+              "hash": "c1848f654aea2e3526d17fc3ce6aeaa5e7e24e66e645b5be2171f3f6b4e5a178",
+              "url": "https://files.pythonhosted.org/packages/e9/86/b2ede1d87122a6d4da86d84cc35d0e48b4aa2476e4281d06101c772c1961/setuptools-62.6.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a4c782ac58fcc9e3a86e5e1a4c74cf9d24bf21e4f1562043309022e1bb76951c",
-              "url": "https://files.pythonhosted.org/packages/6d/72/4d4b2aa376f39e954be948e3e3e2ce3b6d8e2faa1caabfdb4fec207b5456/setuptools-62.5.0.tar.gz"
+              "hash": "990a4f7861b31532871ab72331e755b5f14efbe52d336ea7f6118144dd478741",
+              "url": "https://files.pythonhosted.org/packages/dc/73/88920663229023b724a854d1ab7e3e50a1a28b63eeec399a604ba30f9242/setuptools-62.6.0.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -422,7 +422,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "62.5"
+          "version": "62.6"
         },
         {
           "artifacts": [
@@ -473,19 +473,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6657594ee297170d19f67d55c05852a874e7eb634f4f753dbd667855e07c1708",
-              "url": "https://files.pythonhosted.org/packages/75/e1/932e06004039dd670c9d5e1df0cd606bf46e29a28e65d5bb28e894ea29c9/typing_extensions-4.2.0-py3-none-any.whl"
+              "hash": "25642c956049920a5aa49edcdd6ab1e06d7e5d467fc00e0506c44ac86fbfca02",
+              "url": "https://files.pythonhosted.org/packages/ed/d6/2afc375a8d55b8be879d6b4986d4f69f01115e795e36827fd3a40166028b/typing_extensions-4.3.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f1c24655a0da0d1b67f07e17a5e6b2a105894e6824b92096378bb3668ef02376",
-              "url": "https://files.pythonhosted.org/packages/fe/71/1df93bd59163c8084d812d166c907639646e8aac72886d563851b966bf18/typing_extensions-4.2.0.tar.gz"
+              "hash": "e6d2677a32f47fc7eb2795db1dd15c1f34eff616bcaf2cfb5e997f854fa1c4a6",
+              "url": "https://files.pythonhosted.org/packages/9e/1d/d128169ff58c501059330f1ad96ed62b79114a2eb30b8238af63a2e27f70/typing_extensions-4.3.0.tar.gz"
             }
           ],
           "project_name": "typing-extensions",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "4.2"
+          "version": "4.3"
         },
         {
           "artifacts": [
@@ -519,15 +519,11 @@
           "version": "3.8"
         }
       ],
-      "platform_tag": [
-        "cp310",
-        "cp310",
-        "macosx_12_0_x86_64"
-      ]
+      "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.90",
+  "pex_version": "2.1.94",
   "prefer_older_binary": false,
   "requirements": [
     "towncrier>=21.9"

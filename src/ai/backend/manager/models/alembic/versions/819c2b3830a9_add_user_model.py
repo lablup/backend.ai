@@ -5,14 +5,20 @@ Revises: 8e660aa31fe3
 Create Date: 2019-05-02 00:21:43.704843
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from ai.backend.manager.models import UserRole
 from ai.backend.manager.models.base import (
-    convention, EnumValueType, ForeignKeyIDColumn, GUID, IDColumn,
+    GUID,
+    EnumValueType,
+    ForeignKeyIDColumn,
+    IDColumn,
+    convention,
 )
 from ai.backend.manager.models.user import PasswordColumn
-from ai.backend.manager.models import UserRole
+
 # from ai.backend.manager.models import keypairs, users, UserRole
 
 
