@@ -20,7 +20,7 @@ python_distribution(
     ),
     entry_points={
         "backendai_accelerator_v20": {
-            "cuda": "ai.backend.accelerator.cuda_mock.plugin:CUDAPlugin",
+            "cuda_mock": "ai.backend.accelerator.cuda_mock.plugin:CUDAPlugin",
         }
     },
     generate_setup=True,
