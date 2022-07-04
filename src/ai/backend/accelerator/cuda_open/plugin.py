@@ -1,10 +1,11 @@
 import asyncio
-from decimal import Decimal
 import json
 import logging
+import re
+import uuid
+from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
-import re
 from typing import (
     Any,
     Collection,
@@ -13,40 +14,49 @@ from typing import (
     Mapping,
     MutableMapping,
     Optional,
-    Set,
     Sequence,
+    Set,
     Tuple,
 )
-import uuid
 
-import attr
-import aiohttp
 import aiodocker
+import aiohttp
+import attr
 
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.agent.resources import (
+    AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
     DeviceSlotInfo,
-    AbstractAllocMap,
     DiscretePropertyAllocMap,
 )
+from ai.backend.common.logging import BraceStyleAdapter
+
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
 except ImportError:
     from ai.backend.agent.docker.resources import get_resource_spec_from_container
+
 from ai.backend.agent.stats import (
-    StatContext, MetricTypes,
-    NodeMeasurement, ContainerMeasurement, Measurement,
+    ContainerMeasurement,
+    Measurement,
+    MetricTypes,
+    NodeMeasurement,
+    StatContext,
 )
 from ai.backend.agent.types import Container
 from ai.backend.common.types import (
-    BinarySize, MetricKey,
-    DeviceName, DeviceId, DeviceModelInfo,
-    SlotName, SlotTypes,
+    BinarySize,
+    DeviceId,
+    DeviceModelInfo,
+    DeviceName,
+    MetricKey,
+    SlotName,
+    SlotTypes,
 )
+
 from . import __version__
-from .nvidia import libcudart, libnvml, LibraryError
+from .nvidia import LibraryError, libcudart, libnvml
 
 __all__ = (
     'PREFIX',
@@ -116,7 +126,7 @@ class CUDAPlugin(AbstractComputePlugin):
         raw_device_mask = self.plugin_config.get('device_mask')
         if raw_device_mask is not None:
             self.device_mask = [
-                *map(lambda dev_id: DeviceId(dev_id), raw_device_mask.split(','))
+                *map(lambda dev_id: DeviceId(dev_id), raw_device_mask.split(',')),
             ]
         try:
             detected_devices = await self.list_devices()
@@ -246,9 +256,9 @@ class CUDAPlugin(AbstractComputePlugin):
         ]
 
     async def gather_container_measures(
-            self, ctx: StatContext,
-            container_ids: Sequence[str],
-            ) -> Sequence[ContainerMeasurement]:
+        self, ctx: StatContext,
+        container_ids: Sequence[str],
+    ) -> Sequence[ContainerMeasurement]:
         return []
 
     async def create_alloc_map(self) -> AbstractAllocMap:
@@ -316,7 +326,7 @@ class CUDAPlugin(AbstractComputePlugin):
                     # (e.g., nvidiactl, nvidia-uvm, ... etc.)
                     devices.append(dev)
                     continue
-                device_id = m.group(1)
+                device_id = DeviceId(m.group(1))
                 if device_id not in assigned_device_ids:
                     continue
                 devices.append(dev)
@@ -344,7 +354,7 @@ class CUDAPlugin(AbstractComputePlugin):
                                     "DeviceIDs": assigned_device_ids,
                                     # "all" does not work here
                                     "Capabilities": [
-                                        ["utility", "compute", "video", "graphics", "display"]
+                                        ["utility", "compute", "video", "graphics", "display"],
                                     ],
                                 },
                             ],
@@ -379,8 +389,10 @@ class CUDAPlugin(AbstractComputePlugin):
                 attached_devices.append({  # TODO: update common.types.DeviceModelInfo
                     'device_id': device.device_id,
                     'model_name': device.model_name,
-                    'smp': proc,
-                    'mem': mem,
+                    'data': {
+                        'smp': proc,
+                        'mem': mem,
+                    }
                 })
         return attached_devices
 
@@ -397,18 +409,18 @@ class CUDAPlugin(AbstractComputePlugin):
         if hasattr(alloc_map, 'apply_allocation'):
             alloc_map.apply_allocation({
                 SlotName('cuda.device'): resource_spec.allocations.get(
-                    DeviceName('cuda'), {}
+                    DeviceName('cuda'), {},
                 ).get(
-                    SlotName('cuda.device'), {}
+                    SlotName('cuda.device'), {},
                 ),
             })
         else:
             alloc_map.allocations[SlotName('cuda.device')].update(
                 resource_spec.allocations.get(
-                    DeviceName('cuda'), {}
+                    DeviceName('cuda'), {},
                 ).get(
-                    SlotName('cuda.device'), {}
-                )
+                    SlotName('cuda.device'), {},
+                ),
             )
 
     async def generate_resource_data(

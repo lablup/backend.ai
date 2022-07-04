@@ -145,7 +145,7 @@ class BasePluginContext(Generic[P]):
         for entrypoint in scan_entrypoints(
             plugin_group,
             combined_allowlist,
-            cls_blocklist | arg_blocklist
+            cls_blocklist | arg_blocklist,
         ):
             log.info('loading plugin (group:{}): {}', plugin_group, entrypoint.name)
             yield entrypoint.name, entrypoint.load()
@@ -154,12 +154,12 @@ class BasePluginContext(Generic[P]):
         self,
         context: Any = None,
         allowlist: Optional[set] = None,
-        blocklist: Optional[set] = None
+        blocklist: Optional[set] = None,
     ) -> None:
         scanned_plugins = self.discover_plugins(
             self.plugin_group,
             allowlist=allowlist,
-            blocklist=blocklist
+            blocklist=blocklist,
         )
         for plugin_name, plugin_entry in scanned_plugins:
             plugin_config = await self.etcd.get_prefix(

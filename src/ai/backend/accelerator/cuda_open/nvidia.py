@@ -1,13 +1,7 @@
-from abc import ABCMeta, abstractmethod
 import ctypes
-from typing import (
-    Any, Union,
-    Tuple, NamedTuple,
-    MutableMapping,
-    Type,
-)
 import platform
-
+from abc import ABCMeta, abstractmethod
+from typing import Any, MutableMapping, NamedTuple, Tuple, Type, Union
 
 # ref: https://developer.nvidia.com/cuda-toolkit-archive
 TARGET_CUDA_VERSIONS = (

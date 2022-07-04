@@ -1,10 +1,6 @@
+from typing import AsyncContextManager, NamedTuple, Protocol, TypeVar
+
 import attr
-from typing import (
-    AsyncContextManager,
-    NamedTuple,
-    Protocol,
-    TypeVar,
-)
 
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-from collections import defaultdict
-from datetime import datetime, timezone
-from decimal import Decimal, ROUND_DOWN
 import json
 import logging
-from pathlib import Path
-from pprint import pformat
 import random
 import re
 import statistics
+from collections import defaultdict
+from datetime import datetime, timezone
+from decimal import ROUND_DOWN, Decimal
+from pathlib import Path
+from pprint import pformat
 from typing import (
     Any,
     Collection,
@@ -27,29 +27,42 @@ from typing import (
 import aiodocker
 import trafaret as t
 
-from ai.backend.agent.types import Container
 from ai.backend.agent.exception import InitializationError
 from ai.backend.agent.resources import (
-    AbstractComputePlugin, AbstractAllocMap,
-    DeviceSlotInfo, DiscretePropertyAllocMap, FractionAllocMap,
+    AbstractAllocMap,
+    AbstractComputePlugin,
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
+    FractionAllocMap,
 )
+from ai.backend.agent.types import Container
+
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
 except ImportError:
     from ai.backend.agent.docker.resources import get_resource_spec_from_container
+
 from ai.backend.agent.stats import (
-    StatContext, MetricTypes,
-    NodeMeasurement, ContainerMeasurement, Measurement,
+    ContainerMeasurement,
+    Measurement,
+    MetricTypes,
+    NodeMeasurement,
+    StatContext,
 )
 from ai.backend.common import config
+from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     BinarySize,
-    DeviceName, DeviceId, DeviceModelInfo, HardwareMetadata,
-    SlotName, SlotTypes,
+    DeviceId,
+    DeviceModelInfo,
+    DeviceName,
+    HardwareMetadata,
     MetricKey,
+    SlotName,
+    SlotTypes,
 )
-from ai.backend.common import validators as tx
+
 from . import __version__
 from .defs import AllocationModes
 from .types import CUDADevice, DeviceStat, closing_async
@@ -222,7 +235,7 @@ class CUDAPlugin(AbstractComputePlugin):
             else:
                 device_id = DeviceId(dev_info['mother_uuid'])
             all_devices.append(CUDADevice(
-                device_id=str(device_id),
+                device_id=device_id,
                 hw_location=f"0000:99:{idx:02d}.0",
                 mother_uuid=dev_info['mother_uuid'],
                 numa_node=dev_info['numa_node'],
