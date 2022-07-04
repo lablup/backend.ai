@@ -461,7 +461,8 @@ install_editable_webui() {
     cd src/webui
     cp configs/default.toml config.toml
     local site_name=$(basename $(pwd))
-    # The debug mode in webUI is only for using browser
+    # The debug mode here is only for 'hard-core' debugging scenarios -- it changes lots of behaviors.
+    # (e.g., separate debugging of Electron's renderer and main threads)
     sed_inplace "s@debug = true@debug = false" config.toml
     sed_inplace "s@#apiEndpoint =@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
     sed_inplace "s@#apiEndpointText =@apiEndpointText = "'"'"${site_name}"'"' config.toml
