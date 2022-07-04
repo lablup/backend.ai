@@ -492,9 +492,9 @@ def get_redis_object(
         )
 
 
-async def ping_redis_connection(client: aioredis.client.Redis):
+async def ping_redis_connection(client: aioredis.client.Redis) -> bool:
     try:
-        _ = await client.time()
-    except aioredis.exceptions.ConnectionError as e:
+        return await client.ping()
+    except (aioredis.exceptions.ConnectionError, aioredis.exceptions.TimeoutError) as e:
         log.exception(f'ping_redis_connection(): Connecting to redis failed: {e}')
         raise e
