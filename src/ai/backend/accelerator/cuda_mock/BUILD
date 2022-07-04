@@ -2,6 +2,7 @@ python_sources(
     name="lib",
     sources=["**/*.py"],
     dependencies=[
+        "src/ai/backend/common:lib",
         ":resources",
     ],
 )
@@ -10,6 +11,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":lib",
+        "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
         name="backend.ai-accelerator-cuda-mock",
