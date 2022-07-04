@@ -1,25 +1,17 @@
 from __future__ import annotations
 
-from typing import (
-    Optional,
-    Sequence,
-)
+from typing import Optional, Sequence
 
 import trafaret as t
 
-from ai.backend.common.types import (
-    AccessKey,
-    AgentId,
-    SessionId,
-    ResourceSlot,
-)
+from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId
 
 from .types import (
     AbstractScheduler,
-    PendingSession,
-    ExistingSession,
     AgentContext,
+    ExistingSession,
     KernelInfo,
+    PendingSession,
 )
 
 

@@ -1,26 +1,20 @@
 from __future__ import annotations
 
 import enum
-from typing import (
-    Any,
-    Iterable,
-    List,
-    Mapping,
-    Sequence,
-)
 import uuid
+from typing import Any, Iterable, List, Mapping, Sequence
 
 import sqlalchemy as sa
+import trafaret as t
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-import trafaret as t
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import SessionTypes
 
 from ..defs import DEFAULT_ROLE
 from ..exceptions import InvalidArgument
-from .base import metadata, GUID, IDColumn, EnumType
+from .base import GUID, EnumType, IDColumn, metadata
 from .user import UserRole
 from .vfolder import verify_vfolder_name
 
@@ -152,7 +146,8 @@ async def query_accessible_session_templates(
     allowed_types: Iterable[str] = ['user'],
     extra_conds=None,
 ) -> List[Mapping[str, Any]]:
-    from ai.backend.manager.models import groups, users, association_groups_users as agus
+    from ai.backend.manager.models import association_groups_users as agus
+    from ai.backend.manager.models import groups, users
     entries: List[Mapping[str, Any]] = []
     if 'user' in allowed_types:
         # Query user templates

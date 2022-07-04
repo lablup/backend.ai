@@ -2,7 +2,10 @@ import tempfile
 import textwrap as tw
 from pathlib import Path
 
-from ai.backend.plugin.entrypoint import extract_entrypoints_from_buildscript, match_blocklist
+from ai.backend.plugin.entrypoint import (
+    extract_entrypoints_from_buildscript,
+    match_blocklist,
+)
 
 
 def test_parse_build():

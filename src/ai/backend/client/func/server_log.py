@@ -1,11 +1,7 @@
-from typing import (
-    Union,
-    Sequence,
-    Mapping,
-)
+from typing import Mapping, Sequence, Union
 
-from .base import api_function, BaseFunction
 from ..request import Request
+from .base import BaseFunction, api_function
 
 __all__ = (
     'ServerLog',

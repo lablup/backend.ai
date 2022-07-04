@@ -6,12 +6,16 @@ Create Date: 2019-05-28 10:22:56.904061
 
 """
 import textwrap
-from alembic import op
-import sqlalchemy as sa
-from ai.backend.manager.models.base import (
-    convention, ForeignKeyIDColumn, GUID, IDColumn,
-)
 
+import sqlalchemy as sa
+from alembic import op
+
+from ai.backend.manager.models.base import (
+    GUID,
+    ForeignKeyIDColumn,
+    IDColumn,
+    convention,
+)
 
 # revision identifiers, used by Alembic.
 revision = 'c5e4e764f9e3'

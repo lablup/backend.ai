@@ -1,10 +1,10 @@
 import asyncio
+import sys
 from collections import OrderedDict
 from datetime import timedelta
 from pathlib import Path
 from random import choice, randint
 from string import ascii_uppercase
-import sys
 from tempfile import NamedTemporaryFile
 from unittest import mock
 
@@ -15,14 +15,19 @@ from ai.backend.common.asyncio import AsyncBarrier, run_through
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.networking import curl
+from ai.backend.common.testutils import (
+    AsyncContextManagerMock,
+    mock_awaitable,
+    mock_corofunc,
+)
 from ai.backend.common.utils import (
-    odict, dict2kvlist, nmget,
-    generate_uuid, get_random_seq,
+    dict2kvlist,
+    generate_uuid,
+    get_random_seq,
+    nmget,
+    odict,
     readable_size_to_bytes,
     str_to_timedelta,
-)
-from ai.backend.common.testutils import (
-    mock_corofunc, mock_awaitable, AsyncContextManagerMock,
 )
 
 

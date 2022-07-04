@@ -5,14 +5,14 @@ import shutil
 from collections import defaultdict
 from pathlib import Path
 
+import aiodocker
+import pytest
+
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.types import EtcdRedisConfig, HostPortPair
 from ai.backend.testutils.bootstrap import etcd_container, redis_container  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
-
-import aiodocker
-import pytest
 
 
 @pytest.fixture(scope='session')

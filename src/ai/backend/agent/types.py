@@ -1,17 +1,10 @@
 import asyncio
 import enum
-from typing import (
-    Any, Optional,
-    Mapping,
-    Sequence,
-)
+from typing import Any, Mapping, Optional, Sequence
 
 import attr
 
-from ai.backend.common.types import (
-    ContainerId,
-    KernelId,
-)
+from ai.backend.common.types import ContainerId, KernelId
 
 
 class AgentBackend(enum.Enum):

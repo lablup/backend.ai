@@ -5,89 +5,78 @@ import logging
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Final,
     List,
+    Optional,
     Sequence,
     Tuple,
     Union,
-    TYPE_CHECKING,
-    Optional,
 )
 
 import aiotools
-from dateutil.tz import tzutc
 import sqlalchemy as sa
+from dateutil.tz import tzutc
 from sqlalchemy.engine.row import Row
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import (
-    AsyncConnection as SAConnection,
-)
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
     CoalescingOptions,
-    DoScheduleEvent,
     DoPrepareEvent,
+    DoScheduleEvent,
+    EventDispatcher,
+    EventProducer,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,
     SessionScheduledEvent,
     SessionTerminatedEvent,
-    EventDispatcher,
-    EventProducer,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    aobject,
-    AgentId,
-    ClusterMode,
-    ResourceSlot,
-)
+from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, aobject
+from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ai.backend.manager.types import DistributedLockFactory
-
 from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
-from ..defs import (
-    LockID,
-)
+from ..defs import LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
-    agents, kernels, scaling_groups,
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    AgentStatus,
+    KernelStatus,
+    agents,
+    kernels,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
-    AgentStatus, KernelStatus,
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    scaling_groups,
 )
 from ..models.scaling_group import ScalingGroupOpts
-from ..models.utils import (
-    ExtendedAsyncSAEngine as SAEngine,
-    execute_with_retry,
-    sql_json_increment,
-    sql_json_merge,
-)
-from .types import (
-    PredicateResult,
-    PendingSession,
-    ExistingSession,
-    SchedulingContext,
-    AgentContext,
-    AgentAllocationContext,
-    AbstractScheduler,
-    KernelAgentBinding,
-)
+from ..models.utils import ExtendedAsyncSAEngine as SAEngine
+from ..models.utils import execute_with_retry, sql_json_increment, sql_json_merge
 from .predicates import (
-    check_reserved_batch_session,
     check_concurrency,
     check_dependencies,
-    check_keypair_resource_limit,
-    check_group_resource_limit,
     check_domain_resource_limit,
+    check_group_resource_limit,
+    check_keypair_resource_limit,
+    check_reserved_batch_session,
     check_scaling_group,
+)
+from .types import (
+    AbstractScheduler,
+    AgentAllocationContext,
+    AgentContext,
+    ExistingSession,
+    KernelAgentBinding,
+    PendingSession,
+    PredicateResult,
+    SchedulingContext,
 )
 
 if TYPE_CHECKING:

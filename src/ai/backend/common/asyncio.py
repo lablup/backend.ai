@@ -7,10 +7,10 @@ from typing import (
     Awaitable,
     Callable,
     Collection,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
-    Sequence,
     cast,
 )
 

@@ -1,14 +1,9 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import sys
-from typing import (
-    Any, Optional, Union,
-    Dict, Mapping, MutableMapping,
-    Tuple,
-    cast,
-)
+from pathlib import Path
+from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Union, cast
 
 import tomli
 import trafaret as t

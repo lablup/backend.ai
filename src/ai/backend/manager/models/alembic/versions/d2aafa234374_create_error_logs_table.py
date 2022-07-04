@@ -5,11 +5,11 @@ Revises: 3bb80d1887d6
 Create Date: 2020-02-12 13:55:12.450743
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from ai.backend.manager.models.base import IDColumn, GUID
+from ai.backend.manager.models.base import GUID, IDColumn
 
 # revision identifiers, used by Alembic.
 revision = 'd2aafa234374'
