@@ -79,7 +79,7 @@ msgid ""
 msgstr ""
 
 #: ../../client/dev/testing.rst:43 7c8dd221394042c0bd080363b7cfce48
-msgid "(manager) ``python -m ai.backend.manager.cli etcd rescan-images``"
+msgid "(manager) ``python -m ai.backend.manager.cli image rescan``"
 msgstr ""
 
 #: ../../client/dev/testing.rst:45 3df55cd371254d379a190c6fead3d0a6

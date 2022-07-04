@@ -649,11 +649,11 @@ fi
 
 # Scan the container image registry
 show_info "Scanning the image registry..."
-./backend.ai mgr etcd rescan-images cr.backend.ai
+./backend.ai mgr image rescan cr.backend.ai
 if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-  ./backend.ai mgr etcd alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
+  ./backend.ai mgr image alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
 else
-  ./backend.ai mgr etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
+  ./backend.ai mgr image alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
 fi
 
 # Virtual folder setup
