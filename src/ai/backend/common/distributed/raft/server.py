@@ -28,7 +28,9 @@ class GrpcRaftServer(RaftServer, raft_pb2_grpc.RaftServiceServicer):
         request: raft_pb2.AppendEntriesRequest,
         context: grpc.aio.ServicerContext,
     ) -> raft_pb2.AppendEntriesResponse:
-        success = self._protocol.on_append_entries(
+        if (protocol := self._protocol) is None:
+            return raft_pb2.AppendEntriesResponse(term=request.term, success=False)
+        success = protocol.on_append_entries(
             term=request.term, leader_id=request.leader_id,
             prev_log_index=request.prev_log_index, prev_log_term=request.prev_log_term,
             entries=request.entries, leader_commit=request.leader_commit,
@@ -40,6 +42,8 @@ class GrpcRaftServer(RaftServer, raft_pb2_grpc.RaftServiceServicer):
         request: raft_pb2.RequestVoteRequest,
         context: grpc.aio.ServicerContext,
     ) -> raft_pb2.RequestVoteResponse:
+        if (protocol := self._protocol) is None:
+            return raft_pb2.RequestVoteResponse(term=request.term, vote_granted=False)
         vote_granted = self._protocol.on_request_vote(
             term=request.term, candidate_id=request.candidate_id,
             last_log_index=request.last_log_index, last_log_term=request.last_log_term,

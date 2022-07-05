@@ -27,7 +27,7 @@ def randrangef(start: float, stop: float) -> float:
 class RaftFiniteStateMachine(RaftProtocol):
     def __init__(
         self,
-        peers: Optional[Iterable[str]],
+        peers: Iterable[str],
         server: RaftServer,
         client: RaftClient,
         *,

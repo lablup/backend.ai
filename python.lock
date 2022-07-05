@@ -78,6 +78,7 @@
 //     "types-aiofiles",
 //     "types-cachetools",
 //     "types-click",
+//     "types-protobuf",
 //     "types-python-dateutil",
 //     "types-setuptools",
 //     "types-six",
@@ -3078,13 +3079,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c1848f654aea2e3526d17fc3ce6aeaa5e7e24e66e645b5be2171f3f6b4e5a178",
-              "url": "https://files.pythonhosted.org/packages/e9/86/b2ede1d87122a6d4da86d84cc35d0e48b4aa2476e4281d06101c772c1961/setuptools-62.6.0-py3-none-any.whl"
+              "hash": "db3b8e2f922b2a910a29804776c643ea609badb6a32c4bcc226fd4fd902cce65",
+              "url": "https://files.pythonhosted.org/packages/ae/7f/6d816941769a7783be4258dd35e28bbf1a64bb36b1b7e0c773eff07fb0a8/setuptools-63.1.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "990a4f7861b31532871ab72331e755b5f14efbe52d336ea7f6118144dd478741",
-              "url": "https://files.pythonhosted.org/packages/dc/73/88920663229023b724a854d1ab7e3e50a1a28b63eeec399a604ba30f9242/setuptools-62.6.0.tar.gz"
+              "hash": "16923d366ced322712c71ccb97164d07472abeecd13f3a6c283f6d5d26722793",
+              "url": "https://files.pythonhosted.org/packages/67/25/42e2d6664c3e106c33ecad8356a55e3ae5d81708c89098061a97fbff7cee/setuptools-63.1.0.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -3110,7 +3111,7 @@
             "pytest-checkdocs>=2.4; extra == \"testing\"",
             "pytest-cov; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-enabler; extra == \"testing-integration\"",
-            "pytest-enabler>=1.0.1; extra == \"testing\"",
+            "pytest-enabler>=1.3; extra == \"testing\"",
             "pytest-flake8; extra == \"testing\"",
             "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-perf; extra == \"testing\"",
@@ -3132,7 +3133,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "62.6"
+          "version": "63.1"
         },
         {
           "artifacts": [
@@ -3521,6 +3522,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "d291388678af91bb045fafa864f142dc4ac22f5d4cdca097c7d8d8a32fa9b3ab",
+              "url": "https://files.pythonhosted.org/packages/00/0e/0dc8a4b0ce16bb585a8333e8b3a3d6bb15d22cc203e98ed9fa950276b8fd/types_protobuf-3.19.22-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d2b26861b0cb46a3c8669b0df507b7ef72e487da66d61f9f3576aa76ce028a83",
+              "url": "https://files.pythonhosted.org/packages/41/1f/43011a0441926dbf0d3c6e75aecafb1c0edece9662df56c439e839426930/types-protobuf-3.19.22.tar.gz"
+            }
+          ],
+          "project_name": "types-protobuf",
+          "requires_dists": [],
+          "requires_python": null,
+          "version": "3.19.22"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "fd5ed97262b76ae684695ea38ace8dd7c1bc9491aba7eb4edf6654b7ecabc870",
               "url": "https://files.pythonhosted.org/packages/2e/b7/94fc1e8381cdd6b5cdc06bc3cf6360b1f32f135bf19a9b59fa2a95697b94/types_python_dateutil-2.8.18-py3-none-any.whl"
             },
@@ -3575,19 +3594,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b40078231175423affc00dd0cbb127a5a2bf3dee915890a47947ebc1ab25eee7",
-              "url": "https://files.pythonhosted.org/packages/b1/66/eee9592ecb7ba62aee8572c4a498342b9f3c78a18787b1aebca426aa66f3/types_six-1.16.16-py3-none-any.whl"
+              "hash": "4ff0caa93e90d14cf4858dac1a9e004bb7cae2cfa63e978d435a11060cb1182d",
+              "url": "https://files.pythonhosted.org/packages/63/24/de55ffc9743253c2a44a275b2eeec54739619e34f0e062ef16d96b601b3c/types_six-1.16.17-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "0bfbea0ea5780d861f9deab9053e4809f586f5fb3ef0257ce30b938772a4d09c",
-              "url": "https://files.pythonhosted.org/packages/a2/45/d4d0eba2a6c3b838c0fa1d07fb3d358bca2a3f17d0c4e367ae59086936ec/types-six-1.16.16.tar.gz"
+              "hash": "5fcb1236616eb906637aebec071691b1541dea22ee43f5ce92f5c775cbafc2dd",
+              "url": "https://files.pythonhosted.org/packages/6c/a7/98f9a4dfd7cb682eec1078eeb024b439f48e79d1aa0631ee1b20bfd1285a/types-six-1.16.17.tar.gz"
             }
           ],
           "project_name": "types-six",
           "requires_dists": [],
           "requires_python": null,
-          "version": "1.16.16"
+          "version": "1.16.17"
         },
         {
           "artifacts": [
@@ -3981,6 +4000,7 @@
     "types-aiofiles",
     "types-cachetools",
     "types-click",
+    "types-protobuf",
     "types-python-dateutil",
     "types-setuptools",
     "types-six",

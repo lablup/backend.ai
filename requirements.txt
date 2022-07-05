@@ -70,6 +70,7 @@ types-aiofiles
 types-click
 types-cachetools
 types-Jinja2
+types-protobuf
 types-PyYAML
 types-python-dateutil
 types-setuptools

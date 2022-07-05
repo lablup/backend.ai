@@ -71,8 +71,8 @@ class AsyncGrpcRaftClient:
         last_log_term: int,
         timeout: float = 5.0,
     ) -> bool:
-        queue = Queue()
-        timeout_task = asyncio.create_task(asyncio.sleep(timeout))
+        queue: Queue = Queue()
+        timeout_task: asyncio.Task = asyncio.create_task(asyncio.sleep(timeout))
         done, pending = await asyncio.wait({
             asyncio.create_task(self._request_vote(address, term, candidate_id, last_log_index, last_log_term, queue=queue)),
             timeout_task,
