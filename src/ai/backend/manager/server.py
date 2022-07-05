@@ -331,7 +331,7 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     peers: Tuple[str, ...] = ()
     while len(peers) < num_proc - 1:
         dicts = await root_ctx.shared_config.etcd.get_prefix(f'manager/group/{gid}')
-        peers = tuple(peer for peer in dicts.values() \
+        peers = tuple(peer for peer in dicts.values()
                       if peer is not None and peer != f'{public_ip}:{port}')
         await asyncio.sleep(1.0)
 
