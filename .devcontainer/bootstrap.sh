@@ -20,4 +20,4 @@ git config --global credential.helper=/.codespaces/bin/gitcredential_github.sh
 
 cp /workspaces/backend.ai/scripts/install-dev.sh /tmp/install-backend-ai.sh
 
-bash /tmp/install-backend-ai.sh --install-path /workspaces -e codespaces >install.log 2>&1 
+bash /tmp/install-backend-ai.sh >install.log 2>&1 
