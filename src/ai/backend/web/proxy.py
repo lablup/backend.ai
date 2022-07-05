@@ -141,10 +141,15 @@ async def decrypt_payload(request):
 
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     path = request.match_info.get('path', '')
+    name = request.match_info.get('name', '')
     if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
         api_session = await asyncio.shield(get_api_session(request))
+
+    if name == 'flow':
+        pipeline_endpoint = request.app['config']['pipeline']['endpoint']
+        api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))
     try:
         async with api_session:
             # We perform request signing by ourselves using the HTTP session data,
@@ -217,59 +222,6 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
         }), content_type='application/problem+json')
     finally:
         await api_session.close()
-
-
-async def pipeline_handler(request) -> web.StreamResponse:
-    """
-    This handler is specified for sending up-requests to pipeline server
-    """
-    path = request.match_info['path']
-    api_endpoint = request.app['config']['pipeline']['endpoint']
-    api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
-    try:
-        async with api_session:
-            api_rqst = Request(
-                request.method, path, request.content,
-                params=request.query)
-            if 'Content-Type' in request.headers:
-                api_rqst.content_type = request.content_type                        # set for signing
-                api_rqst.headers['Content-Type'] = request.headers['Content-Type']  # preserve raw value
-            if 'Content-Length' in request.headers:
-                api_rqst.headers['Content-Length'] = request.headers['Content-Length']
-            for hdr in HTTP_HEADERS_TO_FORWARD:
-                if request.headers.get(hdr) is not None:
-                    api_rqst.headers[hdr] = request.headers[hdr]
-            async with api_rqst.fetch() as up_resp:
-                down_resp = web.StreamResponse()
-                down_resp.set_status(up_resp.status, up_resp.reason)
-                down_resp.headers.update(up_resp.headers)
-                # We already have configured CORS handlers and the API server
-                # also provides those headers. Just let them as-is.
-                await down_resp.prepare(request)
-                while True:
-                    chunk = await up_resp.read(8192)
-                    if not chunk:
-                        break
-                    await down_resp.write(chunk)
-                return down_resp
-    except asyncio.CancelledError:
-        raise
-    except BackendAPIError as e:
-        return web.Response(body=json.dumps(e.data),
-                            content_type="application/problem+json",
-                            status=e.status, reason=e.reason)
-    except BackendClientError:
-        log.exception('web_handler: BackendClientError')
-        return web.HTTPBadGateway(text=json.dumps({
-            'type': 'https://api.backend.ai/probs/bad-gateway',
-            'title': "The proxy target server is inaccessible.",
-        }), content_type='application/problem+json')
-    except Exception:
-        log.exception('web_handler: unexpected error')
-        return web.HTTPInternalServerError(text=json.dumps({
-            'type': 'https://api.backend.ai/probs/internal-server-error',
-            'title': "Something has gone wrong.",
-        }), content_type='application/problem+json')
 
 
 async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamResponse:

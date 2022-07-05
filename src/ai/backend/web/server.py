@@ -591,11 +591,11 @@ async def server_main(
     cors.add(app.router.add_route('POST', '/func/{path:.*$}', web_handler))
     cors.add(app.router.add_route('PATCH', '/func/{path:.*$}', web_handler))
     cors.add(app.router.add_route('DELETE', '/func/{path:.*$}', web_handler))
-    cors.add(app.router.add_route('GET', '/flow/{path:.*$}', pipeline_handler))
-    cors.add(app.router.add_route('PUT', '/flow/{path:.*$}', pipeline_handler))
-    cors.add(app.router.add_route('POST', '/flow/{path:.*$}', pipeline_handler))
-    cors.add(app.router.add_route('PATCH', '/flow/{path:.*$}', pipeline_handler))
-    cors.add(app.router.add_route('DELETE', '/flow/{path:.*$}', pipeline_handler))
+    cors.add(app.router.add_route('GET', '/{name:flow}/{path:.*$}', web_handler))
+    cors.add(app.router.add_route('PUT', '/{name:flow}/{path:.*$}', web_handler))
+    cors.add(app.router.add_route('POST', '/{name:flow}/{path:.*$}', web_handler))
+    cors.add(app.router.add_route('PATCH', '/{name:flow}/{path:.*$}', web_handler))
+    cors.add(app.router.add_route('DELETE', '/{name:flow}/{path:.*$}', web_handler))
     if config['service']['mode'] == 'webui':
         fallback_handler = console_handler
     elif config['service']['mode'] == 'static':
