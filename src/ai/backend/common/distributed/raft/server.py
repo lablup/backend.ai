@@ -4,8 +4,8 @@ from typing import Coroutine, List, Optional
 
 import grpc
 
-from .protocol import RaftProtocol
 from ..protos import raft_pb2, raft_pb2_grpc
+from .protocol import RaftProtocol
 
 logging.basicConfig(level=logging.INFO)
 

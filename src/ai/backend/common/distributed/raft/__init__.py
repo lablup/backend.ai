@@ -1,1 +1,1 @@
-from .raft import RaftFiniteStateMachine, RaftState     # noqa: F401
+from .raft import RaftFiniteStateMachine, RaftState  # noqa: F401

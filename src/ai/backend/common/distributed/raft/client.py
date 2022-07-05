@@ -1,8 +1,8 @@
 import abc
 import asyncio
 from contextlib import suppress
-from typing import Iterable
 from queue import Queue
+from typing import Iterable
 
 import grpc
 
