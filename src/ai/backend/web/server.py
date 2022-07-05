@@ -37,7 +37,6 @@ from .logging import BraceStyleAdapter
 from .proxy import (
     decrypt_payload,
     extra_config_headers,
-    pipeline_handler,
     web_handler,
     web_plugin_handler,
     websocket_handler,
