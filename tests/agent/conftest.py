@@ -36,6 +36,7 @@ def local_config(test_id, etcd_container, redis_container):  # noqa: F811
             'backend': 'docker',
             'rpc-listen-addr': HostPortPair('', 6001),
             'agent-sock-port': 6009,
+            'allow-plugins': set(),
         },
         'container': {
             'scratch-type': 'hostdir',
