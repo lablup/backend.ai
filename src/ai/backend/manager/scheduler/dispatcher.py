@@ -784,7 +784,7 @@ class SchedulerDispatcher(aobject):
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
                 async with (
                     async_timeout.timeout(delay=50.0),
-                    aiotools.TaskGroup() as tg
+                    aiotools.PersistentTaskGroup() as tg
                 ):
                     for scheduled_session in scheduled_sessions:
                         await self.registry.event_producer.produce_event(
