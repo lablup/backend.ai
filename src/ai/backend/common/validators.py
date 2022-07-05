@@ -2,7 +2,6 @@
 An extension module to Trafaret which provides additional type checkers.
 '''
 
-from collections.abc import Iterable
 import datetime
 import enum
 import ipaddress
@@ -11,6 +10,7 @@ import os
 import pwd
 import re
 import uuid
+from collections.abc import Iterable
 from decimal import Decimal
 from pathlib import Path as _Path
 from pathlib import PurePath as _PurePath
