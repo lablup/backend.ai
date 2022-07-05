@@ -435,7 +435,6 @@ In this case, we recommend to do it as follows:
       client
       plugin
 
-
 4. Link these directories in the target environment.
 
    For example, if it is a Docker container, you could add
@@ -446,7 +445,6 @@ In this case, we recommend to do it as follows:
    If it is a local checkout with a pyenv-based virtualenv, you could replace
    ``$(pyenv prefix)/lib/python3.10/site-packages/ai/backend/{COMPONENT}`` directories
    with symbolic links to the mono-repo's component source directories.
-
 
 Boosting the performance of Pants commands
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
