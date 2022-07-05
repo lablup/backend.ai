@@ -2,6 +2,7 @@
 An extension module to Trafaret which provides additional type checkers.
 '''
 
+from collections.abc import Iterable
 import datetime
 import enum
 import ipaddress
@@ -611,3 +612,11 @@ class URL(t.Trafaret):
             return yarl.URL(value)
         except ValueError as e:
             self._failure(f"cannot convert the given value to URL (error: {e!r})", value=value)
+
+
+class ToSet(t.Trafaret):
+    def check_and_return(self, value: Any) -> set:
+        if isinstance(value, Iterable):
+            return set(value)
+        else:
+            self._failure(f'value must be Iterable')
