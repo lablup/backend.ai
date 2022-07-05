@@ -805,7 +805,7 @@ class SchedulerDispatcher(aobject):
                 raise asyncio.CancelledError()
             raise
         except asyncio.TimeoutError:
-            log.warn('timeout while executing start_session()')
+            log.warn('prepare(): timeout while executing start_session()', source)
 
     async def start_session(
         self,
