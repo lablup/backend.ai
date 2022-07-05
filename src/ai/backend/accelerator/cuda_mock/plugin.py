@@ -38,8 +38,8 @@ from ai.backend.agent.resources import (
 from ai.backend.agent.types import Container
 
 try:
-    from ai.backend.agent.resources import (
-        get_resource_spec_from_container,  # type: ignore
+    from ai.backend.agent.resources import (  # type: ignore
+        get_resource_spec_from_container,
     )
 except ImportError:
     from ai.backend.agent.docker.resources import get_resource_spec_from_container
