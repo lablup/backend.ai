@@ -325,7 +325,7 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
 
     peers: Tuple[str, ...] = ()
-    while len(peers) < num_proc-1:
+    while len(peers) < num_proc - 1:
         dicts = await root_ctx.shared_config.etcd.get_prefix(f'manager/group/{gid}')
         peers = tuple(peer for peer in dicts.values() if peer != f'{public_ip}:{port}')
         await asyncio.sleep(1.0)
@@ -756,7 +756,7 @@ async def server_main(
 
             if os.geteuid() == 0:
                 uid = root_ctx.local_config['manager']['user']
-                gid = root_ctx.local_config['manager']['group'] # TODO: MUST BE AN INTEGER
+                gid = root_ctx.local_config['manager']['group']
                 os.setgroups([
                     g.gr_gid for g in grp.getgrall()
                     if pwd.getpwuid(uid).pw_name in g.gr_mem

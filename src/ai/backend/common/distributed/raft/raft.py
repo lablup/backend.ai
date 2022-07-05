@@ -105,7 +105,8 @@ class RaftFiniteStateMachine(RaftProtocol):
         last_log_index: int,
         last_log_term: int,
     ) -> bool:
-        logging.info(f'[{datetime.now().isoformat()}] [on_request_vote] term={term} cand={candidate_id[:2]} (last={self._last_voted_term})')
+        logging.info(f'[{datetime.now().isoformat()}] [on_request_vote] '
+                     f'term={term} cand={candidate_id[:2]} (last={self._last_voted_term})')
         current_term = self._synchronize_term(term)
         # 1. Reply false if term < currentTerm.
         self.reset_timeout()

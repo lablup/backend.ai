@@ -1,1 +1,1 @@
-from .distributed import GlobalTimer
+from .distributed import GlobalTimer    # noqa: F401

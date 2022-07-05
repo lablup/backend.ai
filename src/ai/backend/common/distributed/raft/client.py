@@ -57,7 +57,7 @@ class AsyncGrpcRaftClient:
             stub = raft_pb2_grpc.RaftServiceStub(channel)
             request = raft_pb2.AppendEntriesRequest(term=term, leader_id=leader_id, entries=entries)
             try:
-                response = await stub.AppendEntries(request)
+                _ = await stub.AppendEntries(request)
             except grpc.aio.AioRpcError:
                 pass
 
@@ -98,7 +98,7 @@ class AsyncGrpcRaftClient:
             stub = raft_pb2_grpc.RaftServiceStub(channel)
             request = raft_pb2.RequestVoteRequest(
                 term=term, candidate_id=candidate_id,
-                last_log_index=last_log_index, last_log_term=last_log_term
+                last_log_index=last_log_index, last_log_term=last_log_term,
             )
             try:
                 response = await stub.RequestVote(request)

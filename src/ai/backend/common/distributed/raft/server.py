@@ -44,7 +44,7 @@ class GrpcRaftServer(RaftServer, raft_pb2_grpc.RaftServiceServicer):
     ) -> raft_pb2.RequestVoteResponse:
         if (protocol := self._protocol) is None:
             return raft_pb2.RequestVoteResponse(term=request.term, vote_granted=False)
-        vote_granted = self._protocol.on_request_vote(
+        vote_granted = protocol.on_request_vote(
             term=request.term, candidate_id=request.candidate_id,
             last_log_index=request.last_log_index, last_log_term=request.last_log_term,
         )
