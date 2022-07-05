@@ -45,7 +45,11 @@ from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.distributed.raft import RaftFiniteStateMachine, RaftState
 from ai.backend.common.distributed.raft.client import AsyncGrpcRaftClient
 from ai.backend.common.distributed.raft.server import GrpcRaftServer
-from ai.backend.common.events import EventDispatcher, EventProducer, DoLeaderElectionEvent
+from ai.backend.common.events import (
+    DoLeaderElectionEvent,
+    EventDispatcher,
+    EventProducer,
+)
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -66,7 +70,7 @@ from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHand
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
-from .defs import LockID, REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
+from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, LockID
 from .exceptions import InvalidArgument
 from .idle import init_idle_checkers
 from .models.storage import StorageSessionManager
@@ -327,7 +331,8 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     peers: Tuple[str, ...] = ()
     while len(peers) < num_proc - 1:
         dicts = await root_ctx.shared_config.etcd.get_prefix(f'manager/group/{gid}')
-        peers = tuple(peer for peer in dicts.values() if peer != f'{public_ip}:{port}')
+        peers = tuple(peer for peer in dicts.values() \
+                      if peer is not None and peer != f'{public_ip}:{port}')
         await asyncio.sleep(1.0)
 
     _cleanup_coroutines: List[Coroutine] = []
