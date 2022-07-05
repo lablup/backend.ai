@@ -619,4 +619,4 @@ class ToSet(t.Trafaret):
         if isinstance(value, Iterable):
             return set(value)
         else:
-            self._failure(f'value must be Iterable')
+            self._failure('value must be Iterable')
