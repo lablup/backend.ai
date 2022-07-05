@@ -64,14 +64,3 @@ class GrpcRaftServer(RaftServer, raft_pb2_grpc.RaftServiceServicer):
         await server.start()
 
         await server.wait_for_termination()
-
-
-if __name__ == '__main__':
-    import asyncio
-    asyncio.run(
-        GrpcRaftServer.run(
-            servicer=GrpcRaftServer(),
-            cleanup_coroutines=[],
-            port=50051,
-        ),
-    )
