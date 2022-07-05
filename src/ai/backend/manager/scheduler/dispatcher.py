@@ -12,6 +12,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from async_timeout import timeout
 
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
@@ -47,6 +48,8 @@ from ..models import (
     KernelStatus,
     SessionRow,
     SessionStatus,
+    update_session_with_kernels,
+    update_kernel_status,
     get_scheduled_sessions,
     get_sessions_by_id,
     get_sgroup_managed_sessions,
@@ -55,8 +58,6 @@ from ..models import (
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
-    update_kernel,
-    update_session_kernels,
 )
 from ..models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
@@ -259,9 +260,9 @@ class SchedulerDispatcher(aobject):
             async def _apply_cancellation():
                 async with self.db.begin_session() as db_sess:
                     for session in cancelled_sessions:
-                        await update_session_kernels(
+                        await update_session_with_kernels(
                             db_sess, session,
-                            kernel_data={
+                            update_data={
                                 'status': KernelStatus.CANCELLED,
                                 'status_changed': now,
                                 'status_info': 'pending-timeout',
@@ -398,12 +399,17 @@ class SchedulerDispatcher(aobject):
                         await _rollback_predicate_mutations(
                             sess, sched_ctx, sess_ctx,
                         )
-                        await update_session_kernels(
+                        await update_session_with_kernels(
                             sess, sess_ctx,
-                            kernel_data={
+                            update_data={
                                 'status_info': 'predicate-checks-failed',
-                                'status_data': sql_json_increment(
+                                'kernel_status_data': sql_json_increment(
                                     kernels.c.status_data,
+                                    ('scheduler', 'retries'),
+                                    parent_updates=status_update_data,
+                                ),
+                                'session_status_data': sql_json_increment(
+                                    SessionRow.status_data,
                                     ('scheduler', 'retries'),
                                     parent_updates=status_update_data,
                                 ),
@@ -416,16 +422,21 @@ class SchedulerDispatcher(aobject):
                 continue
             else:
                 async def _update() -> None:
-                    async with self.db.begin_session() as sess:
-                        await update_session_kernels(
-                            sess, sess_ctx,
-                            kernel_data={
-                                'status_data': sql_json_merge(
-                                    kernels.c.status_data,
+                    async with self.db.begin_session() as db_sess:
+                        await update_session_with_kernels(
+                            db_sess, sess_ctx,
+                            update_data={
+                                'session_status_data': sql_json_merge(
+                                    SessionRow.status_data,
                                     ('scheduler',),
                                     obj=status_update_data,
                                 ),
-                            },
+                                'kernel_status_data': sql_json_merge(
+                                    KernelRow.status_data,
+                                    ('scheduler',),
+                                    obj=status_update_data,
+                                ),
+                            }
                         )
 
                 await execute_with_retry(_update)
@@ -517,15 +528,23 @@ class SchedulerDispatcher(aobject):
                     await _rollback_predicate_mutations(
                         kernel_db_sess, sched_ctx, sess_ctx,
                     )
-                    await update_session_kernels(
+                    now = datetime.now(tzutc()).isoformat()
+                    await update_session_with_kernels(
                         kernel_db_sess, sess_ctx,
-                        kernel_data={
+                        update_data={
                             'status_info': 'no-available-instances',
-                            'status_data': sql_json_increment(
-                                kernels.c.status_data,
+                            'session_status_data': sql_json_increment(
+                                SessionRow.status_data,
                                 ('scheduler', 'retries'),
                                 parent_updates={
-                                    'last_try': datetime.now(tzutc()).isoformat(),
+                                    'last_try': now,
+                                },
+                            ),
+                            'kernel_status_data': sql_json_increment(
+                                KernelRow.status_data,
+                                ('scheduler', 'retries'),
+                                parent_updates={
+                                    'last_try': now,
                                 },
                             ),
                         },
@@ -545,11 +564,12 @@ class SchedulerDispatcher(aobject):
                     await _rollback_predicate_mutations(
                         kernel_db_sess, sched_ctx, sess_ctx,
                     )
-                    await update_session_kernels(
+                    await update_session_with_kernels(
                         kernel_db_sess, sess_ctx,
-                        kernel_data={
+                        update_data={
                             'status_info': 'scheduler-error',
-                            'status_data': exc_data,
+                            'kernel_status_data': exc_data,
+                            'session_status_data': exc_data,
                         },
                     )
 
@@ -558,18 +578,33 @@ class SchedulerDispatcher(aobject):
 
         async def _finalize_scheduled() -> None:
             async with self.db.begin_session() as kernel_db_sess:
-                await update_session_kernels(
-                    kernel_db_sess, sess_ctx,
-                    kernel_data={
-                        'agent_id': agent_alloc_ctx.id,
-                        'agent_addr': agent_alloc_ctx.addr,
-                        'scaling_group': sgroup_name,
-                        'status': KernelStatus.SCHEDULED,
-                        'status_info': 'scheduled',
-                        'status_data': {},
-                        'status_changed': datetime.now(tzutc()),
-                    },
+                now = datetime.now(tzutc())
+                kernel_query = (
+                    sa.update(KernelRow)
+                    .where(KernelRow.session_id == sess_ctx.id)
+                    .values(
+                        agent_id=agent_alloc_ctx.id,
+                        agent_addr=agent_alloc_ctx.addr,
+                        scaling_group=sgroup_name,
+                        status=KernelStatus.SCHEDULED,
+                        status_info='scheduled',
+                        status_data={},
+                        status_changed=now,
+                    )
                 )
+                await kernel_db_sess.execute(kernel_query)
+
+                session_query = (
+                    sa.update(SessionRow)
+                    .where(SessionRow.id == sess_ctx.id)
+                    .values(
+                        status=SessionStatus.SCHEDULED,
+                        status_info='scheduled',
+                        status_data={},
+                        status_changed=now,
+                    )
+                )
+                await kernel_db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
         await self.registry.event_producer.produce_event(
@@ -640,19 +675,18 @@ class SchedulerDispatcher(aobject):
                             await _rollback_predicate_mutations(
                                 kernel_db_sess, sched_ctx, sess_ctx,
                             )
-                            await update_session_kernels(
-                                kernel_db_sess, sess_ctx,
-                                kernel_data={
+                            await update_kernel_status(
+                                kernel_db_sess, kernel,
+                                update_data={
                                     'status_info': 'no-available-instances',
-                                    'status_data': sql_json_increment(
-                                        kernels.c.status_data,
+                                    'kernel_status_data': sql_json_increment(
+                                        KernelRow.status_data,
                                         ('scheduler', 'retries'),
                                         parent_updates={
                                             'last_try': datetime.now(tzutc()).isoformat(),
                                         },
                                     ),
                                 },
-                                extra_cond=(KernelRow.id == kernel.id),
                             )
 
                     await execute_with_retry(_update)
@@ -669,7 +703,7 @@ class SchedulerDispatcher(aobject):
                             await _rollback_predicate_mutations(
                                 kernel_db_sess, sched_ctx, sess_ctx,
                             )
-                            await update_kernel(
+                            await update_kernel_status(
                                 kernel_db_sess, kernel,
                                 kernel_data={
                                     'status_info': 'scheduler-error',
@@ -688,20 +722,34 @@ class SchedulerDispatcher(aobject):
 
         async def _finalize_scheduled() -> None:
             async with self.db.begin_session() as kernel_db_sess:
+                now = datetime.now(tzutc())
                 for binding in kernel_agent_bindings:
-                    await update_session_kernels(
-                        kernel_db_sess, sess_ctx,
-                        kernel_data={
-                            'agent_id': binding.agent_alloc_ctx.id,
-                            'agent_addr': binding.agent_alloc_ctx.addr,
-                            'scaling_group': sgroup_name,
-                            'status': KernelStatus.SCHEDULED,
-                            'status_info': 'scheduled',
-                            'status_data': {},
-                            'status_changed': datetime.now(tzutc()),
-                        },
-                        extra_cond=(KernelRow.agent_id == binding.agent_alloc_ctx.id),
+                    kernel_query = (
+                        sa.update(KernelRow)
+                        .where(KernelRow.id == binding.kernel.id)
+                        .values(
+                            agent_id=binding.agent_alloc_ctx.id,
+                            agent_addr=binding.agent_alloc_ctx.addr,
+                            scaling_group=sgroup_name,
+                            status=KernelStatus.SCHEDULED,
+                            status_info='scheduled',
+                            status_data={},
+                            status_changed=now,
+                        )
                     )
+                    await kernel_db_sess.execute(kernel_query)
+                
+                session_query = (
+                    sa.update(SessionRow)
+                    .where(SessionRow.id == sess_ctx.id)
+                    .values(
+                        status=SessionStatus.SCHEDULED,
+                        status_info='scheduled',
+                        status_data={},
+                        status_changed=now,
+                    )
+                )
+                await kernel_db_sess.execute(session_query)
 
         await execute_with_retry(_finalize_scheduled)
         await self.registry.event_producer.produce_event(
@@ -780,10 +828,10 @@ class SchedulerDispatcher(aobject):
                         await recalc_agent_resource_occupancy(db_sess, agent)
                     await _rollback_predicate_mutations(db_sess, sched_ctx, session)
                     now = datetime.now(tzutc())
-                    await update_session_kernels(
+                    await update_session_with_kernels(
                         db_sess, session,
-                        kernel_data={
-                            'status': KernelStatus.CANCELLED,
+                        update_data={
+                            'status': SessionStatus.CANCELLED,
                             'status_changed': now,
                             'status_info': "failed-to-start",
                             'status_data': status_data,

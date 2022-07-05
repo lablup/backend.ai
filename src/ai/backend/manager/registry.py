@@ -46,6 +46,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.sql.expression import true
+from sqlalchemy.orm import noload, selectinload
 from yarl import URL
 
 from ai.backend.common import msgpack, redis
@@ -125,14 +126,13 @@ from .models import (
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
 )
-from .models.kernel import KernelRow, get_kernel_occupancy, update_terminating_kernel
+from .models.kernel import KernelRow, get_kernel_occupancy
 from .models.session import (
     SessionRow,
     enqueue_session,
     match_sessions,
     transit_session_lifecycle,
-    update_kernel,
-    update_session_kernels,
+    update_kernel_status,
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -354,7 +354,7 @@ class AgentRegistry:
     async def handle_kernel_exception(
         self,
         op: str,
-        session_id: SessionId,
+        kernel_id: KernelId,
         access_key: AccessKey,
         error_callback=None,
         cancellation_callback=None,
@@ -378,8 +378,8 @@ class AgentRegistry:
             yield
         except asyncio.TimeoutError:
             if set_error:
-                await self.set_session_status(
-                    session_id,
+                await self.set_session_kernel_status(
+                    kernel_id,
                     access_key,
                     KernelStatus.ERROR,
                     status_info=f'operation-timeout ({op})',
@@ -393,8 +393,8 @@ class AgentRegistry:
             raise
         except AgentError as e:
             if set_error:
-                await self.set_session_status(
-                    session_id,
+                await self.set_session_kernel_status(
+                    kernel_id,
                     access_key,
                     KernelStatus.ERROR,
                     status_info=f'agent-error ({e!r})',
@@ -415,8 +415,8 @@ class AgentRegistry:
             raise
         except Exception as e:
             if set_error:
-                await self.set_session_status(
-                    session_id,
+                await self.set_session_kernel_status(
+                    kernel_id,
                     access_key,
                     KernelStatus.ERROR,
                     status_info=f'other-error ({e!r})',
@@ -1783,8 +1783,7 @@ class AgentRegistry:
             'destroy_session', session.id, session.kp_access_key, set_error=True,
         ):
 
-            kernel_list: Sequence[KernelRow]
-            kernel_list = session.kernels
+            kernel_list: Sequence[KernelRow] = session.kernels
             main_stat = {}
             per_agent_tasks = []
             now = datetime.now(tzutc())
@@ -2577,13 +2576,13 @@ class AgentRegistry:
         elif status == AgentStatus.TERMINATED:
             log.info('agent {0} has terminated.', agent_id)
 
-    async def set_session_status(
+    async def set_session_kernel_status(
         self,
-        session_id: SessionId,
+        kernel_id: KernelId,
         access_key: AccessKey,
         status: KernelStatus,
         reason: str = '',
-        **extra_fields,
+        is_single_kernel: bool = False,
     ) -> None:
         now = datetime.now(tzutc())
         data = {
@@ -2591,26 +2590,15 @@ class AgentRegistry:
             'status_info': reason,
             'status_changed': now,
         }
-        if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
-            data['terminated_at'] = now
-        data.update(extra_fields)
 
         async def _update() -> None:
             async with self.db.begin_session() as db_sess:
-                kern_cond = (
-                    (KernelRow.access_key == access_key) &
-                    ~(KernelRow.status.in_(DEAD_KERNEL_STATUSES))
-                )
-                sess_cond = (
-                    (SessionRow.kp_access_key == access_key) &
-                    ~(SessionRow.status.in_(DEAD_SESSION_STATUSES))
-                )
-                # DO NOT UPDATE ALL SESSION RELATED KERNELS !!!
-                await update_session_kernels(
-                    db_sess, session_id,
-                    kernel_data=data,
-                    extra_cond=kern_cond,
-                    sess_cond=sess_cond,
+                await update_kernel_status(
+                    db_sess,
+                    kernel_id,
+                    access_key,
+                    update_data=data,
+                    is_single_kernel=is_single_kernel,
                 )
 
         await execute_with_retry(_update)
@@ -2629,13 +2617,14 @@ class AgentRegistry:
             'status_info': reason,
             'status_changed': now,
         }
-        if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
-            data['terminated_at'] = now
 
         async def _update() -> None:
             async with self.db.begin_session() as db_sess:
-                await update_kernel(
-                    db_sess, kernel_id, kernel_data=data,
+                await update_kernel_status(
+                    db_sess,
+                    kernel_id,
+                    update_data=data,
+                    is_single_kernel=False,
                 )
 
         await execute_with_retry(_update)
@@ -2727,10 +2716,46 @@ class AgentRegistry:
 
         async def _update_kernel_status() -> KernelRow | None:
             async with self.db.begin_session(expire_on_commit=False) as db_sess:
-                return await update_terminating_kernel(
-                    db_sess, kernel_id,
-                    kern_stat, reason, exit_code,
+                select_query = (
+                    sa.select(KernelRow)
+                    .where(KernelRow.id == kernel_id)
+                    .options(
+                        noload('*'),
+                        selectinload(KernelRow.agent).noload('*'),
+                    )
                 )
+                result = await db_sess.execute(select_query)
+                kernel = result.scalars().first()
+                if (
+                    kernel is None
+                    or kernel.status in (
+                        KernelStatus.CANCELLED,
+                        KernelStatus.TERMINATED,
+                        KernelStatus.RESTARTING,
+                    )
+                ):
+                    # Skip if non-existent, already terminated, or restarting.
+                    return None
+
+                # Change the status to TERMINATED.
+                # (we don't delete the row for later logging and billing)
+                now = datetime.now(tzutc())
+                values = {
+                    'status': KernelStatus.TERMINATED,
+                    'status_info': reason,
+                    'status_changed': now,
+                    'status_data': sql_json_merge(
+                        KernelRow.status_data,
+                        ("kernel",),
+                        {"exit_code": exit_code},
+                    ),
+                    'terminated_at': now,
+                }
+                if kern_stat:
+                    values['last_stat'] = msgpack.unpackb(kern_stat)
+                await update_kernel_status(db_sess, kernel, update_data=values)
+                
+
         kernel = await execute_with_retry(_update_kernel_status)
         if kernel is None:
             return
@@ -2788,18 +2813,19 @@ class AgentRegistry:
                     rows,
                 ))
                 if all_terminated:
-                    await update_session_kernels(
-                        db_sess, SessionId(session_id),
-                        kernel_data={
-                            'status_data': sql_json_merge(
-                                KernelRow.status_data,
+                    update_query = (
+                        sa.update(SessionRow)
+                        .where(SessionRow.id == session_id)
+                        .values(
+                            status_data=sql_json_merge(
+                                SessionRow.status_data,
                                 ('session',),
-                                {
-                                    'status': 'terminated',
-                                },
+                                {'status': 'terminated'},
                             ),
-                        },
+                            status=SessionStatus.TERMINATED,
+                        )
                     )
+                    await db_sess.execute(update_query)
 
                 return all_terminated, session_id
 

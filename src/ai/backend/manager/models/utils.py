@@ -14,6 +14,7 @@ from typing import (
     Mapping,
     Tuple,
     TypeVar,
+    TypedDict,
 )
 from urllib.parse import quote_plus as urlquote
 

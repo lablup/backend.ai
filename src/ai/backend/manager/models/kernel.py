@@ -97,7 +97,6 @@ __all__ = (
     'DEAD_KERNEL_STATUSES',
     'LIVE_STATUS',
     'get_kernel_occupancy',
-    'update_terminating_kernel',
     'recalc_concurrency_used',
 )
 
@@ -419,59 +418,6 @@ class SessionInfo(TypedDict):
     session_name: str
     status: KernelStatus
     created_at: datetime
-
-
-async def update_terminating_kernel(
-    db_session: SASession,
-    kernel_id: KernelId,
-    kern_stat,
-    reason: str,
-    exit_code: int = None,
-) -> KernelRow | None:
-    select_query = (
-        sa.select(KernelRow)
-        .where(KernelRow.id == kernel_id)
-        .options(
-            noload('*'),
-            selectinload(KernelRow.agent).noload('*'),
-        )
-    )
-    result = await db_session.execute(select_query)
-    kernel = result.scalars().first()
-    if (
-        kernel is None
-        or kernel.status in (
-            KernelStatus.CANCELLED,
-            KernelStatus.TERMINATED,
-            KernelStatus.RESTARTING,
-        )
-    ):
-        # Skip if non-existent, already terminated, or restarting.
-        return None
-
-    # Change the status to TERMINATED.
-    # (we don't delete the row for later logging and billing)
-    now = datetime.now(tzutc())
-    values = {
-        'status': KernelStatus.TERMINATED,
-        'status_info': reason,
-        'status_changed': now,
-        'status_data': sql_json_merge(
-            KernelRow.status_data,
-            ("kernel",),
-            {"exit_code": exit_code},
-        ),
-        'terminated_at': now,
-    }
-    if kern_stat:
-        values['last_stat'] = msgpack.unpackb(kern_stat)
-    update_query = (
-        sa.update(KernelRow)
-        .values(**values)
-        .where(KernelRow.id == kernel_id)
-    )
-    await db_session.execute(update_query)
-    return kernel
 
 
 async def match_session_ids(
