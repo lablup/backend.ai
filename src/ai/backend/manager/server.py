@@ -27,6 +27,7 @@ from typing import (
     MutableMapping,
     Optional,
     Sequence,
+    Tuple,
     cast,
 )
 
@@ -41,14 +42,14 @@ from ai.backend.common import redis
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.distributed import GlobalTimer
+from ai.backend.common.distributed.raft import RaftFiniteStateMachine, RaftState
+from ai.backend.common.distributed.raft.client import AsyncGrpcRaftClient
+from ai.backend.common.distributed.raft.server import GrpcRaftServer
 from ai.backend.common.events import EventDispatcher, EventProducer, DoLeaderElectionEvent
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.utils import env_info
-from raft.client import AsyncGrpcRaftClient
-from raft.fsm import RaftFiniteStateMachine, RaftState
-from raft.server import GrpcRaftServer
 
 from . import __version__
 from .api.context import RootContext
@@ -323,7 +324,7 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         f'{public_ip}:{port}',
     )
 
-    peers = ()
+    peers: Tuple[Optional[str], ...] = ()
     while len(peers) < num_proc-1:
         dicts = await root_ctx.shared_config.etcd.get_prefix(f'manager/group/{gid}')
         peers = tuple(peer for peer in dicts.values() if peer != f'{public_ip}:{port}')
@@ -381,7 +382,6 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-
     root_ctx.redis_live = redis.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_LIVE_DB)
     root_ctx.redis_stat = redis.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_STAT_DB)
     root_ctx.redis_image = redis.get_redis_object(
