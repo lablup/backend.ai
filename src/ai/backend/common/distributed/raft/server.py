@@ -25,30 +25,30 @@ class GrpcRaftServer(RaftServer, raft_pb2_grpc.RaftServiceServicer):
 
     def AppendEntries(
         self,
-        request: raft_pb2.AppendEntriesRequest,
+        request: raft_pb2.AppendEntriesRequest,                                             # type: ignore
         context: grpc.aio.ServicerContext,
-    ) -> raft_pb2.AppendEntriesResponse:
+    ) -> raft_pb2.AppendEntriesResponse:                                                    # type: ignore
         if (protocol := self._protocol) is None:
-            return raft_pb2.AppendEntriesResponse(term=request.term, success=False)
+            return raft_pb2.AppendEntriesResponse(term=request.term, success=False)         # type: ignore
         success = protocol.on_append_entries(
-            term=request.term, leader_id=request.leader_id,
-            prev_log_index=request.prev_log_index, prev_log_term=request.prev_log_term,
-            entries=request.entries, leader_commit=request.leader_commit,
+            term=request.term, leader_id=request.leader_id,                                 # type: ignore
+            prev_log_index=request.prev_log_index, prev_log_term=request.prev_log_term,     # type: ignore
+            entries=request.entries, leader_commit=request.leader_commit,                   # type: ignore
         )
-        return raft_pb2.AppendEntriesResponse(term=request.term, success=success)
+        return raft_pb2.AppendEntriesResponse(term=request.term, success=success)           # type: ignore
 
     def RequestVote(
         self,
-        request: raft_pb2.RequestVoteRequest,
+        request: raft_pb2.RequestVoteRequest,                                               # type: ignore
         context: grpc.aio.ServicerContext,
-    ) -> raft_pb2.RequestVoteResponse:
+    ) -> raft_pb2.RequestVoteResponse:                                                      # type: ignore
         if (protocol := self._protocol) is None:
-            return raft_pb2.RequestVoteResponse(term=request.term, vote_granted=False)
+            return raft_pb2.RequestVoteResponse(term=request.term, vote_granted=False)      # type: ignore
         vote_granted = protocol.on_request_vote(
-            term=request.term, candidate_id=request.candidate_id,
-            last_log_index=request.last_log_index, last_log_term=request.last_log_term,
+            term=request.term, candidate_id=request.candidate_id,                           # type: ignore
+            last_log_index=request.last_log_index, last_log_term=request.last_log_term,     # type: ignore
         )
-        return raft_pb2.RequestVoteResponse(term=request.term, vote_granted=vote_granted)
+        return raft_pb2.RequestVoteResponse(term=request.term, vote_granted=vote_granted)   # type: ignore
 
     @staticmethod
     async def run(servicer: raft_pb2_grpc.RaftServiceServicer, cleanup_coroutines: List[Coroutine], port: int = 50051):

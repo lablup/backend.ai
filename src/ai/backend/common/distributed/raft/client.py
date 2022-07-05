@@ -30,11 +30,11 @@ class RaftClient(abc.ABC):
         candidate_id: str,
         last_log_index: int,
         last_log_term: int,
-    ):
+    ) -> bool:
         raise NotImplementedError()
 
 
-class AsyncGrpcRaftClient:
+class AsyncGrpcRaftClient(RaftClient):
     async def request_append_entries(
         self,
         *,
