@@ -403,8 +403,8 @@ gracefully shutdown the tests  with fixture cleanup. You can also apply
 additional pytest options such as ``--fulltrace``, ``-s``, etc. by passing them
 after target arguments and ``--`` when executing ``./pants test`` command.
 
-Installing a subset of packages in the editable mode for other projects
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Installing a subset of mono-repo packages in the editable mode for other projects
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Sometimes, you need to editable-install a subset of packages into other project's directories.
 For instance you could mount the client SDK and its internal dependencies for a Docker container for development.
