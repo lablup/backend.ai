@@ -949,14 +949,12 @@ def _watch_cmd(docs: Optional[str] = None):
         )
 
         if not session_name_or_id:
-            click.clear()
             questions = [inquirer.List(
                 'session',
                 message="Select session to watch.",
                 choices=session_names,
             )]
             session_name_or_id = inquirer.prompt(questions).get('session')
-            click.clear()
         else:
             for session_name in session_names:
                 if session_name.startswith(session_name_or_id[0]):
@@ -970,18 +968,6 @@ def _watch_cmd(docs: Optional[str] = None):
                 sys.exit(4)
 
         async def handle_console_output(session: ComputeSession, scope: Literal['*', 'session', 'kernel'] = '*'):
-            def print_state(session_name_or_id: str, current_state_idx: int = -1):
-                click.clear()
-                click.echo(click.style(f'session name: {session_name_or_id}', fg='cyan'))
-                for i, state in enumerate(states):
-                    if i < current_state_idx:
-                        print_done(state)
-                    elif i == current_state_idx:
-                        click.echo(click.style(f'\u22EF {state}', bold=True))
-                    else:
-                        print_warn(state)
-
-            print_state(session_name_or_id)
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
                     match ev.event:
@@ -994,26 +980,26 @@ def _watch_cmd(docs: Optional[str] = None):
                         case events.KERNEL_CANCELLED:
                             print_fail(events.KERNEL_CANCELLED)
                             break
-
-                    try:
-                        print_state(session_name_or_id, current_state_idx=states.index(ev.event))
-                    except ValueError:
-                        pass
-
-                    if ev.event == events.SESSION_TERMINATED:
-                        print_state(session_name_or_id, current_state_idx=len(states))
-                        break
+                        case events.SESSION_TERMINATED:
+                            print_done(events.SESSION_TERMINATED)
+                            break
+                        case _:
+                            print_done(ev.event)
 
         async def handle_json_output(session: ComputeSession, scope: Literal['*', 'session', 'kernel'] = '*'):
-            click.clear()
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
                     event = json.loads(ev.data)
                     event['event'] = ev.event
                     click.echo(event)
 
-                    if ev.event == events.SESSION_TERMINATED:
-                        break
+                    match ev.event:
+                        case events.SESSION_SUCCESS:
+                            sys.exit(event.get('exitCode', 0))
+                        case events.SESSION_FAILURE:
+                            sys.exit(event.get('exitCode', 1))
+                        case events.SESSION_TERMINATED | events.KERNEL_CANCELLED:
+                            break
 
         async def _run_events():
             async with AsyncSession() as session:
