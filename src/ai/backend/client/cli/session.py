@@ -19,11 +19,9 @@ from tabulate import tabulate
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
 from ..func.session import ComputeSession
+from .main import main
 from ..output.fields import session_fields
 from ..output.types import FieldSpec
-from ..session import AsyncSession, Session
-from ..types import Undefined, undefined
-from .main import main
 from .params import CommaSeparatedListType
 from .pretty import (
     print_done,
@@ -34,7 +32,9 @@ from .pretty import (
     print_warn,
 )
 from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
+from ..session import AsyncSession, Session
 from .ssh import container_ssh_ctx
+from ..types import Undefined, undefined
 
 list_expr = CommaSeparatedListType()
 
