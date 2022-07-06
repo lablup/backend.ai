@@ -5,4 +5,5 @@ if [ -f "$BASE_PATH/pants-local" ]; then
 else
   PANTS="$BASE_PATH/pants"
 fi
+echo "Performing lint for changed files ..."
 "$PANTS" lint --changed-since="HEAD~1"

@@ -13,6 +13,6 @@ if [ -n "$(echo "$CURRENT_BRANCH" | sed -n '/^[0-9]\+\.[0-9]\+$/p')" ]; then
 else
   BASE_BRANCH="main"
 fi
-echo "Performing formatting and lint checks on $1/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT}"
+echo "Performing lint and check on $1/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT} ..."
 "$PANTS" tailor --check update-build-files --check
 "$PANTS" lint check --changed-since="$1/${BASE_BRANCH}"
