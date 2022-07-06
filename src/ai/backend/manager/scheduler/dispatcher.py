@@ -264,7 +264,7 @@ class SchedulerDispatcher(aobject):
                         await update_session_with_kernels(
                             db_sess, session,
                             update_data={
-                                'status': KernelStatus.CANCELLED,
+                                'status': SessionStatus.CANCELLED,
                                 'status_changed': now,
                                 'status_info': 'pending-timeout',
                                 'terminated_at': now,
@@ -405,7 +405,7 @@ class SchedulerDispatcher(aobject):
                             update_data={
                                 'status_info': 'predicate-checks-failed',
                                 'kernel_status_data': sql_json_increment(
-                                    kernels.c.status_data,
+                                    KernelRow.status_data,
                                     ('scheduler', 'retries'),
                                     parent_updates=status_update_data,
                                 ),
@@ -442,9 +442,9 @@ class SchedulerDispatcher(aobject):
 
                 await execute_with_retry(_update)
 
-            schedulable_sess = await get_sessions_by_id(
+            schedulable_sess = (await get_sessions_by_id(
                 db_sess, sess_ctx.id, load_kernels=True,
-            )
+            ))[0]
 
             if schedulable_sess.cluster_mode == ClusterMode.SINGLE_NODE:
                 await self._schedule_single_node_session(

@@ -169,7 +169,7 @@ class SessionRow(Base):
     cluster_mode = sa.Column('cluster_mode', sa.String(length=16), nullable=False,
               default=ClusterMode.SINGLE_NODE, server_default=ClusterMode.SINGLE_NODE.name)
     cluster_size = sa.Column('cluster_size', sa.Integer, nullable=False, default=1)
-    kernels = relationship('KernelRow', back_populates='session', primaryjoin='SessionRow.id==KernelRow.session_id')
+    kernels = relationship('KernelRow', back_populates='session')
 
     # Resource ownership
     scaling_group_name = sa.Column('scaling_group_name', sa.ForeignKey('scaling_groups.name'), index=True, nullable=True)
@@ -273,14 +273,19 @@ class SessionRow(Base):
     def main_kernel(self) -> KernelRow:
         kerns = tuple(kern for kern in self.kernels if kern.cluster_role == DEFAULT_ROLE)
         if len(kerns) > 1:
-            raise TooManyKernelsFound
+            raise TooManyKernelsFound(
+                f'Session (id: {self.id}) '
+                'has more than 1 main kernel.'
+            )
         if len(kerns) == 0:
-            raise MainKernelNotFound
+            raise MainKernelNotFound(
+                f'Session (id: {self.id}) has no main kernel.',
+            )
         return kerns[0]
 
 
 class UpdatedStatus(TypedDict, total=False):
-    status: SessionRow | KernelStatus
+    status: SessionStatus | KernelStatus
     status_info: str
     session_status_data: sa.Function | Mapping
     kernel_status_data: sa.Function | Mapping
@@ -305,9 +310,17 @@ async def match_sessions(
     that belongs to the given access key, and return the list of SessionRow.
     """
 
-    fetch_by_id = functools.partial(get_sessions_by_id, allow_prefix=True)
-    fetch_by_name = functools.partial(get_sessions_by_name, allow_prefix=allow_prefix)
-    for fetch_func in (fetch_by_id, fetch_by_name):
+    query_list = [functools.partial(get_sessions_by_name, allow_prefix=allow_prefix)]
+    try:
+        UUID(session_name_or_id)
+    except ValueError:
+        pass
+    else:
+        query_list.append(functools.partial(get_sessions_by_id, allow_prefix=False))
+        if allow_prefix:
+            query_list.append(functools.partial(get_sessions_by_id, allow_prefix=True))
+
+    for fetch_func in query_list:
         rows = await fetch_func(
             db_session, session_name_or_id, access_key,
             allow_stale=allow_stale, for_update=for_update,
@@ -321,7 +334,7 @@ async def match_sessions(
 
 def _build_session_fetch_query(
     base_cond,
-    access_key: AccessKey,
+    access_key: AccessKey | None = None,
     *,
     max_matches: int | None,
     allow_stale: bool = True,
@@ -329,13 +342,16 @@ def _build_session_fetch_query(
     do_ordering: bool = False,
     load_kernels: bool = False,
 ):
-    cond = base_cond & (SessionRow.kp_access_key == access_key)
+    cond = base_cond
+    if access_key:
+        cond = cond & (SessionRow.kp_access_key == access_key)
     if not allow_stale:
         cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
     query = (
         sa.select(SessionRow)
         .where(cond)
         .order_by(sa.desc(SessionRow.created_at))
+        .execution_options(populate_existing=True)
     )
     if max_matches:
         query = query.limit(max_matches).offset(0)
@@ -365,14 +381,14 @@ def _build_session_fetch_query(
 async def get_sessions_by_id(
     db_session: SASession,
     session_id: SessionId,
-    access_key: AccessKey,
+    access_key: AccessKey | None = None,
     *,
-    max_matches: int | None,
+    max_matches: int | None = None,
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
     load_kernels: bool = False,
-) -> SessionRow:
+) -> List[SessionRow]:
     if allow_prefix:
         cond = (sa.sql.expression.cast(SessionRow.id, sa.String).like(f'{session_id}%'))
     else:
@@ -384,6 +400,7 @@ async def get_sessions_by_id(
         for_update=for_update,
         load_kernels=load_kernels,
     )
+
     result = await db_session.execute(query)
     return result.scalars().all()
 
@@ -398,7 +415,7 @@ async def get_sessions_by_name(
     allow_stale: bool = True,
     for_update: bool = False,
     load_kernels: bool = False,
-) -> SessionRow:
+) -> List[SessionRow]:
     if allow_prefix:
         cond = (sa.sql.expression.cast(SessionRow.name, sa.String).like(f'{session_name}%'))
     else:
@@ -489,13 +506,16 @@ async def update_session_with_kernels(
     if update_data.get('status') in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
         update_data['terminated_at'] = datetime.now(tzutc())
 
-    kernel_update = {
-        k: v for k, v in update_data.items()
-        if k in UpdatedStatus.__annotations__ and k != 'session_status_data'
-    }
+    kernel_update = {**update_data}
 
-    if 'kernel_status_data' in kernel_update:
-        kernel_update['status_data'] = kernel_update.pop('kernel_status_data')
+    def filter_status_data_keys(status_data, real_data_key, other_key):
+        if real_data_key in status_data:
+            status_data['status_data'] = status_data.pop(real_data_key)
+        if other_key in status_data:
+            del status_data[other_key]
+
+    filter_status_data_keys(kernel_update, 'kernel_status_data', 'session_status_data')
+    filter_status_data_keys(update_data, 'session_status_data', 'kernel_status_data')
 
     if session_status := update_data.get('status'):
         kernel_update['status'] = SESSION_KERNEL_STATUS_MAPPING[session_status]
@@ -533,7 +553,7 @@ async def update_kernel_status(
     kernel: Union[KernelRow, KernelId],
     access_key=None,
     *,
-    update_data: UpdatedStatus | None,
+    update_data: UpdatedStatus,
     only_active: bool = True,
     is_single_kernel: bool = False,
 ) -> None:
@@ -607,59 +627,6 @@ async def update_kernel_status(
             await db_session.execute(query)
 
 
-# async def update_kernel(
-#     db_session: SASession,
-#     kernel: Union[KernelRow, KernelId],
-#     *,
-#     kernel_data: Mapping[str, Any],
-#     extra_cond=None,
-# ) -> None:
-#     if isinstance(kernel, KernelRow):
-#         kernel_id = kernel.id
-#     elif isinstance(kernel, UUID):
-#         kernel_id = kernel
-#     else:
-#         raise RuntimeError(
-#             'Invalid time of session. '
-#             f'expect KernelRow, uuid.UUID type, but got {type(kernel)}')
-
-#     sess_attr = SessionRow.__dict__
-#     session_update = {
-#         k: v for k, v in kernel_data.items() if k in sess_attr
-#     }
-#     if 'status' in kernel_data:
-#         session_update['status'] = \
-#             _KERNEL_SESSION_STATUS_MAPPING[kernel_data['status']]
-
-#     async with db_session.begin_nested():
-#         cond = (KernelRow.id == kernel_id)
-#         if extra_cond is not None:
-#             cond = cond & extra_cond
-#         update_query = (
-#             sa.update(KernelRow)
-#             .values(**kernel_data)
-#             .where(cond)
-#         )
-#         await db_session.execute(update_query)
-
-#         if not session_update:
-#             return
-
-#         fetch_query = (
-#             sa.select(KernelRow.session_id)
-#             .where(cond)
-#         )
-#         result = await db_session.execute(fetch_query)
-#         session_id = result.scalar()
-#         update_query = (
-#             sa.update(SessionRow)
-#             .values(**session_update)
-#             .where(SessionRow.id == session_id)
-#         )
-#         await db_session.execute(update_query)
-#         await db_session.commit()
-
-
 async def enqueue_session(
     db_session: SASession,
     access_key: AccessKey,
@@ -668,8 +635,9 @@ async def enqueue_session(
     dependency_sessions: Sequence[SessionId] = None,
 ) -> SessionId:
     session = SessionRow(**session_data)
+    kernels = [KernelRow(**kernel) for kernel in kernel_data]
     db_session.add(session)
-    db_session.add_all([KernelRow(**kernel) for kernel in kernel_data])
+    db_session.add_all(kernels)
     session_id = SessionId(session.id)
 
     if not dependency_sessions:

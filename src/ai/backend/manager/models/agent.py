@@ -103,7 +103,11 @@ async def get_agent_cols(
 
     query = sa.select(*cols).where(AgentRow.id == agent_id)
     if for_update:
-        query = query.with_for_update()
+        query = (
+            query
+            .execution_options(populate_existing=True)
+            .with_for_update()
+        )
     result = await db_sess.execute(query)
     return result.first()
 

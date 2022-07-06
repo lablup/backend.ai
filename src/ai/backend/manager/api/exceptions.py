@@ -186,6 +186,11 @@ class GraphQLError(BackendError, web.HTTPBadRequest):
     error_title = 'GraphQL-generated error.'
 
 
+class TooManyKernelsFound(BackendError, web.HTTPNotFound):
+    error_type  = 'https://api.backend.ai/probs/too-many-main-kernel'
+    error_title = 'More than 1 main kernel found.'
+
+
 class InstanceNotFound(ObjectNotFound):
     object_name = 'agent instance'
 
@@ -210,6 +215,10 @@ class SessionNotFound(ObjectNotFound):
     object_name = 'session'
 
 
+class MainKernelNotFound(ObjectNotFound):
+    object_name = 'main kernel'
+
+
 class TooManySessionsMatched(BackendError, web.HTTPNotFound):
     error_type  = 'https://api.backend.ai/probs/too-many-sessions-matched'
     error_title = 'Too many sessions matched.'
@@ -228,16 +237,6 @@ class TooManySessionsMatched(BackendError, web.HTTPNotFound):
             } for item in matches]
             extra_data['matches'] = serializable_matches
         super().__init__(extra_msg, extra_data, **kwargs)
-
-
-class TooManyKernelsFound(BackendError, web.HTTPNotFound):
-    error_type  = 'https://api.backend.ai/probs/too-many-kernels'
-    error_title = 'There are two or more matching kernels.'
-
-
-class MainKernelNotFound(BackendError, web.HTTPNotFound):
-    error_type  = ''
-    error_title = 'There is no main kernel.'
 
 
 class TaskTemplateNotFound(ObjectNotFound):

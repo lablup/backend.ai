@@ -305,7 +305,7 @@ kernels = sa.Table(
 
 class KernelRow(Base):
     __table__ = kernels
-    session = relationship('SessionRow', back_populates='kernels', foreign_keys=[kernels.c.session_id])
+    session = relationship('SessionRow', back_populates='kernels')
     image = relationship('ImageRow', back_populates='kernels')
     agent = relationship('AgentRow', back_populates='kernels')
 
