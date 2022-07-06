@@ -6,7 +6,7 @@ import fcntl
 import logging
 from io import IOBase
 from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Any, Optional
 
 from etcetra.client import EtcdCommunicator, EtcdConnectionManager
 from tenacity import (
@@ -22,11 +22,6 @@ from tenacity import (
 from ai.backend.common.etcd import AsyncEtcd
 
 from .logging import BraceStyleAdapter
-
-if TYPE_CHECKING:
-    def fcntl_flock(__fd: IOBase, __operation: int) -> None: ...    # noqa: E704
-else:
-    from fcntl import flock as fcntl_flock
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -50,7 +45,7 @@ class FileLock(AbstractDistributedLock):
 
     default_timeout: float = 3  # not allow infinite timeout for safety
 
-    _fp: IOBase | None
+    _file: IOBase | None
     _locked: bool = False
 
     def __init__(
@@ -62,7 +57,7 @@ class FileLock(AbstractDistributedLock):
         debug: bool = False,
     ) -> None:
         super().__init__(lifetime=lifetime)
-        self._fp = None
+        self._file = None
         self._path = path
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
@@ -73,16 +68,16 @@ class FileLock(AbstractDistributedLock):
         return self._locked
 
     def __del__(self) -> None:
-        if self._fp is not None:
+        if self._file is not None:
             self._debug = False
             self.release()
             log.debug("file lock implicitly released: {}", self._path)
 
     async def acquire(self) -> None:
-        assert self._fp is None
+        assert self._file is None
         assert not self._locked
         self._path.touch(exist_ok=True)
-        self._fp = open(self._path, "rb")
+        self._file = open(self._path, "rb")
         stop_func = stop_never if self._timeout <= 0 else stop_after_delay(self._timeout)
         try:
             async for attempt in AsyncRetrying(
@@ -91,7 +86,7 @@ class FileLock(AbstractDistributedLock):
                 stop=stop_func,
             ):
                 with attempt:
-                    fcntl_flock(self._fp, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.flock(self._file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     self._locked = True
                     if self._lifetime is not None:
                         self._watchdog_task = asyncio.create_task(
@@ -103,17 +98,17 @@ class FileLock(AbstractDistributedLock):
             raise asyncio.TimeoutError(f"failed to lock file: {self._path}")
 
     def release(self) -> None:
-        assert self._fp is not None
+        assert self._file is not None
         if task := self._watchdog_task:
             if not task.done():
                 task.cancel()
         if self._locked:
-            fcntl_flock(self._fp, fcntl.LOCK_UN)
+            fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
                 log.debug("file lock explicitly released: {}", self._path)
-        self._fp.close()
-        self._fp = None
+        self._file.close()
+        self._file = None
 
     async def __aenter__(self) -> FileLock:
         await self.acquire()
@@ -126,8 +121,8 @@ class FileLock(AbstractDistributedLock):
     async def _watchdog_timer(self, ttl: float):
         await asyncio.sleep(ttl)
         if self._locked:
-            assert (fp := self._fp) is not None
-            fcntl_flock(fp, fcntl.LOCK_UN)
+            assert self._file is not None
+            fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
                 log.debug(f"file lock implicitly released by watchdog: {self._path}")
