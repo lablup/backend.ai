@@ -8,7 +8,7 @@ import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import IO, Final, List, Literal, Optional, Sequence
+from typing import IO, List, Literal, Optional, Sequence
 
 import click
 import inquirer
@@ -23,6 +23,7 @@ from ..output.fields import session_fields
 from ..output.types import FieldSpec
 from ..session import AsyncSession, Session
 from ..types import Undefined, undefined
+from . import events
 from .main import main
 from .params import CommaSeparatedListType
 from .pretty import (
@@ -938,23 +939,13 @@ def _watch_cmd(docs: Optional[str] = None):
                 print_fail('No matching items.')
             sys.exit(4)
 
-        kernel_cancelled: Final[str] = 'kernel_cancelled'
-        kernel_creating: Final[str] = 'kernel_creating'
-        kernel_started: Final[str] = 'kernel_started'
-        kernel_terminated: Final[str] = 'kernel_terminated'
-        kernel_terminating: Final[str] = 'kernel_terminating'
-        session_failure: Final[str] = 'session_failure'
-        session_started: Final[str] = 'session_started'
-        session_success: Final[str] = 'session_success'
-        session_terminated: Final[str] = 'session_terminated'
-
         states = (
-            kernel_creating,
-            kernel_started,
-            session_started,
-            kernel_terminating,
-            kernel_terminated,
-            session_terminated,
+            events.KERNEL_CREATING,
+            events.KERNEL_STARTED,
+            events.SESSION_STARTED,
+            events.KERNEL_TERMINATING,
+            events.KERNEL_TERMINATED,
+            events.SESSION_TERMINATED,
         )
 
         if not session_name_or_id:
@@ -979,7 +970,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 sys.exit(4)
 
         async def handle_console_output(session: ComputeSession, scope: Literal['*', 'session', 'kernel'] = '*'):
-            def print_state(session_name_or_id: str, current_state_idx: int):
+            def print_state(session_name_or_id: str, current_state_idx: int = -1):
                 click.clear()
                 click.echo(click.style(f'session name: {session_name_or_id}', fg='cyan'))
                 for i, state in enumerate(states):
@@ -990,25 +981,26 @@ def _watch_cmd(docs: Optional[str] = None):
                     else:
                         print_warn(state)
 
-            print_state(session_name_or_id, current_state_idx=-1)
+            print_state(session_name_or_id)
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
-                    if ev.event == session_success:
-                        print_done(session_success)
-                        sys.exit(json.loads(ev.data).get('exitCode', 0))
-                    elif ev.event == session_failure:
-                        print_fail(session_failure)
-                        sys.exit(json.loads(ev.data).get('exitCode', 1))
-                    elif ev.event == kernel_cancelled:
-                        print_fail(kernel_cancelled)
-                        break
+                    match ev.event:
+                        case events.SESSION_SUCCESS:
+                            print_done(events.SESSION_SUCCESS)
+                            sys.exit(json.loads(ev.data).get('exitCode', 0))
+                        case events.SESSION_FAILURE:
+                            print_fail(events.SESSION_FAILURE)
+                            sys.exit(json.loads(ev.data).get('exitCode', 1))
+                        case events.KERNEL_CANCELLED:
+                            print_fail(events.KERNEL_CANCELLED)
+                            break
 
                     try:
                         print_state(session_name_or_id, current_state_idx=states.index(ev.event))
                     except ValueError:
                         pass
 
-                    if ev.event == session_terminated:
+                    if ev.event == events.SESSION_TERMINATED:
                         print_state(session_name_or_id, current_state_idx=len(states))
                         break
 
@@ -1020,7 +1012,7 @@ def _watch_cmd(docs: Optional[str] = None):
                     event['event'] = ev.event
                     click.echo(event)
 
-                    if ev.event == session_terminated:
+                    if ev.event == events.SESSION_TERMINATED:
                         break
 
         async def _run_events():
