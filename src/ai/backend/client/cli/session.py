@@ -8,7 +8,7 @@ import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Final, IO, List, Literal, Optional, Sequence
+from typing import IO, Final, List, Literal, Optional, Sequence
 
 import click
 import inquirer
@@ -19,9 +19,11 @@ from tabulate import tabulate
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
 from ..func.session import ComputeSession
-from .main import main
 from ..output.fields import session_fields
 from ..output.types import FieldSpec
+from ..session import AsyncSession, Session
+from ..types import Undefined, undefined
+from .main import main
 from .params import CommaSeparatedListType
 from .pretty import (
     print_done,
@@ -32,9 +34,7 @@ from .pretty import (
     print_warn,
 )
 from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
-from ..session import AsyncSession, Session
 from .ssh import container_ssh_ctx
-from ..types import Undefined, undefined
 
 kernel_cancelled: Final[str] = 'kernel_cancelled'
 kernel_creating: Final[str] = 'kernel_creating'
@@ -993,16 +993,15 @@ def _watch_cmd(docs: Optional[str] = None):
             print_state(session_name_or_id, current_state_idx=-1)
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
-                    match ev.event:
-                        case session_success:
-                            print_done(ev.event)
-                            sys.exit(json.loads(ev.data).get('exitCode', 0))
-                        case session_failure:
-                            print_fail(ev.event)
-                            sys.exit(json.loads(ev.data).get('exitCode', 1))
-                        case kernel_cancelled:
-                            print_fail(ev.event)
-                            break
+                    if ev.event == session_success:
+                        print_done(session_success)
+                        sys.exit(json.loads(ev.data).get('exitCode', 0))
+                    elif ev.event == session_failure:
+                        print_fail(session_failure)
+                        sys.exit(json.loads(ev.data).get('exitCode', 1))
+                    elif ev.event == kernel_cancelled:
+                        print_fail(kernel_cancelled)
+                        break
 
                     try:
                         print_state(session_name_or_id, current_state_idx=states.index(ev.event))
