@@ -426,6 +426,8 @@ bootstrap_pants() {
     else
       echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
     fi
+    # In most cases, we won't need to modify the source code of pants.
+    echo "ENABLE_PANTSD=true" > "$ROOT_PATH/.pants.env"
     echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
     if [ -d tools/pants-src ]; then
       rm -rf tools/pants-src
