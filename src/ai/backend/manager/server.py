@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import functools
+import asyncio
 import grp
 import importlib
 import logging
