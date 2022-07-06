@@ -1,27 +1,26 @@
 import json
 import logging
-from typing import (
-    Any,
-    List,
-    Mapping,
-    TYPE_CHECKING,
-    Tuple,
-)
 import uuid
+from typing import TYPE_CHECKING, Any, List, Mapping, Tuple
 
-from aiohttp import web
 import aiohttp_cors
 import sqlalchemy as sa
 import trafaret as t
 import yaml
+from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ..models import TemplateType, UserRole
+from ..models import association_groups_users as agus
 from ..models import (
-    association_groups_users as agus, domains,
-    groups, session_templates, keypairs, users, UserRole,
-    query_accessible_session_templates, TemplateType,
+    domains,
+    groups,
+    keypairs,
+    query_accessible_session_templates,
+    session_templates,
+    users,
 )
 from ..models.session_template import check_cluster_template
 from .auth import auth_required

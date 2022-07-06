@@ -4,11 +4,12 @@ import sys
 
 import click
 
-from ai.backend.client.session import Session
 from ai.backend.client.output.fields import storage_fields
-from . import admin
-from ..types import CLIContext
+from ai.backend.client.session import Session
+
 from ..extensions import pass_ctx_obj
+from ..types import CLIContext
+from . import admin
 
 
 @admin.group()

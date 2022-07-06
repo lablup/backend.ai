@@ -8,7 +8,6 @@ from ai.backend.common import validators as tx
 from .stats import StatModes
 from .types import AgentBackend
 
-
 coredump_defaults = {
     'enabled': False,
     'path': './coredumps',

@@ -12,14 +12,7 @@ future UX improvements.
 from __future__ import annotations
 
 import json
-from typing import (
-    Any,
-    Dict,
-    Optional,
-    Mapping,
-    Union,
-    cast,
-)
+from typing import Any, Dict, Mapping, Optional, Union, cast
 
 from aiohttp import web
 
@@ -254,6 +247,11 @@ class SessionAlreadyExists(BackendError, web.HTTPBadRequest):
 class VFolderCreationFailed(BackendError, web.HTTPBadRequest):
     error_type  = 'https://api.backend.ai/probs/vfolder-creation-failed'
     error_title = 'Virtual folder creation has failed.'
+
+
+class TooManyVFoldersFound(BackendError, web.HTTPNotFound):
+    error_type = 'https://api.backend.ai/probs/too-many-vfolders'
+    error_title = 'There are two or more matching vfolders.'
 
 
 class VFolderNotFound(ObjectNotFound):

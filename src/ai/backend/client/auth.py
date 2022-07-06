@@ -1,11 +1,8 @@
-from datetime import datetime
 import enum
 import hashlib
 import hmac
-from typing import (
-    Mapping,
-    Tuple,
-)
+from datetime import datetime
+from typing import Mapping, Tuple
 
 import attr
 from yarl import URL

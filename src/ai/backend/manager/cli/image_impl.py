@@ -1,24 +1,18 @@
 import contextlib
 import logging
 from pprint import pprint
+from typing import AsyncIterator
 
 import sqlalchemy as sa
 from tabulate import tabulate
-from typing import AsyncIterator
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-
-from ai.backend.manager.models.image import (
-    ImageAliasRow,
-    ImageRow,
-    rescan_images as rescan_images_func,
-)
-from ai.backend.manager.models.utils import (
-    connect_database,
-)
+from ai.backend.manager.models.image import ImageAliasRow, ImageRow
+from ai.backend.manager.models.image import rescan_images as rescan_images_func
+from ai.backend.manager.models.utils import connect_database
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

@@ -1,27 +1,41 @@
 from __future__ import annotations
 
-from datetime import datetime
+import asyncio
 import json
-from pathlib import Path
 import secrets
 import subprocess
 import sys
-from typing import IO, Literal, Sequence
 import uuid
+from datetime import datetime
+from pathlib import Path
+from typing import IO, List, Literal, Optional, Sequence
 
 import click
+import inquirer
+from async_timeout import timeout
 from humanize import naturalsize
 from tabulate import tabulate
 
-from .main import main
-from .pretty import print_wait, print_done, print_error, print_fail, print_info, print_warn
-from .ssh import container_ssh_ctx
-from .run import format_stats, prepare_env_arg, prepare_resource_arg, prepare_mount_arg
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
-from ..session import Session, AsyncSession
+from ..func.session import ComputeSession
+from ..output.fields import session_fields
+from ..output.types import FieldSpec
+from ..session import AsyncSession, Session
 from ..types import Undefined, undefined
+from . import events
+from .main import main
 from .params import CommaSeparatedListType
+from .pretty import (
+    print_done,
+    print_error,
+    print_fail,
+    print_info,
+    print_wait,
+    print_warn,
+)
+from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
+from .ssh import container_ssh_ctx
 
 list_expr = CommaSeparatedListType()
 
@@ -115,7 +129,7 @@ def _create_cmd(docs: str = None):
         starts_at: str | None,
         startup_command: str | None,
         enqueue_only: bool,
-        max_wait: bool,
+        max_wait: int,
         no_reuse: bool,
         depends: Sequence[str],
         callback_url: str,
@@ -861,3 +875,161 @@ def _events_cmd(docs: str = None):
 # - backend.ai session events
 main.command()(_events_cmd(docs="Alias of \"session events\""))
 session.command()(_events_cmd())
+
+
+def _fetch_session_names():
+    status = ",".join([
+        "PENDING",
+        "SCHEDULED",
+        "PREPARING",
+        "PULLING",
+        "RUNNING",
+        "RESTARTING",
+        "TERMINATING",
+        "RESIZING",
+        "SUSPENDED",
+        "ERROR",
+    ])
+    fields: List[FieldSpec] = [
+        session_fields['name'],
+        session_fields['session_id'],
+        session_fields['group_name'],
+        session_fields['kernel_id'],
+        session_fields['image'],
+        session_fields['type'],
+        session_fields['status'],
+        session_fields['status_info'],
+        session_fields['status_changed'],
+        session_fields['result'],
+    ]
+    with Session() as session:
+        sessions = session.ComputeSession.paginated_list(
+            status=status, access_key=None,
+            fields=fields,
+            page_offset=0,
+            page_size=10,
+            filter=None,
+            order=None,
+        )
+
+    return tuple(map(lambda x: x.get('session_id'), sessions.items))
+
+
+def _watch_cmd(docs: Optional[str] = None):
+
+    @click.argument('session_name_or_id', metavar='SESSION_ID_OR_NAME', nargs=-1)
+    @click.option('-o', '--owner', '--owner-access-key', 'owner_access_key', metavar='ACCESS_KEY',
+                help='Specify the owner of the target session explicitly.')
+    @click.option('--scope', type=click.Choice(['*', 'session', 'kernel']), default='*',
+                help='Filter the events by kernel-specific ones or session-specific ones.')
+    @click.option('--max-wait', metavar='SECONDS', type=int, default=0,
+                help='The maximum duration to wait until the session starts.')
+    @click.option('--output', type=click.Choice(['json', 'console']), default='console',
+                help='Set the output style of the command results.')
+    def watch(session_name_or_id: str, owner_access_key: str, scope: str, max_wait: int, output: str):
+        """
+        Monitor the lifecycle events of a compute session
+        and display in human-friendly interface.
+        """
+        session_names = _fetch_session_names()
+        if not session_names:
+            if output == 'json':
+                sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
+            else:
+                print_fail('No matching items.')
+            sys.exit(4)
+
+        if not session_name_or_id:
+            questions = [inquirer.List(
+                'session',
+                message="Select session to watch.",
+                choices=session_names,
+            )]
+            session_name_or_id = inquirer.prompt(questions).get('session')
+        else:
+            for session_name in session_names:
+                if session_name.startswith(session_name_or_id[0]):
+                    session_name_or_id = session_name
+                    break
+            else:
+                if output == 'json':
+                    sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
+                else:
+                    print_fail('No matching items.')
+                sys.exit(4)
+
+        async def handle_console_output(session: ComputeSession, scope: Literal['*', 'session', 'kernel'] = '*'):
+            async with session.listen_events(scope=scope) as response:  # AsyncSession
+                async for ev in response:
+                    match ev.event:
+                        case events.SESSION_SUCCESS:
+                            print_done(events.SESSION_SUCCESS)
+                            sys.exit(json.loads(ev.data).get('exitCode', 0))
+                        case events.SESSION_FAILURE:
+                            print_fail(events.SESSION_FAILURE)
+                            sys.exit(json.loads(ev.data).get('exitCode', 1))
+                        case events.KERNEL_CANCELLED:
+                            print_fail(events.KERNEL_CANCELLED)
+                            break
+                        case events.SESSION_TERMINATED:
+                            print_done(events.SESSION_TERMINATED)
+                            break
+                        case _:
+                            print_done(ev.event)
+
+        async def handle_json_output(session: ComputeSession, scope: Literal['*', 'session', 'kernel'] = '*'):
+            async with session.listen_events(scope=scope) as response:  # AsyncSession
+                async for ev in response:
+                    event = json.loads(ev.data)
+                    event['event'] = ev.event
+                    click.echo(event)
+
+                    match ev.event:
+                        case events.SESSION_SUCCESS:
+                            sys.exit(event.get('exitCode', 0))
+                        case events.SESSION_FAILURE:
+                            sys.exit(event.get('exitCode', 1))
+                        case events.SESSION_TERMINATED | events.KERNEL_CANCELLED:
+                            break
+
+        async def _run_events():
+            async with AsyncSession() as session:
+                try:
+                    session_id = uuid.UUID(session_name_or_id)
+                    compute_session = session.ComputeSession.from_session_id(session_id)
+                except ValueError:
+                    compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
+
+                if output == 'console':
+                    await handle_console_output(session=compute_session, scope=scope)
+                elif output == 'json':
+                    await handle_json_output(session=compute_session, scope=scope)
+
+        async def _run_events_with_timeout(max_wait: int):
+            try:
+                async with timeout(max_wait):
+                    await _run_events()
+            except asyncio.TimeoutError:
+                sys.exit(2)
+
+        try:
+            if max_wait > 0:
+                asyncio_run(_run_events_with_timeout(max_wait))
+            else:
+                asyncio_run(_run_events())
+        except Exception as e:
+            print_error(e)
+            sys.exit(1)
+
+        sys.exit(0)
+
+    if docs is not None:
+        watch.__doc__ = docs
+    return watch
+
+
+# Make it available as:
+# - backend.ai watch
+# - backend.ai session watch
+main.command()(_watch_cmd(docs="Alias of \"session watch\""))
+session.command()(_watch_cmd())

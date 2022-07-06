@@ -1,23 +1,15 @@
 from __future__ import annotations
 
-import aioredis
-import aioredis.exceptions
-import async_timeout
 import asyncio
 import functools
 import sys
-from typing import (
-    Awaitable,
-    Callable,
-    Final,
-    Sequence,
-    TYPE_CHECKING,
-    TypeVar,
-    Union,
-)
-from typing_extensions import (
-    ParamSpec,
-)
+from typing import TYPE_CHECKING, Awaitable, Callable, Final, Sequence, TypeVar, Union
+
+import aioredis
+import aioredis.exceptions
+import async_timeout
+from typing_extensions import ParamSpec
+
 if TYPE_CHECKING:
     from .types import AbstractRedisNode
 

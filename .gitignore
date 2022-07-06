@@ -120,3 +120,6 @@ ENV/
 
 # Release artifacts
 /CHANGELOG_RELEASE.md
+
+# Kernel scratches
+/scratches/

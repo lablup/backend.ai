@@ -1,21 +1,23 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
 import asyncio
-from collections import defaultdict
-from decimal import Decimal
-from io import BytesIO, SEEK_END
 import json
 import logging
-from pathlib import Path
 import pickle
-import pkg_resources
 import re
 import signal
 import sys
+import time
 import traceback
+import weakref
+from abc import ABCMeta, abstractmethod
+from collections import defaultdict
+from decimal import Decimal
+from io import SEEK_END, BytesIO
+from pathlib import Path
 from types import TracebackType
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Awaitable,
@@ -24,67 +26,41 @@ from typing import (
     Dict,
     FrozenSet,
     Generic,
-    Optional,
     List,
     Literal,
     Mapping,
     MutableMapping,
     MutableSequence,
+    Optional,
     Sequence,
     Set,
     Tuple,
     Type,
     TypeVar,
     Union,
-    TYPE_CHECKING,
     cast,
 )
-import weakref
 
 import aioredis
 import aiotools
-from async_timeout import timeout
 import attr
-from cachetools import cached, LRUCache
+import pkg_resources
 import snappy
+import zmq
+import zmq.asyncio
+from async_timeout import timeout
+from cachetools import LRUCache, cached
 from tenacity import (
     AsyncRetrying,
+    retry_if_exception_type,
     stop_after_attempt,
     stop_after_delay,
-    retry_if_exception_type,
     wait_fixed,
 )
-import time
-import zmq, zmq.asyncio
 
 from ai.backend.common import msgpack, redis
-from ai.backend.common.docker import (
-    ImageRef,
-    MIN_KERNELSPEC,
-    MAX_KERNELSPEC,
-)
-from ai.backend.common.logging import BraceStyleAdapter, pretty
-from ai.backend.common.types import (
-    AutoPullBehavior,
-    ContainerId,
-    KernelId,
-    SessionId,
-    DeviceName,
-    SlotName,
-    HardwareMetadata,
-    ImageRegistry,
-    ClusterInfo,
-    KernelCreationConfig,
-    KernelCreationResult,
-    MountTypes,
-    MountPermission,
-    Sentinel,
-    ServicePortProtocols,
-    VFolderMount,
-    aobject,
-)
+from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import (
-    EventProducer,
     AbstractEvent,
     AgentErrorEvent,
     AgentHeartbeatEvent,
@@ -92,6 +68,7 @@ from ai.backend.common.events import (
     AgentTerminatedEvent,
     DoSyncKernelLogsEvent,
     DoSyncKernelStatsEvent,
+    EventProducer,
     ExecutionCancelledEvent,
     ExecutionFinishedEvent,
     ExecutionStartedEvent,
@@ -104,37 +81,44 @@ from ai.backend.common.events import (
     SessionFailureEvent,
     SessionSuccessEvent,
 )
-from ai.backend.common.utils import cancel_tasks, current_loop
+from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
-from . import __version__ as VERSION
-from .exception import AgentError, ResourceError
-from .kernel import (
-    AbstractKernel,
-    KernelFeatures,
-    match_distro_data,
+from ai.backend.common.types import (
+    AutoPullBehavior,
+    ClusterInfo,
+    ContainerId,
+    DeviceName,
+    HardwareMetadata,
+    ImageRegistry,
+    KernelCreationConfig,
+    KernelCreationResult,
+    KernelId,
+    MountPermission,
+    MountTypes,
+    Sentinel,
+    ServicePortProtocols,
+    SessionId,
+    SlotName,
+    VFolderMount,
+    aobject,
 )
+from ai.backend.common.utils import cancel_tasks, current_loop
+
+from . import __version__ as VERSION
 from . import resources as resources_mod
+from .exception import AgentError, ResourceError
+from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
+    AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
-    AbstractAllocMap,
     KernelResourceSpec,
     Mount,
 )
-from .stats import (
-    StatContext, StatModes,
-)
-from .types import (
-    Container,
-    ContainerStatus,
-    ContainerLifecycleEvent,
-    LifecycleEvent,
-)
-from .utils import (
-    generate_local_instance_id,
-    get_arch_name,
-)
+from .stats import StatContext, StatModes
+from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent
+from .utils import generate_local_instance_id, get_arch_name
 
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd

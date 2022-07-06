@@ -2,11 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import (
-    Callable,
-    Final,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Callable, Final
 
 from .logging import BraceStyleAdapter
 

@@ -2,53 +2,42 @@ from __future__ import annotations
 
 import base64
 import secrets
-from typing import (
-    Any,
-    Dict,
-    Optional,
-    Sequence,
-    List, TYPE_CHECKING,
-    Tuple,
-    TypedDict,
-)
 import uuid
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, TypedDict
 
+import graphene
+import sqlalchemy as sa
+from cryptography.hazmat.backends import default_backend as crypto_default_backend
 from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.backends import default_backend as crypto_default_backend
 from dateutil.parser import parse as dtparse
-import graphene
 from graphene.types.datetime import DateTime as GQLDateTime
-import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack, redis
-from ai.backend.common.types import (
-    AccessKey,
-    SecretKey,
-)
+from ai.backend.common.types import AccessKey, SecretKey
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .vfolder import VirtualFolder
 
+from ..defs import RESERVED_DOTFILES
 from .base import (
     ForeignKeyIDColumn,
     Item,
     PaginatedList,
-    metadata,
-    batch_result,
     batch_multiresult,
+    batch_result,
+    metadata,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .minilang.queryfilter import QueryFilterParser
 from .minilang.ordering import QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
 from .user import ModifyUserInput, UserRole
-from ..defs import RESERVED_DOTFILES
 
 __all__: Sequence[str] = (
     'keypairs',

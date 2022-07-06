@@ -3,8 +3,8 @@ import sys
 
 from tabulate import tabulate
 
-from ...session import AsyncSession
 from ...request import Request
+from ...session import AsyncSession
 from ..pretty import print_done, print_error, print_warn
 from . import admin
 

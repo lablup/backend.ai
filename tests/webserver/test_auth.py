@@ -1,11 +1,10 @@
-import pytest
-
 from typing import Any, Dict
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from aiohttp import web
 
-from ai.backend.web.auth import get_api_session, get_anonymous_session
+from ai.backend.web.auth import get_anonymous_session, get_api_session
 
 
 class DummyRequest:

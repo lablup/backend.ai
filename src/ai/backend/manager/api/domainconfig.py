@@ -1,25 +1,28 @@
 import logging
 import re
-from typing import Any, TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Any, Tuple
 
-from aiohttp import web
 import aiohttp_cors
 import trafaret as t
+from aiohttp import web
 
 from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models import (
+    MAXIMUM_DOTFILE_SIZE,
     domains,
     query_domain_dotfiles,
     verify_dotfile_name,
-    MAXIMUM_DOTFILE_SIZE,
 )
-from .auth import auth_required, admin_required
+from .auth import admin_required, auth_required
 from .exceptions import (
-    InvalidAPIParameters, DotfileCreationFailed,
-    DotfileNotFound, DotfileAlreadyExists,
-    GenericForbidden, DomainNotFound,
+    DomainNotFound,
+    DotfileAlreadyExists,
+    DotfileCreationFailed,
+    DotfileNotFound,
+    GenericForbidden,
+    InvalidAPIParameters,
 )
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware

@@ -1,32 +1,21 @@
 import logging
-from typing import (
-    Any,
-    Iterable,
-    TYPE_CHECKING,
-    Tuple,
-)
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
-from aiohttp import web
 import aiohttp
 import aiohttp_cors
 import aiotools
-from dataclasses import dataclass, field
 import trafaret as t
+from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-
 from ai.backend.manager.api.exceptions import ObjectNotFound
-
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-from ..models import (
-    query_allowed_sgroups,
-)
+from ..models import query_allowed_sgroups
 from .auth import auth_required
-from .manager import (
-    READ_ALLOWED,
-    server_status_required)
+from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
 

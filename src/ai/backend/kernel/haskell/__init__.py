@@ -1,8 +1,8 @@
 import logging
 import os
-from pathlib import Path
 import shlex
 import tempfile
+from pathlib import Path
 
 from .. import BaseRunner
 

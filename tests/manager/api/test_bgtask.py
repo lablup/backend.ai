@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 
-from aiohttp import web
 import attr
 import pytest
+from aiohttp import web
 
 from ai.backend.common import redis
 from ai.backend.common.events import (
@@ -14,12 +14,12 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.types import (
-    AgentId,
-)
+from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import (
-    shared_config_ctx, event_dispatcher_ctx, background_task_ctx,
+    background_task_ctx,
+    event_dispatcher_ctx,
+    shared_config_ctx,
 )
 
 
