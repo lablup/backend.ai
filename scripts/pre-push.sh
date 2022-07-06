@@ -15,4 +15,4 @@ else
 fi
 echo "Performing formatting and lint checks on $1/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT}"
 "$PANTS" tailor --check update-build-files --check
-"$PANTS" fmt lint check --changed-since="$1/${BASE_BRANCH}"
+"$PANTS" lint check --changed-since="$1/${BASE_BRANCH}"

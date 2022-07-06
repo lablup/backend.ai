@@ -368,14 +368,32 @@ install_python() {
   fi
 }
 
-install_pre_push_hook() {
-  local magic_str="monorepo standard pre-push hook"
-  grep -Fq "$magic_str" .git/hooks/pre-push
-  if [ $? -eq 0 ]; then
-    :
+install_git_hooks() {
+  local magic_str="monorepo standard pre-commit hook"
+  if [ -f .git/hooks/pre-commit ]; then
+    grep -Fq "$magic_str" .git/hooks/pre-commit
+    if [ $? -eq 0 ]; then
+      :
+    else
+      echo "" >> .git/hooks/pre-commit
+      cat scripts/pre-commit.sh >> .git/hooks/pre-commit
+    fi
   else
-    echo "" >> .git/hooks/pre-push
-    cat scripts/pre-push.sh >> .git/hooks/pre-push
+    cp scripts/pre-commit.sh .git/hooks/pre-commit
+    chmod +x .git/hooks/pre-commit
+  fi
+  local magic_str="monorepo standard pre-push hook"
+  if [ -f .git/hooks/pre-push ]; then
+    grep -Fq "$magic_str" .git/hooks/pre-push
+    if [ $? -eq 0 ]; then
+      :
+    else
+      echo "" >> .git/hooks/pre-push
+      cat scripts/pre-push.sh >> .git/hooks/pre-push
+    fi
+  else
+    cp scripts/pre-push.sh .git/hooks/pre-push
+    chmod +x .git/hooks/pre-push
   fi
 }
 
@@ -517,8 +535,8 @@ install_git_lfs
 show_info "Ensuring checkout of LFS files..."
 git lfs pull
 
-show_info "Configuring the standard git pre-push hook..."
-install_pre_push_hook
+show_info "Configuring the standard git hooks..."
+install_git_hooks
 
 show_info "Installing Python..."
 install_python
