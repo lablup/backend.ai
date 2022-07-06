@@ -20,6 +20,11 @@ indent_size = 3
 indent_style = space
 indent_size = 2
 
+[changes/*.md]
+max_line_length = 0
+indent_style = space
+indent_size = 2
+
 [BUILD]
 indent_style = space
 indent_size = 4
