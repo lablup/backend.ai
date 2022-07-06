@@ -1872,7 +1872,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 @server_status_required(READ_ALLOWED)
 @check_api_params(
     t.Dict({
-        tx.AliasedKey(['vfolder_id', 'vfolderId']): tx.UUID,
+        tx.AliasedKey(['vfolder_id', 'vfolderId'], default=None): tx.UUID | t.Null,
     }),
 )
 async def list_shared_vfolders(request: web.Request, params: Any) -> web.Response:
@@ -1892,7 +1892,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
             .join(users, users.c.uuid == vfolder_permissions.c.user)
         )
         query = (
-            sa.select([vfolder_permissions, vfolders.c.id, vfolders.c.name, users.c.email])
+            sa.select([vfolder_permissions, vfolders.c.id, vfolders.c.name, vfolders.c.creator, users.c.email])
             .select_from(j)
         )
         if target_vfid is not None:
@@ -1904,7 +1904,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         shared_info.append({
             'vfolder_id': str(shared.id),
             'vfolder_name': str(shared.name),
-            'shared_by': request['user']['email'],
+            'shared_by': str(shared.creator),
             'shared_to': {
                 'uuid': str(shared.user),
                 'email': shared.email,
