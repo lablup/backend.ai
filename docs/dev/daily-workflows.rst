@@ -202,6 +202,9 @@ Switching between branches
 When each branch has different external package requirements, you should run ``./pants export ::``
 before running codes after ``git switch``-ing between such branches.
 
+Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
+In that case, run ``killall -r pantsd`` and it will be fine.
+
 Running entrypoints
 -------------------
 
