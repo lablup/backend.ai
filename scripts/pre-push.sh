@@ -1,11 +1,18 @@
 # backend.ai monorepo standard pre-push hook
-BASEPATH=$(cd "$(dirname "$0")"/../.. && pwd)
-if [ -f "$BASEPATH/pants-local" ]; then
-    PANTS=$BASEPATH/pants-local
+BASE_PATH=$(cd "$(dirname "$0")"/../.. && pwd)
+if [ -f "$BASE_PATH/pants-local" ]; then
+  PANTS="$BASE_PATH/pants-local"
 else
-    PANTS=$BASEPATH/pants
+  PANTS="$BASE_PATH/pants"
 fi
-set -ex
-$PANTS fmt ::
-$PANTS lint check --changed-since=$(git merge-base main HEAD)
-$PANTS tailor --check
+CURRENT_COMMIT=$(git rev-parse --short HEAD)
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ -n "$(echo "$CURRENT_BRANCH" | sed -n '/^[0-9]\+\.[0-9]\+$/p')" ]; then
+  # if we are on the release branch, use it as the base branch.
+  BASE_BRANCH="$CURRENT_BRANCH"
+else
+  BASE_BRANCH="main"
+fi
+echo "Performing formatting and lint checks on $1/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT}"
+"$PANTS" tailor --check update-build-files --check
+"$PANTS" fmt lint check --changed-since="$1/${BASE_BRANCH}"

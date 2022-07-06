@@ -192,6 +192,15 @@ specified in ``pants.toml``.
 
    For Vim, you also need to explicitly activate the exported venv.
 
+Switching between branches
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When each branch has different external package requirements, you should run ``./pants export ::``
+before running codes after ``git switch``-ing between such branches.
+
+Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
+In that case, run ``killall -r pantsd`` and it will be fine.
+
 Running entrypoints
 -------------------
 
@@ -343,6 +352,38 @@ Adding new external dependencies
 
      $ ./pants generate-lockfiles
      $ ./pants export ::
+
+Merging lockfile conflicts
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you work on a branch that adds a new external dependency and the main branch has also
+another external dependency addition, merging the main branch into your branch is likely to
+make a merge conflict on ``python.lock`` file.
+
+In this case, you can just do the followings since we can just *regenerate* the lockfile
+after merging ``requirements.txt`` and ``BUILD`` files.
+
+.. code-block:: console
+
+   $ git merge main
+   ... it says a conflict on python.lock ...
+   $ git checkout --theirs python.lock
+   $ ./pants generate-lockfiles --resolve=python-default
+   $ git add python.lock
+   $ git commit
+
+Resetting Pants
+~~~~~~~~~~~~~~~
+
+If Pants behaves strangely, you could simply reset all its runtime-generated files by:
+
+.. code-block:: console
+
+   $ killall -r pantsd
+   $ rm -r .tmp .pants.d ~/.cache/pants
+
+After this, re-running any Pants command will automatically reinitialize itself and
+all cached data as necessary.
 
 .. _debugging-tests:
 
