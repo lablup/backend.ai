@@ -8,25 +8,13 @@ import sys
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import IO, List, Literal, Optional, Sequence
+from typing import Final, IO, List, Literal, Optional, Sequence
 
 import click
 import inquirer
 from async_timeout import timeout
 from humanize import naturalsize
 from tabulate import tabulate
-
-from ai.backend.common.events import (
-    KernelCancelledEvent,
-    KernelCreatingEvent,
-    KernelStartedEvent,
-    KernelTerminatedEvent,
-    KernelTerminatingEvent,
-    SessionFailureEvent,
-    SessionStartedEvent,
-    SessionSuccessEvent,
-    SessionTerminatedEvent,
-)
 
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
@@ -950,13 +938,23 @@ def _watch_cmd(docs: Optional[str] = None):
                 print_fail('No matching items.')
             sys.exit(4)
 
+        kernel_cancelled: Final[str] = 'kernel_cancelled'
+        kernel_creating: Final[str] = 'kernel_creating'
+        kernel_started: Final[str] = 'kernel_started'
+        kernel_terminated: Final[str] = 'kernel_terminated'
+        kernel_terminating: Final[str] = 'kernel_terminating'
+        session_failure: Final[str] = 'session_failure'
+        session_started: Final[str] = 'session_started'
+        session_success: Final[str] = 'session_success'
+        session_terminated: Final[str] = 'session_terminated'
+
         states = (
-            KernelCreatingEvent.name,
-            KernelStartedEvent.name,
-            SessionStartedEvent.name,
-            KernelTerminatingEvent.name,
-            KernelTerminatedEvent.name,
-            SessionTerminatedEvent.name,
+            kernel_creating,
+            kernel_started,
+            session_started,
+            kernel_terminating,
+            kernel_terminated,
+            session_terminated,
         )
 
         if not session_name_or_id:
@@ -995,15 +993,15 @@ def _watch_cmd(docs: Optional[str] = None):
             print_state(session_name_or_id, current_state_idx=-1)
             async with session.listen_events(scope=scope) as response:  # AsyncSession
                 async for ev in response:
-                    match (event_name := ev.event):
-                        case SessionSuccessEvent.name:
-                            print_done(event_name)
+                    match ev.event:
+                        case session_success:
+                            print_done(ev.event)
                             sys.exit(json.loads(ev.data).get('exitCode', 0))
-                        case SessionFailureEvent.name:
-                            print_fail(event_name)
+                        case session_failure:
+                            print_fail(ev.event)
                             sys.exit(json.loads(ev.data).get('exitCode', 1))
-                        case KernelCancelledEvent.name:
-                            print_fail(event_name)
+                        case kernel_cancelled:
+                            print_fail(ev.event)
                             break
 
                     try:
@@ -1011,7 +1009,7 @@ def _watch_cmd(docs: Optional[str] = None):
                     except ValueError:
                         pass
 
-                    if ev.event == SessionTerminatedEvent.name:
+                    if ev.event == session_terminated:
                         print_state(session_name_or_id, current_state_idx=len(states))
                         break
 
@@ -1023,7 +1021,7 @@ def _watch_cmd(docs: Optional[str] = None):
                     event['event'] = ev.event
                     click.echo(event)
 
-                    if ev.event == SessionTerminatedEvent.name:
+                    if ev.event == session_terminated:
                         break
 
         async def _run_events():
