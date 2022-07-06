@@ -1,8 +1,7 @@
 import asyncio
-from collections import defaultdict
 import functools
-import io
 import inspect
+import io
 import itertools
 import json
 import logging
@@ -10,29 +9,31 @@ import numbers
 import re
 import time
 import traceback
+import uuid
+from collections import defaultdict
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
     Hashable,
     Mapping,
     MutableMapping,
-    Optional, TYPE_CHECKING,
+    Optional,
     Tuple,
     Union,
 )
-import uuid
 
-from aiohttp import web
-import trafaret as t
 import sqlalchemy as sa
+import trafaret as t
 import yaml
+from aiohttp import web
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey
 
-from ..models import keypairs, users, UserRole
-from .exceptions import InvalidAPIParameters, GenericForbidden, QueryNotImplemented
+from ..models import UserRole, keypairs, users
+from .exceptions import GenericForbidden, InvalidAPIParameters, QueryNotImplemented
 
 if TYPE_CHECKING:
     from .context import RootContext

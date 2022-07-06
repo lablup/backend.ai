@@ -1,29 +1,32 @@
 import logging
 import re
-from typing import Any, TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Any, Tuple
 
-import sqlalchemy as sa
-from aiohttp import web
 import aiohttp_cors
+import sqlalchemy as sa
 import trafaret as t
+from aiohttp import web
 
-from ai.backend.common import validators as tx
 from ai.backend.common import msgpack
+from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ..models import MAXIMUM_DOTFILE_SIZE
+from ..models import association_groups_users as agus
 from ..models import (
     groups,
-    association_groups_users as agus,
-    query_group_dotfiles,
     query_group_domain,
+    query_group_dotfiles,
     verify_dotfile_name,
-    MAXIMUM_DOTFILE_SIZE,
 )
-from .auth import auth_required, admin_required
+from .auth import admin_required, auth_required
 from .exceptions import (
-    InvalidAPIParameters, DotfileCreationFailed,
-    DotfileNotFound, DotfileAlreadyExists,
-    GenericForbidden, GroupNotFound,
+    DotfileAlreadyExists,
+    DotfileCreationFailed,
+    DotfileNotFound,
+    GenericForbidden,
+    GroupNotFound,
+    InvalidAPIParameters,
 )
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware

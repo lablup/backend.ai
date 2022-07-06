@@ -2,9 +2,10 @@ from typing import Optional, Sequence
 
 from ai.backend.client.output.fields import image_fields
 from ai.backend.client.output.types import FieldSpec
-from .base import api_function, BaseFunction
+
 from ..request import Request
 from ..session import api_session
+from .base import BaseFunction, api_function
 
 __all__ = (
     'Image',

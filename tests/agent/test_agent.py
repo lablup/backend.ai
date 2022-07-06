@@ -2,9 +2,9 @@
 TODO: rewrite
 '''
 
-import pytest
-
 from unittest.mock import AsyncMock
+
+import pytest
 
 from ai.backend.agent.server import AgentRPCServer
 

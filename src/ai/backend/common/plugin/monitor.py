@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
 import enum
-from typing import (
-    Any,
-    Mapping,
-    Union,
-)
+from abc import ABCMeta, abstractmethod
+from typing import Any, Mapping, Union
 
 from . import AbstractPlugin, BasePluginContext
 

@@ -4,37 +4,39 @@ import enum
 import os.path
 import uuid
 from pathlib import PurePosixPath
-from typing import (
-    Any,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Set,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Set
 
-from dateutil.parser import parse as dtparse
 import graphene
-from graphene.types.datetime import DateTime as GQLDateTime
 import sqlalchemy as sa
+import trafaret as t
+from dateutil.parser import parse as dtparse
+from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-import trafaret as t
 
 from ai.backend.common.types import VFolderMount
 
-from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
+from ..api.exceptions import (
+    InvalidAPIParameters,
+    VFolderNotFound,
+    VFolderOperationFailed,
+)
 from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ..types import UserScope
 from .base import (
-    metadata, EnumValueType, GUID, IDColumn,
-    Item, PaginatedList, BigInt,
+    GUID,
+    BigInt,
+    EnumValueType,
+    IDColumn,
+    Item,
+    PaginatedList,
     batch_multiresult,
+    metadata,
 )
-from .minilang.queryfilter import QueryFilterParser
 from .minilang.ordering import QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
 from .user import UserRole
+
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .storage import StorageSessionManager
@@ -211,7 +213,8 @@ async def query_accessible_vfolders(
     extra_vf_user_conds=None,
     extra_vf_group_conds=None,
 ) -> Sequence[Mapping[str, Any]]:
-    from ai.backend.manager.models import groups, users, association_groups_users as agus
+    from ai.backend.manager.models import association_groups_users as agus
+    from ai.backend.manager.models import groups, users
     if allowed_vfolder_types is None:
         allowed_vfolder_types = ['user']  # legacy default
 
@@ -372,6 +375,7 @@ async def get_allowed_vfolder_hosts_by_group(
     If the requester is a domain admin, gather all `allowed_vfolder_hosts` of the domain groups.
     '''
     from . import domains, groups
+
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = set()
     query = (
@@ -422,6 +426,7 @@ async def get_allowed_vfolder_hosts_by_user(
     All available `allowed_vfolder_hosts` of groups which requester associated will be merged.
     '''
     from . import association_groups_users, domains, groups
+
     # Domain's allowed_vfolder_hosts.
     allowed_hosts = set()
     query = (
@@ -754,8 +759,8 @@ class VirtualFolder(graphene.ObjectType):
         filter: str = None,
         order: str = None,
     ) -> Sequence[VirtualFolder]:
-        from .user import users
         from .group import groups
+        from .user import users
         j = (
             vfolders
             .join(users, vfolders.c.user == users.c.uuid, isouter=True)
@@ -797,6 +802,7 @@ class VirtualFolder(graphene.ObjectType):
         group_id: uuid.UUID = None,
     ) -> Sequence[Sequence[VirtualFolder]]:
         from .user import users
+
         # TODO: num_attached count group-by
         j = sa.join(vfolders, users, vfolders.c.user == users.c.uuid)
         query = (

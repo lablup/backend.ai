@@ -18,15 +18,16 @@ from typing import (
     Union,
 )
 
+import redis.exceptions
+import yarl
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline, PubSub
 from redis.asyncio.sentinel import (
-    Sentinel, SentinelConnectionPool,
-    MasterNotFoundError, SlaveNotFoundError,
+    MasterNotFoundError,
+    Sentinel,
+    SentinelConnectionPool,
+    SlaveNotFoundError,
 )
-import redis.exceptions
-
-import yarl
 
 from .logging import BraceStyleAdapter
 from .types import EtcdRedisConfig, RedisConnectionInfo

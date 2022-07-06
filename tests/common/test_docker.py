@@ -2,12 +2,15 @@ import collections
 import functools
 import itertools
 import typing
-from ai.backend.common.docker import (
-    default_registry, default_repository,
-    ImageRef, PlatformTagSet,
-)
 
 import pytest
+
+from ai.backend.common.docker import (
+    ImageRef,
+    PlatformTagSet,
+    default_registry,
+    default_repository,
+)
 
 
 def test_image_ref_typing():

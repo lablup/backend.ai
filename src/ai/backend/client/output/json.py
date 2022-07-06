@@ -1,16 +1,9 @@
 from __future__ import annotations
 
 import json
-from typing import (
-    Any,
-    Callable,
-    Mapping,
-    Optional,
-    Sequence,
-    TypeVar,
-)
+from typing import Any, Callable, Mapping, Optional, Sequence, TypeVar
 
-from .types import BaseOutputHandler, PaginatedResult, FieldSpec
+from .types import BaseOutputHandler, FieldSpec, PaginatedResult
 
 _json_opts: Mapping[str, Any] = {"indent": 2}
 

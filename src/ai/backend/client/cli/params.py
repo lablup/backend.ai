@@ -1,12 +1,7 @@
 import json
 import re
 from decimal import Decimal
-from typing import (
-    Any,
-    Mapping,
-    Union,
-    Optional,
-)
+from typing import Any, Mapping, Optional, Union
 
 import click
 

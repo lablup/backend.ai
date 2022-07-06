@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
-from collections import UserDict, namedtuple
-from contextvars import ContextVar
-from decimal import Decimal
 import enum
 import ipaddress
 import itertools
 import math
 import numbers
-from pathlib import PurePosixPath
 import sys
+import uuid
+from abc import ABCMeta, abstractmethod
+from collections import UserDict, namedtuple
+from contextvars import ContextVar
+from decimal import Decimal
+from pathlib import PurePosixPath
 from typing import (
+    TYPE_CHECKING,
     Any,
     Dict,
     List,
@@ -22,21 +24,18 @@ from typing import (
     Sequence,
     Tuple,
     Type,
-    TypeVar,
     TypedDict,
-    TYPE_CHECKING,
+    TypeVar,
     Union,
     cast,
     overload,
 )
-import uuid
-
 
 import attr
-from redis.asyncio import Redis
 import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
+from redis.asyncio import Redis
 
 __all__ = (
     'aobject',

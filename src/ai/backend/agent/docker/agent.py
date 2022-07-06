@@ -2,25 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from decimal import Decimal
-from functools import partial
-from io import StringIO
 import json
 import logging
 import os
-from pathlib import Path
-from aiohttp import web
-import pkg_resources
 import secrets
 import shutil
 import signal
 import struct
-from subprocess import CalledProcessError
 import sys
+from decimal import Decimal
+from functools import partial
+from io import StringIO
+from pathlib import Path
+from subprocess import CalledProcessError
 from typing import (
+    TYPE_CHECKING,
     Any,
-    FrozenSet,
     Dict,
+    FrozenSet,
     List,
     Literal,
     Mapping,
@@ -29,21 +28,18 @@ from typing import (
     Sequence,
     Set,
     Tuple,
-    TYPE_CHECKING,
     Union,
 )
 
+import aiotools
+import pkg_resources
+import zmq
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
-import aiotools
+from aiohttp import web
 from async_timeout import timeout
-import zmq
 
-from ai.backend.common.docker import (
-    ImageRef,
-    MIN_KERNELSPEC,
-    MAX_KERNELSPEC,
-)
+from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -51,57 +47,49 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     BinarySize,
     ClusterInfo,
+    ContainerId,
+    DeviceName,
     ImageRegistry,
     KernelCreationConfig,
     KernelId,
-    ContainerId,
-    DeviceName,
-    SlotName,
     MountPermission,
     MountTypes,
     ResourceSlot,
     Sentinel,
+    SlotName,
     current_resource_slots,
 )
 from ai.backend.common.utils import AsyncFileWriter, current_loop
+
+from ..agent import (
+    ACTIVE_STATUS_SET,
+    AbstractAgent,
+    AbstractKernelCreationContext,
+    ComputerContext,
+)
+from ..exception import InitializationError, UnsupportedResource
+from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
+from ..kernel import AbstractKernel, KernelFeatures
+from ..proxy import DomainSocketProxy, proxy_connection
+from ..resources import (
+    AbstractComputePlugin,
+    KernelResourceSpec,
+    Mount,
+    known_slot_types,
+)
+from ..server import get_extra_volumes
+from ..types import Container, ContainerStatus, LifecycleEvent, Port
+from ..utils import (
+    closing_async,
+    container_pid_to_host_pid,
+    get_kernel_id_from_container,
+    host_pid_to_container_pid,
+    update_nested_dict,
+)
 from .kernel import DockerKernel, prepare_kernel_metadata_uri_handling
 from .metadata.server import create_server as create_metadata_server
 from .resources import detect_resources
 from .utils import PersistentServiceContainer
-from ..exception import UnsupportedResource, InitializationError
-from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
-from ..kernel import AbstractKernel, KernelFeatures
-from ..resources import (
-    Mount,
-    KernelResourceSpec,
-)
-from ..agent import (
-    AbstractAgent,
-    AbstractKernelCreationContext,
-    ACTIVE_STATUS_SET,
-    ComputerContext,
-)
-from ..proxy import proxy_connection, DomainSocketProxy
-from ..resources import (
-    AbstractComputePlugin,
-    known_slot_types,
-)
-from ..server import (
-    get_extra_volumes,
-)
-from ..types import (
-    Container,
-    Port,
-    ContainerStatus,
-    LifecycleEvent,
-)
-from ..utils import (
-    closing_async,
-    update_nested_dict,
-    get_kernel_id_from_container,
-    host_pid_to_container_pid,
-    container_pid_to_host_pid,
-)
 
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd

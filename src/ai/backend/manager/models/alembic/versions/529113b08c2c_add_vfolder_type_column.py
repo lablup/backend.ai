@@ -6,13 +6,18 @@ Create Date: 2020-04-09 16:37:35.460936
 
 """
 import textwrap
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.expression import bindparam
-from ai.backend.manager.models import VFolderPermission, VFolderUsageMode, VFolderOwnershipType
-from ai.backend.manager.models.base import convention, EnumValueType, IDColumn, GUID
 
+from ai.backend.manager.models import (
+    VFolderOwnershipType,
+    VFolderPermission,
+    VFolderUsageMode,
+)
+from ai.backend.manager.models.base import GUID, EnumValueType, IDColumn, convention
 
 # revision identifiers, used by Alembic.
 revision = '529113b08c2c'

@@ -2,14 +2,15 @@ import asyncio
 import json
 import logging
 import os
-from pathlib import Path
 import re
 import subprocess
+from pathlib import Path
+
+from .. import BaseRunner, Terminal
 
 # import pygit2
 # from pygit2 import GIT_SORT_TOPOLOGICAL, GIT_SORT_REVERSE
 
-from .. import BaseRunner, Terminal
 
 log = logging.getLogger()
 

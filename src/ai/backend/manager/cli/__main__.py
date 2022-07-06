@@ -9,18 +9,17 @@ from functools import partial
 from pathlib import Path
 
 import click
-from more_itertools import chunked
 import psycopg2
+import sqlalchemy as sa
+from more_itertools import chunked
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
-import sqlalchemy as sa
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.validators import TimeDuration
-
 from ai.backend.manager.models import kernels
 from ai.backend.manager.models.utils import connect_database
 

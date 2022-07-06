@@ -3,16 +3,16 @@ An extension module to Trafaret which provides additional type checkers.
 '''
 
 import datetime
-from decimal import Decimal
 import enum
 import ipaddress
 import json
 import os
-from pathlib import (
-    PurePath as _PurePath,
-    Path as _Path,
-)
+import pwd
 import re
+import uuid
+from decimal import Decimal
+from pathlib import Path as _Path
+from pathlib import PurePath as _PurePath
 from typing import (
     Any,
     List,
@@ -25,11 +25,10 @@ from typing import (
     TypeVar,
     Union,
 )
-import uuid
-import pwd
 
 import dateutil.tz
 from dateutil.relativedelta import relativedelta
+
 try:
     import jwt
     jwt_available = True
@@ -37,14 +36,12 @@ except ImportError:
     jwt_available = False
 import multidict
 import trafaret as t
+import yarl
 from trafaret.base import TrafaretMeta
 from trafaret.lib import _empty
-import yarl
 
-from .types import (
-    BinarySize as _BinarySize,
-    HostPortPair as _HostPortPair,
-)
+from .types import BinarySize as _BinarySize
+from .types import HostPortPair as _HostPortPair
 
 __all__ = (
     'AliasedKey',

@@ -1,28 +1,16 @@
 from __future__ import annotations
 
-import async_timeout
 import asyncio
 import functools
 import sys
-from typing import (
-    Awaitable,
-    Callable,
-    Final,
-    Sequence,
-    TYPE_CHECKING,
-    TypeVar,
-    Union,
-)
-from typing_extensions import (
-    ParamSpec,
-)
+from typing import TYPE_CHECKING, Awaitable, Callable, Final, Sequence, TypeVar, Union
 
+import async_timeout
 from redis.asyncio import Redis
-from redis.exceptions import (
-    AuthenticationError as RedisAuthenticationError,
-    ConnectionError as RedisConnectionError,
-    TimeoutError as RedisTimeoutError,
-)
+from redis.exceptions import AuthenticationError as RedisAuthenticationError
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
+from typing_extensions import ParamSpec
 
 if TYPE_CHECKING:
     from .types import AbstractRedisNode

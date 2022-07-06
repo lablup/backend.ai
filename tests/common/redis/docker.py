@@ -2,26 +2,19 @@ import asyncio
 import contextlib
 import json
 import os
-from pathlib import Path
+import re
 import shutil
 import signal
-from typing import (
-    AsyncIterator,
-    Optional,
-    Tuple,
-)
-import aiohttp
+from pathlib import Path
+from typing import AsyncIterator, Optional, Tuple
 
+import aiohttp
 import async_timeout
 import pytest
 
 from ai.backend.testutils.pants import get_parallel_slot
 
-from .types import (
-    AbstractRedisSentinelCluster,
-    AbstractRedisNode,
-    RedisClusterInfo,
-)
+from .types import AbstractRedisNode, AbstractRedisSentinelCluster, RedisClusterInfo
 from .utils import simple_run_cmd
 
 

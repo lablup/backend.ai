@@ -9,13 +9,16 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from collections import defaultdict
-from datetime import timedelta
 import json
 import logging
 import secrets
 import textwrap
+import uuid
+import weakref
+from collections import defaultdict
+from datetime import timedelta
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     DefaultDict,
@@ -23,32 +26,26 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
-    TYPE_CHECKING,
     Tuple,
     Union,
 )
 from urllib.parse import urlparse
-import uuid
-import weakref
 
 import aiohttp
-import aiotools
-from aiohttp import web
 import aiohttp_cors
-from aiotools import apartial, adefer
+import aiotools
 import attr
 import trafaret as t
-import zmq, zmq.asyncio
+import zmq
+import zmq.asyncio
+from aiohttp import web
+from aiotools import adefer, apartial
 
-from ai.backend.common import redis_helper, validators as tx
+from ai.backend.common import redis_helper
+from ai.backend.common import validators as tx
 from ai.backend.common.events import KernelTerminatingEvent
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    AccessKey,
-    AgentId,
-    KernelId, SessionId,
-)
-
+from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
@@ -64,8 +61,9 @@ from .exceptions import (
 )
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, call_non_bursty
+from .utils import call_non_bursty, check_api_params
 from .wsproxy import TCPProxy
+
 if TYPE_CHECKING:
     from ..config import SharedConfig
     from .context import RootContext

@@ -11,12 +11,12 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
     from ai.backend.common.types import RedisConnectionInfo
 
+    from ..config import LocalConfig, SharedConfig
+    from ..idle import IdleCheckerHost
     from ..models.storage import StorageSessionManager
     from ..models.utils import ExtendedAsyncSAEngine
-    from ..idle import IdleCheckerHost
     from ..plugin.webapp import WebappPluginContext
     from ..registry import AgentRegistry
-    from ..config import LocalConfig, SharedConfig
     from ..types import DistributedLockFactory
     from .types import CORSOptions
 

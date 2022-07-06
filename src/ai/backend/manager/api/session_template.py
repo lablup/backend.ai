@@ -1,36 +1,26 @@
-import json
 import datetime
+import json
 import logging
-from typing import (
-    Any,
-    List,
-    Dict,
-    Mapping,
-    TYPE_CHECKING,
-    Tuple,
-)
 import uuid
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Tuple
 
-from aiohttp import web
 import aiohttp_cors
 import sqlalchemy as sa
 import trafaret as t
 import yaml
+from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..models import (
-    groups, session_templates, users, TemplateType,
-)
+from ..models import TemplateType, groups, session_templates, users
 from ..models.session_template import check_task_template
-
 from .auth import auth_required
 from .exceptions import InvalidAPIParameters, TaskTemplateNotFound
 from .manager import READ_ALLOWED, server_status_required
+from .session import _query_userinfo
 from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
-from .session import _query_userinfo
 
 if TYPE_CHECKING:
     from .context import RootContext

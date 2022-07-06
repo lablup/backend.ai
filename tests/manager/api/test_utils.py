@@ -2,11 +2,8 @@ import asyncio
 
 import pytest
 
+from ai.backend.manager.api.utils import call_non_bursty, mask_sensitive_keys
 from ai.backend.manager.models import verify_dotfile_name, verify_vfolder_name
-from ai.backend.manager.api.utils import (
-    call_non_bursty,
-    mask_sensitive_keys,
-)
 
 
 @pytest.mark.asyncio

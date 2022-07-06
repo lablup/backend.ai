@@ -6,13 +6,14 @@ from typing import TYPE_CHECKING
 import aiotools
 import pytest
 from redis.asyncio import Redis
-from redis.asyncio.sentinel import Sentinel, MasterNotFoundError, SlaveNotFoundError
+from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
+
+from ai.backend.common import redis_helper
+from ai.backend.common import validators as tx
+from ai.backend.common.types import HostPortPair
 
 from .types import RedisClusterInfo
 from .utils import interrupt, with_timeout
-
-from ai.backend.common import redis_helper, validators as tx
-from ai.backend.common.types import HostPortPair
 
 if TYPE_CHECKING:
     from typing import Any

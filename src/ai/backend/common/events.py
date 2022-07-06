@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import abc
 import asyncio
-from collections import defaultdict
 import hashlib
 import logging
 import secrets
 import socket
+import uuid
+from collections import defaultdict
+from types import TracebackType
 from typing import (
     Any,
     Awaitable,
@@ -19,31 +21,29 @@ from typing import (
     Protocol,
     Sequence,
     Type,
-    TypeVar,
     TypedDict,
+    TypeVar,
     Union,
     cast,
 )
-from types import TracebackType
-from typing_extensions import TypeAlias
-import uuid
 
+import attr
 from aiotools.context import aclosing
 from aiotools.server import process_index
 from aiotools.taskgroup import PersistentTaskGroup
-import attr
 from redis.asyncio import ConnectionPool
+from typing_extensions import TypeAlias
 
 from . import msgpack, redis_helper
 from .logging import BraceStyleAdapter
 from .types import (
-    EtcdRedisConfig,
-    RedisConnectionInfo,
-    aobject,
     AgentId,
+    EtcdRedisConfig,
     KernelId,
-    SessionId,
     LogSeverity,
+    RedisConnectionInfo,
+    SessionId,
+    aobject,
 )
 
 __all__ = (

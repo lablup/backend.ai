@@ -8,6 +8,10 @@ from io import IOBase
 from pathlib import Path
 from typing import Any, Optional
 
+from etcetra.client import EtcdCommunicator, EtcdConnectionManager
+from redis.asyncio import Redis
+from redis.asyncio.lock import Lock as AsyncRedisLock
+from redis.asyncio.sentinel import SentinelConnectionPool
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -17,11 +21,6 @@ from tenacity import (
     wait_exponential,
     wait_random,
 )
-
-from etcetra.client import EtcdConnectionManager, EtcdCommunicator
-from redis.asyncio import Redis
-from redis.asyncio.sentinel import SentinelConnectionPool
-from redis.asyncio.lock import Lock as AsyncRedisLock
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.redis_helper import _default_conn_opts

@@ -2,16 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import traceback
-from typing import (
-    List,
-    Tuple,
-)
+from typing import List, Tuple
 
 import aiotools
 import pytest
 from redis.asyncio import Redis
 from redis.asyncio.sentinel import Sentinel
-from redis.exceptions import ConnectionError as RedisConnectionError, TimeoutError as RedisTimeoutError
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from ai.backend.common import redis_helper
 from ai.backend.common.types import HostPortPair, RedisConnectionInfo

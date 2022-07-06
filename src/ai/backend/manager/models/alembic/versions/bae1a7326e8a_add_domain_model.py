@@ -6,13 +6,12 @@ Create Date: 2019-05-08 08:29:29.588817
 
 """
 import textwrap
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-from ai.backend.manager.models.base import (
-    convention, ResourceSlotColumn,
-)
 
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.dialects import postgresql
+
+from ai.backend.manager.models.base import ResourceSlotColumn, convention
 
 # revision identifiers, used by Alembic.
 revision = 'bae1a7326e8a'

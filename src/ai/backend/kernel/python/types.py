@@ -1,5 +1,4 @@
-from namedlist import namedtuple, FACTORY
-
+from namedlist import FACTORY, namedtuple
 
 InputRequest = namedtuple('InputRequest', [
     ('is_password', False),

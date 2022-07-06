@@ -11,7 +11,8 @@ import sys
 import termios
 import traceback
 
-import zmq, zmq.asyncio
+import zmq
+import zmq.asyncio
 
 from .logging import BraceStyleAdapter
 from .utils import safe_close_task

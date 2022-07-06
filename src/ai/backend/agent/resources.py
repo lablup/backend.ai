@@ -1,24 +1,25 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
-from collections import defaultdict
-from decimal import Decimal, ROUND_DOWN
 import enum
 import fnmatch
-import logging
 import json
+import logging
 import operator
+from abc import ABCMeta, abstractmethod
+from collections import defaultdict
+from decimal import ROUND_DOWN, Decimal
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Collection,
+    FrozenSet,
     Iterable,
     Iterator,
     List,
     Mapping,
     MutableMapping,
     Optional,
-    FrozenSet,
     Sequence,
     Set,
     TextIO,
@@ -26,33 +27,39 @@ from typing import (
     Type,
     TypeVar,
     cast,
-    TYPE_CHECKING,
 )
 
-import attr
 import aiodocker
+import attr
 
-from ai.backend.common.types import (
-    ResourceSlot, SlotName, SlotTypes,
-    DeviceId, DeviceName, DeviceModelInfo,
-    MountPermission, MountTypes,
-    BinarySize,
-    HardwareMetadata,
-)
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
+from ai.backend.common.types import (
+    BinarySize,
+    DeviceId,
+    DeviceModelInfo,
+    DeviceName,
+    HardwareMetadata,
+    MountPermission,
+    MountTypes,
+    ResourceSlot,
+    SlotName,
+    SlotTypes,
+)
+
 from .exception import (
     InsufficientResource,
     InvalidResourceArgument,
     InvalidResourceCombination,
     NotMultipleOfQuantum,
 )
-from .stats import StatContext, NodeMeasurement, ContainerMeasurement
+from .stats import ContainerMeasurement, NodeMeasurement, StatContext
 from .types import Container as SessionContainer
 
 if TYPE_CHECKING:
-    from aiofiles.threadpool.text import AsyncTextIOWrapper
     from io import TextIOWrapper
+
+    from aiofiles.threadpool.text import AsyncTextIOWrapper
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.agent.resources'))
 

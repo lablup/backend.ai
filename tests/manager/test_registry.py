@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import snappy
 from sqlalchemy.sql.dml import Insert, Update
 
-from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
-from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.models import AgentStatus
 from ai.backend.common import msgpack
 from ai.backend.common.types import BinarySize, DeviceId, ResourceSlot, SlotName
+from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.models import AgentStatus
+from ai.backend.manager.registry import AgentRegistry
 
 
 @pytest.mark.asyncio
