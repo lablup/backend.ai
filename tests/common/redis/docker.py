@@ -2,7 +2,6 @@ import asyncio
 import contextlib
 import json
 import os
-import re
 import shutil
 import signal
 from pathlib import Path
