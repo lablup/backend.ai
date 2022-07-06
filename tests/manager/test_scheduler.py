@@ -319,7 +319,7 @@ common_image = ImageRow(
     image=common_image_ref.name,
     tag=common_image_ref.tag,
     registry=common_image_ref.registry,
-    architecture=common_image_ref.architecture,
+    architecture=DEFAULT_IMAGE_ARCH,
 )
 
 _common_dummy_for_pending_session: Mapping[str, Any] = dict(
@@ -380,6 +380,7 @@ def example_pending_sessions():
                     cluster_idx=1,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
                     image_id=common_image.id,
+                    image=common_image,
                     resource_opts={},
                     requested_slots=ResourceSlot({
                         'cpu': Decimal('2.0'),

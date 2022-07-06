@@ -23,7 +23,6 @@ from ai.backend.common.types import (
 )
 
 from ..api.exceptions import (
-    GenericForbidden,
     MainKernelNotFound,
     TooManyKernelsFound,
     UnknownDependencySession,
@@ -41,16 +40,14 @@ from .base import (
 )
 from .kernel import KernelRow, KernelStatus, DEAD_KERNEL_STATUSES
 from .keypair import KeyPairRow
-from .utils import sql_json_merge, SqlJsonData
 
 __all__ = (
     'SessionStatus',
     'DEAD_SESSION_STATUSES',
     'AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES',
     'USER_RESOURCE_OCCUPYING_SESSION_STATUSES',
-    'transit_session_lifecycle',
     'SessionRow', 'enqueue_session', 'get_sgroup_managed_sessions',
-    'update_kernel', 'update_kernel_status', 'update_session_with_kernels',
+    'update_kernel_status', 'update_session_with_kernels',
     'get_scheduled_sessions', 'get_schedulerable_session',
     'match_sessions',
     'get_sessions_by_id',
@@ -133,34 +130,32 @@ KERNEL_SESSION_STATUS_MAPPING = {s: _translate_status_by_value(s, SessionStatus)
 SESSION_KERNEL_STATUS_MAPPING = {s: _translate_status_by_value(s, KernelStatus) for s in SessionStatus}
 
 
-def _transit_to_destroy_session(current, forced) -> SessionStatus:
-    match current:
-        case SessionStatus.PENDING:
-            return SessionStatus.CANCELLED
-        case SessionStatus.PULLING:
-            raise GenericForbidden('Cannot destroy kernels in pulling status')
-        case SessionStatus.SCHEDULED | SessionStatus.PREPARING | SessionStatus.TERMINATING | SessionStatus.ERROR:
-            if not forced:
-                raise GenericForbidden(
-                    'Cannot destroy kernels in scheduled/preparing/terminating/error status',
-                )
-            return SessionStatus.TERMINATED
-        case _:
-            return SessionStatus.TERMINATING
+def aggregate_kernel_status(kernel_statues: Sequence[KernelStatus]) -> SessionStatus:
+    behind_most = kernel_statues[0]
+    for s in kernel_statues:
+        match s:
+            case KernelStatus.ERROR:
+                return SessionStatus.ERROR
+            case KernelStatus.SUSPENDED:
+                return SessionStatus.SUSPENDED
+            case KernelStatus.CANCELLED:
+                return SessionStatus.CANCELLED
+            case _:
+                behind_most = min(behind_most, s, key=lambda x: x.value)
+    return KERNEL_SESSION_STATUS_MAPPING[behind_most]
 
 
-def _transit_to_cancel_session(current, forced):
-    return SessionStatus.CANCELLED
-
-
-def transit_session_lifecycle(current, job, forced=False) -> SessionStatus:
-    match job:
-        case 'destroy':
-            return _transit_to_destroy_session(current, forced)
-        case 'cancel':
-            return _transit_to_cancel_session(current, forced)
-        case _:
-            raise RuntimeError('No such job is declared.')
+class SessionOp(str, enum.Enum):
+    CREATE = 'create_session'
+    DESTROY = 'destroy_session'
+    RESTART = 'restart_session'
+    EXECUTE = 'execute'
+    REFRESH = 'refresh_session'
+    SHUTDOWN_SERVICE = 'shutdown_service'
+    UPLOAD_FILE = 'upload_file'
+    DOWNLOAD_FILE = 'download_file'
+    LIST_FILE = 'list_files'
+    GET_AGENT_LOGS = 'get_logs_from_agent'
 
 
 class SessionRow(Base):
@@ -431,7 +426,7 @@ async def get_scheduled_sessions(
     }
     query = (
         sa.update(SessionRow)
-        .where(SessionStatus.SCHEDULED)
+        .where(SessionRow.status == SessionStatus.SCHEDULED)
         .values(**update_data)
         .returning(SessionRow.id)
     )
@@ -610,12 +605,6 @@ async def update_kernel_status(
                 .values(**session_update)
             )
             await db_session.execute(query)
-
-
-async def aggregate_kernel_status(session: SessionRow) -> SessionStatus:
-    kernel_list = session.kernels
-    behind_most = min([k.status for k in kernel_list], key=lambda x: x.value)
-    return KERNEL_SESSION_STATUS_MAPPING[behind_most]
 
 
 # async def update_kernel(

@@ -131,8 +131,8 @@ from .models.session import (
     SessionRow,
     enqueue_session,
     match_sessions,
-    transit_session_lifecycle,
     update_kernel_status,
+    aggregate_kernel_status,
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -1779,28 +1779,28 @@ class AgentRegistry:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
-        async with self.handle_kernel_exception(
-            'destroy_session', session.id, session.kp_access_key, set_error=True,
+        kernel_list: Sequence[KernelRow] = session.kernels
+        main_stat = {}
+        per_agent_tasks = []
+        now = datetime.now(tzutc())
+
+        keyfunc = lambda item: item.agent if item.agent is not None else ''
+        for agent_id, group_iterator in itertools.groupby(
+            sorted(kernel_list, key=keyfunc), key=keyfunc,
         ):
-
-            kernel_list: Sequence[KernelRow] = session.kernels
-            main_stat = {}
-            per_agent_tasks = []
-            now = datetime.now(tzutc())
-
-            keyfunc = lambda item: item.agent if item.agent is not None else ''
-            for agent_id, group_iterator in itertools.groupby(
-                sorted(kernel_list, key=keyfunc), key=keyfunc,
-            ):
-                destroyed_kernels = []
-                grouped_kernels = [*group_iterator]
-                kernel: KernelRow
-                for kernel in grouped_kernels:
+            destroyed_kernels = []
+            grouped_kernels = [*group_iterator]
+            kernel: KernelRow
+            kernel_statues: List[KernelStatus] = []
+            for kernel in grouped_kernels:
+                async with self.handle_kernel_exception(
+                    'destroy_session', kernel.id, session.kp_access_key, set_error=True,
+                ):
                     if kernel.status == KernelStatus.PENDING:
-
+                        transit_to = KernelStatus.CANCELLED
                         async def _update() -> None:
                             values = {
-                                'status': KernelStatus.CANCELLED,
+                                'status': transit_to,
                                 'status_info': reason,
                                 'status_changed': now,
                                 'terminated_at': now,
@@ -1853,14 +1853,15 @@ class AgentRegistry:
                                     -1,
                                 ),
                             )
-
+                        
+                        transit_to = KernelStatus.TERMINATED
                         async def _update() -> None:
                             kern_stat = await redis.execute(
                                 self.redis_stat,
                                 lambda r: r.get(str(kernel.id)),
                             )
                             values = {
-                                'status': KernelStatus.TERMINATED,
+                                'status': transit_to,
                                 'status_info': reason,
                                 'status_changed': now,
                                 'terminated_at': now,
@@ -1892,6 +1893,7 @@ class AgentRegistry:
                                 ),
                             )
 
+                        transit_to = KernelStatus.TERMINATING
                         async def _update() -> None:
                             value = {
                                 'status': KernelStatus.TERMINATING,
@@ -1914,6 +1916,7 @@ class AgentRegistry:
                         await self.event_producer.produce_event(
                             KernelTerminatingEvent(kernel.id, reason),
                         )
+                    kernel_statues.append(transit_to)
 
                     if kernel.agent_addr is None:
                         await self.mark_kernel_terminated(kernel.id, 'missing-agent-allocation')
@@ -1971,7 +1974,7 @@ class AgentRegistry:
                 await asyncio.gather(*per_agent_tasks, return_exceptions=True)
             if forced:
                 await self.recalc_resource_usage()
-            sess_status = transit_session_lifecycle(session.status, 'destroy', forced=forced)
+            sess_status = aggregate_kernel_status(kernel_statues)
             values = {
                 'status': sess_status,
                 'status_info': reason,

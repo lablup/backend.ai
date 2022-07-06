@@ -498,7 +498,10 @@ class SchedulerDispatcher(aobject):
         log_args = _log_args.get(tuple())
         try:
             if not candidate_agents:
-                raise InstanceNotAvailable("There is no candidate agent.")
+                raise InstanceNotAvailable(
+                    "There is no candidate agent. "
+                    f"At least one agent which has {requested_architecture} architecture is needed."
+                )
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
             agent = sess_ctx.main_kernel.agent
