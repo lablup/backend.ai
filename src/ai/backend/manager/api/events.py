@@ -256,8 +256,11 @@ async def enqueue_kernel_termination_status_update(
     if row is None:
         return
     for q in app_ctx.session_event_queues:
-        exit_code = event.exit_code if isinstance(event, (KernelTerminatingEvent, KernelTerminatedEvent)) \
-                    else None
+        exit_code = (
+            event.exit_code
+            if isinstance(event, (KernelTerminatingEvent, KernelTerminatedEvent))
+            else None
+        )
         q.put_nowait((event.name, row._mapping, event.reason, exit_code))
 
 
