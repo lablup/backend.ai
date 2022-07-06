@@ -5,4 +5,4 @@ if [ -f "$BASE_PATH/pants-local" ]; then
 else
   PANTS="$BASE_PATH/pants"
 fi
-"$PANTS" fmt --changed-since="HEAD~1"
+"$PANTS" lint --changed-since="HEAD~1"
