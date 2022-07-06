@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Sequence, Tuple, Union
 
 import aiotools
+import async_timeout
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.exc import DBAPIError
@@ -786,7 +787,10 @@ class SchedulerDispatcher(aobject):
 
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
-                async with aiotools.TaskGroup() as tg:
+                async with (
+                    async_timeout.timeout(delay=50.0),
+                    aiotools.PersistentTaskGroup() as tg,
+                ):
                     for scheduled_session in scheduled_sessions:
                         await self.registry.event_producer.produce_event(
                             SessionPreparingEvent(
@@ -805,6 +809,8 @@ class SchedulerDispatcher(aobject):
                          "maybe another prepare() call is still running")
                 raise asyncio.CancelledError()
             raise
+        except asyncio.TimeoutError:
+            log.warn('prepare(): timeout while executing start_session()')
 
     async def start_session(
         self,
