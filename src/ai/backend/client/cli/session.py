@@ -939,15 +939,6 @@ def _watch_cmd(docs: Optional[str] = None):
                 print_fail('No matching items.')
             sys.exit(4)
 
-        states = (
-            events.KERNEL_CREATING,
-            events.KERNEL_STARTED,
-            events.SESSION_STARTED,
-            events.KERNEL_TERMINATING,
-            events.KERNEL_TERMINATED,
-            events.SESSION_TERMINATED,
-        )
-
         if not session_name_or_id:
             questions = [inquirer.List(
                 'session',
