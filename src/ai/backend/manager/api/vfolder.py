@@ -1700,6 +1700,41 @@ async def leave(request: web.Request, row: VFolderRow) -> web.Response:
     return web.json_response(resp, status=200)
 
 
+@superadmin_required
+@server_status_required(ALL_ALLOWED)
+@vfolder_permission_required(VFolderPermission.READ_ONLY)
+@check_api_params(
+    t.Dict({
+        tx.AliasedKey(['shared_user_id', 'sharedUserId']): t.String,
+    }),
+)
+async def force_leave(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    """
+    Leave a shared vfolder.
+
+    Cannot leave a group vfolder but a vfolder owned by others can be left.
+    """
+    if row['ownership_type'] == VFolderOwnershipType.GROUP:
+        raise InvalidAPIParameters('Cannot leave a group vfolder.')
+
+    root_ctx: RootContext = request.app['_root.context']
+    access_key = request['keypair']['access_key']
+    shared_user_uuid = params['shared_user_id']
+    vfolder_id = row['id']
+    perm = None
+    log.info('VFOLDER.FORCE_LEAVE(ak:{}, vfid:{}, uid:{}, perm:{})',
+             access_key, vfolder_id, shared_user_uuid, perm)
+    async with root_ctx.db.begin() as conn:
+        query = (
+            sa.delete(vfolder_permissions)
+            .where(vfolder_permissions.c.vfolder == vfolder_id)
+            .where(vfolder_permissions.c.user == shared_user_uuid)
+        )
+        await conn.execute(query)
+    resp = {'msg': 'left the shared vfolder'}
+    return web.json_response(resp, status=200)
+
+
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @vfolder_permission_required(VFolderPermission.READ_ONLY)
@@ -2387,6 +2422,7 @@ def create_app(default_cors_options):
     cors.add(add_route('GET',    r'/{name}/files', list_files))
     cors.add(add_route('POST',   r'/{name}/invite', invite))
     cors.add(add_route('POST',   r'/{name}/leave', leave))
+    cors.add(add_route('POST',   r'/{name}/force-leave', force_leave))
     cors.add(add_route('POST',   r'/{name}/share', share))
     cors.add(add_route('DELETE', r'/{name}/unshare', unshare))
     cors.add(add_route('POST',   r'/{name}/clone', clone))
