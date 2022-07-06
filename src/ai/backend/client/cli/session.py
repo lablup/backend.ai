@@ -36,16 +36,6 @@ from .pretty import (
 from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
 from .ssh import container_ssh_ctx
 
-kernel_cancelled: Final[str] = 'kernel_cancelled'
-kernel_creating: Final[str] = 'kernel_creating'
-kernel_started: Final[str] = 'kernel_started'
-kernel_terminated: Final[str] = 'kernel_terminated'
-kernel_terminating: Final[str] = 'kernel_terminating'
-session_failure: Final[str] = 'session_failure'
-session_started: Final[str] = 'session_started'
-session_success: Final[str] = 'session_success'
-session_terminated: Final[str] = 'session_terminated'
-
 list_expr = CommaSeparatedListType()
 
 
@@ -947,6 +937,16 @@ def _watch_cmd(docs: Optional[str] = None):
             else:
                 print_fail('No matching items.')
             sys.exit(4)
+
+        kernel_cancelled: Final[str] = 'kernel_cancelled'
+        kernel_creating: Final[str] = 'kernel_creating'
+        kernel_started: Final[str] = 'kernel_started'
+        kernel_terminated: Final[str] = 'kernel_terminated'
+        kernel_terminating: Final[str] = 'kernel_terminating'
+        session_failure: Final[str] = 'session_failure'
+        session_started: Final[str] = 'session_started'
+        session_success: Final[str] = 'session_success'
+        session_terminated: Final[str] = 'session_terminated'
 
         states = (
             kernel_creating,
