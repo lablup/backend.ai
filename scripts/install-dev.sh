@@ -368,6 +368,17 @@ install_python() {
   fi
 }
 
+install_pre_push_hook() {
+  local magic_str="monorepo standard pre-push hook"
+  grep -Fq "$magic_str" .git/hooks/pre-push
+  if [ $? -eq 0 ]; then
+    :
+  else
+    echo "" >> .git/hooks/pre-push
+    cat scripts/pre-push.sh >> .git/hooks/pre-push
+  fi
+}
+
 check_python() {
   pyenv shell "${PYTHON_VERSION}"
   local _pyprefix=$(python -c 'import sys; print(sys.prefix, end="")')
@@ -503,6 +514,9 @@ install_git_lfs
 
 show_info "Ensuring checkout of LFS files..."
 git lfs pull
+
+show_info "Configuring the standard git pre-push hook..."
+install_pre_push_hook
 
 show_info "Installing Python..."
 install_python
@@ -777,4 +791,4 @@ show_note "How to reset this setup:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
 echo " "
 
-# vim: tw=0
+# vim: tw=0 sts=2 sw=2 et
