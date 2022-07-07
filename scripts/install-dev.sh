@@ -190,6 +190,12 @@ else
 fi
 
 ROOT_PATH="$(pwd)"
+if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
+  show_error "BUILD_ROOT is not found!"
+  echo "You are not on the root directory of the repository checkout."
+  echo "Please \`cd\` there and run \`./scripts/install-dev.sh <args>\`"
+  exit 1
+fi
 PLUGIN_PATH="${ROOT_PATH}/plugins"
 HALFSTACK_VOLUME_PATH="${ROOT_PATH}/volumes"
 PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
