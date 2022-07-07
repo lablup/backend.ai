@@ -44,11 +44,7 @@ from ai.backend.common.cli import LazyGroup
 from ai.backend.common.distributed.raft import RaftFiniteStateMachine, RaftState
 from ai.backend.common.distributed.raft.client import AsyncGrpcRaftClient
 from ai.backend.common.distributed.raft.server import GrpcRaftServer
-from ai.backend.common.events import (
-    DoImageRescanEvent,
-    EventDispatcher,
-    EventProducer,
-)
+from ai.backend.common.events import DoImageRescanEvent, EventDispatcher, EventProducer
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -69,7 +65,7 @@ from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHand
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
-from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, LockID
+from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
 from .exceptions import InvalidArgument
 from .idle import init_idle_checkers
 from .models.storage import StorageSessionManager
@@ -359,7 +355,8 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 root_ctx.local_config.is_leader = True
 
                 async def _event_callback(context: None, source: str, event: DoImageRescanEvent):
-                    log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] (DoImageRescanEvent) root_ctx.local_config.is_leader={root_ctx.local_config.is_leader}')
+                    log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] '
+                             f'(DoImageRescanEvent) root_ctx.local_config.is_leader={root_ctx.local_config.is_leader}')
 
                 async def _attach_leader_task_dispatcher():
                     if task := detach_dispatcher_task:
@@ -371,7 +368,8 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                         log_events=root_ctx.local_config['debug']['log-events'],
                         node_id=root_ctx.local_config['manager']['id'],
                     )
-                    log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] LEADER attach task_dispatcher: {root_ctx.leader_task_dispatcher}')
+                    log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] '
+                             f'LEADER attach task_dispatcher: {root_ctx.leader_task_dispatcher}')
 
                     root_ctx.leader_task_dispatcher.consume(DoImageRescanEvent, None, _event_callback)
 
@@ -393,9 +391,11 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                         task.cancel()
                         await task
                     try:
-                        if hasattr(root_ctx, 'leader_task_dispatcher') and (task_dispatcher := root_ctx.leader_task_dispatcher):
+                        if hasattr(root_ctx, 'leader_task_dispatcher') \
+                            and (task_dispatcher := root_ctx.leader_task_dispatcher):
                             await task_dispatcher.close()
-                        log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] LEADER detach task_dispatcher: {root_ctx.leader_task_dispatcher}')
+                        log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] '
+                                 f'LEADER detach task_dispatcher: {root_ctx.leader_task_dispatcher}')
                     except AttributeError:
                         pass
 
