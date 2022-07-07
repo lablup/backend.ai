@@ -35,7 +35,7 @@ class RaftFiniteStateMachine(RaftProtocol):
         on_state_changed: Optional[Callable] = None,
     ):
         self._id: Final[str] = str(uuid.uuid4())
-        self._peers: Tuple[str] = tuple(peers)
+        self._peers: Tuple[str, ...] = tuple(peers)
         self._server: Final[RaftServer] = server
         self._client: Final[RaftClient] = client
         self._on_state_changed: Optional[Callable[[RaftState], None]] = on_state_changed
@@ -44,7 +44,7 @@ class RaftFiniteStateMachine(RaftProtocol):
         # (Updated on stable storage before responding to RPCs)
         self._current_term: int = 0
         self._voted_for: Optional[str] = None
-        self._log: List[raft_pb2.Log] = []
+        self._log: List[raft_pb2.Log] = []  # type: ignore
 
         # Volatile state on all servers
         self._commit_index: int = 0
