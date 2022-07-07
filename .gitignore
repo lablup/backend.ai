@@ -126,3 +126,6 @@ ENV/
 
 # Kernel scratches
 /scratches/
+
+# macOS specific
+.DS_Store
