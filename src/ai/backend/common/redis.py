@@ -493,6 +493,8 @@ def get_redis_object(
 
 
 async def ping_redis_connection(client: Union[aioredis.client.Redis, aioredis.sentinel.Sentinel]):
+    if isinstance(client, aioredis.sentinel.Sentinel):
+        return
     try:
         _ = await client.ping()
     except aioredis.exceptions.ConnectionError as e:
