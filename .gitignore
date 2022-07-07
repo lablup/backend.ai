@@ -119,7 +119,7 @@ ENV/
 /*.pid
 
 # Additional clones for editable components
-/src/webui/
+/src/ai/backend/webui/
 
 # Release artifacts
 /CHANGELOG_RELEASE.md
