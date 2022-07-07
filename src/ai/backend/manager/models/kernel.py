@@ -28,13 +28,12 @@ import aioredis.client
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
-from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import noload, relationship, selectinload
+from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.common import msgpack, redis
 from ai.backend.common.logging import BraceStyleAdapter
@@ -74,7 +73,6 @@ from .group import groups
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import users
-from .utils import sql_json_merge
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext

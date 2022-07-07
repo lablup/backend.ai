@@ -111,6 +111,7 @@ from .models import (
     AGENT_UPDATE_FIELDS,
     DEAD_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    UpdatedStatus,
     AgentRow,
     AgentStatus,
     ImageRow,
@@ -380,7 +381,7 @@ class AgentRegistry:
                 await self.set_session_kernel_status(
                     kernel_id,
                     access_key,
-                    KernelStatus.ERROR,
+                    status=KernelStatus.ERROR,
                     status_info=f'operation-timeout ({op})',
                 )
             if error_callback:
@@ -395,7 +396,7 @@ class AgentRegistry:
                 await self.set_session_kernel_status(
                     kernel_id,
                     access_key,
-                    KernelStatus.ERROR,
+                    status=KernelStatus.ERROR,
                     status_info=f'agent-error ({e!r})',
                     status_data={
                         "error": {
@@ -417,7 +418,7 @@ class AgentRegistry:
                 await self.set_session_kernel_status(
                     kernel_id,
                     access_key,
-                    KernelStatus.ERROR,
+                    status=KernelStatus.ERROR,
                     status_info=f'other-error ({e!r})',
                     status_data={
                         "error": {
@@ -758,6 +759,7 @@ class AgentRegistry:
         session_enqueue_configs: SessionEnqueuingConfig,
         scaling_group_name: Optional[str],
         session_type: SessionTypes,
+        resource_policy,    # type: ignore
         *,
         user_scope: UserScope,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
@@ -837,8 +839,7 @@ class AgentRegistry:
                         'cluster_idx': i + 1,
                         'cluster_hostname': f'sub{i + 1}',
                     }
-                    sub_kernel_config = cast(KernelEnqueueingConfig, sub_kernel_config)
-                    kernel_enqueue_configs.append(sub_kernel_config)
+                    kernel_enqueue_configs.append(KernelEnqueueingConfig(**sub_kernel_config))
             elif len(kernel_enqueue_configs) > 1:
                 # each container should have its own kernel_config
                 if len(kernel_enqueue_configs) != cluster_size:
@@ -1765,8 +1766,8 @@ class AgentRegistry:
         async with self.db.begin_readonly_session() as db_sess:
             session: SessionRow
             session = await session_getter(
-                load_kernels=True,
                 db_session=db_sess,
+                load_kernels=True,
             )
         if forced:
             reason = 'force-terminated'
@@ -1977,24 +1978,24 @@ class AgentRegistry:
             if forced:
                 await self.recalc_resource_usage()
             sess_status = aggregate_kernel_status(kernel_statues)
-            values = {
-                'status': sess_status,
-                'status_info': reason,
-                'status_changed': now,
-                'terminated_at': now,
-            }
-            async with self.db.begin_session() as db_sess:
-                query = (
-                    sa.update(SessionRow)
-                    .values(**values)
-                    .where(SessionRow.id == session.id)
-                )
-                await db_sess.execute(query)
-            await self.hook_plugin_ctx.notify(
-                'POST_DESTROY_SESSION',
-                (session.id, session.name, session.kp_access_key),
+        values = {
+            'status': sess_status,
+            'status_info': reason,
+            'status_changed': now,
+            'terminated_at': now,
+        }
+        async with self.db.begin_session() as db_sess:
+            query = (
+                sa.update(SessionRow)
+                .values(**values)
+                .where(SessionRow.id == session.id)
             )
-            return main_stat
+            await db_sess.execute(query)
+        await self.hook_plugin_ctx.notify(
+            'POST_DESTROY_SESSION',
+            (session.id, session.name, session.kp_access_key),
+        )
+        return main_stat
 
     async def clean_session(
         self,
@@ -2585,14 +2586,22 @@ class AgentRegistry:
         self,
         kernel_id: KernelId,
         access_key: AccessKey,
+        *,
         status: KernelStatus,
-        reason: str = '',
+        status_info: str = '',
+        status_data: Mapping[str, Any],
         is_single_kernel: bool = False,
     ) -> None:
         now = datetime.now(tzutc())
         data = {
             'status': status,
-            'status_info': reason,
+            'status_info': status_info,
+            'kernel_status_data': status_data,
+            'session_status_data': sql_json_merge(
+                SessionRow.status_data,
+                ('kernels', str(kernel_id),),
+                obj=status_data,
+            ),
             'status_changed': now,
         }
 
@@ -2602,7 +2611,7 @@ class AgentRegistry:
                     db_sess,
                     kernel_id,
                     access_key,
-                    update_data=data,
+                    update_data=UpdatedStatus(**data),
                     is_single_kernel=is_single_kernel,
                 )
 
@@ -2628,7 +2637,7 @@ class AgentRegistry:
                 await update_kernel_status(
                     db_sess,
                     kernel_id,
-                    update_data=data,
+                    update_data=UpdatedStatus(**data),
                     is_single_kernel=False,
                 )
 
@@ -2711,10 +2720,7 @@ class AgentRegistry:
                 select_query = (
                     sa.select(KernelRow)
                     .where(KernelRow.id == kernel_id)
-                    .options(
-                        noload('*'),
-                        selectinload(KernelRow.agent).noload('*'),
-                    )
+                    .options(noload('*'))
                 )
                 result = await db_sess.execute(select_query)
                 kernel = result.scalars().first()
@@ -2745,7 +2751,19 @@ class AgentRegistry:
                 }
                 if kern_stat:
                     values['last_stat'] = msgpack.unpackb(kern_stat)
-                await update_kernel_status(db_sess, kernel, update_data=values)
+                await update_kernel_status(db_sess, kernel, update_data=UpdatedStatus(**values))
+                select_query = (
+                    sa.select(KernelRow)
+                    .where(KernelRow.id == kernel_id)
+                    .execution_options(populate_existing=True)
+                    .options(
+                        noload('*'),
+                        selectinload(KernelRow.agent).noload('*'),
+                    )
+                )
+                result = await db_sess.execute(select_query)
+                return result.scalars().first()
+
 
         kernel = await execute_with_retry(_update_kernel_status)
         if kernel is None:

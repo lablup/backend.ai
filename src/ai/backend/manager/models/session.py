@@ -23,6 +23,7 @@ from ai.backend.common.types import (
 )
 
 from ..api.exceptions import (
+    SessionNotFound,
     MainKernelNotFound,
     TooManyKernelsFound,
     UnknownDependencySession,
@@ -53,6 +54,7 @@ __all__ = (
     'get_session_by_id',
     'SessionDependencyRow',
     'check_all_dependencies',
+    'UpdatedStatus',
 )
 
 
@@ -104,6 +106,7 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
 
 
 def _translate_status_by_value(from_, to_: enum.EnumMeta):
+    s: enum.Enum
     for s in to_:
         if s.value == from_.value:
             return s
@@ -297,7 +300,7 @@ async def match_sessions(
 
     query_list = [functools.partial(get_sessions_by_name, allow_prefix=allow_prefix)]
     try:
-        UUID(session_name_or_id)
+        UUID(str(session_name_or_id))
     except ValueError:
         pass
     else:
@@ -399,16 +402,19 @@ async def get_session_by_id(
     allow_stale: bool = True,
     for_update: bool = False,
     load_kernels: bool = False,
-) -> SessionRow | None:
+) -> SessionRow:
     sessions = await match_sessions_by_id(
         db_session, session_id, access_key,
-        max_matches, allow_stale, for_update,
-        load_kernels, allow_prefix=False,
+        max_matches=max_matches,
+        allow_stale=allow_stale,
+        for_update=for_update,
+        load_kernels=load_kernels,
+        allow_prefix=False,
     )
     try:
         return sessions[0]
     except IndexError:
-        return None
+        raise SessionNotFound(f'Session (id={session_id}) does not exist.')
 
 
 async def get_sessions_by_name(
@@ -603,8 +609,8 @@ async def update_kernel_status(
         if kernel_status := update_data.get('status'):
             session_update['status'] = KERNEL_SESSION_STATUS_MAPPING[kernel_status]
 
-    if session_status_data := update_data.get('session_status_data'):
-        session_update['status_data'] = session_status_data
+    if 'session_status_data' in update_data:
+        session_update['status_data'] = update_data.pop('session_status_data')
 
     async with db_session.begin_nested():
         query = (

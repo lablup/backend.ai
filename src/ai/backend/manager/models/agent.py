@@ -93,6 +93,7 @@ class AgentRow(Base):
     kernels = relationship('KernelRow', back_populates='agent')
     scaling_group = relationship('ScalingGroupRow', back_populates='agents')
 
+
 async def get_agent_cols(
     db_sess: SASession,
     agent_id: AgentId,

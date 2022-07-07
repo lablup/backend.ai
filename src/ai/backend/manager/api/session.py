@@ -122,7 +122,7 @@ from ..models import (
     verify_vfolder_name,
     vfolders,
 )
-from ..models.kernel import KernelRow, match_session_ids
+from ..models.kernel import KernelRow
 from ..models.utils import execute_with_retry
 from ..types import UserScope
 from .auth import auth_required
@@ -534,6 +534,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 },
                 params['config']['scaling_group'],
                 params['session_type'],
+                None,
                 user_scope=UserScope(
                     domain_name=params['domain'],  # type: ignore  # params always have it
                     group_id=group_id,
@@ -1021,6 +1022,11 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             )
 
     session_config: SessionEnqueuingConfig = {
+        'creation_config': {
+            'mounts': mounts,
+            'mount_map': mount_map,
+            'environ': environ,
+        },
         'kernel_configs': kernel_configs,
         'image_ref': kernel_configs[0]['image_ref'],
     }

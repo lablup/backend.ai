@@ -44,6 +44,7 @@ from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
 from ..defs import LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
+    UpdatedStatus,
     AgentRow,
     KernelStatus,
     SessionRow,
@@ -707,10 +708,15 @@ class SchedulerDispatcher(aobject):
                             )
                             await update_kernel_status(
                                 kernel_db_sess, kernel,
-                                kernel_data={
+                                update_data=UpdatedStatus({
                                     'status_info': 'scheduler-error',
-                                    'status_data': exc_data,
-                                },
+                                    'kernel_status_data': exc_data,
+                                    'session_status_data': sql_json_merge(
+                                        SessionRow.status_data,
+                                        ('kernels', str(kernel.id),),
+                                        obj=exc_data,
+                                    ),
+                                }),
                             )
 
                     await execute_with_retry(_update)
@@ -836,13 +842,14 @@ class SchedulerDispatcher(aobject):
                     now = datetime.now(tzutc())
                     await update_session_with_kernels(
                         db_sess, session,
-                        update_data={
+                        update_data=UpdatedStatus({
                             'status': SessionStatus.CANCELLED,
                             'status_changed': now,
                             'status_info': "failed-to-start",
-                            'status_data': status_data,
+                            'session_status_data': status_data,
+                            'kernel_status_data': status_data,
                             'terminated_at': now,
-                        },
+                        }),
                     )
 
             log.debug(log_fmt + 'cleanup-start-failure: begin', *log_args)

@@ -397,6 +397,16 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
         access_key,
         {
             'image_ref': importer_image,
+            'creation_config': {
+                'environ': {
+                    'SRC_IMAGE': source_image.canonical,
+                    'TARGET_IMAGE': target_image.canonical,
+                    'RUNTIME_PATH': params['runtimePath'],
+                    'BUILD_SCRIPT': (
+                        base64.b64encode(dockerfile_content.encode('utf8')).decode('ascii')
+                    ),
+                },
+            },
             'kernel_configs': [{
                 'image_ref': importer_image,
                 'cluster_role': DEFAULT_ROLE,
@@ -420,7 +430,6 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
         },
         None,
         SessionTypes.BATCH,
-        resource_policy,
         user_scope=UserScope(
             domain_name=request['user']['domain_name'],
             group_id=group_id,
