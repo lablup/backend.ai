@@ -349,14 +349,17 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     def _on_state_changed(state: RaftState):
         nonlocal attach_dispatcher_task
         nonlocal detach_dispatcher_task
+
+        is_leader = False
+
         match state:
             case RaftState.LEADER:
                 log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] LEADER')
-                root_ctx.local_config.is_leader = True
+                is_leader = True
 
                 async def _event_callback(context: None, source: str, event: DoImageRescanEvent):
                     log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] '
-                             f'(DoImageRescanEvent) root_ctx.local_config.is_leader={root_ctx.local_config.is_leader}')
+                             f'(DoImageRescanEvent) root_ctx.local_config.is_leader={is_leader}')
 
                 async def _attach_leader_task_dispatcher():
                     if task := detach_dispatcher_task:
@@ -376,8 +379,8 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 attach_dispatcher_task = loop.create_task(_attach_leader_task_dispatcher())
 
             case _:
-                root_ctx.local_config.is_leader = False
                 log.warning(f'[pid={os.getpid()}/pidx={root_ctx.pidx} FOLLOWER')
+                is_leader = False
 
                 async def _random_event_produce_coroutine():
                     while True:
@@ -392,7 +395,7 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                         await task
                     try:
                         if hasattr(root_ctx, 'leader_task_dispatcher') \
-                            and (task_dispatcher := root_ctx.leader_task_dispatcher):
+                           and (task_dispatcher := root_ctx.leader_task_dispatcher):
                             await task_dispatcher.close()
                         log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] '
                                  f'LEADER detach task_dispatcher: {root_ctx.leader_task_dispatcher}')
