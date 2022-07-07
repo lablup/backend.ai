@@ -10,6 +10,26 @@ Currently Backend.AI is developed and tested under only \*NIX-compatible platfor
 The development setup uses a mono-repository for the backend stack and a side-by-side repository checkout of the frontend stack.
 In contrast, the production setup uses per-service independent virtual environments and relies on a separately provisioned app proxy pool.
 
+.. _dev-setup-standard:
+.. figure:: dev-setup.svg
+   :align: center
+
+   A standard development setup of Backend.AI open source components
+
+.. _dev-setup-app:
+.. figure:: dev-setup-app.svg
+   :align: center
+
+   A development setup of Backend.AI open source components for Electron-based desktop app
+
+.. _dev-setup-staticwebui:
+.. figure:: dev-setup-staticwebui.svg
+   :width: 77%
+   :align: center
+
+   A development setup of Backend.AI open source components with pre-built web UI from the ``backend.ai-app`` repository
+
+
 .. currently the layout of the mermaid C4 diagrams has too large space and too small fonts....
 
    .. mermaid::
