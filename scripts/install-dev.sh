@@ -496,10 +496,13 @@ install_editable_webui() {
     # We should NOT set webServerURL as its non-empty value will let the electron app
     # use the prebuilt static resources from the web server, instead of local editable sources.
     sed_inplace "s@proxyURL =@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
+    echo "PROXYLISTENIP=0.0.0.0" >> src/ai/backend/webui/.env
+    echo "PROXYBASEHOST=localhost" >> src/ai/backend/webui/.env
+    echo "PROXYBASEPORT=${WSPROXY_PORT}" >> src/ai/backend/webui/.env
   fi
   npm i
   make compile_wsproxy
-  cd ../..
+  cd ../../../..
 }
 
 # BEGIN!
@@ -866,8 +869,12 @@ fi
 show_note "Manual configuration for storage-proxy's client accessible hostname and webserver URL"
 echo " "
 echo "If you use a VM for this development setup but access it from a web browser outside the VM or remote nodes,"
-echo "you must manually modify the ${YELLOW}volumes/proxies/local/client_api${CYAN} etcd key${NC} to use an IP address or a DNS hostname"
+echo "you must manually modify the following configurations to use an IP address or a DNS hostname"
 echo "that can be accessible from both the client SDK and the web browser."
+echo " "
+echo " - ${YELLOW}volumes/proxies/local/client_api${CYAN} key in the etcd${NC}"
+echo " - ${YELLOW}apiEndpoint${NC}, ${YELLOW}proxyURL${NC} of ${CYAN}src/ai/backend/webui/config.toml${NC}"
+echo " - ${YELLOW}PROXYBASEHOST${NC} of ${CYAN}src/ai/backend/webui/.env${NC}"
 echo " "
 echo "We recommend setting ${BOLD}/etc/hosts${NC}${WHITE} in both the VM and your web browser's host${NC} to keep a consistent DNS hostname"
 echo "of the storage-proxy's client API endpoint."
@@ -878,8 +885,6 @@ echo "where /etc/hosts in the VM contains:"
 echo "  ${WHITE}127.0.0.1      my-dev-machine${NC}"
 echo "and where /etc/hosts in the web browser host contains:"
 echo "  ${WHITE}192.168.99.99  my-dev-machine${NC}"
-echo " "
-echo "Also, you should set the hostname of the ${YELLOW}apiEndpoint${NC}, ${YELLOW}proxyURL${NC} fields of ${BOLD}src/webui/config.toml${NC} in the same way."
 show_note "How to reset this setup:"
 echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
 echo " "
