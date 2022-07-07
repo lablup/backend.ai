@@ -45,8 +45,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.tz import tzutc
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.sql.expression import true
 from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.sql.expression import true
 from yarl import URL
 
 from ai.backend.common import msgpack, redis
@@ -86,7 +86,6 @@ from ai.backend.common.types import (
     check_typed_dict,
 )
 from ai.backend.common.utils import nmget
-from ai.backend.manager.models.session import DEAD_SESSION_STATUSES
 
 from .api.exceptions import (
     AgentError,
@@ -118,8 +117,8 @@ from .models import (
     KernelStatus,
     SessionStatus,
     agents,
-    kernels,
     get_agent_cols,
+    kernels,
     prepare_dotfiles,
     prepare_vfolder_mounts,
     query_allowed_sgroups,
@@ -129,10 +128,10 @@ from .models import (
 from .models.kernel import KernelRow, get_kernel_occupancy
 from .models.session import (
     SessionRow,
+    aggregate_kernel_status,
     enqueue_session,
     match_sessions,
     update_kernel_status,
-    aggregate_kernel_status,
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -1056,8 +1055,8 @@ class AgentRegistry:
                 'agent_id': mapped_agent,
                 'cluster_role': kernel['cluster_role'],
                 'cluster_idx': kernel['cluster_idx'],
-                'cluster_hostname': f"{kernel['cluster_role']}{kernel['cluster_idx']}" \
-                    if not kernel['cluster_hostname'] else kernel['cluster_hostname'],
+                'cluster_hostname': f"{kernel['cluster_role']}{kernel['cluster_idx']}"
+                if not kernel['cluster_hostname'] else kernel['cluster_hostname'],
                 'image_id': image_row.id,
                 'architecture': image_ref.architecture,
                 'registry': image_ref.registry,
@@ -1798,6 +1797,7 @@ class AgentRegistry:
                 ):
                     if kernel.status == KernelStatus.PENDING:
                         transit_to = KernelStatus.CANCELLED
+
                         async def _update() -> None:
                             values = {
                                 'status': transit_to,
@@ -1853,8 +1853,9 @@ class AgentRegistry:
                                     -1,
                                 ),
                             )
-                        
+
                         transit_to = KernelStatus.TERMINATED
+
                         async def _update() -> None:
                             kern_stat = await redis.execute(
                                 self.redis_stat,
@@ -1894,6 +1895,7 @@ class AgentRegistry:
                             )
 
                         transit_to = KernelStatus.TERMINATING
+
                         async def _update() -> None:
                             value = {
                                 'status': KernelStatus.TERMINATING,
@@ -2639,16 +2641,16 @@ class AgentRegistry:
         exit_code: int,
     ) -> None:
         # TODO: store exit code?
-        data = {
-            'result': SessionResult.SUCCESS if success else SessionResult.FAILURE,
-        }
+        result = SessionResult.SUCCESS if success else SessionResult.FAILURE
 
         async def _update() -> None:
             async with self.db.begin_session() as db_sess:
-                await update_session_kernels(
-                    db_sess, session_id,
-                    kernel_data=data,
+                query = (
+                    sa.update(SessionRow)
+                    .where(SessionRow.id == session_id)
+                    .values(result=result)
                 )
+                await db_sess.execute(query)
 
         await execute_with_retry(_update)
 
@@ -2671,26 +2673,13 @@ class AgentRegistry:
 
         async def _update():
             async with self.db.begin_session() as db_sess:
-                # update_query = (
-                #     sa.update(kernels)
-                #     .where(kernels.c.id == sa.bindparam('kernel_id'))
-                #     .values({kernels.c.last_stat: sa.bindparam('last_stat')})
-                # )
-                # params = []
                 for kernel_id, updates in per_kernel_updates.items():
-                    await update_kernel(
-                        db_sess, kernel_id,
-                        kernel_data={
-                            'kernel_id': kernel_id,
-                            'last_stat': updates,
-                        },
+                    update_query = (
+                        sa.update(KernelRow)
+                        .where(KernelRow.id == kernel_id)
+                        .values(last_stat=updates)
                     )
-                #     params.append({
-                #         'kernel_id': kernel_id,
-                #         'last_stat': updates,
-                #     })
-                # await conn.execute(update_query, params)
-
+                    await db_sess.execute(update_query)
         if per_kernel_updates:
             await execute_with_retry(_update)
 
@@ -2757,7 +2746,6 @@ class AgentRegistry:
                 if kern_stat:
                     values['last_stat'] = msgpack.unpackb(kern_stat)
                 await update_kernel_status(db_sess, kernel, update_data=values)
-                
 
         kernel = await execute_with_retry(_update_kernel_status)
         if kernel is None:

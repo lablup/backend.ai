@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import enum
 import functools
-from typing import Any, Callable, List, Mapping, Optional, Sequence, Tuple, TypedDict, Union
 from datetime import datetime
-from dateutil.tz import tzutc
+from typing import Any, List, Mapping, Sequence, TypedDict, Union
 from uuid import UUID
 
 import sqlalchemy as sa
+from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import noload, selectinload, relationship
+from sqlalchemy.orm import noload, relationship, selectinload
 
 from ai.backend.common.types import (
     AccessKey,
@@ -38,7 +38,7 @@ from .base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from .kernel import KernelRow, KernelStatus, DEAD_KERNEL_STATUSES
+from .kernel import DEAD_KERNEL_STATUSES, KernelRow, KernelStatus
 from .keypair import KeyPairRow
 
 __all__ = (
@@ -50,7 +50,7 @@ __all__ = (
     'update_kernel_status', 'update_session_with_kernels',
     'get_scheduled_sessions', 'get_schedulerable_session',
     'match_sessions',
-    'get_sessions_by_id',
+    'get_session_by_id',
     'SessionDependencyRow',
     'check_all_dependencies',
 )
@@ -102,6 +102,7 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
     )
 )
 
+
 def _translate_status_by_value(from_, to_: enum.EnumMeta):
     for s in to_:
         if s.value == from_.value:
@@ -109,21 +110,6 @@ def _translate_status_by_value(from_, to_: enum.EnumMeta):
     else:
         raise RuntimeError(f'Status `{from_}` does not match any status of `{to_}`')
 
-# KERNEL_SESSION_STATUS_MAPPING = {
-#     KernelStatus.PENDING: SessionStatus.PENDING,
-#     KernelStatus.SCHEDULED: SessionStatus.SCHEDULED,
-#     KernelStatus.PREPARING: SessionStatus.PREPARING,
-#     KernelStatus.BUILDING: SessionStatus.BUILDING,
-#     KernelStatus.PULLING: SessionStatus.PULLING,
-#     KernelStatus.RUNNING: SessionStatus.RUNNING,
-#     KernelStatus.RESTARTING: SessionStatus.RESTARTING,
-#     KernelStatus.RESIZING: SessionStatus.RESIZING,
-#     KernelStatus.SUSPENDED: SessionStatus.SUSPENDED,
-#     KernelStatus.TERMINATING: SessionStatus.TERMINATING,
-#     KernelStatus.TERMINATED: SessionStatus.TERMINATED,
-#     KernelStatus.ERROR: SessionStatus.ERROR,
-#     KernelStatus.CANCELLED: SessionStatus.CANCELLED,
-# }
 
 KERNEL_SESSION_STATUS_MAPPING = {s: _translate_status_by_value(s, SessionStatus) for s in KernelStatus}
 
@@ -275,7 +261,7 @@ class SessionRow(Base):
         if len(kerns) > 1:
             raise TooManyKernelsFound(
                 f'Session (id: {self.id}) '
-                'has more than 1 main kernel.'
+                'has more than 1 main kernel.',
             )
         if len(kerns) == 0:
             raise MainKernelNotFound(
@@ -291,7 +277,6 @@ class UpdatedStatus(TypedDict, total=False):
     kernel_status_data: sa.Function | Mapping
     status_changed: datetime.datetime
     terminated_at: datetime.datetime | None
-
 
 
 async def match_sessions(
@@ -316,9 +301,9 @@ async def match_sessions(
     except ValueError:
         pass
     else:
-        query_list.append(functools.partial(get_sessions_by_id, allow_prefix=False))
+        query_list.append(functools.partial(match_sessions_by_id, allow_prefix=False))
         if allow_prefix:
-            query_list.append(functools.partial(get_sessions_by_id, allow_prefix=True))
+            query_list.append(functools.partial(match_sessions_by_id, allow_prefix=True))
 
     for fetch_func in query_list:
         rows = await fetch_func(
@@ -362,7 +347,7 @@ def _build_session_fetch_query(
 
     query = query.options(
         noload('*'),
-        selectinload(SessionRow.image).noload('*')
+        selectinload(SessionRow.image).noload('*'),
     )
     if load_kernels:
         query = query.options(
@@ -378,7 +363,7 @@ def _build_session_fetch_query(
     return query
 
 
-async def get_sessions_by_id(
+async def match_sessions_by_id(
     db_session: SASession,
     session_id: SessionId,
     access_key: AccessKey | None = None,
@@ -403,6 +388,27 @@ async def get_sessions_by_id(
 
     result = await db_session.execute(query)
     return result.scalars().all()
+
+
+async def get_session_by_id(
+    db_session: SASession,
+    session_id: SessionId,
+    access_key: AccessKey | None = None,
+    *,
+    max_matches: int | None = None,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    load_kernels: bool = False,
+) -> SessionRow | None:
+    sessions = await match_sessions_by_id(
+        db_session, session_id, access_key,
+        max_matches, allow_stale, for_update,
+        load_kernels, allow_prefix=False,
+    )
+    try:
+        return sessions[0]
+    except IndexError:
+        return None
 
 
 async def get_sessions_by_name(
@@ -449,7 +455,7 @@ async def get_scheduled_sessions(
     )
     result = await db_session.execute(query)
     session_ids = result.all()
-    
+
     update_data['status'] = KernelStatus.PREPARING
 
     query = (
@@ -502,7 +508,7 @@ async def update_session_with_kernels(
         raise RuntimeError(
             'Invalid type of session. '
             f'expect SessionRow, uuid.UUID type, but got {type(session)}')
-    
+
     if update_data.get('status') in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
         update_data['terminated_at'] = datetime.now(tzutc())
 
@@ -617,7 +623,7 @@ async def update_kernel_status(
             sess_cond = build_condition(
                 (SessionRow.id == session_id),
                 SessionRow.kp_access_key,
-                ~(SessionRow.status.in_(DEAD_SESSION_STATUSES))
+                ~(SessionRow.status.in_(DEAD_SESSION_STATUSES)),
             )
             query = (
                 sa.update(SessionRow)

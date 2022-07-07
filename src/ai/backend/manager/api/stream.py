@@ -30,7 +30,6 @@ from typing import (
     Union,
 )
 from urllib.parse import urlparse
-from ai.backend.manager.models.kernel import KernelRow
 
 import aiohttp
 import aiohttp_cors
@@ -48,6 +47,7 @@ from ai.backend.common.events import KernelTerminatingEvent
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.idle import AppStreamingStatus
+from ai.backend.manager.models.kernel import KernelRow
 
 from ..defs import DEFAULT_ROLE
 from ..models import kernels

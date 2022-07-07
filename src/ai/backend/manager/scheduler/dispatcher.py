@@ -13,7 +13,6 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from async_timeout import timeout
 
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
@@ -49,16 +48,15 @@ from ..models import (
     KernelStatus,
     SessionRow,
     SessionStatus,
-    update_session_with_kernels,
-    update_kernel_status,
     get_scheduled_sessions,
-    get_sessions_by_id,
+    get_session_by_id,
     get_sgroup_managed_sessions,
-    kernels,
     list_alive_agents,
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
+    update_kernel_status,
+    update_session_with_kernels,
 )
 from ..models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
@@ -437,14 +435,14 @@ class SchedulerDispatcher(aobject):
                                     ('scheduler',),
                                     obj=status_update_data,
                                 ),
-                            }
+                            },
                         )
 
                 await execute_with_retry(_update)
 
-            schedulable_sess = (await get_sessions_by_id(
+            schedulable_sess = await get_session_by_id(
                 db_sess, sess_ctx.id, load_kernels=True,
-            ))[0]
+            )
 
             if schedulable_sess.cluster_mode == ClusterMode.SINGLE_NODE:
                 await self._schedule_single_node_session(
@@ -501,7 +499,7 @@ class SchedulerDispatcher(aobject):
             if not candidate_agents:
                 raise InstanceNotAvailable(
                     "There is no candidate agent. "
-                    f"At least one agent which has {requested_architecture} architecture is needed."
+                    f"At least one agent which has {requested_architecture} architecture is needed.",
                 )
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
@@ -742,7 +740,7 @@ class SchedulerDispatcher(aobject):
                         )
                     )
                     await kernel_db_sess.execute(kernel_query)
-                
+
                 session_query = (
                     sa.update(SessionRow)
                     .where(SessionRow.id == sess_ctx.id)
@@ -779,7 +777,6 @@ class SchedulerDispatcher(aobject):
         )
         try:
             async with self.lock_factory(LockID.LOCKID_PREPARE, 600):
-                now = datetime.now(tzutc())
 
                 async def _mark_session_preparing() -> Sequence[SessionRow]:
                     async with self.db.begin_session() as db_sess:
