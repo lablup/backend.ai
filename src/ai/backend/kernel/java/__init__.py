@@ -2,9 +2,9 @@ import asyncio
 import logging
 import os
 import re
-from pathlib import Path
 import shlex
 import tempfile
+from pathlib import Path
 
 from .. import BaseRunner
 

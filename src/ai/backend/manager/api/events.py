@@ -1,27 +1,28 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import json
+import logging
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Final,
     Iterable,
     Mapping,
+    Optional,
     Set,
     Tuple,
     Union,
-    TYPE_CHECKING,
 )
 
-from aiohttp import web
 import aiohttp_cors
-from aiohttp_sse import sse_response
-from aiotools import adefer
 import attr
 import sqlalchemy as sa
 import trafaret as t
+from aiohttp import web
+from aiohttp_sse import sse_response
+from aiotools import adefer
 
 from ai.backend.common import validators as tx
 from ai.backend.common.events import (
@@ -48,11 +49,11 @@ from ai.backend.common.events import (
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
-from ..models import kernels, groups, UserRole
+from ..models import UserRole, groups, kernels
 from ..models.utils import execute_with_retry
 from ..types import Sentinel
 from .auth import auth_required
-from .exceptions import ObjectNotFound, GenericForbidden, GroupNotFound
+from .exceptions import GenericForbidden, GroupNotFound, ObjectNotFound
 from .manager import READ_ALLOWED, server_status_required
 from .utils import check_api_params
 
@@ -64,7 +65,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 sentinel: Final = Sentinel.token
 
-SessionEventInfo = Tuple[str, dict, str]
+SessionEventInfo = Tuple[str, dict, str, Optional[int]]
 BgtaskEvents = Union[BgtaskUpdatedEvent, BgtaskDoneEvent, BgtaskCancelledEvent, BgtaskFailedEvent]
 
 
@@ -124,7 +125,7 @@ async def push_session_events(
                 try:
                     if evdata is sentinel:
                         break
-                    event_name, row, reason = evdata
+                    event_name, row, reason, exit_code = evdata
                     if user_role in (UserRole.USER, UserRole.ADMIN):
                         if row['domain_name'] != request['user']['domain_name']:
                             continue
@@ -150,6 +151,7 @@ async def push_session_events(
                         'sessionName': row['session_name'],
                         'ownerAccessKey': row['access_key'],
                         'sessionId': str(row['session_id']),
+                        'exitCode': exit_code,
                     }
                     if kernel_id := row.get('id'):
                         response_data['kernelId'] = str(kernel_id)
@@ -217,7 +219,7 @@ async def enqueue_kernel_creation_status_update(
     if row is None:
         return
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row._mapping, event.reason))
+        q.put_nowait((event.name, row._mapping, event.reason, None))
 
 
 async def enqueue_kernel_termination_status_update(
@@ -254,7 +256,12 @@ async def enqueue_kernel_termination_status_update(
     if row is None:
         return
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row._mapping, event.reason))
+        exit_code = (
+            event.exit_code
+            if isinstance(event, (KernelTerminatingEvent, KernelTerminatedEvent))
+            else None
+        )
+        q.put_nowait((event.name, row._mapping, event.reason, exit_code))
 
 
 async def enqueue_session_creation_status_update(
@@ -290,7 +297,7 @@ async def enqueue_session_creation_status_update(
     if row is None:
         return
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row._mapping, event.reason))
+        q.put_nowait((event.name, row._mapping, event.reason, None))
 
 
 async def enqueue_session_termination_status_update(
@@ -326,7 +333,7 @@ async def enqueue_session_termination_status_update(
     if row is None:
         return
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row._mapping, event.reason))
+        q.put_nowait((event.name, row._mapping, event.reason, None))
 
 
 async def enqueue_batch_task_result_update(
@@ -361,7 +368,7 @@ async def enqueue_batch_task_result_update(
     if row is None:
         return
     for q in app_ctx.session_event_queues:
-        q.put_nowait((event.name, row._mapping, event.reason))
+        q.put_nowait((event.name, row._mapping, event.reason, event.exit_code))
 
 
 @attr.s(slots=True, auto_attribs=True, init=False)

@@ -1,34 +1,33 @@
+import json
+import logging
+import logging.config
+import logging.handlers
+import os
+import pickle
+import pprint
+import socket
+import ssl
+import sys
+import threading
+import time
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from contextvars import ContextVar
 from datetime import datetime
-import json
-import logging, logging.config, logging.handlers
-import threading
-import os
 from pathlib import Path
-import pickle
-import pprint
-import time
-from typing import (
-    Any, Optional,
-    Mapping, MutableMapping,
-)
-import socket
-import ssl
-import sys
+from typing import Any, Mapping, MutableMapping, Optional
 
 import coloredlogs
-from pythonjsonlogger.jsonlogger import JsonFormatter
 import trafaret as t
-from tblib import pickling_support
 import yarl
 import zmq
+from pythonjsonlogger.jsonlogger import JsonFormatter
+from tblib import pickling_support
 
 from . import config
 from . import validators as tx
-from .logging_utils import BraceStyleAdapter
 from .exception import ConfigurationError
+from .logging_utils import BraceStyleAdapter
 
 # public APIs of this module
 __all__ = (

@@ -368,6 +368,35 @@ install_python() {
   fi
 }
 
+install_git_hooks() {
+  local magic_str="monorepo standard pre-commit hook"
+  if [ -f .git/hooks/pre-commit ]; then
+    grep -Fq "$magic_str" .git/hooks/pre-commit
+    if [ $? -eq 0 ]; then
+      :
+    else
+      echo "" >> .git/hooks/pre-commit
+      cat scripts/pre-commit.sh >> .git/hooks/pre-commit
+    fi
+  else
+    cp scripts/pre-commit.sh .git/hooks/pre-commit
+    chmod +x .git/hooks/pre-commit
+  fi
+  local magic_str="monorepo standard pre-push hook"
+  if [ -f .git/hooks/pre-push ]; then
+    grep -Fq "$magic_str" .git/hooks/pre-push
+    if [ $? -eq 0 ]; then
+      :
+    else
+      echo "" >> .git/hooks/pre-push
+      cat scripts/pre-push.sh >> .git/hooks/pre-push
+    fi
+  else
+    cp scripts/pre-push.sh .git/hooks/pre-push
+    chmod +x .git/hooks/pre-push
+  fi
+}
+
 check_python() {
   pyenv shell "${PYTHON_VERSION}"
   local _pyprefix=$(python -c 'import sys; print(sys.prefix, end="")')
@@ -415,6 +444,8 @@ bootstrap_pants() {
     else
       echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
     fi
+    # In most cases, we won't need to modify the source code of pants.
+    echo "ENABLE_PANTSD=true" > "$ROOT_PATH/.pants.env"
     echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
     if [ -d tools/pants-src ]; then
       rm -rf tools/pants-src
@@ -503,6 +534,9 @@ install_git_lfs
 
 show_info "Ensuring checkout of LFS files..."
 git lfs pull
+
+show_info "Configuring the standard git hooks..."
+install_git_hooks
 
 show_info "Installing Python..."
 install_python
@@ -641,7 +675,7 @@ show_info "Setting up databases..."
 show_info "Configuring the Lablup's official image registry..."
 ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
 ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-if [ "$(uname -p)" = "arm" ]; then
+if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
   ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
 else
   ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
@@ -650,7 +684,7 @@ fi
 # Scan the container image registry
 show_info "Scanning the image registry..."
 ./backend.ai mgr etcd rescan-images cr.backend.ai
-if [ "$(uname -p)" = "arm" ]; then
+if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
   ./backend.ai mgr etcd alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
 else
   ./backend.ai mgr etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
@@ -728,8 +762,8 @@ chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
 
 show_info "Pre-pulling frequently used kernel images..."
 echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
-if [ "$(uname -p)" = "arm" ]; then
-  $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
+if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
+  $docker_sudo docker pull "cr.backend.ai/multiarch/python:3.9-ubuntu20.04"
 else
   $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
   if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
@@ -777,4 +811,4 @@ show_note "How to reset this setup:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
 echo " "
 
-# vim: tw=0
+# vim: tw=0 sts=2 sw=2 et

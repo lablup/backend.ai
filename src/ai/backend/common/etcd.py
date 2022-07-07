@@ -10,10 +10,10 @@ using callbacks in separate threads.
 from __future__ import annotations
 
 import asyncio
-from collections import namedtuple, ChainMap
 import enum
 import functools
 import logging
+from collections import ChainMap, namedtuple
 from typing import (
     AsyncGenerator,
     Dict,
@@ -28,15 +28,13 @@ from typing import (
     Union,
     cast,
 )
-from urllib.parse import quote as _quote, unquote
+from urllib.parse import quote as _quote
+from urllib.parse import unquote
 
-from etcetra.client import (
-    EtcdClient, EtcdTransactionAction,
-)
-from etcetra.types import (
-    CompareKey, EtcdCredential, HostPortPair as EtcetraHostPortPair,
-)
 import trafaret as t
+from etcetra.client import EtcdClient, EtcdTransactionAction
+from etcetra.types import CompareKey, EtcdCredential
+from etcetra.types import HostPortPair as EtcetraHostPortPair
 
 from .logging_utils import BraceStyleAdapter
 from .types import HostPortPair, QueueSentinel

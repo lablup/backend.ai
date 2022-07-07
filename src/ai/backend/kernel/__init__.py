@@ -1,7 +1,6 @@
 from .base import BaseRunner
 from .terminal import Terminal
 
-
 __all__ = (
     'BaseRunner',
     'Terminal',

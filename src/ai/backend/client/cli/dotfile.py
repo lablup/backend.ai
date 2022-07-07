@@ -3,9 +3,9 @@ import sys
 import click
 from tabulate import tabulate
 
-from .main import main
-from .pretty import print_info, print_warn, print_error
 from ..session import Session
+from .main import main
+from .pretty import print_error, print_info, print_warn
 
 
 @main.group()

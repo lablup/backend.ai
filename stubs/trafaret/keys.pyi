@@ -1,6 +1,6 @@
 from typing import Sequence, Union
-from .base import Dict, Key, Trafaret
 
+from .base import Dict, Key, Trafaret
 
 class KeysSubset(Key):
     def __init__(self, *keys: Sequence[str]): ...

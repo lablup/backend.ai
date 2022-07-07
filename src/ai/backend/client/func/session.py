@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import secrets
 import tarfile
 import tempfile
+from pathlib import Path
 from typing import (
     Any,
     AsyncIterator,
@@ -27,21 +27,23 @@ from tqdm import tqdm
 
 from ai.backend.client.output.fields import session_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from .base import api_function, BaseFunction
+
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE
 from ..exceptions import BackendClientError
 from ..pagination import generate_paginated_results
 from ..request import (
-    Request, AttachedFile,
-    WebSocketResponse,
+    AttachedFile,
+    Request,
     SSEContextManager,
     WebSocketContextManager,
+    WebSocketResponse,
 )
 from ..session import api_session
-from ..utils import ProgressReportingReader
 from ..types import Undefined, undefined
-from ..versioning import get_naming, get_id_or_name
+from ..utils import ProgressReportingReader
+from ..versioning import get_id_or_name, get_naming
+from .base import BaseFunction, api_function
 
 __all__ = (
     'ComputeSession',

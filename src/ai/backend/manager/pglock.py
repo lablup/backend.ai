@@ -4,8 +4,8 @@ from typing import Any, AsyncContextManager
 
 from ai.backend.common.lock import AbstractDistributedLock
 
-from .models.utils import ExtendedAsyncSAEngine
 from .defs import LockID
+from .models.utils import ExtendedAsyncSAEngine
 
 
 class PgAdvisoryLock(AbstractDistributedLock):

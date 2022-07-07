@@ -1,8 +1,8 @@
 import enum
 import os
-from pathlib import Path
 import random
 import re
+from pathlib import Path
 from typing import (
     Any,
     Callable,

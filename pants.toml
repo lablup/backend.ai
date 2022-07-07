@@ -1,10 +1,11 @@
 [GLOBAL]
-pants_version = "2.12.0rc2"
+pants_version = "2.12.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
     "pants.backend.python",
     "pants.backend.python.lint.flake8",
+    "pants.backend.python.lint.isort",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.experimental.python",
     "setupgen",
@@ -32,7 +33,7 @@ root_patterns = [
 
 [python]
 enable_resolves = true
-interpreter_constraints = ["CPython==3.10.4"]
+interpreter_constraints = ["CPython==3.10.5"]
 lockfile_generator = "pex"
 
 [python.resolves]
@@ -42,6 +43,18 @@ python-kernel = "python-kernel.lock"
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
 
+# Temporarily reverted due to pantsbuild/pants#15990
+[pex-cli]
+version = "v2.1.94"
+known_versions = [
+    "v2.1.94|macos_arm64|775c22b97e057d595a8b334fab89f5a07ac9c552a36912504f62577f53a2d2d2|3802178",
+    "v2.1.94|macos_x86_64|775c22b97e057d595a8b334fab89f5a07ac9c552a36912504f62577f53a2d2d2|3802178",
+    "v2.1.94|linux_arm64|775c22b97e057d595a8b334fab89f5a07ac9c552a36912504f62577f53a2d2d2|3802178",
+    "v2.1.94|linux_x86_64|775c22b97e057d595a8b334fab89f5a07ac9c552a36912504f62577f53a2d2d2|3802178",
+]
+# When trying a new pex version, you could find out the hash and size-in-bytes as follows:
+# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.94/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
+
 [flake8]
 version = "flake8>=4.0"
 extra_requirements.add = [
@@ -49,6 +62,9 @@ extra_requirements.add = [
     "setuptools>=60.0",
 ]
 lockfile = "tools/flake8.lock"
+
+[isort]
+lockfile = "tools/isort.lock"
 
 [pytest]
 version = "pytest>=7.0"

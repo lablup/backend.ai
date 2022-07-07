@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import (
-    List,
-)
+from typing import List
 
 import aioredis
 import aioredis.client

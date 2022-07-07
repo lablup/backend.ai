@@ -3,11 +3,7 @@ from __future__ import annotations
 import decimal
 import json
 import textwrap
-from typing import (
-    Any,
-    Mapping,
-    Optional,
-)
+from typing import Any, Mapping, Optional
 
 import humanize
 
