@@ -361,21 +361,17 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 global_timer = None
 
     client = AsyncGrpcRaftClient()
-    server = GrpcRaftServer()
+    raft_server = GrpcRaftServer()
     raft = RaftFiniteStateMachine(
         peers=peers,
-        server=server,
+        server=raft_server,
         client=client,
         on_state_changed=_on_state_changed,
     )
 
     _ = (
         loop.create_task(
-            GrpcRaftServer.run(
-                server,
-                cleanup_coroutines=_cleanup_coroutines,
-                port=port,
-            ),
+            raft_server.run(cleanup_coroutines=_cleanup_coroutines, port=port),
         ),
         loop.create_task(raft.main()),
     )

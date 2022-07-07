@@ -5,10 +5,11 @@ import math
 import random
 import uuid
 from datetime import datetime
-from typing import Callable, Final, Iterable, Optional
+from typing import Callable, Final, Iterable, List, Optional, Tuple
 
 from .client import RaftClient
 from .protocol import RaftProtocol
+from ..protos import raft_pb2
 from .server import RaftServer
 
 __all__ = ('RaftFiniteStateMachine', 'RaftState')
@@ -33,17 +34,30 @@ class RaftFiniteStateMachine(RaftProtocol):
         *,
         on_state_changed: Optional[Callable] = None,
     ):
-        self._id = str(uuid.uuid4())
-        self._current_term: int = 0
-        self._last_voted_term: int = 0
-        self._election_timeout: float = randrangef(0.15, 0.3)
-        self._heartbeat_interval: Final[float] = 0.1
-        self._peers = tuple(peers)
-        self._server = server
-        self._client = client
-        self._leader_id: Optional[str] = None
-
+        self._id: Final[str] = str(uuid.uuid4())
+        self._peers: Tuple[str] = tuple(peers)
+        self._server: Final[RaftServer] = server
+        self._client: Final[RaftClient] = client
         self._on_state_changed: Optional[Callable[[RaftState], None]] = on_state_changed
+
+        # Persistent state on all servers
+        # (Updated on stable storage before responding to RPCs)
+        self._current_term: int = 0
+        self._voted_for: Optional[str] = None
+        self._log: List[raft_pb2.Log] = []
+
+        # Volatile state on all servers
+        self._commit_index: int = 0
+        self._last_applied: int = 0
+
+        # Volatile state on leaders
+        # (Reinitialized after election)
+        self._next_index: List[int] = []
+        self._match_index: List[int] = []
+
+        self._election_timeout: Final[float] = randrangef(0.15, 0.3)
+        self._heartbeat_interval: Final[float] = 0.1
+        self._leader_id: Optional[str] = None
 
         self.execute_transition(RaftState.FOLLOWER)
         self._server.bind(self)
@@ -75,7 +89,9 @@ class RaftFiniteStateMachine(RaftProtocol):
         getattr(self._on_state_changed, '__call__', lambda _: None)(next_state)
 
     """
-    External Transitions
+    RaftProtocol Implementations
+    - on_append_entries
+    - on_request_vote
     """
     def on_append_entries(
         self,
@@ -87,14 +103,19 @@ class RaftFiniteStateMachine(RaftProtocol):
         entries: Iterable[str],
         leader_commit: int,
     ) -> bool:
-        current_term = self._synchronize_term(term)
-        self._leader_id = leader_id
-        logging.info(f'[{datetime.now().isoformat()}] [on_append_entries] term={term} leader={leader_id[:2]}')
-        self.reset_timeout()
-        if term >= current_term:
-            self.execute_transition(RaftState.FOLLOWER)
-        if term < current_term:
+        """Receiver implementation:
+        1. Reply false if term < currentTerm
+        2. Reply false if log doesn't contain any entry at prevLogIndex whose term matches prevLogTerm
+        3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it
+        4. Append any new entries not already in the log
+        5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
+        """
+        if term < self.current_term:
             return False
+        self._synchronize_term(term)
+        self._leader_id = leader_id
+        logging.debug(f'[{datetime.now().isoformat()}] [on_append_entries] term={term} leader={leader_id[:2]}')
+        self.reset_timeout()
         return True
 
     def on_request_vote(
@@ -105,16 +126,19 @@ class RaftFiniteStateMachine(RaftProtocol):
         last_log_index: int,
         last_log_term: int,
     ) -> bool:
-        logging.info(f'[{datetime.now().isoformat()}] [on_request_vote] '
-                     f'term={term} cand={candidate_id[:2]} (last={self._last_voted_term})')
-        current_term = self._synchronize_term(term)
-        # 1. Reply false if term < currentTerm.
+        """Receiver implementation:
+        1. Reply false if term < currentTerm
+        2. If votedFor is null or candidateId, and candidate's log is at least up-to-date as receiver's log, grant vote
+        """
+        current_term = self.current_term
+        self._synchronize_term(term)
         self.reset_timeout()
         if term < current_term:
             return False
-        # 2. If votedFor is null or candidateId, and candidate's log is at least up-to-date as receiver's log, grant vote.
-        if self._last_voted_term < term:
-            self._last_voted_term = term
+        if self.voted_for is None:
+            self._voted_for = candidate_id
+            return True
+        elif self.voted_for == candidate_id:
             return True
         return False
 
@@ -127,10 +151,9 @@ class RaftFiniteStateMachine(RaftProtocol):
             self._elapsed_time += interval
 
     async def _request_vote(self):
-        term = self._current_term = self.current_term + 1
+        term = self.current_term
+        self._synchronize_term(term + 1)
         self.execute_transition(RaftState.CANDIDATE)
-        self._last_voted_term = term
-        logging.info(f'[_request_vote] term={term} last_vote={self._last_voted_term}')
         results = await asyncio.gather(*[
             asyncio.create_task(
                 self._client.request_vote(
@@ -155,14 +178,15 @@ class RaftFiniteStateMachine(RaftProtocol):
             for peer in self._peers
         }, return_when=asyncio.ALL_COMPLETED)
 
-    def _synchronize_term(self, term: int) -> int:
-        """
+    def _synchronize_term(self, term: int):
+        """Rules for Servers
         All Servers:
-        - If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower.
+        - If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower
         """
-        current_term = self.current_term
-        self._current_term = max(self.current_term, term)
-        return current_term
+        if term > self.current_term:
+            self._current_term = term
+            self.execute_transition(RaftState.FOLLOWER)
+            self._voted_for = None
 
     @property
     def id(self) -> str:
@@ -177,5 +201,13 @@ class RaftFiniteStateMachine(RaftProtocol):
         return self._current_term
 
     @property
+    def voted_for(self) -> Optional[str]:
+        return self._voted_for
+
+    @property
+    def membership(self) -> int:
+        return len(self._peers) + 1
+
+    @property
     def quorum(self) -> int:
-        return math.floor((len(self._peers) + 1) / 2) + 1
+        return math.floor(self.membership / 2) + 1

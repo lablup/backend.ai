@@ -50,17 +50,14 @@ class GrpcRaftServer(RaftServer, raft_pb2_grpc.RaftServiceServicer):
         )
         return raft_pb2.RequestVoteResponse(term=request.term, vote_granted=vote_granted)   # type: ignore
 
-    @staticmethod
-    async def run(servicer: raft_pb2_grpc.RaftServiceServicer, cleanup_coroutines: List[Coroutine], port: int = 50051):
+    async def run(self, cleanup_coroutines: List[Coroutine], port: int = 50051):
         server = grpc.aio.server()
-        raft_pb2_grpc.add_RaftServiceServicer_to_server(servicer, server)
+        raft_pb2_grpc.add_RaftServiceServicer_to_server(self, server)
         server.add_insecure_port(f'[::]:{port}')
 
         async def server_graceful_shutdown():
             await server.stop(5)
 
         cleanup_coroutines.append(server_graceful_shutdown())
-
         await server.start()
-
         await server.wait_for_termination()
