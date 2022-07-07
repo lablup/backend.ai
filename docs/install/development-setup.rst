@@ -12,7 +12,7 @@ In contrast, the production setup uses per-service independent virtual environme
 
 There are three ways to run both the backend and frontend stacks for development, as demonstrated in
 :numref:`dev-setup-standard`, :numref:`dev-setup-app`, and :numref:`dev-setup-staticwebui`.
-The installation guide in this page using ``scripts/install-dev.sh`` covers all three cases because the difference
+The installation guide in this page using ``scripts/install-dev.sh`` covers all three cases because the only difference
 is that how you launch the Web UI from the mono-repo.
 
 .. _dev-setup-standard:
