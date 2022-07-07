@@ -7,9 +7,9 @@ import uuid
 from datetime import datetime
 from typing import Callable, Final, Iterable, List, Optional, Tuple
 
+from ..protos import raft_pb2
 from .client import RaftClient
 from .protocol import RaftProtocol
-from ..protos import raft_pb2
 from .server import RaftServer
 
 __all__ = ('RaftFiniteStateMachine', 'RaftState')
@@ -106,7 +106,8 @@ class RaftFiniteStateMachine(RaftProtocol):
         """Receiver implementation:
         1. Reply false if term < currentTerm
         2. Reply false if log doesn't contain any entry at prevLogIndex whose term matches prevLogTerm
-        3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it
+        3. If an existing entry conflicts with a new one (same index but different terms),
+           delete the existing entry and all that follow it
         4. Append any new entries not already in the log
         5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
         """
