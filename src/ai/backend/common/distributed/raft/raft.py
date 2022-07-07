@@ -70,9 +70,20 @@ class RaftFiniteStateMachine(RaftProtocol):
                     await self._wait_for_election_timeout()
                     self.execute_transition(RaftState.CANDIDATE)
                 case RaftState.CANDIDATE:
+                    """Rules for Servers
+                    Candidates
+                    - On conversion to candidate, start election:
+                        - Increment currentTerm
+                        - Vote for self
+                        - Reset election timer
+                        - Send RequestVote RPCs to all other servers
+                    - If votes received from majority of servers: become leader
+                    - If AppendEntries RPC received from new leader: convert to follower
+                    - If election timeout elapses: start new election
+                    """
                     self._leader_id = None
                     while self._state is RaftState.CANDIDATE:
-                        await self._request_vote()
+                        await self._start_election()
                         if self._state is RaftState.LEADER:
                             break
                         await asyncio.sleep(self._election_timeout)
@@ -151,10 +162,16 @@ class RaftFiniteStateMachine(RaftProtocol):
             await asyncio.sleep(interval)
             self._elapsed_time += interval
 
-    async def _request_vote(self):
+    """
+    async def request_append_entries(self, logs: Iterable[raft_pb2.Log]):   # type: ignore
+        assert self.is_leader is True
+        pass
+    """
+
+    async def _start_election(self):
+        self._synchronize_term(self.current_term + 1)
+        self._voted_for = self.id
         term = self.current_term
-        self._synchronize_term(term + 1)
-        self.execute_transition(RaftState.CANDIDATE)
         results = await asyncio.gather(*[
             asyncio.create_task(
                 self._client.request_vote(

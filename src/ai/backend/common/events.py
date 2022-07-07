@@ -105,8 +105,8 @@ class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
 
 
-class DoLeaderElectionEvent(EmptyEventArgs, AbstractEvent):
-    name = "do_leader_election"
+class DoImageRescanEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_image_rescan"
 
 
 @attr.s(slots=True, frozen=True)

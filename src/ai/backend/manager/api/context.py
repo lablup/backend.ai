@@ -50,3 +50,6 @@ class RootContext(BaseContext):
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
+
+    leader_task_dispatcher: EventDispatcher
+    leader_task_producer: EventProducer

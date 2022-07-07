@@ -41,12 +41,11 @@ from setproctitle import setproctitle
 from ai.backend.common import redis
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.distributed.raft import RaftFiniteStateMachine, RaftState
 from ai.backend.common.distributed.raft.client import AsyncGrpcRaftClient
 from ai.backend.common.distributed.raft.server import GrpcRaftServer
 from ai.backend.common.events import (
-    DoLeaderElectionEvent,
+    DoImageRescanEvent,
     EventDispatcher,
     EventProducer,
 )
@@ -338,27 +337,69 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     _cleanup_coroutines: List[Coroutine] = []
 
     loop = asyncio.get_running_loop()
-    global_timer: Optional[GlobalTimer] = None
+
+    async def _attach_leader_task_producer():
+        root_ctx.leader_task_producer = await EventProducer.new(
+            root_ctx.shared_config.data['redis'],
+            db=REDIS_STREAM_DB,
+        )
+
+    producer_task = loop.create_task(_attach_leader_task_producer())
+    attach_dispatcher_task: Optional[asyncio.Task] = None
+    detach_dispatcher_task: Optional[asyncio.Task] = None
+    await producer_task
 
     # TODO: Decoupling
     def _on_state_changed(state: RaftState):
-        nonlocal global_timer
+        nonlocal attach_dispatcher_task
+        nonlocal detach_dispatcher_task
         match state:
             case RaftState.LEADER:
-                log.warning(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] LEADER')
-                global_timer = GlobalTimer(
-                    root_ctx.distributed_lock_factory(lock_id=LockID.LOCKID_LEADER_ELECTION_TIMER, lifetime_hint=10.0),
-                    root_ctx.event_producer,
-                    lambda: DoLeaderElectionEvent(),
-                    interval=10.0,
-                )
-                log.debug(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] global_timer.join(): {global_timer}')
-                loop.create_task(global_timer.join())
+                log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] LEADER')
+                root_ctx.local_config.is_leader = True
+
+                async def _event_callback(context: None, source: str, event: DoImageRescanEvent):
+                    log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] (DoImageRescanEvent) root_ctx.local_config.is_leader={root_ctx.local_config.is_leader}')
+
+                async def _attach_leader_task_dispatcher():
+                    if task := detach_dispatcher_task:
+                        task.cancel()
+                        await task
+                    root_ctx.leader_task_dispatcher = await EventDispatcher.new(
+                        root_ctx.shared_config.data['redis'],
+                        db=REDIS_STREAM_DB,
+                        log_events=root_ctx.local_config['debug']['log-events'],
+                        node_id=root_ctx.local_config['manager']['id'],
+                    )
+                    log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] LEADER attach task_dispatcher: {root_ctx.leader_task_dispatcher}')
+
+                    root_ctx.leader_task_dispatcher.consume(DoImageRescanEvent, None, _event_callback)
+
+                attach_dispatcher_task = loop.create_task(_attach_leader_task_dispatcher())
+
             case _:
-                if timer := global_timer:
-                    log.debug(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] global_timer.leave(): {global_timer}')
-                    loop.create_task(timer.leave())
-                global_timer = None
+                root_ctx.local_config.is_leader = False
+                log.warning(f'[pid={os.getpid()}/pidx={root_ctx.pidx} FOLLOWER')
+
+                async def _random_event_produce_coroutine():
+                    while True:
+                        await asyncio.sleep(1)
+                        await root_ctx.leader_task_producer.produce_event(DoImageRescanEvent())
+
+                _ = loop.create_task(_random_event_produce_coroutine())
+
+                async def _detach_leader_task_dispatcher():
+                    if task := attach_dispatcher_task:
+                        task.cancel()
+                        await task
+                    try:
+                        if hasattr(root_ctx, 'leader_task_dispatcher') and (task_dispatcher := root_ctx.leader_task_dispatcher):
+                            await task_dispatcher.close()
+                        log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] LEADER detach task_dispatcher: {root_ctx.leader_task_dispatcher}')
+                    except AttributeError:
+                        pass
+
+                detach_dispatcher_task = loop.create_task(_detach_leader_task_dispatcher())
 
     client = AsyncGrpcRaftClient()
     raft_server = GrpcRaftServer()
@@ -384,13 +425,17 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.redis_live = redis.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_LIVE_DB)
+    log.info(f'root_ctx.redis_live ping: {await redis.ping_redis_connection(root_ctx.redis_live.client)}')
     root_ctx.redis_stat = redis.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_STAT_DB)
+    log.info(f'root_ctx.redis_stat ping: {await redis.ping_redis_connection(root_ctx.redis_stat.client)}')
     root_ctx.redis_image = redis.get_redis_object(
         root_ctx.shared_config.data['redis'], db=REDIS_IMAGE_DB,
     )
+    log.info(f'root_ctx.redis_image ping: {await redis.ping_redis_connection(root_ctx.redis_image.client)}')
     root_ctx.redis_stream = redis.get_redis_object(
         root_ctx.shared_config.data['redis'], db=REDIS_STREAM_DB,
     )
+    log.info(f'root_ctx.redis_stream ping: {await redis.ping_redis_connection(root_ctx.redis_stream.client)}')
     yield
     await root_ctx.redis_stream.close()
     await root_ctx.redis_image.close()
@@ -638,11 +683,11 @@ def build_root_app(
     if cleanup_contexts is None:
         cleanup_contexts = [
             manager_status_ctx,
-            raft_ctx,
             redis_ctx,
             database_ctx,
             distributed_lock_ctx,
             event_dispatcher_ctx,
+            raft_ctx,
             idle_checker_ctx,
             storage_manager_ctx,
             hook_plugin_ctx,
