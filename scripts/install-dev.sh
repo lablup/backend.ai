@@ -79,8 +79,7 @@ usage() {
   echo "    (default: main)"
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
-  echo "    Install the webui as an editable repository instead of"
-  echo "    the submodule in the src/ai/backend/web/static directory."
+  echo "    Install the webui as an editable repository under src/ai/backend/webui."
   echo ""
   echo "  ${LWHITE}--postgres-port PORT${NC}"
   echo "    The port to bind the PostgreSQL container service."
@@ -452,13 +451,13 @@ bootstrap_pants() {
 
 install_editable_webui() {
   show_info "Installing editable version of Web UI..."
-  if [ -d "./src/webui" ]; then
-    echo "src/webui already exists, so running 'make clean' on it..."
-    cd src/webui
+  if [ -d "./src/ai/backend/webui" ]; then
+    echo "src/ai/backend/webui already exists, so running 'make clean' on it..."
+    cd src/ai/backend/webui
     make clean
   else
-    git clone https://github.com/lablup/backend.ai-webui ./src/webui
-    cd src/webui
+    git clone https://github.com/lablup/backend.ai-webui ./src/ai/backend/webui
+    cd src/ai/backend/webui
     cp configs/default.toml config.toml
     local site_name=$(basename $(pwd))
     # The debug mode here is only for 'hard-core' debugging scenarios -- it changes lots of behaviors.
@@ -827,11 +826,11 @@ fi
 if [ $EDITABLE_WEBUI -eq 1 ]; then
   show_note "How to run the editable checkout of webui:"
   echo "(Terminal 1)"
-  echo "  > ${WHITE}cd src/webui; npm run build:d${NC}"
+  echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
   echo "(Terminal 2)"
-  echo "  > ${WHITE}cd src/webui; npm run server:d${NC}"
+  echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
   echo "(Terminal 3)"
-  echo "  > ${WHITE}cd src/webui; npm run wsproxy${NC}"
+  echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
 fi
 show_note "Manual configuration for storage-proxy's client accessible hostname and webserver URL"
 echo " "
