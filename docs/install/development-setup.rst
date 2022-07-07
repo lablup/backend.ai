@@ -10,6 +10,11 @@ Currently Backend.AI is developed and tested under only \*NIX-compatible platfor
 The development setup uses a mono-repository for the backend stack and a side-by-side repository checkout of the frontend stack.
 In contrast, the production setup uses per-service independent virtual environments and relies on a separately provisioned app proxy pool.
 
+There are three ways to run both the backend and frontend stacks for development, as demonstrated in
+:numref:`dev-setup-standard`, :numref:`dev-setup-app`, and :numref:`dev-setup-staticwebui`.
+The installation guide in this page using ``scripts/install-dev.sh`` covers all three cases because the difference
+is that how you launch the Web UI from the mono-repo.
+
 .. _dev-setup-standard:
 .. figure:: dev-setup.svg
    :align: center
