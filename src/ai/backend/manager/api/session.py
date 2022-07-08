@@ -1580,6 +1580,7 @@ async def report_stats(root_ctx: RootContext, interval: float) -> None:
     except sqlalchemy.exc.InterfaceError:
         log.warn('report_stats(): error while connecting to PostgreSQL server')
 
+
 @server_status_required(ALL_ALLOWED)
 @auth_required
 @check_api_params(

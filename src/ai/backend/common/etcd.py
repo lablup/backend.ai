@@ -32,10 +32,10 @@ from typing import (
 )
 from urllib.parse import quote as _quote
 from urllib.parse import unquote
-from etcetra import EtcdCommunicator, WatchEvent
-import grpc
 
+import grpc
 import trafaret as t
+from etcetra import EtcdCommunicator, WatchEvent
 from etcetra.client import EtcdClient, EtcdTransactionAction
 from etcetra.types import CompareKey, EtcdCredential
 from etcetra.types import HostPortPair as EtcetraHostPortPair
