@@ -7,16 +7,17 @@ import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.engine.row import Row
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
 
 from .base import (
+    Base,
     BigInt,
     EnumType,
     ResourceSlotColumn,
     batch_result,
+    batch_result_in_session,
     metadata,
     set_if_set,
     simple_db_mutate,
@@ -62,6 +63,10 @@ keypair_resource_policies = sa.Table(
 )
 
 
+class KeyPairResourcePolicyRow(Base):
+    __table__ = keypair_resource_policies
+
+
 class KeyPairResourcePolicy(graphene.ObjectType):
     name = graphene.String()
     created_at = GQLDateTime()
@@ -79,33 +84,30 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     def from_row(
         cls,
         ctx: GraphQueryContext,
-        row: Row | None,
+        row: KeyPairResourcePolicyRow | None,
     ) -> KeyPairResourcePolicy | None:
         if row is None:
             return None
         return cls(
-            name=row['name'],
-            created_at=row['created_at'],
-            default_for_unspecified=row['default_for_unspecified'].name,
-            total_resource_slots=row['total_resource_slots'].to_json(),
-            max_session_lifetime=row['max_session_lifetime'],
-            max_concurrent_sessions=row['max_concurrent_sessions'],
-            max_containers_per_session=row['max_containers_per_session'],
-            idle_timeout=row['idle_timeout'],
-            max_vfolder_count=row['max_vfolder_count'],
-            max_vfolder_size=row['max_vfolder_size'],
-            allowed_vfolder_hosts=row['allowed_vfolder_hosts'],
+            name=row.name,
+            created_at=row.created_at,
+            default_for_unspecified=row.default_for_unspecified.name,
+            total_resource_slots=row.total_resource_slots.to_json(),
+            max_session_lifetime=row.max_session_lifetime,
+            max_concurrent_sessions=row.max_concurrent_sessions,
+            max_containers_per_session=row.max_containers_per_session,
+            idle_timeout=row.idle_timeout,
+            max_vfolder_count=row.max_vfolder_count,
+            max_vfolder_size=row.max_vfolder_size,
+            allowed_vfolder_hosts=row.allowed_vfolder_hosts,
         )
 
     @classmethod
     async def load_all(cls, ctx: GraphQueryContext) -> Sequence[KeyPairResourcePolicy]:
-        query = (
-            sa.select([keypair_resource_policies])
-            .select_from(keypair_resource_policies)
-        )
-        async with ctx.db.begin_readonly() as conn:
+        query = sa.select(KeyPairResourcePolicyRow)
+        async with ctx.db.begin_readonly_session() as db_sess:
             return [
-                obj async for r in (await conn.stream(query))
+                obj async for r in (await db_sess.stream_scalars(query))
                 if (obj := cls.from_row(ctx, r)) is not None
             ]
 
@@ -120,7 +122,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
-            sa.select([keypair_resource_policies])
+            sa.select(KeyPairResourcePolicyRow)
             .select_from(j)
             .where(
                 keypairs.c.user_id == (
@@ -131,9 +133,9 @@ class KeyPairResourcePolicy(graphene.ObjectType):
                 ),
             )
         )
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as db_sess:
             return [
-                obj async for r in (await conn.stream(query))
+                obj async for r in (await db_sess.stream_scalars(query))
                 if (obj := cls.from_row(ctx, r)) is not None
             ]
 
@@ -144,15 +146,15 @@ class KeyPairResourcePolicy(graphene.ObjectType):
         names: Sequence[str],
     ) -> Sequence[KeyPairResourcePolicy | None]:
         query = (
-            sa.select([keypair_resource_policies])
+            sa.select(KeyPairResourcePolicyRow)
             .select_from(keypair_resource_policies)
             .where(keypair_resource_policies.c.name.in_(names))
             .order_by(keypair_resource_policies.c.name)
         )
-        async with ctx.db.begin_readonly() as conn:
-            return await batch_result(
-                ctx, conn, query, cls,
-                names, lambda row: row['name'],
+        async with ctx.db.begin_readonly_session() as db_sess:
+            return await batch_result_in_session(
+                ctx, db_sess, query, cls,
+                names, lambda row: row.name,
             )
 
     @classmethod
@@ -167,7 +169,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
-            sa.select([keypair_resource_policies])
+            sa.select(KeyPairResourcePolicyRow)
             .select_from(j)
             .where(
                 (keypair_resource_policies.c.name.in_(names)) &
@@ -176,9 +178,9 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             .order_by(keypair_resource_policies.c.name)
         )
         async with ctx.db.begin_readonly() as conn:
-            return await batch_result(
+            return await batch_result_in_session(
                 ctx, conn, query, cls,
-                names, lambda row: row['name'],
+                names, lambda row: row.name,
             )
 
     @classmethod
@@ -192,14 +194,14 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
-            sa.select([keypair_resource_policies])
+            sa.select(KeyPairResourcePolicyRow)
             .select_from(j)
             .where((keypairs.c.access_key.in_(access_keys)))
             .order_by(keypair_resource_policies.c.name)
         )
-        async with ctx.db.begin_readonly() as conn:
+        async with ctx.db.begin_readonly_session() as db_sess:
             return [
-                obj async for r in (await conn.stream(query))
+                obj async for r in (await db_sess.stream_scalars(query))
                 if (obj := cls.from_row(ctx, r)) is not None
             ]
 
