@@ -658,8 +658,6 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                                 session_id,
                                 AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
                             )
-            except aioredis.exceptions.ConnectionError:
-                log.warn('stream_conn_tracker_gc(): error while connecting to Redis server, retrying...')
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
                     log.warn('stream_conn_tracker_gc(): error while connecting to Etcd server, retrying...')
