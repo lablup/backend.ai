@@ -518,6 +518,8 @@ set -e
 # Make directories
 show_info "Using the current working-copy directory as the installation path..."
 
+mkdir -p ./var/lib/backend.ai
+
 mkdir -p ./wheelhouse
 if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
   show_info "Prebuild grpcio wheels for Apple Silicon..."
