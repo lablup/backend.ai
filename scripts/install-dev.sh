@@ -180,6 +180,12 @@ else
 fi
 
 ROOT_PATH="$(pwd)"
+if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
+  show_error "BUILD_ROOT is not found!"
+  echo "You are not on the root directory of the repository checkout."
+  echo "Please \`cd\` there and run \`./scripts/install-dev.sh <args>\`"
+  exit 1
+fi
 PLUGIN_PATH="${ROOT_PATH}/plugins"
 HALFSTACK_VOLUME_PATH="${ROOT_PATH}/volumes"
 PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
@@ -368,6 +374,35 @@ install_python() {
   fi
 }
 
+install_git_hooks() {
+  local magic_str="monorepo standard pre-commit hook"
+  if [ -f .git/hooks/pre-commit ]; then
+    grep -Fq "$magic_str" .git/hooks/pre-commit
+    if [ $? -eq 0 ]; then
+      :
+    else
+      echo "" >> .git/hooks/pre-commit
+      cat scripts/pre-commit.sh >> .git/hooks/pre-commit
+    fi
+  else
+    cp scripts/pre-commit.sh .git/hooks/pre-commit
+    chmod +x .git/hooks/pre-commit
+  fi
+  local magic_str="monorepo standard pre-push hook"
+  if [ -f .git/hooks/pre-push ]; then
+    grep -Fq "$magic_str" .git/hooks/pre-push
+    if [ $? -eq 0 ]; then
+      :
+    else
+      echo "" >> .git/hooks/pre-push
+      cat scripts/pre-push.sh >> .git/hooks/pre-push
+    fi
+  else
+    cp scripts/pre-push.sh .git/hooks/pre-push
+    chmod +x .git/hooks/pre-push
+  fi
+}
+
 check_python() {
   pyenv shell "${PYTHON_VERSION}"
   local _pyprefix=$(python -c 'import sys; print(sys.prefix, end="")')
@@ -415,6 +450,8 @@ bootstrap_pants() {
     else
       echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
     fi
+    # In most cases, we won't need to modify the source code of pants.
+    echo "ENABLE_PANTSD=true" > "$ROOT_PATH/.pants.env"
     echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
     if [ -d tools/pants-src ]; then
       rm -rf tools/pants-src
@@ -503,6 +540,9 @@ install_git_lfs
 
 show_info "Ensuring checkout of LFS files..."
 git lfs pull
+
+show_info "Configuring the standard git hooks..."
+install_git_hooks
 
 show_info "Installing Python..."
 install_python
@@ -777,4 +817,4 @@ show_note "How to reset this setup:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
 echo " "
 
-# vim: tw=0
+# vim: tw=0 sts=2 sw=2 et

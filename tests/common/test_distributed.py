@@ -11,6 +11,7 @@ from multiprocessing import Event, Process, Queue
 from pathlib import Path
 from typing import Any, Iterable, List
 
+import aiotools
 import attr
 import pytest
 from etcetra.types import HostPortPair as EtcdHostPortPair
@@ -296,3 +297,37 @@ async def test_global_timer_join_leave(request, test_ns, redis_container) -> Non
 
     await event_producer.close()
     await event_dispatcher.close()
+
+
+@pytest.mark.asyncio
+async def test_filelock_watchdog(request, test_ns) -> None:
+    """
+    This test case is for verifying
+    if watchdog releases the lock after the timeout(ttl)
+    even though the given job is in progress yet.
+
+    TODO: For further implementation, the `FileLock` should be able to **cancel** current job after timeout.
+    """
+    lock_path = Path(tempfile.gettempdir()) / f'{test_ns}.lock'
+    request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
+
+    loop = asyncio.get_running_loop()
+    vclock = aiotools.VirtualClock()
+    with vclock.patch_loop():
+
+        async def _main(ttl: float, delay: float = 5.0, interval: float = 0.03):
+            async with FileLock(lock_path, timeout=0, lifetime=ttl, debug=True) as lock:
+                t = 0.0
+                while lock.is_locked and t < delay:
+                    await asyncio.sleep(interval)
+                    t += interval
+
+        ttl, delay = (3.0, float('inf'))
+        n = 4
+
+        begin = loop.time()
+
+        coroutines = [asyncio.create_task(_main(ttl=ttl, delay=delay)) for _ in range(n)]
+        await asyncio.gather(*coroutines)
+
+        assert ttl * n <= (loop.time() - begin) < delay * n
