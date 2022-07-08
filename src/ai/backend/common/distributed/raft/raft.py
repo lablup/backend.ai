@@ -104,10 +104,6 @@ class RaftFiniteStateMachine(aobject, RaftProtocol):
         if callback := self._on_state_changed:
             if inspect.iscoroutinefunction(callback):
                 await callback(next_state)
-                """
-                src/ai/backend/common/distributed/raft/raft.py:105: error: Incompatible types in "await" (actual type "Optional[Any]", expected type "Awaitable[Any]")
-                # src/ai/backend/common/distributed/raft/raft.py:105: error: "None" not callable
-                """
             elif inspect.isfunction(callback):
                 callback(next_state)
 
