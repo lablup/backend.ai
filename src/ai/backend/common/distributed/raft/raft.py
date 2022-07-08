@@ -6,7 +6,7 @@ import math
 import random
 import uuid
 from datetime import datetime
-from typing import Callable, Final, Iterable, List, Optional, Tuple
+from typing import Awaitable, Callable, Final, Iterable, List, Optional, Tuple
 
 from ...types import aobject
 from ..protos import raft_pb2
@@ -34,13 +34,13 @@ class RaftFiniteStateMachine(aobject, RaftProtocol):
         server: RaftServer,
         client: RaftClient,
         *,
-        on_state_changed: Optional[Callable] = None,
+        on_state_changed: Optional[Callable[[RaftState], Awaitable]] = None,
     ) -> None:
         self._id: Final[str] = str(uuid.uuid4())
         self._peers: Tuple[str, ...] = tuple(peers)
         self._server: Final[RaftServer] = server
         self._client: Final[RaftClient] = client
-        self._on_state_changed: Optional[Callable[[RaftState], None]] = on_state_changed
+        self._on_state_changed: Optional[Callable[[RaftState], Awaitable]] = on_state_changed
 
         # Persistent state on all servers
         # (Updated on stable storage before responding to RPCs)
@@ -101,10 +101,15 @@ class RaftFiniteStateMachine(aobject, RaftProtocol):
 
     async def _execute_transition(self, next_state: RaftState):
         self._state = next_state
-        if inspect.iscoroutinefunction(callback := self._on_state_changed):
-            await callback(next_state)
-        elif inspect.isfunction(callback):
-            callback(next_state)
+        if callback := self._on_state_changed:
+            if inspect.iscoroutinefunction(callback):
+                await callback(next_state)
+                """
+                src/ai/backend/common/distributed/raft/raft.py:105: error: Incompatible types in "await" (actual type "Optional[Any]", expected type "Awaitable[Any]")
+                # src/ai/backend/common/distributed/raft/raft.py:105: error: "None" not callable
+                """
+            elif inspect.isfunction(callback):
+                callback(next_state)
 
     """
     RaftProtocol Implementations
