@@ -54,7 +54,7 @@ scaling-group = "default"
 # skip-manager-detection = false
 
 # This directory is used to store the last registry file.
-var-base-path = "/var/lib/backend.ai"
+# var-base-path = "/var/lib/backend.ai"
 
 [container]
 # The port range to expose public service ports.
