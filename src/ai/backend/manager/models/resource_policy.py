@@ -16,7 +16,6 @@ from .base import (
     BigInt,
     EnumType,
     ResourceSlotColumn,
-    batch_result,
     batch_result_in_session,
     metadata,
     set_if_set,
