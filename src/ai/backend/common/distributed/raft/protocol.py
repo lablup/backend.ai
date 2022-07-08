@@ -4,7 +4,7 @@ from typing import Iterable
 
 class RaftProtocol(abc.ABC):
     @abc.abstractmethod
-    def on_append_entries(
+    async def on_append_entries(
         self,
         *,
         term: int,
@@ -17,7 +17,7 @@ class RaftProtocol(abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def on_request_vote(
+    async def on_request_vote(
         self,
         *,
         term: int,

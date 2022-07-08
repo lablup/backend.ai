@@ -13,7 +13,7 @@ import subprocess
 import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
-from contextlib import closing
+from contextlib import closing, suppress
 from datetime import datetime
 from pathlib import Path
 from typing import (
@@ -334,21 +334,11 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     loop = asyncio.get_running_loop()
 
-    async def _attach_leader_task_producer():
-        root_ctx.leader_task_producer = await EventProducer.new(
-            root_ctx.shared_config.data['redis'],
-            db=REDIS_STREAM_DB,
-        )
-
-    producer_task = loop.create_task(_attach_leader_task_producer())
-    attach_dispatcher_task: Optional[asyncio.Task] = None
-    detach_dispatcher_task: Optional[asyncio.Task] = None
-    await producer_task
+    random_event_produce_task: Optional[asyncio.Task] = None
 
     # TODO: Decoupling
-    def _on_state_changed(state: RaftState):
-        nonlocal attach_dispatcher_task
-        nonlocal detach_dispatcher_task
+    async def _on_state_changed(state: RaftState):
+        nonlocal random_event_produce_task
 
         is_leader = False
 
@@ -358,27 +348,22 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 is_leader = True
 
                 async def _event_callback(context: None, source: str, event: DoImageRescanEvent):
-                    log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] '
-                             f'(DoImageRescanEvent) root_ctx.local_config.is_leader={is_leader}')
+                    log.debug(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] '
+                              f'(DoImageRescanEvent) root_ctx.local_config.is_leader={is_leader}')
 
-                async def _attach_leader_task_dispatcher():
-                    if task := detach_dispatcher_task:
-                        task.cancel()
-                        await task
-                    root_ctx.leader_task_dispatcher = await EventDispatcher.new(
-                        root_ctx.shared_config.data['redis'],
-                        db=REDIS_STREAM_DB,
-                        log_events=root_ctx.local_config['debug']['log-events'],
-                        node_id=root_ctx.local_config['manager']['id'],
-                    )
-                    log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] '
-                             f'LEADER attach task_dispatcher: {root_ctx.leader_task_dispatcher}')
+                root_ctx.leader_task_dispatcher = await EventDispatcher.new(
+                    root_ctx.shared_config.data['redis'],
+                    db=REDIS_STREAM_DB,
+                    log_events=root_ctx.local_config['debug']['log-events'],
+                    node_id=root_ctx.local_config['manager']['id'],
+                )
+                root_ctx.leader_task_dispatcher.consume(DoImageRescanEvent, None, _event_callback)
 
-                    root_ctx.leader_task_dispatcher.consume(DoImageRescanEvent, None, _event_callback)
+            case RaftState.CANDIDATE:
+                log.warning(f'[pid={os.getpid()}/pidx={root_ctx.pidx} CANDIDATE')
+                is_leader = False
 
-                attach_dispatcher_task = loop.create_task(_attach_leader_task_dispatcher())
-
-            case _:
+            case RaftState.FOLLOWER:
                 log.warning(f'[pid={os.getpid()}/pidx={root_ctx.pidx} FOLLOWER')
                 is_leader = False
 
@@ -387,26 +372,25 @@ async def raft_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                         await asyncio.sleep(1)
                         await root_ctx.leader_task_producer.produce_event(DoImageRescanEvent())
 
-                _ = loop.create_task(_random_event_produce_coroutine())
-
-                async def _detach_leader_task_dispatcher():
-                    if task := attach_dispatcher_task:
-                        task.cancel()
+                if task := random_event_produce_task:
+                    task.cancel()
+                    with suppress(asyncio.CancelledError):
                         await task
-                    try:
-                        if hasattr(root_ctx, 'leader_task_dispatcher') \
-                           and (task_dispatcher := root_ctx.leader_task_dispatcher):
-                            await task_dispatcher.close()
-                        log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] '
-                                 f'LEADER detach task_dispatcher: {root_ctx.leader_task_dispatcher}')
-                    except AttributeError:
-                        pass
-
-                detach_dispatcher_task = loop.create_task(_detach_leader_task_dispatcher())
+                random_event_produce_task = loop.create_task(_random_event_produce_coroutine())
+                """
+                try:
+                    if hasattr(root_ctx, 'leader_task_dispatcher') \
+                        and (task_dispatcher := root_ctx.leader_task_dispatcher):
+                        await task_dispatcher.close()
+                    log.info(f'[pid={os.getpid()}/pidx={root_ctx.pidx}] '
+                                f'LEADER detach task_dispatcher: {root_ctx.leader_task_dispatcher}')
+                except AttributeError:
+                    pass
+                """
 
     client = AsyncGrpcRaftClient()
     raft_server = GrpcRaftServer()
-    raft = RaftFiniteStateMachine(
+    raft = await RaftFiniteStateMachine.new(
         peers=peers,
         server=raft_server,
         client=client,
@@ -471,7 +455,12 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log_events=root_ctx.local_config['debug']['log-events'],
         node_id=root_ctx.local_config['manager']['id'],
     )
+    root_ctx.leader_task_producer = await EventProducer.new(
+        root_ctx.shared_config.data['redis'],
+        db=REDIS_STREAM_DB,
+    )
     yield
+    await root_ctx.leader_task_producer.close()
     await root_ctx.event_producer.close()
     await asyncio.sleep(0.2)
     await root_ctx.event_dispatcher.close()

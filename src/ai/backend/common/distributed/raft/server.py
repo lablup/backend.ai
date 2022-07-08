@@ -23,28 +23,28 @@ class GrpcRaftServer(RaftServer, raft_pb2_grpc.RaftServiceServicer):
     def bind(self, protocol: RaftProtocol):
         self._protocol = protocol
 
-    def AppendEntries(
+    async def AppendEntries(
         self,
         request: raft_pb2.AppendEntriesRequest,                                             # type: ignore
         context: grpc.aio.ServicerContext,
     ) -> raft_pb2.AppendEntriesResponse:                                                    # type: ignore
         if (protocol := self._protocol) is None:
             return raft_pb2.AppendEntriesResponse(term=request.term, success=False)         # type: ignore
-        success = protocol.on_append_entries(
+        success = await protocol.on_append_entries(
             term=request.term, leader_id=request.leader_id,                                 # type: ignore
             prev_log_index=request.prev_log_index, prev_log_term=request.prev_log_term,     # type: ignore
             entries=request.entries, leader_commit=request.leader_commit,                   # type: ignore
         )
         return raft_pb2.AppendEntriesResponse(term=request.term, success=success)           # type: ignore
 
-    def RequestVote(
+    async def RequestVote(
         self,
         request: raft_pb2.RequestVoteRequest,                                               # type: ignore
         context: grpc.aio.ServicerContext,
     ) -> raft_pb2.RequestVoteResponse:                                                      # type: ignore
         if (protocol := self._protocol) is None:
             return raft_pb2.RequestVoteResponse(term=request.term, vote_granted=False)      # type: ignore
-        vote_granted = protocol.on_request_vote(
+        vote_granted = await protocol.on_request_vote(
             term=request.term, candidate_id=request.candidate_id,                           # type: ignore
             last_log_index=request.last_log_index, last_log_term=request.last_log_term,     # type: ignore
         )
