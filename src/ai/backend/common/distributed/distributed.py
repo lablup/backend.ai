@@ -4,11 +4,11 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Callable, Final
 
-from .logging import BraceStyleAdapter
+from ..logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
-    from .events import AbstractEvent, EventProducer
-    from .lock import AbstractDistributedLock
+    from ..events import AbstractEvent, EventProducer
+    from ..lock import AbstractDistributedLock
 
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
