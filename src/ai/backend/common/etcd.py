@@ -462,9 +462,9 @@ class AsyncEtcd:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f'{_slash(scope_prefix)}'))
         mangled_key = self._mangle_key(f'{_slash(scope_prefix)}{key}')
-        # NOTE: yield from in async-generator is not supported.
+        ended_without_error = False
 
-        while True:
+        while not ended_without_error:
             try:
                 async for ev in self._watch_impl(
                     lambda communicator: communicator.watch(
@@ -477,10 +477,14 @@ class AsyncEtcd:
                     wait_timeout=wait_timeout,
                 ):
                     yield ev
+                ended_without_error = True
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
                     log.warn('watch(): error while connecting to Etcd server, retrying...')
                     await asyncio.sleep(0.5)
+                    ended_without_error = False
+                else:
+                    raise
 
     async def watch_prefix(
         self, key_prefix: str, *,
@@ -494,8 +498,9 @@ class AsyncEtcd:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f'{_slash(scope_prefix)}'))
         mangled_key_prefix = self._mangle_key(f'{_slash(scope_prefix)}{key_prefix}')
+        ended_without_error = False
 
-        while True:
+        while not ended_without_error:
             try:
                 async for ev in self._watch_impl(
                     lambda communicator: communicator.watch_prefix(
@@ -508,7 +513,11 @@ class AsyncEtcd:
                     wait_timeout=wait_timeout,
                 ):
                     yield ev
+                ended_without_error = True
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
                     log.warn('watch_prefix(): error while connecting to Etcd server, retrying...')
                     await asyncio.sleep(0.5)
+                    ended_without_error = False
+                else:
+                    raise e
