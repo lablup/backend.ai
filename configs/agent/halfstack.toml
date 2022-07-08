@@ -13,6 +13,7 @@ agent-sock-port = 6007
 scaling-group = "default"
 pid-file = "./agent.pid"
 event-loop = "uvloop"
+var-base-path = "/var/lib/backend.ai"
 
 
 [container]
