@@ -1622,9 +1622,9 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
 async def destroy(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app['_root.context']
     session_name = request.match_info['session_name']
-    if params['forced'] and request['user']['role'] not in (UserRole.ADMIN, UserRole.SUPERADMIN):
-        raise InsufficientPrivilege('You are not allowed to force-terminate')
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
+    if requester_access_key != owner_access_key and request['user']['role'] not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+        raise InsufficientPrivilege('You are not allowed to force-terminate others\'s sessions')
     # domain_name = None
     # if requester_access_key != owner_access_key and \
     #         not request['is_superadmin'] and request['is_admin']:
