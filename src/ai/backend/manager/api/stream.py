@@ -33,7 +33,6 @@ from urllib.parse import urlparse
 
 import aiohttp
 import aiohttp_cors
-import aioredis.exceptions
 import aiotools
 import attr
 import grpc
