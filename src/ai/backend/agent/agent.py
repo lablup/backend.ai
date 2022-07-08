@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import pickle
 import re
 import signal
+import shutil
 import sys
 import time
 import traceback
@@ -1124,9 +1126,17 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
         Scan currently running kernels and recreate the kernel objects in
         ``self.kernel_registry`` if any missing.
         """
+        
+        ipc_base_path = self.local_config['agent']['ipc-base-path']
+        var_base_path = self.local_config['agent']['var-base-path']
+        last_registry_file = f'last_registry.{self.local_instance_id}.dat'
+        if os.path.isfile(ipc_base_path / last_registry_file):
+            shutil.move(ipc_base_path / last_registry_file, 
+                        var_base_path / last_registry_file)
+            log.info('Success move last registry file [tmp] -> [var/lib]')
+
         try:
-            ipc_base_path = self.local_config['agent']['ipc-base-path']
-            with open(ipc_base_path / f'last_registry.{self.local_instance_id}.dat', 'rb') as f:
+            with open(var_base_path / last_registry_file, 'rb') as f:
                 self.kernel_registry = pickle.load(f)
                 for kernel_obj in self.kernel_registry.values():
                     kernel_obj.agent_config = self.local_config
@@ -1791,7 +1801,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
         if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
         try:
-            ipc_base_path = self.local_config["agent"]["ipc-base-path"]
+            ipc_base_path = self.local_config["agent"]["var-base-path"]
             last_registry_file = f"last_registry.{self.local_instance_id}.dat"
             with open(ipc_base_path / last_registry_file, "wb") as f:
                 pickle.dump(self.kernel_registry, f)
