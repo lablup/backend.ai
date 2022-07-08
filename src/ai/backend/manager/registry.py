@@ -111,7 +111,6 @@ from .models import (
     AGENT_UPDATE_FIELDS,
     DEAD_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    UpdatedStatus,
     AgentRow,
     AgentStatus,
     ImageRow,
@@ -132,7 +131,6 @@ from .models.session import (
     aggregate_kernel_status,
     enqueue_session,
     match_sessions,
-    update_kernel_status,
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -759,7 +757,7 @@ class AgentRegistry:
         session_enqueue_configs: SessionEnqueuingConfig,
         scaling_group_name: Optional[str],
         session_type: SessionTypes,
-        resource_policy,    # type: ignore
+        resource_policy,
         *,
         user_scope: UserScope,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
@@ -2564,16 +2562,6 @@ class AgentRegistry:
                     .where(AgentRow.id == agent_id)
                 )
                 await db_sess.execute(update_query)
-                # update_query = (
-                #     sa.update(agents)
-                #     .values({
-                #         'status': status,
-                #         'status_changed': now,
-                #         'lost_at': now,
-                #     })
-                #     .where(agents.c.id == agent_id)
-                # )
-                # await conn.execute(update_query)
 
         await redis.execute(self.redis_image, _pipe_builder)
         await execute_with_retry(_update)
@@ -2593,27 +2581,42 @@ class AgentRegistry:
         is_single_kernel: bool = False,
     ) -> None:
         now = datetime.now(tzutc())
-        data = {
-            'status': status,
-            'status_info': status_info,
-            'kernel_status_data': status_data,
-            'session_status_data': sql_json_merge(
-                SessionRow.status_data,
-                ('kernels', str(kernel_id),),
-                obj=status_data,
-            ),
-            'status_changed': now,
-        }
-
         async def _update() -> None:
             async with self.db.begin_session() as db_sess:
-                await update_kernel_status(
-                    db_sess,
-                    kernel_id,
-                    access_key,
-                    update_data=UpdatedStatus(**data),
-                    is_single_kernel=is_single_kernel,
+                kernel_query = (
+                    sa.update(KernelRow)
+                    .where(KernelRow.id == kernel_id)
+                    .values(
+                        status=status,
+                        status_info=status_info,
+                        status_data=status_data,
+                        status_changed=now,
+                    )
+                    .returning(KernelRow.session_id)
                 )
+                result = await db_sess.execute(kernel_query)
+                session_id = result.scalars().first()
+                session_query = (
+                    sa.select(SessionRow)
+                    .where(SessionRow.id == session_id)
+                    .options(selectinload(SessionRow.kernels))
+                )
+                result = await db_sess.execute(session_query)
+                session = result.scalars().first()
+                updated_status = aggregate_kernel_status([k.status for k in session.kernels])
+                update_query = (
+                    sa.update(SessionRow)
+                    .where(SessionRow.id == session_id)
+                    .values(
+                        status=updated_status,
+                        status_data=sql_json_merge(
+                            SessionRow.status_data,
+                            ('kernels', str(kernel_id),),
+                            obj=status_data,
+                        ),
+                    )
+                )
+                await db_sess.execute(update_query)
 
         await execute_with_retry(_update)
 
@@ -2634,12 +2637,33 @@ class AgentRegistry:
 
         async def _update() -> None:
             async with self.db.begin_session() as db_sess:
-                await update_kernel_status(
-                    db_sess,
-                    kernel_id,
-                    update_data=UpdatedStatus(**data),
-                    is_single_kernel=False,
+                kernel_query = (
+                    sa.update(KernelRow)
+                    .where(KernelRow.id == kernel_id)
+                    .values(**data)
+                    .returning(KernelRow.session_id)
                 )
+                result = await db_sess.execute(kernel_query)
+                session_id = result.scalars().first()
+                session_query = (
+                    sa.select(SessionRow)
+                    .where(SessionRow.id == session_id)
+                    .options(selectinload(SessionRow.kernels))
+                    .execution_options(populate_existing=True)
+                )
+                result = await db_sess.execute(session_query)
+                session = result.scalars().first()
+                updated_status = aggregate_kernel_status([k.status for k in session.kernels])
+                if updated_status != session.status:
+                    update_query = (
+                        sa.update(SessionRow)
+                        .where(SessionRow.id == session_id)
+                        .values(
+                            status=updated_status,
+                            status_changed=now,
+                        )
+                    )
+                    await db_sess.execute(update_query)
 
         await execute_with_retry(_update)
 
@@ -2751,7 +2775,34 @@ class AgentRegistry:
                 }
                 if kern_stat:
                     values['last_stat'] = msgpack.unpackb(kern_stat)
-                await update_kernel_status(db_sess, kernel, update_data=UpdatedStatus(**values))
+                kernel_query = (
+                    sa.update(KernelRow)
+                    .where(KernelRow.id == kernel.id)
+                    .values(**values)
+                )
+                await db_sess.execute(kernel_query)
+                session_select = (
+                    sa.select(SessionRow)
+                    .where(SessionRow.id == kernel.session_id)
+                    .execution_options(populate_existing=True)
+                    .options(selectinload(SessionRow.kernels))
+                )
+                result = await db_sess.execute(session_select)
+                session = result.scalars().first()
+                updated_status = aggregate_kernel_status([k.status for k in session.kernels])
+                session_query = (
+                    sa.update(SessionRow)
+                    .where(SessionRow.id == kernel.session_id)
+                    .values(
+                        status=updated_status,
+                        status_data=sql_json_merge(
+                            SessionRow.status_data,
+                            ('kernels', str(kernel.id),),
+                            {'exit_code': exit_code},
+                        ),
+                    )
+                )
+                await db_sess.execute(session_query)
                 select_query = (
                     sa.select(KernelRow)
                     .where(KernelRow.id == kernel_id)

@@ -44,7 +44,6 @@ from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
 from ..defs import LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
-    UpdatedStatus,
     AgentRow,
     KernelStatus,
     SessionRow,
@@ -56,8 +55,6 @@ from ..models import (
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
-    update_kernel_status,
-    update_session_with_kernels,
 )
 from ..models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ..models.utils import ExtendedAsyncSAEngine as SAEngine
@@ -260,15 +257,28 @@ class SchedulerDispatcher(aobject):
             async def _apply_cancellation():
                 async with self.db.begin_session() as db_sess:
                     for session in cancelled_sessions:
-                        await update_session_with_kernels(
-                            db_sess, session,
-                            update_data={
-                                'status': SessionStatus.CANCELLED,
-                                'status_changed': now,
-                                'status_info': 'pending-timeout',
-                                'terminated_at': now,
-                            },
+                        kernel_query = (
+                            sa.update(KernelRow)
+                            .where(KernelRow.session_id == session.id)
+                            .values(
+                                status=KernelStatus.CANCELLED,
+                                status_changed=now,
+                                status_info='pending-timeout',
+                                terminated_at=now,
+                            )
                         )
+                        await db_sess.execute(kernel_query)
+                        session_query = (
+                            sa.update(SessionRow)
+                            .where(SessionRow.id == session.id)
+                            .values(
+                                status=SessionStatus.CANCELLED,
+                                status_changed=now,
+                                status_info='pending-timeout',
+                                terminated_at=now,
+                            )
+                        )
+                        await db_sess.execute(session_query)
 
             await execute_with_retry(_apply_cancellation)
             for sess in cancelled_sessions:
@@ -399,22 +409,32 @@ class SchedulerDispatcher(aobject):
                         await _rollback_predicate_mutations(
                             sess, sched_ctx, sess_ctx,
                         )
-                        await update_session_with_kernels(
-                            sess, sess_ctx,
-                            update_data={
-                                'status_info': 'predicate-checks-failed',
-                                'kernel_status_data': sql_json_increment(
+                        kernel_query = (
+                            sa.update(KernelRow)
+                            .where(KernelRow.session_id == sess_ctx.id)
+                            .values(
+                                status_info='predicate-checks-failed',
+                                status_data=sql_json_increment(
                                     KernelRow.status_data,
                                     ('scheduler', 'retries'),
                                     parent_updates=status_update_data,
                                 ),
-                                'session_status_data': sql_json_increment(
+                            )
+                        )
+                        await db_sess.execute(kernel_query)
+                        session_query = (
+                            sa.update(SessionRow)
+                            .where(SessionRow.id == sess_ctx.id)
+                            .values(
+                                status_info='predicate-checks-failed',
+                                status_data=sql_json_increment(
                                     SessionRow.status_data,
                                     ('scheduler', 'retries'),
                                     parent_updates=status_update_data,
                                 ),
-                            },
+                            )
                         )
+                        await db_sess.execute(session_query)
 
                 await execute_with_retry(_update)
                 # Predicate failures are *NOT* permanent errors.
@@ -423,21 +443,28 @@ class SchedulerDispatcher(aobject):
             else:
                 async def _update() -> None:
                     async with self.db.begin_session() as db_sess:
-                        await update_session_with_kernels(
-                            db_sess, sess_ctx,
-                            update_data={
-                                'session_status_data': sql_json_merge(
-                                    SessionRow.status_data,
-                                    ('scheduler',),
-                                    obj=status_update_data,
-                                ),
-                                'kernel_status_data': sql_json_merge(
+                        kernel_query = (
+                            sa.update(KernelRow)
+                            .where(KernelRow.session_id == sess_ctx.id)
+                            .values(
+                                status_data=sql_json_merge(
                                     KernelRow.status_data,
                                     ('scheduler',),
                                     obj=status_update_data,
-                                ),
-                            },
+                            ))
                         )
+                        await db_sess.execute(kernel_query)
+                        session_query = (
+                            sa.update(SessionRow)
+                            .where(SessionRow.id == sess_ctx.id)
+                            .values(
+                                status_data=sql_json_merge(
+                                    SessionRow.status_data,
+                                    ('scheduler',),
+                                    obj=status_update_data,
+                            ))
+                        )
+                        await db_sess.execute(session_query)
 
                 await execute_with_retry(_update)
 
@@ -532,26 +559,36 @@ class SchedulerDispatcher(aobject):
                         kernel_db_sess, sched_ctx, sess_ctx,
                     )
                     now = datetime.now(tzutc()).isoformat()
-                    await update_session_with_kernels(
-                        kernel_db_sess, sess_ctx,
-                        update_data={
-                            'status_info': 'no-available-instances',
-                            'session_status_data': sql_json_increment(
-                                SessionRow.status_data,
-                                ('scheduler', 'retries'),
-                                parent_updates={
-                                    'last_try': now,
-                                },
-                            ),
-                            'kernel_status_data': sql_json_increment(
+                    kernel_query = (
+                        sa.update(KernelRow)
+                        .where(KernelRow.session_id == sess_ctx.id)
+                        .values(
+                            status_info='no-available-instances',
+                            status_data=sql_json_increment(
                                 KernelRow.status_data,
                                 ('scheduler', 'retries'),
                                 parent_updates={
                                     'last_try': now,
                                 },
                             ),
-                        },
+                        )
                     )
+                    await kernel_db_sess.execute(kernel_query)
+                    session_query = (
+                        sa.update(SessionRow)
+                        .where(SessionRow.id == sess_ctx.id)
+                        .values(
+                            status_info='no-available-instances',
+                            status_data=sql_json_increment(
+                                SessionRow.status_data,
+                                ('scheduler', 'retries'),
+                                parent_updates={
+                                    'last_try': now,
+                                },
+                            ),
+                        )
+                    )
+                    await kernel_db_sess.execute(session_query)\
 
             await execute_with_retry(_update)
             raise
@@ -567,14 +604,24 @@ class SchedulerDispatcher(aobject):
                     await _rollback_predicate_mutations(
                         kernel_db_sess, sched_ctx, sess_ctx,
                     )
-                    await update_session_with_kernels(
-                        kernel_db_sess, sess_ctx,
-                        update_data={
-                            'status_info': 'scheduler-error',
-                            'kernel_status_data': exc_data,
-                            'session_status_data': exc_data,
-                        },
+                    kernel_query = (
+                        sa.update(KernelRow)
+                        .where(KernelRow.session_id == sess_ctx.id)
+                        .values(
+                            status_info='scheduler-error',
+                            status_data=exc_data,
+                        )
                     )
+                    await kernel_db_sess.execute(kernel_query)
+                    session_query = (
+                        sa.update(SessionRow)
+                        .where(SessionRow.id == sess_ctx.id)
+                        .values(
+                            status_info='scheduler-error',
+                            status_data=exc_data,
+                        )
+                    )
+                    await kernel_db_sess.execute(session_query)
 
             await execute_with_retry(_update)
             raise
@@ -678,19 +725,21 @@ class SchedulerDispatcher(aobject):
                             await _rollback_predicate_mutations(
                                 kernel_db_sess, sched_ctx, sess_ctx,
                             )
-                            await update_kernel_status(
-                                kernel_db_sess, kernel,
-                                update_data={
-                                    'status_info': 'no-available-instances',
-                                    'kernel_status_data': sql_json_increment(
+                            kernel_query = (
+                                sa.update(KernelRow)
+                                .where(KernelRow.id == kernel.id)
+                                .values(
+                                    status_info='no-available-instances',
+                                    status_data=sql_json_increment(
                                         KernelRow.status_data,
                                         ('scheduler', 'retries'),
                                         parent_updates={
                                             'last_try': datetime.now(tzutc()).isoformat(),
                                         },
                                     ),
-                                },
+                                )
                             )
+                            await kernel_db_sess.execute(kernel_query)
 
                     await execute_with_retry(_update)
                     raise
@@ -706,18 +755,27 @@ class SchedulerDispatcher(aobject):
                             await _rollback_predicate_mutations(
                                 kernel_db_sess, sched_ctx, sess_ctx,
                             )
-                            await update_kernel_status(
-                                kernel_db_sess, kernel,
-                                update_data=UpdatedStatus({
-                                    'status_info': 'scheduler-error',
-                                    'kernel_status_data': exc_data,
-                                    'session_status_data': sql_json_merge(
+                            kernel_query = (
+                                sa.update(KernelRow)
+                                .where(KernelRow.id == kernel.id)
+                                .values(
+                                    status_info='scheduler-error',
+                                    status_data=exc_data,
+                                )
+                            )
+                            await kernel_db_sess.execute(kernel_query)
+                            session_query = (
+                                sa.update(SessionRow)
+                                .where(SessionRow.id == kernel.session_id)
+                                .values(
+                                    status_data=sql_json_merge(
                                         SessionRow.status_data,
                                         ('kernels', str(kernel.id),),
                                         obj=exc_data,
                                     ),
-                                }),
+                                )
                             )
+                            await kernel_db_sess.execute(session_query)
 
                     await execute_with_retry(_update)
                     raise
@@ -785,7 +843,7 @@ class SchedulerDispatcher(aobject):
             async with self.lock_factory(LockID.LOCKID_PREPARE, 600):
 
                 async def _mark_session_preparing() -> Sequence[SessionRow]:
-                    async with self.db.begin_session() as db_sess:
+                    async with self.db.begin_session(expire_on_commit=False) as db_sess:
                         return await get_scheduled_sessions(db_sess)
 
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
@@ -840,17 +898,30 @@ class SchedulerDispatcher(aobject):
                         await recalc_agent_resource_occupancy(db_sess, agent)
                     await _rollback_predicate_mutations(db_sess, sched_ctx, session)
                     now = datetime.now(tzutc())
-                    await update_session_with_kernels(
-                        db_sess, session,
-                        update_data=UpdatedStatus({
-                            'status': SessionStatus.CANCELLED,
-                            'status_changed': now,
-                            'status_info': "failed-to-start",
-                            'session_status_data': status_data,
-                            'kernel_status_data': status_data,
-                            'terminated_at': now,
-                        }),
+                    kernel_query = (
+                        sa.update(KernelRow)
+                        .where(KernelRow.session_id == session.id)
+                        .values(
+                            status=KernelStatus.CANCELLED,
+                            status_changed=now,
+                            status_info='failed-to-start',
+                            status_data=status_data,
+                            terminated_at=now,
+                        )
                     )
+                    await db_sess.execute(kernel_query)
+                    session_query = (
+                        sa.update(SessionRow)
+                        .where(SessionRow.id == session.id)
+                        .values(
+                            status=SessionStatus.CANCELLED,
+                            status_changed=now,
+                            status_info='failed-to-start',
+                            status_data=status_data,
+                            terminated_at=now,
+                        )
+                    )
+                    await db_sess.execute(session_query)
 
             log.debug(log_fmt + 'cleanup-start-failure: begin', *log_args)
             try:

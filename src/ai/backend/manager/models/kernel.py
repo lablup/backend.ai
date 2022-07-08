@@ -114,7 +114,7 @@ class KernelStatus(enum.Enum):
     # ---
     RUNNING = 30
     RESTARTING = 31
-    RESIZING = 32
+    RESIZING = 32       # Is it possible to resize kernel??
     SUSPENDED = 33
     # ---
     TERMINATING = 40
