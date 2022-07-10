@@ -16,6 +16,30 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.03.9 (2022-07-10)
+
+### Features
+* install-dev: Ensure that the user is on the build root directory (the repository's topmost directory). ([#524](https://github.com/lablup/backend.ai/issues/524))
+* client: Bump the compatible manager API version range to v6.20220615 ([#533](https://github.com/lablup/backend.ai/issues/533))
+
+### Fixes
+* Use `uname -m` instead of `uname -p` for better compatibility with many Linux variants and macOS when configuring the image registry and pulling the base Python image ([#505](https://github.com/lablup/backend.ai/issues/505))
+* Fix `prepare()` not running when `start_session()` call hangs without raising Exception ([#514](https://github.com/lablup/backend.ai/issues/514))
+* Update the sample docker-compose configuration so that the healthcheck for Redis container takes care of "loading" status of the Redis server ([#527](https://github.com/lablup/backend.ai/issues/527))
+* Fix background tasks exiting without notice due to inappropriate exception handling inside task ([#530](https://github.com/lablup/backend.ai/issues/530))
+
+### Miscellaneous
+* Upgrade the CPython version requirement to 3.10.5 ([#481](https://github.com/lablup/backend.ai/issues/481))
+* Introduce `isort` as our linter and formatter to ensure consistency of the code style of import statements ([#495](https://github.com/lablup/backend.ai/issues/495))
+* Let git ignore `/scratches` directory that kernels use. ([#497](https://github.com/lablup/backend.ai/issues/497))
+* Manually upgrade pex version to 2.1.93 to avoid alternating platform tags in lockfiles depending on at which architecture the lockfiles are generated ([#498](https://github.com/lablup/backend.ai/issues/498))
+* Upgrade pex to 2.1.94 which addresses a fresh `./pants expor` regression in #498's manual upgrade to 2.1.93 ([#506](https://github.com/lablup/backend.ai/issues/506))
+* Upgrade Pants to 2.12.0rc3 to 2.12.0 ([#508](https://github.com/lablup/backend.ai/issues/508))
+* Let `scripts/install-dev.sh` configure the standard git pre-push hook that runs fmt for all files and lint/check against the changed files ([#518](https://github.com/lablup/backend.ai/issues/518))
+* Improve the latency of git pre push hook with better defaults and auto-detection of release branches ([#519](https://github.com/lablup/backend.ai/issues/519))
+* Add git pre-commit hook to run a quick lint check and improve `install-dev.sh` script to properly create-or-update the git hook scripts ([#520](https://github.com/lablup/backend.ai/issues/520))
+
+
 ## 22.03.8 (2022-06-26)
 
 ### Breaking Changes
