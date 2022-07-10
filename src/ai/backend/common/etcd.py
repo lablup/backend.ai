@@ -110,8 +110,9 @@ class AsyncEtcd:
         namespace: str,
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
-        credentials=None,
-        encoding='utf-8',
+        credentials: dict[str, str] = None,
+        encoding: str = 'utf-8',
+        watch_reconnect_intvl: float = 0.5,
     ) -> None:
         self.scope_prefix_map = t.Dict({
             t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
@@ -126,6 +127,7 @@ class AsyncEtcd:
         self.ns = namespace
         log.info('using etcd cluster from {} with namespace "{}"', addr, namespace)
         self.encoding = encoding
+        self.watch_reconnect_intvl = watch_reconnect_intvl
         self.etcd = EtcdClient(
             EtcetraHostPortPair(str(addr.host), addr.port),
             credentials=self._creds,
@@ -481,7 +483,7 @@ class AsyncEtcd:
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
                     log.warn('watch(): error while connecting to Etcd server, retrying...')
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(self.watch_reconnect_intvl)
                     ended_without_error = False
                 else:
                     raise
@@ -517,7 +519,7 @@ class AsyncEtcd:
             except grpc.aio.AioRpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE:
                     log.warn('watch_prefix(): error while connecting to Etcd server, retrying...')
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(self.watch_reconnect_intvl)
                     ended_without_error = False
                 else:
                     raise e
