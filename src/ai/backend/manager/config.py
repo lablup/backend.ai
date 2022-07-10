@@ -449,6 +449,8 @@ class SharedConfig(AbstractConfig):
         super().__init__()
         credentials = None
         if etcd_user:
+            assert etcd_user is not None
+            assert etcd_password is not None
             credentials = {
                 'user': etcd_user,
                 'password': etcd_password,
