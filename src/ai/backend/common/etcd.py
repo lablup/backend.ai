@@ -120,7 +120,7 @@ class AsyncEtcd:
             t.Key(ConfigScopes.NODE, optional=True): t.String,
         }).check(scope_prefix_map)
         if credentials is not None:
-            self._creds = EtcdCredential(credentials.get('user'), credentials.get('password'))
+            self._creds = EtcdCredential(credentials['user'], credentials['password'])
         else:
             self._creds = None
 
