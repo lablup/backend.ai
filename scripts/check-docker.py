@@ -9,7 +9,6 @@ from urllib.parse import quote
 import requests
 import requests_unixsocket
 
-
 log = functools.partial(print, file=sys.stderr)
 run = subprocess.run
 
