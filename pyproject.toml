@@ -58,3 +58,4 @@ explicit_package_bases = true
 profile = "black"
 sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 known_first_party = ["ai.backend"]
+skip_gitignore = true
