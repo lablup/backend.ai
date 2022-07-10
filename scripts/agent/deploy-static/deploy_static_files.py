@@ -1,7 +1,8 @@
-import paramiko
-import sys
 import os
 import subprocess
+import sys
+
+import paramiko
 
 if len(sys.argv) == 1:
     print('Usage: python deploy_static_files.py <Worker Node IPs seperated by space>')
