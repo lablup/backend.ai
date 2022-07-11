@@ -23,6 +23,8 @@ def wait_health_check(container_id):
         if container_info[0]['State']['Health']['Status'].lower() != 'healthy':
             time.sleep(0.2)
             continue
+        # Give extra grace period to avoid intermittent connection failure.
+        time.sleep(0.1)
         return container_info
 
 
@@ -64,8 +66,8 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     proc = subprocess.run(
         [
             'docker', 'run', '-d',
+            '--health-cmd', 'redis-cli ping | grep PONG',
             '-p', f'0.0.0.0:{redis_allocated_port}:6379',
-            '--health-cmd', 'redis-cli ping',
             '--health-interval', '1s',
             '--health-start-period', '0.3s',
             'redis:7-alpine',
