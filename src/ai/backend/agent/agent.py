@@ -1290,7 +1290,8 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
             # disable running different architecture's image
             raise AgentError(
                 f'cannot run {ctx.image_ref.architecture} image on {agent_architecture} machine',
-            ) 
+            )
+ 
         # Check if we need to pull the container image
         do_pull = await self.check_image(
             ctx.image_ref,
