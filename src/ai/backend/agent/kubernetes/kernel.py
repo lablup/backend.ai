@@ -141,10 +141,12 @@ class KubernetesKernel(AbstractKernel):
         return True
 
     async def get_completions(self, text: str, opts: Mapping[str, Any]):
+        assert self.runner is not None
         result = await self.runner.feed_and_get_completion(text, opts)
         return {'status': 'finished', 'completions': result}
 
     async def check_status(self):
+        assert self.runner is not None
         result = await self.runner.feed_and_get_status()
         return result
 
@@ -156,10 +158,12 @@ class KubernetesKernel(AbstractKernel):
         return {'logs': result.data.decode('utf-8')}
 
     async def interrupt_kernel(self):
+        assert self.runner is not None
         await self.runner.feed_interrupt()
         return {'status': 'finished'}
 
     async def start_service(self, service: str, opts: Mapping[str, Any]):
+        assert self.runner is not None
         if self.data.get('block_service_ports', False):
             return {
                 'status': 'failed',
@@ -180,9 +184,11 @@ class KubernetesKernel(AbstractKernel):
         return result
 
     async def shutdown_service(self, service: str):
+        assert self.runner is not None
         await self.runner.feed_shutdown_service(service)
 
     async def get_service_apps(self):
+        assert self.runner is not None
         result = await self.runner.feed_service_apps()
         return result
 
