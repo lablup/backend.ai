@@ -4,10 +4,8 @@ from typing import List
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from sqlalchemy.ext.asyncio import (
-    AsyncConnection as SAConnection,
-    AsyncSession as SASession,
-)
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis
 from ai.backend.common.logging import BraceStyleAdapter
@@ -15,11 +13,11 @@ from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 
 from ..models import (
     DefaultForUnspecified,
+    KeyPairResourcePolicyRow,
     domains,
     groups,
     kernels,
     keypair_resource_policies,
-    KeyPairResourcePolicyRow,
     query_allowed_sgroups,
     session_dependencies,
 )
