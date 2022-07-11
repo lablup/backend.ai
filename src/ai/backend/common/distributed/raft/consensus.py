@@ -179,7 +179,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         await self._synchronize_term(term)
         self._leader_id = leader_id
         await self._log.append_entries(entries)
-        if tuple(entries):
+        if entries := tuple(entries):
             logging.info(f'[{datetime.now()}] pid={os.getpid()} on_append_entries(term={term}, entry={entries[-1].index}, '
                          f'total={await self._log.size()})')
         await self.reset_timeout()

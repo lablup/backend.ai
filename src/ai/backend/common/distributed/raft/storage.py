@@ -1,6 +1,6 @@
 import abc
 import uuid
-from typing import Generic, Iterable, List, Optional, TypeVar
+from typing import Dict, Generic, Iterable, List, Optional, TypeVar, cast
 
 import aioredis
 
@@ -52,7 +52,7 @@ class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
         self._namespace: str = str(uuid.uuid4())
 
     async def __ainit__(self, *args, host: str = '127.0.0.1', port: int = 8111, **kwargs) -> None:
-        keepalive_options = {}
+        keepalive_options: Dict[str, str] = {}
         self._redis = await aioredis.Redis.from_url(
             f'redis://{host}:{port}',
             socket_keepalive=True,
@@ -61,9 +61,10 @@ class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
 
     async def append_entries(self, entries: Iterable[T]) -> None:
         if entries := tuple(entries):
-            await self._redis.rpush(
-                self._namespace,
-                *map(lambda x: x.SerializeToString(), entries))
+            if isinstance(entries[0], (raft_pb2.Log,)):
+                entries = map(lambda x: cast(x, raft_pb2.Log).SerializeToString(),  # type: ignore
+                              filter(lambda x: x is not None, entries))             # type: ignore
+            await self._redis.rpush(self._namespace, *entries)
 
     async def get(self, index: int) -> Optional[T]:
         if index >= 0:
