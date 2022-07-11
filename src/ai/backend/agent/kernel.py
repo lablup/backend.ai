@@ -150,7 +150,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     _tasks: Set[asyncio.Task]
 
-    runner: 'AbstractCodeRunner'
+    runner: Optional[AbstractCodeRunner]
 
     def __init__(
         self, kernel_id: KernelId, image: ImageRef, version: int, *,
@@ -173,6 +173,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.stats_enabled = False
         self._tasks = set()
         self.environ = environ
+        self.runner = None
 
     async def init(self) -> None:
         log.debug('kernel.init(k:{0}, api-ver:{1}, client-features:{2}): '
@@ -277,6 +278,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     ) -> NextResult:
         myself = asyncio.current_task()
         assert myself is not None
+        assert self.runner is not None
         self._tasks.add(myself)
         try:
             await self.runner.attach_output_queue(run_id)
