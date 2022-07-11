@@ -872,7 +872,7 @@ if [ $EDITABLE_WEBUI -eq 1 ]; then
   echo "(Terminal 3)"
   echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
 fi
-show_note "Manual configuration for storage-proxy's client accessible hostname and webserver URL"
+show_note "Manual configuration for the client accessible hostname in various proxies"
 echo " "
 echo "If you use a VM for this development setup but access it from a web browser outside the VM or remote nodes,"
 echo "you must manually modify the following configurations to use an IP address or a DNS hostname"
