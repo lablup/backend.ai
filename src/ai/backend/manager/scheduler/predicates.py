@@ -4,7 +4,10 @@ from typing import List
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import (
+    AsyncConnection as SAConnection,
+    AsyncSession as SASession,
+)
 
 from ai.backend.common import redis
 from ai.backend.common.logging import BraceStyleAdapter
@@ -16,6 +19,7 @@ from ..models import (
     groups,
     kernels,
     keypair_resource_policies,
+    KeyPairResourcePolicyRow,
     query_allowed_sgroups,
     session_dependencies,
 )
@@ -73,12 +77,11 @@ async def check_concurrency(
 
     async def _get_max_concurrent_sessions() -> int:
         select_query = (
-            sa.select([keypair_resource_policies])
-            .select_from(keypair_resource_policies)
+            sa.select(KeyPairResourcePolicyRow.max_concurrent_sessions)
             .where(keypair_resource_policies.c.name == sess_ctx.resource_policy)
         )
-        result = await db_conn.execute(select_query)
-        return result.first()['max_concurrent_sessions']
+        result = await SASession(db_conn).execute(select_query)
+        return result.scalar()
 
     max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions)
     ok, concurrency_used = await redis.execute_script(
@@ -145,13 +148,16 @@ async def check_keypair_resource_limit(
     sess_ctx: PendingSession,
 ) -> PredicateResult:
     query = (
-        sa.select([keypair_resource_policies])
-        .select_from(keypair_resource_policies)
+        sa.select(KeyPairResourcePolicyRow)
         .where(keypair_resource_policies.c.name == sess_ctx.resource_policy)
     )
-    result = await db_conn.execute(query)
-    resource_policy = result.first()
-    total_keypair_allowed = ResourceSlot.from_policy(resource_policy,
+    result = await SASession(db_conn).execute(query)
+    resource_policy = result.scalars().first()
+    policy_map = {
+        'total_resource_slots': resource_policy.total_resource_slots,
+        'default_for_unspecified': resource_policy.default_for_unspecified,
+    }
+    total_keypair_allowed = ResourceSlot.from_policy(policy_map,
                                                      sched_ctx.known_slot_types)
     key_occupied = await sched_ctx.registry.get_keypair_occupancy(
         sess_ctx.access_key, conn=db_conn)

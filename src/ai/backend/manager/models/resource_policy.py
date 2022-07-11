@@ -32,6 +32,7 @@ log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.models'))
 
 __all__: Sequence[str] = (
     'keypair_resource_policies',
+    'KeyPairResourcePolicyRow',
     'KeyPairResourcePolicy',
     'DefaultForUnspecified',
     'CreateKeyPairResourcePolicy',
