@@ -84,8 +84,8 @@ def local_config(test_id, etcd_container, redis_container):  # noqa: F811
 
 @pytest.fixture(scope='session', autouse=True)
 def test_local_instance_id(local_config, session_mocker, test_id):
-    ipc_base_path = local_config['agent']['ipc-base-path']
-    registry_state_path = ipc_base_path / f'last_registry.{test_id}.dat'
+    var_base_path = local_config['agent']['var-base-path']
+    registry_state_path = var_base_path / f'last_registry.{test_id}.dat'
     try:
         os.unlink(registry_state_path)
     except FileNotFoundError:
