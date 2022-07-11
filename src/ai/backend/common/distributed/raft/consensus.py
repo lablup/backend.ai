@@ -14,6 +14,7 @@ from .client import AbstractRaftClient
 from .protocol import AbstractRaftProtocol
 from .protos import raft_pb2
 from .server import AbstractRaftServer
+from .storage import AbstractLogStorage, RedisLogStorage
 from .types import PeerId
 
 logging.basicConfig(level=logging.INFO)
@@ -54,7 +55,6 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         # (Updated on stable storage before responding to RPCs)
         self._current_term: int = 0
         self._voted_for: Optional[PeerId] = None
-        self._log: List[raft_pb2.Log] = []  # type.ignore
 
         # Volatile state on all servers
         self._commit_index: int = 0
@@ -69,6 +69,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
 
     async def __ainit__(self) -> None:
         await self._execute_transition(RaftState.FOLLOWER)
+        self._log: AbstractLogStorage[raft_pb2.Log] = await RedisLogStorage[raft_pb2.Log].new()    # type: ignore
 
     async def _execute_transition(self, next_state: RaftState) -> None:
         self._state = next_state
@@ -78,9 +79,29 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
             elif inspect.isfunction(callback):
                 callback(next_state)
 
+    """
+    async def _append_random_entry_coro(self):
+        while True:
+            await asyncio.sleep(3.0)
+            command = str(uuid.uuid4())
+            entry = raft_pb2.Log(index=await self._log.size(), term=self.current_term, command=command)
+            await self._log.append_entries((entry,))
+            while not await self.replicate_logs(entries=(entry,)):
+                await asyncio.sleep(0.1)
+    """
+
     async def main(self) -> None:
+        # _append_random_entry_task: Optional[asyncio.Task] = None
         while True:
             logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} state={self._state}')
+            """
+            if task := _append_random_entry_task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            """
             match self._state:
                 case RaftState.FOLLOWER:
                     await self.reset_timeout()
@@ -106,11 +127,29 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                         await asyncio.sleep(self._election_timeout)
                 case RaftState.LEADER:
                     logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} LEADER({self.id})')
+                    # _append_random_entry_task = asyncio.create_task(self._append_random_entry_coro())
                     self._leader_id = self.id
                     while self._state is RaftState.LEADER:
                         await self._publish_heartbeat()
                         await asyncio.sleep(self._heartbeat_interval)
             await asyncio.sleep(0)
+
+    async def _publish_heartbeat(self) -> None:
+        await self.replicate_logs(entries=())
+
+    async def replicate_logs(self, entries: Tuple[raft_pb2.Log, ...]) -> bool:
+        done, _ = await asyncio.wait({
+            asyncio.create_task(
+                self._client.append_entries(
+                    address=address, term=self.current_term,
+                    leader_id=self.id, entries=entries,
+                ),
+            )
+            for address in self._peers
+        }, return_when=asyncio.ALL_COMPLETED)
+        if entries:
+            logging.info(f'replicate_logs(entries={entries[-1].index}, total={await self._log.size()})')
+        return sum([task.result() for task in done]) + 1 >= self.quorum
 
     """
     AbstractRaftProtocol Implementations
@@ -124,7 +163,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         leader_id: PeerId,
         prev_log_index: int,
         prev_log_term: int,
-        entries: Iterable[str],
+        entries: Iterable[raft_pb2.Log],    # type: ignore
         leader_commit: int,
     ) -> bool:
         """Receiver implementation:
@@ -138,8 +177,11 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         if term < self.current_term:
             return False
         await self._synchronize_term(term)
-        logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} on_append_entries(term={term}, leader={leader_id})')
         self._leader_id = leader_id
+        await self._log.append_entries(entries)
+        if tuple(entries):
+            logging.info(f'[{datetime.now()}] pid={os.getpid()} on_append_entries(term={term}, entry={entries[-1].index}, '
+                         f'total={await self._log.size()})')
         await self.reset_timeout()
         return True
 
@@ -180,28 +222,20 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._voted_for = self.id
         term = self.current_term
         logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} start_election(term={term})')
+        last_log = await self._log.get(-1)
+        last_log_index = last_log.index if last_log else 0
+        last_log_term = last_log.term if last_log else 0
         results = await asyncio.gather(*[
             asyncio.create_task(
                 self._client.request_vote(
                     address=address, term=term, candidate_id=self.id,
-                    last_log_index=0, last_log_term=0,
+                    last_log_index=last_log_index, last_log_term=last_log_term,
                 ),
             )
             for address in self._peers
         ])
         if sum(results) + 1 >= self.quorum:
             await self._execute_transition(RaftState.LEADER)
-
-    async def _publish_heartbeat(self) -> None:
-        await asyncio.wait({
-            asyncio.create_task(
-                self._client.append_entries(
-                    address=address, term=self.current_term,
-                    leader_id=self.id, entries=(),
-                ),
-            )
-            for address in self._peers
-        }, return_when=asyncio.ALL_COMPLETED)
 
     async def _synchronize_term(self, term: int) -> None:
         """Rules for Servers

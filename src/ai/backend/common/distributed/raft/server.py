@@ -14,6 +14,9 @@ class AbstractRaftServer(abc.ABC):
 
 
 class GrpcRaftServer(AbstractRaftServer, raft_pb2_grpc.RaftServiceServicer):
+    """
+    A grpc-based implementation of `AbstractRaftServer`.
+    """
     def __init__(self, credentials: Optional[grpc.ServerCredentials] = None):
         self._protocol: Optional[AbstractRaftProtocol] = None
         self._credentials: Optional[grpc.ServerCredentials] = credentials

@@ -16,7 +16,7 @@ class AbstractRaftClient(abc.ABC):
         address: str,
         term: int,
         leader_id: PeerId,
-        entries: Iterable[str],     # FIXME: Use raft_pb2.Entry
+        entries: Iterable[raft_pb2.Log],    # type: ignore
     ) -> bool:
         raise NotImplementedError()
 
@@ -34,6 +34,9 @@ class AbstractRaftClient(abc.ABC):
 
 
 class GrpcRaftClient(AbstractRaftClient):
+    """
+    A grpc-based implementation of `AbstractRaftClient`.
+    """
     def __init__(self, credentials: Optional[grpc.ChannelCredentials] = None):
         self._credentials: Optional[grpc.ChannelCredentials] = credentials
 
@@ -43,7 +46,7 @@ class GrpcRaftClient(AbstractRaftClient):
         address: str,
         term: int,
         leader_id: PeerId,
-        entries: Iterable[str],
+        entries: Iterable[raft_pb2.Log],    # type: ignore
         timeout: float = 5.0,
     ) -> bool:
         try:
@@ -61,7 +64,7 @@ class GrpcRaftClient(AbstractRaftClient):
         address: str,
         term: int,
         leader_id: PeerId,
-        entries: Iterable[str],
+        entries: Iterable[raft_pb2.Log],    # type: ignore
     ) -> bool:
         if credentials := self._credentials:
             channel = grpc.aio.secure_channel(address, credentials)

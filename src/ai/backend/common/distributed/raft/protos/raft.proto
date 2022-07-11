@@ -34,9 +34,5 @@ message RequestVoteResponse {
 message Log {
     uint64 index = 1;
     uint64 term = 2;
-    string message = 3;
-}
-
-message Entry {
-    string command = 1;
+    string command = 3;
 }
