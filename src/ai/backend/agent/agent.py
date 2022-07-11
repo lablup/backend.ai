@@ -1125,7 +1125,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
         """
         Scan currently running kernels and recreate the kernel objects in
         ``self.kernel_registry`` if any missing.
-        """ 
+        """
         ipc_base_path = self.local_config['agent']['ipc-base-path']
         var_base_path = self.local_config['agent']['var-base-path']
         last_registry_file = f'last_registry.{self.local_instance_id}.dat'
@@ -1290,9 +1290,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
             # disable running different architecture's image
             raise AgentError(
                 f'cannot run {ctx.image_ref.architecture} image on {agent_architecture} machine',
-            )
-
-        
+            ) 
         # Check if we need to pull the container image
         do_pull = await self.check_image(
             ctx.image_ref,
