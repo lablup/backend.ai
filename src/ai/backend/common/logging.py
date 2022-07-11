@@ -185,7 +185,12 @@ class ConsoleFormatter(logging.Formatter):
 
 class CustomJsonFormatter(JsonFormatter):
 
-    def add_fields(self, log_record, record, message_dict):
+    def add_fields(
+        self,
+        log_record: dict[str, Any],  # the manipulated entry object
+        record: logging.LogRecord,   # the source log record
+        message_dict: dict[str, Any],
+    ) -> None:
         super().add_fields(log_record, record, message_dict)
         if not log_record.get('timestamp'):
             # this doesn't use record.created, so it is slightly off
