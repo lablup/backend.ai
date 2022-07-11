@@ -13,7 +13,7 @@ from ai.backend.client.session import Session
 from ..extensions import pass_ctx_obj
 from ..main import main
 from ..pretty import print_fail
-from ..session import session as user_session
+from ..session.lifecycle import session as user_session
 from ..types import CLIContext
 from . import admin
 

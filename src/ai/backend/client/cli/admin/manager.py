@@ -10,7 +10,7 @@ from tabulate import tabulate
 from ai.backend.cli.interaction import ask_yn
 
 from ..pretty import print_done, print_error, print_fail, print_info, print_wait
-from ..session import Session
+from ..session.lifecycle import Session
 from . import admin
 
 

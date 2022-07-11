@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Iterator, List
 
-from .pretty import print_fail, print_info
+from ..pretty import print_fail, print_info
 
 
 @contextlib.contextmanager
