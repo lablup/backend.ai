@@ -404,10 +404,11 @@ async def read_stream_by_group(
                         autoclaim_start_id,
                     ),
                 )
-                for msg_id, msg_data in reply:
+                for msg_id, msg_data in reply[1]:
                     messages.append((msg_id, msg_data))
-                if len(reply) == 0:
+                if reply[0] == b'0-0':
                     break
+                autoclaim_start_id = reply[0]
             reply = await execute(
                 r,
                 lambda r: r.xreadgroup(
