@@ -95,7 +95,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                     self._readonly_txn_count -= 1
 
     @actxmgr
-    async def begin_session(self, expire_on_commit=True) -> AsyncIterator[SASession]:
+    async def begin_session(self, expire_on_commit=False) -> AsyncIterator[SASession]:
         async with self.begin() as conn:
             session = SASession(bind=conn, expire_on_commit=expire_on_commit)
             try:
@@ -106,9 +106,9 @@ class ExtendedAsyncSAEngine(SAEngine):
                 raise e
 
     @actxmgr
-    async def begin_readonly_session(self, deferrable: bool = False) -> AsyncIterator[SASession]:
+    async def begin_readonly_session(self, deferrable: bool = False, expire_on_commit=False) -> AsyncIterator[SASession]:
         async with self.begin_readonly(deferrable=deferrable) as conn:
-            yield SASession(bind=conn)
+            yield SASession(bind=conn, expire_on_commit=expire_on_commit)
 
     @actxmgr
     async def advisory_lock(self, lock_id: LockID) -> AsyncIterator[None]:

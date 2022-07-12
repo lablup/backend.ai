@@ -65,11 +65,11 @@ async def check_concurrency(
     sess_ctx: SessionRow,
 ) -> PredicateResult:
 
-    resource_policy = sess_ctx.access_key_row.resource_policy
+    resource_policy = sess_ctx.access_key_row.resource_policy_row
     if resource_policy is None:
         query = (
             sa.select(KeyPairResourcePolicyRow)
-            .where(KeyPairResourcePolicyRow.name == sess_ctx.access_key_row.resource_policy_name)
+            .where(KeyPairResourcePolicyRow.name == sess_ctx.access_key_row.resource_policy)
         )
         result = await db_sess.execute(query)
         resource_policy = result.scalar()
@@ -115,11 +115,11 @@ async def check_keypair_resource_limit(
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
-    resource_policy = sess_ctx.access_key_row.resource_policy
+    resource_policy = sess_ctx.access_key_row.resource_policy_row
     if resource_policy is None:
         query = (
             sa.select(KeyPairResourcePolicyRow)
-            .where(KeyPairResourcePolicyRow.name == sess_ctx.access_key_row.resource_policy_name)
+            .where(KeyPairResourcePolicyRow.name == sess_ctx.access_key_row.resource_policy)
         )
         result = await db_sess.execute(query)
         resource_policy = result.scalar()

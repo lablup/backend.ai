@@ -321,7 +321,7 @@ async def _query_userinfo(
             sa.select(KeyPairRow, UserRow.role, UserRow.domain_name)
             .select_from(sa.join(KeyPairRow, UserRow, KeyPairRow.user == UserRow.uuid))
             .where(KeyPairRow.access_key == owner_access_key)
-            .options(selectinload(KeyPairRow.resource_policy))
+            .options(selectinload(KeyPairRow.resource_policy_row))
         )
         result = await db_sess.execute(query)
         row = result.first()

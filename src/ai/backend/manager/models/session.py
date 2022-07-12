@@ -155,7 +155,7 @@ def aggregate_kernel_status(kernel_statuses: Sequence[KernelStatus]) -> SessionS
     such as status with minimal value can represent the status of session.
     """
     candidates = set()
-    priority_finished_status = SessionStatus.TERMINATING
+    priority_finished_status = SessionStatus.TERMINATED
     is_finished = True
     for s in kernel_statuses:
         match s:
@@ -525,7 +525,7 @@ async def get_scheduled_sessions(
             selectinload(SessionRow.access_key_row)
             .options(
                 noload('*'),
-                selectinload(KeyPairRow.resource_policy).noload('*'),
+                selectinload(KeyPairRow.resource_policy_row).noload('*'),
             ),
             selectinload(SessionRow.kernels)
             .options(
