@@ -45,8 +45,8 @@ from aiohttp import hdrs, web
 from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
-from sqlalchemy.orm import selectinload
 from redis.asyncio import Redis
+from sqlalchemy.orm import selectinload
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.manager.models.image import ImageRow

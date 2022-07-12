@@ -1850,7 +1850,7 @@ class AgentRegistry:
                         if kernel.cluster_role == DEFAULT_ROLE:
                             # The main session is terminated;
                             # decrement the user's concurrency counter
-                            await redis.execute(
+                            await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.incrby(
                                     f"keypair.concurrency_used.{kernel.access_key}",
