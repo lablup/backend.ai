@@ -47,13 +47,13 @@ class DRFScheduler(AbstractScheduler):
                 slot_share = Decimal(value) / slot_cap
                 if dominant_share < slot_share:
                     dominant_share = slot_share
-            if self.per_user_dominant_share[existing_sess.kp_access_key] < dominant_share:
-                self.per_user_dominant_share[existing_sess.kp_access_key] = dominant_share
+            if self.per_user_dominant_share[existing_sess.access_key] < dominant_share:
+                self.per_user_dominant_share[existing_sess.access_key] = dominant_share
         log.debug('per-user dominant share: {}', dict(self.per_user_dominant_share))
 
         # Find who has the least dominant share among the pending session.
         users_with_pending_session: Set[AccessKey] = {
-            pending_sess.kp_access_key for pending_sess in pending_sessions
+            pending_sess.access_key for pending_sess in pending_sessions
         }
         if not users_with_pending_session:
             return None
@@ -66,7 +66,7 @@ class DRFScheduler(AbstractScheduler):
         # Pick the first pending session of the user
         # who has the lowest dominant share.
         for pending_sess in pending_sessions:
-            if pending_sess.kp_access_key == least_dominant_share_user:
+            if pending_sess.access_key == least_dominant_share_user:
                 return pending_sess
 
         return None
@@ -119,7 +119,7 @@ class DRFScheduler(AbstractScheduler):
         pending_session: SessionRow,
     ) -> Optional[AgentRow]:
         return self._assign_agent(
-            agents, pending_session.kp_access_key, pending_session.requested_slots,
+            agents, pending_session.access_key, pending_session.requested_slots,
         )
 
     def assign_agent_for_kernel(

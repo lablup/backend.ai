@@ -65,11 +65,11 @@ async def check_concurrency(
     sess_ctx: SessionRow,
 ) -> PredicateResult:
 
-    resource_policy = sess_ctx.access_key.resource_policy
+    resource_policy = sess_ctx.access_key_row.resource_policy
     if resource_policy is None:
         query = (
             sa.select(KeyPairResourcePolicyRow)
-            .where(KeyPairResourcePolicyRow.name == sess_ctx.access_key.resource_policy_name)
+            .where(KeyPairResourcePolicyRow.name == sess_ctx.access_key_row.resource_policy_name)
         )
         result = await db_sess.execute(query)
         resource_policy = result.scalar()
@@ -79,7 +79,7 @@ async def check_concurrency(
         sched_ctx.registry.redis_stat,
         'check_keypair_concurrency_used',
         _check_keypair_concurrency_script,
-        [f"keypair.concurrency_used.{sess_ctx.kp_access_key}"],
+        [f"keypair.concurrency_used.{sess_ctx.access_key}"],
         [max_concurrent_sessions],
     )
     if ok == 0:
@@ -90,7 +90,7 @@ async def check_concurrency(
         )
     log.debug(
         'number of concurrent sessions of ak:{0} = {1} / {2}',
-        sess_ctx.kp_access_key,
+        sess_ctx.access_key,
         concurrency_used,
         max_concurrent_sessions,
     )
@@ -115,20 +115,20 @@ async def check_keypair_resource_limit(
     sched_ctx: SchedulingContext,
     sess_ctx: SessionRow,
 ) -> PredicateResult:
-    resource_policy = sess_ctx.access_key.resource_policy
+    resource_policy = sess_ctx.access_key_row.resource_policy
     if resource_policy is None:
         query = (
             sa.select(KeyPairResourcePolicyRow)
-            .where(KeyPairResourcePolicyRow.name == sess_ctx.access_key.resource_policy_name)
+            .where(KeyPairResourcePolicyRow.name == sess_ctx.access_key_row.resource_policy_name)
         )
         result = await db_sess.execute(query)
         resource_policy = result.scalar()
     total_keypair_allowed = ResourceSlot.from_policy(resource_policy.get_map(),
                                                      sched_ctx.known_slot_types)
     key_occupied = await sched_ctx.registry.get_keypair_occupancy(
-        sess_ctx.kp_access_key, sess=db_sess)
-    log.debug('keypair:{} current-occupancy: {}', sess_ctx.kp_access_key, key_occupied)
-    log.debug('keypair:{} total-allowed: {}', sess_ctx.kp_access_key, total_keypair_allowed)
+        sess_ctx.access_key, sess=db_sess)
+    log.debug('keypair:{} current-occupancy: {}', sess_ctx.access_key, key_occupied)
+    log.debug('keypair:{} total-allowed: {}', sess_ctx.access_key, total_keypair_allowed)
     if not (key_occupied + sess_ctx.requested_slots <= total_keypair_allowed):
         return PredicateResult(
             False,
@@ -207,7 +207,7 @@ async def check_scaling_group(
                 _db_sess,
                 sess_ctx.domain_name,
                 sess_ctx.group_id,
-                sess_ctx.kp_access_key,
+                sess_ctx.access_key,
             )
 
     sgroups = await execute_with_retry(_query)

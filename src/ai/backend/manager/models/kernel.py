@@ -357,7 +357,7 @@ class KernelRow(Base):
 
         cond = (
             (KernelRow.name.in_(kernel_ids)) &
-            (KernelRow.kp_access_key == access_key)
+            (KernelRow.access_key == access_key)
         )
         if not allow_stale:
             cond = cond & (~KernelRow.status.in_(DEAD_KERNEL_STATUSES))

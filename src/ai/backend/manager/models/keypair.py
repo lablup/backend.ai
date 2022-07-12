@@ -89,7 +89,7 @@ keypairs = sa.Table(
 
 class KeyPairRow(Base):
     __table__ = keypairs
-    sessions = relationship('SessionRow', back_populates='access_key')
+    sessions = relationship('SessionRow', back_populates='access_key_row')
     resource_policy_row = relationship('KeyPairResourcePolicyRow', back_populates='keypairs')
     scaling_groups = relationship(
         'ScalingGroupRow', secondary='sgroups_for_keypairs', back_populates='keypairs',

@@ -215,8 +215,8 @@ class SessionRow(Base):
     group = relationship('GroupRow', back_populates='sessions')
     user_uuid = ForeignKeyIDColumn('user_uuid', 'users.uuid', nullable=False)
     user = relationship('UserRow', back_populates='sessions')
-    kp_access_key = sa.Column('kp_access_key', sa.String(length=20), sa.ForeignKey('keypairs.access_key'))
-    access_key = relationship('KeyPairRow', back_populates='sessions')
+    access_key = sa.Column('access_key', sa.String(length=20), sa.ForeignKey('keypairs.access_key'))
+    access_key_row = relationship('KeyPairRow', back_populates='sessions')
 
     # if image_id is null, should find a image field from related kernel row.
     image_id = ForeignKeyIDColumn('image_id', 'images.id')
@@ -376,7 +376,7 @@ def _build_session_fetch_query(
 ):
     cond = base_cond
     if access_key:
-        cond = cond & (SessionRow.kp_access_key == access_key)
+        cond = cond & (SessionRow.access_key == access_key)
     if not allow_stale:
         cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
     query = (
@@ -522,7 +522,7 @@ async def get_scheduled_sessions(
         .execution_options(populate_existing=True)
         .options(
             noload('*'),
-            selectinload(SessionRow.access_key)
+            selectinload(SessionRow.access_key_row)
             .options(
                 noload('*'),
                 selectinload(KeyPairRow.resource_policy).noload('*'),
@@ -586,7 +586,7 @@ async def get_sgroup_managed_sessions(
             noload('*'),
             selectinload(SessionRow.group).options(noload('*')),
             selectinload(SessionRow.domain).options(noload('*')),
-            selectinload(SessionRow.access_key).options(noload('*')),
+            selectinload(SessionRow.access_key_row).options(noload('*')),
         )
     )
     result = await db_sess.execute(query)
@@ -730,7 +730,7 @@ class ComputeSession(graphene.ObjectType):
             'group_id': row.group_id,
             'user_email': row.user.email,
             'user_id': row.user_uuid,
-            'access_key': row.kp_access_key,
+            'access_key': row.access_key,
             'created_user_email': None,  # TODO: implement
             'created_user_id': None,     # TODO: implement
 
@@ -869,7 +869,7 @@ class ComputeSession(graphene.ObjectType):
         if group_id is not None:
             query = query.where(SessionRow.group_id == group_id)
         if access_key is not None:
-            query = query.where(SessionRow.kp_access_key == access_key)
+            query = query.where(SessionRow.access_key == access_key)
         if status is not None:
             query = query.where(SessionRow.status.in_(status_list))
         if filter is not None:
@@ -912,7 +912,7 @@ class ComputeSession(graphene.ObjectType):
         if group_id is not None:
             query = query.where(SessionRow.group_id == group_id)
         if access_key is not None:
-            query = query.where(SessionRow.kp_access_key == access_key)
+            query = query.where(SessionRow.access_key == access_key)
         if status is not None:
             query = query.where(SessionRow.status.in_(status_list))
         if filter is not None:
@@ -976,7 +976,7 @@ class ComputeSession(graphene.ObjectType):
         if domain_name is not None:
             query = query.where(SessionRow.domain_name == domain_name)
         if access_key is not None:
-            query = query.where(SessionRow.kp_access_key == access_key)
+            query = query.where(SessionRow.access_key == access_key)
         async with ctx.db.begin_readonly_session() as db_sess:
             return await batch_result_in_session(
                 ctx, db_sess, query, cls,

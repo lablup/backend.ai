@@ -322,7 +322,7 @@ class SchedulerDispatcher(aobject):
                 sess_ctx.id,
                 sess_ctx.session_type,
                 sess_ctx.name,
-                sess_ctx.kp_access_key,
+                sess_ctx.access_key,
                 sess_ctx.cluster_mode,
             )
             _log_fmt.set(log_fmt)
@@ -881,7 +881,7 @@ class SchedulerDispatcher(aobject):
         session: SessionRow,
     ) -> None:
         log_fmt = "prepare(s:{0.id}, type:{0.session_type}, name:{0.name}, " \
-                  "ak:{0.kp_access_key}, cluster_mode:{0.cluster_mode}): "
+                  "ak:{0.access_key}, cluster_mode:{0.cluster_mode}): "
         log_args = (session, )
         log.debug(log_fmt + 'try-starting', *log_args)
         try:
@@ -1035,4 +1035,4 @@ async def _rollback_predicate_mutations(
     # (especially with multi-node multi-container cluster sessions)
     # may accumulate up multiple subtractions, resulting in
     # negative concurrency_occupied values.
-    await recalc_concurrency_used(db_sess, sched_ctx.registry.redis_stat, AccessKey(session.kp_access_key))
+    await recalc_concurrency_used(db_sess, sched_ctx.registry.redis_stat, AccessKey(session.access_key))

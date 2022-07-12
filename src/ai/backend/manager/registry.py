@@ -874,7 +874,7 @@ class AgentRegistry:
             'domain_name': user_scope.domain_name,
             'group_id': user_scope.group_id,
             'user_uuid': user_scope.user_uuid,
-            'kp_access_key': access_key,
+            'access_key': access_key,
             'tag': session_tag,
             'starts_at': starts_at,
             'callback_url': callback_url,
@@ -1120,7 +1120,7 @@ class AgentRegistry:
 
         hook_result = await self.hook_plugin_ctx.dispatch(
             'PRE_START_SESSION',
-            (session_id, scheduled_session.name, scheduled_session.kp_access_key),
+            (session_id, scheduled_session.name, scheduled_session.access_key),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -1228,7 +1228,7 @@ class AgentRegistry:
                 ",".join(f"{k}:{v}" for k, v in replicas.items()),
             'BACKENDAI_CLUSTER_HOSTS':
                 ",".join(binding.kernel.cluster_hostname for binding in kernel_agent_bindings),
-            'BACKENDAI_ACCESS_KEY': scheduled_session.kp_access_key,
+            'BACKENDAI_ACCESS_KEY': scheduled_session.access_key,
         }
 
         # Aggregate by agents to minimize RPC calls
@@ -1293,7 +1293,7 @@ class AgentRegistry:
         )
         await self.hook_plugin_ctx.notify(
             'POST_START_SESSION',
-            (session_id, scheduled_session.name, scheduled_session.kp_access_key),
+            (session_id, scheduled_session.name, scheduled_session.access_key),
         )
 
     def convert_resource_spec_to_resource_slot(
@@ -1469,7 +1469,7 @@ class AgentRegistry:
                 log.debug(
                     'start_session(s:{}, ak:{}, k:{}) -> created on ag:{}',
                     scheduled_session.name,
-                    scheduled_session.kp_access_key,
+                    scheduled_session.access_key,
                     [binding.kernel.id for binding in items],
                     agent_alloc_ctx.id,
                 )
@@ -1772,7 +1772,7 @@ class AgentRegistry:
             reason = 'force-terminated'
         hook_result = await self.hook_plugin_ctx.dispatch(
             'PRE_DESTROY_SESSION',
-            (session.id, session.name, session.kp_access_key),
+            (session.id, session.name, session.access_key),
             return_when=ALL_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -1793,7 +1793,7 @@ class AgentRegistry:
             kernel_statues: List[KernelStatus] = []
             for kernel in grouped_kernels:
                 async with self.handle_kernel_exception(
-                    'destroy_session', kernel.id, session.kp_access_key, set_error=True,
+                    'destroy_session', kernel.id, session.access_key, set_error=True,
                 ):
                     if kernel.status == KernelStatus.PENDING:
                         transit_to = KernelStatus.CANCELLED
@@ -1992,7 +1992,7 @@ class AgentRegistry:
             await db_sess.execute(query)
         await self.hook_plugin_ctx.notify(
             'POST_DESTROY_SESSION',
-            (session.id, session.name, session.kp_access_key),
+            (session.id, session.name, session.access_key),
         )
         return main_stat
 

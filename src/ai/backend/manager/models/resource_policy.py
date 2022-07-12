@@ -67,7 +67,7 @@ keypair_resource_policies = sa.Table(
 
 class KeyPairResourcePolicyRow(Base):
     __table__ = keypair_resource_policies
-    keypairs = relationship('KeyPairRow', back_populates='resource_policy')
+    keypairs = relationship('KeyPairRow', back_populates='resource_policy_row')
 
     def get_map(self) -> Dict[str, Any]:
         return {col: getattr(self, col) for col in self.__mapper__.columns.keys()}

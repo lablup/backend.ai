@@ -122,7 +122,7 @@ def upgrade():
         domain_name = sa.Column('domain_name', sa.String(length=64), nullable=False)
         group_id = sa.Column('group_id', GUID(), nullable=False)
         user_uuid = sa.Column('user_uuid', GUID(), nullable=False)
-        kp_access_key = sa.Column('kp_access_key', sa.String(length=20), nullable=True)
+        access_key = sa.Column('access_key', sa.String(length=20), nullable=True)
         # kp_resource_policy = sa.Column(
         #     'kp_resource_policy', sa.String(length=256), nullable=False)
 
@@ -162,7 +162,7 @@ def upgrade():
         last_stat = sa.Column('last_stat', pgsql.JSONB(astext_type=sa.Text()), nullable=True)
 
     SessionRow.__table__.create(connection)
-    op.create_foreign_key(op.f('fk_sessions_access_key_keypairs'), 'sessions', 'keypairs', ['kp_access_key'], ['access_key'])
+    op.create_foreign_key(op.f('fk_sessions_access_key_keypairs'), 'sessions', 'keypairs', ['access_key'], ['access_key'])
     op.create_foreign_key(op.f('fk_sessions_domain_name_domains'), 'sessions', 'domains', ['domain_name'], ['name'])
     op.create_foreign_key(op.f('fk_sessions_group_id_groups'), 'sessions', 'groups', ['group_id'], ['id'])
     op.create_foreign_key(op.f('fk_sessions_image_images'), 'sessions', 'images', ['image_id'], ['id'])
@@ -202,7 +202,7 @@ def upgrade():
                 'domain_name': row['domain_name'],
                 'group_id': row['group_id'],
                 'user_uuid': row['user_uuid'],
-                'kp_access_key': row['access_key'],
+                'access_key': row['access_key'],
                 'image_id': img_map[row['image']],
                 'tag': row['tag'],
                 'occupying_slots': row['occupied_slots'],
