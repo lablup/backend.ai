@@ -128,25 +128,28 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
 )
 
 
-def _translate_status_by_value(from_, to_: enum.EnumMeta):
-    s: enum.Enum
-    for s in to_:
-        if s.value == from_.value:
-            return s
-    else:
-        raise RuntimeError(f'Status `{from_}` does not match any status of `{to_}`')
-
-
-KERNEL_SESSION_STATUS_MAPPING = {s: _translate_status_by_value(s, SessionStatus) for s in KernelStatus}
-
-SESSION_KERNEL_STATUS_MAPPING = {s: _translate_status_by_value(s, KernelStatus) for s in SessionStatus}
+KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
+    KernelStatus.PENDING: SessionStatus.PENDING,
+    KernelStatus.SCHEDULED: SessionStatus.SCHEDULED,
+    KernelStatus.PREPARING: SessionStatus.PREPARING,
+    KernelStatus.BUILDING: SessionStatus.BUILDING,
+    KernelStatus.PULLING: SessionStatus.PULLING,
+    KernelStatus.RUNNING: SessionStatus.RUNNING,
+    KernelStatus.RESTARTING: SessionStatus.RESTARTING,
+    KernelStatus.RESIZING: SessionStatus.RESIZING,
+    KernelStatus.SUSPENDED: SessionStatus.SUSPENDED,
+    KernelStatus.TERMINATING: SessionStatus.TERMINATING,
+    KernelStatus.TERMINATED: SessionStatus.TERMINATED,
+    KernelStatus.ERROR: SessionStatus.ERROR,
+    KernelStatus.CANCELLED: SessionStatus.CANCELLED,
+}
 
 
 def aggregate_kernel_status(kernel_statuses: Sequence[KernelStatus]) -> SessionStatus:
     """
-    Determine a SessionStatus by statues of sibling kernel.
+    Determine a SessionStatus by statuses of sibling kernel.
     If any of kernels is pre-running status, the session is assumed pre-running.
-    If any of kernels is running and not all-kernels are finished, the session is assumed running.
+    If any of kernels is running, the session is assumed running.
     If all of kernels are finished, one of ERROR, CANCELLED, TERMINATING, TERMINATED should be session status.
 
     We can set the value of Status enum for representing status,
@@ -159,11 +162,15 @@ def aggregate_kernel_status(kernel_statuses: Sequence[KernelStatus]) -> SessionS
         match s:
             case KernelStatus.ERROR:
                 priority_finished_status = SessionStatus.ERROR
+            case KernelStatus.TERMINATING:
+                if priority_finished_status != SessionStatus.ERROR:
+                    priority_finished_status = SessionStatus.TERMINATING
             case KernelStatus.CANCELLED:
-                priority_finished_status = min(priority_finished_status, key=lambda s: s.value)
-            case KernelStatus.TERMINATING | KernelStatus.TERMINATED:
-                if priority_finished_status not in (KernelStatus.ERROR, KernelStatus.CANCELLED):
-                    priority_finished_status = min(priority_finished_status, s, key=lambda s: s.value)
+                if priority_finished_status not in (SessionStatus.ERROR, SessionStatus.TERMINATING):
+                    priority_finished_status = SessionStatus.CANCELLED
+            case KernelStatus.TERMINATED:
+                if priority_finished_status not in (SessionStatus.ERROR, SessionStatus.CANCELLED, SessionStatus.TERMINATING):
+                    priority_finished_status = SessionStatus.TERMINATED
             case _:
                 candidates.add(s)
                 is_finished = False
