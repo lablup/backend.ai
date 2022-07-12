@@ -53,10 +53,14 @@ from .image import (
 from .kernel import (
     ComputeContainer,
     ComputeContainerList,
-    ComputeSession,
-    ComputeSessionList,
+    # ComputeSession,
+    # ComputeSessionList,
     LegacyComputeSession,
     LegacyComputeSessionList,
+)
+from .session import (
+    ComputeSession,
+    ComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
 from .resource_policy import (
