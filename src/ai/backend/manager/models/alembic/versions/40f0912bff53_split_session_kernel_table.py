@@ -115,7 +115,7 @@ def upgrade():
         session_type = sa.Column('session_type', pgsql.ENUM('INTERACTIVE', 'BATCH', name='sessiontypes', create_type=False), server_default='INTERACTIVE', nullable=False)
         cluster_mode = sa.Column('cluster_mode', sa.String(length=16), server_default='SINGLE_NODE', nullable=False)
         cluster_size = sa.Column('cluster_size', sa.Integer(), nullable=False)
-        
+
         # Resource ownership
         scaling_group_name = sa.Column('scaling_group_name', sa.String(length=64), nullable=True)
         target_sgroup_names = sa.Column('target_sgroup_names', sa.ARRAY(sa.String(length=64)), server_default='{}', nullable=True)
@@ -232,11 +232,11 @@ def upgrade():
             if sess['created_at'] > row['created_at']:
                 sess['created_at'] = row['created_at']
                 st_change = row['st_change']
-            
+
             if sess['starts_at'] > row['starts_at']:
                 sess['starts_at'] = row['starts_at']
                 st_change = row['st_change']
-            
+
             if str(sess['status']) not in ('ERROR', 'CANCELLED'):
                 if KernelStatus.index(str(sess['status'])) > KernelStatus.index(str(row['status'])):
                     sess['status'] = row['status']
@@ -261,7 +261,7 @@ def upgrade():
             #         sinfo = {sess['id']: sinfo}
             #     sinfo = {**sinfo, row['id']: row['status_info']}
             #     sess['status_info'] = json.dumps(sinfo)
-        
+
     creates = tuple(all_kernel_sessions.values())
     if creates:
         connection.execute(SessionRow.__table__.insert(), creates)
@@ -301,14 +301,11 @@ def upgrade():
     op.create_foreign_key(op.f('fk_kernels_image_id_images'), 'kernels', 'images', ['image_id'], ['id'])
     op.alter_column('kernels', column_name='agent', new_column_name='agent_id')
     op.add_column('kernels', sa.Column('requested_slots', pgsql.JSONB(), nullable=True))
-    
+
     # Agent table
     op.drop_index('ix_agents_scaling_group', table_name='agents')
     op.alter_column('agents', column_name='scaling_group', new_column_name='scaling_group_name')
     op.create_index(op.f('ix_agents_scaling_group_name'), 'agents', ['scaling_group_name'], unique=False)
-
-    # Keypair table
-    op.alter_column('keypairs', column_name='resource_policy', new_column_name='resource_policy_name')
 
     ## Association tables
     # groups_users
@@ -316,7 +313,7 @@ def upgrade():
 
     # scaling_groups_domains
     op.drop_constraint('uq_sgroup_domain', 'sgroups_for_domains', type_='unique')
-    
+
     # scaling_groups_groups
     op.drop_constraint('uq_sgroup_ugroup', 'sgroups_for_groups', type_='unique')
 
@@ -405,14 +402,11 @@ def downgrade():
 
     sess_statues.drop(op.get_bind())
     sess_results.drop(op.get_bind())
-        
+
     # Agent table
     op.drop_index(op.f('ix_agents_scaling_group_name'), table_name='agents')
     op.alter_column('agents', column_name='scaling_group_name', new_column_name='scaling_group')
     op.create_index('ix_agents_scaling_group', 'agents', ['scaling_group'], unique=False)
-
-    # Keypair table
-    op.alter_column('keypairs', column_name='resource_policy_name', new_column_name='resource_policy')
 
     ## Association tables
     # groups users

@@ -218,7 +218,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     access_key = request['keypair']['access_key']
     user_role = request['user']['role']
     user_uuid = request['user']['uuid']
-    resource_policy = request['keypair']['resource_policy_name']
+    resource_policy = request['keypair']['resource_policy']
     domain_name = request['user']['domain_name']
     group_id_or_name = params['group']
     log.info('VFOLDER.CREATE (ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})',
@@ -525,7 +525,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     domain_name = request['user']['domain_name']
     group_id = params['group_id']
     domain_admin = request['user']['role'] == UserRole.ADMIN
-    resource_policy = request['keypair']['resource_policy_name']
+    resource_policy = request['keypair']['resource_policy']
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin() as conn:
         allowed_hosts: Set[str] = set()
@@ -735,7 +735,7 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
             raise VFolderNotFound('no such accessible vfolder')
 
     # Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
-    resource_policy = request['keypair']['resource_policy_name']
+    resource_policy = request['keypair']['resource_policy']
     max_vfolder_size = resource_policy.get('max_vfolder_size', 0)
     if (
         max_vfolder_size > 0
@@ -1718,7 +1718,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     access_key = request['keypair']['access_key']
     user_role = request['user']['role']
     user_uuid = request['user']['uuid']
-    resource_policy = request['keypair']['resource_policy_name']
+    resource_policy = request['keypair']['resource_policy']
     domain_name = request['user']['domain_name']
     log.info('VFOLDER.CLONE (ak:{}, vf:{}, vft:{}, vfh:{}, umod:{}, perm:{})',
              access_key, row['name'], params['target_name'], params['folder_host'],

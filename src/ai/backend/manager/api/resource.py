@@ -102,7 +102,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app['_root.context']
     try:
         access_key = request['keypair']['access_key']
-        resource_policy = request['keypair']['resource_policy_name']
+        resource_policy = request['keypair']['resource_policy']
         domain_name = request['user']['domain_name']
         # TODO: uncomment when we implement scaling group.
         # scaling_group = request.query.get('scaling_group')

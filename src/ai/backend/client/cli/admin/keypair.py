@@ -32,7 +32,7 @@ def info(ctx: CLIContext) -> None:
         keypair_fields['is_admin'],
         keypair_fields['created_at'],
         keypair_fields['last_used'],
-        keypair_fields['resource_policy_name'],
+        keypair_fields['resource_policy'],
         keypair_fields['rate_limit'],
         keypair_fields['concurrency_used'],
     ]
@@ -76,7 +76,7 @@ def list(ctx: CLIContext, user_id, is_active, filter_, order, offset, limit) -> 
         keypair_fields['is_admin'],
         keypair_fields['created_at'],
         keypair_fields['last_used'],
-        keypair_fields['resource_policy_name'],
+        keypair_fields['resource_policy'],
         keypair_fields['rate_limit'],
         keypair_fields['concurrency_used'],
     ]
@@ -124,7 +124,7 @@ def add(ctx: CLIContext, user_id, resource_policy, admin, inactive,  rate_limit)
                 user_id,
                 is_active=not inactive,
                 is_admin=admin,
-                resource_policy_name=resource_policy,
+                resource_policy=resource_policy,
                 rate_limit=rate_limit)
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -169,7 +169,7 @@ def update(ctx: CLIContext, access_key, resource_policy, is_admin, is_active,  r
                 access_key,
                 is_active=is_active,
                 is_admin=is_admin,
-                resource_policy_name=resource_policy,
+                resource_policy=resource_policy,
                 rate_limit=rate_limit)
         except Exception as e:
             ctx.output.print_mutation_error(

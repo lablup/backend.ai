@@ -78,7 +78,7 @@ keypairs = sa.Table(
     sa.Column('ssh_private_key', sa.String(length=2000), nullable=True),
 
     ForeignKeyIDColumn('user', 'users.uuid', nullable=False),
-    sa.Column('resource_policy_name', sa.String(length=256),
+    sa.Column('resource_policy', sa.String(length=256),
               sa.ForeignKey('keypair_resource_policies.name'),
               nullable=False),
     # dotfiles column, \x90 means empty list in msgpack
@@ -90,7 +90,7 @@ keypairs = sa.Table(
 class KeyPairRow(Base):
     __table__ = keypairs
     sessions = relationship('SessionRow', back_populates='access_key')
-    resource_policy = relationship('KeyPairResourcePolicyRow', back_populates='keypairs')
+    resource_policy_row = relationship('KeyPairResourcePolicyRow', back_populates='keypairs')
     scaling_groups = relationship(
         'ScalingGroupRow', secondary='sgroups_for_keypairs', back_populates='keypairs',
     )
@@ -185,7 +185,7 @@ class KeyPair(graphene.ObjectType):
             secret_key=row['secret_key'],
             is_active=row['is_active'],
             is_admin=row['is_admin'],
-            resource_policy=row['resource_policy_name'],
+            resource_policy=row['resource_policy'],
             created_at=row['created_at'],
             last_used=row['last_used'],
             rate_limit=row['rate_limit'],
@@ -262,7 +262,7 @@ class KeyPair(graphene.ObjectType):
         "full_name": ("users_full_name", None),
         "is_active": ("keypairs_is_active", None),
         "is_admin": ("keypairs_is_admin", None),
-        'resource_policy_name': ("keypairs_resource_policy", None),
+        'resource_policy': ("keypairs_resource_policy", None),
         "created_at": ("keypairs_created_at", dtparse),
         "last_used": ("keypairs_last_used", dtparse),
         "rate_limit": ("keypairs_rate_limit", None),
@@ -276,7 +276,7 @@ class KeyPair(graphene.ObjectType):
         "full_name": "users_full_name",
         "is_active": "keypairs_is_active",
         "is_admin": "keypairs_is_admin",
-        'resource_policy_name': "keypairs_resource_policy",
+        'resource_policy': "keypairs_resource_policy",
         "created_at": "keypairs_created_at",
         "last_used": "keypairs_last_used",
         "rate_limit": "keypairs_rate_limit",
@@ -477,7 +477,7 @@ class CreateKeyPair(graphene.Mutation):
             'secret_key': sk,
             'is_active': props.is_active,
             'is_admin': props.is_admin,
-            'resource_policy_name': props.resource_policy,
+            'resource_policy': props.resource_policy,
             'rate_limit': props.rate_limit,
             'num_queries': 0,
             'ssh_public_key': pubkey,
@@ -509,7 +509,7 @@ class ModifyKeyPair(graphene.Mutation):
         data: Dict[str, Any] = {}
         set_if_set(props, data, 'is_active')
         set_if_set(props, data, 'is_admin')
-        set_if_set(props, data, 'resource_policy_name')
+        set_if_set(props, data, 'resource_policy')
         set_if_set(props, data, 'rate_limit')
         update_query = (
             sa.update(keypairs)

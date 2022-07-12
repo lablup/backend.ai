@@ -74,7 +74,7 @@ class KeyPairFactory(ModelFactory):
             'secret_key': sk,
             'is_active': True,
             'is_admin': False,
-            'resource_policy_name': 'default',
+            'resource_policy': 'default',
         }
 
     async def before_creation(self):

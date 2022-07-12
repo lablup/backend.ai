@@ -409,7 +409,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
                         .join(users, keypairs.c.user == users.c.uuid)
                         .join(
                             keypair_resource_policies,
-                            keypairs.c.resource_policy_name == keypair_resource_policies.c.name,
+                            keypairs.c.resource_policy == keypair_resource_policies.c.name,
                         )
                     )
                     query = (
@@ -451,7 +451,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
                         keypairs
                         .join(users, keypairs.c.user == users.c.uuid)
                         .join(keypair_resource_policies,
-                              keypairs.c.resource_policy_name == keypair_resource_policies.c.name)
+                              keypairs.c.resource_policy == keypair_resource_policies.c.name)
                     )
                     query = (
                         sa.select([users, keypairs, keypair_resource_policies], use_labels=True)
@@ -499,7 +499,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             },
             'is_admin': row['keypairs_is_admin'],
         }
-        auth_result['keypair']['resource_policy_name'] = {
+        auth_result['keypair']['resource_policy'] = {
             col.name: row[f'keypair_resource_policies_{col.name}']
             for col in keypair_resource_policies.c
         }
@@ -746,7 +746,7 @@ async def signup(request: web.Request, params: Any) -> web.Response:
                 'secret_key': sk,
                 'is_active': True if data.get('status') == UserStatus.ACTIVE else False,
                 'is_admin': False,
-                'resource_policy_name': resource_policy,
+                'resource_policy': resource_policy,
                 'rate_limit': 1000,
                 'num_queries': 0,
                 'user': user.uuid,

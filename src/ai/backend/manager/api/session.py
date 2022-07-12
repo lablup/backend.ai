@@ -335,7 +335,7 @@ async def _query_userinfo(
         owner_domain = request['user']['domain_name']
         owner_uuid = requester_uuid
         owner_role = UserRole.USER
-        resource_policy = request['keypair']['resource_policy_name']
+        resource_policy = request['keypair']['resource_policy']
 
     query = (
         sa.select(DomainRow.name)

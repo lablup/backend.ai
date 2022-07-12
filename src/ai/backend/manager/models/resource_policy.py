@@ -128,7 +128,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     ) -> Sequence[KeyPairResourcePolicy]:
         j = sa.join(
             keypairs, keypair_resource_policies,
-            keypairs.c.resource_policy_name == keypair_resource_policies.c.name,
+            keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
             sa.select([keypair_resource_policies])
@@ -175,7 +175,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
         access_key = ctx.access_key
         j = sa.join(
             keypairs, keypair_resource_policies,
-            keypairs.c.resource_policy_name == keypair_resource_policies.c.name,
+            keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
             sa.select([keypair_resource_policies])
@@ -200,7 +200,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     ) -> Sequence[KeyPairResourcePolicy]:
         j = sa.join(
             keypairs, keypair_resource_policies,
-            keypairs.c.resource_policy_name == keypair_resource_policies.c.name,
+            keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
             sa.select([keypair_resource_policies])
