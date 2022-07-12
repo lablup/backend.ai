@@ -34,7 +34,6 @@ from urllib.parse import urlparse
 
 import aiohttp
 import aiohttp_cors
-import aioredis
 import aiotools
 import attr
 import multidict
@@ -47,6 +46,7 @@ from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from sqlalchemy.orm import selectinload
+from redis.asyncio import Redis
 from sqlalchemy.sql.expression import null, true
 
 from ai.backend.manager.models.image import ImageRow
@@ -55,7 +55,7 @@ from ai.backend.manager.models.user import UserRow
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
@@ -1474,7 +1474,7 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
         now = datetime.now(tzutc())
         timeout = timedelta(seconds=root_ctx.local_config['manager']['heartbeat-timeout'])
 
-        async def _check_impl(r: aioredis.Redis):
+        async def _check_impl(r: Redis):
             async for agent_id, prev in r.hscan_iter('agent.last_seen'):
                 prev = datetime.fromtimestamp(float(prev), tzutc())
                 if now - prev > timeout:
@@ -1482,7 +1482,7 @@ async def check_agent_lost(root_ctx: RootContext, interval: float) -> None:
                         AgentTerminatedEvent("agent-lost"),
                         source=agent_id.decode())
 
-        await redis.execute(root_ctx.redis_live, _check_impl)
+        await redis_helper.execute(root_ctx.redis_live, _check_impl)
     except asyncio.CancelledError:
         pass
 
@@ -1493,12 +1493,12 @@ async def handle_kernel_log(
     event: DoSyncKernelLogsEvent,
 ) -> None:
     root_ctx: RootContext = app['_root.context']
-    redis_conn = redis.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_STREAM_DB)
+    redis_conn = redis_helper.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_STREAM_DB)
     # The log data is at most 10 MiB.
     log_buffer = BytesIO()
     log_key = f'containerlog.{event.container_id}'
     try:
-        list_size = await redis.execute(
+        list_size = await redis_helper.execute(
             redis_conn,
             lambda r: r.llen(log_key),
         )
@@ -1510,7 +1510,7 @@ async def handle_kernel_log(
             return
         for _ in range(list_size):
             # Read chunk-by-chunk to allow interleaving with other Redis operations.
-            chunk = await redis.execute(redis_conn, lambda r: r.lpop(log_key))
+            chunk = await redis_helper.execute(redis_conn, lambda r: r.lpop(log_key))
             if chunk is None:  # maybe missing
                 log_buffer.write(b"(container log unavailable)\n")
                 break
@@ -1530,7 +1530,7 @@ async def handle_kernel_log(
             await execute_with_retry(_update_log)
         finally:
             # Clear the log data from Redis when done.
-            await redis.execute(
+            await redis_helper.execute(
                 redis_conn,
                 lambda r: r.delete(log_key),
             )

@@ -7,6 +7,7 @@ import logging
 import re
 import secrets
 import time
+import typing
 import uuid
 import weakref
 from collections import defaultdict
@@ -26,12 +27,12 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    TypeAlias,
     Union,
     cast,
 )
 
 import aiodocker
-import aioredis
 import aiotools
 import snappy
 import sqlalchemy as sa
@@ -43,13 +44,14 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.tz import tzutc
+from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.sql.expression import true
 from yarl import URL
 
-from ai.backend.common import msgpack, redis
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -150,6 +152,7 @@ if TYPE_CHECKING:
     from .models.storage import StorageSessionManager
     from .scheduler.types import KernelAgentBinding, SchedulingContext
 
+MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 __all__ = ['AgentRegistry', 'InstanceNotFound']
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.registry'))
@@ -1681,28 +1684,28 @@ class AgentRegistry:
         # Update keypair resource usage for keypairs with running containers.
         kp_key = 'keypair.concurrency_used'
 
-        async def _update(r: aioredis.Redis):
-            updates: Mapping[str, int] = \
+        async def _update(r: Redis):
+            updates = \
                 {f'{kp_key}.{k}': concurrency_used_per_key[k] for k in concurrency_used_per_key}
             if updates:
-                await r.mset(updates)
+                await r.mset(typing.cast(MSetType, updates))
 
-        async def _update_by_fullscan(r: aioredis.Redis):
-            updates: Dict[str, int] = {}
+        async def _update_by_fullscan(r: Redis):
+            updates = {}
             keys = await r.keys(f'{kp_key}.*')
             for ak in keys:
                 usage = concurrency_used_per_key.get(ak, 0)
                 updates[f'{kp_key}.{ak}'] = usage
             if updates:
-                await r.mset(updates)
+                await r.mset(typing.cast(MSetType, updates))
 
         if do_fullscan:
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_stat,
                 _update_by_fullscan,
             )
         else:
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_stat,
                 _update,
             )
@@ -1858,7 +1861,7 @@ class AgentRegistry:
                         transit_to = KernelStatus.TERMINATED
 
                         async def _update() -> None:
-                            kern_stat = await redis.execute(
+                            kern_stat = await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.get(str(kernel.id)),
                             )
@@ -1887,7 +1890,7 @@ class AgentRegistry:
                         if kernel.cluster_role == DEFAULT_ROLE:
                             # The main session is terminated;
                             # decrement the user's concurrency counter
-                            await redis.execute(
+                            await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.incrby(
                                     f"keypair.concurrency_used.{kernel.access_key}",
@@ -1955,7 +1958,7 @@ class AgentRegistry:
                         last_stat: Optional[Dict[str, Any]]
                         last_stat = None
                         try:
-                            raw_last_stat = await redis.execute(
+                            raw_last_stat = await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.get(str(kernel.id)))
                             if raw_last_stat is not None:
@@ -2392,7 +2395,7 @@ class AgentRegistry:
             instance_rejoin = False
 
             # Update "last seen" timestamp for liveness tracking
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_live,
                 lambda r: r.hset('agent.last_seen', agent_id, now.timestamp()),
             )
@@ -2497,13 +2500,13 @@ class AgentRegistry:
             known_registries = await get_known_registries(self.shared_config.etcd)
             loaded_images = msgpack.unpackb(snappy.decompress(agent_info['images']))
 
-            def _pipe_builder(r: aioredis.Redis):
+            async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 for image in loaded_images:
                     image_ref = ImageRef(image[0], known_registries, agent_info['architecture'])
-                    pipe.sadd(image_ref.canonical, agent_id)
+                    await pipe.sadd(image_ref.canonical, agent_id)
                 return pipe
-            await redis.execute(self.redis_image, _pipe_builder)
+            await redis_helper.execute(self.redis_image, _pipe_builder)
 
         await self.hook_plugin_ctx.notify(
             'POST_AGENT_HEARTBEAT',
@@ -2511,12 +2514,12 @@ class AgentRegistry:
         )
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
-        await redis.execute(self.redis_live, lambda r: r.hdel('agent.last_seen', agent_id))
+        await redis_helper.execute(self.redis_live, lambda r: r.hdel('agent.last_seen', agent_id))
 
-        async def _pipe_builder(r: aioredis.Redis):
+        async def _pipe_builder(r: Redis):
             pipe = r.pipeline()
             async for imgname in r.scan_iter():
-                pipe.srem(imgname, agent_id)
+                await pipe.srem(imgname, agent_id)
             return pipe
 
         async def _update() -> None:
@@ -2556,7 +2559,7 @@ class AgentRegistry:
                 )
                 await db_sess.execute(update_query)
 
-        await redis.execute(self.redis_image, _pipe_builder)
+        await redis_helper.execute(self.redis_image, _pipe_builder)
         await execute_with_retry(_update)
         if status == AgentStatus.LOST:
             log.warning('agent {0} heartbeat timeout detected.', agent_id)
@@ -2698,7 +2701,7 @@ class AgentRegistry:
         log.debug('sync_kernel_stats(k:{!r})', kernel_ids)
         for kernel_id in kernel_ids:
             raw_kernel_id = str(kernel_id)
-            kern_stat = await redis.execute(
+            kern_stat = await redis_helper.execute(
                 self.redis_stat,
                 lambda r: r.get(raw_kernel_id),
             )
@@ -2738,7 +2741,7 @@ class AgentRegistry:
             except asyncio.CancelledError:
                 pass
 
-        kern_stat = await redis.execute(
+        kern_stat = await redis_helper.execute(
             self.redis_stat,
             lambda r: r.get(str(kernel_id)),
         )

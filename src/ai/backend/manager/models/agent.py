@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, relationship, selectinload
 from sqlalchemy.sql.expression import true
 
-from ai.backend.common import msgpack, redis
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata
 
 from .base import (
@@ -219,7 +219,7 @@ class Agent(graphene.ObjectType):
     async def resolve_live_stat(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
         rs = ctx.redis_stat
-        live_stat = await redis.execute(rs, lambda r: r.get(str(self.id)))
+        live_stat = await redis_helper.execute(rs, lambda r: r.get(str(self.id)))
         if live_stat is not None:
             live_stat = msgpack.unpackb(live_stat)
         return live_stat
@@ -227,7 +227,7 @@ class Agent(graphene.ObjectType):
     async def resolve_cpu_cur_pct(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
         rs = ctx.redis_stat
-        live_stat = await redis.execute(rs, lambda r: r.get(str(self.id)))
+        live_stat = await redis_helper.execute(rs, lambda r: r.get(str(self.id)))
         if live_stat is not None:
             live_stat = msgpack.unpackb(live_stat)
             try:
@@ -239,7 +239,7 @@ class Agent(graphene.ObjectType):
     async def resolve_mem_cur_bytes(self, info: graphene.ResolveInfo) -> Any:
         ctx: GraphQueryContext = info.context
         rs = ctx.redis_stat
-        live_stat = await redis.execute(rs, lambda r: r.get(str(self.id)))
+        live_stat = await redis_helper.execute(rs, lambda r: r.get(str(self.id)))
         if live_stat is not None:
             live_stat = msgpack.unpackb(live_stat)
             try:

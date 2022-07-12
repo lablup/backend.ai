@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.models.session import SessionRow
@@ -75,7 +75,7 @@ async def check_concurrency(
         resource_policy = result.scalar()
 
     max_concurrent_sessions = resource_policy.max_concurrent_sessions
-    ok, concurrency_used = await redis.execute_script(
+    ok, concurrency_used = await redis_helper.execute_script(
         sched_ctx.registry.redis_stat,
         'check_keypair_concurrency_used',
         _check_keypair_concurrency_script,

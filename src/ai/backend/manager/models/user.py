@@ -19,7 +19,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import RedisConnectionInfo
 
@@ -1104,7 +1104,7 @@ class PurgeUser(graphene.Mutation):
             .where(keypairs.c.user == user_uuid),
         )
         access_key = ak_rows.first().access_key
-        await redis.execute(
+        await redis_helper.execute(
             redis_conn,
             lambda r: r.delete(f'keypair.concurrency_used.{access_key}'),
         )

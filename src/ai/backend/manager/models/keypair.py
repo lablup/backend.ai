@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
 
-from ai.backend.common import msgpack, redis
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AccessKey, SecretKey
 
 if TYPE_CHECKING:
@@ -196,7 +196,7 @@ class KeyPair(graphene.ObjectType):
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        n = await redis.execute(ctx.redis_stat, lambda r: r.get(f"kp:{self.access_key}:num_queries"))
+        n = await redis_helper.execute(ctx.redis_stat, lambda r: r.get(f"kp:{self.access_key}:num_queries"))
         if n is not None:
             return n
         return 0
@@ -217,7 +217,7 @@ class KeyPair(graphene.ObjectType):
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
         kp_key = 'keypair.concurrency_used'
-        concurrency_used = await redis.execute(
+        concurrency_used = await redis_helper.execute(
             ctx.redis_stat,
             lambda r: r.get(f'{kp_key}.{self.access_key}'),
         )
@@ -541,7 +541,7 @@ class DeleteKeyPair(graphene.Mutation):
             sa.delete(keypairs)
             .where(keypairs.c.access_key == access_key)
         )
-        await redis.execute(
+        await redis_helper.execute(
             ctx.redis_stat,
             lambda r: r.delete(f'keypair.concurrency_used.{access_key}'),
         )

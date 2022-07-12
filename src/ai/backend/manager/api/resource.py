@@ -18,13 +18,13 @@ import sqlalchemy as sa
 import trafaret as t
 import yarl
 from aiohttp import web
-from aioredis import Redis
-from aioredis.client import Pipeline as RedisPipeline
 from async_timeout import timeout as _timeout
 from dateutil.relativedelta import relativedelta
 from dateutil.tz import tzutc
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline as RedisPipeline
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
@@ -333,13 +333,13 @@ async def get_container_stats_for_period(request: web.Request, start_date, end_d
         result = await conn.execute(query)
         rows = result.fetchall()
 
-    def _pipe_builder(r: Redis) -> RedisPipeline:
+    async def _pipe_builder(r: Redis) -> RedisPipeline:
         pipe = r.pipeline()
         for row in rows:
-            pipe.get(str(row['id']))
+            await pipe.get(str(row['id']))
         return pipe
 
-    raw_stats = await redis.execute(root_ctx.redis_stat, _pipe_builder)
+    raw_stats = await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
 
     objs_per_group = {}
     local_tz = root_ctx.shared_config['system']['timezone']
@@ -591,7 +591,7 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
                 gpu_allocated += int(row.occupied_slots['cuda.devices'])
             if 'cuda.shares' in row.occupied_slots:
                 gpu_allocated += Decimal(row.occupied_slots['cuda.shares'])
-            raw_stat = await redis.execute(root_ctx.redis_stat, lambda r: r.get(str(row['id'])))
+            raw_stat = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.get(str(row['id'])))
             if raw_stat:
                 last_stat = msgpack.unpackb(raw_stat)
                 io_read_bytes += int(nmget(last_stat, 'io_read.current', 0))
