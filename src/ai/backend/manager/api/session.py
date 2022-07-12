@@ -39,6 +39,7 @@ import aiotools
 import attr
 import multidict
 import sqlalchemy as sa
+import sqlalchemy.exc
 import trafaret as t
 import yarl
 from aiohttp import hdrs, web
@@ -1538,52 +1539,56 @@ async def handle_kernel_log(
         await redis_conn.close()
 
 
+@catch_unexpected(log)
 async def report_stats(root_ctx: RootContext, interval: float) -> None:
-    stats_monitor = root_ctx.stats_monitor
-    await stats_monitor.report_metric(
-        GAUGE, 'ai.backend.manager.coroutines', len(asyncio.all_tasks()))
+    try:
+        stats_monitor = root_ctx.stats_monitor
+        await stats_monitor.report_metric(
+            GAUGE, 'ai.backend.manager.coroutines', len(asyncio.all_tasks()))
 
-    all_inst_ids = [
-        inst_id async for inst_id
-        in root_ctx.registry.enumerate_instances()]
-    await stats_monitor.report_metric(
-        GAUGE, 'ai.backend.manager.agent_instances', len(all_inst_ids))
+        all_inst_ids = [
+            inst_id async for inst_id
+            in root_ctx.registry.enumerate_instances()]
+        await stats_monitor.report_metric(
+            GAUGE, 'ai.backend.manager.agent_instances', len(all_inst_ids))
 
-    async with root_ctx.db.begin_readonly() as conn:
-        query = (
-            sa.select([sa.func.count()])
-            .select_from(kernels)
-            .where(
-                (kernels.c.cluster_role == DEFAULT_ROLE) &
-                (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+        async with root_ctx.db.begin_readonly() as conn:
+            query = (
+                sa.select([sa.func.count()])
+                .select_from(kernels)
+                .where(
+                    (kernels.c.cluster_role == DEFAULT_ROLE) &
+                    (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                )
             )
-        )
-        n = await conn.scalar(query)
-        await stats_monitor.report_metric(
-            GAUGE, 'ai.backend.manager.active_kernels', n)
-        subquery = (
-            sa.select([sa.func.count()])
-            .select_from(keypairs)
-            .where(keypairs.c.is_active == true())
-            .group_by(keypairs.c.user_id)
-        )
-        query = sa.select([sa.func.count()]).select_from(subquery.alias())
-        n = await conn.scalar(query)
-        await stats_monitor.report_metric(
-            GAUGE, 'ai.backend.users.has_active_key', n)
+            n = await conn.scalar(query)
+            await stats_monitor.report_metric(
+                GAUGE, 'ai.backend.manager.active_kernels', n)
+            subquery = (
+                sa.select([sa.func.count()])
+                .select_from(keypairs)
+                .where(keypairs.c.is_active == true())
+                .group_by(keypairs.c.user_id)
+            )
+            query = sa.select([sa.func.count()]).select_from(subquery.alias())
+            n = await conn.scalar(query)
+            await stats_monitor.report_metric(
+                GAUGE, 'ai.backend.users.has_active_key', n)
 
-        subquery = subquery.where(keypairs.c.last_used != null())
-        query = sa.select([sa.func.count()]).select_from(subquery.alias())
-        n = await conn.scalar(query)
-        await stats_monitor.report_metric(
-            GAUGE, 'ai.backend.users.has_used_key', n)
+            subquery = subquery.where(keypairs.c.last_used != null())
+            query = sa.select([sa.func.count()]).select_from(subquery.alias())
+            n = await conn.scalar(query)
+            await stats_monitor.report_metric(
+                GAUGE, 'ai.backend.users.has_used_key', n)
 
-        """
-        query = sa.select([sa.func.count()]).select_from(usage)
-        n = await conn.scalar(query)
-        await stats_monitor.report_metric(
-            GAUGE, 'ai.backend.manager.accum_kernels', n)
-        """
+            """
+            query = sa.select([sa.func.count()]).select_from(usage)
+            n = await conn.scalar(query)
+            await stats_monitor.report_metric(
+                GAUGE, 'ai.backend.manager.accum_kernels', n)
+            """
+    except (sqlalchemy.exc.InterfaceError, ConnectionRefusedError):
+        log.warn('report_stats(): error while connecting to PostgreSQL server')
 
 
 @server_status_required(ALL_ALLOWED)
@@ -2243,9 +2248,11 @@ async def init(app: web.Application) -> None:
     # Scan ALIVE agents
     app_ctx.agent_lost_checker = aiotools.create_timer(
         functools.partial(check_agent_lost, root_ctx), 1.0)
+    app_ctx.agent_lost_checker.set_name('agent_lost_checker')
     app_ctx.stats_task = aiotools.create_timer(
         functools.partial(report_stats, root_ctx), 5.0,
     )
+    app_ctx.stats_task.set_name('stats_task')
 
 
 async def shutdown(app: web.Application) -> None:

@@ -35,6 +35,7 @@ import aiohttp
 import aiohttp_cors
 import aiotools
 import attr
+import grpc
 import trafaret as t
 import zmq
 import zmq.asyncio
@@ -626,9 +627,15 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
     shared_config: SharedConfig = root_ctx.shared_config
     try:
         while True:
-            no_packet_timeout: timedelta = tx.TimeDuration().check(
-                await shared_config.etcd.get('config/idle/app-streaming-packet-timeout') or '5m',
-            )
+            try:
+                no_packet_timeout: timedelta = tx.TimeDuration().check(
+                    await shared_config.etcd.get('config/idle/app-streaming-packet-timeout') or '5m',
+                )
+            except grpc.aio.AioRpcError as e:
+                if e.code() == grpc.StatusCode.UNAVAILABLE:
+                    log.warn('stream_conn_tracker_gc(): error while connecting to Etcd server, retrying...')
+                else:
+                    raise e
             async with app_ctx.conn_tracker_lock:
                 now = await redis.execute(redis_live, lambda r: r.time())
                 now = now[0] + (now[1] / (10**6))
@@ -648,8 +655,10 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
                         redis_live,
                         lambda r: r.zcount(conn_tracker_key, float('-inf'), float('+inf')),
                     )
-                    log.debug(f"conn_tracker: gc {session_id} "
-                              f"removed/remaining = {removed_count}/{remaining_count}")
+                    log.debug(
+                        f"conn_tracker: gc {session_id} "
+                        f"removed/remaining = {removed_count}/{remaining_count}",
+                    )
                     if prev_remaining_count > 0 and remaining_count == 0:
                         await root_ctx.idle_checker_host.update_app_streaming_status(
                             session_id,
