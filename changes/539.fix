@@ -1,0 +1,1 @@
+Fixed a logging error which is raised when `log_record` has a key `level`, but its value is `None`.
