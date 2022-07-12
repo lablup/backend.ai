@@ -50,17 +50,11 @@ from .image import (
     RescanImages,
     UnloadImage,
 )
-from .kernel import (
+from .kernel import (  # ComputeSession,; ComputeSessionList,
     ComputeContainer,
     ComputeContainerList,
-    # ComputeSession,
-    # ComputeSessionList,
     LegacyComputeSession,
     LegacyComputeSessionList,
-)
-from .session import (
-    ComputeSession,
-    ComputeSessionList,
 )
 from .keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
 from .resource_policy import (
@@ -89,6 +83,7 @@ from .scaling_group import (
     ModifyScalingGroup,
     ScalingGroup,
 )
+from .session import ComputeSession, ComputeSessionList
 from .storage import StorageVolume, StorageVolumeList
 from .user import (
     CreateUser,

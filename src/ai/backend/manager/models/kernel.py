@@ -5,13 +5,11 @@ import logging
 import uuid
 from collections import OrderedDict
 from datetime import datetime
-from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
     Container,
     Dict,
-    Iterable,
     List,
     Mapping,
     Optional,
@@ -47,7 +45,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionResult,
     SessionTypes,
-    SlotName,
     VFolderMount,
 )
 

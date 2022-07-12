@@ -428,8 +428,9 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
                 'bootstrap_script': '',
             }],
         },
-        None,
+        params['launchOptions']['scalingGroup'],
         SessionTypes.BATCH,
+        resource_policy,
         user_scope=UserScope(
             domain_name=request['user']['domain_name'],
             group_id=group_id,

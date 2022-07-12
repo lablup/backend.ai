@@ -534,7 +534,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 },
                 params['config']['scaling_group'],
                 params['session_type'],
-                None,
+                resource_policy,
                 user_scope=UserScope(
                     domain_name=params['domain'],  # type: ignore  # params always have it
                     group_id=group_id,

@@ -4,14 +4,14 @@ import enum
 import functools
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, List, Mapping, Sequence, TYPE_CHECKING, Union, Iterable
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Sequence, Union
 from uuid import UUID
 
-import sqlalchemy as sa
 import graphene
-from graphene.types.datetime import DateTime as GQLDateTime
+import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
+from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, relationship, selectinload
@@ -19,17 +19,17 @@ from sqlalchemy.orm import noload, relationship, selectinload
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
-    SlotName,
+    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
-    ResourceSlot,
+    SlotName,
     VFolderMount,
 )
 
 from ..api.exceptions import (
-    SessionNotFound,
     MainKernelNotFound,
+    SessionNotFound,
     TooManyKernelsFound,
     UnknownDependencySession,
 )
@@ -38,27 +38,26 @@ from .base import (
     GUID,
     Base,
     BigInt,
-    Item,
     EnumType,
     ForeignKeyIDColumn,
+    Item,
+    PaginatedList,
     ResourceSlotColumn,
     SessionIDColumn,
     StructuredJSONObjectListColumn,
     URLColumn,
-    PaginatedList,
-    batch_result_in_session,
     batch_multiresult_in_session,
+    batch_result_in_session,
 )
+from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .keypair import KeyPairRow
-from .group import GroupRow
-from .user import UserRow
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
+from .user import UserRow
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
-    from sqlalchemy.engine import Row
 
 
 __all__ = (
@@ -997,4 +996,3 @@ class ComputeSessionList(graphene.ObjectType):
         interfaces = (PaginatedList, )
 
     items = graphene.List(ComputeSession, required=True)
-

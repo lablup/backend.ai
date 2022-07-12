@@ -451,7 +451,8 @@ class SchedulerDispatcher(aobject):
                                     KernelRow.status_data,
                                     ('scheduler',),
                                     obj=status_update_data,
-                            ))
+                                ),
+                            )
                         )
                         await db_sess.execute(kernel_query)
                         session_query = (
@@ -462,7 +463,8 @@ class SchedulerDispatcher(aobject):
                                     SessionRow.status_data,
                                     ('scheduler',),
                                     obj=status_update_data,
-                            ))
+                                ),
+                            )
                         )
                         await db_sess.execute(session_query)
 
@@ -770,7 +772,7 @@ class SchedulerDispatcher(aobject):
                                 .values(
                                     status_data=sql_json_merge(
                                         SessionRow.status_data,
-                                        ('kernels', str(kernel.id),),
+                                        ('kernels', str(kernel.id)),
                                         obj=exc_data,
                                     ),
                                 )
