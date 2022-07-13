@@ -497,10 +497,13 @@ install_editable_webui() {
     # The debug mode here is only for 'hard-core' debugging scenarios -- it changes lots of behaviors.
     # (e.g., separate debugging of Electron's renderer and main threads)
     sed_inplace "s@debug = true@debug = false" config.toml
+    # The webserver endpoint to use in the session mode.
     sed_inplace "s@#apiEndpoint =@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
     sed_inplace "s@#apiEndpointText =@apiEndpointText = "'"'"${site_name}"'"' config.toml
-    # We should NOT set webServerURL as its non-empty value will let the electron app
-    # use the prebuilt static resources from the web server, instead of local editable sources.
+    # webServerURL lets the electron app use the web UI contents from the server.
+    # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.web.server` instance.
+    # In the former case, you may live-edit the webui sources while running them in the electron app.
+    sed_inplace "s@webServerURL =@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
     sed_inplace "s@proxyURL =@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
     echo "PROXYLISTENIP=0.0.0.0" >> src/ai/backend/webui/.env
     echo "PROXYBASEHOST=localhost" >> src/ai/backend/webui/.env
@@ -878,8 +881,8 @@ echo "If you use a VM for this development setup but access it from a web browse
 echo "you must manually modify the following configurations to use an IP address or a DNS hostname"
 echo "that can be accessible from both the client SDK and the web browser."
 echo " "
-echo " - ${YELLOW}volumes/proxies/local/client_api${CYAN} key in the etcd${NC}"
-echo " - ${YELLOW}apiEndpoint${NC}, ${YELLOW}proxyURL${NC} of ${CYAN}src/ai/backend/webui/config.toml${NC}"
+echo " - ${YELLOW}volumes/proxies/local/client_api${CYAN} etcd key${NC}"
+echo " - ${YELLOW}apiEndpoint${NC}, ${YELLOW}proxyURL${NC}, ${YELLOW}webServerURL${NC} of ${CYAN}src/ai/backend/webui/config.toml${NC}"
 echo " - ${YELLOW}PROXYBASEHOST${NC} of ${CYAN}src/ai/backend/webui/.env${NC}"
 echo " "
 echo "We recommend setting ${BOLD}/etc/hosts${NC}${WHITE} in both the VM and your web browser's host${NC} to keep a consistent DNS hostname"
