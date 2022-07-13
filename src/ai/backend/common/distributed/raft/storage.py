@@ -49,7 +49,7 @@ class InMemoryLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
 
     async def clear(self, index: int) -> None:
         assert hasattr(self._storage[0], 'index')
-        self._storage = list(filter(lambda x: x.index < index, self._storage))
+        self._storage = list(filter(lambda x: x.index < index, self._storage))  # type: ignore
 
     async def size(self) -> int:
         return len(self._storage)
@@ -89,7 +89,7 @@ class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
         return log
 
     async def clear(self, index: int) -> None:
-        assert hasattr(self._storage[0], 'index')
+        pass
 
     async def size(self) -> int:
         return await self._redis.llen(self._namespace)
@@ -113,15 +113,15 @@ class MongoLogStorage(aobject, AbstractLogStorage[T]):
     async def append_entries(self, entries: Iterable[T]) -> None:
         if entries := tuple(entries):
             if isinstance(entries[0], (raft_pb2.Log,)):
-                entries = [
+                entry_dicts = [
                     {
-                        "index": entry.index,
-                        "term": entry.term,
-                        "command": entry.command,
+                        "index": entry.index,       # type: ignore
+                        "term": entry.term,         # type: ignore
+                        "command": entry.command,   # type: ignore
                     }
                     for entry in entries
                 ]
-                _ = await self._db.insert_many(entries)
+                _ = await self._db.insert_many(entry_dicts)
 
     async def get(self, index: int) -> Optional[T]:
         return await self._db.find_one({"index": index})
