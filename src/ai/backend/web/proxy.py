@@ -141,7 +141,7 @@ async def decrypt_payload(request):
 
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     path = request.match_info.get('path', '')
-    first_path = request.path.strip(r'\/').split('/')[0]  # extract the first path
+    first_path = request.path.lstrip('/').partition('/')[0]  # extract the first path  # extract the first path
     if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
