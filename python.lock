@@ -105,14 +105,14 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0c0acb66b4e72d6606c9fa14ac9eb001a222c37c885b8fbdf65f41824cfa855f",
-              "url": "https://files.pythonhosted.org/packages/c5/16/a9de89d859eeaa0f9fdf5675a97ea1416265e1ebc039c7b9ea2c9e5433ac/aioconsole-0.4.1.tar.gz"
+              "hash": "9b719b270e7cf6f2454eeaf16c20a025b73f0d4d352d157baa77ce9ad1df427d",
+              "url": "https://files.pythonhosted.org/packages/ee/9c/f8bc72c09eae047197d820b1618314323c780005b9a854b99bed75407d43/aioconsole-0.5.0.tar.gz"
             }
           ],
           "project_name": "aioconsole",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "0.4.1"
+          "version": "0.5"
         },
         {
           "artifacts": [
