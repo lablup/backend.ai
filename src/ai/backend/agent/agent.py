@@ -573,7 +573,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
         self.timer_tasks.append(aiotools.create_timer(self.sync_container_lifecycles, 10.0))
 
         if abuse_report_path := self.local_config['agent'].get('abuse-report-path'):
-            log.debug('Enabling abnormal reported kernel removal feature')
+            log.info('Enabling auto-removal of kernels reported for abnormal activities')
             abuse_report_path.mkdir(exist_ok=True, parents=True)
             self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 10.0))
 
@@ -1139,7 +1139,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
                         KernelId(UUID(body['ID'])),
                         ContainerId(body['CID']),
                         LifecycleEvent.DESTROY,
-                        body.get('reason', 'abnormal-reported'),
+                        body.get('reason', 'anomaly-detected'),
                     )
 
                     await self.loop.run_in_executor(None, _rm, reported_kernel)
