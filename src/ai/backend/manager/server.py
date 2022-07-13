@@ -33,7 +33,7 @@ import click
 from aiohttp import web
 from setproctitle import setproctitle
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.events import EventDispatcher, EventProducer
@@ -57,7 +57,13 @@ from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHand
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
-from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB
+from .defs import (
+    REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
+    REDIS_STAT_DB,
+    REDIS_STREAM_DB,
+    REDIS_STREAM_LOCK,
+)
 from .exceptions import InvalidArgument
 from .idle import init_idle_checkers
 from .models.storage import StorageSessionManager
@@ -289,19 +295,23 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
-    root_ctx.redis_live = redis.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_LIVE_DB)
-    root_ctx.redis_stat = redis.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_STAT_DB)
-    root_ctx.redis_image = redis.get_redis_object(
+    root_ctx.redis_live = redis_helper.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_LIVE_DB)
+    root_ctx.redis_stat = redis_helper.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_STAT_DB)
+    root_ctx.redis_image = redis_helper.get_redis_object(
         root_ctx.shared_config.data['redis'], db=REDIS_IMAGE_DB,
     )
-    root_ctx.redis_stream = redis.get_redis_object(
+    root_ctx.redis_stream = redis_helper.get_redis_object(
         root_ctx.shared_config.data['redis'], db=REDIS_STREAM_DB,
+    )
+    root_ctx.redis_lock = redis_helper.get_redis_object(
+        root_ctx.shared_config.data['redis'], db=REDIS_STREAM_LOCK,
     )
     yield
     await root_ctx.redis_stream.close()
     await root_ctx.redis_image.close()
     await root_ctx.redis_stat.close()
     await root_ctx.redis_live.close()
+    await root_ctx.redis_lock.close()
 
 
 @actxmgr
@@ -494,7 +504,12 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
             from .pglock import PgAdvisoryLock
             return lambda lock_id, lifetime_hint: PgAdvisoryLock(root_ctx.db, lock_id)
         case 'redlock':
-            raise NotImplementedError("Redlock on aioredis v2 is not supported yet.")
+            from ai.backend.common.lock import RedisLock
+            return lambda lock_id, lifetime_hint: RedisLock(
+                str(lock_id),
+                root_ctx.redis_lock,
+                lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
+            )
         case 'etcd':
             from ai.backend.common.lock import EtcdLock
             return lambda lock_id, lifetime_hint: EtcdLock(
