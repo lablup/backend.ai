@@ -814,6 +814,7 @@ class ComputeSession(graphene.ObjectType):
     status_changed = GQLDateTime()
     status_info = graphene.String()
     status_data = graphene.JSONString()
+    status_history = graphene.JSONString()
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
@@ -870,6 +871,7 @@ class ComputeSession(graphene.ObjectType):
             'status_changed': row['status_changed'],
             'status_info': row['status_info'],
             'status_data': row['status_data'],
+            'status_history': row['status_history'] or {},
             'created_at': row['created_at'],
             'terminated_at': row['terminated_at'],
             'starts_at': row['starts_at'],
