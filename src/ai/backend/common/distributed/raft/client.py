@@ -16,7 +16,10 @@ class AbstractRaftClient(abc.ABC):
         address: str,
         term: int,
         leader_id: PeerId,
+        prev_log_index: int,
+        prev_log_term: int,
         entries: Iterable[raft_pb2.Log],    # type: ignore
+        leader_commit: int,
     ) -> bool:
         raise NotImplementedError()
 
@@ -46,12 +49,15 @@ class GrpcRaftClient(AbstractRaftClient):
         address: str,
         term: int,
         leader_id: PeerId,
+        prev_log_index: int,
+        prev_log_term: int,
         entries: Iterable[raft_pb2.Log],    # type: ignore
+        leader_commit: int,
         timeout: float = 5.0,
     ) -> bool:
         try:
             success = await asyncio.wait_for(
-                self._append_entries(address, term, leader_id, entries),
+                self._append_entries(address, term, leader_id, prev_log_index, prev_log_term, entries, leader_commit),
                 timeout=timeout,
             )
             return success
@@ -64,7 +70,10 @@ class GrpcRaftClient(AbstractRaftClient):
         address: str,
         term: int,
         leader_id: PeerId,
+        prev_log_index: int,
+        prev_log_term: int,
         entries: Iterable[raft_pb2.Log],    # type: ignore
+        leader_commit: int,
     ) -> bool:
         if credentials := self._credentials:
             channel = grpc.aio.secure_channel(address, credentials)
@@ -72,7 +81,11 @@ class GrpcRaftClient(AbstractRaftClient):
             channel = grpc.aio.insecure_channel(address)
 
         stub = raft_pb2_grpc.RaftServiceStub(channel)
-        request = raft_pb2.AppendEntriesRequest(term=term, leader_id=leader_id, entries=entries)
+        request = raft_pb2.AppendEntriesRequest(
+            term=term, leader_id=leader_id,
+            prev_log_index=prev_log_index, prev_log_term=prev_log_term,
+            entries=entries, leader_commit=leader_commit,
+        )
         try:
             response = await stub.AppendEntries(request)
             return response.success

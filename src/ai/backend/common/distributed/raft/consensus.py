@@ -14,7 +14,7 @@ from .client import AbstractRaftClient
 from .protocol import AbstractRaftProtocol
 from .protos import raft_pb2
 from .server import AbstractRaftServer
-from .storage import AbstractLogStorage, RedisLogStorage
+from .storage import AbstractLogStorage, MongoLogStorage
 from .types import PeerId
 
 logging.basicConfig(level=logging.INFO)
@@ -47,7 +47,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._client: Final[AbstractRaftClient] = client
         self._on_state_changed: Optional[Callable[[RaftState], Awaitable]] = on_state_changed
 
-        self._election_timeout: Final[float] = randrangef(0.15, 0.3)
+        self._election_timeout: Final[float] = randrangef(0.15, 0.3)    # 0.01 ~ 0.5
         self._heartbeat_interval: Final[float] = 0.1
         self._leader_id: Optional[PeerId] = None
 
@@ -65,11 +65,15 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._next_index: List[int] = []
         self._match_index: List[int] = []
 
+        self._cache_prev_log_index: int = 0
+        self._cache_prev_log_term: int = 0
+        self._cache_leader_commit: int = 0
+
         self._server.bind(self)
 
     async def __ainit__(self) -> None:
         await self._execute_transition(RaftState.FOLLOWER)
-        self._log: AbstractLogStorage[raft_pb2.Log] = await RedisLogStorage[raft_pb2.Log].new()    # type: ignore
+        self._log: AbstractLogStorage[raft_pb2.Log] = await MongoLogStorage[raft_pb2.Log].new()    # type: ignore
 
     async def _execute_transition(self, next_state: RaftState) -> None:
         self._state = next_state
@@ -79,29 +83,29 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
             elif inspect.isfunction(callback):
                 callback(next_state)
 
-    """
     async def _append_random_entry_coro(self):
         while True:
             await asyncio.sleep(3.0)
             command = str(uuid.uuid4())
+            logging.info(f'[LEADE] Storage size: {await self._log.size()}')
             entry = raft_pb2.Log(index=await self._log.size(), term=self.current_term, command=command)
             await self._log.append_entries((entry,))
+            self._cache_prev_log_index += 1
+            self._cache_prev_log_term = self.current_term
+            # self._cache_leader_commit
             while not await self.replicate_logs(entries=(entry,)):
                 await asyncio.sleep(0.1)
-    """
 
     async def main(self) -> None:
-        # _append_random_entry_task: Optional[asyncio.Task] = None
+        _append_random_entry_task: Optional[asyncio.Task] = None
         while True:
             logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} state={self._state}')
-            """
             if task := _append_random_entry_task:
                 task.cancel()
                 try:
                     await task
                 except asyncio.CancelledError:
                     pass
-            """
             match self._state:
                 case RaftState.FOLLOWER:
                     await self.reset_timeout()
@@ -126,8 +130,8 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                             break
                         await asyncio.sleep(self._election_timeout)
                 case RaftState.LEADER:
-                    logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} LEADER({self.id})')
-                    # _append_random_entry_task = asyncio.create_task(self._append_random_entry_coro())
+                    logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} LEADER({self.id.split("-")[0]})')
+                    _append_random_entry_task = asyncio.create_task(self._append_random_entry_coro())
                     self._leader_id = self.id
                     while self._state is RaftState.LEADER:
                         await self._publish_heartbeat()
@@ -141,8 +145,9 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         done, _ = await asyncio.wait({
             asyncio.create_task(
                 self._client.append_entries(
-                    address=address, term=self.current_term,
-                    leader_id=self.id, entries=entries,
+                    address=address, term=self.current_term, leader_id=self.id,
+                    prev_log_index=self._cache_prev_log_index, prev_log_term=self._cache_prev_log_term,
+                    entries=entries, leader_commit=self._cache_leader_commit,
                 ),
             )
             for address in self._peers
@@ -167,19 +172,39 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         leader_commit: int,
     ) -> bool:
         """Receiver implementation:
-        1. Reply false if term < currentTerm
-        2. Reply false if log doesn't contain any entry at prevLogIndex whose term matches prevLogTerm
-        3. If an existing entry conflicts with a new one (same index but different terms),
-           delete the existing entry and all that follow it
         4. Append any new entries not already in the log
         5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
         """
+
+        """Receiver implementation:
+        1. Reply false if term < currentTerm
+        """
         if term < self.current_term:
             return False
+
+        """Receiver implementation:
+        2. Reply false if log doesn't contain any entry at prevLogIndex whose term matches prevLogTerm
+        """
+        if (log := await self._log.get(prev_log_index)) and (log.term != prev_log_term):
+            return False
+
         await self._synchronize_term(term)
+
+        """Receiver implementation:
+        3. If an existing entry conflicts with a new one (same index but different terms),
+           delete the existing entry and all that follow it
+        """
+        for entry in (entries := tuple(entries)):
+            if (old_entry := await self._log.get(entry.index)) and (old_entry.term != entry.term):
+                await self._log.clear(index=entry.index)
+                break
+
+        self._cache_prev_log_index = prev_log_index
+        self._cache_prev_log_term = prev_log_term
+
         self._leader_id = leader_id
-        await self._log.append_entries(entries)
         if entries := tuple(entries):
+            await self._log.append_entries(entries)
             logging.info(f'[{datetime.now()}] pid={os.getpid()} on_append_entries(term={term}, entry={entries[-1].index}, '
                          f'total={await self._log.size()})')
         await self.reset_timeout()

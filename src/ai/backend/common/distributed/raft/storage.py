@@ -3,6 +3,7 @@ import uuid
 from typing import Dict, Generic, Iterable, List, Optional, TypeVar, cast
 
 import aioredis
+import motor.motor_asyncio
 
 from ...types import aobject
 from .protos import raft_pb2
@@ -20,16 +21,20 @@ class AbstractLogStorage(abc.ABC, Generic[T]):
         raise NotImplementedError()
 
     @abc.abstractmethod
+    async def clear(self, index: int) -> None:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
     async def size(self) -> int:
         raise NotImplementedError()
 
 
-class InMemoryLogStorage(Generic[T], AbstractLogStorage[T]):
+class InMemoryLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._storage: List[T] = []
 
-    def __ainit__(self, *args, **kwargs) -> None:
+    async def __ainit__(self, *args, **kwargs) -> None:
         pass
 
     async def append_entries(self, entries: Iterable[T]) -> None:
@@ -42,13 +47,16 @@ class InMemoryLogStorage(Generic[T], AbstractLogStorage[T]):
             pass
         return None
 
+    async def clear(self, index: int) -> None:
+        assert hasattr(self._storage[0], 'index')
+        self._storage = list(filter(lambda x: x.index < index, self._storage))
+
     async def size(self) -> int:
         return len(self._storage)
 
 
 class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
     def __init__(self, *args, **kwargs) -> None:
-        self._len: int = 0
         self._namespace: str = str(uuid.uuid4())
 
     async def __ainit__(self, *args, host: str = '127.0.0.1', port: int = 8111, **kwargs) -> None:
@@ -80,5 +88,46 @@ class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
         log.ParseFromString(item)
         return log
 
+    async def clear(self, index: int) -> None:
+        assert hasattr(self._storage[0], 'index')
+
     async def size(self) -> int:
         return await self._redis.llen(self._namespace)
+
+
+class MongoLogStorage(aobject, AbstractLogStorage[T]):
+    def __init__(self, *args, **kwargs) -> None:
+        username = kwargs.get('username', 'root')
+        password = kwargs.get('password', '0000')
+        host = kwargs.get('host', 'localhost')
+        port = kwargs.get('port', 27017)
+
+        self._uuid: str = str(uuid.uuid4()).split('-')[0]
+
+        client = motor.motor_asyncio.AsyncIOMotorClient(f'mongodb://{username}:{password}@{host}:{port}')
+        self._db = client['backend-ai']['raft'][self._uuid]
+
+    async def __ainit__(self, *args, **kwargs) -> None:
+        pass
+
+    async def append_entries(self, entries: Iterable[T]) -> None:
+        if entries := tuple(entries):
+            if isinstance(entries[0], (raft_pb2.Log,)):
+                entries = [
+                    {
+                        "index": entry.index,
+                        "term": entry.term,
+                        "command": entry.command,
+                    }
+                    for entry in entries
+                ]
+                _ = await self._db.insert_many(entries)
+
+    async def get(self, index: int) -> Optional[T]:
+        return await self._db.find_one({"index": index})
+
+    async def clear(self, index: int) -> None:
+        await self._db.delete_many({"index": {"$le": index}})
+
+    async def size(self) -> int:
+        return await self._db.count_documents({})
