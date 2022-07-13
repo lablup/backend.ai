@@ -141,13 +141,13 @@ async def decrypt_payload(request):
 
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     path = request.match_info.get('path', '')
-    name = request.match_info.get('name', '')
+    first_path = request.path.strip(r'\/').split('/')[0]  # extract the first path
     if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
         api_session = await asyncio.shield(get_api_session(request))
 
-    if name == 'flow':
+    if first_path == 'pipeline':
         pipeline_endpoint = request.app['config']['pipeline']['endpoint']
         api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))
     try:
