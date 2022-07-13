@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import enum
-import functools
 from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Sequence, Union
 from uuid import UUID
 
+import aiotools
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -342,15 +342,15 @@ async def match_sessions(
     that belongs to the given access key, and return the list of SessionRow.
     """
 
-    query_list = [functools.partial(get_sessions_by_name, allow_prefix=allow_prefix)]
+    query_list = [aiotools.apartial(get_sessions_by_name, allow_prefix=allow_prefix)]
     try:
         UUID(str(session_name_or_id))
     except ValueError:
         pass
     else:
-        query_list.append(functools.partial(match_sessions_by_id, allow_prefix=False))
+        query_list.append(aiotools.apartial(match_sessions_by_id, allow_prefix=False))
         if allow_prefix:
-            query_list.append(functools.partial(match_sessions_by_id, allow_prefix=True))
+            query_list.append(aiotools.apartial(match_sessions_by_id, allow_prefix=True))
 
     for fetch_func in query_list:
         rows = await fetch_func(
