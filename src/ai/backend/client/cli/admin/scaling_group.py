@@ -2,15 +2,17 @@ import sys
 
 import click
 
-from ai.backend.client.session import Session
 from ai.backend.client.func.scaling_group import (
-    _default_list_fields,
     _default_detail_fields,
+    _default_list_fields,
 )
 from ai.backend.client.output.fields import scaling_group_fields
-from . import admin
+from ai.backend.client.session import Session
+
+from ..extensions import pass_ctx_obj
 from ..params import JSONParamType
 from ..types import CLIContext
+from . import admin
 
 
 @admin.group()
@@ -21,7 +23,7 @@ def scaling_group() -> None:
 
 
 @scaling_group.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('group', type=str, metavar='GROUP_NAME')
 def get_available(ctx: CLIContext, group: str) -> None:
     with Session() as session:
@@ -34,7 +36,7 @@ def get_available(ctx: CLIContext, group: str) -> None:
 
 
 @scaling_group.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str)
 def info(ctx: CLIContext, name: str) -> None:
     """
@@ -51,7 +53,7 @@ def info(ctx: CLIContext, name: str) -> None:
 
 
 @scaling_group.command()
-@click.pass_obj
+@pass_ctx_obj
 def list(ctx: CLIContext) -> None:
     """
     List and manage scaling groups.
@@ -67,7 +69,7 @@ def list(ctx: CLIContext) -> None:
 
 
 @scaling_group.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str, metavar='NAME')
 @click.option('-d', '--description', type=str, default='',
               help='Description of new scaling group')
@@ -120,7 +122,7 @@ def add(ctx: CLIContext, name, description, inactive,
 
 
 @scaling_group.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str, metavar='NAME')
 @click.option('-d', '--description', type=str, default='',
               help='Description of new scaling group')
@@ -175,7 +177,7 @@ def update(ctx: CLIContext, name, description, inactive,
 
 
 @scaling_group.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str, metavar='NAME')
 def delete(ctx: CLIContext, name):
     """
@@ -209,7 +211,7 @@ def delete(ctx: CLIContext, name):
 
 
 @scaling_group.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('scaling_group', type=str, metavar='SCALING_GROUP')
 @click.argument('domain', type=str, metavar='DOMAIN')
 def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
@@ -247,7 +249,7 @@ def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
 
 
 @scaling_group.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('scaling_group', type=str, metavar='SCALING_GROUP')
 @click.argument('domain', type=str, metavar='DOMAIN')
 def dissociate_scaling_group(ctx: CLIContext, scaling_group, domain):

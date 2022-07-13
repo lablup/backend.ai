@@ -1,23 +1,17 @@
 from __future__ import annotations
 
-import aioredis
-import aioredis.exceptions
-import async_timeout
 import asyncio
 import functools
 import sys
-from typing import (
-    Awaitable,
-    Callable,
-    Final,
-    Sequence,
-    TYPE_CHECKING,
-    TypeVar,
-    Union,
-)
-from typing_extensions import (
-    ParamSpec,
-)
+from typing import TYPE_CHECKING, Awaitable, Callable, Final, Sequence, TypeVar, Union
+
+import async_timeout
+from redis.asyncio import Redis
+from redis.exceptions import AuthenticationError as RedisAuthenticationError
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
+from typing_extensions import ParamSpec
+
 if TYPE_CHECKING:
     from .types import AbstractRedisNode
 
@@ -41,20 +35,22 @@ async def simple_run_cmd(cmdargs: Sequence[Union[str, bytes]], **kwargs) -> asyn
 
 
 async def wait_redis_ready(host: str, port: int, password: str = None) -> None:
-    r = aioredis.from_url(f"redis://{host}:{port}", password=password, socket_timeout=0.2)
+    r = Redis.from_url(f"redis://{host}:{port}", password=password, socket_timeout=0.2)
     while True:
         try:
             print("CheckReady.PING", port, file=sys.stderr)
             await r.ping()
             print("CheckReady.PONG", port, file=sys.stderr)
-        except aioredis.exceptions.AuthenticationError:
+        except RedisAuthenticationError:
             raise
         except (
             ConnectionResetError,
-            aioredis.exceptions.ConnectionError,
+            ConnectionError,
+            RedisConnectionError,
         ):
+            print('connectionError, retrying')
             await asyncio.sleep(0.1)
-        except aioredis.exceptions.TimeoutError:
+        except RedisTimeoutError:
             pass
         else:
             break

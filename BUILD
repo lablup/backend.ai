@@ -4,6 +4,8 @@ python_requirements(
     module_mapping={
         "aiodataloader-ng": ["aiodataloader"],
         "attrs": ["attr", "attrs"],
+        "aiohttp-session": ["aiohttp_session"],
+        "pycryptodome": ["Crypto"],
         "python-dateutil": ["dateutil"],
         "python-json-logger": ["pythonjsonlogger"],
         "python-snappy": ["snappy"],
@@ -20,6 +22,7 @@ python_requirements(
         "types-Jinja2": ["Jinja2"],
         "types-PyYAML": ["yaml"],
         "types-python-dateutil": ["dateutil"],
+        "types-redis": ["redis"],
         "types-six": ["six"],
         "types-tabulate": ["tabulate"],
     },

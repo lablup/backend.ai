@@ -20,15 +20,31 @@ Prerequisites
 
 Install the followings accordingly to your host operating system.
 
+* `Git LFS <https://git-lfs.github.com/>`_
+
 * `pyenv <https://github.com/pyenv/pyenv>`_ and `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_
 
   - Ensure that you have the Python version specified in ``pants.toml`` on your ``PATH``.
 
-* `docker <https://docs.docker.com/install/>`_
+  - Depending on your Linux Distribution, you may have to additionally install a sysmte package that enables Python's `pip` command.
 
-* `docker-compose <https://docs.docker.com/compose/install/>`_ (v2 required)
+    * Ubuntu
 
-* `rust <https://rustup.rs/>`_ (for bootstrapping Pants)
+      .. code-block:: console
+
+         $ sudo apt install python3-pip
+
+    * Fedora Core & CentOS
+
+      .. code-block:: console
+
+         $ sudo dnf install python3-pip
+
+* `Docker <https://docs.docker.com/install/>`_
+
+* `Docker Compose <https://docs.docker.com/compose/install/>`_ (v2 required)
+
+* `Rust <https://rustup.rs/>`_ (for bootstrapping Pants)
 
 .. note::
 

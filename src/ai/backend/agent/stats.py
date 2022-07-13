@@ -5,12 +5,13 @@ Reference: https://www.datadoghq.com/blog/how-to-collect-docker-metrics/
 """
 
 import asyncio
-from decimal import Decimal
 import enum
 import logging
 import sys
 import time
+from decimal import Decimal
 from typing import (
+    TYPE_CHECKING,
     Callable,
     Dict,
     FrozenSet,
@@ -21,23 +22,25 @@ from typing import (
     Sequence,
     Set,
     Tuple,
-    TYPE_CHECKING,
 )
-import aioredis
 
 import attr
+from redis.asyncio import Redis
 
-from ai.backend.common import redis
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common import msgpack
 from ai.backend.common.types import (
-    ContainerId, DeviceId, KernelId,
-    MetricKey, MetricValue, MovingStatValue,
+    ContainerId,
+    DeviceId,
+    KernelId,
+    MetricKey,
+    MetricValue,
+    MovingStatValue,
 )
-from .utils import (
-    remove_exponent,
-)
+
+from .utils import remove_exponent
+
 if TYPE_CHECKING:
     from .agent import AbstractAgent
 
@@ -342,13 +345,13 @@ class StatContext:
                       self.agent.local_config['agent']['id'], redis_agent_updates['node'])
         serialized_agent_updates = msgpack.packb(redis_agent_updates)
 
-        async def _pipe_builder(r: aioredis.Redis):
-            async with r.pipeline() as pipe:
-                pipe.set(self.agent.local_config['agent']['id'], serialized_agent_updates)
-                pipe.expire(self.agent.local_config['agent']['id'], self.cache_lifespan)
-                await pipe.execute()
+        async def _pipe_builder(r: Redis):
+            pipe = r.pipeline()
+            await pipe.set(self.agent.local_config['agent']['id'], serialized_agent_updates)
+            await pipe.expire(self.agent.local_config['agent']['id'], self.cache_lifespan)
+            return pipe
 
-        await redis.execute(self.agent.redis_stat_pool, _pipe_builder)
+        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
 
     async def collect_container_stat(
         self,
@@ -365,8 +368,9 @@ class StatContext:
                 try:
                     cid = info['container_id']
                 except KeyError:
-                    log.warning('collect_container_stat(): no container for kernel {}}', kid)
-                kernel_id_map[ContainerId(cid)] = kid
+                    log.warning('collect_container_stat(): no container for kernel {}', kid)
+                else:
+                    kernel_id_map[ContainerId(cid)] = kid
             unused_kernel_ids = set(self.kernel_metrics.keys()) - set(kernel_id_map.values())
             for unused_kernel_id in unused_kernel_ids:
                 log.debug('removing kernel_metric for {}', unused_kernel_id)
@@ -412,7 +416,7 @@ class StatContext:
                         else:
                             self.kernel_metrics[kernel_id][metric_key].update(measure)
 
-        async def _pipe_builder(r: aioredis.Redis):
+        async def _pipe_builder(r: Redis):
             async with r.pipeline() as pipe:
                 for kernel_id in updated_kernel_ids:
                     metrics = self.kernel_metrics[kernel_id]
@@ -425,7 +429,7 @@ class StatContext:
                                 kernel_id, serializable_metrics)
                     serialized_metrics = msgpack.packb(serializable_metrics)
 
-                    pipe.set(str(kernel_id), serialized_metrics)
-                    await pipe.execute()
+                    await pipe.set(str(kernel_id), serialized_metrics)
+                    return pipe
 
-        await redis.execute(self.agent.redis_stat_pool, _pipe_builder)
+        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)

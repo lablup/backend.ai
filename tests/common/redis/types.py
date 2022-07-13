@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
 import contextlib
-from typing import (
-    AsyncIterator,
-    Sequence,
-    Tuple,
-)
+from abc import ABCMeta, abstractmethod
+from typing import AsyncIterator, Sequence, Tuple
+
 import attr
 
 

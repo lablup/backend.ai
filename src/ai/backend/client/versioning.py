@@ -1,12 +1,6 @@
 from __future__ import annotations
 
-from typing import (
-    Callable,
-    Sequence,
-    Tuple,
-    Union,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Callable, Sequence, Tuple, Union
 
 if TYPE_CHECKING:
     from .func.session import ComputeSession

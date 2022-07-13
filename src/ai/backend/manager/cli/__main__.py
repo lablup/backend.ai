@@ -8,18 +8,18 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 
-import aioredis, aioredis.client
 import click
 import psycopg2
 import sqlalchemy as sa
 from more_itertools import chunked
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 from setproctitle import setproctitle
 
-from ai.backend.common import redis as redis_helper
+from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.validators import TimeDuration
-
 from ai.backend.manager.models import kernels
 from ai.backend.manager.models.utils import connect_database
 
@@ -163,12 +163,12 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                 delete_count = 0
                 async with redis_ctx(cli_ctx) as redis_conn_set:
 
-                    def _build_pipe(
-                        r: aioredis.Redis,
+                    async def _build_pipe(
+                        r: Redis,
                         kernel_ids: list[str],
-                    ) -> aioredis.client.Pipeline:
+                    ) -> Pipeline:
                         pipe = r.pipeline(transaction=False)
-                        pipe.delete(*kernel_ids)
+                        await pipe.delete(*kernel_ids)
                         return pipe
 
                     if len(target_kernels) > 0:

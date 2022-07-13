@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 import asyncio
-from contextvars import ContextVar
-from contextlib import asynccontextmanager as actxmgr
-from collections import defaultdict
 import copy
-from datetime import datetime
-from decimal import Decimal
 import itertools
 import logging
+import re
 import secrets
 import time
-import re
+import typing
+import uuid
+import weakref
+from collections import defaultdict
+from contextlib import asynccontextmanager as actxmgr
+from contextvars import ContextVar
+from datetime import datetime
+from decimal import Decimal
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncIterator,
     Callable,
@@ -24,32 +28,30 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
-    TYPE_CHECKING,
+    TypeAlias,
     Union,
     cast,
 )
-import uuid
-import weakref
 
 import aiodocker
-import aioredis
 import aiotools
-from async_timeout import timeout as _timeout
-from callosum.rpc import Peer, RPCUserError
-from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.backends import default_backend
-from dateutil.tz import tzutc
 import snappy
 import sqlalchemy as sa
+import zmq
+from async_timeout import timeout as _timeout
+from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
+from callosum.rpc import Peer, RPCUserError
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from dateutil.tz import tzutc
+from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.sql.expression import true
 from yarl import URL
-import zmq
 
-from ai.backend.common import msgpack, redis
-from ai.backend.common.docker import get_registry_info, get_known_registries, ImageRef
+from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentStartedEvent,
     KernelCancelledEvent,
@@ -61,11 +63,7 @@ from ai.backend.common.events import (
     SessionTerminatedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.plugin.hook import (
-    HookPluginContext,
-    ALL_COMPLETED,
-    PASSED,
-)
+from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AccessKey,
@@ -90,48 +88,53 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import nmget
 
 from .api.exceptions import (
-    BackendError, InvalidAPIParameters,
-    RejectedByHook,
-    InstanceNotFound,
-    SessionNotFound, TooManySessionsMatched,
-    KernelCreationFailed, KernelDestructionFailed,
-    KernelExecutionFailed, KernelRestartFailed,
-    ScalingGroupNotFound,
     AgentError,
+    BackendError,
     GenericForbidden,
+    InstanceNotFound,
+    InvalidAPIParameters,
+    KernelCreationFailed,
+    KernelDestructionFailed,
+    KernelExecutionFailed,
+    KernelRestartFailed,
     QuotaExceeded,
+    RejectedByHook,
+    ScalingGroupNotFound,
+    SessionNotFound,
+    TooManySessionsMatched,
 )
 from .config import SharedConfig
-from .exceptions import MultiAgentError
 from .defs import DEFAULT_ROLE, INTRINSIC_SLOTS
-from .types import SessionGetter, UserScope
+from .exceptions import MultiAgentError
 from .models import (
-    agents, kernels,
-    keypair_resource_policies,
-    session_dependencies,
-    AgentStatus, KernelStatus,
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    DEAD_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    AgentStatus,
     ImageRow,
-    query_allowed_sgroups,
+    KernelStatus,
+    agents,
+    kernels,
+    keypair_resource_policies,
     prepare_dotfiles,
     prepare_vfolder_mounts,
+    query_allowed_sgroups,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    DEAD_KERNEL_STATUSES,
+    session_dependencies,
 )
-from .models.kernel import match_session_ids, get_all_kernels, get_main_kernels
+from .models.kernel import get_all_kernels, get_main_kernels, match_session_ids
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
-    reenter_txn, sql_json_merge,
+    reenter_txn,
+    sql_json_merge,
 )
+from .types import SessionGetter, UserScope
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import (
-        AsyncConnection as SAConnection,
-    )
     from sqlalchemy.engine.row import Row
+    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
     from ai.backend.common.events import EventDispatcher, EventProducer
 
@@ -139,10 +142,11 @@ if TYPE_CHECKING:
     from .scheduler.types import (
         AgentAllocationContext,
         KernelAgentBinding,
-        SchedulingContext,
         PendingSession,
+        SchedulingContext,
     )
 
+MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 __all__ = ['AgentRegistry', 'InstanceNotFound']
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.registry'))
@@ -880,6 +884,9 @@ class AgentRegistry:
             'agent': sa.bindparam('mapped_agent'),
             'id': sa.bindparam('kernel_id'),
             'status': KernelStatus.PENDING,
+            'status_history': {
+                KernelStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+            },
             'session_creation_id': session_creation_id,
             'session_id': session_id,
             'session_name': session_name,
@@ -1118,7 +1125,7 @@ class AgentRegistry:
         sched_ctx: SchedulingContext,
         scheduled_session: PendingSession,
     ) -> None:
-        from .scheduler.types import KernelAgentBinding, AgentAllocationContext
+        from .scheduler.types import AgentAllocationContext, KernelAgentBinding
         kernel_agent_bindings: Sequence[KernelAgentBinding] = [
             KernelAgentBinding(
                 kernel=k,
@@ -1348,6 +1355,13 @@ class AgentRegistry:
                             'stdin_port': created_info['stdin_port'],
                             'stdout_port': created_info['stdout_port'],
                             'service_ports': service_ports,
+                            'status_history': sql_json_merge(
+                                kernels.c.status_history,
+                                (),
+                                {
+                                    KernelStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
+                                },
+                            ),
                         }
                         actual_allocs = self.convert_resource_spec_to_resource_slot(
                             created_info['resource_spec']['allocations'])
@@ -1692,28 +1706,28 @@ class AgentRegistry:
         # Update keypair resource usage for keypairs with running containers.
         kp_key = 'keypair.concurrency_used'
 
-        async def _update(r: aioredis.Redis):
-            updates: Mapping[str, int] = \
+        async def _update(r: Redis):
+            updates = \
                 {f'{kp_key}.{k}': concurrency_used_per_key[k] for k in concurrency_used_per_key}
             if updates:
-                await r.mset(updates)
+                await r.mset(typing.cast(MSetType, updates))
 
-        async def _update_by_fullscan(r: aioredis.Redis):
-            updates: Dict[str, int] = {}
+        async def _update_by_fullscan(r: Redis):
+            updates = {}
             keys = await r.keys(f'{kp_key}.*')
             for ak in keys:
                 usage = concurrency_used_per_key.get(ak, 0)
                 updates[f'{kp_key}.{ak}'] = usage
             if updates:
-                await r.mset(updates)
+                await r.mset(typing.cast(MSetType, updates))
 
         if do_fullscan:
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_stat,
                 _update_by_fullscan,
             )
         else:
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_stat,
                 _update,
             )
@@ -1832,6 +1846,13 @@ class AgentRegistry:
                                         'status_info': reason,
                                         'status_changed': now,
                                         'terminated_at': now,
+                                        'status_history': sql_json_merge(
+                                            kernels.c.status_history,
+                                            (),
+                                            {
+                                                KernelStatus.CANCELLED.name: now.isoformat(),
+                                            },
+                                        ),
                                     })
                                     .where(kernels.c.id == kernel['id']),
                                 )
@@ -1867,7 +1888,7 @@ class AgentRegistry:
                             destroyed_kernels.append(kernel)
 
                         async def _update() -> None:
-                            kern_stat = await redis.execute(
+                            kern_stat = await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.get(str(kernel['id'])),
                             )
@@ -1877,6 +1898,13 @@ class AgentRegistry:
                                     'status_info': reason,
                                     'status_changed': now,
                                     'terminated_at': now,
+                                    'status_history': sql_json_merge(
+                                        kernels.c.status_history,
+                                        (),
+                                        {
+                                            KernelStatus.TERMINATED.name: now.isoformat(),
+                                        },
+                                    ),
                                 }
                                 if kern_stat:
                                     values['last_stat'] = msgpack.unpackb(kern_stat)
@@ -1889,7 +1917,7 @@ class AgentRegistry:
                         if kernel['cluster_role'] == DEFAULT_ROLE:
                             # The main session is terminated;
                             # decrement the user's concurrency counter
-                            await redis.execute(
+                            await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.incrby(
                                     f"keypair.concurrency_used.{kernel['access_key']}",
@@ -1915,6 +1943,13 @@ class AgentRegistry:
                                             "kernel": {"exit_code": None},
                                             "session": {"status": "terminating"},
                                         },
+                                        'status_history': sql_json_merge(
+                                            kernels.c.status_history,
+                                            (),
+                                            {
+                                                KernelStatus.TERMINATING.name: now.isoformat(),
+                                            },
+                                        ),
                                     })
                                     .where(kernels.c.id == kernel['id']),
                                 )
@@ -1922,7 +1957,7 @@ class AgentRegistry:
                         if kernel['cluster_role'] == DEFAULT_ROLE:
                             # The main session is terminated;
                             # decrement the user's concurrency counter
-                            await redis.execute(
+                            await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.incrby(
                                     f"keypair.concurrency_used.{kernel['access_key']}",
@@ -1970,7 +2005,7 @@ class AgentRegistry:
                             last_stat: Optional[Dict[str, Any]]
                             last_stat = None
                             try:
-                                raw_last_stat = await redis.execute(
+                                raw_last_stat = await redis_helper.execute(
                                     self.redis_stat,
                                     lambda r: r.get(str(kernel['id'])))
                                 if raw_last_stat is not None:
@@ -2093,6 +2128,13 @@ class AgentRegistry:
                             kernels.update()
                             .values({
                                 'status': KernelStatus.RESTARTING,
+                                'status_history': sql_json_merge(
+                                    kernels.c.status_history,
+                                    (),
+                                    {
+                                        KernelStatus.RESTARTING.name: datetime.now(tzutc()).isoformat(),
+                                    },
+                                ),
                             })
                             .where(kernels.c.id == kernel['id'])
                         )
@@ -2125,6 +2167,13 @@ class AgentRegistry:
                                 'stdin_port': kernel_info['stdin_port'],
                                 'stdout_port': kernel_info['stdout_port'],
                                 'service_ports': kernel_info.get('service_ports', []),
+                                'status_history': sql_json_merge(
+                                    kernels.c.status_history,
+                                    (),
+                                    {
+                                        KernelStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
+                                    },
+                                ),
                             })
                             .where(kernels.c.id == kernel['id'])
                         )
@@ -2379,7 +2428,7 @@ class AgentRegistry:
             instance_rejoin = False
 
             # Update "last seen" timestamp for liveness tracking
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_live,
                 lambda r: r.hset('agent.last_seen', agent_id, now.timestamp()),
             )
@@ -2486,13 +2535,13 @@ class AgentRegistry:
             known_registries = await get_known_registries(self.shared_config.etcd)
             loaded_images = msgpack.unpackb(snappy.decompress(agent_info['images']))
 
-            def _pipe_builder(r: aioredis.Redis):
+            async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 for image in loaded_images:
                     image_ref = ImageRef(image[0], known_registries, agent_info['architecture'])
-                    pipe.sadd(image_ref.canonical, agent_id)
+                    await pipe.sadd(image_ref.canonical, agent_id)
                 return pipe
-            await redis.execute(self.redis_image, _pipe_builder)
+            await redis_helper.execute(self.redis_image, _pipe_builder)
 
         await self.hook_plugin_ctx.notify(
             'POST_AGENT_HEARTBEAT',
@@ -2500,12 +2549,12 @@ class AgentRegistry:
         )
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
-        await redis.execute(self.redis_live, lambda r: r.hdel('agent.last_seen', agent_id))
+        await redis_helper.execute(self.redis_live, lambda r: r.hdel('agent.last_seen', agent_id))
 
-        async def _pipe_builder(r: aioredis.Redis):
+        async def _pipe_builder(r: Redis):
             pipe = r.pipeline()
             async for imgname in r.scan_iter():
-                pipe.srem(imgname, agent_id)
+                await pipe.srem(imgname, agent_id)
             return pipe
 
         async def _update() -> None:
@@ -2541,7 +2590,7 @@ class AgentRegistry:
                 )
                 await conn.execute(update_query)
 
-        await redis.execute(self.redis_image, _pipe_builder)
+        await redis_helper.execute(self.redis_image, _pipe_builder)
         await execute_with_retry(_update)
 
     async def set_session_status(
@@ -2557,6 +2606,13 @@ class AgentRegistry:
             'status': status,
             'status_info': reason,
             'status_changed': now,
+            'status_history': sql_json_merge(
+                kernels.c.status_history,
+                (),
+                {
+                    status.name: now.isoformat(),
+                },
+            ),
         }
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data['terminated_at'] = now
@@ -2590,6 +2646,13 @@ class AgentRegistry:
             'status': status,
             'status_info': reason,
             'status_changed': now,
+            'status_history': sql_json_merge(
+                kernels.c.status_history,
+                (),
+                {
+                    status.name: now.isoformat(),   # ["PULLING", "PREPARING"]
+                },
+            ),
         }
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data['terminated_at'] = now
@@ -2634,7 +2697,7 @@ class AgentRegistry:
         log.debug('sync_kernel_stats(k:{!r})', kernel_ids)
         for kernel_id in kernel_ids:
             raw_kernel_id = str(kernel_id)
-            kern_stat = await redis.execute(
+            kern_stat = await redis_helper.execute(
                 self.redis_stat,
                 lambda r: r.get(raw_kernel_id),
             )
@@ -2680,7 +2743,7 @@ class AgentRegistry:
             except asyncio.CancelledError:
                 pass
 
-        kern_stat = await redis.execute(
+        kern_stat = await redis_helper.execute(
             self.redis_stat,
             lambda r: r.get(str(kernel_id)),
         )
@@ -2724,6 +2787,13 @@ class AgentRegistry:
                         kernels.c.status_data,
                         ("kernel",),
                         {"exit_code": exit_code},
+                    ),
+                    'status_history': sql_json_merge(
+                        kernels.c.status_history,
+                        (),
+                        {
+                            KernelStatus.TERMINATED.name: now.isoformat(),
+                        },
                     ),
                     'terminated_at': now,
                 }
@@ -2802,6 +2872,13 @@ class AgentRegistry:
                                 ("session",),
                                 {
                                     "status": "terminated",
+                                },
+                            ),
+                            status_history=sql_json_merge(
+                                kernels.c.status_history,
+                                (),
+                                {
+                                    KernelStatus.TERMINATED.name: datetime.now(tzutc()).isoformat(),
                                 },
                             ),
                         )

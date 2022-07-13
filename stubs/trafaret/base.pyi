@@ -1,7 +1,8 @@
-from typing import Any as _Any, Hashable, Optional, NoReturn, Type as _Type
+from typing import Any as _Any
+from typing import Hashable, NoReturn, Optional
+from typing import Type as _Type
 
 from trafaret.dataerror import DataError
-
 
 class TrafaretMeta(type):
     def __or__(cls, other): ...

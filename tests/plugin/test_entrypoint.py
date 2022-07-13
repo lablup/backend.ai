@@ -2,7 +2,10 @@ import tempfile
 import textwrap as tw
 from pathlib import Path
 
-from ai.backend.plugin.entrypoint import extract_entrypoints_from_buildscript
+from ai.backend.plugin.entrypoint import (
+    extract_entrypoints_from_buildscript,
+    match_blocklist,
+)
 
 
 def test_parse_build():
@@ -61,3 +64,10 @@ def test_parse_build():
         items = [*extract_entrypoints_from_buildscript("backendai_error_monitor_v20", p)]
         assert (items[0].name, items[0].module, items[0].attr) == \
                ("intrinsic", "ai.backend.manager.plugin.error_monitor", "ErrorMonitor")
+
+
+def test_match_blocklist():
+    assert match_blocklist("ai.backend.manager:abc", {"ai.backend.manager"})
+    assert not match_blocklist("ai.backend.manager:abc", {"ai.backend.agent"})
+    assert match_blocklist("ai.backend.manager.scheduler.fifo:FIFOScheduler", {"ai.backend.manager"})
+    assert not match_blocklist("ai.backend.common.monitor:ErrorMonitor", {"ai.backend.manager"})

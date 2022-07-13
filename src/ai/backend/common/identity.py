@@ -1,16 +1,13 @@
-from ipaddress import (
-    ip_address,
-    _BaseNetwork as BaseIPNetwork, _BaseAddress as BaseIPAddress,
-)
 import json
 import logging
 import os
 import socket
 import sys
-from typing import (
-    Awaitable, Callable, Iterable, Optional,
-)
+from ipaddress import _BaseAddress as BaseIPAddress
+from ipaddress import _BaseNetwork as BaseIPNetwork
+from ipaddress import ip_address
 from pathlib import Path
+from typing import Awaitable, Callable, Iterable, Optional
 
 import aiodns
 import netifaces

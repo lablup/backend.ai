@@ -1,26 +1,19 @@
 from __future__ import annotations
 
 import logging
-from typing import (
-    Any,
-    AsyncGenerator,
-    Iterable,
-    Mapping,
-    TYPE_CHECKING,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Iterable, Mapping, Tuple
 
-from aiohttp import web
 import aiohttp_cors
 import trafaret as t
+from aiohttp import web
 
 from ai.backend.common.docker import get_known_registries
 from ai.backend.common.logging import BraceStyleAdapter
 
 from .auth import superadmin_required
 from .exceptions import InvalidAPIParameters
-from .utils import check_api_params
 from .types import CORSOptions, WebMiddleware
+from .utils import check_api_params
 
 if TYPE_CHECKING:
     from .context import RootContext

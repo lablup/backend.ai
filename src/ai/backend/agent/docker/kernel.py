@@ -2,31 +2,26 @@ import asyncio
 import logging
 import lzma
 import os
-from pathlib import Path, PurePosixPath
-import pkg_resources
 import re
 import shutil
 import subprocess
 import textwrap
-from typing import (
-    Any, Optional,
-    Mapping, Dict,
-    FrozenSet,
-    Sequence, Tuple,
-)
+from pathlib import Path, PurePosixPath
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
 
+import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
 
+from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import KernelId
 from ai.backend.common.utils import current_loop
 
-from ai.backend.agent.docker.utils import PersistentServiceContainer
+from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
-from ..kernel import AbstractKernel, AbstractCodeRunner
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -73,10 +68,12 @@ class DockerKernel(AbstractKernel):
             client_features=client_features)
 
     async def get_completions(self, text: str, opts: Mapping[str, Any]):
+        assert self.runner is not None
         result = await self.runner.feed_and_get_completion(text, opts)
         return {'status': 'finished', 'completions': result}
 
     async def check_status(self):
+        assert self.runner is not None
         result = await self.runner.feed_and_get_status()
         return result
 
@@ -88,10 +85,12 @@ class DockerKernel(AbstractKernel):
         return {'logs': ''.join(logs)}
 
     async def interrupt_kernel(self):
+        assert self.runner is not None
         await self.runner.feed_interrupt()
         return {'status': 'finished'}
 
     async def start_service(self, service: str, opts: Mapping[str, Any]):
+        assert self.runner is not None
         if self.data.get('block_service_ports', False):
             return {
                 'status': 'failed',
@@ -112,9 +111,11 @@ class DockerKernel(AbstractKernel):
         return result
 
     async def shutdown_service(self, service: str):
+        assert self.runner is not None
         await self.runner.feed_shutdown_service(service)
 
     async def get_service_apps(self):
+        assert self.runner is not None
         result = await self.runner.feed_service_apps()
         return result
 

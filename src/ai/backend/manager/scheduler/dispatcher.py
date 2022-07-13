@@ -5,89 +5,79 @@ import logging
 from contextvars import ContextVar
 from datetime import datetime, timedelta
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Final,
     List,
+    Optional,
     Sequence,
     Tuple,
     Union,
-    TYPE_CHECKING,
-    Optional,
 )
 
 import aiotools
-from dateutil.tz import tzutc
+import async_timeout
 import sqlalchemy as sa
+from dateutil.tz import tzutc
 from sqlalchemy.engine.row import Row
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import (
-    AsyncConnection as SAConnection,
-)
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
     CoalescingOptions,
-    DoScheduleEvent,
     DoPrepareEvent,
+    DoScheduleEvent,
+    EventDispatcher,
+    EventProducer,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,
     SessionScheduledEvent,
     SessionTerminatedEvent,
-    EventDispatcher,
-    EventProducer,
 )
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    aobject,
-    AgentId,
-    ClusterMode,
-    ResourceSlot,
-)
+from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, aobject
+from ai.backend.manager.types import DistributedLockFactory
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
-from ai.backend.manager.types import DistributedLockFactory
-
 from ..api.exceptions import GenericBadRequest, InstanceNotAvailable
-from ..defs import (
-    LockID,
-)
+from ..defs import LockID
 from ..exceptions import convert_to_status_data
 from ..models import (
-    agents, kernels, scaling_groups,
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    AgentStatus,
+    KernelStatus,
+    agents,
+    kernels,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
-    AgentStatus, KernelStatus,
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    scaling_groups,
 )
 from ..models.scaling_group import ScalingGroupOpts
-from ..models.utils import (
-    ExtendedAsyncSAEngine as SAEngine,
-    execute_with_retry,
-    sql_json_increment,
-    sql_json_merge,
-)
-from .types import (
-    PredicateResult,
-    PendingSession,
-    ExistingSession,
-    SchedulingContext,
-    AgentContext,
-    AgentAllocationContext,
-    AbstractScheduler,
-    KernelAgentBinding,
-)
+from ..models.utils import ExtendedAsyncSAEngine as SAEngine
+from ..models.utils import execute_with_retry, sql_json_increment, sql_json_merge
 from .predicates import (
-    check_reserved_batch_session,
     check_concurrency,
     check_dependencies,
-    check_keypair_resource_limit,
-    check_group_resource_limit,
     check_domain_resource_limit,
+    check_group_resource_limit,
+    check_keypair_resource_limit,
+    check_reserved_batch_session,
     check_scaling_group,
+)
+from .types import (
+    AbstractScheduler,
+    AgentAllocationContext,
+    AgentContext,
+    ExistingSession,
+    KernelAgentBinding,
+    PendingSession,
+    PredicateResult,
+    SchedulingContext,
 )
 
 if TYPE_CHECKING:
@@ -290,6 +280,13 @@ class SchedulerDispatcher(aobject):
                         'status_changed': now,
                         'status_info': "pending-timeout",
                         'terminated_at': now,
+                        'status_history': sql_json_merge(
+                            kernels.c.status_history,
+                            (),
+                            {
+                                KernelStatus.CANCELLED.name: now.isoformat(),
+                            },
+                        ),
                     }).where(kernels.c.session_id.in_([
                         item['session_id'] for item in cancelled_session_rows
                     ]))
@@ -589,6 +586,7 @@ class SchedulerDispatcher(aobject):
 
         async def _finalize_scheduled() -> None:
             async with self.db.begin() as kernel_db_conn:
+                now = datetime.now(tzutc())
                 query = kernels.update().values({
                     'agent': agent_alloc_ctx.agent_id,
                     'agent_addr': agent_alloc_ctx.agent_addr,
@@ -596,7 +594,14 @@ class SchedulerDispatcher(aobject):
                     'status': KernelStatus.SCHEDULED,
                     'status_info': 'scheduled',
                     'status_data': {},
-                    'status_changed': datetime.now(tzutc()),
+                    'status_changed': now,
+                    'status_history': sql_json_merge(
+                        kernels.c.status_history,
+                        (),
+                        {
+                            KernelStatus.SCHEDULED.name: now.isoformat(),
+                        },
+                    ),
                 }).where(kernels.c.session_id == sess_ctx.session_id)
                 await kernel_db_conn.execute(query)
 
@@ -725,6 +730,7 @@ class SchedulerDispatcher(aobject):
         async def _finalize_scheduled() -> None:
             async with self.db.begin() as kernel_db_conn:
                 for binding in kernel_agent_bindings:
+                    now = datetime.now(tzutc())
                     query = kernels.update().values({
                         'agent': binding.agent_alloc_ctx.agent_id,
                         'agent_addr': binding.agent_alloc_ctx.agent_addr,
@@ -732,7 +738,14 @@ class SchedulerDispatcher(aobject):
                         'status': KernelStatus.SCHEDULED,
                         'status_info': 'scheduled',
                         'status_data': {},
-                        'status_changed': datetime.now(tzutc()),
+                        'status_changed': now,
+                        'status_history': sql_json_merge(
+                            kernels.c.status_history,
+                            (),
+                            {
+                                KernelStatus.SCHEDULED.name: now.isoformat(),
+                            },
+                        ),
                     }).where(kernels.c.id == binding.kernel.kernel_id)
                     await kernel_db_conn.execute(query)
 
@@ -771,6 +784,13 @@ class SchedulerDispatcher(aobject):
                                 'status_changed': now,
                                 'status_info': "",
                                 'status_data': {},
+                                'status_history': sql_json_merge(
+                                    kernels.c.status_history,
+                                    (),
+                                    {
+                                        KernelStatus.PREPARING.name: now.isoformat(),
+                                    },
+                                ),
                             })
                             .where(
                                 (kernels.c.status == KernelStatus.SCHEDULED),
@@ -792,7 +812,10 @@ class SchedulerDispatcher(aobject):
 
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
-                async with aiotools.TaskGroup() as tg:
+                async with (
+                    async_timeout.timeout(delay=50.0),
+                    aiotools.PersistentTaskGroup() as tg,
+                ):
                     for scheduled_session in scheduled_sessions:
                         await self.registry.event_producer.produce_event(
                             SessionPreparingEvent(
@@ -811,6 +834,8 @@ class SchedulerDispatcher(aobject):
                          "maybe another prepare() call is still running")
                 raise asyncio.CancelledError()
             raise
+        except asyncio.TimeoutError:
+            log.warn('prepare(): timeout while executing start_session()')
 
     async def start_session(
         self,
@@ -843,6 +868,13 @@ class SchedulerDispatcher(aobject):
                         'status_info': "failed-to-start",
                         'status_data': status_data,
                         'terminated_at': now,
+                        'status_history': sql_json_merge(
+                            kernels.c.status_history,
+                            (),
+                            {
+                                KernelStatus.CANCELLED.name: now.isoformat(),
+                            },
+                        ),
                     }).where(kernels.c.session_id == session.session_id)
                     await db_conn.execute(update_query)
 

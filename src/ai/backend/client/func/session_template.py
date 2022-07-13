@@ -1,8 +1,8 @@
 from typing import Any, List, Mapping
 
-from .base import api_function, BaseFunction
 from ..request import Request
 from ..session import api_session
+from .base import BaseFunction, api_function
 
 __all__ = (
     'SessionTemplate',

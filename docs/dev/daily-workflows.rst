@@ -98,6 +98,16 @@ smaller target of files that you work on and `use an option to select the
 targets only changed
 <https://www.pantsbuild.org/docs/advanced-target-selection#running-over-changed-files-with---changed-since>`_ (``--changed-since``).
 
+Running formatters
+------------------
+
+If you encounter failure from ``isort``, you may run the formatter to automatically fix the import ordering issues.
+
+.. code-block:: console
+
+   $ ./pants fmt ::
+   $ ./pants fmt src/ai/backend/common::
+
 Running unit tests
 ------------------
 
@@ -170,6 +180,10 @@ Then configure your IDEs/editors to use
 interpreter for your code, where ``VERSION`` is the interpreter version
 specified in ``pants.toml``.
 
+To make LSP (language server protocol) services like PyLance to detect our source packages correctly,
+you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
+``plugins/*/`` directories if you have added Backend.AI plugin checkouts.
+
 .. tip::
 
    To activate flake8/mypy checks (in Vim) and get proper intelli-sense support
@@ -181,6 +195,15 @@ specified in ``pants.toml``.
       $ ./py -m pip install flake8 mypy pytest
 
    For Vim, you also need to explicitly activate the exported venv.
+
+Switching between branches
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When each branch has different external package requirements, you should run ``./pants export ::``
+before running codes after ``git switch``-ing between such branches.
+
+Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
+In that case, run ``killall -r pantsd`` and it will be fine.
 
 Running entrypoints
 -------------------
@@ -334,6 +357,38 @@ Adding new external dependencies
      $ ./pants generate-lockfiles
      $ ./pants export ::
 
+Merging lockfile conflicts
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you work on a branch that adds a new external dependency and the main branch has also
+another external dependency addition, merging the main branch into your branch is likely to
+make a merge conflict on ``python.lock`` file.
+
+In this case, you can just do the followings since we can just *regenerate* the lockfile
+after merging ``requirements.txt`` and ``BUILD`` files.
+
+.. code-block:: console
+
+   $ git merge main
+   ... it says a conflict on python.lock ...
+   $ git checkout --theirs python.lock
+   $ ./pants generate-lockfiles --resolve=python-default
+   $ git add python.lock
+   $ git commit
+
+Resetting Pants
+~~~~~~~~~~~~~~~
+
+If Pants behaves strangely, you could simply reset all its runtime-generated files by:
+
+.. code-block:: console
+
+   $ killall -r pantsd
+   $ rm -r .tmp .pants.d ~/.cache/pants
+
+After this, re-running any Pants command will automatically reinitialize itself and
+all cached data as necessary.
+
 .. _debugging-tests:
 
 Debugging test cases (or interactively running test cases)
@@ -350,6 +405,49 @@ This means that you can directly observe the console output and Ctrl+C to
 gracefully shutdown the tests  with fixture cleanup. You can also apply
 additional pytest options such as ``--fulltrace``, ``-s``, etc. by passing them
 after target arguments and ``--`` when executing ``./pants test`` command.
+
+Installing a subset of mono-repo packages in the editable mode for other projects
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sometimes, you need to editable-install a subset of packages into other project's directories.
+For instance you could mount the client SDK and its internal dependencies for a Docker container for development.
+
+In this case, we recommend to do it as follows:
+
+1. Run the following command to build a wheel from the current mono-repo source:
+
+   .. code-block:: console
+
+      $ ./pants --tag=wheel package src/ai/backend/client:dist
+
+   This will generate ``dist/backend.ai_client-{VERSION}-py3-none-any.whl``.
+
+2. Run ``pip install -U {MONOREPO_PATH}/dist/{WHEEL_FILE}`` in the target environment.
+
+   This will populate the package metadata and install its external dependencies.
+   The target environment may be one of a separate virtualenv or a container being built.
+   For container builds, you need to first ``COPY`` the wheel file and install it.
+
+3. Check the internal dependency directories to link by running the following command:
+
+   .. code-block:: console
+
+      $ ./pants dependencies --transitive src/ai/backend/client:lib \
+      >   | grep src/ai/backend | grep -v ':version' | cut -d/ -f4 | uniq
+      cli
+      client
+      plugin
+
+4. Link these directories in the target environment.
+
+   For example, if it is a Docker container, you could add
+   ``-v {MONOREPO_PATH}/src/ai/backend/{COMPONENT}:/usr/local/lib/python3.10/site-packages/ai/backend/{COMPONENT}``
+   to the ``docker create`` or ``docker run`` commands for all the component
+   directories found in the previous step.
+
+   If it is a local checkout with a pyenv-based virtualenv, you could replace
+   ``$(pyenv prefix)/lib/python3.10/site-packages/ai/backend/{COMPONENT}`` directories
+   with symbolic links to the mono-repo's component source directories.
 
 Boosting the performance of Pants commands
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

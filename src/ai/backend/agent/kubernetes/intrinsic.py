@@ -1,43 +1,36 @@
-from decimal import Decimal
 import logging
 import os
-from pathlib import Path
 import platform
-from typing import (
-    Any,
-    Collection,
-    Dict,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-)
+from decimal import Decimal
+from pathlib import Path
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence
 
 import aiohttp
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
-from kubernetes_asyncio import client as K8sClient, config as K8sConfig
+from kubernetes_asyncio import client as K8sClient
+from kubernetes_asyncio import config as K8sConfig
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
-    DeviceName, DeviceId,
+    DeviceId,
     DeviceModelInfo,
-    SlotName, SlotTypes,
+    DeviceName,
+    SlotName,
+    SlotTypes,
 )
-from .agent import Container
-from .resources import (
-    get_resource_spec_from_container,
-)
+
 from .. import __version__
 from ..resources import (
-    AbstractAllocMap, DeviceSlotInfo,
-    DiscretePropertyAllocMap,
+    AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
+    DeviceSlotInfo,
+    DiscretePropertyAllocMap,
 )
-from ..stats import (
-    StatContext, NodeMeasurement, ContainerMeasurement,
-)
+from ..stats import ContainerMeasurement, NodeMeasurement, StatContext
+from .agent import Container
+from .resources import get_resource_spec_from_container
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

@@ -10,17 +10,28 @@ import json
 import logging
 from pathlib import Path
 from typing import (
-    Any, Collection, Optional, Union,
+    Any,
+    Collection,
+    Dict,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    Tuple,
     TypedDict,
-    Mapping, MutableMapping, Dict,
-    Sequence, List, Tuple,
+    Union,
 )
 
 import attr
 
 from . import service_actions
+from .exception import (
+    DisallowedArgument,
+    DisallowedEnvironment,
+    InvalidServiceDefinition,
+)
 from .logging import BraceStyleAdapter
-from .exception import DisallowedArgument, DisallowedEnvironment, InvalidServiceDefinition
 
 log = BraceStyleAdapter(logging.getLogger())
 

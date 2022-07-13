@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
 import asyncio
 import logging
 import re
+from abc import ABCMeta, abstractmethod
 from typing import (
     Any,
     ClassVar,
-    Container,
     Dict,
     Generic,
     Iterator,
     Mapping,
+    Optional,
     Tuple,
     Type,
     TypeVar,
@@ -106,6 +106,7 @@ class BasePluginContext(Generic[P]):
     local_config: Mapping[str, Any]
     plugins: Dict[str, P]
     plugin_group: ClassVar[str] = 'backendai_XXX_v10'
+    blocklist: ClassVar[Optional[set[str]]] = None
 
     _config_watchers: WeakSet[asyncio.Task]
 
@@ -126,13 +127,11 @@ class BasePluginContext(Generic[P]):
     def discover_plugins(
         cls,
         plugin_group: str,
-        blocklist: Container[str] = None,
+        blocklist: set[str] = None,
     ) -> Iterator[Tuple[str, Type[P]]]:
-        if blocklist is None:
-            blocklist = set()
-        for entrypoint in scan_entrypoints(plugin_group):
-            if entrypoint.name in blocklist:
-                continue
+        cls_blocklist = set() if cls.blocklist is None else cls.blocklist
+        arg_blocklist = set() if blocklist is None else blocklist
+        for entrypoint in scan_entrypoints(plugin_group, cls_blocklist | arg_blocklist):
             log.info('loading plugin (group:{}): {}', plugin_group, entrypoint.name)
             yield entrypoint.name, entrypoint.load()
 

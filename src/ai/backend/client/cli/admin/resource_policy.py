@@ -3,16 +3,18 @@ import sys
 import click
 
 from ai.backend.cli.interaction import ask_yn
-from ai.backend.client.session import Session
 from ai.backend.client.func.keypair_resource_policy import (
-    _default_list_fields,
     _default_detail_fields,
+    _default_list_fields,
 )
+from ai.backend.client.session import Session
+
+from ..extensions import pass_ctx_obj
+from ..pretty import print_info
+from ..types import CLIContext
+
 # from ai.backend.client.output.fields import keypair_resource_policy_fields
 from . import admin
-from ..pretty import print_info
-
-from ..types import CLIContext
 
 
 @admin.group()
@@ -23,7 +25,7 @@ def keypair_resource_policy() -> None:
 
 
 @keypair_resource_policy.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str)
 def info(ctx: CLIContext, name: str) -> None:
     """
@@ -41,7 +43,7 @@ def info(ctx: CLIContext, name: str) -> None:
 
 
 @keypair_resource_policy.command()
-@click.pass_obj
+@pass_ctx_obj
 def list(ctx):
     """
     List and manage keypair resource policies.
@@ -57,7 +59,7 @@ def list(ctx):
 
 
 @keypair_resource_policy.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str, default=None, metavar='NAME')
 @click.option('--default-for-unspecified', type=str, default='UNLIMITED',
               help='Default behavior for unspecified resources: '
@@ -121,7 +123,7 @@ def add(ctx: CLIContext, name, default_for_unspecified, total_resource_slots, ma
 
 
 @keypair_resource_policy.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str, default=None, metavar='NAME')
 @click.option('--default-for-unspecified', type=str,
               help='Default behavior for unspecified resources: '
@@ -184,7 +186,7 @@ def update(ctx: CLIContext, name, default_for_unspecified, total_resource_slots,
 
 
 @keypair_resource_policy.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.argument('name', type=str, default=None, metavar='NAME')
 def delete(ctx: CLIContext, name):
     """

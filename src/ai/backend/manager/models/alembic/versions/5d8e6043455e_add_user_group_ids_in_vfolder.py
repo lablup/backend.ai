@@ -5,11 +5,16 @@ Revises: 02950808ca3d
 Create Date: 2019-06-06 15:02:58.804516
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.sql.expression import bindparam
-from ai.backend.manager.models.base import convention, ForeignKeyIDColumn,  GUID, IDColumn
 
+from ai.backend.manager.models.base import (
+    GUID,
+    ForeignKeyIDColumn,
+    IDColumn,
+    convention,
+)
 
 # revision identifiers, used by Alembic.
 revision = '5d8e6043455e'

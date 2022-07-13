@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import snappy
 from sqlalchemy.sql.dml import Insert, Update
 
-from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
-from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.models import AgentStatus
 from ai.backend.common import msgpack
 from ai.backend.common.types import BinarySize, DeviceId, ResourceSlot, SlotName
+from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
+from ai.backend.manager.models import AgentStatus
+from ai.backend.manager.registry import AgentRegistry
 
 
 @pytest.mark.asyncio
@@ -25,9 +25,9 @@ async def test_handle_heartbeat(
     mocker.patch('ai.backend.manager.registry.get_known_registries', mock_get_known_registries)
     mock_redis_wrapper = MagicMock()
     mock_redis_wrapper.execute = AsyncMock()
-    mocker.patch('ai.backend.manager.registry.redis', mock_redis_wrapper)
+    mocker.patch('ai.backend.manager.registry.redis_helper', mock_redis_wrapper)
 
-    def mocked_entrypoints(entry_point_group: str):
+    def mocked_entrypoints(entry_point_group: str, blocklist: set[str] = None):
         return []
 
     mocker.patch('ai.backend.common.plugin.scan_entrypoints', mocked_entrypoints)

@@ -386,7 +386,7 @@ msgstr ""
 
 #: ../../dev/adding-kernels.rst:192 236f420843c7475da512b4b3d63e2a1f
 msgid "``write_file``"
-msgstr ""
+msgstr "``write_file``"
 
 #: ../../dev/adding-kernels.rst:193 ba349db722a64359b0cf16c2d52b0678
 msgid "``body``: a list of string lines (template-enabled)"
@@ -417,7 +417,7 @@ msgstr ""
 
 #: ../../dev/adding-kernels.rst:198 97423900f53c4f40885b47ff44209544
 msgid "``write_tempfile``"
-msgstr ""
+msgstr "``write_tempfile``"
 
 #: ../../dev/adding-kernels.rst:199 253e1db8184c4c309d5f4ea8a59a3a4b
 msgid "``body``: a list of string line (template-enabled)"
@@ -429,7 +429,7 @@ msgstr ""
 
 #: ../../dev/adding-kernels.rst:202 127a296ac03c4a2f8dd577af17b2b506
 msgid "``mkdir``"
-msgstr ""
+msgstr "``mkdir``"
 
 #: ../../dev/adding-kernels.rst:203 6e69a657263e4822af161981ed056a43
 msgid ""
@@ -439,7 +439,7 @@ msgstr ""
 
 #: ../../dev/adding-kernels.rst:205 69adcc21369540b08a1b2a730b1b3ecb
 msgid "``run_command``"
-msgstr ""
+msgstr "``run_command``"
 
 #: ../../dev/adding-kernels.rst:206 a41a172abbae4c759f294a10a9c8e23c
 msgid ""
@@ -455,7 +455,7 @@ msgstr ""
 
 #: ../../dev/adding-kernels.rst:208 dc608171ea9f45b8bc16a68496cbb177
 msgid "``log``"
-msgstr ""
+msgstr "``log``"
 
 #: ../../dev/adding-kernels.rst:209 92534ec012cb45508d97ee39166710c7
 msgid "``body``: a string to send as kernel log (template-enabled)"

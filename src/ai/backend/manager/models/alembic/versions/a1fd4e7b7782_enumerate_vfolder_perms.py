@@ -5,11 +5,11 @@ Revises: f9971fbb34d9
 Create Date: 2018-09-05 16:51:49.973195
 
 """
-from alembic import op
 import sqlalchemy as sa
-from ai.backend.manager.models import VFolderPermission
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from ai.backend.manager.models import VFolderPermission
 
 # revision identifiers, used by Alembic.
 revision = 'a1fd4e7b7782'

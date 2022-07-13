@@ -382,7 +382,7 @@ async def get_quota(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid", default=None): t.Null | t.String,
+                t.Key("vfid", default=None): t.Null | tx.UUID,
             },
         ),
     ) as params:
@@ -399,7 +399,7 @@ async def set_quota(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid", default=None): t.Null | t.String,
+                t.Key("vfid", default=None): t.Null | tx.UUID,
                 t.Key("size_bytes"): tx.BinarySize,
             },
         ),
@@ -485,7 +485,7 @@ async def rename_file(request: web.Request) -> web.Response:
                 t.Key("vfid"): tx.UUID(),
                 t.Key("relpath"): tx.PurePath(relative_only=True),
                 t.Key("new_name"): t.String(),
-                t.Key("is_dir"): t.ToBool(),  # ignored since 22.03
+                t.Key("is_dir", default=False): t.ToBool,  # ignored since 22.03
             },
         ),
     ) as params:

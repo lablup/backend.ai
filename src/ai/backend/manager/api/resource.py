@@ -3,51 +3,49 @@ Resource preset APIs.
 """
 
 import copy
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
-from decimal import Decimal
 import functools
 import json
 import logging
 import re
-from typing import (
-    Any,
-    Iterable,
-    TYPE_CHECKING,
-    Tuple,
-    MutableMapping,
-)
+from datetime import datetime, timedelta
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Tuple
 
 import aiohttp
-from aiohttp import web
 import aiohttp_cors
-from aioredis import Redis
-from aioredis.client import Pipeline as RedisPipeline
-from async_timeout import timeout as _timeout
-from dateutil.tz import tzutc
 import msgpack
 import sqlalchemy as sa
 import trafaret as t
 import yarl
+from aiohttp import web
+from async_timeout import timeout as _timeout
+from dateutil.relativedelta import relativedelta
+from dateutil.tz import tzutc
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline as RedisPipeline
 
-from ai.backend.common import redis, validators as tx
+from ai.backend.common import redis_helper
+from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.utils import nmget
 from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.common.utils import nmget
 
 from ..models import (
-    agents, resource_presets,
-    domains, groups, kernels, users,
-    AgentStatus,
-    association_groups_users,
-    query_allowed_sgroups,
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    RESOURCE_USAGE_KERNEL_STATUSES, LIVE_STATUS,
+    LIVE_STATUS,
+    RESOURCE_USAGE_KERNEL_STATUSES,
+    AgentStatus,
+    agents,
+    association_groups_users,
+    domains,
+    groups,
+    kernels,
+    query_allowed_sgroups,
+    resource_presets,
+    users,
 )
 from .auth import auth_required, superadmin_required
-from .exceptions import (
-    InvalidAPIParameters,
-)
+from .exceptions import InvalidAPIParameters
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
@@ -335,13 +333,13 @@ async def get_container_stats_for_period(request: web.Request, start_date, end_d
         result = await conn.execute(query)
         rows = result.fetchall()
 
-    def _pipe_builder(r: Redis) -> RedisPipeline:
+    async def _pipe_builder(r: Redis) -> RedisPipeline:
         pipe = r.pipeline()
         for row in rows:
-            pipe.get(str(row['id']))
+            await pipe.get(str(row['id']))
         return pipe
 
-    raw_stats = await redis.execute(root_ctx.redis_stat, _pipe_builder)
+    raw_stats = await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
 
     objs_per_group = {}
     local_tz = root_ctx.shared_config['system']['timezone']
@@ -593,7 +591,7 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
                 gpu_allocated += int(row.occupied_slots['cuda.devices'])
             if 'cuda.shares' in row.occupied_slots:
                 gpu_allocated += Decimal(row.occupied_slots['cuda.shares'])
-            raw_stat = await redis.execute(root_ctx.redis_stat, lambda r: r.get(str(row['id'])))
+            raw_stat = await redis_helper.execute(root_ctx.redis_stat, lambda r: r.get(str(row['id'])))
             if raw_stat:
                 last_stat = msgpack.unpackb(raw_stat)
                 io_read_bytes += int(nmget(last_stat, 'io_read.current', 0))

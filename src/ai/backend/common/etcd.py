@@ -10,12 +10,14 @@ using callbacks in separate threads.
 from __future__ import annotations
 
 import asyncio
-from collections import namedtuple, ChainMap
 import enum
 import functools
 import logging
+from collections import ChainMap, namedtuple
 from typing import (
     AsyncGenerator,
+    AsyncIterator,
+    Callable,
     Dict,
     Iterable,
     List,
@@ -28,15 +30,15 @@ from typing import (
     Union,
     cast,
 )
-from urllib.parse import quote as _quote, unquote
+from urllib.parse import quote as _quote
+from urllib.parse import unquote
 
-from etcetra.client import (
-    EtcdClient, EtcdTransactionAction,
-)
-from etcetra.types import (
-    CompareKey, EtcdCredential, HostPortPair as EtcetraHostPortPair,
-)
+import grpc
 import trafaret as t
+from etcetra import EtcdCommunicator, WatchEvent
+from etcetra.client import EtcdClient, EtcdTransactionAction
+from etcetra.types import CompareKey, EtcdCredential
+from etcetra.types import HostPortPair as EtcetraHostPortPair
 
 from .logging_utils import BraceStyleAdapter
 from .types import HostPortPair, QueueSentinel
@@ -108,8 +110,9 @@ class AsyncEtcd:
         namespace: str,
         scope_prefix_map: Mapping[ConfigScopes, str],
         *,
-        credentials=None,
-        encoding='utf-8',
+        credentials: dict[str, str] = None,
+        encoding: str = 'utf-8',
+        watch_reconnect_intvl: float = 0.5,
     ) -> None:
         self.scope_prefix_map = t.Dict({
             t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
@@ -117,13 +120,14 @@ class AsyncEtcd:
             t.Key(ConfigScopes.NODE, optional=True): t.String,
         }).check(scope_prefix_map)
         if credentials is not None:
-            self._creds = EtcdCredential(credentials.get('user'), credentials.get('password'))
+            self._creds = EtcdCredential(credentials['user'], credentials['password'])
         else:
             self._creds = None
 
         self.ns = namespace
         log.info('using etcd cluster from {} with namespace "{}"', addr, namespace)
         self.encoding = encoding
+        self.watch_reconnect_intvl = watch_reconnect_intvl
         self.etcd = EtcdClient(
             EtcetraHostPortPair(str(addr.host), addr.port),
             credentials=self._creds,
@@ -424,22 +428,17 @@ class AsyncEtcd:
         async with self.etcd.connect() as communicator:
             await communicator.delete_prefix(mangled_key_prefix)
 
-    async def watch(
-        self, key: str, *,
-        scope: ConfigScopes = ConfigScopes.GLOBAL,
-        scope_prefix_map: Mapping[ConfigScopes, str] = None,
-        once: bool = False,
-        ready_event: asyncio.Event = None,
-        cleanup_event: asyncio.Event = None,
-        wait_timeout: float = None,
+    async def _watch_impl(
+        self,
+        iterator_factory: Callable[[EtcdCommunicator], AsyncIterator[WatchEvent]],
+        scope_prefix_len: int,
+        once: bool,
+        cleanup_event: Optional[asyncio.Event] = None,
+        wait_timeout: Optional[float] = None,
     ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
-        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
-        scope_prefix_len = len(self._mangle_key(f'{_slash(scope_prefix)}'))
-        mangled_key = self._mangle_key(f'{_slash(scope_prefix)}{key}')
-        # NOTE: yield from in async-generator is not supported.
         try:
             async with self.etcd.connect() as communicator:
-                iterator = communicator.watch(mangled_key, ready_event=ready_event)
+                iterator = iterator_factory(communicator)
                 async for ev in iterator:
                     if wait_timeout is not None:
                         try:
@@ -453,6 +452,42 @@ class AsyncEtcd:
             if cleanup_event:
                 cleanup_event.set()
 
+    async def watch(
+        self, key: str, *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] = None,
+        once: bool = False,
+        ready_event: asyncio.Event = None,
+        cleanup_event: asyncio.Event = None,
+        wait_timeout: float = None,
+    ) -> AsyncGenerator[Union[QueueSentinel, Event], None]:
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        scope_prefix_len = len(self._mangle_key(f'{_slash(scope_prefix)}'))
+        mangled_key = self._mangle_key(f'{_slash(scope_prefix)}{key}')
+        ended_without_error = False
+
+        while not ended_without_error:
+            try:
+                async for ev in self._watch_impl(
+                    lambda communicator: communicator.watch(
+                        mangled_key,
+                        ready_event=ready_event,
+                    ),
+                    scope_prefix_len,
+                    once,
+                    cleanup_event=cleanup_event,
+                    wait_timeout=wait_timeout,
+                ):
+                    yield ev
+                ended_without_error = True
+            except grpc.aio.AioRpcError as e:
+                if e.code() == grpc.StatusCode.UNAVAILABLE:
+                    log.warn('watch(): error while connecting to Etcd server, retrying...')
+                    await asyncio.sleep(self.watch_reconnect_intvl)
+                    ended_without_error = False
+                else:
+                    raise
+
     async def watch_prefix(
         self, key_prefix: str, *,
         scope: ConfigScopes = ConfigScopes.GLOBAL,
@@ -465,18 +500,26 @@ class AsyncEtcd:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f'{_slash(scope_prefix)}'))
         mangled_key_prefix = self._mangle_key(f'{_slash(scope_prefix)}{key_prefix}')
-        try:
-            async with self.etcd.connect() as communicator:
-                iterator = communicator.watch_prefix(mangled_key_prefix, ready_event=ready_event)
-                async for ev in iterator:
-                    if wait_timeout is not None:
-                        try:
-                            ev = await asyncio.wait_for(iterator.__anext__(), wait_timeout)
-                        except asyncio.TimeoutError:
-                            pass
-                    yield Event(ev.key[scope_prefix_len:], ev.event, ev.value)
-                    if once:
-                        return
-        finally:
-            if cleanup_event:
-                cleanup_event.set()
+        ended_without_error = False
+
+        while not ended_without_error:
+            try:
+                async for ev in self._watch_impl(
+                    lambda communicator: communicator.watch_prefix(
+                        mangled_key_prefix,
+                        ready_event=ready_event,
+                    ),
+                    scope_prefix_len,
+                    once,
+                    cleanup_event=cleanup_event,
+                    wait_timeout=wait_timeout,
+                ):
+                    yield ev
+                ended_without_error = True
+            except grpc.aio.AioRpcError as e:
+                if e.code() == grpc.StatusCode.UNAVAILABLE:
+                    log.warn('watch_prefix(): error while connecting to Etcd server, retrying...')
+                    await asyncio.sleep(self.watch_reconnect_intvl)
+                    ended_without_error = False
+                else:
+                    raise e

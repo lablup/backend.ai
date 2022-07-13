@@ -1,34 +1,33 @@
+import json
+import logging
+import logging.config
+import logging.handlers
+import os
+import pickle
+import pprint
+import socket
+import ssl
+import sys
+import threading
+import time
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from contextvars import ContextVar
 from datetime import datetime
-import json
-import logging, logging.config, logging.handlers
-import threading
-import os
 from pathlib import Path
-import pickle
-import pprint
-import time
-from typing import (
-    Any, Optional,
-    Mapping, MutableMapping,
-)
-import socket
-import ssl
-import sys
+from typing import Any, Mapping, MutableMapping, Optional
 
 import coloredlogs
-from pythonjsonlogger.jsonlogger import JsonFormatter
 import trafaret as t
-from tblib import pickling_support
 import yarl
 import zmq
+from pythonjsonlogger.jsonlogger import JsonFormatter
+from tblib import pickling_support
 
 from . import config
 from . import validators as tx
-from .logging_utils import BraceStyleAdapter
 from .exception import ConfigurationError
+from .logging_utils import BraceStyleAdapter
 
 # public APIs of this module
 __all__ = (
@@ -186,16 +185,21 @@ class ConsoleFormatter(logging.Formatter):
 
 class CustomJsonFormatter(JsonFormatter):
 
-    def add_fields(self, log_record, record, message_dict):
+    def add_fields(
+        self,
+        log_record: dict[str, Any],  # the manipulated entry object
+        record: logging.LogRecord,   # the source log record
+        message_dict: dict[str, Any],
+    ) -> None:
         super().add_fields(log_record, record, message_dict)
         if not log_record.get('timestamp'):
             # this doesn't use record.created, so it is slightly off
             now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
             log_record['timestamp'] = now
-        if log_record.get('level', record.levelname):
-            log_record['level'] = log_record['level'].upper()
+        if loglevel := log_record.get('level'):
+            log_record['level'] = loglevel.upper()
         else:
-            log_record['level'] = record.levelname
+            log_record['level'] = record.levelname.upper()
 
 
 class pretty:

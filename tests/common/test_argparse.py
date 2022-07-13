@@ -4,8 +4,14 @@ import ipaddress
 import pytest
 
 from ai.backend.common.argparse import (
-    port_no, port_range, positive_int, non_negative_int,
-    HostPortPair, host_port_pair, ipaddr, path,
+    HostPortPair,
+    host_port_pair,
+    ipaddr,
+    non_negative_int,
+    path,
+    port_no,
+    port_range,
+    positive_int,
 )
 
 localhost_ipv4 = ipaddress.ip_address('127.0.0.1')

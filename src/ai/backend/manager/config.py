@@ -169,46 +169,38 @@ Alias keys are also URL-quoted in the same way.
        - {instance-id}: 1  # just a membership set
 """
 
-from abc import abstractmethod
-from collections import UserDict
-from contextvars import ContextVar
 import logging
 import os
-from pathlib import Path
-from pprint import pformat
 import secrets
 import socket
 import sys
-from typing import (
-    Any,
-    Awaitable,
-    Callable,
-    Final,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-)
+from abc import abstractmethod
+from collections import UserDict
+from contextvars import ContextVar
+from pathlib import Path
+from pprint import pformat
+from typing import Any, Awaitable, Callable, Final, List, Mapping, Optional, Sequence
 
 import aiotools
 import click
 import trafaret as t
 import yarl
 
-from ai.backend.common import config, validators as tx
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common import config
+from ai.backend.common import validators as tx
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
-    SlotName, SlotTypes,
     HostPortPair,
+    SlotName,
+    SlotTypes,
     current_resource_slots,
 )
-from ai.backend.common.etcd import ConfigScopes
 
+from ..manager.defs import INTRINSIC_SLOTS
 from .api.exceptions import ServerMisconfiguredError
 from .api.manager import ManagerStatus
-from ..manager.defs import INTRINSIC_SLOTS
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -457,6 +449,8 @@ class SharedConfig(AbstractConfig):
         super().__init__()
         credentials = None
         if etcd_user:
+            assert etcd_user is not None
+            assert etcd_password is not None
             credentials = {
                 'user': etcd_user,
                 'password': etcd_password,

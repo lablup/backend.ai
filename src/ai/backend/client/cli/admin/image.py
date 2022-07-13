@@ -4,17 +4,17 @@ import sys
 import click
 from tqdm import tqdm
 
+from ai.backend.client.func.image import _default_list_fields_admin
 from ai.backend.client.session import Session
-from ai.backend.client.func.image import (
-    _default_list_fields_admin,
-)
-# from ai.backend.client.output.fields import image_fields
-from . import admin
+
 from ...compat import asyncio_run
 from ...session import AsyncSession
-from ..pretty import print_done, print_warn, print_fail, print_error
-
+from ..extensions import pass_ctx_obj
+from ..pretty import print_done, print_error, print_fail, print_warn
 from ..types import CLIContext
+
+# from ai.backend.client.output.fields import image_fields
+from . import admin
 
 
 @admin.group()
@@ -25,7 +25,7 @@ def image() -> None:
 
 
 @image.command()
-@click.pass_obj
+@pass_ctx_obj
 @click.option('--operation', is_flag=True, help='Get operational images only')
 def list(ctx: CLIContext, operation: bool) -> None:
     """
