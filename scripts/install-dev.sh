@@ -161,6 +161,8 @@ elif [ -f /etc/redhat-release -o "$DISTRO" == "RedHat" -o "$DISTRO" == "CentOS" 
   DISTRO="RedHat"
 elif [ -f /etc/system-release -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+elif [ -f /usr/lib/os-release -o "$DISTRO" == "SUSE" ]; then
+  DISTRO="SUSE"
 else
   show_error "Sorry, your host OS distribution is not supported by this script."
   show_info "Please send us a pull request or file an issue to support your environment!"
@@ -267,6 +269,10 @@ install_script_deps() {
     $sudo yum clean expire-cache  # next yum invocation will update package metadata cache
     $sudo yum install -y git jq gcc make gcc-c++
     ;;
+  SUSE)
+    $sudo zypper update
+    $sudo zypper install -y git jq gcc make gcc-c++
+    ;;
   Darwin)
     if ! type "brew" >/dev/null 2>&1; then
       show_error "brew is not available!"
@@ -287,6 +293,10 @@ install_pybuild_deps() {
     ;;
   RedHat)
     $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel sqlite-devel libffi-devel xz-devel
+    ;;
+  SUSE)
+    $sudo zypper update
+    $sudo zypper install -y openssl-devel readline-devel gdbm-devel zlib-devel libbz2-devel sqlite3-devel libffi-devel xz-devel
     ;;
   Darwin)
     brew install openssl
@@ -312,6 +322,9 @@ install_git_lfs() {
     curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | $sudo bash
     $sudo yum install -y git-lfs
     ;;
+  SUSE)
+    $sudo zypper install -y git-lfs
+    ;;
   Darwin)
     brew install git-lfs
     ;;
@@ -327,6 +340,9 @@ install_system_pkg() {
     ;;
   RedHat)
     $sudo yum install -y $2
+    ;;
+  SUSE)
+    $sudo zypper install -y $2
     ;;
   Darwin)
     brew install $3

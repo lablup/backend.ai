@@ -18,12 +18,12 @@ from typing import (
     Union,
 )
 
-import aioredis
-import aioredis.client
 from aiohttp import web
 from aiohttp_sse import sse_response
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 
-from . import redis
+from . import redis_helper
 from .events import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
@@ -68,19 +68,19 @@ class ProgressReporter:
         current, total = self.current_progress, self.total_progress
         redis_producer = self.event_producer.redis_client
 
-        def _pipe_builder(r: aioredis.Redis) -> aioredis.client.Pipeline:
+        async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
             tracker_key = f'bgtask.{self.task_id}'
-            pipe.hset(tracker_key, mapping={
+            await pipe.hset(tracker_key, mapping={
                 'current': str(current),
                 'total': str(total),
                 'msg': message or '',
                 'last_update': str(time.time()),
             })
-            pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
+            await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
             return pipe
 
-        await redis.execute(redis_producer, _pipe_builder)
+        await redis_helper.execute(redis_producer, _pipe_builder)
         await self.event_producer.produce_event(
             BgtaskUpdatedEvent(
                 self.task_id,
@@ -133,7 +133,7 @@ class BackgroundTaskManager:
         """
         tracker_key = f'bgtask.{task_id}'
         redis_producer = self.event_producer.redis_client
-        task_info = await redis.execute(
+        task_info = await redis_helper.execute(
             redis_producer,
             lambda r: r.hgetall(tracker_key),
             encoding='utf-8',
@@ -201,11 +201,11 @@ class BackgroundTaskManager:
         task_id = uuid.uuid4()
         redis_producer = self.event_producer.redis_client
 
-        def _pipe_builder(r: aioredis.Redis) -> aioredis.client.Pipeline:
+        async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline()
             tracker_key = f'bgtask.{task_id}'
             now = str(time.time())
-            pipe.hset(tracker_key, mapping={
+            await pipe.hset(tracker_key, mapping={
                 'status': 'started',
                 'current': '0',
                 'total': '0',
@@ -213,10 +213,10 @@ class BackgroundTaskManager:
                 'started_at': now,
                 'last_update': now,
             })
-            pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
+            await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
             return pipe
 
-        await redis.execute(redis_producer, _pipe_builder)
+        await redis_helper.execute(redis_producer, _pipe_builder)
 
         task = asyncio.create_task(self._wrapper_task(func, task_id, name))
         self.ongoing_tasks.add(task)
@@ -247,18 +247,18 @@ class BackgroundTaskManager:
         finally:
             redis_producer = self.event_producer.redis_client
 
-            async def _pipe_builder(r: aioredis.Redis):
+            async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 tracker_key = f'bgtask.{task_id}'
-                pipe.hset(tracker_key, mapping={
+                await pipe.hset(tracker_key, mapping={
                     'status': task_result[7:],  # strip "bgtask_"
                     'msg': message,
                     'last_update': str(time.time()),
                 })
-                pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
-                await pipe.execute()
+                await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
+                return pipe
 
-            await redis.execute(redis_producer, _pipe_builder)
+            await redis_helper.execute(redis_producer, _pipe_builder)
             await self.event_producer.produce_event(
                 event_cls(
                     task_id,

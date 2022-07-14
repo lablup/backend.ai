@@ -49,7 +49,7 @@ pyzmq~=22.1.0
 PyJWT~=2.0
 PyYAML~=5.4.1
 packaging>=21.3
-redis[hiredis]~=4.3.1
+redis[hiredis]~=4.3.4
 rich~=12.2
 SQLAlchemy[postgresql_asyncpg]~=1.4.29
 setproctitle~=1.2.2
@@ -73,6 +73,7 @@ types-cachetools
 types-Jinja2
 types-PyYAML
 types-python-dateutil
+types-redis
 types-setuptools
 types-six
 types-tabulate
