@@ -24,6 +24,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 HTTP_HEADERS_TO_FORWARD = [
     'Accept-Language',
+    'Authorization',
 ]
 
 extra_config_headers = t.Dict({
@@ -140,10 +141,15 @@ async def decrypt_payload(request):
 
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     path = request.match_info.get('path', '')
+    first_path = request.path.lstrip('/').partition('/')[0]  # extract the first path  # extract the first path
     if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
         api_session = await asyncio.shield(get_api_session(request))
+
+    if first_path == 'pipeline':
+        pipeline_endpoint = request.app['config']['pipeline']['endpoint']
+        api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))
     try:
         async with api_session:
             # We perform request signing by ourselves using the HTTP session data,
