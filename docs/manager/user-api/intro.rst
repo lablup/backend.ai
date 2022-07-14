@@ -45,6 +45,21 @@ In the query mode, usually the runtime context (e.g., global variables) is prese
 
    The state diagram of a “run” with the **execute** API.
 
+.. we need prettier version of mermaid... :(
+
+   .. mermaid::
+
+      flowchart TB
+          START(Start a Run) -->|status: continued,\nbuild-finished,\nclean-finished| CONT;
+          START -->|status: waiting-input| INPUT;
+          START -->|status: finished| FIN;
+          INPUT(User Input) -->|status: continued,\nbuild-finished,\nclean-finished| CONT;
+          INPUT -->|status: finished| FIN;
+          CONT(Continuation) -->|status: continued,\nbuild-finished,\nclean-finished| CONT;
+          CONT -->|status: waiting-input| INPUT;
+          CONT -->|status: finished| FIN;
+          FIN(Finish a Run);
+
 The **execute** API accepts 4 arguments: ``mode``, ``runId``, ``code``, and ``options`` (``opts``).
 It returns an :ref:`execution-result-object` encoded as JSON.
 
