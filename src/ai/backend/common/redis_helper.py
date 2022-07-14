@@ -496,7 +496,7 @@ def get_redis_object(
         )
 
 
-async def ping_redis_connection(client: Redis) -> None:
+async def ping_redis_connection(client: Redis) -> bool:
     try:
         return await client.ping()
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:

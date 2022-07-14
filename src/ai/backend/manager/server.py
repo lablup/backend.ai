@@ -294,18 +294,22 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-
     root_ctx.redis_live = redis_helper.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_LIVE_DB)
+    await redis_helper.ping_redis_connection(root_ctx.redis_live.client)
     root_ctx.redis_stat = redis_helper.get_redis_object(root_ctx.shared_config.data['redis'], db=REDIS_STAT_DB)
+    await redis_helper.ping_redis_connection(root_ctx.redis_stat.client)
     root_ctx.redis_image = redis_helper.get_redis_object(
         root_ctx.shared_config.data['redis'], db=REDIS_IMAGE_DB,
     )
+    await redis_helper.ping_redis_connection(root_ctx.redis_image.client)
     root_ctx.redis_stream = redis_helper.get_redis_object(
         root_ctx.shared_config.data['redis'], db=REDIS_STREAM_DB,
     )
+    await redis_helper.ping_redis_connection(root_ctx.redis_stream.client)
     root_ctx.redis_lock = redis_helper.get_redis_object(
         root_ctx.shared_config.data['redis'], db=REDIS_STREAM_LOCK,
     )
+    await redis_helper.ping_redis_connection(root_ctx.redis_lock.client)
     yield
     await root_ctx.redis_stream.close()
     await root_ctx.redis_image.close()
