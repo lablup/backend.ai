@@ -576,37 +576,6 @@ show_info "Using the current working-copy directory as the installation path..."
 
 mkdir -p ./var/lib/backend.ai
 
-mkdir -p ./wheelhouse
-if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
-  show_info "Prebuild grpcio wheels for Apple Silicon..."
-  if [ -z "$(pyenv virtualenvs | grep "tmp-grpcio-build")" ]; then
-    pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
-  fi
-  pyenv shell tmp-grpcio-build
-  if [ $(python -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)') -eq 0 ]; then
-    # ref: https://github.com/grpc/grpc/issues/25082
-    export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
-    export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
-    echo "Set grpcio wheel build variables."
-  else
-    unset GRPC_PYTHON_BUILD_SYSTEM_OPENSSL
-    unset GRPC_PYTHON_BUILD_SYSTEM_ZLIB
-    unset CFLAGS
-    unset LDFLAGS
-  fi
-  pip install -U -q pip setuptools wheel
-  # ref: https://github.com/grpc/grpc/issues/28387
-  pip wheel -w ./wheelhouse --no-binary :all: grpcio grpcio-tools
-  pyenv shell --unset
-  pyenv uninstall -f tmp-grpcio-build
-  echo "List of prebuilt wheels:"
-  ls -l ./wheelhouse
-  # Currently there are not many packages that provides prebuilt binaries for M1 Macs.
-  # Let's configure necessary env-vars to build them locally via bdist_wheel.
-  echo "Configuring additional build flags for local wheel builds for macOS on Apple Silicon ..."
-  set_brew_python_build_flags
-fi
-
 # Install postgresql, etcd packages via docker
 show_info "Launching the docker compose \"halfstack\"..."
 mkdir -p "$HALFSTACK_VOLUME_PATH"
