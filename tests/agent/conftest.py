@@ -24,7 +24,7 @@ def test_id():
 def local_config(test_id, etcd_container, redis_container):  # noqa: F811
     ipc_base_path = Path.cwd() / f'.tmp/{test_id}/agent-ipc'
     ipc_base_path.mkdir(parents=True, exist_ok=True)
-    var_base_path = Path.cwd() / 'var/lib/backend.ai'
+    var_base_path = Path.cwd() / f'.tmp/{test_id}/agent-var'
     var_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
 
