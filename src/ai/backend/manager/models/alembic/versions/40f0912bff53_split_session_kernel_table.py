@@ -150,6 +150,7 @@ def upgrade():
                 'TERMINATED', 'ERROR', 'CANCELLED', name='sessionstatus', create_type=True,
             ), server_default='PENDING', nullable=False)
         status_changed = sa.Column('status_changed', sa.DateTime(timezone=True), nullable=True)
+        status_history = sa.Column('status_history', pgsql.JSONB(), nullable=True, default=sa.null())
         status_info = sa.Column('status_info', sa.Unicode(), nullable=True)
         status_data = sa.Column('status_data', pgsql.JSONB(astext_type=sa.Text()), nullable=True)
         callback_url = sa.Column('callback_url', sa.types.UnicodeText(), nullable=True)

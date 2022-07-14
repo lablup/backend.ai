@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import pickle
 import re
 import signal
@@ -40,6 +41,7 @@ from typing import (
     Union,
     cast,
 )
+from uuid import UUID
 
 import aiotools
 import attr
@@ -81,6 +83,7 @@ from ai.backend.common.events import (
     SessionFailureEvent,
     SessionSuccessEvent,
 )
+from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
@@ -552,6 +555,11 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
 
         # Prepare auto-cleaning of idle kernels.
         self.timer_tasks.append(aiotools.create_timer(self.sync_container_lifecycles, 10.0))
+
+        if abuse_report_path := self.local_config['agent'].get('abuse-report-path'):
+            log.info('Enabling auto-removal of kernels reported for abnormal activities')
+            abuse_report_path.mkdir(exist_ok=True, parents=True)
+            self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 10.0))
 
         loop = current_loop()
         self.last_registry_written_time = time.monotonic()
@@ -1093,6 +1101,35 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
             else:
                 hwinfo[key] = result
         return hwinfo
+
+    async def _cleanup_reported_kernels(self, interval: float):
+        dest_path: Path = self.local_config['agent']['abuse-report-path']
+
+        def _read(path: Path) -> str:
+            with open(path, 'r') as fr:
+                return fr.read()
+
+        def _rm(path: Path) -> None:
+            os.remove(path)
+
+        terminated_kernels: MutableMapping[str, ContainerLifecycleEvent] = {}
+        try:
+            async with FileLock(path=dest_path / 'report.lock'):
+                for reported_kernel in dest_path.glob('report.*.json'):
+                    raw_body = await self.loop.run_in_executor(None, _read, reported_kernel)
+                    body: MutableMapping[str, str] = json.loads(raw_body)
+                    log.debug('cleanup requested: {} ({})', body['ID'], body.get('reason'))
+                    terminated_kernels[body['ID']] = ContainerLifecycleEvent(
+                        KernelId(UUID(body['ID'])),
+                        ContainerId(body['CID']),
+                        LifecycleEvent.DESTROY,
+                        body.get('reason', 'anomaly-detected'),
+                    )
+
+                    await self.loop.run_in_executor(None, _rm, reported_kernel)
+        finally:
+            for kernel_id, ev in terminated_kernels.items():
+                await self.container_lifecycle_queue.put(ev)
 
     @abstractmethod
     async def scan_images(self) -> Mapping[str, str]:

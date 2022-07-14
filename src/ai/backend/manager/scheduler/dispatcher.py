@@ -265,6 +265,13 @@ class SchedulerDispatcher(aobject):
                                 status_changed=now,
                                 status_info='pending-timeout',
                                 terminated_at=now,
+                                status_history=sql_json_merge(
+                                    KernelRow.status_history,
+                                    (),
+                                    {
+                                        KernelStatus.CANCELLED.name: now.isoformat(),
+                                    },
+                                ),
                             )
                         )
                         await db_sess.execute(kernel_query)
@@ -642,6 +649,13 @@ class SchedulerDispatcher(aobject):
                         status_info='scheduled',
                         status_data={},
                         status_changed=now,
+                        status_history=sql_json_merge(
+                            KernelRow.status_history,
+                            (),
+                            {
+                                KernelStatus.SCHEDULED.name: now.isoformat(),
+                            },
+                        ),
                     )
                 )
                 await kernel_db_sess.execute(kernel_query)
@@ -803,6 +817,13 @@ class SchedulerDispatcher(aobject):
                             status_info='scheduled',
                             status_data={},
                             status_changed=now,
+                            status_history=sql_json_merge(
+                                KernelRow.status_history,
+                                (),
+                                {
+                                    KernelStatus.SCHEDULED.name: now.isoformat(),
+                                },
+                            ),
                         )
                     )
                     await kernel_db_sess.execute(kernel_query)
@@ -815,6 +836,13 @@ class SchedulerDispatcher(aobject):
                         status_info='scheduled',
                         status_data={},
                         status_changed=now,
+                        status_history=sql_json_merge(
+                            SessionRow.status_history,
+                            (),
+                            {
+                                SessionStatus.SCHEDULED.name: now.isoformat(),
+                            },
+                        ),
                     )
                 )
                 await kernel_db_sess.execute(session_query)
@@ -909,6 +937,13 @@ class SchedulerDispatcher(aobject):
                             status_info='failed-to-start',
                             status_data=status_data,
                             terminated_at=now,
+                            status_history=sql_json_merge(
+                                KernelRow.status_history,
+                                (),
+                                {
+                                    KernelStatus.CANCELLED.name: now.isoformat(),
+                                },
+                            ),
                         )
                     )
                     await db_sess.execute(kernel_query)
@@ -921,6 +956,13 @@ class SchedulerDispatcher(aobject):
                             status_info='failed-to-start',
                             status_data=status_data,
                             terminated_at=now,
+                            status_history=sql_json_merge(
+                                SessionRow.status_history,
+                                (),
+                                {
+                                    SessionStatus.CANCELLED.name: now.isoformat(),
+                                },
+                            ),
                         )
                     )
                     await db_sess.execute(session_query)

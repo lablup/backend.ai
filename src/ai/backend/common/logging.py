@@ -196,7 +196,10 @@ class CustomJsonFormatter(JsonFormatter):
             # this doesn't use record.created, so it is slightly off
             now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
             log_record['timestamp'] = now
-        log_record['level'] = log_record.get('level', record.levelname).upper()
+        if loglevel := log_record.get('level'):
+            log_record['level'] = loglevel.upper()
+        else:
+            log_record['level'] = record.levelname.upper()
 
 
 class pretty:

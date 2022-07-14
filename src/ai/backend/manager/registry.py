@@ -900,6 +900,9 @@ class AgentRegistry:
 
         kernel_shared_data = {
             'status': KernelStatus.PENDING,
+            'status_history': {
+                KernelStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+            },
             'session_creation_id': session_creation_id,
             'session_id': session_id,
             'session_name': session_name,
@@ -1358,6 +1361,13 @@ class AgentRegistry:
                             'stdin_port': created_info['stdin_port'],
                             'stdout_port': created_info['stdout_port'],
                             'service_ports': service_ports,
+                            'status_history': sql_json_merge(
+                                kernels.c.status_history,
+                                (),
+                                {
+                                    KernelStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
+                                },
+                            ),
                         }
                         actual_allocs = self.convert_resource_spec_to_resource_slot(
                             created_info['resource_spec']['allocations'])
@@ -1806,6 +1816,13 @@ class AgentRegistry:
                                 'status_info': reason,
                                 'status_changed': now,
                                 'terminated_at': now,
+                                'status_history': sql_json_merge(
+                                    KernelRow.status_history,
+                                    (),
+                                    {
+                                        transit_to.name: now.isoformat(),
+                                    },
+                                ),
                             }
                             async with self.db.begin_session() as db_sess:
                                 query = (
@@ -1870,6 +1887,13 @@ class AgentRegistry:
                                 'status_info': reason,
                                 'status_changed': now,
                                 'terminated_at': now,
+                                'status_history': sql_json_merge(
+                                    KernelRow.status_history,
+                                    (),
+                                    {
+                                        transit_to.name: now.isoformat(),
+                                    },
+                                ),
                             }
                             if kern_stat:
                                 values['last_stat'] = msgpack.unpackb(kern_stat)
@@ -1909,6 +1933,13 @@ class AgentRegistry:
                                     "kernel": {"exit_code": None},
                                     "session": {"status": "terminating"},
                                 },
+                                'status_history': sql_json_merge(
+                                    KernelRow.status_history,
+                                    (),
+                                    {
+                                        transit_to.name: now.isoformat(),
+                                    },
+                                ),
                             }
                             async with self.db.begin_session() as db_sess:
                                 query = (
@@ -2074,11 +2105,22 @@ class AgentRegistry:
                 self.kernel_creation_tracker[
                     kernel.id
                 ] = start_future
+                transit_to = KernelStatus.RESTARTING
+                values = {
+                    'status': transit_to,
+                    'status_history': sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {
+                            transit_to.name: datetime.now(tzutc()).isoformat(),
+                        },
+                    ),
+                }
                 try:
                     async with self.db.begin_session() as db_sess:
                         query = (
                             sa.update(KernelRow)
-                            .values(status=KernelStatus.RESTARTING)
+                            .values(**values)
                             .where(KernelRow.id == kernel.id)
                         )
                         await db_sess.execute(query)
@@ -2100,16 +2142,24 @@ class AgentRegistry:
                         )
                     await start_future
                     async with self.db.begin_session() as db_sess:
+                        transit_to = KernelStatus.RUNNING
                         query = (
                             sa.update(KernelRow)
                             .values(
-                                status=KernelStatus.RUNNING,
+                                status=transit_to,
                                 container_id=kernel_info['container_id'],
                                 repl_in_port=kernel_info['repl_in_port'],
                                 repl_out_port=kernel_info['repl_out_port'],
                                 stdin_port=kernel_info['stdin_port'],
                                 stdout_port=kernel_info['stdout_port'],
                                 service_ports=kernel_info.get('service_ports', []),
+                                status_history=sql_json_merge(
+                                    KernelRow.status_history,
+                                    (),
+                                    {
+                                        transit_to.name: datetime.now(tzutc()).isoformat(),
+                                    },
+                                ),
                             )
                             .where(KernelRow.id == kernel.id)
                         )
@@ -2579,6 +2629,15 @@ class AgentRegistry:
         updated: Dict[str, Any] = {}
         if status is not None:
             updated['status'] = status
+            updated['status_history'] = sql_json_merge(
+                KernelRow.status_history,
+                (),
+                {
+                    status.name: now.isoformat(),
+                },
+            ),
+            if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
+                updated['terminated_at'] = now
         if status_info is not None:
             updated['status_info'] = status_info
         if status_data is not None:
@@ -2640,6 +2699,13 @@ class AgentRegistry:
             'status': status,
             'status_info': reason,
             'status_changed': now,
+            'status_history': sql_json_merge(
+                kernels.c.status_history,
+                (),
+                {
+                    status.name: now.isoformat(),   # ["PULLING", "PREPARING"]
+                },
+            ),
         }
 
         async def _update() -> None:
@@ -2778,6 +2844,13 @@ class AgentRegistry:
                         ("kernel",),
                         {"exit_code": exit_code},
                     ),
+                    'status_history': sql_json_merge(
+                        kernels.c.status_history,
+                        (),
+                        {
+                            KernelStatus.TERMINATED.name: now.isoformat(),
+                        },
+                    ),
                     'terminated_at': now,
                 }
                 if kern_stat:
@@ -2846,6 +2919,13 @@ class AgentRegistry:
                         'status_info': reason,
                         'status_changed': now,
                         'terminated_at': now,
+                        'status_history': sql_json_merge(
+                            SessionRow.status_history,
+                            (),
+                            {
+                                SessionStatus.TERMINATED.name: datetime.now(tzutc()).isoformat(),
+                            },
+                        ),
                     }
                     query = (
                         sa.update(SessionRow)

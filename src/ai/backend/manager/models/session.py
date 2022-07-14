@@ -49,6 +49,7 @@ from .base import (
     batch_multiresult_in_session,
     batch_result_in_session,
 )
+from .utils import sql_json_merge
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .keypair import KeyPairRow
@@ -281,6 +282,7 @@ class SessionRow(Base):
     #         // used to prevent duplication of SessionTerminatedEvent
     #   }
     # }
+    status_history = sa.Column('status_history', pgsql.JSONB(), nullable=True, default=sa.null())
     callback_url = sa.Column('callback_url', URLColumn, nullable=True, default=sa.null())
 
     startup_command = sa.Column('startup_command', sa.Text, nullable=True)
@@ -496,6 +498,13 @@ async def get_scheduled_sessions(
         'status_changed': now,
         'status_info': "",
         'status_data': {},
+        'status_history': sql_json_merge(
+            SessionRow.status_history,
+            (),
+            {
+                SessionStatus.PREPARING.name: now.isoformat(),
+            },
+        ),
     }
     query = (
         sa.update(SessionRow)
@@ -507,6 +516,13 @@ async def get_scheduled_sessions(
     session_ids = result.scalars().all()
 
     update_data['status'] = KernelStatus.PREPARING
+    update_data['status_history'] = sql_json_merge(
+        KernelRow.status_history,
+        (),
+        {
+            KernelStatus.PREPARING.name: now.isoformat(),
+        },
+    ),
 
     query = (
         sa.update(KernelRow)
@@ -683,6 +699,7 @@ class ComputeSession(graphene.ObjectType):
     status_changed = GQLDateTime()
     status_info = graphene.String()
     status_data = graphene.JSONString()
+    status_history = graphene.JSONString()
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
@@ -739,6 +756,7 @@ class ComputeSession(graphene.ObjectType):
             'status_changed': row.status_changed,
             'status_info': row.status_info,
             'status_data': row.status_data,
+            'status_history': row.status_history or {},
             'created_at': row.created_at,
             'terminated_at': row.terminated_at,
             'starts_at': row.starts_at,
