@@ -97,7 +97,7 @@ def test_mask_sensitive_keys():
 
 @pytest.mark.asyncio
 async def test_sql_json_merge():
-    config = load_config(config_path=Path.cwd().parent.parent / "manager.toml")
+    config = load_config(config_path=Path(__file__).parent.parent.parent.parent / "manager.toml")
     async with connect_database(config) as db:
         async with db.begin() as conn:
             query = sqlalchemy.select([users.c.uuid]).select_from(users)
