@@ -491,7 +491,7 @@ async def get_sessions_by_name(
 
 async def get_scheduled_sessions(
     db_session: SASession,
-) -> SessionRow:
+) -> List[SessionRow]:
     now = datetime.now(tzutc())
     update_data = {
         'status': SessionStatus.PREPARING,
@@ -515,6 +515,9 @@ async def get_scheduled_sessions(
     result = await db_session.execute(query)
     session_ids = result.scalars().all()
 
+    if not session_ids:
+        return []
+
     update_data['status'] = KernelStatus.PREPARING
     update_data['status_history'] = sql_json_merge(
         KernelRow.status_history,
@@ -522,7 +525,7 @@ async def get_scheduled_sessions(
         {
             KernelStatus.PREPARING.name: now.isoformat(),
         },
-    ),
+    )
 
     query = (
         sa.update(KernelRow)
