@@ -49,13 +49,13 @@ from .base import (
     batch_multiresult_in_session,
     batch_result_in_session,
 )
-from .utils import sql_json_merge
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .keypair import KeyPairRow
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import UserRow
+from .utils import sql_json_merge
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext

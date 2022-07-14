@@ -161,6 +161,8 @@ _read_only_txn_opts = {
     'postgresql_readonly': True,
 }
 
+NO_AGENT = 'NO_AGENT'
+
 
 class PeerInvoker(Peer):
 
@@ -1285,12 +1287,21 @@ class AgentRegistry:
                 (KernelRow.session_id == session_id),
                 status_choice=None,
             )
+            session_transit_to = SessionStatus.RUNNING
+            now = datetime.now(tzutc())
             query = (
                 sa.update(SessionRow)
                 .values(
                     occupying_slots=total_resource_occupancy,
-                    status=SessionStatus.RUNNING,
-                    status_changed=datetime.now(tzutc()),
+                    status=session_transit_to,
+                    status_changed=now,
+                    status_history=sql_json_merge(
+                        SessionRow.status_history,
+                        (),
+                        {
+                            session_transit_to.name: now.isoformat(),
+                        },
+                    ),
                 )
                 .where(SessionRow.id == session_id)
             )
@@ -1799,11 +1810,13 @@ class AgentRegistry:
         now = datetime.now(tzutc())
         to_be_terminated = []
 
-        keyfunc = lambda item: item.agent if item.agent is not None else ''
-        for agent_id, group_iterator in itertools.groupby(
-            sorted(kernel_list, key=keyfunc), key=keyfunc,
+        sortfunc = lambda item: item.agent.id if item.agent.id is not None else NO_AGENT
+        groupfunc = lambda item: item.agent if item.agent is not None else NO_AGENT
+        agent: AgentRow
+        for agent, group_iterator in itertools.groupby(
+            sorted(kernel_list, key=sortfunc), key=groupfunc,
         ):
-            destroyed_kernels = []
+            destroyed_kernels: List[KernelRow] = []
             grouped_kernels = [*group_iterator]
             kernel: KernelRow
             for kernel in grouped_kernels:
@@ -1909,9 +1922,9 @@ class AgentRegistry:
                                 await db_sess.execute(query)
 
                         await execute_with_retry(_update)
-                        # await self.event_producer.produce_event(
-                        #     KernelTerminatedEvent(kernel.id, reason),
-                        # )
+                        await self.event_producer.produce_event(
+                            KernelTerminatedEvent(kernel.id, reason),
+                        )
                     else:
 
                         if kernel.cluster_role == DEFAULT_ROLE:
@@ -1957,20 +1970,23 @@ class AgentRegistry:
                             KernelTerminatingEvent(kernel.id, reason),
                         )
 
-                    # if kernel.agent_addr is None:
-                    #     await self.mark_kernel_terminated(kernel.id, 'missing-agent-allocation')
-                    #     if kernel.cluster_role == DEFAULT_ROLE:
-                    #         main_stat = {'status': 'terminated'}
-                    # else:
-                    destroyed_kernels.append(kernel)
+                    if kernel.agent_addr is None or agent is NO_AGENT:
+                        await self.mark_kernel_terminated(kernel.id, 'missing-agent-allocation')
+                        if kernel.cluster_role == DEFAULT_ROLE:
+                            main_stat = {'status': 'terminated'}
+                    else:
+                        destroyed_kernels.append(kernel)
 
-            async def _destroy_kernels_in_agent(session, destroyed_kernels) -> None:
+            async def _destroy_kernels_in_agent(
+                session_id: SessionId,
+                destroyed_kernels: List[KernelRow],
+            ) -> None:
                 nonlocal main_stat
                 async with RPCContext(
-                    destroyed_kernels[0]['agent'],
-                    destroyed_kernels[0]['agent_addr'],
+                    agent.id,
+                    agent.addr,
                     invoke_timeout=None,
-                    order_key=session.id,
+                    order_key=str(session_id),
                     keepalive_timeout=self.rpc_keepalive_timeout,
                 ) as rpc:
                     rpc_coros = []
@@ -1985,8 +2001,8 @@ class AgentRegistry:
                     except Exception:
                         log.exception(
                             "destroy_kernels_in_agent(a:{}, s:{}): unexpected error",
-                            destroyed_kernels[0]['agent'],
-                            session.id,
+                            agent.id,
+                            session_id,
                         )
                     for kernel in destroyed_kernels:
                         last_stat: Optional[Dict[str, Any]]
@@ -2005,15 +2021,15 @@ class AgentRegistry:
                                 **(last_stat if last_stat is not None else {}),
                                 'status': 'terminated',
                             }
-
             if destroyed_kernels:
-                per_agent_tasks.append(_destroy_kernels_in_agent(session, destroyed_kernels))
+                per_agent_tasks.append(_destroy_kernels_in_agent(session.id, destroyed_kernels))
                 to_be_terminated.extend(destroyed_kernels)
 
-            if per_agent_tasks:
-                await asyncio.gather(*per_agent_tasks, return_exceptions=True)
-            if forced:
-                await self.recalc_resource_usage()
+        if per_agent_tasks:
+            await asyncio.gather(*per_agent_tasks, return_exceptions=True)
+
+        if forced:
+            await self.recalc_resource_usage()
 
         for kernel in to_be_terminated:
             await self.event_producer.produce_event(
@@ -2658,7 +2674,7 @@ class AgentRegistry:
                 {
                     status.name: now.isoformat(),
                 },
-            ),
+            )
             if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
                 updated['terminated_at'] = now
         if status_info is not None:
@@ -2699,7 +2715,7 @@ class AgentRegistry:
                         {
                             updated_status.name: now.isoformat(),
                         },
-                    ),
+                    )
                 if status_data is not None:
                     session_updated['status_data'] = sql_json_merge(
                         SessionRow.status_data,

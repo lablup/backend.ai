@@ -1279,7 +1279,7 @@ async def recalc_concurrency_used(
             sa.select(sa.func.count())
             .select_from(KernelRow)
             .where(
-                (KernelRow.access_key == access_key),
+                (KernelRow.access_key == access_key) &
                 (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
             ),
         )
