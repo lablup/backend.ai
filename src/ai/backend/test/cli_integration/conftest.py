@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import secrets
+import uuid
 from collections import namedtuple
 from contextlib import closing
 from pathlib import Path
@@ -115,3 +116,8 @@ def new_keypair_options() -> Tuple[KeypairOption, ...]:
         KeypairOption(is_active=False, is_admin=True, rate_limit=15000, resource_policy='default'),
         KeypairOption(is_active=False, is_admin=False, rate_limit=100000, resource_policy='default'),
     )
+
+
+@pytest.fixture(scope="module")
+def keypair_resource_policy() -> str:
+    return str(uuid.uuid4())
