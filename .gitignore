@@ -111,5 +111,11 @@ ENV/
 /*.pid
 /scratches/
 
+# Additional clones for editable components
+/src/ai/backend/webui/
+
 # Release artifacts
 /CHANGELOG_RELEASE.md
+
+# macOS specific
+.DS_Store

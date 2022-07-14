@@ -7,6 +7,95 @@ Development Setup
 
 Currently Backend.AI is developed and tested under only \*NIX-compatible platforms (Linux or macOS).
 
+The development setup uses a mono-repository for the backend stack and a side-by-side repository checkout of the frontend stack.
+In contrast, the production setup uses per-service independent virtual environments and relies on a separately provisioned app proxy pool.
+
+There are three ways to run both the backend and frontend stacks for development, as demonstrated in
+:numref:`dev-setup-standard`, :numref:`dev-setup-app`, and :numref:`dev-setup-staticwebui`.
+The installation guide in this page using ``scripts/install-dev.sh`` covers all three cases because the only difference
+is that how you launch the Web UI from the mono-repo.
+
+.. _dev-setup-standard:
+.. figure:: dev-setup.svg
+   :align: center
+
+   A standard development setup of Backend.AI open source components
+
+.. _dev-setup-app:
+.. figure:: dev-setup-app.svg
+   :align: center
+
+   A development setup of Backend.AI open source components for Electron-based desktop app
+
+.. _dev-setup-staticwebui:
+.. figure:: dev-setup-staticwebui.svg
+   :width: 77%
+   :align: center
+
+   A development setup of Backend.AI open source components with pre-built web UI from the ``backend.ai-app`` repository
+
+
+.. currently the layout of the mermaid C4 diagrams has too large space and too small fonts....
+
+   .. mermaid::
+
+       C4Component
+       title Component Diagram of Development Setup
+
+       Person(user, "User")
+       Boundary(backend, "Backend Stack from Mono-repo") {
+          Container(manager, "Manager", "Python", "Independent daemon")
+          Container(webserver, "Web server", "Python", "Independent daemon")
+          Container(agent, "Agent", "Python", "Independent daemon")
+          Container(storage_proxy, "Storage Proxy", "Python", "Independent daemon")
+          ContainerDb(halfstack, "Halfstack", "Docker", "Set of containers")
+       }
+       Boundary(frontend, "Frontend Stack") {
+          Container(wsproxy, "Embedded wsproxy", "NodeJS", "Running on a NodeJS server")
+          Container(webui, "Web UI", "NodeJS", "Running on a NodeJS server")
+       }
+       Rel(user, manager, "HTTP", "")
+       Rel(user, webui, "HTTP", "")
+       Rel(user, wsproxy, "HTTP", "")
+       Rel(user, storage_proxy, "HTTP", "")
+       Rel(webui, webserver, "HTTP", "")
+       Rel(wsproxy, agent, "Native protocols", "")
+       Rel(webserver, manager, "HTTP", "")
+       Rel(manager, agent, "Callosum", "")
+       Rel(manager, storage_proxy, "HTTP", "")
+       Rel(manager, halfstack, "Native protocols", "")
+       Rel(agent, halfstack, "Native protocols", "")
+
+
+   .. mermaid::
+
+       C4Component
+       title Component Diagram of Production Setup
+
+       Person(user, "User")
+       Boundary(backend, "Backend Services") {
+          Container(manager, "Manager", "Python", "Independent service")
+          Container(webserver, "Web server", "Python", "Independent service with embedded Web UI")
+          Container(agent, "Agent", "Python", "Independent service")
+          Container(storage_proxy, "Storage Proxy", "Python", "Independent service")
+       }
+       Boundary(frontend, "External App Proxy Pool") {
+          Container(wsproxy, "Scalable wsproxy", "NodeJS", "Independent service")
+       }
+       Boundary(database, "Databases") {
+          ContainerDb(halfstack, "Halfstack", "Docker", "Set of containers")
+       }
+       Rel(user, manager, "HTTP", "")
+       Rel(user, webserver, "HTTP", "")
+       Rel(user, wsproxy, "HTTP", "")
+       Rel(user, storage_proxy, "HTTP", "")
+       Rel(wsproxy, agent, "Native protocols", "")
+       Rel(webserver, manager, "HTTP", "")
+       Rel(manager, agent, "Callosum", "")
+       Rel(manager, storage_proxy, "HTTP", "")
+       Rel(manager, halfstack, "Native protocols", "")
+       Rel(agent, halfstack, "Native protocols", "")
+
 
 Installation from Source
 ------------------------
@@ -86,6 +175,16 @@ the CUDA mockup plugin together, etc.
    TensorFlow CPU-only kernel.  To try out other images, you have to pull them
    manually afterwards.
 
+.. note::
+
+   Currently there are many limitations on running deep learning images on ARM64 platforms,
+   because users need to rebuild the whole computation library stack, although more supported
+   images will come in the future.
+
+.. note::
+
+   To install the webui in an editable state, try ``--editable-webui`` flag option when running ``scripts/install-dev.sh``.
+
 .. tip::
 
    **Using the agent's cgroup-based statistics without the root privilege (Linux-only)**
@@ -136,6 +235,11 @@ Open yet another terminal for client and run:
    $ export BACKEND_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
    $ ./backend.ai config
    $ ./backend.ai run python -c 'print("hello world")'
+   ∙ Session token prefix: fb05c73953
+   ✔ [0] Session fb05c73953 is ready.
+   hello world
+   ✔ [0] Execution finished. (exit code = 0)
+   ✔ [0] Cleaned up the session.
    $ ./backend.ai ps
 
 
@@ -146,3 +250,9 @@ Shutdown all docker containers using ``docker compose -f docker-compose.halfstac
 
 You may need ``sudo`` to remove the directories mounted as halfstack container volumes
 because Docker auto-creates them with the root privilege.
+
+
+Daily Workflows
+~~~~~~~~~~~~~~~
+
+Check out :doc:`/dev/daily-workflows` for your reference.
