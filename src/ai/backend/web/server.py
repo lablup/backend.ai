@@ -14,7 +14,6 @@ from pprint import pprint
 from typing import Any, AsyncIterator, MutableMapping, Tuple
 
 import aiohttp_cors
-import aioredis
 import aiotools
 import click
 import jinja2
@@ -26,6 +25,8 @@ from aiohttp import web
 from aiohttp_session import get_session
 from aiohttp_session import setup as setup_session
 from aiohttp_session.redis_storage import RedisStorage
+from aioredis import Redis as AioRedisLegacy
+from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
@@ -541,7 +542,13 @@ async def server_main(
         keepalive_options[socket.TCP_KEEPINTVL] = 5
     if hasattr(socket, 'TCP_KEEPCNT'):
         keepalive_options[socket.TCP_KEEPCNT] = 3
-    app['redis'] = await aioredis.Redis.from_url(
+    app['redis'] = await Redis.from_url(
+        str(redis_url),
+        socket_keepalive=True,
+        socket_keepalive_options=keepalive_options,
+    )
+    # FIXME: remove after aio-libs/aiohttp-session#704 is merged
+    aioredis_legacy_client = await AioRedisLegacy.from_url(
         str(redis_url),
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
@@ -551,7 +558,8 @@ async def server_main(
         await app['redis'].flushdb()
         log.info('flushed session storage.')
     redis_storage = RedisStorage(
-        app['redis'],
+        # FIXME: replace to app['redis'] after aio-libs/aiohttp-session#704 is merged
+        aioredis_legacy_client,
         max_age=config['session']['max_age'])
 
     setup_session(app, redis_storage)
@@ -590,6 +598,11 @@ async def server_main(
     cors.add(app.router.add_route('POST', '/func/{path:.*$}', web_handler))
     cors.add(app.router.add_route('PATCH', '/func/{path:.*$}', web_handler))
     cors.add(app.router.add_route('DELETE', '/func/{path:.*$}', web_handler))
+    cors.add(app.router.add_route('GET', '/pipeline/{path:.*$}', web_handler))
+    cors.add(app.router.add_route('PUT', '/pipeline/{path:.*$}', web_handler))
+    cors.add(app.router.add_route('POST', '/pipeline/{path:.*$}', web_handler))
+    cors.add(app.router.add_route('PATCH', '/pipeline/{path:.*$}', web_handler))
+    cors.add(app.router.add_route('DELETE', '/pipeline/{path:.*$}', web_handler))
     if config['service']['mode'] == 'webui':
         fallback_handler = console_handler
     elif config['service']['mode'] == 'static':

@@ -161,6 +161,8 @@ elif [ -f /etc/redhat-release -o "$DISTRO" == "RedHat" -o "$DISTRO" == "CentOS" 
   DISTRO="RedHat"
 elif [ -f /etc/system-release -o "$DISTRO" == "Amazon" ]; then
   DISTRO="RedHat"
+elif [ -f /usr/lib/os-release -o "$DISTRO" == "SUSE" ]; then
+  DISTRO="SUSE"
 else
   show_error "Sorry, your host OS distribution is not supported by this script."
   show_info "Please send us a pull request or file an issue to support your environment!"
@@ -180,6 +182,12 @@ else
 fi
 
 ROOT_PATH="$(pwd)"
+if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
+  show_error "BUILD_ROOT is not found!"
+  echo "You are not on the root directory of the repository checkout."
+  echo "Please \`cd\` there and run \`./scripts/install-dev.sh <args>\`"
+  exit 1
+fi
 PLUGIN_PATH="${ROOT_PATH}/plugins"
 HALFSTACK_VOLUME_PATH="${ROOT_PATH}/volumes"
 PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
@@ -261,6 +269,10 @@ install_script_deps() {
     $sudo yum clean expire-cache  # next yum invocation will update package metadata cache
     $sudo yum install -y git jq gcc make gcc-c++
     ;;
+  SUSE)
+    $sudo zypper update
+    $sudo zypper install -y git jq gcc make gcc-c++
+    ;;
   Darwin)
     if ! type "brew" >/dev/null 2>&1; then
       show_error "brew is not available!"
@@ -281,6 +293,10 @@ install_pybuild_deps() {
     ;;
   RedHat)
     $sudo yum install -y openssl-devel readline-devel gdbm-devel zlib-devel bzip2-devel sqlite-devel libffi-devel xz-devel
+    ;;
+  SUSE)
+    $sudo zypper update
+    $sudo zypper install -y openssl-devel readline-devel gdbm-devel zlib-devel libbz2-devel sqlite3-devel libffi-devel xz-devel
     ;;
   Darwin)
     brew install openssl
@@ -306,6 +322,9 @@ install_git_lfs() {
     curl -s https://packagecloud.io/install/repositories/github/git-lfs/script.rpm.sh | $sudo bash
     $sudo yum install -y git-lfs
     ;;
+  SUSE)
+    $sudo zypper install -y git-lfs
+    ;;
   Darwin)
     brew install git-lfs
     ;;
@@ -321,6 +340,9 @@ install_system_pkg() {
     ;;
   RedHat)
     $sudo yum install -y $2
+    ;;
+  SUSE)
+    $sudo zypper install -y $2
     ;;
   Darwin)
     brew install $3
@@ -365,6 +387,35 @@ install_python() {
     fi
   else
     echo "${PYTHON_VERSION} is already installed."
+  fi
+}
+
+install_git_hooks() {
+  local magic_str="monorepo standard pre-commit hook"
+  if [ -f .git/hooks/pre-commit ]; then
+    grep -Fq "$magic_str" .git/hooks/pre-commit
+    if [ $? -eq 0 ]; then
+      :
+    else
+      echo "" >> .git/hooks/pre-commit
+      cat scripts/pre-commit.sh >> .git/hooks/pre-commit
+    fi
+  else
+    cp scripts/pre-commit.sh .git/hooks/pre-commit
+    chmod +x .git/hooks/pre-commit
+  fi
+  local magic_str="monorepo standard pre-push hook"
+  if [ -f .git/hooks/pre-push ]; then
+    grep -Fq "$magic_str" .git/hooks/pre-push
+    if [ $? -eq 0 ]; then
+      :
+    else
+      echo "" >> .git/hooks/pre-push
+      cat scripts/pre-push.sh >> .git/hooks/pre-push
+    fi
+  else
+    cp scripts/pre-push.sh .git/hooks/pre-push
+    chmod +x .git/hooks/pre-push
   fi
 }
 
@@ -415,6 +466,8 @@ bootstrap_pants() {
     else
       echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
     fi
+    # In most cases, we won't need to modify the source code of pants.
+    echo "ENABLE_PANTSD=true" > "$ROOT_PATH/.pants.env"
     echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
     if [ -d tools/pants-src ]; then
       rm -rf tools/pants-src
@@ -503,6 +556,9 @@ install_git_lfs
 
 show_info "Ensuring checkout of LFS files..."
 git lfs pull
+
+show_info "Configuring the standard git hooks..."
+install_git_hooks
 
 show_info "Installing Python..."
 install_python
@@ -777,4 +833,4 @@ show_note "How to reset this setup:"
 echo "    > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
 echo " "
 
-# vim: tw=0
+# vim: tw=0 sts=2 sw=2 et
