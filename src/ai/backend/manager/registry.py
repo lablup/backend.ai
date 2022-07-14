@@ -1246,6 +1246,7 @@ class AgentRegistry:
             'BACKENDAI_CLUSTER_HOSTS':
                 ",".join(binding.kernel.cluster_hostname for binding in kernel_agent_bindings),
             'BACKENDAI_ACCESS_KEY': scheduled_session.access_key,
+			'BACKENDAI_SERVICE_PORTS': ",".join(str(port) for port in scheduled_session.preopen_ports),
         })
 
         # Aggregate by agents to minimize RPC calls
