@@ -247,7 +247,8 @@ def sql_json_merge(
                 if _depth == len(key) - 1
                 else sql_json_merge(col, key, obj=obj, _depth=_depth + 1)
             ),
-        ),
+        )
+        if key else sa.func.cast(obj, psql.JSONB),
     )
     return expr
 
