@@ -4069,7 +4069,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.98",
+  "pex_version": "2.1.99",
   "prefer_older_binary": false,
   "requirements": [
     "Jinja2~=3.0.1",
