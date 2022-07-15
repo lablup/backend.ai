@@ -25,6 +25,7 @@ from typing import (
     Tuple,
     TypedDict,
     Union,
+    cast,
 )
 
 import zmq
@@ -848,7 +849,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                             continue
                         await self.output_queue.put(
                             ResultRecord(
-                                msg_type.decode('ascii'),
+                                cast(ResultType, msg_type.decode('ascii')),
                                 msg_data.decode('utf8'),
                             ))
                 except asyncio.QueueFull:
