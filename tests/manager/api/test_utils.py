@@ -1,22 +1,21 @@
 import asyncio
 import uuid
 from datetime import datetime
-from pathlib import Path
 
 import pytest
 import sqlalchemy
 from dateutil.tz import tzutc
 
 from ai.backend.manager.api.utils import call_non_bursty, mask_sensitive_keys
-from ai.backend.manager.config import load as load_config
 from ai.backend.manager.models import (
+    domains,
     groups,
     kernels,
     users,
     verify_dotfile_name,
     verify_vfolder_name,
 )
-from ai.backend.manager.models.utils import connect_database, sql_json_merge
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, sql_json_merge
 
 
 @pytest.mark.asyncio
@@ -96,17 +95,50 @@ def test_mask_sensitive_keys():
 
 
 @pytest.mark.asyncio
-async def test_sql_json_merge():
-    config = load_config(config_path=Path(__file__).parent.parent.parent.parent.parent.parent / "manager.toml")
-    async with connect_database(config) as db:
-        async with db.begin() as conn:
-            query = sqlalchemy.select([users.c.uuid]).select_from(users)
-            result = await conn.execute(query)
-            user_uuid, *_ = result.first()
+async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
+    async def create_user_row(
+        conn: sqlalchemy.ext.asyncio.engine.AsyncConnection,
+    ) -> str:
+        user_uuid = str(uuid.uuid4()).replace("-", "")
+        postfix = str(uuid.uuid4()).split("-")[1]
+        query = users.insert().values({
+            "uuid": user_uuid,
+            "username": f"TestCaseRunner-{postfix}",
+            "email": f"tc.runner-{postfix}@lablup.com",
+        })
+        await conn.execute(query)
+        return user_uuid
 
-            query = sqlalchemy.select([groups.c.id]).select_from(groups)
-            result = await conn.execute(query)
-            group_id, *_ = result.first()
+    async def create_domain_row(
+        conn: sqlalchemy.ext.asyncio.engine.AsyncConnection,
+    ) -> str:
+        domain_name = "default"
+        query = domains.insert().values({
+            "name": domain_name,
+            "total_resource_slots": {},
+        })
+        await conn.execute(query)
+        return domain_name
+
+    async def create_group_row(
+        conn: sqlalchemy.ext.asyncio.engine.AsyncConnection,
+        domain_name: str = "default",
+    ) -> str:
+        group_id = str(uuid.uuid4()).replace("-", "")
+        group_name = str(uuid.uuid4()).split("-")[0]
+        query = groups.insert().values({
+            "id": group_id,
+            "name": group_name,
+            "domain_name": domain_name,
+            "total_resource_slots": {},
+        })
+        await conn.execute(query)
+        return group_id
+
+    async with database_engine.begin() as conn:
+        user_uuid = await create_user_row(conn)
+        domain_name = await create_domain_row(conn)
+        group_id = await create_group_row(conn, domain_name=domain_name)
 
     async def create_kernel_row(
         conn: sqlalchemy.ext.asyncio.engine.AsyncConnection,
@@ -135,13 +167,23 @@ async def test_sql_json_merge():
         query = kernels.select().select_from(kernels).where(kernels.c.session_id == session_id)
         return await conn.execute(query)
 
-    async def delete_kernel_rows(
+    async def delete_rows(
         conn: sqlalchemy.ext.asyncio.engine.AsyncConnection,
     ):
-        query = kernels.delete()
-        await conn.execute(query)
+        await conn.execute(kernels.delete())
+        await conn.execute(groups.delete())
+        await conn.execute(domains.delete())
+        await conn.execute(users.delete())
 
     timestamp = datetime.now(tzutc()).isoformat()
+
+    # TEST 00
+    expected = None
+    async with database_engine.begin() as conn:
+        session_id = await create_kernel_row(conn, group_id, user_uuid)
+        kernel, *_ = await select_kernel_row(conn, session_id)
+    assert kernel is not None
+    assert kernel.status_history == expected
 
     # TEST 01
     expected = {
@@ -150,21 +192,20 @@ async def test_sql_json_merge():
             "PREPARING": timestamp,
         },
     }
-    async with connect_database(config) as db:
-        async with db.begin() as conn:
-            session_id = await create_kernel_row(conn, group_id, user_uuid)
-            query = kernels.update().values({
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    ("kernel",),
-                    {
-                        "PENDING": timestamp,
-                        "PREPARING": timestamp,
-                    },
-                ),
-            }).where(kernels.c.session_id == session_id)
-            await conn.execute(query)
-            kernel, *_ = await select_kernel_row(conn, session_id)
+    async with database_engine.begin() as conn:
+        session_id = await create_kernel_row(conn, group_id, user_uuid)
+        query = kernels.update().values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel",),
+                {
+                    "PENDING": timestamp,
+                    "PREPARING": timestamp,
+                },
+            ),
+        }).where(kernels.c.session_id == session_id)
+        await conn.execute(query)
+        kernel, *_ = await select_kernel_row(conn, session_id)
     assert kernel is not None
     assert kernel.status_history == expected
 
@@ -177,21 +218,20 @@ async def test_sql_json_merge():
             },
         },
     }
-    async with connect_database(config) as db:
-        async with db.begin() as conn:
-            session_id = await create_kernel_row(conn, group_id, user_uuid)
-            query = kernels.update().values({
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    ("kernel", "session"),
-                    {
-                        "PENDING": timestamp,
-                        "PREPARING": timestamp,
-                    },
-                ),
-            }).where(kernels.c.session_id == session_id)
-            await conn.execute(query)
-            kernel, *_ = await select_kernel_row(conn, session_id)
+    async with database_engine.begin() as conn:
+        session_id = await create_kernel_row(conn, group_id, user_uuid)
+        query = kernels.update().values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel", "session"),
+                {
+                    "PENDING": timestamp,
+                    "PREPARING": timestamp,
+                },
+            ),
+        }).where(kernels.c.session_id == session_id)
+        await conn.execute(query)
+        kernel, *_ = await select_kernel_row(conn, session_id)
     assert kernel is not None
     assert kernel.status_history == expected
 
@@ -202,18 +242,176 @@ async def test_sql_json_merge():
             timestamp,
         ],
     }
-    async with connect_database(config) as db:
-        async with db.begin() as conn:
-            session_id = await create_kernel_row(conn, group_id, user_uuid)
-            query = kernels.update().values({
-                "status_history": sql_json_merge(
-                    kernels.c.status_history,
-                    ("PENDING",),
-                    timestamp,
-                ),
-            }).where(kernels.c.session_id == session_id)
-            await conn.execute(query)
-            kernel, *_ = await select_kernel_row(conn, session_id)
+    async with database_engine.begin() as conn:
+        session_id = await create_kernel_row(conn, group_id, user_uuid)
+        query = kernels.update().values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("PENDING",),
+                timestamp,
+            ),
+        }).where(kernels.c.session_id == session_id)
+        await conn.execute(query)
+        kernel, *_ = await select_kernel_row(conn, session_id)
+    assert kernel is not None
+    assert kernel.status_history == expected
+
+    # TEST 04
+    expected = {
+        "kernel": {
+            "session": {
+                "more": {
+                    "details": {
+                        "PENDING": timestamp,
+                        "PREPARING": timestamp,
+                    },
+                },
+            },
+        },
+    }
+    async with database_engine.begin() as conn:
+        session_id = await create_kernel_row(conn, group_id, user_uuid)
+        query = kernels.update().values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel", "session", "more", "details"),
+                {
+                    "PENDING": timestamp,
+                    "PREPARING": timestamp,
+                },
+            ),
+        }).where(kernels.c.session_id == session_id)
+        await conn.execute(query)
+        kernel, *_ = await select_kernel_row(conn, session_id)
+    assert kernel is not None
+    assert kernel.status_history == expected
+
+    # TEST 05
+    expected = {
+        "more": {
+            "details": {
+                "PENDING": timestamp,
+                "PREPARING": timestamp,
+            },
+        },
+    }
+    async with database_engine.begin() as conn:
+        session_id = await create_kernel_row(conn, group_id, user_uuid)
+        query = kernels.update().values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel", "session", "more", "details"),
+                {
+                    "PENDING": timestamp,
+                    "PREPARING": timestamp,
+                },
+                _depth=2,
+            ),
+        }).where(kernels.c.session_id == session_id)
+        await conn.execute(query)
+        kernel, *_ = await select_kernel_row(conn, session_id)
+    assert kernel is not None
+    assert kernel.status_history == expected
+
+    # TEST 06
+    expected = {
+        "details": {
+            "PENDING": timestamp,
+            "PREPARING": timestamp,
+        },
+    }
+    async with database_engine.begin() as conn:
+        session_id = await create_kernel_row(conn, group_id, user_uuid)
+        query = kernels.update().values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel", "session", "more", "details"),
+                {
+                    "PENDING": timestamp,
+                    "PREPARING": timestamp,
+                },
+                _depth=3,
+            ),
+        }).where(kernels.c.session_id == session_id)
+        await conn.execute(query)
+        kernel, *_ = await select_kernel_row(conn, session_id)
+    assert kernel is not None
+    assert kernel.status_history == expected
+
+    # TEST 07 (Append)
+    expected = {
+        "kernel": {
+            "session": {
+                "PENDING": timestamp,
+                "PREPARING": timestamp,
+                "TERMINATED": timestamp,
+                "TERMINATING": timestamp,
+            },
+        },
+    }
+    async with database_engine.begin() as conn:
+        session_id = await create_kernel_row(conn, group_id, user_uuid)
+        query = kernels.update().values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel", "session"),
+                {
+                    "PENDING": timestamp,
+                    "PREPARING": timestamp,
+                },
+            ),
+        }).where(kernels.c.session_id == session_id)
+        await conn.execute(query)
+        query = kernels.update().values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel", "session"),
+                {
+                    "TERMINATING": timestamp,
+                    "TERMINATED": timestamp,
+                },
+            ),
+        }).where(kernels.c.session_id == session_id)
+        await conn.execute(query)
+        kernel, *_ = await select_kernel_row(conn, session_id)
+    assert kernel is not None
+    assert kernel.status_history == expected
+
+    # TEST 08
+    expected = {
+        "details": {
+            "PENDING": timestamp,
+            "PREPARING": timestamp,
+            "TERMINATING": timestamp,
+            "TERMINATED": timestamp,
+        },
+    }
+    async with database_engine.begin() as conn:
+        session_id = await create_kernel_row(conn, group_id, user_uuid)
+        query = kernels.update().values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel", "session", "details"),
+                {
+                    "PENDING": timestamp,
+                    "PREPARING": timestamp,
+                },
+            ),
+        }).where(kernels.c.session_id == session_id)
+        await conn.execute(query)
+        query = kernels.update().values({
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                ("kernel", "session", "details"),
+                {
+                    "TERMINATING": timestamp,
+                    "TERMINATED": timestamp,
+                },
+                _depth=2,
+            ),
+        }).where(kernels.c.session_id == session_id)
+        await conn.execute(query)
+        kernel, *_ = await select_kernel_row(conn, session_id)
     assert kernel is not None
     assert kernel.status_history == expected
 
@@ -224,7 +422,7 @@ async def test_sql_json_merge():
         "PREPARING": timestamp,
     }
     async with connect_database(config) as db:
-        async with db.begin() as conn:
+        async with database_engine.begin() as conn:
             session_id = await create_kernel_row(conn, group_id, user_uuid)
             query = kernels.update().values({
                 "status_history": sql_json_merge(
@@ -243,6 +441,5 @@ async def test_sql_json_merge():
     """
 
     # CLEAN UP
-    async with connect_database(config) as db:
-        async with db.begin() as conn:
-            await delete_kernel_rows(conn)
+    async with database_engine.begin() as conn:
+        await delete_rows(conn)
