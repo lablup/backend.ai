@@ -1067,8 +1067,6 @@ def _watch_cmd(docs: Optional[str] = None):
             print_error(e)
             sys.exit(1)
 
-        sys.exit(0)
-
     if docs is not None:
         watch.__doc__ = docs
     return watch
