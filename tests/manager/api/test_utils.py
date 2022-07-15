@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from datetime import datetime
+from typing import Union
 
 import pytest
 import sqlalchemy
@@ -142,8 +143,8 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
 
     async def create_kernel_row(
         conn: sqlalchemy.ext.asyncio.engine.AsyncConnection,
-        group_id: uuid.UUID,
-        user_uuid: uuid.UUID,
+        group_id: Union[str, uuid.UUID],
+        user_uuid: Union[str, uuid.UUID],
     ) -> str:
         session_id = str(uuid.uuid4()).replace('-', '')
         query = kernels.insert().values({
@@ -162,7 +163,7 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
 
     async def select_kernel_row(
         conn: sqlalchemy.ext.asyncio.engine.AsyncConnection,
-        session_id: uuid.UUID,
+        session_id: Union[str, uuid.UUID],
     ):
         query = kernels.select().select_from(kernels).where(kernels.c.session_id == session_id)
         return await conn.execute(query)
