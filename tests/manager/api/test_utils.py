@@ -238,31 +238,6 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
 
     # TEST 03
     expected = {
-        "PENDING": [
-            {},
-            {
-                "timestamp": timestamp,
-            },
-        ],
-    }
-    async with database_engine.begin() as conn:
-        session_id = await create_kernel_row(conn, group_id, user_uuid)
-        query = kernels.update().values({
-            "status_history": sql_json_merge(
-                kernels.c.status_history,
-                ("PENDING",),
-                {
-                    "timestamp": timestamp,
-                },
-            ),
-        }).where(kernels.c.session_id == session_id)
-        await conn.execute(query)
-        kernel, *_ = await select_kernel_row(conn, session_id)
-    assert kernel is not None
-    assert kernel.status_history == expected
-
-    # TEST 04
-    expected = {
         "kernel": {
             "session": {
                 "more": {
@@ -291,7 +266,7 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
     assert kernel is not None
     assert kernel.status_history == expected
 
-    # TEST 05
+    # TEST 04
     expected = {
         "more": {
             "details": {
@@ -318,7 +293,7 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
     assert kernel is not None
     assert kernel.status_history == expected
 
-    # TEST 06
+    # TEST 05
     expected = {
         "details": {
             "PENDING": timestamp,
@@ -343,7 +318,7 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
     assert kernel is not None
     assert kernel.status_history == expected
 
-    # TEST 07 (Append)
+    # TEST 06 (Append)
     expected = {
         "kernel": {
             "session": {
@@ -382,7 +357,7 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
     assert kernel is not None
     assert kernel.status_history == expected
 
-    # TEST 08
+    # TEST 07
     expected = {
         "details": {
             "PENDING": timestamp,
