@@ -4,11 +4,11 @@ import sys
 
 import click
 
+from ai.backend.cli.types import CLIContext, ExitCode
 from ai.backend.client.output.fields import storage_fields
 from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
-from ..types import CLIContext, ExitCode
 from . import admin
 
 
@@ -45,7 +45,7 @@ def info(ctx: CLIContext, vfolder_host: str) -> None:
             ctx.output.print_item(item, fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
 
 
 @storage.command()
@@ -84,4 +84,4 @@ def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
             )
     except Exception as e:
         ctx.output.print_error(e)
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)

@@ -3,10 +3,11 @@ import sys
 import click
 from tabulate import tabulate
 
+from ai.backend.cli.types import ExitCode
+
 from ..session import Session
 from .main import main
 from .pretty import print_error, print_info, print_warn
-from .types import ExitCode
 
 
 @main.group()
@@ -54,7 +55,7 @@ def create(path, permission, dotfile_path, owner_access_key, domain, group):
             print_info(f'Dotfile {dotfile_.path} created and ready')
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
 
 
 @dotfile.command()
@@ -78,7 +79,7 @@ def get(path, owner_access_key, domain, group):
             print(body['data'])
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
 
 
 @dotfile.command()
@@ -116,7 +117,7 @@ def list(owner_access_key, domain, group):
             print(tabulate(rows, hdrs))
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
 
 
 @dotfile.command()
@@ -156,7 +157,7 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
             print_info(f'Dotfile {dotfile_.path} updated')
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
 
 
 @dotfile.command()
@@ -188,4 +189,4 @@ def delete(path, force, owner_access_key, domain, group):
             print_info(f'Dotfile {dotfile_.path} deleted')
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)

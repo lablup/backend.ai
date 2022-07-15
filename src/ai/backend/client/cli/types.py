@@ -20,10 +20,3 @@ class CLIContext:
     api_config: APIConfig = attr.field()
     output_mode: OutputMode = attr.field()
     output: BaseOutputHandler = attr.field(default=None)
-
-
-class ExitCode(enum.Enum):
-    OK = 0
-    ERROR = 1
-    TIMEOUT = 2
-    INVALID_ARGUMENTS = 3

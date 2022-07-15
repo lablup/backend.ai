@@ -3,10 +3,11 @@ from datetime import datetime
 
 import click
 
+from ai.backend.cli.types import ExitCode
+
 from ..session import Session
 from .main import main
 from .pretty import print_error
-from .types import ExitCode
 
 
 @main.group()
@@ -41,4 +42,4 @@ def list(mark_read, page_size, page_number):
                 print('No logs.')
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)

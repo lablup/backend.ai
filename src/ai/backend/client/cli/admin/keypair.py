@@ -2,11 +2,11 @@ import sys
 
 import click
 
+from ai.backend.cli.types import CLIContext, ExitCode
 from ai.backend.client.output.fields import keypair_fields
 from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
-from ..types import CLIContext, ExitCode
 from . import admin
 
 
@@ -43,7 +43,7 @@ def info(ctx: CLIContext) -> None:
             ctx.output.print_item(item, fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
 
 
 @keypair.command()
@@ -98,7 +98,7 @@ def list(ctx: CLIContext, user_id, is_active, filter_, order, offset, limit) -> 
             )
     except Exception as e:
         ctx.output.print_error(e)
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
 
 
 @keypair.command()
@@ -132,14 +132,14 @@ def add(ctx: CLIContext, user_id, resource_policy, admin, inactive,  rate_limit)
                 item_name='keypair',
                 action_name='add',
             )
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='keypair',
                 action_name='add',
             )
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             item_name='keypair',
@@ -177,14 +177,14 @@ def update(ctx: CLIContext, access_key, resource_policy, is_admin, is_active,  r
                 item_name='keypair',
                 action_name='update',
             )
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='keypair',
                 action_name='update',
             )
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -211,14 +211,14 @@ def delete(ctx: CLIContext, access_key):
                 item_name='keypair',
                 action_name='deletion',
             )
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='keypair',
                 action_name='deletion',
             )
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -245,14 +245,14 @@ def activate(ctx: CLIContext, access_key):
                 item_name='keypair',
                 action_name='activation',
             )
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='keypair',
                 action_name='activation',
             )
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -279,14 +279,14 @@ def deactivate(ctx: CLIContext, access_key):
                 item_name='keypair',
                 action_name='deactivation',
             )
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='keypair',
                 action_name='deactivation',
             )
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={

@@ -8,10 +8,10 @@ import click
 from tabulate import tabulate
 
 from ai.backend.cli.interaction import ask_yn
+from ai.backend.cli.types import ExitCode
 
 from ..pretty import print_done, print_error, print_fail, print_info, print_wait
 from ..session import Session
-from ..types import ExitCode
 from . import admin
 
 
@@ -31,7 +31,7 @@ def status():
                            headers='firstrow'))
     except Exception as e:
         print_error(e)
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
 
 
 @manager.command()
@@ -70,7 +70,7 @@ def freeze(wait, force_kill):
             print('Manager is successfully frozen.')
     except Exception as e:
         print_error(e)
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
 
 
 @manager.command()
@@ -82,7 +82,7 @@ def unfreeze():
             print('Manager is successfully unfrozen.')
     except Exception as e:
         print_error(e)
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
 
 
 @admin.group()
@@ -103,7 +103,7 @@ def get():
                 print('No announcements.')
     except Exception as e:
         print_error(e)
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
 
 
 @announcement.command()
@@ -122,12 +122,12 @@ def update(message):
                 )
             if message is None:
                 print_info('Cancelled')
-                sys.exit(ExitCode.ERROR)
+                sys.exit(ExitCode.FAILURE)
             session.Manager.update_announcement(enabled=True, message=message)
         print_done('Posted new announcement.')
     except Exception as e:
         print_error(e)
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
 
 
 @announcement.command()
@@ -135,14 +135,14 @@ def delete():
     """Delete current announcement."""
     if not ask_yn():
         print_info('Cancelled.')
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
     try:
         with Session() as session:
             session.Manager.update_announcement(enabled=False)
         print_done('Deleted announcement.')
     except Exception as e:
         print_error(e)
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
 
 
 @announcement.command()
@@ -150,7 +150,7 @@ def dismiss():
     """Do not show the same announcement again."""
     if not ask_yn():
         print_info('Cancelled.')
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
     try:
         local_state_path = Path(appdirs.user_state_dir('backend.ai', 'Lablup'))
         with open(local_state_path / 'announcement.json', 'rb') as f:
@@ -161,10 +161,10 @@ def dismiss():
         print_done('Dismissed the last shown announcement.')
     except (IOError, json.JSONDecodeError):
         print_fail('No announcements seen yet.')
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
     except Exception as e:
         print_error(e)
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
 
 
 @manager.group()
@@ -188,7 +188,7 @@ def include_agents(agent_ids):
         print_done('The given agents now accepts new sessions.')
     except Exception as e:
         print_error(e)
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
 
 
 @scheduler.command()
@@ -205,4 +205,4 @@ def exclude_agents(agent_ids):
         print_done('The given agents will no longer start new sessions.')
     except Exception as e:
         print_error(e)
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)

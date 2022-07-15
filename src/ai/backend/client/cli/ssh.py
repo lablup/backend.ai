@@ -7,8 +7,9 @@ import sys
 from pathlib import Path
 from typing import Iterator, List
 
+from ai.backend.cli.types import ExitCode
+
 from .pretty import print_fail, print_info
-from .types import ExitCode
 
 
 @contextlib.contextmanager
@@ -27,7 +28,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     except subprocess.CalledProcessError as e:
         print_fail(f"Failed to download the SSH key from the session (exit: {e.returncode}):")
         print(e.stdout.decode())
-        sys.exit(ExitCode.ERROR)
+        sys.exit(ExitCode.FAILURE)
     os.rename(key_filename, key_path)
     print_info(f"running a temporary sshd proxy at localhost:{port} ...", file=sys.stderr)
     # proxy_proc is a background process
@@ -49,7 +50,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
                 print_fail(f"Unexpected early termination of the sshd app command "
                            f"(exit: {proxy_proc.returncode}):")
                 print((b"\n".join(lines)).decode())
-                sys.exit(ExitCode.ERROR)
+                sys.exit(ExitCode.FAILURE)
             if f"127.0.0.1:{port}".encode() in line:
                 break
             lines.append(line)

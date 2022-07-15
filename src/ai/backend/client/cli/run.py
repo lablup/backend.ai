@@ -16,6 +16,8 @@ import tabulate as tabulate_mod
 from humanize import naturalsize
 from tabulate import tabulate
 
+from ai.backend.cli.types import ExitCode
+
 from ..compat import asyncio_run, current_loop
 from ..config import local_cache_path
 from ..exceptions import BackendError
@@ -31,7 +33,6 @@ from .pretty import (
     print_wait,
     print_warn,
 )
-from .types import ExitCode
 
 tabulate_mod.PRESERVE_WHITESPACE = True
 range_expr = RangeExprOptionType()
@@ -474,7 +475,7 @@ def run(image, files, name,                                 # base args
             )
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         if compute_session.status == 'PENDING':
             print_info('Session ID {0} is enqueued for scheduling.'
                        .format(name))
@@ -534,7 +535,7 @@ def run(image, files, name,                                 # base args
             vprint_done('[{0}] Execution finished.'.format(idx))
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.ERROR)
+            sys.exit(ExitCode.FAILURE)
         finally:
             if rm:
                 vprint_wait('[{0}] Cleaning up the session...'.format(idx))
@@ -719,7 +720,7 @@ def run(image, files, name,                                 # base args
             if any(map(lambda r: isinstance(r, Exception), results)):
                 if is_multi:
                     print_fail('There were failed cases!')
-                sys.exit(ExitCode.ERROR)
+                sys.exit(ExitCode.FAILURE)
 
     try:
         asyncio_run(_run_cases())
