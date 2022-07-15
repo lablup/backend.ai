@@ -14,7 +14,7 @@ from ..extensions import pass_ctx_obj
 from ..main import main
 from ..pretty import print_fail
 from ..session import session as user_session
-from ..types import CLIContext
+from ..types import CLIContext, ExitCode
 from . import admin
 
 SessionItem = Dict[str, Any]
@@ -84,7 +84,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                     fields.append(session_fields['access_key'])
             except Exception as e:
                 ctx.output.print_error(e)
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
             if name_only:
                 pass
             elif format is not None:
@@ -92,7 +92,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 for opt in options:
                     if opt not in session_fields:
                         ctx.output.print_fail(f"There is no such format option: {opt}")
-                        sys.exit(1)
+                        sys.exit(ExitCode.INVALID_ARGUMENTS)
                 fields = [
                     session_fields[opt] for opt in options
                 ]
@@ -180,7 +180,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 )
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
     list.__name__ = name
     if docs is not None:
@@ -235,20 +235,20 @@ def _info_cmd(docs: str = None):
                 uuid.UUID(session_id)
             except ValueError:
                 print_fail("In API v5 or later, the session ID must be given in the UUID format.")
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
             v = {'id': session_id}
             q = q.replace('$fields', ' '.join(f.field_ref for f in fields))
             try:
                 resp = session_.Admin.query(q, v)
             except Exception as e:
                 ctx.output.print_error(e)
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
             if resp['compute_session'] is None:
                 if session_.api_version[0] < 5:
                     ctx.output.print_fail('There is no such running compute session.')
                 else:
                     ctx.output.print_fail('There is no such compute session.')
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
             ctx.output.print_item(resp['compute_session'], fields)
 
     if docs is not None:

@@ -6,6 +6,7 @@ import click
 from ..session import Session
 from .main import main
 from .pretty import print_error
+from .types import ExitCode
 
 
 @main.group()
@@ -40,4 +41,4 @@ def list(mark_read, page_size, page_number):
                 print('No logs.')
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)

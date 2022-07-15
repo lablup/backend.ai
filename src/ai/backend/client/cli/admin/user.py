@@ -10,7 +10,7 @@ from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
 from ..pretty import print_info
-from ..types import CLIContext
+from ..types import CLIContext, ExitCode
 from . import admin
 
 
@@ -49,7 +49,7 @@ def info(ctx: CLIContext, email: str) -> None:
             ctx.output.print_item(item, fields=fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 @user.command()
@@ -101,7 +101,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
             )
     except Exception as e:
         ctx.output.print_error(e)
-        sys.exit(1)
+        sys.exit(ExitCode.ERROR)
 
 
 @user.command()
@@ -144,14 +144,14 @@ def add(ctx: CLIContext, domain_name, email, password, username, full_name, role
                 item_name='user',
                 action_name='add',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='user',
                 action_name='add',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         ctx.output.print_mutation_result(
             data,
             item_name='user',
@@ -195,14 +195,14 @@ def update(ctx: CLIContext, email, password, username, full_name, domain_name, r
                 item_name='user',
                 action_name='update',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='user',
                 action_name='update',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -229,14 +229,14 @@ def delete(ctx: CLIContext, email):
                 item_name='user',
                 action_name='deletion',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='user',
                 action_name='deletion',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -262,7 +262,7 @@ def purge(ctx: CLIContext, email, purge_shared_vfolders):
         try:
             if not ask_yn():
                 print_info('Cancelled')
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
             data = session.User.purge(email, purge_shared_vfolders)
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -270,14 +270,14 @@ def purge(ctx: CLIContext, email, purge_shared_vfolders):
                 item_name='user',
                 action_name='purge',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='user',
                 action_name='purge',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         ctx.output.print_mutation_result(
             data,
             extra_info={

@@ -11,7 +11,7 @@ from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
 from ..pretty import print_error
-from ..types import CLIContext
+from ..types import CLIContext, ExitCode
 from ..vfolder import vfolder as user_vfolder
 from . import admin
 
@@ -57,7 +57,7 @@ def _list_cmd(docs: str = None):
                 )
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
     if docs is not None:
         list.__doc__ = docs
@@ -81,7 +81,7 @@ def list_hosts():
             print("Mounted hosts: {}".format(', '.join(resp['allowed'])))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 @vfolder.command()
@@ -104,7 +104,7 @@ def perf_metric(vfolder_host):
             ))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 @vfolder.command()
@@ -122,7 +122,7 @@ def get_fstab_contents(agent_id):
             resp = session.VFolder.get_fstab_contents(agent_id)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         print(resp)
 
 
@@ -137,7 +137,7 @@ def list_mounts():
             resp = session.VFolder.list_mounts()
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         print('manager')
         for k, v in resp['manager'].items():
             print(' ', k, ':', v)
@@ -168,7 +168,7 @@ def mount_host(fs_location, name, options, edit_fstab):
             resp = session.VFolder.mount_host(name, fs_location, options, edit_fstab)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         print('manager')
         for k, v in resp['manager'].items():
             print(' ', k, ':', v)
@@ -196,7 +196,7 @@ def umount_host(name, edit_fstab):
             resp = session.VFolder.umount_host(name, edit_fstab)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         print('manager')
         for k, v in resp['manager'].items():
             print(' ', k, ':', v)

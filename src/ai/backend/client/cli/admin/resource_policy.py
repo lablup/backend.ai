@@ -11,7 +11,7 @@ from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
 from ..pretty import print_info
-from ..types import CLIContext
+from ..types import CLIContext, ExitCode
 
 # from ai.backend.client.output.fields import keypair_resource_policy_fields
 from . import admin
@@ -39,7 +39,7 @@ def info(ctx: CLIContext, name: str) -> None:
             ctx.output.print_item(item, _default_detail_fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 @keypair_resource_policy.command()
@@ -55,7 +55,7 @@ def list(ctx):
             ctx.output.print_list(items, _default_list_fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 @keypair_resource_policy.command()
@@ -108,14 +108,14 @@ def add(ctx: CLIContext, name, default_for_unspecified, total_resource_slots, ma
                 item_name='resource_policy',
                 action_name='add',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='resource_policy',
                 action_name='add',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         ctx.output.print_mutation_result(
             data,
             item_name='resource_policy',
@@ -169,14 +169,14 @@ def update(ctx: CLIContext, name, default_for_unspecified, total_resource_slots,
                 item_name='resource_policy',
                 action_name='update',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='resource_policy',
                 action_name='update',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -197,7 +197,7 @@ def delete(ctx: CLIContext, name):
     with Session() as session:
         if not ask_yn():
             print_info('Cancelled.')
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         try:
             data = session.KeypairResourcePolicy.delete(name)
         except Exception as e:
@@ -206,14 +206,14 @@ def delete(ctx: CLIContext, name):
                 item_name='resource_policy',
                 action_name='deletion',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         if not data['ok']:
             ctx.output.print_mutation_error(
                 msg=data['msg'],
                 item_name='resource_policy',
                 action_name='deletion',
             )
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         ctx.output.print_mutation_result(
             data,
             extra_info={

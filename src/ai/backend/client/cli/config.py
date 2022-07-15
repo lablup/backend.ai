@@ -11,6 +11,7 @@ from ..exceptions import BackendClientError
 from ..session import Session
 from .main import main
 from .pretty import print_done, print_error, print_fail, print_warn
+from .types import ExitCode
 
 
 @main.command()
@@ -116,7 +117,7 @@ def login():
             result = session.Auth.login(user_id, password)
             if not result['authenticated']:
                 print_fail('Login failed.')
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
             print_done('Login succeeded.')
 
             local_state_path.mkdir(parents=True, exist_ok=True)

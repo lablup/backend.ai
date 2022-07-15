@@ -11,7 +11,7 @@ from ...compat import asyncio_run
 from ...session import AsyncSession
 from ..extensions import pass_ctx_obj
 from ..pretty import print_done, print_error, print_fail, print_warn
-from ..types import CLIContext
+from ..types import CLIContext, ExitCode
 
 # from ai.backend.client.output.fields import image_fields
 from . import admin
@@ -37,7 +37,7 @@ def list(ctx: CLIContext, operation: bool) -> None:
             ctx.output.print_list(items, _default_list_fields_admin)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 @image.command()
@@ -55,10 +55,10 @@ def rescan(registry: str) -> None:
                 result = await session.Image.rescan_images(registry)
             except Exception as e:
                 print_error(e)
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
             if not result['ok']:
                 print_fail(f"Failed to begin registry scanning: {result['msg']}")
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
             print_done("Started updating the image metadata from the configured registries.")
             bgtask_id = result['task_id']
             bgtask = session.BackgroundTask(bgtask_id)
@@ -97,7 +97,7 @@ def alias(alias, target, arch):
             result = session.Image.alias_image(alias, target, arch)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         if result['ok']:
             print_done(f"An alias has created: {alias} -> {target}")
         else:
@@ -113,7 +113,7 @@ def dealias(alias):
             result = session.Image.dealias_image(alias)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
         if result['ok']:
             print_done(f"The alias has been removed: {alias}")
         else:
