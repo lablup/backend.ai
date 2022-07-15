@@ -30,6 +30,10 @@ readlinkf() {
   $bpython -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
 
+relpath() {
+  $bpython -c "import os.path; print(os.path.relpath('$1','${2:-$PWD}'))"
+}
+
 sed_inplace() {
   # BSD sed and GNU sed implements the "-i" option differently.
   case "$OSTYPE" in
@@ -198,8 +202,9 @@ if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
   echo "Please \`cd\` there and run \`./scripts/install-dev.sh <args>\`"
   exit 1
 fi
-PLUGIN_PATH="${ROOT_PATH}/plugins"
-HALFSTACK_VOLUME_PATH="${ROOT_PATH}/volumes"
+VAR_BASE_PATH=$(relpath "${ROOT_PATH}/var/lib/backend.ai")
+PLUGIN_PATH=$(relpath "${ROOT_PATH}/plugins")
+HALFSTACK_VOLUME_PATH=$(relpath "${ROOT_PATH}/volumes")
 PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
 PYTHON_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("CPython==([^\"]+)", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -619,8 +624,6 @@ set -e
 # Make directories
 show_info "Using the current working-copy directory as the installation path..."
 
-mkdir -p ./var/lib/backend.ai
-
 # Install postgresql, etcd packages via docker
 show_info "Launching the docker compose \"halfstack\"..."
 mkdir -p "$HALFSTACK_VOLUME_PATH"
@@ -677,9 +680,11 @@ sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:
 
 # configure halfstack ports
 cp configs/agent/halfstack.toml ./agent.toml
+mkdir -p "$VAR_BASE_PATH"
 sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
+sed_inplace "s/var-base-path = .*$/var-base-path = \"${VAR_BASE_PATH}\"/" ./agent.toml
 
 # configure storage-proxy
 cp configs/storage-proxy/sample.toml ./storage-proxy.toml
