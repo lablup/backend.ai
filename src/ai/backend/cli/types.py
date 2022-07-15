@@ -1,3 +1,4 @@
+import enum
 from typing import Dict
 
 import attr
