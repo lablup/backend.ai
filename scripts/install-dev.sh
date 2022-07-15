@@ -521,13 +521,9 @@ install_editable_webui() {
     # In the former case, you may live-edit the webui sources while running them in the electron app.
     sed_inplace "s@webServerURL =@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
     sed_inplace "s@proxyURL =@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
-    env_file=".env"
-    if [ ! -f $env_file ]; then
-      touch $env_file
-    fi
-    echo "PROXYLISTENIP=0.0.0.0" >> $env_file
-    echo "PROXYBASEHOST=localhost" >> $env_file
-    echo "PROXYBASEPORT=${WSPROXY_PORT}" >> $env_file
+    echo "PROXYLISTENIP=0.0.0.0" >> .env
+    echo "PROXYBASEHOST=localhost" >> .env
+    echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
   fi
   npm i
   make compile_wsproxy
