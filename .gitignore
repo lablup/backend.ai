@@ -89,7 +89,6 @@ ENV/
 /.pants.rc
 /pants-local
 /tools/pants-src
-/tools/pants-local
 
 # Local configurations
 /manager.toml
