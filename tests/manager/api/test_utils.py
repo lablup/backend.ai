@@ -136,11 +136,6 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
         await conn.execute(query)
         return group_id
 
-    async with database_engine.begin() as conn:
-        user_uuid = await create_user_row(conn)
-        domain_name = await create_domain_row(conn)
-        group_id = await create_group_row(conn, domain_name=domain_name)
-
     async def create_kernel_row(
         conn: sqlalchemy.ext.asyncio.engine.AsyncConnection,
         group_id: Union[str, uuid.UUID],
@@ -166,7 +161,8 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
         session_id: Union[str, uuid.UUID],
     ):
         query = kernels.select().select_from(kernels).where(kernels.c.session_id == session_id)
-        return await conn.execute(query)
+        kernel, *_ = await conn.execute(query)
+        return kernel
 
     async def delete_rows(
         conn: sqlalchemy.ext.asyncio.engine.AsyncConnection,
@@ -176,13 +172,18 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
         await conn.execute(domains.delete())
         await conn.execute(users.delete())
 
+    async with database_engine.begin() as conn:
+        user_uuid = await create_user_row(conn)
+        domain_name = await create_domain_row(conn)
+        group_id = await create_group_row(conn, domain_name=domain_name)
+
     timestamp = datetime.now(tzutc()).isoformat()
 
     # TEST 00
     expected: Optional[Dict[str, Any]] = None
     async with database_engine.begin() as conn:
         session_id = await create_kernel_row(conn, group_id, user_uuid)
-        kernel, *_ = await select_kernel_row(conn, session_id)
+        kernel = await select_kernel_row(conn, session_id)
     assert kernel is not None
     assert kernel.status_history == expected
 
@@ -206,7 +207,7 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
             ),
         }).where(kernels.c.session_id == session_id)
         await conn.execute(query)
-        kernel, *_ = await select_kernel_row(conn, session_id)
+        kernel = await select_kernel_row(conn, session_id)
     assert kernel is not None
     assert kernel.status_history == expected
 
@@ -232,7 +233,7 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
             ),
         }).where(kernels.c.session_id == session_id)
         await conn.execute(query)
-        kernel, *_ = await select_kernel_row(conn, session_id)
+        kernel = await select_kernel_row(conn, session_id)
     assert kernel is not None
     assert kernel.status_history == expected
 
@@ -262,63 +263,11 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
             ),
         }).where(kernels.c.session_id == session_id)
         await conn.execute(query)
-        kernel, *_ = await select_kernel_row(conn, session_id)
+        kernel = await select_kernel_row(conn, session_id)
     assert kernel is not None
     assert kernel.status_history == expected
 
-    # TEST 04
-    expected = {
-        "more": {
-            "details": {
-                "PENDING": timestamp,
-                "PREPARING": timestamp,
-            },
-        },
-    }
-    async with database_engine.begin() as conn:
-        session_id = await create_kernel_row(conn, group_id, user_uuid)
-        query = kernels.update().values({
-            "status_history": sql_json_merge(
-                kernels.c.status_history,
-                ("kernel", "session", "more", "details"),
-                {
-                    "PENDING": timestamp,
-                    "PREPARING": timestamp,
-                },
-                _depth=2,
-            ),
-        }).where(kernels.c.session_id == session_id)
-        await conn.execute(query)
-        kernel, *_ = await select_kernel_row(conn, session_id)
-    assert kernel is not None
-    assert kernel.status_history == expected
-
-    # TEST 05
-    expected = {
-        "details": {
-            "PENDING": timestamp,
-            "PREPARING": timestamp,
-        },
-    }
-    async with database_engine.begin() as conn:
-        session_id = await create_kernel_row(conn, group_id, user_uuid)
-        query = kernels.update().values({
-            "status_history": sql_json_merge(
-                kernels.c.status_history,
-                ("kernel", "session", "more", "details"),
-                {
-                    "PENDING": timestamp,
-                    "PREPARING": timestamp,
-                },
-                _depth=3,
-            ),
-        }).where(kernels.c.session_id == session_id)
-        await conn.execute(query)
-        kernel, *_ = await select_kernel_row(conn, session_id)
-    assert kernel is not None
-    assert kernel.status_history == expected
-
-    # TEST 06 (Append)
+    # TEST 04 (Append)
     expected = {
         "kernel": {
             "session": {
@@ -353,45 +302,7 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
             ),
         }).where(kernels.c.session_id == session_id)
         await conn.execute(query)
-        kernel, *_ = await select_kernel_row(conn, session_id)
-    assert kernel is not None
-    assert kernel.status_history == expected
-
-    # TEST 07
-    expected = {
-        "details": {
-            "PENDING": timestamp,
-            "PREPARING": timestamp,
-            "TERMINATING": timestamp,
-            "TERMINATED": timestamp,
-        },
-    }
-    async with database_engine.begin() as conn:
-        session_id = await create_kernel_row(conn, group_id, user_uuid)
-        query = kernels.update().values({
-            "status_history": sql_json_merge(
-                kernels.c.status_history,
-                ("kernel", "session", "details"),
-                {
-                    "PENDING": timestamp,
-                    "PREPARING": timestamp,
-                },
-            ),
-        }).where(kernels.c.session_id == session_id)
-        await conn.execute(query)
-        query = kernels.update().values({
-            "status_history": sql_json_merge(
-                kernels.c.status_history,
-                ("kernel", "session", "details"),
-                {
-                    "TERMINATING": timestamp,
-                    "TERMINATED": timestamp,
-                },
-                _depth=2,
-            ),
-        }).where(kernels.c.session_id == session_id)
-        await conn.execute(query)
-        kernel, *_ = await select_kernel_row(conn, session_id)
+        kernel = await select_kernel_row(conn, session_id)
     assert kernel is not None
     assert kernel.status_history == expected
 
@@ -415,7 +326,7 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
                 ),
             }).where(kernels.c.session_id == session_id)
             await conn.execute(query)
-            kernel, *_ = await select_kernel_row(conn, session_id)
+            kernel = await select_kernel_row(conn, session_id)
     assert kernel is not None
     assert kernel.status_history == expected
     """
