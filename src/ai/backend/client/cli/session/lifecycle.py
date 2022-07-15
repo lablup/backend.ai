@@ -13,8 +13,6 @@ import click
 from humanize import naturalsize
 from tabulate import tabulate
 
-from .args import click_start_option
-
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
 from ...session import AsyncSession, Session
@@ -29,7 +27,13 @@ from ..pretty import (
     print_wait,
     print_warn,
 )
-from .execute import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
+from .args import click_start_option
+from .execute import (
+    format_stats,
+    prepare_env_arg,
+    prepare_mount_arg,
+    prepare_resource_arg,
+)
 from .ssh import container_ssh_ctx
 
 list_expr = CommaSeparatedListType()

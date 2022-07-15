@@ -31,7 +31,6 @@ from ..pretty import (
     print_wait,
     print_warn,
 )
-
 from .args import click_start_option
 
 tabulate_mod.PRESERVE_WHITESPACE = True
