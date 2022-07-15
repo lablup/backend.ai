@@ -1,3 +1,6 @@
+from typing import Optional
+
+
 class WekaError(Exception):
     pass
 
@@ -7,32 +10,31 @@ class WekaInitError(WekaError):
 
 
 class WekaAPIError(WekaError):
-    name = 'WekaAPIError'
-    message = ''
+    message: str
 
-    def __init__(self, message: str = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, message: Optional[str] = None, *args):
+        super().__init__(message, *args)
 
-        self.message = message or 'Unknown Error'
+        self.message = message or ''
 
     def __str__(self) -> str:
-        return f'{self.name}: {self.message}'
+        return type(self).__name__
 
 
 class WekaInvalidBodyError(WekaAPIError):
-    name = 'WekaInvalidBodyError'
+    pass
 
 
 class WekaUnauthorizedError(WekaAPIError):
-    name = 'WekaUnauthorizedError'
+    pass
 
 
 class WekaNotFoundError(WekaAPIError):
-    name = 'WekaNotFoundError'
+    pass
 
 
 class WekaInternalError(WekaAPIError):
-    name = 'WekaInternalError'
+    pass
 
 
 class WekaNoMetricError(WekaError):
