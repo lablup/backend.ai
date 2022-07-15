@@ -6,6 +6,7 @@ from ..compat import asyncio_run
 from ..session import AsyncSession
 from .main import main
 from .pretty import print_error
+from .types import ExitCode
 
 
 @main.command()
@@ -26,4 +27,4 @@ def task_logs(task_id):
         asyncio_run(_task_logs())
     except Exception as e:
         print_error(e)
-        sys.exit(1)
+        sys.exit(ExitCode.ERROR)

@@ -38,6 +38,7 @@ from .pretty import (
 )
 from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
 from .ssh import container_ssh_ctx
+from .types import ExitCode
 
 list_expr = CommaSeparatedListType()
 
@@ -208,7 +209,7 @@ def _create_cmd(docs: str = None):
                 )
             except Exception as e:
                 print_error(e)
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
             else:
                 if compute_session.status == 'PENDING':
                     print_info('Session ID {0} is enqueued for scheduling.'
@@ -409,7 +410,7 @@ def _create_from_template_cmd(docs: str = None):
                 )
             except Exception as e:
                 print_error(e)
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
             else:
                 if compute_session.status == 'PENDING':
                     print_info('Session ID {0} is enqueued for scheduling.'
@@ -468,7 +469,7 @@ def _destroy_cmd(docs: str = None):
         """
         if len(session_names) == 0:
             print_warn('Specify at least one session ID. Check usage with "-h" option.')
-            sys.exit(1)
+            sys.exit(ExitCode.INVALID_ARGUMENT)
         print_wait('Terminating the session(s)...')
         with Session() as session:
             has_failure = False
@@ -496,7 +497,7 @@ def _destroy_cmd(docs: str = None):
                     else:
                         print('Statistics is not available.')
             if has_failure:
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
 
     if docs is not None:
         destroy.__doc__ = docs
@@ -519,7 +520,7 @@ def _restart_cmd(docs: str = None):
         """
         if len(session_refs) == 0:
             print_warn('Specify at least one session ID. Check usage with "-h" option.')
-            sys.exit(1)
+            sys.exit(ExitCode.INVALID_ARGUMENT)
         print_wait('Restarting the session(s)...')
         with Session() as session:
             has_failure = False
@@ -541,7 +542,7 @@ def _restart_cmd(docs: str = None):
                 if not has_failure:
                     print_done('Done.')
             if has_failure:
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
 
     if docs is not None:
         restart.__doc__ = docs
@@ -580,7 +581,7 @@ def upload(session_id, files):
             print_done('Uploaded.')
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 @session.command()
@@ -614,7 +615,7 @@ def download(session_id, files, dest):
             print_done('Downloaded to {}.'.format(dest.resolve()))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 @session.command()
@@ -638,7 +639,7 @@ def ls(session_id, path):
 
             if 'errors' in result and result['errors']:
                 print_fail(result['errors'])
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
 
             files = json.loads(result['files'])
             table = []
@@ -653,7 +654,7 @@ def ls(session_id, path):
             print(tabulate(table, headers=headers))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 @session.command()
@@ -675,7 +676,7 @@ def logs(session_id):
             print_done('End of logs.')
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 @session.command('status-history')
@@ -719,7 +720,7 @@ def status_history(session_id):
             print_done(f'Actual Resource Allocation Time: {result}')
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 @session.command()
@@ -741,7 +742,7 @@ def rename(session_id, new_id):
             print_done(f'Session renamed to {new_id}.')
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
 
 def _ssh_cmd(docs: str = None):
@@ -983,7 +984,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
             else:
                 print_fail('No matching items.')
-            sys.exit(4)
+            sys.exit(ExitCode.ERROR)
 
         if not session_name_or_id:
             questions = [inquirer.List(
@@ -1002,7 +1003,7 @@ def _watch_cmd(docs: Optional[str] = None):
                     sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
                 else:
                     print_fail('No matching items.')
-                sys.exit(4)
+                sys.exit(ExitCode.ERROR)
 
         async def handle_console_output(session: ComputeSession, scope: Literal['*', 'session', 'kernel'] = '*'):
             async with session.listen_events(scope=scope) as response:  # AsyncSession
@@ -1056,7 +1057,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 async with timeout(max_wait):
                     await _run_events()
             except asyncio.TimeoutError:
-                sys.exit(2)
+                sys.exit(ExitCode.TIMEOUT)
 
         try:
             if max_wait > 0:
@@ -1065,7 +1066,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 asyncio_run(_run_events())
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.ERROR)
 
     if docs is not None:
         watch.__doc__ = docs

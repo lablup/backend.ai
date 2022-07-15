@@ -14,6 +14,7 @@ from ..session import AsyncSession
 from ..versioning import get_naming
 from .main import main
 from .pretty import print_error, print_fail, print_info, print_warn
+from .types import ExitCode
 
 
 class WSProxy:
@@ -292,7 +293,7 @@ def app(session_name, app, bind, arg, env):
         sys.exit(proxy_ctx.exit_code)
     except Exception as e:
         print_error(e)
-        sys.exit(1)
+        sys.exit(ExitCode.ERROR)
 
 
 @main.command()

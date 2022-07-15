@@ -9,7 +9,7 @@ from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
 from ..pretty import print_info
-from ..types import CLIContext
+from ..types import CLIContext, ExitCode
 
 # from ai.backend.client.output.fields import group_fields
 from . import admin
@@ -49,7 +49,7 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
                 ctx.output.print_item(item, _default_detail_fields)
             except Exception as e:
                 ctx.output.print_error(e)
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
         else:
             # interpret as UUID
             try:
@@ -57,7 +57,7 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
                 ctx.output.print_item(item, _default_detail_fields)
             except Exception as e:
                 ctx.output.print_error(e)
-                sys.exit(1)
+                sys.exit(ExitCode.ERROR)
 
 
 @group.command()
