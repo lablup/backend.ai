@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Union
+from typing import Any, Dict, Optional, Union
 
 import pytest
 import sqlalchemy
@@ -179,7 +179,7 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
     timestamp = datetime.now(tzutc()).isoformat()
 
     # TEST 00
-    expected = None
+    expected: Optional[Dict[str, Any]] = None
     async with database_engine.begin() as conn:
         session_id = await create_kernel_row(conn, group_id, user_uuid)
         kernel, *_ = await select_kernel_row(conn, session_id)
@@ -240,7 +240,9 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
     expected = {
         "PENDING": [
             {},
-            timestamp,
+            {
+                "timestamp": timestamp,
+            },
         ],
     }
     async with database_engine.begin() as conn:
@@ -249,7 +251,9 @@ async def test_sql_json_merge(database_engine: ExtendedAsyncSAEngine):
             "status_history": sql_json_merge(
                 kernels.c.status_history,
                 ("PENDING",),
-                timestamp,
+                {
+                    "timestamp": timestamp,
+                },
             ),
         }).where(kernels.c.session_id == session_id)
         await conn.execute(query)
