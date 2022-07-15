@@ -233,6 +233,7 @@ def sql_json_merge(
     Generate an SQLAlchemy column update expression that merges the given object with
     the existing object at a specific (nested) key of the given JSONB column,
     with automatic creation of empty objects in parents and the target level.
+
     Note that the existing value must be also an object, not a primitive value.
     """
     expr = sa.func.coalesce(
