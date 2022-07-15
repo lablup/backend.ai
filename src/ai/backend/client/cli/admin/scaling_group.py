@@ -2,7 +2,7 @@ import sys
 
 import click
 
-from ai.backend.cli.types import CLIContext, ExitCode
+from ai.backend.cli.types import ExitCode
 from ai.backend.client.func.scaling_group import (
     _default_detail_fields,
     _default_list_fields,
@@ -12,6 +12,7 @@ from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
 from ..params import JSONParamType
+from ..types import CLIContext
 from . import admin
 
 

@@ -18,7 +18,7 @@ from dateutil.tz import tzutc
 from humanize import naturalsize
 from tabulate import tabulate
 
-from ai.backend.cli.types import ExitCode, Undefined, undefined
+from ai.backend.cli.types import ExitCode
 
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
@@ -26,6 +26,7 @@ from ..func.session import ComputeSession
 from ..output.fields import session_fields
 from ..output.types import FieldSpec
 from ..session import AsyncSession, Session
+from ..types import Undefined, undefined
 from . import events
 from .main import main
 from .params import CommaSeparatedListType
