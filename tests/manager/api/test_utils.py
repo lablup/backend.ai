@@ -98,7 +98,7 @@ async def _select_kernel_row(
 
 
 @pytest.mark.asyncio
-async def test_sql_json__default(session_info):
+async def test_sql_json_merge__default(session_info):
     session_id, conn = session_info
     expected: Optional[Dict[str, Any]] = None
     kernel = await _select_kernel_row(conn, session_id)
@@ -107,7 +107,7 @@ async def test_sql_json__default(session_info):
 
 
 @pytest.mark.asyncio
-async def test_sql_json__deeper_object(session_info):
+async def test_sql_json_merge__deeper_object(session_info):
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
     expected = {
@@ -135,7 +135,7 @@ async def test_sql_json__deeper_object(session_info):
 
 
 @pytest.mark.asyncio
-async def test_sql_json__append_values(session_info):
+async def test_sql_json_merge__append_values(session_info):
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
     expected = {
@@ -176,7 +176,7 @@ async def test_sql_json__append_values(session_info):
 
 
 @pytest.mark.asyncio
-async def test_sql_json__kernel_status_history(session_info):
+async def test_sql_json_merge__kernel_status_history(session_info):
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
     expected = {
@@ -219,7 +219,7 @@ async def test_sql_json__kernel_status_history(session_info):
 
 
 @pytest.mark.asyncio
-async def test_sql_json__mixed_formats(session_info):
+async def test_sql_json_merge__mixed_formats(session_info):
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
     expected = {
@@ -255,7 +255,7 @@ async def test_sql_json__mixed_formats(session_info):
 
 
 @pytest.mark.asyncio
-async def test_sql_json__json_serializable_types(session_info):
+async def test_sql_json_merge__json_serializable_types(session_info):
     session_id, conn = session_info
     expected = {
         "boolean": True,
