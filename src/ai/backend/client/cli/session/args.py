@@ -68,5 +68,5 @@ def click_start_option():
                        'If not specified, config\'s domain name will be used.'),
         click.option('-g', '--group', metavar='GROUP_NAME', default=None,
                   help='Group name where the session is spawned. '
-                       'User should be a member of the group to execute the code.')
+                       'User should be a member of the group to execute the code.'),
     )
