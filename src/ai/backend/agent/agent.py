@@ -6,8 +6,8 @@ import logging
 import os
 import pickle
 import re
-import signal
 import shutil
+import signal
 import sys
 import time
 import traceback
@@ -1327,7 +1327,7 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
             raise AgentError(
                 f'cannot run {ctx.image_ref.architecture} image on {agent_architecture} machine',
             )
- 
+
         # Check if we need to pull the container image
         do_pull = await self.check_image(
             ctx.image_ref,
