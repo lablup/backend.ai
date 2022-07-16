@@ -48,18 +48,18 @@ python-kernel = "python-kernel.lock"
 
 # Temporarily reverted due to pantsbuild/pants#15990
 [pex-cli]
-version = "v2.1.98"
+version = "v2.1.99"
 known_versions = [
-    "v2.1.98|macos_arm64|b3db597492c3d1250036749bec8330a0e8786ec7a4bd6f0c9f8ff1675c90c0b4|3811372",
-    "v2.1.98|macos_x86_64|b3db597492c3d1250036749bec8330a0e8786ec7a4bd6f0c9f8ff1675c90c0b4|3811372",
-    "v2.1.98|linux_arm64|b3db597492c3d1250036749bec8330a0e8786ec7a4bd6f0c9f8ff1675c90c0b4|3811372",
-    "v2.1.98|linux_x86_64|b3db597492c3d1250036749bec8330a0e8786ec7a4bd6f0c9f8ff1675c90c0b4|3811372",
+    "v2.1.99|macos_arm64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
+    "v2.1.99|macos_x86_64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
+    "v2.1.99|linux_arm64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
+    "v2.1.99|linux_x86_64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
 ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
-# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.94/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
+# $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 
 [flake8]
-version = "flake8>=4.0"
+version = "flake8>=4.0.1"
 extra_requirements.add = [
     "flake8-commas>=2.1",
     "setuptools>=60.0",
@@ -70,12 +70,12 @@ lockfile = "tools/flake8.lock"
 lockfile = "tools/isort.lock"
 
 [pytest]
-version = "pytest>=7.0"
+version = "pytest>=7.1.2"
 extra_requirements.add = [
-    "pytest-asyncio>=0.18",
+    "pytest-asyncio>=0.19",
     "pytest-aiohttp>=1.0.4",
     "pytest-dependency>=0.5.1",
-    "pytest-mock>=3.5.0",
+    "pytest-mock>=3.8.2",
     "aioresponses>=0.7.3",
 ]
 args = ["-v", "-m", "'not integration'"]
@@ -84,7 +84,7 @@ execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 timeout_default = 300
 
 [mypy]
-version = "mypy>=0.950"
+version = "mypy>=0.961"
 extra_requirements.add = [
 ]
 lockfile = "tools/mypy.lock"

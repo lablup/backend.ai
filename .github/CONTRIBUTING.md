@@ -16,7 +16,7 @@ Versioning Scheme
 -----------------
 
 Before you make a contribution, ensure that which branch is the target you want to
-conntribute to.
+contribute to.
 Please take a look at [our versioning scheme
 document](https://docs.backend.ai/en/latest/install/version-management-and-upgrades.html#version-numbering)
 to understand how we name branches and tags.

@@ -512,18 +512,18 @@ install_editable_webui() {
     local site_name=$(basename $(pwd))
     # The debug mode here is only for 'hard-core' debugging scenarios -- it changes lots of behaviors.
     # (e.g., separate debugging of Electron's renderer and main threads)
-    sed_inplace "s@debug = true@debug = false" config.toml
+    sed_inplace "s@debug = true@debug = false@" config.toml
     # The webserver endpoint to use in the session mode.
     sed_inplace "s@#apiEndpoint =@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
-    sed_inplace "s@#apiEndpointText =@apiEndpointText = "'"'"${site_name}"'"' config.toml
+    sed_inplace "s@#apiEndpointText =@apiEndpointText = "'"'"${site_name}"'"@' config.toml
     # webServerURL lets the electron app use the web UI contents from the server.
     # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.web.server` instance.
     # In the former case, you may live-edit the webui sources while running them in the electron app.
     sed_inplace "s@webServerURL =@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
     sed_inplace "s@proxyURL =@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
-    echo "PROXYLISTENIP=0.0.0.0" >> src/ai/backend/webui/.env
-    echo "PROXYBASEHOST=localhost" >> src/ai/backend/webui/.env
-    echo "PROXYBASEPORT=${WSPROXY_PORT}" >> src/ai/backend/webui/.env
+    echo "PROXYLISTENIP=0.0.0.0" >> .env
+    echo "PROXYBASEHOST=localhost" >> .env
+    echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
   fi
   npm i
   make compile_wsproxy
@@ -619,36 +619,6 @@ set -e
 # Make directories
 show_info "Using the current working-copy directory as the installation path..."
 
-mkdir -p ./wheelhouse
-if [ "$DISTRO" = "Darwin" -a "$(uname -p)" = "arm" ]; then
-  show_info "Prebuild grpcio wheels for Apple Silicon..."
-  if [ -z "$(pyenv virtualenvs | grep "tmp-grpcio-build")" ]; then
-    pyenv virtualenv "${PYTHON_VERSION}" tmp-grpcio-build
-  fi
-  pyenv shell tmp-grpcio-build
-  if [ $(python -c 'import sys; print(1 if sys.version_info >= (3, 10) else 0)') -eq 0 ]; then
-    # ref: https://github.com/grpc/grpc/issues/25082
-    export GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=1
-    export GRPC_PYTHON_BUILD_SYSTEM_ZLIB=1
-    echo "Set grpcio wheel build variables."
-  else
-    unset GRPC_PYTHON_BUILD_SYSTEM_OPENSSL
-    unset GRPC_PYTHON_BUILD_SYSTEM_ZLIB
-    unset CFLAGS
-    unset LDFLAGS
-  fi
-  pip install -U -q pip setuptools wheel
-  # ref: https://github.com/grpc/grpc/issues/28387
-  pip wheel -w ./wheelhouse --no-binary :all: grpcio grpcio-tools
-  pyenv shell --unset
-  pyenv uninstall -f tmp-grpcio-build
-  echo "List of prebuilt wheels:"
-  ls -l ./wheelhouse
-  # Currently there are not many packages that provides prebuilt binaries for M1 Macs.
-  # Let's configure necessary env-vars to build them locally via bdist_wheel.
-  echo "Configuring additional build flags for local wheel builds for macOS on Apple Silicon ..."
-  set_brew_python_build_flags
-fi
 
 # Install postgresql, etcd packages via docker
 show_info "Launching the docker compose \"halfstack\"..."
