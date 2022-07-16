@@ -2860,11 +2860,6 @@ class AgentRegistry:
             except asyncio.CancelledError:
                 pass
 
-        kern_stat = await redis_helper.execute(
-            self.redis_stat,
-            lambda r: r.get(str(kernel_id)),
-        )
-
         async def _update_status() -> KernelRow | None:
             async with self.db.begin_session() as db_sess:
                 select_query = (
@@ -2907,6 +2902,11 @@ class AgentRegistry:
                     ),
                     'terminated_at': now,
                 }
+
+                kern_stat = await redis_helper.execute(
+                    self.redis_stat,
+                    lambda r: r.get(str(kernel_id)),
+                )
                 if kern_stat:
                     values['last_stat'] = msgpack.unpackb(kern_stat)
                 kernel_query = (
@@ -2951,7 +2951,7 @@ class AgentRegistry:
         kernel_id: KernelId,
         reason: str,
     ) -> None:
-        async def _update_session() -> Tuple[bool, SessionId]:
+        async def _check_and_mark() -> Tuple[bool, SessionId]:
             async with self.db.begin_session() as db_sess:
                 query = (
                     sa.select(KernelRow)
@@ -2977,7 +2977,7 @@ class AgentRegistry:
                             SessionRow.status_history,
                             (),
                             {
-                                SessionStatus.TERMINATED.name: datetime.now(tzutc()).isoformat(),
+                                sess_status.name: datetime.now(tzutc()).isoformat(),
                             },
                         ),
                     }
@@ -2990,58 +2990,7 @@ class AgentRegistry:
                 all_terminated = session.status in (SessionStatus.TERMINATED, SessionStatus.CANCELLED)
                 return all_terminated, session.id
 
-        # async def _check_and_mark() -> Tuple[bool, SessionId | None]:
-        #     async with self.db.begin_session() as db_sess:
-        #         session_id_query = (
-        #             sa.select(
-        #                 KernelRow.session_id,
-        #             )
-        #             .select_from(KernelRow)
-        #             .where(KernelRow.id == kernel_id)
-        #         )
-        #         kernels_query = (
-        #             sa.select(
-        #                 KernelRow.session_id,
-        #                 KernelRow.status_data,
-        #                 KernelRow.status,
-        #             )
-        #             .select_from(KernelRow)
-        #             .where(
-        #                 (KernelRow.session_id == session_id_query.scalar_subquery()),
-        #             )
-        #             .with_for_update()
-        #         )
-        #         result = await db_sess.execute(kernels_query)
-        #         rows = result.fetchall()
-        #         if not rows:
-        #             return False, None
-        #         session_id = rows[0].session_id
-        #         if nmget(rows[0].status_data, "session.status") == "terminated":
-        #             # if already marked "session-terminated", skip the rest process
-        #             return False, session_id
-        #         all_terminated = all(map(
-        #             lambda row: row.status in (KernelStatus.TERMINATED, KernelStatus.CANCELLED),
-        #             rows,
-        #         ))
-        #         if all_terminated:
-        #             update_query = (
-        #                 sa.update(SessionRow)
-        #                 .where(SessionRow.id == session_id)
-        #                 .values(
-        #                     status_data=sql_json_merge(
-        #                         SessionRow.status_data,
-        #                         ('session',),
-        #                         {'status': 'terminated'},
-        #                     ),
-        #                     status=SessionStatus.TERMINATED,
-        #                 )
-        #             )
-        #             await db_sess.execute(update_query)
-
-        #         return all_terminated, session_id
-
-        # do_fire_event, session_id = await execute_with_retry(_check_and_mark)
-        do_fire_event, session_id = await execute_with_retry(_update_session)
+        do_fire_event, session_id = await execute_with_retry(_check_and_mark)
         if session_id is None:
             return
         if do_fire_event:
