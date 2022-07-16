@@ -144,6 +144,15 @@ has_python() {
   fi
 }
 
+has_npm(){
+ npm -v >/dev/null 2>&1
+ if [ "$?" -eq 127 ]; then
+    echo 0 
+  else
+    echo 1
+  fi
+}
+
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
   if [ $(id -u) = "0" ]; then
     docker_sudo=''
@@ -190,6 +199,15 @@ else
   show_info "This script assumes Python 2.7+/3+ is already available on your system."
   exit 1
 fi
+
+if [ $EDITABLE_WEBUI -eq 1 ];then
+  if [ $(has_npm) -eq 0 ]; then
+    show_error "npm is not available!"
+    show_info "To use editable version of Web UI you have to install npm on the system."
+    exit 1
+  fi
+fi
+
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
