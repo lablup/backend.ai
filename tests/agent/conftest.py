@@ -24,6 +24,8 @@ def test_id():
 def local_config(test_id, etcd_container, redis_container):  # noqa: F811
     ipc_base_path = Path.cwd() / f'.tmp/{test_id}/agent-ipc'
     ipc_base_path.mkdir(parents=True, exist_ok=True)
+    var_base_path = Path.cwd() / f'.tmp/{test_id}/agent-var'
+    var_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
 
     cfg = {
@@ -32,6 +34,7 @@ def local_config(test_id, etcd_container, redis_container):  # noqa: F811
             'id': f"i-{test_id}",
             'scaling-group': f"sg-{test_id}",
             'ipc-base-path': ipc_base_path,
+            'var-base-path': var_base_path,
             'backend': 'docker',
             'rpc-listen-addr': HostPortPair('', 6001),
             'agent-sock-port': 6009,
@@ -83,8 +86,8 @@ def local_config(test_id, etcd_container, redis_container):  # noqa: F811
 
 @pytest.fixture(scope='session', autouse=True)
 def test_local_instance_id(local_config, session_mocker, test_id):
-    ipc_base_path = local_config['agent']['ipc-base-path']
-    registry_state_path = ipc_base_path / f'last_registry.{test_id}.dat'
+    var_base_path = local_config['agent']['var-base-path']
+    registry_state_path = var_base_path / f'last_registry.{test_id}.dat'
     try:
         os.unlink(registry_state_path)
     except FileNotFoundError:
