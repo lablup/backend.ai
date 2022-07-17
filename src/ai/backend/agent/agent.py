@@ -1834,9 +1834,9 @@ class AbstractAgent(aobject, Generic[KernelObjectType, KernelCreationContextType
         if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
         try:
-            ipc_base_path = self.local_config["agent"]["var-base-path"]
+            var_base_path = self.local_config["agent"]["var-base-path"]
             last_registry_file = f"last_registry.{self.local_instance_id}.dat"
-            with open(ipc_base_path / last_registry_file, "wb") as f:
+            with open(var_base_path / last_registry_file, "wb") as f:
                 pickle.dump(self.kernel_registry, f)
             self.last_registry_written_time = now
             log.debug("saved {}", last_registry_file)
