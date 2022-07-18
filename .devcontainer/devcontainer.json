@@ -17,28 +17,6 @@
             "statuses": "read",
             "issues": "read"
           }
-        },
-        "lablup/backend.ai-accelerator-cuda": {
-          "permissions": {
-            "actions": "read",
-            "checks": "read",
-            "contents": "write",
-            "packages": "read",
-            "pull_requests": "write",
-            "statuses": "read",
-            "issues": "read"
-          }
-        },
-        "lablup/backend.ai-accelerator-cuda-mock": {
-          "permissions": {
-            "actions": "read",
-            "checks": "read",
-            "contents": "write",
-            "packages": "read",
-            "pull_requests": "write",
-            "statuses": "read",
-            "issues": "read"
-          }
         }
       }
     }
