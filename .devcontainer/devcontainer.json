@@ -8,13 +8,37 @@
     "codespaces": {
       "repositories": {
         "lablup/backend.ai-webui": {
-          "permissions": "write-all"
+          "permissions": {
+            "actions": "read",
+            "checks": "read",
+            "contents": "write",
+            "packages": "read",
+            "pull_requests": "write",
+            "statuses": "read",
+            "issues": "read"
+          }
         },
         "lablup/backend.ai-accelerator-cuda": {
-          "permissions": "write-all"
+          "permissions": {
+            "actions": "read",
+            "checks": "read",
+            "contents": "write",
+            "packages": "read",
+            "pull_requests": "write",
+            "statuses": "read",
+            "issues": "read"
+          }
         },
         "lablup/backend.ai-accelerator-cuda-mock": {
-          "permissions": "write-all"
+          "permissions": {
+            "actions": "read",
+            "checks": "read",
+            "contents": "write",
+            "packages": "read",
+            "pull_requests": "write",
+            "statuses": "read",
+            "issues": "read"
+          }
         }
       }
     }
