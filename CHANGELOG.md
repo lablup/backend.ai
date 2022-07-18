@@ -16,6 +16,26 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.03.10 (2022-07-18)
+
+### Features
+* install-dev: Support editable installation of the web UI (`src/ai/backend/webui`) for ease of new frontend developers ([#501](https://github.com/lablup/backend.ai/issues/501))
+* Allow general users to force termination of their own sessions. ([#525](https://github.com/lablup/backend.ai/issues/525))
+* agent: Add `var-base-path` to `config.toml` to persistently store the last registry file, with automatic relocation of existing file upon agent startup ([#529](https://github.com/lablup/backend.ai/issues/529))
+
+### Fixes
+* Fix agent crashing with `AttributeError: 'DockerKernel' object has no attribute 'runner'` error. ([#534](https://github.com/lablup/backend.ai/issues/534))
+* logging: Fix accessing the missing `level` attribute of `LogRecord` objects ([#538](https://github.com/lablup/backend.ai/issues/538))
+* Re-add null-check of the `'level'` key of the log record removed in #538 ([#540](https://github.com/lablup/backend.ai/issues/540))
+* Fix typo & check file on install-dev.sh ([#551](https://github.com/lablup/backend.ai/issues/551))
+* Upgrade external dependencies which provide new binary wheels for Python 3.10 and latest bug fixes ([#560](https://github.com/lablup/backend.ai/issues/560))
+
+### Miscellaneous
+* Introduce https://dist.backend.ai/pypi/simple to serve custom prebuilt wheels and workaround upstream issues in a timely manner ([#545](https://github.com/lablup/backend.ai/issues/545))
+* Remove manual grpcio wheel building section from `scripts/install-dev.sh` ([#547](https://github.com/lablup/backend.ai/issues/547))
+* Upgrade pex to 2.1.99 to resolve intermittent failures in CI and venv generation in development setups ([#552](https://github.com/lablup/backend.ai/issues/552))
+
+
 ## 22.03.9 (2022-07-10)
 
 ### Features
