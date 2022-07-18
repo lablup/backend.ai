@@ -24,6 +24,8 @@ agent_local_config_iv = t.Dict({
         t.Key('id', default=None): t.Null | t.String,
         t.Key('ipc-base-path', default="/tmp/backend.ai/ipc"):
             tx.Path(type='dir', auto_create=True),
+        t.Key('var-base-path', default="./var/lib/backend.ai"):
+            tx.Path(type='dir', auto_create=True),
         t.Key('region', default=None): t.Null | t.String,
         t.Key('instance-type', default=None): t.Null | t.String,
         t.Key('scaling-group', default='default'): t.String,
