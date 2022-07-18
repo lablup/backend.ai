@@ -1,5 +1,7 @@
 import abc
+import sqlite3
 import uuid
+from pathlib import Path
 from typing import Dict, Generic, Iterable, List, Optional, TypeVar, cast
 
 import aioredis
@@ -53,6 +55,62 @@ class InMemoryLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
 
     async def size(self) -> int:
         return len(self._storage)
+
+
+class SqliteLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
+    def __init__(self, *args, **kwargs) -> None:
+        self._id: str = kwargs.get("id") or str(uuid.uuid4())
+        self._volatile: bool = kwargs.get("volatile", False)
+        self._database = Path(__file__).parent / f"{self._id}.db"
+
+        with sqlite3.connect(self.database) as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS raft
+                (idx INTEGER, term INTEGER, command TEXT)
+            """)
+            conn.commit()
+
+    def __del__(self):
+        if self._volatile:
+            with sqlite3.connect(self.database) as conn:
+                cur = conn.cursor()
+                cur.execute("DROP TABLE raft")
+                conn.commit()
+            self._database.unlink(missing_ok=True)
+
+    async def __ainit__(self, *args, **kwargs) -> None:
+        pass
+
+    async def append_entries(self, entries: Iterable[T]) -> None:
+        entries = tuple((entry.index, entry.term, entry.command) for entry in entries)   # type: ignore
+        with sqlite3.connect(self.database) as conn:
+            cur = conn.cursor()
+            cur.executemany("INSERT INTO raft VALUES (?, ?, ?)", entries)   # type: ignore
+            conn.commit()
+
+    async def get(self, index: int) -> Optional[T]:
+        with sqlite3.connect(self.database) as conn:
+            cur = conn.cursor()
+            if row := cur.execute(f"SELECT * FROM raft LIMIT 1 OFFSET {index}").fetchone():
+                row = raft_pb2.Log(index=row[0], term=row[1], command=row[2])
+            return row
+
+    async def clear(self, index: int) -> None:
+        with sqlite3.connect(self.database) as conn:
+            cur = conn.cursor()
+            cur.execute(f"DELETE FROM raft ORDER BY rowid LIMIT -1 OFFSET {index}")
+            conn.commit()
+
+    async def size(self) -> int:
+        with sqlite3.connect(self.database) as conn:
+            cur = conn.cursor()
+            count, *_ = cur.execute("SELECT COUNT(*) FROM raft").fetchone()
+            return count
+
+    @property
+    def database(self) -> Path:
+        return self._database
 
 
 class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
