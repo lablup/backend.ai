@@ -184,23 +184,25 @@ To make LSP (language server protocol) services like PyLance to detect our sourc
 you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
 ``plugins/*/`` directories if you have added Backend.AI plugin checkouts.
 
-.. tip::
+For linters and formatters, configure the tool executable paths to indicate
+``dist/export/python/virtualenvs/tools/TOOLNAME/bin/EXECUTABLE``.
+For example, flake8's executable path is
+``dist/export/python/virtualenvs/tools/flake8/bin/flake8``.
 
-   To activate flake8/mypy checks (in Vim) and get proper intelli-sense support
-   for pytest (in VSCode), just install them in the exported venv as follows.
-   (You need to repeat this when you re-export!)
-
-   .. code-block:: console
-
-      $ ./py -m pip install flake8 mypy pytest
-
-   For Vim, you also need to explicitly activate the exported venv.
+In VSCode, set ``python.linting.flake8Path`` and similar keys of the workspace settings.
+In Vim with `ALE <https://github.com/dense-analysis/ale>`_,
+add ``let g:ale_python_flake8_executable = '...'`` and alikes in the same way.
+To apply this Vim config value only to the local working copy, add ``set exrc`` in your user-level
+vimrc and put them in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build root directory.
 
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When each branch has different external package requirements, you should run ``./pants export ::``
 before running codes after ``git switch``-ing between such branches.
+
+Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
+In that case, run ``killall -r pantsd`` and it will be fine.
 
 Running entrypoints
 -------------------
@@ -380,7 +382,7 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 
 .. code-block:: console
 
-   $ killall pantsd
+   $ killall -r pantsd
    $ rm -r .tmp .pants.d ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and
