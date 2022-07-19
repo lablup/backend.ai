@@ -174,20 +174,21 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         entries: Iterable[raft_pb2.Log],    # type: ignore
         leader_commit: int,
     ) -> bool:
+        await self.reset_timeout()
+
         """Receiver implementation:
         1. Reply false if term < currentTerm
         """
         if term < self.current_term:
             return False
 
+        await self._synchronize_term(term)
+
         """Receiver implementation:
         2. Reply false if log doesn't contain any entry at prevLogIndex whose term matches prevLogTerm
         """
         if (log := await self._log.get(prev_log_index)) and (log.term != prev_log_term):
             return False
-
-        await self._synchronize_term(term)
-        await self.reset_timeout()
 
         """Receiver implementation:
         3. If an existing entry conflicts with a new one (same index but different terms),
@@ -226,14 +227,16 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         last_log_index: int,
         last_log_term: int,
     ) -> bool:
-        current_term = self.current_term
-        await self._synchronize_term(term)
         await self.reset_timeout()
+
         """Receiver implementation:
         1. Reply false if term < currentTerm
         """
-        if term < current_term:
+        if term < self.current_term:
             return False
+
+        await self._synchronize_term(term)
+
         """Receiver implementation:
         2. If votedFor is null or candidateId, and candidate's log is at least up-to-date as receiver's log, grant vote
         """
@@ -257,7 +260,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._voted_for = self.id
         term = self.current_term
         logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} start_election(term={term})')
-        last_log = await self._log.get(-1)
+        last_log = await self._log.last()
         last_log_index = last_log.index if last_log else 0
         last_log_term = last_log.term if last_log else 0
         results = await asyncio.gather(*[
