@@ -2,7 +2,6 @@ import enum
 import os
 import random
 import re
-from dotenv import load_dotenv
 from pathlib import Path
 from typing import (
     Any,
@@ -19,6 +18,7 @@ from typing import (
 )
 
 import appdirs
+from dotenv import load_dotenv
 from yarl import URL
 
 __all__ = [
