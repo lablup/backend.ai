@@ -1884,6 +1884,8 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
     root_ctx: RootContext = request.app['_root.context']
     access_key = request['keypair']['access_key']
     target_vfid = params['vfolder_id']
+    user_role = request['user']['role']
+    rqst_user_email = request['user']['email']
     log.info('VFOLDER.LIST_SHARED_VFOLDERS (ak:{})', access_key)
     async with root_ctx.db.begin() as conn:
         j = (
@@ -1897,6 +1899,8 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         )
         if target_vfid is not None:
             query = query.where(vfolders.c.id == target_vfid)
+        if user_role not in (UserRole.SUPERADMIN):
+            query = query.where(rqst_user_email == vfolders.c.creator)
         result = await conn.execute(query)
         shared_list = result.fetchall()
     shared_info = []
