@@ -16,7 +16,7 @@ python_distribution(
     provides=python_artifact(
         name="backend.ai-accelerator-cuda-mock",
         description="Backend.AI Accelerator Plugin for CUDA (Mockup)",
-        license="Proprietary",
+        license="LGPLv3",
     ),
     entry_points={
         "backendai_accelerator_v20": {

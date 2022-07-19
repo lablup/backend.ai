@@ -1,1 +1,3 @@
-__version__ = '0.2.0'
+from pathlib import Path
+
+__version__ = (Path(__file__).parent / 'VERSION').read_text().strip()

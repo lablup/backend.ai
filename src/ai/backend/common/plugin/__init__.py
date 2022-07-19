@@ -131,21 +131,15 @@ class BasePluginContext(Generic[P]):
         allowlist: set[str] = None,
         blocklist: set[str] = None,
     ) -> Iterator[Tuple[str, Type[P]]]:
-        combined_allowlist: Optional[set] = None
-        if cls.allowlist is not None:
-            if combined_allowlist is None:
-                combined_allowlist = set()
-            combined_allowlist |= cls.allowlist
-        if allowlist is not None:
-            if combined_allowlist is None:
-                combined_allowlist = set()
-            combined_allowlist |= allowlist
+        cls_allowlist = set() if cls.allowlist is None else cls.allowlist
+        arg_allowlist = set() if allowlist is None else allowlist
+        allowlist_enabled = allowlist is not None or cls.allowlist is not None
         cls_blocklist = set() if cls.blocklist is None else cls.blocklist
         arg_blocklist = set() if blocklist is None else blocklist
         for entrypoint in scan_entrypoints(
             plugin_group,
-            combined_allowlist,
-            cls_blocklist | arg_blocklist,
+            allowlist=cls_allowlist | arg_allowlist if allowlist_enabled else None,
+            blocklist=cls_blocklist | arg_blocklist,
         ):
             log.info('loading plugin (group:{}): {}', plugin_group, entrypoint.name)
             yield entrypoint.name, entrypoint.load()
