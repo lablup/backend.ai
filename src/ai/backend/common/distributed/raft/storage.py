@@ -90,9 +90,13 @@ class SqliteLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
             conn.commit()
 
     async def get(self, index: int) -> Optional[T]:
+        if index >= 0:
+            query = f"SELECT * FROM {self._table} LIMIT 1 OFFSET {index}"
+        else:
+            query = f"SELECT * FROM {self._table} LIMIT 1 OFFSET {(await self.size()) + index}"
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            if row := cur.execute(f"SELECT * FROM {self._table} LIMIT 1 OFFSET {index}").fetchone():
+            if row := cur.execute(query).fetchone():
                 row = raft_pb2.Log(index=row[0], term=row[1], command=row[2])
             return row
 
