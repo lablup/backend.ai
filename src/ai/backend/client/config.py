@@ -227,8 +227,6 @@ class APIConfig:
         random.shuffle(self._endpoints)
         self._endpoint_type = endpoint_type if endpoint_type is not None else \
             get_env('ENDPOINT_TYPE', self.DEFAULTS['endpoint_type'], clean=str)
-        if self._endpoint_type == 'session':
-            self._endpoint_type = 'api'
         self._domain = domain if domain is not None else \
             get_env('DOMAIN', self.DEFAULTS['domain'], clean=str)
         self._group = group if group is not None else \
