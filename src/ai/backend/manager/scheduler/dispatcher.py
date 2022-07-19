@@ -67,7 +67,6 @@ from .predicates import (
     check_group_resource_limit,
     check_keypair_resource_limit,
     check_reserved_batch_session,
-    check_scaling_group,
 )
 from .types import (
     AbstractScheduler,
@@ -374,10 +373,6 @@ class SchedulerDispatcher(aobject):
                             'domain_resource_limit',
                             check_domain_resource_limit(kernel_db_conn, sched_ctx, sess_ctx),
                         ),
-                        (
-                            'scaling_group_resource_limit',
-                            check_scaling_group(kernel_db_conn, sched_ctx, sess_ctx),
-                        ),
                     ]
                     for predicate_name, check_coro in predicates:
                         try:
@@ -391,7 +386,6 @@ class SchedulerDispatcher(aobject):
 
             check_results = await execute_with_retry(_check_predicates)
             has_failure = False
-            has_permanent_failure = False
             failed_predicates = []
             passed_predicates = []
             for predicate_name, result in check_results:
@@ -412,14 +406,8 @@ class SchedulerDispatcher(aobject):
                         'msg': result.message or "",
                     })
                     has_failure = True
-                    if result.permanent:
-                        has_permanent_failure = True  # noqa
             if has_failure:
                 log.debug(log_fmt + 'predicate-checks-failed (temporary)', *log_args)
-                # TODO: handle has_permanent_failure as cancellation
-                #  - An early implementation of it has caused DB query blocking due to
-                #    the inclusion of the kernels.status field. :(
-                #    Let's fix it.
 
                 async def _update() -> None:
                     async with self.db.begin() as conn:
