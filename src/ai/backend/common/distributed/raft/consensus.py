@@ -71,7 +71,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
 
         self._server.bind(self)
 
-    async def __ainit__(self) -> None:
+    async def __ainit__(self, *args, **kwargs) -> None:
         await self._execute_transition(RaftState.FOLLOWER)
         self._log: AbstractLogStorage[raft_pb2.Log] = await MongoLogStorage[raft_pb2.Log].new()    # type: ignore
 
@@ -196,7 +196,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         """
         for entry in (entries := tuple(entries)):
             if (old_entry := await self._log.get(entry.index)) and (old_entry.term != entry.term):
-                await self._log.clear(index=entry.index)
+                await self._log.splice(index=entry.index)
                 break
 
         self._cache_prev_log_index = prev_log_index

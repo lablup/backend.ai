@@ -23,7 +23,7 @@ class AbstractLogStorage(abc.ABC, Generic[T]):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    async def clear(self, index: int) -> None:
+    async def splice(self, index: int) -> None:
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -49,7 +49,7 @@ class InMemoryLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
             pass
         return None
 
-    async def clear(self, index: int) -> None:
+    async def splice(self, index: int) -> None:
         assert hasattr(self._storage[0], 'index')
         self._storage = list(filter(lambda x: x.index < index, self._storage))  # type: ignore
 
@@ -96,7 +96,7 @@ class SqliteLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
                 row = raft_pb2.Log(index=row[0], term=row[1], command=row[2])
             return row
 
-    async def clear(self, index: int) -> None:
+    async def splice(self, index: int) -> None:
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
             cur.execute(f"DELETE FROM raft ORDER BY rowid LIMIT -1 OFFSET {index}")
@@ -146,7 +146,7 @@ class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
         log.ParseFromString(item)
         return log
 
-    async def clear(self, index: int) -> None:
+    async def splice(self, index: int) -> None:
         pass
 
     async def size(self) -> int:
@@ -184,7 +184,7 @@ class MongoLogStorage(aobject, AbstractLogStorage[T]):
     async def get(self, index: int) -> Optional[T]:
         return await self._db.find_one({"index": index})
 
-    async def clear(self, index: int) -> None:
+    async def splice(self, index: int) -> None:
         await self._db.delete_many({"index": {"$le": index}})
 
     async def size(self) -> int:
