@@ -2,27 +2,25 @@ import abc
 import sqlite3
 import uuid
 from pathlib import Path
-from typing import Dict, Final, Generic, Iterable, List, Optional, TypeVar, cast
+from typing import Dict, Final, Iterable, List, Optional
 
 import aioredis
 
 from ...types import aobject
 from .protos import raft_pb2
 
-T = TypeVar('T')
 
-
-class AbstractLogStorage(abc.ABC, Generic[T]):
+class AbstractLogStorage(abc.ABC):
     @abc.abstractmethod
-    async def append_entries(self, entries: Iterable[T]) -> None:
+    async def append_entries(self, entries: Iterable[raft_pb2.Log]) -> None:
         raise NotImplementedError()
 
     @abc.abstractmethod
-    async def get(self, index: int) -> Optional[T]:
+    async def get(self, index: int) -> Optional[raft_pb2.Log]:
         raise NotImplementedError()
 
     @abc.abstractmethod
-    async def last(self) -> Optional[T]:
+    async def last(self) -> Optional[raft_pb2.Log]:
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -34,35 +32,34 @@ class AbstractLogStorage(abc.ABC, Generic[T]):
         raise NotImplementedError()
 
 
-class InMemoryLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
+class InMemoryLogStorage(aobject, AbstractLogStorage):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._storage: List[T] = []
+        self._storage: List[raft_pb2.Log] = []
 
     async def __ainit__(self, *args, **kwargs) -> None:
         pass
 
-    async def append_entries(self, entries: Iterable[T]) -> None:
+    async def append_entries(self, entries: Iterable[raft_pb2.Log]) -> None:
         self._storage.extend(entries)
 
-    async def get(self, index: int) -> Optional[T]:
+    async def get(self, index: int) -> Optional[raft_pb2.Log]:
         for log in self._storage:
             if log.index == index:
                 return log
         return None
 
-    async def last(self) -> Optional[T]:
+    async def last(self) -> Optional[raft_pb2.Log]:
         return self._storage[-1] if self._storage else None
 
     async def splice(self, index: int) -> None:
-        assert hasattr(self._storage[0], 'index')
-        self._storage = list(filter(lambda x: x.index < index, self._storage))  # type: ignore
+        self._storage = list(filter(lambda x: x.index < index, self._storage))
 
     async def size(self) -> int:
         return len(self._storage)
 
 
-class SqliteLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
+class SqliteLogStorage(aobject, AbstractLogStorage):
     def __init__(self, *args, **kwargs) -> None:
         self._id: str = kwargs.get("id") or str(uuid.uuid4())
         self._volatile: bool = kwargs.get("volatile", False)
@@ -88,21 +85,21 @@ class SqliteLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
     async def __ainit__(self, *args, **kwargs) -> None:
         pass
 
-    async def append_entries(self, entries: Iterable[T]) -> None:
+    async def append_entries(self, entries: Iterable[raft_pb2.Log]) -> None:
         entries = tuple((entry.index, entry.term, entry.command) for entry in entries)   # type: ignore
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
             cur.executemany(f"INSERT INTO {self._table} VALUES (?, ?, ?)", entries)   # type: ignore
             conn.commit()
 
-    async def get(self, index: int) -> Optional[T]:
+    async def get(self, index: int) -> Optional[raft_pb2.Log]:
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
             if row := cur.execute(f"SELECT * FROM {self._table} WHERE idx = :index", {"index": index}).fetchone():
                 row = raft_pb2.Log(index=row[0], term=row[1], command=row[2])
             return row
 
-    async def last(self) -> Optional[T]:
+    async def last(self) -> Optional[raft_pb2.Log]:
         count = await self.size()
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
@@ -127,7 +124,7 @@ class SqliteLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
         return self._database
 
 
-class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
+class RedisLogStorage(aobject, AbstractLogStorage):
     def __init__(self, *args, **kwargs) -> None:
         self._namespace: str = str(uuid.uuid4())
 
@@ -139,14 +136,11 @@ class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
             socket_keepalive_options=keepalive_options,
         )
 
-    async def append_entries(self, entries: Iterable[T]) -> None:
+    async def append_entries(self, entries: Iterable[raft_pb2.Log]) -> None:
         if entries := tuple(entries):
-            if isinstance(entries[0], (raft_pb2.Log,)):
-                entries = map(lambda x: cast(x, raft_pb2.Log).SerializeToString(),  # type: ignore
-                              filter(lambda x: x is not None, entries))             # type: ignore
             await self._redis.rpush(self._namespace, *entries)
 
-    async def get(self, index: int) -> Optional[T]:
+    async def get(self, index: int) -> Optional[raft_pb2.Log]:
         if index >= 0:
             item = await self._redis.lindex(self._namespace, index)
         else:
@@ -160,7 +154,7 @@ class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
         log.ParseFromString(item)
         return log
 
-    async def last(self) -> Optional[T]:
+    async def last(self) -> Optional[raft_pb2.Log]:
         raise NotImplementedError()
 
     async def splice(self, index: int) -> None:

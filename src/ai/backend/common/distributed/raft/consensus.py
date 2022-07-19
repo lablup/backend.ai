@@ -73,7 +73,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
 
     async def __ainit__(self, *args, **kwargs) -> None:
         await self._execute_transition(RaftState.FOLLOWER)
-        self._log: AbstractLogStorage[raft_pb2.Log] = await SqliteLogStorage[raft_pb2.Log].new(id=self.id)    # type: ignore
+        self._log: AbstractLogStorage = await SqliteLogStorage.new(id=self.id)    # type: ignore
 
     async def _execute_transition(self, next_state: RaftState) -> None:
         self._state = next_state

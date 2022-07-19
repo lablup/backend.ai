@@ -8,7 +8,7 @@ from ai.backend.common.distributed.raft.storage import SqliteLogStorage
 
 @pytest.mark.asyncio
 async def test_sqlite_storage() -> None:
-    storage = SqliteLogStorage[raft_pb2.Log](volatile=True)
+    storage = SqliteLogStorage(volatile=True)
 
     n = 16
     entries = tuple(
