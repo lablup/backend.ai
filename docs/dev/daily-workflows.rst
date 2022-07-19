@@ -184,23 +184,25 @@ To make LSP (language server protocol) services like PyLance to detect our sourc
 you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
 ``plugins/*/`` directories if you have added Backend.AI plugin checkouts.
 
-.. tip::
+For linters and formatters, configure the tool executable paths to indicate
+``dist/export/python/virtualenvs/tools/TOOLNAME/bin/EXECUTABLE``.
+For example, flake8's executable path is
+``dist/export/python/virtualenvs/tools/flake8/bin/flake8``.
 
-   To activate flake8/mypy checks (in Vim) and get proper intelli-sense support
-   for pytest (in VSCode), just install them in the exported venv as follows.
-   (You need to repeat this when you re-export!)
-
-   .. code-block:: console
-
-      $ ./py -m pip install flake8 mypy pytest
-
-   For Vim, you also need to explicitly activate the exported venv.
+In VSCode, set ``python.linting.flake8Path`` and similar keys of the workspace settings.
+In Vim with `ALE <https://github.com/dense-analysis/ale>`_,
+add ``let g:ale_python_flake8_executable = '...'`` and alikes in the same way.
+To apply this Vim config value only to the local working copy, add ``set exrc`` in your user-level
+vimrc and put them in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build root directory.
 
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When each branch has different external package requirements, you should run ``./pants export ::``
 before running codes after ``git switch``-ing between such branches.
+
+Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
+In that case, run ``killall -r pantsd`` and it will be fine.
 
 Running entrypoints
 -------------------
@@ -380,7 +382,7 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 
 .. code-block:: console
 
-   $ killall pantsd
+   $ killall -r pantsd
    $ rm -r .tmp .pants.d ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and
@@ -402,6 +404,49 @@ This means that you can directly observe the console output and Ctrl+C to
 gracefully shutdown the tests  with fixture cleanup. You can also apply
 additional pytest options such as ``--fulltrace``, ``-s``, etc. by passing them
 after target arguments and ``--`` when executing ``./pants test`` command.
+
+Installing a subset of mono-repo packages in the editable mode for other projects
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sometimes, you need to editable-install a subset of packages into other project's directories.
+For instance you could mount the client SDK and its internal dependencies for a Docker container for development.
+
+In this case, we recommend to do it as follows:
+
+1. Run the following command to build a wheel from the current mono-repo source:
+
+   .. code-block:: console
+
+      $ ./pants --tag=wheel package src/ai/backend/client:dist
+
+   This will generate ``dist/backend.ai_client-{VERSION}-py3-none-any.whl``.
+
+2. Run ``pip install -U {MONOREPO_PATH}/dist/{WHEEL_FILE}`` in the target environment.
+
+   This will populate the package metadata and install its external dependencies.
+   The target environment may be one of a separate virtualenv or a container being built.
+   For container builds, you need to first ``COPY`` the wheel file and install it.
+
+3. Check the internal dependency directories to link by running the following command:
+
+   .. code-block:: console
+
+      $ ./pants dependencies --transitive src/ai/backend/client:lib \
+      >   | grep src/ai/backend | grep -v ':version' | cut -d/ -f4 | uniq
+      cli
+      client
+      plugin
+
+4. Link these directories in the target environment.
+
+   For example, if it is a Docker container, you could add
+   ``-v {MONOREPO_PATH}/src/ai/backend/{COMPONENT}:/usr/local/lib/python3.10/site-packages/ai/backend/{COMPONENT}``
+   to the ``docker create`` or ``docker run`` commands for all the component
+   directories found in the previous step.
+
+   If it is a local checkout with a pyenv-based virtualenv, you could replace
+   ``$(pyenv prefix)/lib/python3.10/site-packages/ai/backend/{COMPONENT}`` directories
+   with symbolic links to the mono-repo's component source directories.
 
 Boosting the performance of Pants commands
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

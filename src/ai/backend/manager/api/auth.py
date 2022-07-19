@@ -11,12 +11,12 @@ import aiohttp_cors
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
-from aioredis import Redis
-from aioredis.client import Pipeline as RedisPipeline
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline as RedisPipeline
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
@@ -430,11 +430,11 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             async def _pipe_builder(r: Redis) -> RedisPipeline:
                 pipe = r.pipeline()
                 num_queries_key = f'kp:{access_key}:num_queries'
-                pipe.incr(num_queries_key)
-                pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
+                await pipe.incr(num_queries_key)
+                await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
                 return pipe
 
-            await redis.execute(root_ctx.redis_stat, _pipe_builder)
+            await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
         else:
             # unsigned requests may be still accepted for public APIs
             pass
@@ -475,11 +475,11 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             async def _pipe_builder(r: Redis) -> RedisPipeline:
                 pipe = r.pipeline()
                 num_queries_key = f'kp:{access_key}:num_queries'
-                pipe.incr(num_queries_key)
-                pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
+                await pipe.incr(num_queries_key)
+                await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
                 return pipe
 
-            await redis.execute(root_ctx.redis_stat, _pipe_builder)
+            await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
         else:
             # unsigned requests may be still accepted for public APIs
             pass

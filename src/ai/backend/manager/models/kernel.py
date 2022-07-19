@@ -21,17 +21,17 @@ from typing import (
 )
 from uuid import UUID
 
-import aioredis
-import aioredis.client
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common import msgpack, redis
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
@@ -259,6 +259,7 @@ kernels = sa.Table(
     #         // used to prevent duplication of SessionTerminatedEvent
     #   }
     # }
+    sa.Column('status_history', pgsql.JSONB(), nullable=True, default=sa.null()),
     sa.Column('callback_url', URLColumn, nullable=True, default=sa.null()),
 
     sa.Column('startup_command', sa.Text, nullable=True),
@@ -517,14 +518,14 @@ class KernelStatistics:
         session_ids: Sequence[SessionId],
     ) -> Sequence[Optional[Mapping[str, Any]]]:
 
-        def _build_pipeline(redis: aioredis.Redis) -> aioredis.client.Pipeline:
+        async def _build_pipeline(redis: Redis) -> Pipeline:
             pipe = redis.pipeline()
             for sess_id in session_ids:
-                pipe.get(str(sess_id))
+                await pipe.get(str(sess_id))
             return pipe
 
         stats = []
-        results = await redis.execute(ctx.redis_stat, _build_pipeline)
+        results = await redis_helper.execute(ctx.redis_stat, _build_pipeline)
         for result in results:
             if result is not None:
                 stats.append(msgpack.unpackb(result))
@@ -813,6 +814,7 @@ class ComputeSession(graphene.ObjectType):
     status_changed = GQLDateTime()
     status_info = graphene.String()
     status_data = graphene.JSONString()
+    status_history = graphene.JSONString()
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
@@ -869,6 +871,7 @@ class ComputeSession(graphene.ObjectType):
             'status_changed': row['status_changed'],
             'status_info': row['status_info'],
             'status_data': row['status_data'],
+            'status_history': row['status_history'] or {},
             'created_at': row['created_at'],
             'terminated_at': row['terminated_at'],
             'starts_at': row['starts_at'],
@@ -1535,7 +1538,7 @@ async def recalc_concurrency_used(
         result = await db_conn.execute(query)
         concurrency_used = result.first()[0]
 
-    await redis.execute(
+    await redis_helper.execute(
         redis_stat,
         lambda r: r.set(
             f'keypair.concurrency_used.{access_key}', concurrency_used,

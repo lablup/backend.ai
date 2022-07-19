@@ -368,13 +368,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "db3b8e2f922b2a910a29804776c643ea609badb6a32c4bcc226fd4fd902cce65",
-              "url": "https://files.pythonhosted.org/packages/ae/7f/6d816941769a7783be4258dd35e28bbf1a64bb36b1b7e0c773eff07fb0a8/setuptools-63.1.0-py3-none-any.whl"
+              "hash": "0d33c374d41c7863419fc8f6c10bfe25b7b498aa34164d135c622e52580c6b16",
+              "url": "https://files.pythonhosted.org/packages/a4/53/bfc6409447ca024558b8b19d055de94c813c3e32c0296c48a0873a161cf5/setuptools-63.2.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "16923d366ced322712c71ccb97164d07472abeecd13f3a6c283f6d5d26722793",
-              "url": "https://files.pythonhosted.org/packages/67/25/42e2d6664c3e106c33ecad8356a55e3ae5d81708c89098061a97fbff7cee/setuptools-63.1.0.tar.gz"
+              "hash": "c04b44a57a6265fe34a4a444e965884716d34bae963119a76353434d6f18e450",
+              "url": "https://files.pythonhosted.org/packages/0a/ba/52611dc8278828eb9ec339e6914a0f865f9e2af967214905927835dfac0a/setuptools-63.2.0.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -422,7 +422,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "63.1"
+          "version": "63.2"
         },
         {
           "artifacts": [
@@ -491,13 +491,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c4f6e5bbf48e74f7a38e7cc5b0480ff42b0ae5178957d564d18932525d5cf099",
-              "url": "https://files.pythonhosted.org/packages/80/0e/16a7ee38617aab6a624e95948d314097cc2669edae9b02ded53309941cfc/zipp-3.8.0-py3-none-any.whl"
+              "hash": "47c40d7fe183a6f21403a199b3e4192cca5774656965b0a4988ad2f8feb5f009",
+              "url": "https://files.pythonhosted.org/packages/f0/36/639d6742bcc3ffdce8b85c31d79fcfae7bb04b95f0e5c4c6f8b206a038cc/zipp-3.8.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "56bf8aadb83c24db6c4b577e13de374ccfb67da2078beba1d037c17980bf43ad",
-              "url": "https://files.pythonhosted.org/packages/cc/3c/3e8c69cd493297003da83f26ccf1faea5dd7da7892a0a7c965ac3bcba7bf/zipp-3.8.0.tar.gz"
+              "hash": "05b45f1ee8f807d0cc928485ca40a07cb491cf092ff587c0df9cb1fd154848d2",
+              "url": "https://files.pythonhosted.org/packages/3b/e3/fb79a1ea5f3a7e9745f688855d3c673f2ef7921639a380ec76f7d4d83a85/zipp-3.8.1.tar.gz"
             }
           ],
           "project_name": "zipp",
@@ -505,10 +505,11 @@
             "func-timeout; extra == \"testing\"",
             "jaraco.itertools; extra == \"testing\"",
             "jaraco.packaging>=9; extra == \"docs\"",
+            "jaraco.tidelift>=1.4; extra == \"docs\"",
             "pytest-black>=0.3.7; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest-checkdocs>=2.4; extra == \"testing\"",
             "pytest-cov; extra == \"testing\"",
-            "pytest-enabler>=1.0.1; extra == \"testing\"",
+            "pytest-enabler>=1.3; extra == \"testing\"",
             "pytest-flake8; extra == \"testing\"",
             "pytest-mypy>=0.9.1; platform_python_implementation != \"PyPy\" and extra == \"testing\"",
             "pytest>=6; extra == \"testing\"",
@@ -516,14 +517,14 @@
             "sphinx; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.8"
+          "version": "3.8.1"
         }
       ],
       "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.94",
+  "pex_version": "2.1.99",
   "prefer_older_binary": false,
   "requirements": [
     "towncrier>=21.9"
@@ -533,6 +534,7 @@
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
+  "target_systems": [],
   "transitive": true,
   "use_pep517": null
 }

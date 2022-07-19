@@ -185,16 +185,21 @@ class ConsoleFormatter(logging.Formatter):
 
 class CustomJsonFormatter(JsonFormatter):
 
-    def add_fields(self, log_record, record, message_dict):
+    def add_fields(
+        self,
+        log_record: dict[str, Any],  # the manipulated entry object
+        record: logging.LogRecord,   # the source log record
+        message_dict: dict[str, Any],
+    ) -> None:
         super().add_fields(log_record, record, message_dict)
         if not log_record.get('timestamp'):
             # this doesn't use record.created, so it is slightly off
             now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
             log_record['timestamp'] = now
-        if log_record.get('level', record.levelname):
-            log_record['level'] = log_record['level'].upper()
+        if loglevel := log_record.get('level'):
+            log_record['level'] = loglevel.upper()
         else:
-            log_record['level'] = record.levelname
+            log_record['level'] = record.levelname.upper()
 
 
 class pretty:

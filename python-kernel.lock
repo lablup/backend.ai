@@ -227,13 +227,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "e7f5212177af7ab34179690140f188aa9bf3d322d8155ed972cbded19f55b6f3",
-              "url": "https://files.pythonhosted.org/packages/34/7d/8e442c0637a648c0136f686e015dc2f547f1a19f2690b183aa340a6762bc/jupyter_core-4.10.0-py3-none-any.whl"
+              "hash": "715e22bb6cc7db3718fddfac1f69f1c7e899ca00e42bdfd4bf3705452b9fd84a",
+              "url": "https://files.pythonhosted.org/packages/66/5f/32ee101e07d5ece26876f13526b16179525e19f4e460f8085e9ef8e54cff/jupyter_core-4.11.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a6de44b16b7b31d7271130c71a6792c4040f077011961138afed5e5e73181aec",
-              "url": "https://files.pythonhosted.org/packages/91/5d/746dd5b904854043f99e72a22c69a2e9b3eb0ade2adc2b288e666ffa816f/jupyter_core-4.10.0.tar.gz"
+              "hash": "2e5f244d44894c4154d06aeae3419dd7f1b0ef4494dc5584929b398c61cfd314",
+              "url": "https://files.pythonhosted.org/packages/e4/e0/13fc7f8b72f39d87c1c32918a99475911b7b2f28c1a9f2734a5ab5cc35ef/jupyter_core-4.11.1.tar.gz"
             }
           ],
           "project_name": "jupyter-core",
@@ -247,7 +247,7 @@
             "traitlets"
           ],
           "requires_python": ">=3.7",
-          "version": "4.10"
+          "version": "4.11.1"
         },
         {
           "artifacts": [
@@ -618,7 +618,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.94",
+  "pex_version": "2.1.99",
   "prefer_older_binary": false,
   "requirements": [
     "async_timeout~=3.0",
@@ -634,6 +634,7 @@
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
+  "target_systems": [],
   "transitive": true,
   "use_pep517": null
 }
