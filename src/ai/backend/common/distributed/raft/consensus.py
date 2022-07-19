@@ -68,7 +68,6 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
 
         self._cache_prev_log_index: int = 0
         self._cache_prev_log_term: int = 0
-        self._cache_leader_commit: int = 0
 
         self._server.bind(self)
 
@@ -88,12 +87,13 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         while True:
             await asyncio.sleep(3.0)
             command = str(uuid.uuid4())
-            logging.info(f'[LEADE] Storage size: {await self._log.size()}')
+            logging.info(f'[LEADER] Storage size: {await self._log.size()}')
             entry = raft_pb2.Log(index=await self._log.size(), term=self.current_term, command=command)
             await self._log.append_entries((entry,))
+
             self._cache_prev_log_index += 1
             self._cache_prev_log_term = self.current_term
-            # self._cache_leader_commit
+
             while not await self.replicate_logs(entries=(entry,)):
                 await asyncio.sleep(0.1)
 
@@ -148,13 +148,15 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                 self._client.append_entries(
                     address=address, term=self.current_term, leader_id=self.id,
                     prev_log_index=self._cache_prev_log_index, prev_log_term=self._cache_prev_log_term,
-                    entries=entries, leader_commit=self._cache_leader_commit,
+                    entries=entries, leader_commit=self._commit_index,
                 ),
             )
             for address in self._peers
         }, return_when=asyncio.ALL_COMPLETED)
         if entries:
-            logging.info(f'replicate_logs(entries={entries[-1].index}, total={await self._log.size()})')
+            logging.info(
+                f'[{datetime.now().isoformat()}] replicate(entries={entries[-1].index}, '
+                f'total={await self._log.size()})')
         return sum([task.result() for task in done]) + 1 >= self.quorum
 
     """
@@ -173,11 +175,6 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         leader_commit: int,
     ) -> bool:
         """Receiver implementation:
-        4. Append any new entries not already in the log
-        5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
-        """
-
-        """Receiver implementation:
         1. Reply false if term < currentTerm
         """
         if term < self.current_term:
@@ -190,6 +187,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
             return False
 
         await self._synchronize_term(term)
+        await self.reset_timeout()
 
         """Receiver implementation:
         3. If an existing entry conflicts with a new one (same index but different terms),
@@ -203,12 +201,21 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._cache_prev_log_index = prev_log_index
         self._cache_prev_log_term = prev_log_term
 
+        """Receiver implementation:
+        4. Append any new entries not already in the log
+        """
         self._leader_id = leader_id
-        if entries := tuple(entries):
+        if entries:
             await self._log.append_entries(entries)
             logging.info(f'[{datetime.now()}] pid={os.getpid()} on_append_entries(term={term}, entry={entries[-1].index}, '
                          f'total={await self._log.size()})')
-        await self.reset_timeout()
+
+        """Receiver implementation:
+        5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
+        """
+        if leader_commit > self._commit_index:
+            self._commit_index = min(leader_commit, entries[-1].entry)
+
         return True
 
     async def on_request_vote(
@@ -219,15 +226,17 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         last_log_index: int,
         last_log_term: int,
     ) -> bool:
-        """Receiver implementation:
-        1. Reply false if term < currentTerm
-        2. If votedFor is null or candidateId, and candidate's log is at least up-to-date as receiver's log, grant vote
-        """
         current_term = self.current_term
         await self._synchronize_term(term)
         await self.reset_timeout()
+        """Receiver implementation:
+        1. Reply false if term < currentTerm
+        """
         if term < current_term:
             return False
+        """Receiver implementation:
+        2. If votedFor is null or candidateId, and candidate's log is at least up-to-date as receiver's log, grant vote
+        """
         if self.voted_for is None:
             self._voted_for = candidate_id
             return True

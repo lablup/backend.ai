@@ -22,6 +22,10 @@ class AbstractLogStorage(abc.ABC, Generic[T]):
         raise NotImplementedError()
 
     @abc.abstractmethod
+    async def last(self) -> Optional[T]:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
     async def splice(self, index: int) -> None:
         raise NotImplementedError()
 
@@ -42,11 +46,13 @@ class InMemoryLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
         self._storage.extend(entries)
 
     async def get(self, index: int) -> Optional[T]:
-        try:
-            return self._storage[index]
-        except IndexError:
-            pass
+        for log in self._storage:
+            if log.index == index:
+                return log
         return None
+
+    async def last(self) -> Optional[T]:
+        return self._storage[-1] if self._storage else None
 
     async def splice(self, index: int) -> None:
         assert hasattr(self._storage[0], 'index')
@@ -67,7 +73,7 @@ class SqliteLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
             cur = conn.cursor()
             cur.execute(f"""
                 CREATE TABLE IF NOT EXISTS {self._table}
-                (idx INTEGER, term INTEGER, command TEXT)
+                (idx INTEGER PRIMARY KEY, term INTEGER, command TEXT)
             """)
             conn.commit()
 
@@ -90,20 +96,24 @@ class SqliteLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
             conn.commit()
 
     async def get(self, index: int) -> Optional[T]:
-        if index >= 0:
-            query = f"SELECT * FROM {self._table} LIMIT 1 OFFSET {index}"
-        else:
-            query = f"SELECT * FROM {self._table} LIMIT 1 OFFSET {(await self.size()) + index}"
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            if row := cur.execute(query).fetchone():
+            if row := cur.execute(f"SELECT * FROM {self._table} WHERE idx = :index", {"index": index}).fetchone():
+                row = raft_pb2.Log(index=row[0], term=row[1], command=row[2])
+            return row
+
+    async def last(self) -> Optional[T]:
+        count = await self.size()
+        with sqlite3.connect(self.database) as conn:
+            cur = conn.cursor()
+            if row := cur.execute(f"SELECT * FROM {self._table} LIMIT 1 OFFSET {count - 1}").fetchone():
                 row = raft_pb2.Log(index=row[0], term=row[1], command=row[2])
             return row
 
     async def splice(self, index: int) -> None:
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            cur.execute(f"DELETE FROM {self._table} ORDER BY rowid LIMIT -1 OFFSET {index}")
+            cur.execute(f"DELETE FROM {self._table} WHERE idx >= :index", {"index": index})
             conn.commit()
 
     async def size(self) -> int:
@@ -149,6 +159,9 @@ class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
         log = raft_pb2.Log()    # type: ignore
         log.ParseFromString(item)
         return log
+
+    async def last(self) -> Optional[T]:
+        raise NotImplementedError()
 
     async def splice(self, index: int) -> None:
         pass
