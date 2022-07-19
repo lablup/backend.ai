@@ -2,10 +2,9 @@ import abc
 import sqlite3
 import uuid
 from pathlib import Path
-from typing import Dict, Generic, Iterable, List, Optional, TypeVar, cast
+from typing import Dict, Final, Generic, Iterable, List, Optional, TypeVar, cast
 
 import aioredis
-import motor.motor_asyncio
 
 from ...types import aobject
 from .protos import raft_pb2
@@ -62,11 +61,12 @@ class SqliteLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
         self._id: str = kwargs.get("id") or str(uuid.uuid4())
         self._volatile: bool = kwargs.get("volatile", False)
         self._database = Path(__file__).parent / f"{self._id}.db"
+        self._table: Final[str] = "raft"
 
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS raft
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS {self._table}
                 (idx INTEGER, term INTEGER, command TEXT)
             """)
             conn.commit()
@@ -75,7 +75,7 @@ class SqliteLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
         if self._volatile:
             with sqlite3.connect(self.database) as conn:
                 cur = conn.cursor()
-                cur.execute("DROP TABLE raft")
+                cur.execute(f"DROP TABLE {self._table}")
                 conn.commit()
             self._database.unlink(missing_ok=True)
 
@@ -86,26 +86,26 @@ class SqliteLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
         entries = tuple((entry.index, entry.term, entry.command) for entry in entries)   # type: ignore
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            cur.executemany("INSERT INTO raft VALUES (?, ?, ?)", entries)   # type: ignore
+            cur.executemany(f"INSERT INTO {self._table} VALUES (?, ?, ?)", entries)   # type: ignore
             conn.commit()
 
     async def get(self, index: int) -> Optional[T]:
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            if row := cur.execute(f"SELECT * FROM raft LIMIT 1 OFFSET {index}").fetchone():
+            if row := cur.execute(f"SELECT * FROM {self._table} LIMIT 1 OFFSET {index}").fetchone():
                 row = raft_pb2.Log(index=row[0], term=row[1], command=row[2])
             return row
 
     async def splice(self, index: int) -> None:
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            cur.execute(f"DELETE FROM raft ORDER BY rowid LIMIT -1 OFFSET {index}")
+            cur.execute(f"DELETE FROM {self._table} ORDER BY rowid LIMIT -1 OFFSET {index}")
             conn.commit()
 
     async def size(self) -> int:
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            count, *_ = cur.execute("SELECT COUNT(*) FROM raft").fetchone()
+            count, *_ = cur.execute(f"SELECT COUNT(*) FROM {self._table}").fetchone()
             return count
 
     @property
@@ -151,41 +151,3 @@ class RedisLogStorage(aobject, Generic[T], AbstractLogStorage[T]):
 
     async def size(self) -> int:
         return await self._redis.llen(self._namespace)
-
-
-class MongoLogStorage(aobject, AbstractLogStorage[T]):
-    def __init__(self, *args, **kwargs) -> None:
-        username = kwargs.get('username', 'root')
-        password = kwargs.get('password', '0000')
-        host = kwargs.get('host', 'localhost')
-        port = kwargs.get('port', 27017)
-
-        self._uuid: str = str(uuid.uuid4()).split('-')[0]
-
-        client = motor.motor_asyncio.AsyncIOMotorClient(f'mongodb://{username}:{password}@{host}:{port}')
-        self._db = client['backend-ai']['raft'][self._uuid]
-
-    async def __ainit__(self, *args, **kwargs) -> None:
-        pass
-
-    async def append_entries(self, entries: Iterable[T]) -> None:
-        if entries := tuple(entries):
-            if isinstance(entries[0], (raft_pb2.Log,)):
-                entry_dicts = [
-                    {
-                        "index": entry.index,       # type: ignore
-                        "term": entry.term,         # type: ignore
-                        "command": entry.command,   # type: ignore
-                    }
-                    for entry in entries
-                ]
-                _ = await self._db.insert_many(entry_dicts)
-
-    async def get(self, index: int) -> Optional[T]:
-        return await self._db.find_one({"index": index})
-
-    async def splice(self, index: int) -> None:
-        await self._db.delete_many({"index": {"$le": index}})
-
-    async def size(self) -> int:
-        return await self._db.count_documents({})

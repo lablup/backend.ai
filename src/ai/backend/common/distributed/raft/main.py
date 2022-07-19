@@ -12,8 +12,8 @@ _cleanup_coroutines: List[Coroutine] = []
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--port', '-p', type=int, default=50051)
-    parser.add_argument('peers', metavar='peers', type=str, nargs='+',
+    parser.add_argument("--port", "-p", type=int, default=50051)
+    parser.add_argument("peers", metavar="peers", type=str, nargs="+",
                         help='"<HOST>:<PORT>" list of peers.')
     return parser.parse_args()
 
@@ -23,7 +23,7 @@ async def _main():
 
     server = GrpcRaftServer()
     client = GrpcRaftClient()
-    raft = await RaftConsensusModule.new(peers=args.peers, server=server, client=client)
+    raft = await RaftConsensusModule.new(peers=args.peers, server=server, client=client, id=str(args.port))
 
     done, pending = await asyncio.wait({
         asyncio.create_task(

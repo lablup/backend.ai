@@ -14,7 +14,7 @@ from .client import AbstractRaftClient
 from .protocol import AbstractRaftProtocol
 from .protos import raft_pb2
 from .server import AbstractRaftServer
-from .storage import AbstractLogStorage, MongoLogStorage
+from .storage import AbstractLogStorage, SqliteLogStorage
 from .types import PeerId
 
 logging.basicConfig(level=logging.INFO)
@@ -40,8 +40,9 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         client: AbstractRaftClient,
         *,
         on_state_changed: Optional[Callable[[RaftState], Awaitable]] = None,
+        **kwargs,
     ) -> None:
-        self._id: Final[PeerId] = str(uuid.uuid4())
+        self._id: Final[PeerId] = kwargs.get("id") or str(uuid.uuid4())
         self._peers: Tuple[PeerId, ...] = tuple(peers)
         self._server: Final[AbstractRaftServer] = server
         self._client: Final[AbstractRaftClient] = client
@@ -73,7 +74,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
 
     async def __ainit__(self, *args, **kwargs) -> None:
         await self._execute_transition(RaftState.FOLLOWER)
-        self._log: AbstractLogStorage[raft_pb2.Log] = await MongoLogStorage[raft_pb2.Log].new()    # type: ignore
+        self._log: AbstractLogStorage[raft_pb2.Log] = await SqliteLogStorage[raft_pb2.Log].new(id=self.id)    # type: ignore
 
     async def _execute_transition(self, next_state: RaftState) -> None:
         self._state = next_state
