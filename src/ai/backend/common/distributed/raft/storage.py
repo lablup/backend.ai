@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 from typing import Dict, Final, Iterable, List, Optional
 
-import aioredis
+from redis.asyncio import Redis
 
 from ...types import aobject
 from .protos import raft_pb2
@@ -130,7 +130,7 @@ class RedisLogStorage(aobject, AbstractLogStorage):
 
     async def __ainit__(self, *args, host: str = '127.0.0.1', port: int = 8111, **kwargs) -> None:
         keepalive_options: Dict[str, str] = {}
-        self._redis = await aioredis.Redis.from_url(
+        self._redis = await Redis.from_url(
             f'redis://{host}:{port}',
             socket_keepalive=True,
             socket_keepalive_options=keepalive_options,
