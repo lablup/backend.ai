@@ -684,7 +684,7 @@ mkdir -p "$VAR_BASE_PATH"
 sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
-sed_inplace "s/var-base-path = .*$/var-base-path = \"${VAR_BASE_PATH}\"/" ./agent.toml
+sed_inplace 's@var-base-path = .*$@var-base-path = "'"${VAR_BASE_PATH}"'"@' ./agent.toml
 
 # configure storage-proxy
 cp configs/storage-proxy/sample.toml ./storage-proxy.toml
