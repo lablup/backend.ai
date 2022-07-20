@@ -79,6 +79,7 @@ allowChangeSigninMode = {{allow_change_signin_mode}}
 allowAnonymousChangePassword = {{allow_anonymous_change_password}}
 allowProjectResourceMonitor = {{allow_project_resource_monitor}}
 allowManualImageNameForSession = {{allow_manual_image_name_for_session}}
+alwaysEnqueueComputeSession = {{always_enqueue_compute_session}}
 allowSignupWithoutConfirmation = {{allow_signup_without_confirmation}}
 autoLogout = {{auto_logout}}
 debug = {{webui_debug}}
@@ -203,6 +204,8 @@ async def console_handler(request: web.Request) -> web.StreamResponse:
                 'true' if config['service']['allow_project_resource_monitor'] else 'false',
             'allow_manual_image_name_for_session':
                 'true' if config['service'].get('allow_manual_image_name_for_session') else 'false',
+            'always_enqueue_compute_session':
+                'true' if config['service'].get('always_enqueue_compute_session') else 'false',
             'allow_signup_without_confirmation':
                 'true' if config['service'].get('allow_signup_without_confirmation') else 'false',
             'webui_debug': 'true' if config['service'].get('webui_debug') else 'false',
