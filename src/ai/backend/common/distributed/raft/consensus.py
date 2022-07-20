@@ -66,14 +66,17 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._next_index: List[int] = []
         self._match_index: List[int] = []
 
-        self._cache_prev_log_index: int = 0
-        self._cache_prev_log_term: int = 0
+        self._prev_log_index: int = 0
+        self._prev_log_term: int = 0
 
         self._server.bind(self)
 
     async def __ainit__(self, *args, **kwargs) -> None:
         await self._execute_transition(RaftState.FOLLOWER)
         self._log: AbstractLogStorage = await SqliteLogStorage.new(id=self.id)    # type: ignore
+
+        if last_log := (await self._log.last()):
+            self._prev_log_index = last_log.index
 
     async def _execute_transition(self, next_state: RaftState) -> None:
         self._state = next_state
@@ -88,11 +91,12 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
             await asyncio.sleep(3.0)
             command = str(uuid.uuid4())
             logging.info(f'[LEADER] Storage size: {await self._log.size()}')
-            entry = raft_pb2.Log(index=await self._log.size(), term=self.current_term, command=command)
+            next_index = self._prev_log_index + 1
+            entry = raft_pb2.Log(index=next_index, term=self.current_term, command=command)
             await self._log.append_entries((entry,))
 
-            self._cache_prev_log_index += 1
-            self._cache_prev_log_term = self.current_term
+            self._prev_log_index = next_index
+            self._prev_log_term = self.current_term
 
             while not await self.replicate_logs(entries=(entry,)):
                 await asyncio.sleep(0.1)
@@ -143,21 +147,21 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         await self.replicate_logs(entries=())
 
     async def replicate_logs(self, entries: Tuple[raft_pb2.Log, ...]) -> bool:
-        done, _ = await asyncio.wait({
+        results = await asyncio.gather(*[
             asyncio.create_task(
                 self._client.append_entries(
                     address=address, term=self.current_term, leader_id=self.id,
-                    prev_log_index=self._cache_prev_log_index, prev_log_term=self._cache_prev_log_term,
+                    prev_log_index=self._prev_log_index, prev_log_term=self._prev_log_term,
                     entries=entries, leader_commit=self._commit_index,
                 ),
             )
             for address in self._peers
-        }, return_when=asyncio.ALL_COMPLETED)
+        ])
         if entries:
             logging.info(
                 f'[{datetime.now().isoformat()}] replicate(entries={entries[-1].index}, '
                 f'total={await self._log.size()})')
-        return sum([task.result() for task in done]) + 1 >= self.quorum
+        return sum(results) + 1 >= self.quorum
 
     """
     AbstractRaftProtocol Implementations
@@ -190,6 +194,8 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         if (log := await self._log.get(prev_log_index)) and (log.term != prev_log_term):
             return False
 
+        self._leader_id = leader_id
+
         """Receiver implementation:
         3. If an existing entry conflicts with a new one (same index but different terms),
            delete the existing entry and all that follow it
@@ -199,16 +205,15 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                 await self._log.splice(index=entry.index)
                 break
 
-        self._cache_prev_log_index = prev_log_index
-        self._cache_prev_log_term = prev_log_term
+        self._prev_log_index = prev_log_index
+        self._prev_log_term = prev_log_term
 
         """Receiver implementation:
         4. Append any new entries not already in the log
         """
-        self._leader_id = leader_id
         if entries:
             await self._log.append_entries(entries)
-            logging.info(f'[{datetime.now()}] pid={os.getpid()} on_append_entries(term={term}, entry={entries[-1].index}, '
+            logging.info(f'[{datetime.now()}] pid={os.getpid()} on_append_entries(term={term}, index={entries[-1].index}, '
                          f'total={await self._log.size()})')
 
         """Receiver implementation:
