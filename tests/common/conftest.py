@@ -11,7 +11,7 @@ from ai.backend.testutils.bootstrap import etcd_container, redis_container  # no
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--do-test-redis",
+        "--skip-test-redis",
         action="store_true",
         default=False,
         help="run Redis tests",
@@ -23,7 +23,7 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    if not config.getoption("--do-test-redis"):
+    if config.getoption("--skip-test-redis"):
         # auto-skip tests marked with "redis" unless --test-redis option is given.
         do_skip = pytest.mark.skip(
             reason="skipped because no related files are changed",

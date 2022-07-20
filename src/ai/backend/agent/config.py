@@ -24,6 +24,8 @@ agent_local_config_iv = t.Dict({
         t.Key('id', default=None): t.Null | t.String,
         t.Key('ipc-base-path', default="/tmp/backend.ai/ipc"):
             tx.Path(type='dir', auto_create=True),
+        t.Key('var-base-path', default="./var/lib/backend.ai"):
+            tx.Path(type='dir', auto_create=True),
         t.Key('region', default=None): t.Null | t.String,
         t.Key('instance-type', default=None): t.Null | t.String,
         t.Key('scaling-group', default='default'): t.String,
@@ -31,7 +33,9 @@ agent_local_config_iv = t.Dict({
             tx.Path(type='file', allow_nonexisting=True, allow_devnull=True),
         t.Key('event-loop', default='asyncio'): t.Enum('asyncio', 'uvloop'),
         t.Key('skip-manager-detection', default=False): t.ToBool,
-        t.Key('aiomonitor-port', default=50102): t.Int[1:65535],
+        t.Key('aiomonitor-port', default=50002): t.Int[1:65535],
+        t.Key('abuse-report-path', default=None): t.Null | tx.Path(type='dir',
+                                                                   allow_nonexisting=True),
     }).allow_extra('*'),
     t.Key('container'): t.Dict({
         t.Key('kernel-uid', default=-1): tx.UserID,

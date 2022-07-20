@@ -27,16 +27,14 @@ from typing import (
     cast,
 )
 
-import aioredis
-import aioredis.exceptions
-import aioredis.sentinel
 import attr
 from aiotools.context import aclosing
 from aiotools.server import process_index
 from aiotools.taskgroup import PersistentTaskGroup
+from redis.asyncio import ConnectionPool
 from typing_extensions import TypeAlias
 
-from . import msgpack, redis
+from . import msgpack, redis_helper
 from .logging import BraceStyleAdapter
 from .types import (
     AgentId,
@@ -522,7 +520,7 @@ class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
 class RedisConnectorFunc(Protocol):
     def __call__(
         self,
-    ) -> aioredis.ConnectionPool:
+    ) -> ConnectionPool:
         ...
 
 
@@ -650,7 +648,7 @@ class EventDispatcher(aobject):
         _redis_config = redis_config.copy()
         if service_name:
             _redis_config['service_name'] = service_name
-        self.redis_client = redis.get_redis_object(_redis_config, db=db)
+        self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
         self._log_events = log_events
         self._closed = False
         self.consumers = defaultdict(set)
@@ -778,7 +776,7 @@ class EventDispatcher(aobject):
             await asyncio.sleep(0)
 
     async def _consume_loop(self) -> None:
-        async with aclosing(redis.read_stream_by_group(
+        async with aclosing(redis_helper.read_stream_by_group(
             self.redis_client,
             self._stream_key,
             self._consumer_group,
@@ -801,7 +799,7 @@ class EventDispatcher(aobject):
                     log.exception('EventDispatcher.consume(): unexpected-error')
 
     async def _subscribe_loop(self) -> None:
-        async with aclosing(redis.read_stream(
+        async with aclosing(redis_helper.read_stream(
             self.redis_client,
             self._stream_key,
         )) as agen:
@@ -839,7 +837,7 @@ class EventProducer(aobject):
         if service_name:
             _redis_config['service_name'] = service_name
         self._closed = False
-        self.redis_client = redis.get_redis_object(_redis_config, db=db)
+        self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
         self._log_events = log_events
         self._stream_key = stream_key
 
@@ -863,7 +861,7 @@ class EventProducer(aobject):
             b'source': source.encode(),
             b'args': msgpack.packb(event.serialize()),
         }
-        await redis.execute(
+        await redis_helper.execute(
             self.redis_client,
             lambda r: r.xadd(self._stream_key, raw_event),  # type: ignore # aio-libs/aioredis-py#1182
         )

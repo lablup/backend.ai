@@ -1,7 +1,6 @@
+import re
 import subprocess
 import sys
-import re
-
 
 rx_oneline = re.compile(r"^(?P<commit>[a-f0-9]{40}) (?P<msg>.*?)(\(#(?P<pr>\d+)\))?$")
 

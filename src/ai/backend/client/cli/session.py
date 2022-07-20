@@ -6,13 +6,15 @@ import secrets
 import subprocess
 import sys
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import IO, List, Literal, Optional, Sequence
 
 import click
 import inquirer
 from async_timeout import timeout
+from dateutil.parser import isoparse
+from dateutil.tz import tzutc
 from humanize import naturalsize
 from tabulate import tabulate
 
@@ -671,6 +673,50 @@ def logs(session_id):
             logs = result.get('logs') if 'logs' in result else ''
             print(logs)
             print_done('End of logs.')
+        except Exception as e:
+            print_error(e)
+            sys.exit(1)
+
+
+@session.command('status-history')
+@click.argument('session_id', metavar='SESSID')
+def status_history(session_id):
+    '''
+    Shows the status transition history of the compute session.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    '''
+    with Session() as session:
+        print_wait('Retrieving status history...')
+        kernel = session.ComputeSession(session_id)
+        try:
+            status_history = kernel.get_status_history().get('result')
+            print_info(f'status_history: {status_history}')
+            if (preparing := status_history.get('preparing')) is None:
+                result = {
+                    'result': {
+                        'seconds': 0,
+                        'microseconds': 0,
+                    },
+                }
+            elif (terminated := status_history.get('terminated')) is None:
+                alloc_time_until_now: timedelta = datetime.now(tzutc()) - isoparse(preparing)
+                result = {
+                    'result': {
+                        'seconds': alloc_time_until_now.seconds,
+                        'microseconds': alloc_time_until_now.microseconds,
+                    },
+                }
+            else:
+                alloc_time: timedelta = isoparse(terminated) - isoparse(preparing)
+                result = {
+                    'result': {
+                        'seconds': alloc_time.seconds,
+                        'microseconds': alloc_time.microseconds,
+                    },
+                }
+            print_done(f'Actual Resource Allocation Time: {result}')
         except Exception as e:
             print_error(e)
             sys.exit(1)

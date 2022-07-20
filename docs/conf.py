@@ -13,8 +13,8 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 import sphinx_rtd_theme
@@ -42,6 +42,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx_rtd_theme',
     'sphinxcontrib_trio',
+    'sphinxcontrib.mermaid',
     'sphinx_autodoc_typehints',
 ]
 
