@@ -795,28 +795,17 @@ class AgentRegistry:
             )
 
         async with self.db.begin_readonly() as conn:
-            # Check scaling group availability if scaling_group parameter is given.
-            # If scaling_group is not provided, it will be selected as the first one among
-            # the list of allowed scaling groups.
-            sgroups = await query_allowed_sgroups(
-                conn, user_scope.domain_name, user_scope.group_id, access_key,
+
+            checked_scaling_group = await check_scaling_group(
+                conn, scaling_group, session_type,
+                access_key, user_scope.domain_name, user_scope.group_id,
             )
-            if not sgroups:
-                raise ScalingGroupNotFound("You have no scaling groups allowed to use.")
             if scaling_group is None:
-                scaling_group = sgroups[0]['name']
                 log.warning(
                     f"enqueue_session(s:{session_name}, ak:{access_key}): "
                     f"The client did not specify the scaling group for session; "
-                    f"falling back to {scaling_group}",
+                    f"falling back to {checked_scaling_group}",
                 )
-            else:
-                for sgroup in sgroups:
-                    if scaling_group == sgroup['name']:
-                        break
-                else:
-                    raise ScalingGroupNotFound(f"The scaling group {scaling_group} does not exist.")
-            assert scaling_group is not None
 
             # Translate mounts/mount_map into vfolder mounts
             requested_mounts = kernel_enqueue_configs[0]['creation_config'].get('mounts') or []
@@ -896,7 +885,7 @@ class AgentRegistry:
             'cluster_role': sa.bindparam('cluster_role'),
             'cluster_idx': sa.bindparam('cluster_idx'),
             'cluster_hostname': sa.bindparam('cluster_hostname'),
-            'scaling_group': scaling_group,
+            'scaling_group': checked_scaling_group,
             'domain_name': user_scope.domain_name,
             'group_id': user_scope.group_id,
             'user_uuid': user_scope.user_uuid,
@@ -2902,3 +2891,53 @@ class AgentRegistry:
         reason: str,
     ) -> None:
         await self.clean_session(session_id)
+
+
+async def check_scaling_group(
+    conn: SAConnection,
+    scaling_group: str | None,
+    session_type: SessionTypes,
+    access_key: AccessKey,
+    domain_name: str,
+    group_id: Union[uuid.UUID, str],
+) -> str:
+    # Check scaling group availability if scaling_group parameter is given.
+    # If scaling_group is not provided, it will be selected as the first one among
+    # the list of allowed scaling groups.
+    candidates = await query_allowed_sgroups(
+        conn, domain_name, group_id, access_key,
+    )
+    if not candidates:
+        raise ScalingGroupNotFound("You have no scaling groups allowed to use.")
+
+    stype = session_type.value.lower()
+    if scaling_group is None:
+        for sgroup in candidates:
+            allowed_session_types = sgroup['scheduler_opts'].allowed_session_types
+            if stype in allowed_session_types:
+                scaling_group = sgroup['name']
+                break
+        else:
+            raise ScalingGroupNotFound(
+                f"No scaling groups accept the session type '{session_type}'.",
+            )
+    else:
+        err_msg = (
+            f"The scaling group '{scaling_group}' does not exist "
+            f"or you do not have access to the scaling group '{scaling_group}'."
+        )
+        for sgroup in candidates:
+            if scaling_group == sgroup['name']:
+                # scaling_group's unique key is 'name' field for now,
+                # but we will change scaling_group's unique key to new 'id' field.
+                allowed_session_types = sgroup['scheduler_opts'].allowed_session_types
+                if stype in allowed_session_types:
+                    break
+                err_msg = (
+                    f"The scaling group '{scaling_group}' does not accept "
+                    f"the session type '{session_type}'. "
+                )
+        else:
+            raise ScalingGroupNotFound(err_msg)
+    assert scaling_group is not None
+    return scaling_group
