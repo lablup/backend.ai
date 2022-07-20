@@ -7,7 +7,7 @@ import os
 import random
 import uuid
 from datetime import datetime
-from typing import Awaitable, Callable, Final, Iterable, List, Optional, Tuple
+from typing import Awaitable, Callable, Dict, Final, Iterable, Optional, Tuple
 
 from ...types import aobject
 from .client import AbstractRaftClient
@@ -33,6 +33,36 @@ class RaftState(enum.Enum):
 
 
 class RaftConsensusModule(aobject, AbstractRaftProtocol):
+    """Rules for Servers
+    All Servers
+    - If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state machine
+    - If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower
+
+    Followers
+    - Respond to RPCs from candidates and leaders
+    - If election timeout elapses without receiving AppendEntries RPC from current leader or granting vote to candidate:
+      convert to candidate
+
+    Candidates
+    - On conversion to candidate, start election:
+        - Increment currentTerm
+        - Vote for self
+        - Reset election timer
+        - Send RequestVote RPCs to all other servers
+    - If votes received from majority of servers: become leader
+    - If AppendEntries RPC received from new leader: convert to follower
+    - If election timeout elapses: start new election
+
+    Leaders
+    - Upon election: send initial empty AppendEntries RPCs (heartbeat) to each server;
+      repeat during idle periods to prevent election timeouts
+    - If command received from client: append entry to local log, respond after entry applied to state machine
+    - If last log index >= nextIndex for a follower: send AppendEntries RPC with log entries starting at nextIndex
+        - If successful: update nextIndex and matchIndex for follower
+        - If AppendEntries fails because of log inconsistency: decrement nextIndex and retry
+    - If there exists an N such that N > commitIndex, a majority of matchIndex[i] >= N, and log[N].term == currentTerm:
+      set commitIndex = N
+    """
     def __init__(
         self,
         peers: Iterable[PeerId],
@@ -52,19 +82,9 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._heartbeat_interval: Final[float] = 0.1
         self._leader_id: Optional[PeerId] = None
 
-        # Persistent state on all servers
-        # (Updated on stable storage before responding to RPCs)
-        self._current_term: int = 0
-        self._voted_for: Optional[PeerId] = None
-
-        # Volatile state on all servers
-        self._commit_index: int = 0
-        self._last_applied: int = 0
-
-        # Volatile state on leaders
-        # (Reinitialized after election)
-        self._next_index: List[int] = []
-        self._match_index: List[int] = []
+        self._reinitialize_persistent_state()
+        self._reinitialize_volatile_state()
+        self._reinitialize_leader_volatile_state()
 
         self._prev_log_index: int = 0
         self._prev_log_term: int = 0
@@ -73,10 +93,52 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
 
     async def __ainit__(self, *args, **kwargs) -> None:
         await self._execute_transition(RaftState.FOLLOWER)
-        self._log: AbstractLogStorage = await SqliteLogStorage.new(id=self.id)    # type: ignore
+        self._log = await SqliteLogStorage.new(id=self.id)    # type: ignore
 
         if last_log := (await self._log.last()):
             self._prev_log_index = last_log.index
+
+    def _reinitialize_persistent_state(self):
+        """Persistent state on all servers
+        (Updated on stable storage before responding to RPCs)
+
+        currentTerm (int): latest term server has seen
+                           (initialized to 0 on first boot, increases monotonically)
+        votedFor (ai.backend.common.distributed.raft.types.PeerId):
+            candidateId that received vote in current term (or null if none)
+        log (Iterable[ai.backend.common.distributed.raft.protos.raft_pb2.Log]): log entries;
+            each entry contains command for state machine, and term when entry was received by leader
+            (first index is 1)
+        """
+        self._current_term: int = 0
+        self._voted_for: Optional[PeerId] = None
+        self._log: AbstractLogStorage
+
+    def _reinitialize_volatile_state(self):
+        """Volatile state on all servers
+        (Reinitialized after election)
+
+        commitIndex (int): index of highest log entry known to be committed
+                           (initialized to 0, increases monotonically)
+        lastApplied (int): index of highest log entry applied to state machine
+                           (initialized to 0, increases monotonically)
+        """
+        self._commit_index: int = 0
+        self._last_applied: int = 0
+
+    def _reinitialize_leader_volatile_state(self):
+        """Volatile state on leaders
+        (Reinitialized after election)
+
+        nextIndex (Dict[ai.backend.common.distributed.raft.types.PeerId, int]):
+            for each server, index of the next log entry to send to that server
+            (initialized to leader last log index + 1)
+        matchIndex (Dict[ai.backend.common.distributed.raft.types.PeerId, int]):
+            for each server, index of highest log entry known to be replicated on server
+            (initialized to 0, increases monotonically)
+        """
+        self._next_index: Dict[PeerId, int] = {}
+        self._match_index: Dict[PeerId, int] = {}
 
     async def _execute_transition(self, next_state: RaftState) -> None:
         self._state = next_state
@@ -117,21 +179,12 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                     await self._wait_for_election_timeout()
                     await self._execute_transition(RaftState.CANDIDATE)
                 case RaftState.CANDIDATE:
-                    """Rules for Servers
-                    Candidates
-                    - On conversion to candidate, start election:
-                        - Increment currentTerm
-                        - Vote for self
-                        - Reset election timer
-                        - Send RequestVote RPCs to all other servers
-                    - If votes received from majority of servers: become leader
-                    - If AppendEntries RPC received from new leader: convert to follower
-                    - If election timeout elapses: start new election
-                    """
                     self._leader_id = None
                     while self._state is RaftState.CANDIDATE:
                         await self._start_election()
+                        self._reinitialize_volatile_state()
                         if self._state is RaftState.LEADER:
+                            self._reinitialize_leader_volatile_state()
                             break
                         await asyncio.sleep(self._election_timeout)
                 case RaftState.LEADER:
@@ -163,11 +216,6 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                 f'total={await self._log.size()})')
         return sum(results) + 1 >= self.quorum
 
-    """
-    AbstractRaftProtocol Implementations
-    - on_append_entries
-    - on_request_vote
-    """
     async def on_append_entries(
         self,
         *,
@@ -179,27 +227,15 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         leader_commit: int,
     ) -> bool:
         await self.reset_timeout()
-
-        """Receiver implementation:
-        1. Reply false if term < currentTerm
-        """
         if term < self.current_term:
             return False
-
         await self._synchronize_term(term)
 
-        """Receiver implementation:
-        2. Reply false if log doesn't contain any entry at prevLogIndex whose term matches prevLogTerm
-        """
         if (log := await self._log.get(prev_log_index)) and (log.term != prev_log_term):
             return False
 
         self._leader_id = leader_id
 
-        """Receiver implementation:
-        3. If an existing entry conflicts with a new one (same index but different terms),
-           delete the existing entry and all that follow it
-        """
         for entry in (entries := tuple(entries)):
             if (old_entry := await self._log.get(entry.index)) and (old_entry.term != entry.term):
                 await self._log.splice(index=entry.index)
@@ -208,17 +244,11 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._prev_log_index = prev_log_index
         self._prev_log_term = prev_log_term
 
-        """Receiver implementation:
-        4. Append any new entries not already in the log
-        """
         if entries:
             await self._log.append_entries(entries)
             logging.info(f'[{datetime.now()}] pid={os.getpid()} on_append_entries(term={term}, index={entries[-1].index}, '
                          f'total={await self._log.size()})')
 
-        """Receiver implementation:
-        5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
-        """
         if leader_commit > self._commit_index:
             self._commit_index = min(leader_commit, entries[-1].entry)
 
@@ -233,18 +263,10 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         last_log_term: int,
     ) -> bool:
         await self.reset_timeout()
-
-        """Receiver implementation:
-        1. Reply false if term < currentTerm
-        """
         if term < self.current_term:
             return False
-
         await self._synchronize_term(term)
 
-        """Receiver implementation:
-        2. If votedFor is null or candidateId, and candidate's log is at least up-to-date as receiver's log, grant vote
-        """
         if self.voted_for is None:
             self._voted_for = candidate_id
             return True
@@ -281,10 +303,6 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
             await self._execute_transition(RaftState.LEADER)
 
     async def _synchronize_term(self, term: int) -> None:
-        """Rules for Servers
-        All Servers:
-        - If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower
-        """
         if term > self.current_term:
             self._current_term = term
             await self._execute_transition(RaftState.FOLLOWER)
