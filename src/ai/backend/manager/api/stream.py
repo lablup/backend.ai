@@ -260,7 +260,7 @@ async def stream_pty(defer, request: web.Request) -> web.StreamResponse:
                 )
         except asyncio.CancelledError:
             pass
-        except:
+        except Exception:
             await root_ctx.error_monitor.capture_exception(
                 context={"user": request["user"]["uuid"]}
             )
