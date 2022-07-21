@@ -20,18 +20,8 @@ from redis.asyncio import Redis
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import AbstractEvent, EventDispatcher, EventProducer
-from ai.backend.common.lock import (
-    AbstractDistributedLock,
-    EtcdLock,
-    FileLock,
-    RedisLock,
-)
-from ai.backend.common.types import (
-    AgentId,
-    EtcdRedisConfig,
-    HostPortPair,
-    RedisConnectionInfo,
-)
+from ai.backend.common.lock import AbstractDistributedLock, EtcdLock, FileLock, RedisLock
+from ai.backend.common.types import AgentId, EtcdRedisConfig, HostPortPair, RedisConnectionInfo
 
 
 @dataclass
@@ -70,7 +60,7 @@ class NoopEvent(AbstractEvent):
     test_ns: str = attr.ib()
 
     def serialize(self) -> tuple:
-        return (self.test_ns, )
+        return (self.test_ns,)
 
     @classmethod
     def deserialize(cls, value: tuple):
@@ -123,7 +113,6 @@ def etcd_timer_node_process(
     asyncio.set_event_loop(asyncio.new_event_loop())
 
     async def _main() -> None:
-
         async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
             print("_tick")
             queue.put(time.monotonic())
@@ -142,9 +131,9 @@ def etcd_timer_node_process(
             addr=etcd_ctx.addr,
             namespace=etcd_ctx.namespace,
             scope_prefix_map={
-                ConfigScopes.GLOBAL: 'global',
-                ConfigScopes.SGROUP: 'sgroup/testing',
-                ConfigScopes.NODE: 'node/i-test',
+                ConfigScopes.GLOBAL: "global",
+                ConfigScopes.SGROUP: "sgroup/testing",
+                ConfigScopes.NODE: "node/i-test",
             },
         )
         timer = GlobalTimer(
@@ -166,7 +155,6 @@ def etcd_timer_node_process(
 
 
 class TimerNode(threading.Thread):
-
     def __init__(
         self,
         event_records: list[float],
@@ -220,7 +208,7 @@ class TimerNode(threading.Thread):
 
 @pytest.mark.asyncio
 async def test_global_timer_filelock(request, test_ns, redis_container) -> None:
-    lock_path = Path(tempfile.gettempdir()) / f'{test_ns}.lock'
+    lock_path = Path(tempfile.gettempdir()) / f"{test_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
     lock_factory = lambda: FileLock(lock_path, timeout=0, debug=True)
 
@@ -229,7 +217,7 @@ async def test_global_timer_filelock(request, test_ns, redis_container) -> None:
     num_records = 0
     delay = 3.0
     interval = 0.5
-    target_count = (delay / interval)
+    target_count = delay / interval
     threads: List[TimerNode] = []
     for thread_idx in range(num_threads):
         timer_node = TimerNode(
@@ -265,17 +253,17 @@ async def test_global_timer_filelock(request, test_ns, redis_container) -> None:
 async def test_gloal_timer_redlock(test_ns, redis_container) -> None:
     redis_addr = redis_container[1]
     r = RedisConnectionInfo(
-        Redis.from_url(f'redis://{redis_addr.host}:{redis_addr.port}'),
+        Redis.from_url(f"redis://{redis_addr.host}:{redis_addr.port}"),
         service_name=None,
     )
-    lock_factory = lambda: RedisLock(f'{test_ns}lock', r, debug=True)
+    lock_factory = lambda: RedisLock(f"{test_ns}lock", r, debug=True)
 
     event_records: List[float] = []
     num_threads = 7
     num_records = 0
     delay = 3.0
     interval = 0.5
-    target_count = (delay / interval)
+    target_count = delay / interval
     tasks: List[Tuple[asyncio.Task, asyncio.Event]] = []
     for thread_idx in range(num_threads):
         stop_event = asyncio.Event()
@@ -309,21 +297,23 @@ async def test_gloal_timer_redlock(test_ns, redis_container) -> None:
 
 @pytest.mark.asyncio
 async def test_global_timer_etcdlock(
-    test_ns, etcd_container, redis_container,
+    test_ns,
+    etcd_container,
+    redis_container,
 ) -> None:
-    lock_name = f'{test_ns}lock'
+    lock_name = f"{test_ns}lock"
     event_records_queue: Queue = Queue()
     num_processes = 7
     num_records = 0
     delay = 3.0
     interval = 0.5
-    target_count = (delay / interval)
+    target_count = delay / interval
     processes: List[Process] = []
     stop_event = Event()
     for proc_idx in range(num_processes):
         process = Process(
             target=etcd_timer_node_process,
-            name=f'proc-{proc_idx}',
+            name=f"proc-{proc_idx}",
             args=(
                 event_records_queue,
                 stop_event,
@@ -379,7 +369,7 @@ async def test_global_timer_join_leave(request, test_ns, redis_container) -> Non
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
 
-    lock_path = Path(tempfile.gettempdir()) / f'{test_ns}.lock'
+    lock_path = Path(tempfile.gettempdir()) / f"{test_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
     for _ in range(10):
         timer = GlobalTimer(
@@ -404,7 +394,7 @@ async def test_filelock_watchdog(request, test_ns) -> None:
 
     TODO: For further implementation, the `FileLock` should be able to **cancel** current job after timeout.
     """
-    lock_path = Path(tempfile.gettempdir()) / f'{test_ns}.lock'
+    lock_path = Path(tempfile.gettempdir()) / f"{test_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
 
     loop = asyncio.get_running_loop()
@@ -418,7 +408,7 @@ async def test_filelock_watchdog(request, test_ns) -> None:
                     await asyncio.sleep(interval)
                     t += interval
 
-        ttl, delay = (3.0, float('inf'))
+        ttl, delay = (3.0, float("inf"))
         n = 4
 
         begin = loop.time()

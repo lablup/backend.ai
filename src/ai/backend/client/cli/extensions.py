@@ -12,8 +12,9 @@ from ai.backend.client.output import get_output_handler
 
 def set_client_config(info: Mapping) -> CLIContext:
     from .announcement import announce
-    skip_sslcert_validation = info.get('skip_sslcert_validation', False)
-    output = info.get('output', 'console')
+
+    skip_sslcert_validation = info.get("skip_sslcert_validation", False)
+    output = info.get("output", "console")
     config = APIConfig(
         skip_sslcert_validation=skip_sslcert_validation,
         announcement_handler=announce,
@@ -28,6 +29,7 @@ def set_client_config(info: Mapping) -> CLIContext:
     cli_ctx.output = get_output_handler(cli_ctx, output_mode)
 
     from .pretty import show_warning
+
     warnings.showwarning = show_warning
     return cli_ctx
 
@@ -44,7 +46,7 @@ def pass_ctx_obj(f: F) -> F:
             case CliContextInfo(info=info):
                 inner = f(set_client_config(info), *args, **kwargs)
             case _:
-                raise RuntimeError('Invalid Context from client command')
+                raise RuntimeError("Invalid Context from client command")
         return inner
 
     return update_wrapper(cast(F, new_func), f)

@@ -10,20 +10,21 @@ from alembic import op
 from sqlalchemy.sql.expression import bindparam
 
 # revision identifiers, used by Alembic.
-revision = '11146ba02235'
-down_revision = '0f7a4b643940'
+revision = "11146ba02235"
+down_revision = "0f7a4b643940"
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
     conn = op.get_bind()
-    op.alter_column('agents', column_name='architecture', type_=sa.String(length=32))
-    query = '''
+    op.alter_column("agents", column_name="architecture", type_=sa.String(length=32))
+    query = """
     UPDATE agents
     SET architecture = TRIM (architecture);
-    '''
+    """
     conn.execute(query)
 
+
 def downgrade():
-    op.alter_column('agents', column_name='architecture', type_=sa.CHAR(length=32))
+    op.alter_column("agents", column_name="architecture", type_=sa.CHAR(length=32))

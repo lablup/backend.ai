@@ -21,7 +21,7 @@ class DeviceStat(NamedTuple):
     gpu_util: int
     mem_util: int
     power_usage: int  # milli-watts
-    power_max: int    # milli-watts
+    power_max: int  # milli-watts
     core_temperature: int
 
 
@@ -40,7 +40,7 @@ class SupportsAsyncClose(Protocol):
         ...
 
 
-_SupportsAsyncCloseT = TypeVar('_SupportsAsyncCloseT', bound=SupportsAsyncClose)
+_SupportsAsyncCloseT = TypeVar("_SupportsAsyncCloseT", bound=SupportsAsyncClose)
 
 
 class closing_async(AsyncContextManager[_SupportsAsyncCloseT]):

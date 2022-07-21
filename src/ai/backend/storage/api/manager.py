@@ -126,8 +126,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
             {
                 t.Key("volume"): t.String(),
                 t.Key("vfid"): tx.UUID(),
-                t.Key("options", default=None): t.Null
-                | VFolderCreationOptions.as_trafaret(),
+                t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
             },
         ),
     ) as params:
@@ -165,8 +164,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
                 t.Key("src_vfid"): tx.UUID(),
                 t.Key("dst_volume"): t.String(),
                 t.Key("dst_vfid"): tx.UUID(),
-                t.Key("options", default=None): t.Null
-                | VFolderCreationOptions.as_trafaret(),
+                t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
             },
         ),
     ) as params:
@@ -545,8 +543,7 @@ async def create_download_session(request: web.Request) -> web.Response:
             "volume": params["volume"],
             "vfid": str(params["vfid"]),
             "relpath": str(params["relpath"]),
-            "exp": datetime.utcnow()
-            + ctx.local_config["storage-proxy"]["session-expire"],
+            "exp": datetime.utcnow() + ctx.local_config["storage-proxy"]["session-expire"],
         }
         token = jwt.encode(
             token_data,
@@ -583,8 +580,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
             "relpath": str(params["relpath"]),
             "size": params["size"],
             "session": session_id,
-            "exp": datetime.utcnow()
-            + ctx.local_config["storage-proxy"]["session-expire"],
+            "exp": datetime.utcnow() + ctx.local_config["storage-proxy"]["session-expire"],
         }
         token = jwt.encode(
             token_data,

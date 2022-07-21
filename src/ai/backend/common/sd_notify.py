@@ -38,7 +38,7 @@ import socket
 import asyncudp
 
 
-class SystemdNotifier():
+class SystemdNotifier:
 
     socket: asyncudp.Socket | None
     address: str | None
@@ -49,7 +49,7 @@ class SystemdNotifier():
 
     @property
     def enabled(self) -> bool:
-        return (self.address is not None)
+        return self.address is not None
 
     async def _send(self, raw_msg: bytes) -> None:
         """
@@ -62,11 +62,13 @@ class SystemdNotifier():
         loop = asyncio.get_running_loop()
         if self.socket is None:
             self.socket = asyncudp.Socket(
-                *(await loop.create_datagram_endpoint(
-                    asyncudp._SocketProtocol,
-                    family=socket.AF_UNIX,
-                    remote_addr=self.address,  # type: ignore
-                )),
+                *(
+                    await loop.create_datagram_endpoint(
+                        asyncudp._SocketProtocol,
+                        family=socket.AF_UNIX,
+                        remote_addr=self.address,  # type: ignore
+                    )
+                ),
             )
         self.socket.sendto(raw_msg)
 
@@ -84,19 +86,19 @@ class SystemdNotifier():
 
     async def set_errno(self, errno: int) -> None:
         """Set an errno-style integer code to indicate service failure."""
-        await self._send(b"ERRNO=%d\n" % (errno, ))
+        await self._send(b"ERRNO=%d\n" % (errno,))
 
     async def set_buserror(self, code: str) -> None:
         """Set a D-Bus-style error code to indicate service failure."""
-        await self._send(b"BUSERROR=%s\n" % (code.encode('utf8'), ))
+        await self._send(b"BUSERROR=%s\n" % (code.encode("utf8"),))
 
     async def set_main_pid(self, pid: int) -> None:
         """Set the main PID for the case when the service manager did not fork the process itself."""
-        await self._send(b"MAINPID=%d\n" % (pid, ))
+        await self._send(b"MAINPID=%d\n" % (pid,))
 
     async def update_status(self, msg: str) -> None:
         """Set a custom service status message"""
-        await self._send(b"STATUS=%s\n" % (msg.encode('utf8'), ))
+        await self._send(b"STATUS=%s\n" % (msg.encode("utf8"),))
 
     async def keepalive(self) -> None:
         """

@@ -9,22 +9,22 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = 'f5530eccf202'
-down_revision = 'ed666f476f39'
+revision = "f5530eccf202"
+down_revision = "ed666f476f39"
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
     op.create_index(
-        op.f('ix_kernels_uuid_prefix'),
-        'kernels',
+        op.f("ix_kernels_uuid_prefix"),
+        "kernels",
         [sa.text('CAST("id" AS VARCHAR) COLLATE "C"')],
     )
 
 
 def downgrade():
     op.drop_index(
-        op.f('ix_kernels_uuid_prefix'),
-        'kernels',
+        op.f("ix_kernels_uuid_prefix"),
+        "kernels",
     )

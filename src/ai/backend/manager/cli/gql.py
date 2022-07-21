@@ -25,9 +25,6 @@ def cli(args) -> None:
 @click.pass_obj
 def show(cli_ctx: CLIContext) -> None:
     with cli_ctx.logger:
-        schema = graphene.Schema(
-            query=Queries,
-            mutation=Mutations,
-            auto_camelcase=False)
-        log.info('======== GraphQL API Schema ========')
+        schema = graphene.Schema(query=Queries, mutation=Mutations, auto_camelcase=False)
+        log.info("======== GraphQL API Schema ========")
         print(str(schema))

@@ -47,16 +47,18 @@ from .types import (
 )
 
 __all__ = (
-    'AbstractEvent',
-    'EventCallback',
-    'EventDispatcher',
-    'EventHandler',
-    'EventProducer',
+    "AbstractEvent",
+    "EventCallback",
+    "EventDispatcher",
+    "EventHandler",
+    "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger('ai.backend.common.events'))
+log = BraceStyleAdapter(logging.getLogger("ai.backend.common.events"))
 
-PTGExceptionHandler: TypeAlias = Callable[[Type[Exception], Exception, TracebackType], Awaitable[None]]
+PTGExceptionHandler: TypeAlias = Callable[
+    [Type[Exception], Exception, TracebackType], Awaitable[None]
+]
 
 
 class AbstractEvent(metaclass=abc.ABCMeta):
@@ -81,8 +83,7 @@ class AbstractEvent(metaclass=abc.ABCMeta):
         pass
 
 
-class EmptyEventArgs():
-
+class EmptyEventArgs:
     def serialize(self) -> tuple:
         return tuple()
 
@@ -125,12 +126,12 @@ class DoTerminateSessionEvent(AbstractEvent):
 
 
 @attr.s(slots=True, frozen=True)
-class GenericAgentEventArgs():
+class GenericAgentEventArgs:
 
-    reason: str = attr.ib(default='')
+    reason: str = attr.ib(default="")
 
     def serialize(self) -> tuple:
-        return (self.reason, )
+        return (self.reason,)
 
     @classmethod
     def deserialize(cls, value: tuple):
@@ -182,7 +183,7 @@ class AgentHeartbeatEvent(AbstractEvent):
     agent_info: Mapping[str, Any] = attr.ib()
 
     def serialize(self) -> tuple:
-        return (self.agent_info, )
+        return (self.agent_info,)
 
     @classmethod
     def deserialize(cls, value: tuple):
@@ -190,10 +191,10 @@ class AgentHeartbeatEvent(AbstractEvent):
 
 
 @attr.s(slots=True, frozen=True)
-class KernelCreationEventArgs():
+class KernelCreationEventArgs:
     kernel_id: KernelId = attr.ib()
     creation_id: str = attr.ib()
-    reason: str = attr.ib(default='')
+    reason: str = attr.ib(default="")
 
     def serialize(self) -> tuple:
         return (
@@ -262,9 +263,9 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
 
 
 @attr.s(slots=True, frozen=True)
-class KernelTerminationEventArgs():
+class KernelTerminationEventArgs:
     kernel_id: KernelId = attr.ib()
-    reason: str = attr.ib(default='')
+    reason: str = attr.ib(default="")
     exit_code: int = attr.ib(default=-1)
 
     def serialize(self) -> tuple:
@@ -292,10 +293,10 @@ class KernelTerminatedEvent(KernelTerminationEventArgs, AbstractEvent):
 
 
 @attr.s(slots=True, frozen=True)
-class SessionCreationEventArgs():
+class SessionCreationEventArgs:
     session_id: SessionId = attr.ib()
     creation_id: str = attr.ib()
-    reason: str = attr.ib(default='')
+    reason: str = attr.ib(default="")
 
     def serialize(self) -> tuple:
         return (
@@ -334,9 +335,9 @@ class SessionStartedEvent(SessionCreationEventArgs, AbstractEvent):
 
 
 @attr.s(slots=True, frozen=True)
-class SessionTerminationEventArgs():
+class SessionTerminationEventArgs:
     session_id: SessionId = attr.ib()
-    reason: str = attr.ib(default='')
+    reason: str = attr.ib(default="")
 
     def serialize(self) -> tuple:
         return (
@@ -357,9 +358,9 @@ class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
 
 
 @attr.s(slots=True, frozen=True)
-class SessionResultEventArgs():
+class SessionResultEventArgs:
     session_id: SessionId = attr.ib()
-    reason: str = attr.ib(default='')
+    reason: str = attr.ib(default="")
     exit_code: int = attr.ib(default=-1)
 
     def serialize(self) -> tuple:
@@ -414,16 +415,12 @@ class DoSyncKernelStatsEvent(AbstractEvent):
     kernel_ids: Sequence[KernelId] = attr.ib()
 
     def serialize(self) -> tuple:
-        return (
-            [*map(str, self.kernel_ids)],
-        )
+        return ([*map(str, self.kernel_ids)],)
 
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(
-            kernel_ids=tuple(
-                KernelId(uuid.UUID(item)) for item in value[0]
-            ),
+            kernel_ids=tuple(KernelId(uuid.UUID(item)) for item in value[0]),
         )
 
 
@@ -432,9 +429,7 @@ class GenericSessionEventArgs(AbstractEvent):
     session_id: SessionId = attr.ib()
 
     def serialize(self) -> tuple:
-        return (
-            str(self.session_id),
-        )
+        return (str(self.session_id),)
 
     @classmethod
     def deserialize(cls, value: tuple):
@@ -487,7 +482,7 @@ class BgtaskUpdatedEvent(AbstractEvent):
 
 
 @attr.s(auto_attribs=True, slots=True)
-class BgtaskDoneEventArgs():
+class BgtaskDoneEventArgs:
     task_id: uuid.UUID = attr.ib()
     message: Optional[str] = attr.ib(default=None)
 
@@ -524,9 +519,9 @@ class RedisConnectorFunc(Protocol):
         ...
 
 
-TEvent = TypeVar('TEvent', bound='AbstractEvent')
-TEventCov = TypeVar('TEventCov', bound='AbstractEvent')
-TContext = TypeVar('TContext')
+TEvent = TypeVar("TEvent", bound="AbstractEvent")
+TEventCov = TypeVar("TEventCov", bound="AbstractEvent")
+TContext = TypeVar("TContext")
 
 EventCallback = Union[
     Callable[[TContext, AgentId, TEvent], Coroutine[Any, Any, None]],
@@ -569,7 +564,7 @@ class CoalescingState:
         assert self.fut_sync is not None
         self.last_added = loop.time()
         self.batch_size += 1
-        if self.batch_size >= opts['max_batch_size']:
+        if self.batch_size >= opts["max_batch_size"]:
             assert self.last_handle is not None
             self.last_handle.cancel()
             self.fut_sync.cancel()
@@ -579,17 +574,17 @@ class CoalescingState:
             return True
         # Schedule.
         self.last_handle = loop.call_later(
-            opts['max_wait'],
+            opts["max_wait"],
             self.proceed,
         )
-        if self.last_added > 0 and loop.time() - self.last_added < opts['max_wait']:
+        if self.last_added > 0 and loop.time() - self.last_added < opts["max_wait"]:
             # Cancel the previously pending task.
             self.last_handle.cancel()
             self.fut_sync.cancel()
             # Reschedule.
             self.fut_sync = loop.create_future()
             self.last_handle = loop.call_later(
-                opts['max_wait'],
+                opts["max_wait"],
                 self.proceed,
             )
         try:
@@ -639,7 +634,7 @@ class EventDispatcher(aobject):
         log_events: bool = False,
         *,
         service_name: str = None,
-        stream_key: str = 'events',
+        stream_key: str = "events",
         consumer_group: str = "manager",
         node_id: str = None,
         consumer_exception_handler: PTGExceptionHandler = None,
@@ -647,7 +642,7 @@ class EventDispatcher(aobject):
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
-            _redis_config['service_name'] = service_name
+            _redis_config["service_name"] = service_name
         self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
         self._log_events = log_events
         self._closed = False
@@ -698,7 +693,9 @@ class EventDispatcher(aobject):
     ) -> EventHandler[TContext, TEvent]:
         if name is None:
             name = f"evh-{secrets.token_urlsafe(16)}"
-        handler = EventHandler(event_cls, name, context, callback, coalescing_opts, CoalescingState())
+        handler = EventHandler(
+            event_cls, name, context, callback, coalescing_opts, CoalescingState()
+        )
         self.consumers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
 
@@ -706,7 +703,9 @@ class EventDispatcher(aobject):
         self,
         handler: EventHandler[TContext, TEvent],
     ) -> None:
-        self.consumers[handler.event_cls.name].discard(cast(EventHandler[Any, AbstractEvent], handler))
+        self.consumers[handler.event_cls.name].discard(
+            cast(EventHandler[Any, AbstractEvent], handler)
+        )
 
     def subscribe(
         self,
@@ -719,7 +718,9 @@ class EventDispatcher(aobject):
     ) -> EventHandler[TContext, TEvent]:
         if name is None:
             name = f"evh-{secrets.token_urlsafe(16)}"
-        handler = EventHandler(event_cls, name, context, callback, coalescing_opts, CoalescingState())
+        handler = EventHandler(
+            event_cls, name, context, callback, coalescing_opts, CoalescingState()
+        )
         self.subscribers[event_cls.name].add(cast(EventHandler[Any, AbstractEvent], handler))
         return handler
 
@@ -727,7 +728,9 @@ class EventDispatcher(aobject):
         self,
         handler: EventHandler[TContext, TEvent],
     ) -> None:
-        self.subscribers[handler.event_cls.name].discard(cast(EventHandler[Any, AbstractEvent], handler))
+        self.subscribers[handler.event_cls.name].discard(
+            cast(EventHandler[Any, AbstractEvent], handler)
+        )
 
     async def handle(self, evh_type: str, evh: EventHandler, source: AgentId, args: tuple) -> None:
         coalescing_opts = evh.coalescing_opts
@@ -736,7 +739,7 @@ class EventDispatcher(aobject):
         event_cls = evh.event_cls
         if self._closed:
             return
-        if (await coalescing_state.rate_control(coalescing_opts)):
+        if await coalescing_state.rate_control(coalescing_opts):
             if self._closed:
                 return
             if self._log_events:
@@ -754,7 +757,7 @@ class EventDispatcher(aobject):
         args: tuple,
     ) -> None:
         if self._log_events:
-            log.debug('DISPATCH_CONSUMERS(ev:{}, ag:{})', event_name, source)
+            log.debug("DISPATCH_CONSUMERS(ev:{}, ag:{})", event_name, source)
         for consumer in self.consumers[event_name].copy():
             self.consumer_taskgroup.create_task(
                 self.handle("CONSUMER", consumer, source, args),
@@ -768,7 +771,7 @@ class EventDispatcher(aobject):
         args: tuple,
     ) -> None:
         if self._log_events:
-            log.debug('DISPATCH_SUBSCRIBERS(ev:{}, ag:{})', event_name, source)
+            log.debug("DISPATCH_SUBSCRIBERS(ev:{}, ag:{})", event_name, source)
         for subscriber in self.subscribers[event_name].copy():
             self.subscriber_taskgroup.create_task(
                 self.handle("SUBSCRIBER", subscriber, source, args),
@@ -776,12 +779,14 @@ class EventDispatcher(aobject):
             await asyncio.sleep(0)
 
     async def _consume_loop(self) -> None:
-        async with aclosing(redis_helper.read_stream_by_group(
-            self.redis_client,
-            self._stream_key,
-            self._consumer_group,
-            self._consumer_name,
-        )) as agen:
+        async with aclosing(
+            redis_helper.read_stream_by_group(
+                self.redis_client,
+                self._stream_key,
+                self._consumer_group,
+                self._consumer_name,
+            )
+        ) as agen:
             async for msg_id, msg_data in agen:
                 if self._closed:
                     return
@@ -789,20 +794,22 @@ class EventDispatcher(aobject):
                     continue
                 try:
                     await self.dispatch_consumers(
-                        msg_data[b'name'].decode(),
-                        msg_data[b'source'].decode(),
-                        msgpack.unpackb(msg_data[b'args']),
+                        msg_data[b"name"].decode(),
+                        msg_data[b"source"].decode(),
+                        msgpack.unpackb(msg_data[b"args"]),
                     )
                 except asyncio.CancelledError:
                     raise
                 except Exception:
-                    log.exception('EventDispatcher.consume(): unexpected-error')
+                    log.exception("EventDispatcher.consume(): unexpected-error")
 
     async def _subscribe_loop(self) -> None:
-        async with aclosing(redis_helper.read_stream(
-            self.redis_client,
-            self._stream_key,
-        )) as agen:
+        async with aclosing(
+            redis_helper.read_stream(
+                self.redis_client,
+                self._stream_key,
+            )
+        ) as agen:
             async for msg_id, msg_data in agen:
                 if self._closed:
                     return
@@ -810,14 +817,14 @@ class EventDispatcher(aobject):
                     continue
                 try:
                     await self.dispatch_subscribers(
-                        msg_data[b'name'].decode(),
-                        msg_data[b'source'].decode(),
-                        msgpack.unpackb(msg_data[b'args']),
+                        msg_data[b"name"].decode(),
+                        msg_data[b"source"].decode(),
+                        msgpack.unpackb(msg_data[b"args"]),
                     )
                 except asyncio.CancelledError:
                     raise
                 except Exception:
-                    log.exception('EventDispatcher.subscribe(): unexpected-error')
+                    log.exception("EventDispatcher.subscribe(): unexpected-error")
 
 
 class EventProducer(aobject):
@@ -830,12 +837,12 @@ class EventProducer(aobject):
         db: int = 0,
         *,
         service_name: str = None,
-        stream_key: str = 'events',
+        stream_key: str = "events",
         log_events: bool = False,
     ) -> None:
         _redis_config = redis_config.copy()
         if service_name:
-            _redis_config['service_name'] = service_name
+            _redis_config["service_name"] = service_name
         self._closed = False
         self.redis_client = redis_helper.get_redis_object(_redis_config, db=db)
         self._log_events = log_events
@@ -852,14 +859,14 @@ class EventProducer(aobject):
         self,
         event: AbstractEvent,
         *,
-        source: str = 'manager',
+        source: str = "manager",
     ) -> None:
         if self._closed:
             return
         raw_event = {
-            b'name': event.name.encode(),
-            b'source': source.encode(),
-            b'args': msgpack.packb(event.serialize()),
+            b"name": event.name.encode(),
+            b"source": source.encode(),
+            b"args": msgpack.packb(event.serialize()),
         }
         await redis_helper.execute(
             self.redis_client,
@@ -869,10 +876,10 @@ class EventProducer(aobject):
 
 def _generate_consumer_id(node_id: str = None) -> str:
     h = hashlib.sha1()
-    h.update(str(node_id or socket.getfqdn()).encode('utf8'))
+    h.update(str(node_id or socket.getfqdn()).encode("utf8"))
     hostname_hash = h.hexdigest()
     h = hashlib.sha1()
-    h.update(__file__.encode('utf8'))
+    h.update(__file__.encode("utf8"))
     installation_path_hash = h.hexdigest()
     pidx = process_index.get(0)
     return f"{hostname_hash}:{installation_path_hash}:{pidx}"
