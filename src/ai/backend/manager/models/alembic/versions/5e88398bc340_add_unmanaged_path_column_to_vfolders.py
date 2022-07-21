@@ -9,17 +9,15 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = '5e88398bc340'
-down_revision = 'd452bacd085c'
+revision = "5e88398bc340"
+down_revision = "d452bacd085c"
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
-    op.add_column('vfolders', sa.Column('unmanaged_path', sa.String(length=512), nullable=True))
+    op.add_column("vfolders", sa.Column("unmanaged_path", sa.String(length=512), nullable=True))
 
 
 def downgrade():
-    op.drop_column('vfolders', 'unmanaged_path')
-
-
+    op.drop_column("vfolders", "unmanaged_path")

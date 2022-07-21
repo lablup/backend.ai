@@ -7,19 +7,18 @@ from ai.backend.manager.models.utils import execute_with_retry
 
 @pytest.mark.asyncio
 async def test_execute_with_retry():
-
     class DummyDBError(Exception):
         def __init__(self, pgcode):
             self.pgcode = pgcode
 
     async def txn_func_generic_failure():
-        raise sa.exc.IntegrityError('DUMMY_SQL', params=None, orig=DummyDBError('999'))
+        raise sa.exc.IntegrityError("DUMMY_SQL", params=None, orig=DummyDBError("999"))
 
     async def txn_func_generic_failure_2():
         raise ZeroDivisionError("oops")
 
     async def txn_func_permanent_serialization_failure():
-        raise sa.exc.DBAPIError('DUMMY_SQL', params=None, orig=DummyDBError('40001'))
+        raise sa.exc.DBAPIError("DUMMY_SQL", params=None, orig=DummyDBError("40001"))
 
     _fail_count = 0
 
@@ -28,7 +27,7 @@ async def test_execute_with_retry():
         _fail_count += 1
         if _fail_count == 10:
             return 1234
-        raise sa.exc.DBAPIError('DUMMY_SQL', params=None, orig=DummyDBError('40001'))
+        raise sa.exc.DBAPIError("DUMMY_SQL", params=None, orig=DummyDBError("40001"))
 
     vclock = aiotools.VirtualClock()
     with vclock.patch_loop():

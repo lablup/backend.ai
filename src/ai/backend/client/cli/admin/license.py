@@ -21,16 +21,18 @@ def show():
     """
     Show the license information (enterprise editions only).
     """
+
     async def _show_license():
         async with AsyncSession():
-            rqst = Request('GET', '/license')
+            rqst = Request("GET", "/license")
             async with rqst.fetch() as resp:
                 data = await resp.json()
-            if data['status'] == 'valid':
-                print_done('Your Backend.AI lincese is valid.')
-                print(tabulate([(k, v) for k, v in data['certificate'].items()]))
+            if data["status"] == "valid":
+                print_done("Your Backend.AI lincese is valid.")
+                print(tabulate([(k, v) for k, v in data["certificate"].items()]))
             else:
-                print_warn('Your Backend.AI lincese is valid.')
+                print_warn("Your Backend.AI lincese is valid.")
+
     try:
         asyncio.run(_show_license())
     except Exception as e:

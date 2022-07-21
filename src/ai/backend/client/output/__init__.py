@@ -10,10 +10,13 @@ if TYPE_CHECKING:
 
 def get_output_handler(cli_ctx: CLIContext, output_mode: OutputMode) -> BaseOutputHandler:
     from ai.backend.client.cli.types import OutputMode
+
     if output_mode == OutputMode.JSON:
         from .json import JsonOutputHandler
+
         return JsonOutputHandler(cli_ctx)
     elif output_mode == OutputMode.CONSOLE:
         from .console import ConsoleOutputHandler
+
         return ConsoleOutputHandler(cli_ctx)
     raise RuntimeError("Invalid output handler", output_mode)

@@ -10,7 +10,6 @@ TIMEOUT = pexpect.TIMEOUT
 
 
 class ClientRunnerFunc(Protocol):
-
     def __call__(
         self,
         cmdargs: Sequence[str | Path],

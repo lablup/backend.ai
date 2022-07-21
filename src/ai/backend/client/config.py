@@ -22,13 +22,13 @@ from dotenv import load_dotenv
 from yarl import URL
 
 __all__ = [
-    'parse_api_version',
-    'get_config',
-    'set_config',
-    'APIConfig',
-    'API_VERSION',
-    'DEFAULT_CHUNK_SIZE',
-    'MAX_INFLIGHT_CHUNKS',
+    "parse_api_version",
+    "get_config",
+    "set_config",
+    "APIConfig",
+    "API_VERSION",
+    "DEFAULT_CHUNK_SIZE",
+    "MAX_INFLIGHT_CHUNKS",
 ]
 
 
@@ -39,24 +39,24 @@ class Undefined(enum.Enum):
 _config = None
 _undefined = Undefined.token
 
-API_VERSION = (6, '20220615')
-MIN_API_VERSION = (5, '20191215')
+API_VERSION = (6, "20220615")
+MIN_API_VERSION = (5, "20191215")
 
 DEFAULT_CHUNK_SIZE = 16 * (2**20)  # 16 MiB
 MAX_INFLIGHT_CHUNKS = 4
 
-local_state_path = Path(appdirs.user_state_dir('backend.ai', 'Lablup'))
-local_cache_path = Path(appdirs.user_cache_dir('backend.ai', 'Lablup'))
+local_state_path = Path(appdirs.user_state_dir("backend.ai", "Lablup"))
+local_cache_path = Path(appdirs.user_cache_dir("backend.ai", "Lablup"))
 
 
 def parse_api_version(value: str) -> Tuple[int, str]:
-    match = re.search(r'^v(?P<major>\d+)\.(?P<date>\d{8})$', value)
+    match = re.search(r"^v(?P<major>\d+)\.(?P<date>\d{8})$", value)
     if match is not None:
         return int(match.group(1)), match.group(2)
-    raise ValueError('Could not parse the given API version string', value)
+    raise ValueError("Could not parse the given API version string", value)
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def default_clean(v: Union[str, Mapping]) -> T:
@@ -85,9 +85,9 @@ def get_env(
     """
     load_dotenv(override=True)
     key = key.upper()
-    raw = os.environ.get('BACKEND_' + key)
+    raw = os.environ.get("BACKEND_" + key)
     if raw is None:
-        raw = os.environ.get('SORNA_' + key)
+        raw = os.environ.get("SORNA_" + key)
     if raw is None:
         if default is _undefined:
             raise KeyError(key)
@@ -99,11 +99,11 @@ def get_env(
 
 def bool_env(v: str) -> bool:
     v = v.lower()
-    if v in ('y', 'yes', 't', 'true', '1'):
+    if v in ("y", "yes", "t", "true", "1"):
         return True
-    if v in ('n', 'no', 'f', 'false', '0'):
+    if v in ("n", "no", "f", "false", "0"):
         return False
-    raise ValueError('Unrecognized value of boolean environment variable', v)
+    raise ValueError("Unrecognized value of boolean environment variable", v)
 
 
 def _clean_urls(v: Union[URL, str]) -> List[URL]:
@@ -111,10 +111,10 @@ def _clean_urls(v: Union[URL, str]) -> List[URL]:
         return [v]
     urls = []
     if isinstance(v, str):
-        for entry in v.split(','):
+        for entry in v.split(","):
             url = URL(entry)
             if not url.is_absolute():
-                raise ValueError('URL {} is not absolute.'.format(url))
+                raise ValueError("URL {} is not absolute.".format(url))
             urls.append(url)
     return urls
 
@@ -122,7 +122,7 @@ def _clean_urls(v: Union[URL, str]) -> List[URL]:
 def _clean_tokens(v: str) -> Tuple[str, ...]:
     if not v:
         return tuple()
-    return tuple(v.split(','))
+    return tuple(v.split(","))
 
 
 def _clean_address_map(v: Union[str, Mapping]) -> Mapping:
@@ -136,7 +136,7 @@ def _clean_address_map(v: Union[str, Mapping]) -> Mapping:
     for assignment in v.split(","):
         try:
             k, _, v = assignment.partition("=")
-            if k == '' or v == '':
+            if k == "" or v == "":
                 raise ValueError
         except ValueError:
             raise ValueError(f"{v} is not a valid mapping expression")
@@ -183,15 +183,15 @@ class APIConfig:
     """
 
     DEFAULTS: Mapping[str, Union[str, Mapping]] = {
-        'endpoint': 'https://api.backend.ai',
-        'endpoint_type': 'api',
-        'version': f'v{API_VERSION[0]}.{API_VERSION[1]}',
-        'hash_type': 'sha256',
-        'domain': 'default',
-        'group': 'default',
-        'storage_proxy_address_map': {},
-        'connection_timeout': '10.0',
-        'read_timeout': '0',
+        "endpoint": "https://api.backend.ai",
+        "endpoint_type": "api",
+        "version": f"v{API_VERSION[0]}.{API_VERSION[1]}",
+        "hash_type": "sha256",
+        "domain": "default",
+        "group": "default",
+        "storage_proxy_address_map": {},
+        "connection_timeout": "10.0",
+        "read_timeout": "0",
     }
     """
     The default values for config parameterse settable via environment variables
@@ -204,7 +204,8 @@ class APIConfig:
     _skip_sslcert_validation: bool
 
     def __init__(
-        self, *,
+        self,
+        *,
         endpoint: Union[URL, str] = None,
         endpoint_type: str = None,
         domain: str = None,
@@ -222,57 +223,72 @@ class APIConfig:
         announcement_handler: Callable[[str], None] = None,
     ) -> None:
         from . import get_user_agent
+
         self._endpoints = (
-            _clean_urls(endpoint) if endpoint else
-            get_env('ENDPOINT', self.DEFAULTS['endpoint'], clean=_clean_urls)
+            _clean_urls(endpoint)
+            if endpoint
+            else get_env("ENDPOINT", self.DEFAULTS["endpoint"], clean=_clean_urls)
         )
         random.shuffle(self._endpoints)
-        self._endpoint_type = endpoint_type if endpoint_type is not None else \
-            get_env('ENDPOINT_TYPE', self.DEFAULTS['endpoint_type'], clean=str)
-        self._domain = domain if domain is not None else \
-            get_env('DOMAIN', self.DEFAULTS['domain'], clean=str)
-        self._group = group if group is not None else \
-            get_env('GROUP', self.DEFAULTS['group'], clean=str)
-        self._storage_proxy_address_map = storage_proxy_address_map \
-            if storage_proxy_address_map is not None else \
-            get_env(
-                'OVERRIDE_STORAGE_PROXY',
-                self.DEFAULTS['storage_proxy_address_map'],
+        self._endpoint_type = (
+            endpoint_type
+            if endpoint_type is not None
+            else get_env("ENDPOINT_TYPE", self.DEFAULTS["endpoint_type"], clean=str)
+        )
+        self._domain = (
+            domain if domain is not None else get_env("DOMAIN", self.DEFAULTS["domain"], clean=str)
+        )
+        self._group = (
+            group if group is not None else get_env("GROUP", self.DEFAULTS["group"], clean=str)
+        )
+        self._storage_proxy_address_map = (
+            storage_proxy_address_map
+            if storage_proxy_address_map is not None
+            else get_env(
+                "OVERRIDE_STORAGE_PROXY",
+                self.DEFAULTS["storage_proxy_address_map"],
                 # The shape of this env var must be like "X1=Y1,X2=Y2"
                 clean=_clean_address_map,
             )
-        self._version = version if version is not None else \
-            default_clean(self.DEFAULTS['version'])
+        )
+        self._version = version if version is not None else default_clean(self.DEFAULTS["version"])
         self._user_agent = user_agent if user_agent is not None else get_user_agent()
-        if self._endpoint_type == 'api':
-            self._access_key = access_key if access_key is not None else \
-                get_env('ACCESS_KEY', '')
-            self._secret_key = secret_key if secret_key is not None else \
-                get_env('SECRET_KEY', '')
+        if self._endpoint_type == "api":
+            self._access_key = access_key if access_key is not None else get_env("ACCESS_KEY", "")
+            self._secret_key = secret_key if secret_key is not None else get_env("SECRET_KEY", "")
         else:
-            self._access_key = 'dummy'
-            self._secret_key = 'dummy'
-        self._hash_type = hash_type.lower() if hash_type is not None else \
-                          cast(str, self.DEFAULTS['hash_type'])
+            self._access_key = "dummy"
+            self._secret_key = "dummy"
+        self._hash_type = (
+            hash_type.lower() if hash_type is not None else cast(str, self.DEFAULTS["hash_type"])
+        )
         arg_vfolders = set(vfolder_mounts) if vfolder_mounts else set()
-        env_vfolders = set(get_env('VFOLDER_MOUNTS', '', clean=_clean_tokens))
+        env_vfolders = set(get_env("VFOLDER_MOUNTS", "", clean=_clean_tokens))
         self._vfolder_mounts = [*(arg_vfolders | env_vfolders)]
         # prefer the argument flag and fallback to env if the flag is not set.
         if skip_sslcert_validation:
             self._skip_sslcert_validation = True
         else:
             self._skip_sslcert_validation = get_env(
-                'SKIP_SSLCERT_VALIDATION', 'no', clean=bool_env,
+                "SKIP_SSLCERT_VALIDATION",
+                "no",
+                clean=bool_env,
             )
-        self._connection_timeout = connection_timeout if connection_timeout is not None else \
-            get_env('CONNECTION_TIMEOUT', self.DEFAULTS['connection_timeout'], clean=float)
-        self._read_timeout = read_timeout if read_timeout is not None else \
-            get_env('READ_TIMEOUT', self.DEFAULTS['read_timeout'], clean=float)
+        self._connection_timeout = (
+            connection_timeout
+            if connection_timeout is not None
+            else get_env("CONNECTION_TIMEOUT", self.DEFAULTS["connection_timeout"], clean=float)
+        )
+        self._read_timeout = (
+            read_timeout
+            if read_timeout is not None
+            else get_env("READ_TIMEOUT", self.DEFAULTS["read_timeout"], clean=float)
+        )
         self._announcement_handler = announcement_handler
 
     @property
     def is_anonymous(self) -> bool:
-        return self._access_key == ''
+        return self._access_key == ""
 
     @property
     def endpoint(self) -> URL:
@@ -365,7 +381,7 @@ class APIConfig:
 
     @property
     def announcement_handler(self) -> Optional[Callable[[str], None]]:
-        '''The announcement handler to display server-set announcements.'''
+        """The announcement handler to display server-set announcements."""
         return self._announcement_handler
 
 
