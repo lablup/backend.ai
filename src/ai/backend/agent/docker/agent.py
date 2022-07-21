@@ -894,10 +894,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         if self.docker:
             await self.docker.close()
 
-    async def detect_resources(self) -> Tuple[
-        Mapping[DeviceName, AbstractComputePlugin],
-        Mapping[SlotName, Decimal],
-    ]:
+    async def detect_resources(
+        self,
+    ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
         return await detect_resources(self.etcd, self.local_config)
 
     async def enumerate_containers(
