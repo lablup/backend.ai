@@ -1,6 +1,6 @@
 import abc
 import asyncio
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Tuple
 
 import grpc
 
@@ -20,7 +20,28 @@ class AbstractRaftClient(abc.ABC):
         prev_log_term: int,
         entries: Iterable[raft_pb2.Log],    # type: ignore
         leader_commit: int,
-    ) -> bool:
+    ) -> Tuple[int, bool]:
+        """
+        Send `AppendEntries` request to follower.
+
+        Arguments
+        ---------
+        :param str address: follower's IP address with port (e.g. "127.0.0.1:50051")
+        :param int term: leader's term
+        :param ai.backend.common.distributed.raft.types.PeerId leader_id: so follower can redirect clients
+        :param int prev_log_index: index of log entry immediately preceding new ones
+        :param int prev_log_term: term of prevLogIndex entry
+        :param Iterable[ai.backend.common.distributed.raft.protos.raft_pb2.Log] entries: log entries to store
+            (empty for heartbeat; may send more than one for efficiency)
+        :param int leader_commit: leader's commitIndex
+        ---------
+
+        Returns
+        -------
+        :param int term: follower's currentTerm, for leader to update itself
+        :param bool success: true if follower contained entry matching prevLogIndex and prevLogTerm
+        -------
+        """
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -32,7 +53,25 @@ class AbstractRaftClient(abc.ABC):
         candidate_id: PeerId,
         last_log_index: int,
         last_log_term: int,
-    ) -> bool:
+    ) -> Tuple[int, bool]:
+        """
+        Send `RequestVote` request to follower.
+
+        Arguments
+        ---------
+        :param str address: follower's IP address with port (e.g. "127.0.0.1:50051")
+        :param int term: candidate's term
+        :param ai.backend.common.distributed.raft.types.PeerId candidate_id: candidate requesting vote
+        :param int last_log_index: index of candidate's last log entry
+        :param int last_log_term: term of candidate's last log entry
+        ---------
+
+        Returns
+        -------
+        :param int term: follower's currentTerm, for candidate to update itself
+        :param bool vote_granted: true means candidate received vote
+        -------
+        """
         raise NotImplementedError()
 
 
@@ -54,16 +93,16 @@ class GrpcRaftClient(AbstractRaftClient):
         entries: Iterable[raft_pb2.Log],    # type: ignore
         leader_commit: int,
         timeout: float = 5.0,
-    ) -> bool:
+    ) -> Tuple[int, bool]:
         try:
-            success = await asyncio.wait_for(
+            term, success = await asyncio.wait_for(
                 self._append_entries(address, term, leader_id, prev_log_index, prev_log_term, entries, leader_commit),
                 timeout=timeout,
             )
-            return success
+            return term, success
         except (asyncio.CancelledError, asyncio.TimeoutError):
             pass
-        return False
+        return term, False
 
     async def _append_entries(
         self,
@@ -74,7 +113,7 @@ class GrpcRaftClient(AbstractRaftClient):
         prev_log_term: int,
         entries: Iterable[raft_pb2.Log],    # type: ignore
         leader_commit: int,
-    ) -> bool:
+    ) -> Tuple[int, bool]:
         if credentials := self._credentials:
             channel = grpc.aio.secure_channel(address, credentials)
         else:
@@ -88,9 +127,9 @@ class GrpcRaftClient(AbstractRaftClient):
         )
         try:
             response = await stub.AppendEntries(request)
-            return response.success
+            return response.term, response.success
         except grpc.aio.AioRpcError:
-            return False
+            return term, False
         finally:
             await channel.close()
 
@@ -103,16 +142,16 @@ class GrpcRaftClient(AbstractRaftClient):
         last_log_index: int,
         last_log_term: int,
         timeout: float = 5.0,
-    ) -> bool:
+    ) -> Tuple[int, bool]:
         try:
-            vote_granted = await asyncio.wait_for(
+            term, vote_granted = await asyncio.wait_for(
                 self._request_vote(address, term, candidate_id, last_log_index, last_log_term),
                 timeout=timeout,
             )
-            return vote_granted
+            return term, vote_granted
         except asyncio.TimeoutError:
             pass
-        return False
+        return term, False
 
     async def _request_vote(
         self,
@@ -121,7 +160,7 @@ class GrpcRaftClient(AbstractRaftClient):
         candidate_id: PeerId,
         last_log_index: int,
         last_log_term: int,
-    ) -> bool:
+    ) -> Tuple[int, bool]:
         if credentials := self._credentials:
             channel = grpc.aio.secure_channel(address, credentials)
         else:
@@ -134,8 +173,8 @@ class GrpcRaftClient(AbstractRaftClient):
         )
         try:
             response = await stub.RequestVote(request)
-            return response.vote_granted
+            return response.term, response.vote_granted
         except grpc.aio.AioRpcError:
-            return False
+            return term, False
         finally:
             await channel.close()

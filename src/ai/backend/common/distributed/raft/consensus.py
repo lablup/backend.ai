@@ -200,7 +200,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         await self.replicate_logs(entries=())
 
     async def replicate_logs(self, entries: Tuple[raft_pb2.Log, ...]) -> bool:
-        results = await asyncio.gather(*[
+        terms, succeeds = zip(*await asyncio.gather(*[
             asyncio.create_task(
                 self._client.append_entries(
                     address=address, term=self.current_term, leader_id=self.id,
@@ -209,12 +209,16 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                 ),
             )
             for address in self._peers
-        ])
+        ]))
         if entries:
             logging.info(
                 f'[{datetime.now().isoformat()}] replicate(entries={entries[-1].index}, '
                 f'total={await self._log.size()})')
-        return sum(results) + 1 >= self.quorum
+        for term in terms:
+            if term > self.current_term:
+                await self._synchronize_term(term)
+                break
+        return sum(succeeds) + 1 >= self.quorum
 
     async def on_append_entries(
         self,
@@ -290,7 +294,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         last_log = await self._log.last()
         last_log_index = last_log.index if last_log else 0
         last_log_term = last_log.term if last_log else 0
-        results = await asyncio.gather(*[
+        terms, grants = zip(*await asyncio.gather(*[
             asyncio.create_task(
                 self._client.request_vote(
                     address=address, term=term, candidate_id=self.id,
@@ -298,9 +302,14 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                 ),
             )
             for address in self._peers
-        ])
-        if sum(results) + 1 >= self.quorum:
-            await self._execute_transition(RaftState.LEADER)
+        ]))
+        for term in terms:
+            if term > self.current_term:
+                await self._synchronize_term(term)
+                break
+        else:
+            if sum(grants) + 1 >= self.quorum:
+                await self._execute_transition(RaftState.LEADER)
 
     async def _synchronize_term(self, term: int) -> None:
         if term > self.current_term:
