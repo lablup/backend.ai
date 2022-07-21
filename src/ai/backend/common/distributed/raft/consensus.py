@@ -16,6 +16,7 @@ from .protos import raft_pb2
 from .server import AbstractRaftServer
 from .storage import AbstractLogStorage, SqliteLogStorage
 from .types import PeerId
+from .utils import AtomicInteger
 
 logging.basicConfig(level=logging.INFO)
 
@@ -110,7 +111,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
             each entry contains command for state machine, and term when entry was received by leader
             (first index is 1)
         """
-        self._current_term: int = 0
+        self._current_term: AtomicInteger = AtomicInteger(0)
         self._voted_for: Optional[PeerId] = None
         self._log: AbstractLogStorage
 
@@ -287,7 +288,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
             self._elapsed_time += interval
 
     async def _start_election(self) -> None:
-        await self._synchronize_term(self.current_term + 1)
+        self._current_term.increase()
         self._voted_for = self.id
         term = self.current_term
         logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} start_election(term={term})')
@@ -311,9 +312,9 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
             if sum(grants) + 1 >= self.quorum:
                 await self._execute_transition(RaftState.LEADER)
 
-    async def _synchronize_term(self, term: int) -> None:
+    async def _synchronize_term(self, term: int):
         if term > self.current_term:
-            self._current_term = term
+            self._current_term.set(term)
             await self._execute_transition(RaftState.FOLLOWER)
             self._voted_for = None
 
@@ -327,7 +328,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
 
     @property
     def current_term(self) -> int:
-        return self._current_term
+        return self._current_term.value
 
     @property
     def voted_for(self) -> Optional[PeerId]:
