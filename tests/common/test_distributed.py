@@ -58,7 +58,7 @@ class NoopEvent(AbstractEvent):
     test_ns: str = attr.ib()
 
     def serialize(self) -> tuple:
-        return (self.test_ns, )
+        return (self.test_ns,)
 
     @classmethod
     def deserialize(cls, value: tuple):
@@ -66,7 +66,6 @@ class NoopEvent(AbstractEvent):
 
 
 class TimerNode(threading.Thread):
-
     def __init__(
         self,
         event_records: list[float],
@@ -120,14 +119,14 @@ class TimerNode(threading.Thread):
 
 @pytest.mark.asyncio
 async def test_global_timer_filelock(request, test_ns, redis_container) -> None:
-    lock_path = Path(tempfile.gettempdir()) / f'{test_ns}.lock'
+    lock_path = Path(tempfile.gettempdir()) / f"{test_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
     event_records: List[float] = []
     num_threads = 7
     num_records = 0
     delay = 3.0
     interval = 0.5
-    target_count = (delay / interval)
+    target_count = delay / interval
     threads: List[TimerNode] = []
     for thread_idx in range(num_threads):
         timer_node = TimerNode(
@@ -168,7 +167,6 @@ def etcd_timer_node_process(
     asyncio.set_event_loop(asyncio.new_event_loop())
 
     async def _main() -> None:
-
         async def _tick(context: Any, source: AgentId, event: NoopEvent) -> None:
             print("_tick")
             queue.put(time.monotonic())
@@ -187,9 +185,9 @@ def etcd_timer_node_process(
             addr=etcd_ctx.addr,
             namespace=etcd_ctx.namespace,
             scope_prefix_map={
-                ConfigScopes.GLOBAL: 'global',
-                ConfigScopes.SGROUP: 'sgroup/testing',
-                ConfigScopes.NODE: 'node/i-test',
+                ConfigScopes.GLOBAL: "global",
+                ConfigScopes.SGROUP: "sgroup/testing",
+                ConfigScopes.NODE: "node/i-test",
             },
         )
         timer = GlobalTimer(
@@ -212,21 +210,23 @@ def etcd_timer_node_process(
 
 @pytest.mark.asyncio
 async def test_global_timer_etcdlock(
-    test_ns, etcd_container, redis_container,
+    test_ns,
+    etcd_container,
+    redis_container,
 ) -> None:
-    lock_name = f'{test_ns}lock'
+    lock_name = f"{test_ns}lock"
     event_records_queue: Queue = Queue()
     num_processes = 7
     num_records = 0
     delay = 3.0
     interval = 0.5
-    target_count = (delay / interval)
+    target_count = delay / interval
     processes: List[Process] = []
     stop_event = Event()
     for proc_idx in range(num_processes):
         process = Process(
             target=etcd_timer_node_process,
-            name=f'proc-{proc_idx}',
+            name=f"proc-{proc_idx}",
             args=(
                 event_records_queue,
                 stop_event,
@@ -282,7 +282,7 @@ async def test_global_timer_join_leave(request, test_ns, redis_container) -> Non
     )
     event_dispatcher.consume(NoopEvent, None, _tick)
 
-    lock_path = Path(tempfile.gettempdir()) / f'{test_ns}.lock'
+    lock_path = Path(tempfile.gettempdir()) / f"{test_ns}.lock"
     request.addfinalizer(partial(lock_path.unlink, missing_ok=True))
     for _ in range(10):
         timer = GlobalTimer(

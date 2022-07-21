@@ -40,47 +40,59 @@ from .minilang.queryfilter import QueryFilterParser
 from .user import ModifyUserInput, UserRole
 
 __all__: Sequence[str] = (
-    'keypairs',
-    'KeyPair', 'KeyPairList',
-    'UserInfo',
-    'KeyPairInput',
-    'CreateKeyPair', 'ModifyKeyPair', 'DeleteKeyPair',
-    'Dotfile', 'MAXIMUM_DOTFILE_SIZE',
-    'query_owned_dotfiles',
-    'query_bootstrap_script',
-    'verify_dotfile_name',
+    "keypairs",
+    "KeyPair",
+    "KeyPairList",
+    "UserInfo",
+    "KeyPairInput",
+    "CreateKeyPair",
+    "ModifyKeyPair",
+    "DeleteKeyPair",
+    "Dotfile",
+    "MAXIMUM_DOTFILE_SIZE",
+    "query_owned_dotfiles",
+    "query_bootstrap_script",
+    "verify_dotfile_name",
 )
 
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 keypairs = sa.Table(
-    'keypairs', metadata,
-    sa.Column('user_id', sa.String(length=256), index=True),
-    sa.Column('access_key', sa.String(length=20), primary_key=True),
-    sa.Column('secret_key', sa.String(length=40)),
-    sa.Column('is_active', sa.Boolean, index=True),
-    sa.Column('is_admin', sa.Boolean, index=True,
-              default=False, server_default=false()),
-    sa.Column('created_at', sa.DateTime(timezone=True),
-              server_default=sa.func.now()),
-    sa.Column('modified_at', sa.DateTime(timezone=True),
-              server_default=sa.func.now(), onupdate=sa.func.current_timestamp()),
-    sa.Column('last_used', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('rate_limit', sa.Integer),
-    sa.Column('num_queries', sa.Integer, server_default='0'),
-
+    "keypairs",
+    metadata,
+    sa.Column("user_id", sa.String(length=256), index=True),
+    sa.Column("access_key", sa.String(length=20), primary_key=True),
+    sa.Column("secret_key", sa.String(length=40)),
+    sa.Column("is_active", sa.Boolean, index=True),
+    sa.Column("is_admin", sa.Boolean, index=True, default=False, server_default=false()),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    sa.Column(
+        "modified_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        onupdate=sa.func.current_timestamp(),
+    ),
+    sa.Column("last_used", sa.DateTime(timezone=True), nullable=True),
+    sa.Column("rate_limit", sa.Integer),
+    sa.Column("num_queries", sa.Integer, server_default="0"),
     # SSH Keypairs.
-    sa.Column('ssh_public_key', sa.String(length=750), nullable=True),
-    sa.Column('ssh_private_key', sa.String(length=2000), nullable=True),
-
-    ForeignKeyIDColumn('user', 'users.uuid', nullable=False),
-    sa.Column('resource_policy', sa.String(length=256),
-              sa.ForeignKey('keypair_resource_policies.name'),
-              nullable=False),
+    sa.Column("ssh_public_key", sa.String(length=750), nullable=True),
+    sa.Column("ssh_private_key", sa.String(length=2000), nullable=True),
+    ForeignKeyIDColumn("user", "users.uuid", nullable=False),
+    sa.Column(
+        "resource_policy",
+        sa.String(length=256),
+        sa.ForeignKey("keypair_resource_policies.name"),
+        nullable=False,
+    ),
     # dotfiles column, \x90 means empty list in msgpack
-    sa.Column('dotfiles', sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b'\x90'),
-    sa.Column('bootstrap_script', sa.String(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=''),
+    sa.Column(
+        "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
+    ),
+    sa.Column(
+        "bootstrap_script", sa.String(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=""
+    ),
 )
 
 
@@ -96,7 +108,7 @@ class UserInfo(graphene.ObjectType):
     ) -> Optional[UserInfo]:
         if row is None:
             return None
-        return cls(email=row['email'], full_name=row['full_name'])
+        return cls(email=row["email"], full_name=row["full_name"])
 
     @classmethod
     async def batch_load_by_uuid(
@@ -106,21 +118,25 @@ class UserInfo(graphene.ObjectType):
     ) -> Sequence[Optional[UserInfo]]:
         async with ctx.db.begin_readonly() as conn:
             from .user import users
+
             query = (
                 sa.select([users.c.uuid, users.c.email, users.c.full_name])
                 .select_from(users)
                 .where(users.c.uuid.in_(user_uuids))
             )
             return await batch_result(
-                ctx, conn, query, cls,
-                user_uuids, lambda row: row['uuid'],
+                ctx,
+                conn,
+                query,
+                cls,
+                user_uuids,
+                lambda row: row["uuid"],
             )
 
 
 class KeyPair(graphene.ObjectType):
-
     class Meta:
-        interfaces = (Item, )
+        interfaces = (Item,)
 
     user_id = graphene.String()
     full_name = graphene.String()
@@ -137,9 +153,9 @@ class KeyPair(graphene.ObjectType):
 
     ssh_public_key = graphene.String()
 
-    vfolders = graphene.List('ai.backend.manager.models.VirtualFolder')
+    vfolders = graphene.List("ai.backend.manager.models.VirtualFolder")
     compute_sessions = graphene.List(
-        'ai.backend.manager.models.ComputeSession',
+        "ai.backend.manager.models.ComputeSession",
         status=graphene.String(),
     )
     concurrency_used = graphene.Int()
@@ -148,15 +164,16 @@ class KeyPair(graphene.ObjectType):
 
     # Deprecated
     concurrency_limit = graphene.Int(
-        deprecation_reason='Moved to KeyPairResourcePolicy object as '
-                           'the max_concurrent_sessions field.')
+        deprecation_reason="Moved to KeyPairResourcePolicy object as "
+        "the max_concurrent_sessions field."
+    )
 
     async def resolve_user_info(
         self,
         info: graphene.ResolveInfo,
     ) -> UserInfo:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader(ctx, 'UserInfo.by_uuid')
+        loader = ctx.dataloader_manager.get_loader(ctx, "UserInfo.by_uuid")
         return await loader.load(self.user)
 
     @classmethod
@@ -166,48 +183,51 @@ class KeyPair(graphene.ObjectType):
         row: Row,
     ) -> KeyPair:
         return cls(
-            id=row['access_key'],
-            user_id=row['user_id'],
-            full_name=row['full_name'] if 'full_name' in row.keys() else None,
-            access_key=row['access_key'],
-            secret_key=row['secret_key'],
-            is_active=row['is_active'],
-            is_admin=row['is_admin'],
-            resource_policy=row['resource_policy'],
-            created_at=row['created_at'],
-            last_used=row['last_used'],
-            rate_limit=row['rate_limit'],
-            user=row['user'],
-            ssh_public_key=row['ssh_public_key'],
+            id=row["access_key"],
+            user_id=row["user_id"],
+            full_name=row["full_name"] if "full_name" in row.keys() else None,
+            access_key=row["access_key"],
+            secret_key=row["secret_key"],
+            is_active=row["is_active"],
+            is_admin=row["is_admin"],
+            resource_policy=row["resource_policy"],
+            created_at=row["created_at"],
+            last_used=row["last_used"],
+            rate_limit=row["rate_limit"],
+            user=row["user"],
+            ssh_public_key=row["ssh_public_key"],
             concurrency_limit=0,  # deprecated
         )
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        n = await redis.execute(ctx.redis_stat, lambda r: r.get(f"kp:{self.access_key}:num_queries"))
+        n = await redis.execute(
+            ctx.redis_stat, lambda r: r.get(f"kp:{self.access_key}:num_queries")
+        )
         if n is not None:
             return n
         return 0
 
     async def resolve_vfolders(self, info: graphene.ResolveInfo) -> Sequence[VirtualFolder]:
         ctx: GraphQueryContext = info.context
-        loader = ctx.dataloader_manager.get_loader(ctx, 'VirtualFolder')
+        loader = ctx.dataloader_manager.get_loader(ctx, "VirtualFolder")
         return await loader.load(self.access_key)
 
     async def resolve_compute_sessions(self, info: graphene.ResolveInfo, raw_status: str = None):
         ctx: GraphQueryContext = info.context
         from . import KernelStatus  # noqa: avoid circular imports
+
         if raw_status is not None:
             status = KernelStatus[raw_status]
-        loader = ctx.dataloader_manager.get_loader(ctx, 'ComputeSession', status=status)
+        loader = ctx.dataloader_manager.get_loader(ctx, "ComputeSession", status=status)
         return await loader.load(self.access_key)
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-        kp_key = 'keypair.concurrency_used'
+        kp_key = "keypair.concurrency_used"
         concurrency_used = await redis.execute(
             ctx.redis_stat,
-            lambda r: r.get(f'{kp_key}.{self.access_key}'),
+            lambda r: r.get(f"{kp_key}.{self.access_key}"),
         )
         if concurrency_used is not None:
             return int(concurrency_used)
@@ -223,14 +243,13 @@ class KeyPair(graphene.ObjectType):
         limit: int = None,
     ) -> Sequence[KeyPair]:
         from .user import users
+
         j = sa.join(
-            keypairs, users,
+            keypairs,
+            users,
             keypairs.c.user == users.c.uuid,
         )
-        query = (
-            sa.select([keypairs])
-            .select_from(j)
-        )
+        query = sa.select([keypairs]).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if is_active is not None:
@@ -239,7 +258,8 @@ class KeyPair(graphene.ObjectType):
             query = query.limit(limit)
         async with graph_ctx.db.begin_readonly() as conn:
             return [
-                obj async for row in (await conn.stream(query))
+                obj
+                async for row in (await conn.stream(query))
                 if (obj := cls.from_row(graph_ctx, row)) is not None
             ]
 
@@ -282,11 +302,9 @@ class KeyPair(graphene.ObjectType):
         filter: str = None,
     ) -> int:
         from .user import users
+
         j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-        query = (
-            sa.select([sa.func.count()])
-            .select_from(j)
-        )
+        query = sa.select([sa.func.count()]).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if email is not None:
@@ -314,6 +332,7 @@ class KeyPair(graphene.ObjectType):
         order: str = None,
     ) -> Sequence[KeyPair]:
         from .user import users
+
         j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
         query = (
             sa.select([keypairs, users.c.email, users.c.full_name])
@@ -337,7 +356,8 @@ class KeyPair(graphene.ObjectType):
             query = query.order_by(keypairs.c.created_at.desc())
         async with graph_ctx.db.begin_readonly() as conn:
             return [
-                obj async for row in (await conn.stream(query))
+                obj
+                async for row in (await conn.stream(query))
                 if (obj := cls.from_row(graph_ctx, row)) is not None
             ]
 
@@ -351,23 +371,25 @@ class KeyPair(graphene.ObjectType):
         is_active: bool = None,
     ) -> Sequence[Sequence[Optional[KeyPair]]]:
         from .user import users
+
         j = sa.join(
-            keypairs, users,
+            keypairs,
+            users,
             keypairs.c.user == users.c.uuid,
         )
-        query = (
-            sa.select([keypairs])
-            .select_from(j)
-            .where(keypairs.c.user_id.in_(user_ids))
-        )
+        query = sa.select([keypairs]).select_from(j).where(keypairs.c.user_id.in_(user_ids))
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if is_active is not None:
             query = query.where(keypairs.c.is_active == is_active)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
-                graph_ctx, conn, query, cls,
-                user_ids, lambda row: row['user_id'],
+                graph_ctx,
+                conn,
+                query,
+                cls,
+                user_ids,
+                lambda row: row["user_id"],
             )
 
     @classmethod
@@ -379,27 +401,29 @@ class KeyPair(graphene.ObjectType):
         domain_name: str = None,
     ) -> Sequence[Optional[KeyPair]]:
         from .user import users
+
         j = sa.join(
-            keypairs, users,
+            keypairs,
+            users,
             keypairs.c.user == users.c.uuid,
         )
-        query = (
-            sa.select([keypairs])
-            .select_from(j)
-            .where(keypairs.c.access_key.in_(access_keys))
-        )
+        query = sa.select([keypairs]).select_from(j).where(keypairs.c.access_key.in_(access_keys))
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_result(
-                graph_ctx, conn, query, cls,
-                access_keys, lambda row: row['access_key'],
+                graph_ctx,
+                conn,
+                query,
+                cls,
+                access_keys,
+                lambda row: row["access_key"],
             )
 
 
 class KeyPairList(graphene.ObjectType):
     class Meta:
-        interfaces = (PaginatedList, )
+        interfaces = (PaginatedList,)
 
     items = graphene.List(KeyPair, required=True)
 
@@ -444,14 +468,12 @@ class CreateKeyPair(graphene.Mutation):
         props: KeyPairInput,
     ) -> CreateKeyPair:
         from .user import users  # noqa
+
         graph_ctx: GraphQueryContext = info.context
         data = cls.prepare_new_keypair(user_id, props)
-        insert_query = (
-            sa.insert(keypairs)
-            .values(
-                **data,
-                user=sa.select([users.c.uuid]).where(users.c.email == user_id).as_scalar(),
-            )
+        insert_query = sa.insert(keypairs).values(
+            **data,
+            user=sa.select([users.c.uuid]).where(users.c.email == user_id).as_scalar(),
         )
         return await simple_db_mutate_returning_item(cls, graph_ctx, insert_query, item_cls=KeyPair)
 
@@ -460,16 +482,16 @@ class CreateKeyPair(graphene.Mutation):
         ak, sk = generate_keypair()
         pubkey, privkey = generate_ssh_keypair()
         data = {
-            'user_id': user_email,
-            'access_key': ak,
-            'secret_key': sk,
-            'is_active': props.is_active,
-            'is_admin': props.is_admin,
-            'resource_policy': props.resource_policy,
-            'rate_limit': props.rate_limit,
-            'num_queries': 0,
-            'ssh_public_key': pubkey,
-            'ssh_private_key': privkey,
+            "user_id": user_email,
+            "access_key": ak,
+            "secret_key": sk,
+            "is_active": props.is_active,
+            "is_admin": props.is_admin,
+            "resource_policy": props.resource_policy,
+            "rate_limit": props.rate_limit,
+            "num_queries": 0,
+            "ssh_public_key": pubkey,
+            "ssh_private_key": privkey,
         }
         return data
 
@@ -495,15 +517,11 @@ class ModifyKeyPair(graphene.Mutation):
     ) -> ModifyKeyPair:
         ctx: GraphQueryContext = info.context
         data: Dict[str, Any] = {}
-        set_if_set(props, data, 'is_active')
-        set_if_set(props, data, 'is_admin')
-        set_if_set(props, data, 'resource_policy')
-        set_if_set(props, data, 'rate_limit')
-        update_query = (
-            sa.update(keypairs)
-            .values(data)
-            .where(keypairs.c.access_key == access_key)
-        )
+        set_if_set(props, data, "is_active")
+        set_if_set(props, data, "is_admin")
+        set_if_set(props, data, "resource_policy")
+        set_if_set(props, data, "rate_limit")
+        update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
         return await simple_db_mutate(cls, ctx, update_query)
 
 
@@ -525,13 +543,10 @@ class DeleteKeyPair(graphene.Mutation):
         access_key: AccessKey,
     ) -> DeleteKeyPair:
         ctx: GraphQueryContext = info.context
-        delete_query = (
-            sa.delete(keypairs)
-            .where(keypairs.c.access_key == access_key)
-        )
+        delete_query = sa.delete(keypairs).where(keypairs.c.access_key == access_key)
         await redis.execute(
             ctx.redis_stat,
-            lambda r: r.delete(f'keypair.concurrency_used.{access_key}'),
+            lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
         )
         return await simple_db_mutate(cls, ctx, delete_query)
 
@@ -543,18 +558,18 @@ class Dotfile(TypedDict):
 
 
 def generate_keypair() -> Tuple[AccessKey, SecretKey]:
-    '''
+    """
     AWS-like access key and secret key generation.
-    '''
-    ak = 'AKIA' + base64.b32encode(secrets.token_bytes(10)).decode('ascii')
+    """
+    ak = "AKIA" + base64.b32encode(secrets.token_bytes(10)).decode("ascii")
     sk = secrets.token_urlsafe(30)
     return AccessKey(ak), SecretKey(sk)
 
 
 def generate_ssh_keypair() -> Tuple[str, str]:
-    '''
+    """
     Generate RSA keypair for SSH/SFTP connection.
-    '''
+    """
     key = rsa.generate_private_key(
         backend=crypto_default_backend(),
         public_exponent=65537,
@@ -565,10 +580,14 @@ def generate_ssh_keypair() -> Tuple[str, str]:
         crypto_serialization.PrivateFormat.TraditionalOpenSSL,
         crypto_serialization.NoEncryption(),
     ).decode("utf-8")
-    public_key = key.public_key().public_bytes(
-        crypto_serialization.Encoding.OpenSSH,
-        crypto_serialization.PublicFormat.OpenSSH,
-    ).decode("utf-8")
+    public_key = (
+        key.public_key()
+        .public_bytes(
+            crypto_serialization.Encoding.OpenSSH,
+            crypto_serialization.PublicFormat.OpenSSH,
+        )
+        .decode("utf-8")
+    )
     return (public_key, private_key)
 
 

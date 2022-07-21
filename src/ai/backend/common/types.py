@@ -39,51 +39,53 @@ import trafaret as t
 import typeguard
 
 __all__ = (
-    'aobject',
-    'JSONSerializableMixin',
-    'DeviceId',
-    'ContainerId',
-    'SessionId',
-    'KernelId',
-    'MetricKey',
-    'MetricValue',
-    'MovingStatValue',
-    'PID',
-    'HostPID',
-    'ContainerPID',
-    'BinarySize',
-    'HostPortPair',
-    'DeviceId',
-    'SlotName',
-    'IntrinsicSlotNames',
-    'ResourceSlot',
-    'HardwareMetadata',
-    'MountPermission',
-    'MountPermissionLiteral',
-    'MountTypes',
-    'VFolderMount',
-    'KernelCreationConfig',
-    'KernelCreationResult',
-    'ServicePortProtocols',
-    'ClusterInfo',
-    'ClusterMode',
-    'ClusterSSHKeyPair',
-    'check_typed_dict',
-    'EtcdRedisConfig',
-    'RedisConnectionInfo',
+    "aobject",
+    "JSONSerializableMixin",
+    "DeviceId",
+    "ContainerId",
+    "SessionId",
+    "KernelId",
+    "MetricKey",
+    "MetricValue",
+    "MovingStatValue",
+    "PID",
+    "HostPID",
+    "ContainerPID",
+    "BinarySize",
+    "HostPortPair",
+    "DeviceId",
+    "SlotName",
+    "IntrinsicSlotNames",
+    "ResourceSlot",
+    "HardwareMetadata",
+    "MountPermission",
+    "MountPermissionLiteral",
+    "MountTypes",
+    "VFolderMount",
+    "KernelCreationConfig",
+    "KernelCreationResult",
+    "ServicePortProtocols",
+    "ClusterInfo",
+    "ClusterMode",
+    "ClusterSSHKeyPair",
+    "check_typed_dict",
+    "EtcdRedisConfig",
+    "RedisConnectionInfo",
 )
 
 if TYPE_CHECKING:
     from .docker import ImageRef
 
 
-T_aobj = TypeVar('T_aobj', bound='aobject')
+T_aobj = TypeVar("T_aobj", bound="aobject")
 
-current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar('current_resource_slots')
+current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
+    "current_resource_slots"
+)
 
 
 class aobject(object):
-    '''
+    """
     An "asynchronous" object which guarantees to invoke both ``def __init__(self, ...)`` and
     ``async def __ainit(self)__`` to ensure asynchronous initialization of the object.
 
@@ -92,15 +94,15 @@ class aobject(object):
     .. code-block:: python
 
        o = await SomeAObj.new(...)
-    '''
+    """
 
     @classmethod
     async def new(cls: Type[T_aobj], *args, **kwargs) -> T_aobj:
-        '''
+        """
         We can do ``await SomeAObject(...)``, but this makes mypy
         to complain about its return type with ``await`` statement.
         This is a copy of ``__new__()`` to workaround it.
-        '''
+        """
         instance = super().__new__(cls)
         cls.__init__(instance, *args, **kwargs)
         await instance.__ainit__()
@@ -110,19 +112,19 @@ class aobject(object):
         pass
 
     async def __ainit__(self) -> None:
-        '''
+        """
         Automatically called when creating the instance using
         ``await SubclassOfAObject(...)``
         where the arguments are passed to ``__init__()`` as in
         the vanilla Python classes.
-        '''
+        """
         pass
 
 
-T1 = TypeVar('T1')
-T2 = TypeVar('T2')
-T3 = TypeVar('T3')
-T4 = TypeVar('T4')
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+T3 = TypeVar("T3")
+T4 = TypeVar("T4")
 
 
 @overload
@@ -160,11 +162,11 @@ def check_typed_tuple(
 def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
-            typeguard.check_type('item', val, typ)
+            typeguard.check_type("item", val, typ)
     return value
 
 
-TD = TypeVar('TD')
+TD = TypeVar("TD")
 
 
 def check_typed_dict(value: Mapping[Any, Any], expected_type: Type[TD]) -> TD:
@@ -177,48 +179,49 @@ def check_typed_dict(value: Mapping[Any, Any], expected_type: Type[TD]) -> TD:
     Currently using this function may not be able to fix type errors, due to an upstream issue:
     python/mypy#9827
     """
-    assert issubclass(expected_type, dict) and hasattr(expected_type, '__annotations__'), \
-           f"expected_type ({type(expected_type)}) must be a TypedDict class"
+    assert issubclass(expected_type, dict) and hasattr(
+        expected_type, "__annotations__"
+    ), f"expected_type ({type(expected_type)}) must be a TypedDict class"
     frame = sys._getframe(1)
     _globals = frame.f_globals
     _locals = frame.f_locals
     memo = typeguard._TypeCheckMemo(_globals, _locals)
-    typeguard.check_typed_dict('value', value, expected_type, memo)
+    typeguard.check_typed_dict("value", value, expected_type, memo)
     # Here we passed the check, so return it after casting.
     return cast(TD, value)
 
 
-PID = NewType('PID', int)
-HostPID = NewType('HostPID', PID)
-ContainerPID = NewType('ContainerPID', PID)
+PID = NewType("PID", int)
+HostPID = NewType("HostPID", PID)
+ContainerPID = NewType("ContainerPID", PID)
 
-ContainerId = NewType('ContainerId', str)
-SessionId = NewType('SessionId', uuid.UUID)
-KernelId = NewType('KernelId', uuid.UUID)
-ImageAlias = NewType('ImageAlias', str)
+ContainerId = NewType("ContainerId", str)
+SessionId = NewType("SessionId", uuid.UUID)
+KernelId = NewType("KernelId", uuid.UUID)
+ImageAlias = NewType("ImageAlias", str)
 
-AgentId = NewType('AgentId', str)
-DeviceName = NewType('DeviceName', str)
-DeviceId = NewType('DeviceId', str)
-SlotName = NewType('SlotName', str)
-MetricKey = NewType('MetricKey', str)
+AgentId = NewType("AgentId", str)
+DeviceName = NewType("DeviceName", str)
+DeviceId = NewType("DeviceId", str)
+SlotName = NewType("SlotName", str)
+MetricKey = NewType("MetricKey", str)
 
-AccessKey = NewType('AccessKey', str)
-SecretKey = NewType('SecretKey', str)
+AccessKey = NewType("AccessKey", str)
+SecretKey = NewType("SecretKey", str)
 
 
 class LogSeverity(str, enum.Enum):
-    CRITICAL = 'critical'
-    ERROR = 'error'
-    WARNING = 'warning'
-    INFO = 'info'
-    DEBUG = 'debug'
+    CRITICAL = "critical"
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
+    DEBUG = "debug"
 
 
 class SlotTypes(str, enum.Enum):
-    COUNT = 'count'
-    BYTES = 'bytes'
-    UNIQUE = 'unique'
+    COUNT = "count"
+    BYTES = "bytes"
+    UNIQUE = "unique"
 
 
 class HardwareMetadata(TypedDict):
@@ -228,31 +231,31 @@ class HardwareMetadata(TypedDict):
 
 
 class AutoPullBehavior(str, enum.Enum):
-    DIGEST = 'digest'
-    TAG = 'tag'
-    NONE = 'none'
+    DIGEST = "digest"
+    TAG = "tag"
+    NONE = "none"
 
 
 class ServicePortProtocols(str, enum.Enum):
-    HTTP = 'http'
-    TCP = 'tcp'
-    PREOPEN = 'preopen'
+    HTTP = "http"
+    TCP = "tcp"
+    PREOPEN = "preopen"
 
 
 class SessionTypes(str, enum.Enum):
-    INTERACTIVE = 'interactive'
-    BATCH = 'batch'
+    INTERACTIVE = "interactive"
+    BATCH = "batch"
 
 
 class SessionResult(str, enum.Enum):
-    UNDEFINED = 'undefined'
-    SUCCESS = 'success'
-    FAILURE = 'failure'
+    UNDEFINED = "undefined"
+    SUCCESS = "success"
+    FAILURE = "failure"
 
 
 class ClusterMode(str, enum.Enum):
-    SINGLE_NODE = 'single-node'
-    MULTI_NODE = 'multi-node'
+    SINGLE_NODE = "single-node"
+    MULTI_NODE = "multi-node"
 
 
 class MovingStatValue(TypedDict):
@@ -265,96 +268,107 @@ class MovingStatValue(TypedDict):
     version: Optional[int]  # for legacy client compatibility
 
 
-MetricValue = TypedDict('MetricValue', {
-    'current': str,
-    'capacity': Optional[str],
-    'pct': Optional[str],
-    'unit_hint': str,
-    'stats.min': str,
-    'stats.max': str,
-    'stats.sum': str,
-    'stats.avg': str,
-    'stats.diff': str,
-    'stats.rate': str,
-}, total=False)
+MetricValue = TypedDict(
+    "MetricValue",
+    {
+        "current": str,
+        "capacity": Optional[str],
+        "pct": Optional[str],
+        "unit_hint": str,
+        "stats.min": str,
+        "stats.max": str,
+        "stats.sum": str,
+        "stats.avg": str,
+        "stats.diff": str,
+        "stats.rate": str,
+    },
+    total=False,
+)
 
 
 class IntrinsicSlotNames(enum.Enum):
-    CPU = SlotName('cpu')
-    MEMORY = SlotName('mem')
+    CPU = SlotName("cpu")
+    MEMORY = SlotName("mem")
 
 
 class DefaultForUnspecified(str, enum.Enum):
-    LIMITED = 'LIMITED'
-    UNLIMITED = 'UNLIMITED'
+    LIMITED = "LIMITED"
+    UNLIMITED = "UNLIMITED"
 
 
 class HandlerForUnknownSlotName(str, enum.Enum):
-    DROP = 'drop'
-    ERROR = 'error'
+    DROP = "drop"
+    ERROR = "error"
 
 
-Quantum = Decimal('0.000')
+Quantum = Decimal("0.000")
 
 
 class MountPermission(str, enum.Enum):
-    READ_ONLY = 'ro'
-    READ_WRITE = 'rw'
-    RW_DELETE = 'wd'
+    READ_ONLY = "ro"
+    READ_WRITE = "rw"
+    RW_DELETE = "wd"
 
 
-MountPermissionLiteral = Literal['ro', 'rw', 'wd']
+MountPermissionLiteral = Literal["ro", "rw", "wd"]
 
 
 class MountTypes(str, enum.Enum):
-    VOLUME = 'volume'
-    BIND = 'bind'
-    TMPFS = 'tmpfs'
-    K8S_GENERIC = 'k8s-generic'
-    K8S_HOSTPATH = 'k8s-hostpath'
+    VOLUME = "volume"
+    BIND = "bind"
+    TMPFS = "tmpfs"
+    K8S_GENERIC = "k8s-generic"
+    K8S_HOSTPATH = "k8s-hostpath"
 
 
-class HostPortPair(namedtuple('HostPortPair', 'host port')):
-
+class HostPortPair(namedtuple("HostPortPair", "host port")):
     def as_sockaddr(self) -> Tuple[str, int]:
         return str(self.host), self.port
 
     def __str__(self) -> str:
         if isinstance(self.host, ipaddress.IPv6Address):
-            return f'[{self.host}]:{self.port}'
-        return f'{self.host}:{self.port}'
+            return f"[{self.host}]:{self.port}"
+        return f"{self.host}:{self.port}"
 
 
 class BinarySize(int):
-    '''
+    """
     A wrapper around Python integers to represent binary sizes for storage and
     memory in various places.
 
     Its string representation and parser, ``from_str()`` classmethod, does not use
     any locale-specific digit delimeters -- it supports only standard Python
     digit delimeters.
-    '''
+    """
 
     suffix_map = {
-        'y': 2 ** 80, 'Y': 2 ** 80,  # yotta
-        'z': 2 ** 70, 'Z': 2 ** 70,  # zetta
-        'e': 2 ** 60, 'E': 2 ** 60,  # exa
-        'p': 2 ** 50, 'P': 2 ** 50,  # peta
-        't': 2 ** 40, 'T': 2 ** 40,  # tera
-        'g': 2 ** 30, 'G': 2 ** 30,  # giga
-        'm': 2 ** 20, 'M': 2 ** 20,  # mega
-        'k': 2 ** 10, 'K': 2 ** 10,  # kilo
-        ' ': 1,
+        "y": 2**80,
+        "Y": 2**80,  # yotta
+        "z": 2**70,
+        "Z": 2**70,  # zetta
+        "e": 2**60,
+        "E": 2**60,  # exa
+        "p": 2**50,
+        "P": 2**50,  # peta
+        "t": 2**40,
+        "T": 2**40,  # tera
+        "g": 2**30,
+        "G": 2**30,  # giga
+        "m": 2**20,
+        "M": 2**20,  # mega
+        "k": 2**10,
+        "K": 2**10,  # kilo
+        " ": 1,
     }
-    suffices = (' ', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
-    endings = ('ibytes', 'ibyte', 'ib', 'bytes', 'byte', 'b')
+    suffices = (" ", "K", "M", "G", "T", "P", "E", "Z", "Y")
+    endings = ("ibytes", "ibyte", "ib", "bytes", "byte", "b")
 
     @classmethod
     def _parse_str(cls, expr: str) -> Union[BinarySize, Decimal]:
-        if expr.lower() in ('inf', 'infinite', 'infinity'):
-            return Decimal('Infinity')
+        if expr.lower() in ("inf", "infinite", "infinity"):
+            return Decimal("Infinity")
         orig_expr = expr
-        expr = expr.strip().replace('_', '')
+        expr = expr.strip().replace("_", "")
         try:
             return cls(expr)
         except ValueError:
@@ -375,13 +389,13 @@ class BinarySize(int):
                     else:
                         # has no suffix and is not an integer
                         # -> fractional bytes (e.g., 1.5 byte)
-                        raise ValueError('Fractional bytes are not allowed')
+                        raise ValueError("Fractional bytes are not allowed")
             except ArithmeticError:
-                raise ValueError('Unconvertible value', orig_expr)
+                raise ValueError("Unconvertible value", orig_expr)
             try:
                 multiplier = cls.suffix_map[suffix]
             except KeyError:
-                raise ValueError('Unconvertible value', orig_expr)
+                raise ValueError("Unconvertible value", orig_expr)
             return cls(dec_expr * multiplier)
 
     @classmethod
@@ -391,13 +405,13 @@ class BinarySize(int):
     ) -> BinarySize:
         if isinstance(expr, Decimal):
             if expr.is_infinite():
-                raise ValueError('infinite values are not allowed')
+                raise ValueError("infinite values are not allowed")
             return cls(expr)
         if isinstance(expr, numbers.Integral):
             return cls(int(expr))
         result = cls._parse_str(expr)
         if isinstance(result, Decimal) and result.is_infinite():
-            raise ValueError('infinite values are not allowed')
+            raise ValueError("infinite values are not allowed")
         return cls(int(result))
 
     @classmethod
@@ -425,47 +439,47 @@ class BinarySize(int):
         if d == d.to_integral():
             value = d.quantize(Decimal(1))
         else:
-            value = d.quantize(Decimal('.00')).normalize()
+            value = d.quantize(Decimal(".00")).normalize()
         return value
 
     def __str__(self):
         suffix_idx = self._preformat()
         if suffix_idx == 0:
             if self == 1:
-                return f'{int(self)} byte'
+                return f"{int(self)} byte"
             else:
-                return f'{int(self)} bytes'
+                return f"{int(self)} bytes"
         else:
             suffix = type(self).suffices[suffix_idx]
             multiplier = type(self).suffix_map[suffix]
             value = self._quantize(self, multiplier)
-            return f'{value} {suffix.upper()}iB'
+            return f"{value} {suffix.upper()}iB"
 
     def __format__(self, format_spec):
         if len(format_spec) != 1:
-            raise ValueError('format-string for BinarySize can be only one character.')
-        if format_spec == 's':
+            raise ValueError("format-string for BinarySize can be only one character.")
+        if format_spec == "s":
             # automatically scaled
             suffix_idx = self._preformat()
             if suffix_idx == 0:
-                return f'{int(self)}'
+                return f"{int(self)}"
             suffix = type(self).suffices[suffix_idx]
             multiplier = type(self).suffix_map[suffix]
             value = self._quantize(self, multiplier)
-            return f'{value}{suffix.lower()}'
+            return f"{value}{suffix.lower()}"
         else:
             # use the given scale
             suffix = format_spec.lower()
             multiplier = type(self).suffix_map.get(suffix)
             if multiplier is None:
-                raise ValueError('Unsupported scale unit.', suffix)
+                raise ValueError("Unsupported scale unit.", suffix)
             value = self._quantize(self, multiplier)
-            return f'{value}{suffix.lower()}'.strip()
+            return f"{value}{suffix.lower()}".strip()
 
 
 class ResourceSlot(UserDict):
 
-    __slots__ = ('data', )
+    __slots__ = ("data",)
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -479,37 +493,33 @@ class ResourceSlot(UserDict):
             self.data[k] = Decimal(0)
 
     def __add__(self, other: ResourceSlot) -> ResourceSlot:
-        assert isinstance(other, ResourceSlot), 'Only can add ResourceSlot to ResourceSlot.'
+        assert isinstance(other, ResourceSlot), "Only can add ResourceSlot to ResourceSlot."
         self.sync_keys(other)
-        return type(self)({
-            k: self.get(k, 0) + other.get(k, 0)
-            for k in (self.keys() | other.keys())
-        })
+        return type(self)(
+            {k: self.get(k, 0) + other.get(k, 0) for k in (self.keys() | other.keys())}
+        )
 
     def __sub__(self, other: ResourceSlot) -> ResourceSlot:
-        assert isinstance(other, ResourceSlot), 'Only can subtract ResourceSlot from ResourceSlot.'
+        assert isinstance(other, ResourceSlot), "Only can subtract ResourceSlot from ResourceSlot."
         self.sync_keys(other)
-        return type(self)({
-            k: self.data[k] - other.get(k, 0)
-            for k in self.keys()
-        })
+        return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
 
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
-        assert isinstance(other, ResourceSlot), 'Only can compare ResourceSlot objects.'
+        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
         self_values = [self.data[k] for k in sorted(self.data.keys())]
         other_values = [other.data[k] for k in sorted(other.data.keys())]
         return self_values == other_values
 
     def __ne__(self, other: object) -> bool:
-        assert isinstance(other, ResourceSlot), 'Only can compare ResourceSlot objects.'
+        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
         return not self.__eq__(other)
 
     def eq_contains(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), 'Only can compare ResourceSlot objects.'
+        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         common_keys = sorted(other.keys() & self.keys())
         only_other_keys = other.keys() - self.keys()
         self_values = [self.data[k] for k in common_keys]
@@ -517,7 +527,7 @@ class ResourceSlot(UserDict):
         return self_values == other_values and all(other[k] == 0 for k in only_other_keys)
 
     def eq_contained(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), 'Only can compare ResourceSlot objects.'
+        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         common_keys = sorted(other.keys() & self.keys())
         only_self_keys = self.keys() - other.keys()
         self_values = [self.data[k] for k in common_keys]
@@ -525,44 +535,43 @@ class ResourceSlot(UserDict):
         return self_values == other_values and all(self[k] == 0 for k in only_self_keys)
 
     def __le__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), 'Only can compare ResourceSlot objects.'
+        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
         return not any(s > o for s, o in zip(self_values, other_values))
 
     def __lt__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), 'Only can compare ResourceSlot objects.'
+        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
         self_values = [self.data[k] for k in self.keys()]
         other_values = [other.data[k] for k in self.keys()]
-        return (not any(s > o for s, o in zip(self_values, other_values)) and
-                not (self_values == other_values))
+        return not any(s > o for s, o in zip(self_values, other_values)) and not (
+            self_values == other_values
+        )
 
     def __ge__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), 'Only can compare ResourceSlot objects.'
+        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
         return not any(s < o for s, o in zip(self_values, other_values))
 
     def __gt__(self, other: ResourceSlot) -> bool:
-        assert isinstance(other, ResourceSlot), 'Only can compare ResourceSlot objects.'
+        assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
         self_values = [self.data[k] for k in other.keys()]
         other_values = [other.data[k] for k in other.keys()]
-        return (not any(s < o for s, o in zip(self_values, other_values)) and
-                not (self_values == other_values))
+        return not any(s < o for s, o in zip(self_values, other_values)) and not (
+            self_values == other_values
+        )
 
     def normalize_slots(self, *, ignore_unknown: bool) -> ResourceSlot:
         known_slots = current_resource_slots.get()
         unset_slots = known_slots.keys() - self.data.keys()
         if not ignore_unknown and (unknown_slots := self.data.keys() - known_slots.keys()):
-            raise ValueError('Unknown slots', unknown_slots)
-        data = {
-            k: v for k, v in self.data.items()
-            if k in known_slots
-        }
+            raise ValueError("Unknown slots", unknown_slots)
+        data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
             data[k] = Decimal(0)
         return type(self)(data)
@@ -570,7 +579,7 @@ class ResourceSlot(UserDict):
     @classmethod
     def _normalize_value(cls, value: Any, unit: str) -> Decimal:
         try:
-            if unit == 'bytes':
+            if unit == "bytes":
                 if isinstance(value, Decimal):
                     return Decimal(value) if value.is_finite() else value
                 if isinstance(value, int):
@@ -581,14 +590,14 @@ class ResourceSlot(UserDict):
                 if value.is_finite():
                     value = value.quantize(Quantum).normalize()
         except ArithmeticError:
-            raise ValueError('Cannot convert to decimal', value)
+            raise ValueError("Cannot convert to decimal", value)
         return value
 
     @classmethod
     def _humanize_value(cls, value: Decimal, unit: str) -> str:
-        if unit == 'bytes':
+        if unit == "bytes":
             try:
-                result = '{:s}'.format(BinarySize(value))
+                result = "{:s}".format(BinarySize(value))
             except (OverflowError, ValueError):
                 result = _stringify_number(value)
         else:
@@ -597,40 +606,44 @@ class ResourceSlot(UserDict):
 
     @classmethod
     def _guess_slot_type(cls, key: str) -> str:
-        if 'mem' in key:
-            return 'bytes'
-        return 'count'
+        if "mem" in key:
+            return "bytes"
+        return "count"
 
     @classmethod
-    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> 'ResourceSlot':
+    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> "ResourceSlot":
         try:
             data = {
                 k: cls._normalize_value(v, slot_types[k])
-                for k, v in policy['total_resource_slots'].items()
+                for k, v in policy["total_resource_slots"].items()
                 if v is not None and k in slot_types
             }
             # fill missing (depending on the policy for unspecified)
             fill = Decimal(0)
-            if policy['default_for_unspecified'] == DefaultForUnspecified.UNLIMITED:
-                fill = Decimal('Infinity')
+            if policy["default_for_unspecified"] == DefaultForUnspecified.UNLIMITED:
+                fill = Decimal("Infinity")
             for k in slot_types.keys():
                 if k not in data:
                     data[k] = fill
         except KeyError as e:
-            raise ValueError('unit unknown for slot', e.args[0])
+            raise ValueError("unit unknown for slot", e.args[0])
         return cls(data)
 
     @classmethod
-    def from_user_input(cls, obj: Mapping[str, Any], slot_types: Optional[Mapping]) -> 'ResourceSlot':
+    def from_user_input(
+        cls, obj: Mapping[str, Any], slot_types: Optional[Mapping]
+    ) -> "ResourceSlot":
         try:
             if slot_types is None:
                 data = {
-                    k: cls._normalize_value(v, cls._guess_slot_type(k)) for k, v in obj.items()
+                    k: cls._normalize_value(v, cls._guess_slot_type(k))
+                    for k, v in obj.items()
                     if v is not None
                 }
             else:
                 data = {
-                    k: cls._normalize_value(v, slot_types[k]) for k, v in obj.items()
+                    k: cls._normalize_value(v, slot_types[k])
+                    for k, v in obj.items()
                     if v is not None
                 }
                 # fill missing
@@ -638,35 +651,29 @@ class ResourceSlot(UserDict):
                     if k not in data:
                         data[k] = Decimal(0)
         except KeyError as e:
-            raise ValueError('unit unknown for slot', e.args[0])
+            raise ValueError("unit unknown for slot", e.args[0])
         return cls(data)
 
     def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
         try:
             return {
-                k: type(self)._humanize_value(v, slot_types[k]) for k, v in self.data.items()
+                k: type(self)._humanize_value(v, slot_types[k])
+                for k, v in self.data.items()
                 if v is not None
             }
         except KeyError as e:
-            raise ValueError('unit unknown for slot', e.args[0])
+            raise ValueError("unit unknown for slot", e.args[0])
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> 'ResourceSlot':
-        data = {
-            k: Decimal(v) for k, v in obj.items()
-            if v is not None
-        }
+    def from_json(cls, obj: Mapping[str, Any]) -> "ResourceSlot":
+        data = {k: Decimal(v) for k, v in obj.items() if v is not None}
         return cls(data)
 
     def to_json(self) -> Mapping[str, str]:
-        return {
-            k: _stringify_number(Decimal(v)) for k, v in self.data.items()
-            if v is not None
-        }
+        return {k: _stringify_number(Decimal(v)) for k, v in self.data.items() if v is not None}
 
 
 class JSONSerializableMixin(metaclass=ABCMeta):
-
     @abstractmethod
     def to_json(self) -> dict[str, Any]:
         raise NotImplementedError
@@ -692,12 +699,12 @@ class VFolderMount(JSONSerializableMixin):
 
     def to_json(self) -> dict[str, Any]:
         return {
-            'name': self.name,
-            'vfid': str(self.vfid),
-            'vfsubpath': str(self.vfsubpath),
-            'host_path': str(self.host_path),
-            'kernel_path': str(self.kernel_path),
-            'mount_perm': self.mount_perm.value,
+            "name": self.name,
+            "vfid": str(self.vfid),
+            "vfsubpath": str(self.vfsubpath),
+            "host_path": str(self.host_path),
+            "kernel_path": str(self.kernel_path),
+            "mount_perm": self.mount_perm.value,
         }
 
     @classmethod
@@ -707,14 +714,17 @@ class VFolderMount(JSONSerializableMixin):
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
         from . import validators as tx
-        return t.Dict({
-            t.Key('name'): t.String,
-            t.Key('vfid'): tx.UUID,
-            t.Key('vfsubpath', default="."): tx.PurePath,
-            t.Key('host_path'): tx.PurePath,
-            t.Key('kernel_path'): tx.PurePath,
-            t.Key('mount_perm'): tx.Enum(MountPermission),
-        })
+
+        return t.Dict(
+            {
+                t.Key("name"): t.String,
+                t.Key("vfid"): tx.UUID,
+                t.Key("vfsubpath", default="."): tx.PurePath,
+                t.Key("host_path"): tx.PurePath,
+                t.Key("kernel_path"): tx.PurePath,
+                t.Key("mount_perm"): tx.Enum(MountPermission),
+            }
+        )
 
 
 class ImageRegistry(TypedDict):
@@ -749,7 +759,7 @@ class ClusterInfo(TypedDict):
 
 
 class ClusterSSHKeyPair(TypedDict):
-    public_key: str   # OpenSSH authorized-keys compatible format
+    public_key: str  # OpenSSH authorized-keys compatible format
     private_key: str  # PEM-encoded string
 
 
@@ -768,8 +778,8 @@ class KernelCreationResult(TypedDict):
     attached_devices: Mapping[DeviceName, Sequence[DeviceModelInfo]]
     repl_in_port: int
     repl_out_port: int
-    stdin_port: int     # legacy
-    stdout_port: int    # legacy
+    stdin_port: int  # legacy
+    stdout_port: int  # legacy
 
 
 class KernelCreationConfig(TypedDict):
@@ -777,11 +787,11 @@ class KernelCreationConfig(TypedDict):
     auto_pull: AutoPullBehavior
     session_type: SessionTypes
     cluster_mode: ClusterMode
-    cluster_role: str       # the kernel's role in the cluster
-    cluster_idx: int        # the kernel's index in the cluster
-    cluster_hostname: str   # the kernel's hostname in the cluster
+    cluster_role: str  # the kernel's role in the cluster
+    cluster_idx: int  # the kernel's index in the cluster
+    cluster_hostname: str  # the kernel's hostname in the cluster
     resource_slots: Mapping[str, str]  # json form of ResourceSlot
-    resource_opts: Mapping[str, str]   # json form of resource options
+    resource_opts: Mapping[str, str]  # json form of resource options
     environ: Mapping[str, str]
     mounts: Sequence[Mapping[str, Any]]  # list of serialized VFolderMount
     package_directory: Sequence[str]
@@ -803,20 +813,20 @@ class KernelEnqueueingConfig(TypedDict):
 
 
 def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
-    '''
+    """
     Stringify a number, preventing unwanted scientific notations.
-    '''
+    """
     if isinstance(v, (float, Decimal)):
         if math.isinf(v) and v > 0:
-            result = 'Infinity'
+            result = "Infinity"
         elif math.isinf(v) and v < 0:
-            result = '-Infinity'
+            result = "-Infinity"
         else:
-            result = '{:f}'.format(v)
+            result = "{:f}".format(v)
     elif isinstance(v, BinarySize):
-        result = '{:d}'.format(int(v))
+        result = "{:d}".format(int(v))
     elif isinstance(v, int):
-        result = '{:d}'.format(v)
+        result = "{:d}".format(v)
     else:
         result = str(v)
     return result

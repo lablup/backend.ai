@@ -5,16 +5,7 @@ import functools
 import json
 import logging
 from contextlib import asynccontextmanager as actxmgr
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Mapping,
-    Tuple,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, AsyncIterator, Awaitable, Callable, Mapping, Tuple, TypeVar
 from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
@@ -43,7 +34,7 @@ from ..defs import LockID
 from ..types import Sentinel
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-column_constraints = ['nullable', 'index', 'unique', 'primary_key']
+column_constraints = ["nullable", "index", "unique", "primary_key"]
 
 # TODO: Implement begin(), begin_readonly() for AsyncSession also
 
@@ -66,7 +57,8 @@ class ExtendedAsyncSAEngine(SAEngine):
             if self._generic_txn_count >= self._txn_concurrency_threshold:
                 log.warning(
                     "The number of concurrent generic transaction ({}) exceeded the threshold {}.",
-                    self._generic_txn_count, self._txn_concurrency_threshold,
+                    self._generic_txn_count,
+                    self._txn_concurrency_threshold,
                     stack_info=False,
                 )
             try:
@@ -81,7 +73,8 @@ class ExtendedAsyncSAEngine(SAEngine):
             if self._readonly_txn_count >= self._txn_concurrency_threshold:
                 log.warning(
                     "The number of concurrent read-only transaction ({}) exceeded the threshold {}.",
-                    self._readonly_txn_count, self._txn_concurrency_threshold,
+                    self._readonly_txn_count,
+                    self._txn_concurrency_threshold,
                     stack_info=False,
                 )
             conn_with_exec_opts = await conn.execution_options(
@@ -126,7 +119,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                     f"SELECT pg_advisory_lock({lock_id:d});",
                 )
             except sa.exc.DBAPIError as e:
-                if getattr(e.orig, 'pgcode', None) == '55P03':  # lock not available error
+                if getattr(e.orig, "pgcode", None) == "55P03":  # lock not available error
                     # This may happen upon shutdown after some time.
                     raise asyncio.CancelledError()
                 raise
@@ -153,10 +146,11 @@ async def connect_database(
     local_config: LocalConfig | Mapping[str, Any],
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     from .base import pgsql_connect_opts
-    username = local_config['db']['user']
-    password = local_config['db']['password']
-    address = local_config['db']['addr']
-    dbname = local_config['db']['name']
+
+    username = local_config["db"]["user"]
+    password = local_config["db"]["password"]
+    address = local_config["db"]["addr"]
+    dbname = local_config["db"]["name"]
     url = f"postgresql+asyncpg://{urlquote(username)}:{urlquote(password)}@{address}/{urlquote(dbname)}"
 
     version_check_db = create_async_engine(url)
@@ -164,7 +158,7 @@ async def connect_database(
         result = await conn.execute(sa.text("show server_version"))
         major, minor, *_ = map(int, result.scalar().split("."))
         if (major, minor) < (11, 0):
-            pgsql_connect_opts['server_settings'].pop("jit")
+            pgsql_connect_opts["server_settings"].pop("jit")
     await version_check_db.dispose()
 
     db = create_async_engine(
@@ -197,7 +191,7 @@ async def reenter_txn(
             yield conn
 
 
-TQueryResult = TypeVar('TQueryResult')
+TQueryResult = TypeVar("TQueryResult")
 
 
 async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) -> TQueryResult:
@@ -213,7 +207,7 @@ async def execute_with_retry(txn_func: Callable[[], Awaitable[TQueryResult]]) ->
                 try:
                     result = await txn_func()
                 except DBAPIError as e:
-                    if getattr(e.orig, 'pgcode', None) == '40001':
+                    if getattr(e.orig, "pgcode", None) == "40001":
                         raise TryAgain
                     raise
     except RetryError:
@@ -243,8 +237,9 @@ def sql_json_merge(
         sa.func.jsonb_build_object(
             key[_depth],
             (
-                sa.func.coalesce(col[key], sa.text("'{}'::jsonb"))
-                .concat(sa.func.cast(obj, psql.JSONB))
+                sa.func.coalesce(col[key], sa.text("'{}'::jsonb")).concat(
+                    sa.func.cast(obj, psql.JSONB)
+                )
                 if _depth == len(key) - 1
                 else sql_json_merge(col, key, obj=obj, _depth=_depth + 1)
             ),
@@ -288,18 +283,19 @@ def sql_json_increment(
 
 def _populate_column(column: sa.Column):
     column_attrs = dict(column.__dict__)
-    name = column_attrs.pop('name')
+    name = column_attrs.pop("name")
     return sa.Column(name, column.type, **{k: column_attrs[k] for k in column_constraints})
 
 
 def regenerate_table(table: sa.Table, new_metadata: sa.MetaData) -> sa.Table:
-    '''
+    """
     This function can be used to regenerate table which belongs to SQLAlchemy ORM Class,
     which can be helpful when you're tring to build fresh new table for use on diffrent context
     than main manager logic (e.g. test code).
     Check out tests/test_image.py for more details.
-    '''
+    """
     return sa.Table(
-        table.name, new_metadata,
+        table.name,
+        new_metadata,
         *[_populate_column(c) for c in table.columns],
     )

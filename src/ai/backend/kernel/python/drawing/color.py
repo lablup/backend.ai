@@ -1,11 +1,10 @@
 import enum
 import struct
 
-rgba = struct.Struct('BBBB')
+rgba = struct.Struct("BBBB")
 
 
 class Color:
-
     def __init__(self, red, green, blue, alpha=255):
         self.red = red
         self.green = green
@@ -14,7 +13,7 @@ class Color:
 
     @staticmethod
     def from_hex(value):
-        value = value.replace('#', '')
+        value = value.replace("#", "")
         r = int(value[0:2], 16)
         g = int(value[2:4], 16)
         b = int(value[4:6], 16)
@@ -32,17 +31,15 @@ class Color:
 
     def to_hex(self, include_alpha=True):
         if include_alpha:
-            return u'#{:02x}{:02x}{:02x}{:02x}'.format(
-                self.red, self.green, self.blue, self.alpha)
+            return "#{:02x}{:02x}{:02x}{:02x}".format(self.red, self.green, self.blue, self.alpha)
         else:
-            return u'#{:02x}{:02x}{:02x}'.format(
-                self.red, self.green, self.blue)
+            return "#{:02x}{:02x}{:02x}".format(self.red, self.green, self.blue)
 
     def to_bytes(self):
         return rgba.pack(self.red, self.green, self.blue, self.alpha)
 
     def to_rgba(self):
-        return 'rgba({},{},{},{})'.format(self.red, self.green, self.blue, self.alpha)
+        return "rgba({},{},{},{})".format(self.red, self.green, self.blue, self.alpha)
 
 
 class Colors(Color, enum.Enum):
@@ -59,5 +56,6 @@ class Colors(Color, enum.Enum):
 
 
 __all__ = [
-    'Color', 'Colors',
+    "Color",
+    "Colors",
 ]

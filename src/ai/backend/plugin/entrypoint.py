@@ -64,7 +64,9 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     entrypoints = {}
     # Scan self-exported entrypoints when executed via pex.
     ai_backend_ns_path = Path(__file__).parent.parent
-    log.debug("scan_entrypoint_from_buildscript(%r): Namespace path: %s", group_name, ai_backend_ns_path)
+    log.debug(
+        "scan_entrypoint_from_buildscript(%r): Namespace path: %s", group_name, ai_backend_ns_path
+    )
     for buildscript_path in ai_backend_ns_path.glob("**/BUILD"):
         for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
             entrypoints[entrypoint.name] = entrypoint
@@ -74,7 +76,7 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     except ValueError:
         pass
     else:
-        src_path = build_root / 'src'
+        src_path = build_root / "src"
         log.debug("scan_entrypoint_from_buildscript(%r): current src: %s", group_name, src_path)
         for buildscript_path in src_path.glob("**/BUILD"):
             for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
@@ -89,8 +91,12 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
     except ValueError:
         pass
     else:
-        plugins_path = build_root / 'plugins'
-        log.debug("scan_entrypoint_from_plugin_checkouts(%r): plugin parent dir: %s", group_name, plugins_path)
+        plugins_path = build_root / "plugins"
+        log.debug(
+            "scan_entrypoint_from_plugin_checkouts(%r): plugin parent dir: %s",
+            group_name,
+            plugins_path,
+        )
         # For cases when plugins use Pants
         for buildscript_path in plugins_path.glob("**/BUILD"):
             for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
@@ -107,7 +113,7 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
 def find_build_root(path: Optional[Path] = None) -> Path:
     cwd = Path.cwd() if path is None else path
     while True:
-        if (cwd / 'BUILD_ROOT').exists():
+        if (cwd / "BUILD_ROOT").exists():
             return cwd
         cwd = cwd.parent
         if cwd.parent == cwd:
@@ -123,10 +129,10 @@ def extract_entrypoints_from_buildscript(
     tree = ast.parse(buildscript_path.read_bytes())
     for node in tree.body:
         if (
-            isinstance(node, ast.Expr) and
-            isinstance(node.value, ast.Call) and
-            isinstance(node.value.func, ast.Name) and
-            node.value.func.id == "python_distribution"
+            isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Call)
+            and isinstance(node.value.func, ast.Name)
+            and node.value.func.id == "python_distribution"
         ):
             for kwarg in node.value.keywords:
                 if kwarg.arg == "entry_points":
@@ -147,16 +153,12 @@ def extract_entrypoints_from_setup_cfg(
 ) -> Iterator[EntryPoint]:
     cfg = configparser.ConfigParser()
     cfg.read(setup_cfg_path)
-    raw_data = cfg.get('options.entry_points', group_name, fallback="").strip()
+    raw_data = cfg.get("options.entry_points", group_name, fallback="").strip()
     if not raw_data:
         return
     data = {
         k.strip(): v.strip()
-        for k, v in (
-            line.split("=", maxsplit=1)
-            for line in
-            raw_data.splitlines()
-        )
+        for k, v in (line.split("=", maxsplit=1) for line in raw_data.splitlines())
     }
     for name, ref in data.items():
         yield EntryPoint(name=name, value=ref, group=group_name)

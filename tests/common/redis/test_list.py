@@ -21,7 +21,7 @@ from .utils import interrupt, with_timeout
 @pytest.mark.redis
 @pytest.mark.asyncio
 @pytest.mark.xfail
-@pytest.mark.parametrize("disruption_method", ['stop', 'pause'])
+@pytest.mark.parametrize("disruption_method", ["stop", "pause"])
 async def test_blist(redis_container: str, disruption_method: str) -> None:
     do_pause = asyncio.Event()
     paused = asyncio.Event()
@@ -41,21 +41,23 @@ async def test_blist(redis_container: str, disruption_method: str) -> None:
             pass
 
     r = RedisConnectionInfo(
-        aioredis.from_url(url='redis://localhost:9379', socket_timeout=0.5),
+        aioredis.from_url(url="redis://localhost:9379", socket_timeout=0.5),
         service_name=None,
     )
     assert isinstance(r.client, aioredis.Redis)
     await r.client.delete("bl1")
 
     pop_task = asyncio.create_task(pop(r, "bl1"))
-    interrupt_task = asyncio.create_task(interrupt(
-        disruption_method,
-        DockerRedisNode("node", 9379, redis_container),
-        do_pause=do_pause,
-        do_unpause=do_unpause,
-        paused=paused,
-        unpaused=unpaused,
-    ))
+    interrupt_task = asyncio.create_task(
+        interrupt(
+            disruption_method,
+            DockerRedisNode("node", 9379, redis_container),
+            do_pause=do_pause,
+            do_unpause=do_unpause,
+            paused=paused,
+            unpaused=unpaused,
+        )
+    )
     await asyncio.sleep(0)
 
     for i in range(5):
@@ -65,10 +67,10 @@ async def test_blist(redis_container: str, disruption_method: str) -> None:
     await paused.wait()
     for i in range(5):
         # The Redis server is dead temporarily...
-        if disruption_method == 'stop':
+        if disruption_method == "stop":
             with pytest.raises(aioredis.exceptions.ConnectionError):
                 await r.client.rpush("bl1", str(5 + i))
-        elif disruption_method == 'pause':
+        elif disruption_method == "pause":
             with pytest.raises(asyncio.TimeoutError):
                 await r.client.rpush("bl1", str(5 + i))
         else:
@@ -94,7 +96,7 @@ async def test_blist(redis_container: str, disruption_method: str) -> None:
 @pytest.mark.redis
 @pytest.mark.asyncio
 @pytest.mark.xfail
-@pytest.mark.parametrize("disruption_method", ['stop', 'pause'])
+@pytest.mark.parametrize("disruption_method", ["stop", "pause"])
 async def test_blist_with_retrying_rpush(redis_container: str, disruption_method: str) -> None:
     do_pause = asyncio.Event()
     paused = asyncio.Event()
@@ -114,21 +116,23 @@ async def test_blist_with_retrying_rpush(redis_container: str, disruption_method
             pass
 
     r = RedisConnectionInfo(
-        aioredis.from_url(url='redis://localhost:9379', socket_timeout=0.5),
+        aioredis.from_url(url="redis://localhost:9379", socket_timeout=0.5),
         service_name=None,
     )
     assert isinstance(r.client, aioredis.Redis)
     await r.client.delete("bl1")
 
     pop_task = asyncio.create_task(pop(r, "bl1"))
-    interrupt_task = asyncio.create_task(interrupt(
-        disruption_method,
-        DockerRedisNode("node", 9379, redis_container),
-        do_pause=do_pause,
-        do_unpause=do_unpause,
-        paused=paused,
-        unpaused=unpaused,
-    ))
+    interrupt_task = asyncio.create_task(
+        interrupt(
+            disruption_method,
+            DockerRedisNode("node", 9379, redis_container),
+            do_pause=do_pause,
+            do_unpause=do_unpause,
+            paused=paused,
+            unpaused=unpaused,
+        )
+    )
     await asyncio.sleep(0)
 
     for i in range(5):
@@ -166,7 +170,7 @@ async def test_blist_with_retrying_rpush(redis_container: str, disruption_method
 @pytest.mark.redis
 @pytest.mark.asyncio
 @pytest.mark.xfail
-@pytest.mark.parametrize("disruption_method", ['stop', 'pause'])
+@pytest.mark.parametrize("disruption_method", ["stop", "pause"])
 @with_timeout(30.0)
 async def test_blist_cluster_sentinel(
     redis_cluster: RedisClusterInfo,
@@ -182,7 +186,8 @@ async def test_blist_cluster_sentinel(
         try:
             async with aiotools.aclosing(
                 redis.blpop(
-                    s, key,
+                    s,
+                    key,
                     reconnect_poll_interval=0.3,
                     service_name="mymaster",
                 ),
@@ -196,23 +201,25 @@ async def test_blist_cluster_sentinel(
     s = RedisConnectionInfo(
         aioredis.sentinel.Sentinel(
             redis_cluster.sentinel_addrs,
-            password='develove',
+            password="develove",
             socket_timeout=0.5,
         ),
-        service_name='mymaster',
+        service_name="mymaster",
     )
     await redis.execute(s, lambda r: r.delete("bl1"))
 
     pop_task = asyncio.create_task(pop(s, "bl1"))
-    interrupt_task = asyncio.create_task(interrupt(
-        disruption_method,
-        redis_cluster.nodes[0],
-        do_pause=do_pause,
-        do_unpause=do_unpause,
-        paused=paused,
-        unpaused=unpaused,
-        redis_password='develove',
-    ))
+    interrupt_task = asyncio.create_task(
+        interrupt(
+            disruption_method,
+            redis_cluster.nodes[0],
+            do_pause=do_pause,
+            do_unpause=do_unpause,
+            paused=paused,
+            unpaused=unpaused,
+            redis_password="develove",
+        )
+    )
     await asyncio.sleep(0)
 
     for i in range(5):

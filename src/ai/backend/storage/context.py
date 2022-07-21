@@ -41,10 +41,7 @@ class Context:
         self.local_config = local_config
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
-        return {
-            name: VolumeInfo(**info)
-            for name, info in self.local_config["volume"].items()
-        }
+        return {name: VolumeInfo(**info) for name, info in self.local_config["volume"].items()}
 
     @actxmgr
     async def get_volume(self, name: str) -> AsyncIterator[AbstractVolume]:

@@ -60,19 +60,19 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 __all__ = (
-    'rescan_images',
-    'update_aliases_from_file',
-    'ImageType',
-    'ImageAliasRow',
-    'ImageRow',
-    'Image',
-    'PreloadImage',
-    'RescanImages',
-    'ForgetImage',
-    'ModifyImage',
-    'AliasImage',
-    'DealiasImage',
-    'ClearImages',
+    "rescan_images",
+    "update_aliases_from_file",
+    "ImageType",
+    "ImageAliasRow",
+    "ImageRow",
+    "Image",
+    "PreloadImage",
+    "RescanImages",
+    "ForgetImage",
+    "ModifyImage",
+    "AliasImage",
+    "DealiasImage",
+    "ClearImages",
 )
 
 
@@ -88,7 +88,7 @@ async def rescan_images(
 
     registry_config_iv = t.Mapping(t.String, container_registry_iv)
     latest_registry_config = registry_config_iv.check(
-        await etcd.get_prefix('config/docker/registry'),
+        await etcd.get_prefix("config/docker/registry"),
     )
     # TODO: delete images from registries removed from the previous config?
     if registry is None:
@@ -112,23 +112,27 @@ async def update_aliases_from_file(session: AsyncSession, file: Path) -> List[Im
     log.info('Updating image aliases from "{0}"', file)
     ret: List[ImageAliasRow] = []
     try:
-        data = yaml.safe_load(open(file, 'r', encoding='utf-8'))
+        data = yaml.safe_load(open(file, "r", encoding="utf-8"))
     except IOError:
         log.error('Cannot open "{0}".', file)
         return []
-    for item in data['aliases']:
+    for item in data["aliases"]:
         alias = item[0]
         target = item[1]
         if len(item) >= 2:
             architecture = item[2]
         else:
             log.warn(
-                'architecture not set for {} => {}, assuming as {}',
-                target, alias, DEFAULT_IMAGE_ARCH)
+                "architecture not set for {} => {}, assuming as {}",
+                target,
+                alias,
+                DEFAULT_IMAGE_ARCH,
+            )
             architecture = DEFAULT_IMAGE_ARCH
         try:
             image_row = await ImageRow.from_image_ref(
-                session, ImageRef(target, ['*'], architecture),
+                session,
+                ImageRef(target, ["*"], architecture),
             )
             image_alias = ImageAliasRow(
                 alias=alias,
@@ -137,45 +141,55 @@ async def update_aliases_from_file(session: AsyncSession, file: Path) -> List[Im
             # let user call session.begin()
             session.add(image_alias)
             ret.append(image_alias)
-            print(f'{alias} -> {image_row.image_ref}')
+            print(f"{alias} -> {image_row.image_ref}")
         except UnknownImageReference:
-            print(f'{alias} -> target image not found')
-    log.info('Done.')
+            print(f"{alias} -> target image not found")
+    log.info("Done.")
     return ret
 
 
 class ImageType(enum.Enum):
-    COMPUTE = 'compute'
-    SYSTEM = 'system'
-    SERVICE = 'service'
+    COMPUTE = "compute"
+    SYSTEM = "system"
+    SERVICE = "service"
 
 
 class ImageRow(Base):
-    __tablename__ = 'images'
-    id = IDColumn('id')
-    name = sa.Column('name', sa.String, nullable=False, index=True)
-    image = sa.Column('image', sa.String, nullable=False, index=True)
+    __tablename__ = "images"
+    id = IDColumn("id")
+    name = sa.Column("name", sa.String, nullable=False, index=True)
+    image = sa.Column("image", sa.String, nullable=False, index=True)
     created_at = sa.Column(
-        'created_at', sa.DateTime(timezone=True),
-        server_default=sa.func.now(), index=True,
+        "created_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        index=True,
     )
-    tag = sa.Column('tag', sa.TEXT)
-    registry = sa.Column('registry', sa.String, nullable=False, index=True)
-    architecture = sa.Column('architecture', sa.String, nullable=False, index=True, default='x86_64')
-    config_digest = sa.Column('config_digest', sa.CHAR(length=72), nullable=False)
-    size_bytes = sa.Column('size_bytes', sa.BigInteger, nullable=False)
-    type = sa.Column('type', sa.Enum(ImageType), nullable=False)
-    accelerators = sa.Column('accelerators', sa.String)
-    labels = sa.Column('labels', sa.JSON, nullable=False)
-    resources = sa.Column('resources', StructuredJSONColumn(
-        t.Mapping(
-            t.String,
-            t.Dict({
-                t.Key('min'): t.String,
-                t.Key('max', default=None): t.Null | t.String,
-            }),
+    tag = sa.Column("tag", sa.TEXT)
+    registry = sa.Column("registry", sa.String, nullable=False, index=True)
+    architecture = sa.Column(
+        "architecture", sa.String, nullable=False, index=True, default="x86_64"
+    )
+    config_digest = sa.Column("config_digest", sa.CHAR(length=72), nullable=False)
+    size_bytes = sa.Column("size_bytes", sa.BigInteger, nullable=False)
+    type = sa.Column("type", sa.Enum(ImageType), nullable=False)
+    accelerators = sa.Column("accelerators", sa.String)
+    labels = sa.Column("labels", sa.JSON, nullable=False)
+    resources = sa.Column(
+        "resources",
+        StructuredJSONColumn(
+            t.Mapping(
+                t.String,
+                t.Dict(
+                    {
+                        t.Key("min"): t.String,
+                        t.Key("max", default=None): t.Null | t.String,
+                    }
+                ),
+            ),
         ),
-    ), nullable=False)
+        nullable=False,
+    )
     aliases: relationship
 
     def __init__(
@@ -216,7 +230,8 @@ class ImageRow(Base):
         load_aliases=False,
     ) -> ImageRow:
         query = (
-            sa.select(ImageRow).select_from(ImageRow)
+            sa.select(ImageRow)
+            .select_from(ImageRow)
             .join(ImageAliasRow, ImageRow.aliases.and_(ImageAliasRow.alias == alias))
         )
         if load_aliases:
@@ -307,7 +322,7 @@ class ImageRow(Base):
                 resolver_func = functools.partial(cls.from_image_ref, strict_arch=strict_arch)
                 searched_refs.append(f"ref:{reference.canonical!r}")
             try:
-                if (row := await resolver_func(session, reference, load_aliases=load_aliases)):
+                if row := await resolver_func(session, reference, load_aliases=load_aliases):
                     return row
             except UnknownImageReference:
                 continue
@@ -322,7 +337,7 @@ class ImageRow(Base):
         return result.scalars().all()
 
     def __str__(self) -> str:
-        return self.image_ref.canonical + f' ({self.image_ref.architecture})'
+        return self.image_ref.canonical + f" ({self.image_ref.architecture})"
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -340,13 +355,13 @@ class ImageRow(Base):
             if slot_unit is None:
                 # ignore unknown slots
                 continue
-            min_value = resource.get('min')
+            min_value = resource.get("min")
             if min_value is None:
                 min_value = Decimal(0)
-            max_value = resource.get('max')
+            max_value = resource.get("max")
             if max_value is None:
-                max_value = Decimal('Infinity')
-            if slot_unit == 'bytes':
+                max_value = Decimal("Infinity")
+            if slot_unit == "bytes":
                 if not isinstance(min_value, Decimal):
                     min_value = BinarySize.from_str(min_value)
                 if not isinstance(max_value, Decimal):
@@ -364,70 +379,73 @@ class ImageRow(Base):
             if slot_key not in min_slot:
                 min_slot[slot_key] = Decimal(0)
             if slot_key not in max_slot:
-                max_slot[slot_key] = Decimal('Infinity')
+                max_slot[slot_key] = Decimal("Infinity")
 
         return min_slot, max_slot
 
     def _parse_row(self):
         res_limits = []
         for slot_key, slot_range in self.resources.items():
-            min_value = slot_range.get('min')
+            min_value = slot_range.get("min")
             if min_value is None:
                 min_value = Decimal(0)
-            max_value = slot_range.get('max')
+            max_value = slot_range.get("max")
             if max_value is None:
-                max_value = Decimal('Infinity')
-            res_limits.append({
-                'key': slot_key,
-                'min': min_value,
-                'max': max_value,
-            })
+                max_value = Decimal("Infinity")
+            res_limits.append(
+                {
+                    "key": slot_key,
+                    "min": min_value,
+                    "max": max_value,
+                }
+            )
 
         accels = self.accelerators
         if accels is None:
             accels = []
         else:
-            accels = accels.split(',')
+            accels = accels.split(",")
 
         return {
-            'canonical_ref': self.name,
-            'name': self.image,
-            'humanized_name': self.image,  # TODO: implement
-            'tag': self.tag,
-            'architecture': self.architecture,
-            'registry': self.registry,
-            'digest': self.config_digest,
-            'labels': self.labels,
-            'size_bytes': self.size_bytes,
-            'resource_limits': res_limits,
-            'supported_accelerators': accels,
+            "canonical_ref": self.name,
+            "name": self.image,
+            "humanized_name": self.image,  # TODO: implement
+            "tag": self.tag,
+            "architecture": self.architecture,
+            "registry": self.registry,
+            "digest": self.config_digest,
+            "labels": self.labels,
+            "size_bytes": self.size_bytes,
+            "resource_limits": res_limits,
+            "supported_accelerators": accels,
         }
 
     async def inspect(self) -> Mapping[str, Any]:
         parsed_image_info = self._parse_row()
-        parsed_image_info['reverse_aliases'] = [x.alias for x in self.aliases]
+        parsed_image_info["reverse_aliases"] = [x.alias for x in self.aliases]
         return parsed_image_info
 
     def set_resource_limit(
-        self, slot_type: str,
+        self,
+        slot_type: str,
         value_range: Tuple[Optional[Decimal], Optional[Decimal]],
     ):
         resources = self.resources
         if resources.get(slot_type) is None:
             resources[slot_type] = {}
         if value_range[0] is not None:
-            resources[slot_type]['min'] = str(value_range[0])
+            resources[slot_type]["min"] = str(value_range[0])
         if value_range[1] is not None:
-            resources[slot_type]['max'] = str(value_range[1])
+            resources[slot_type]["max"] = str(value_range[1])
 
         self.resources = resources
 
 
 class ImageAliasRow(Base):
-    __tablename__ = 'image_aliases'
-    id = IDColumn('id')
-    alias = sa.Column('alias', sa.String, unique=True, index=True)
-    image_id = ForeignKeyIDColumn('image', 'images.id', nullable=False)
+    __tablename__ = "image_aliases"
+    id = IDColumn("id")
+    alias = sa.Column("alias", sa.String, unique=True, index=True)
+    image_id = ForeignKeyIDColumn("image", "images.id", nullable=False)
     image: relationship
 
     @classmethod
@@ -444,7 +462,7 @@ class ImageAliasRow(Base):
         )
         if existing_alias is not None:
             raise ValueError(
-                f'alias already created with ({existing_alias.image})',
+                f"alias already created with ({existing_alias.image})",
             )
         new_alias = ImageAliasRow(
             alias=alias,
@@ -454,8 +472,8 @@ class ImageAliasRow(Base):
         return new_alias
 
 
-ImageRow.aliases = relationship('ImageAliasRow', back_populates='image')
-ImageAliasRow.image = relationship('ImageRow', back_populates='aliases')
+ImageRow.aliases = relationship("ImageAliasRow", back_populates="image")
+ImageAliasRow.image = relationship("ImageRow", back_populates="aliases")
 
 
 class Image(graphene.ObjectType):
@@ -483,9 +501,7 @@ class Image(graphene.ObjectType):
         row: ImageRow,
     ) -> Image:
         # TODO: add architecture
-        installed = (
-            await redis.execute(ctx.redis_image, lambda r: r.scard(row.name))
-        ) > 0
+        installed = (await redis.execute(ctx.redis_image, lambda r: r.scard(row.name))) > 0
         _installed_agents = await redis.execute(
             ctx.redis_image,
             lambda r: r.smembers(row.name),
@@ -497,8 +513,8 @@ class Image(graphene.ObjectType):
                     installed_agents.append(agent_id.decode())
                 else:
                     installed_agents.append(agent_id)
-        is_superadmin = (ctx.user['role'] == UserRole.SUPERADMIN)
-        hide_agents = False if is_superadmin else ctx.local_config['manager']['hide-agents']
+        is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
+        hide_agents = False if is_superadmin else ctx.local_config["manager"]["hide-agents"]
         return cls(
             id=row.id,
             name=row.image,
@@ -507,19 +523,18 @@ class Image(graphene.ObjectType):
             registry=row.registry,
             architecture=row.architecture,
             digest=row.config_digest,
-            labels=[
-                KVPair(key=k, value=v)
-                for k, v in row.labels.items()],
+            labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
             aliases=[alias_row.alias for alias_row in row.aliases],
             size_bytes=row.size_bytes,
             resource_limits=[
                 ResourceLimit(
                     key=k,
-                    min=v.get('min', Decimal(0)),
-                    max=v.get('max', Decimal('Infinity')),
+                    min=v.get("min", Decimal(0)),
+                    max=v.get("max", Decimal("Infinity")),
                 )
-                for k, v in row.resources.items()],
-            supported_accelerators=(row.accelerators or '').split(','),
+                for k, v in row.resources.items()
+            ],
+            supported_accelerators=(row.accelerators or "").split(","),
             installed=installed,
             installed_agents=installed_agents if not hide_agents else None,
             # legacy
@@ -539,10 +554,7 @@ class Image(graphene.ObjectType):
         )
         async with graph_ctx.db.begin_readonly_session() as session:
             result = await session.execute(query)
-            return [
-                await Image.from_row(graph_ctx, row)
-                for row in result.scalars.all()
-            ]
+            return [await Image.from_row(graph_ctx, row) for row in result.scalars.all()]
 
     @classmethod
     async def batch_load_by_image_ref(
@@ -562,10 +574,13 @@ class Image(graphene.ObjectType):
     ) -> Image:
         try:
             async with ctx.db.begin_readonly_session() as session:
-                row = await ImageRow.resolve(session, [
-                    ImageRef(reference, ['*'], architecture),
-                    ImageAlias(reference),
-                ])
+                row = await ImageRow.resolve(
+                    session,
+                    [
+                        ImageRef(reference, ["*"], architecture),
+                        ImageAlias(reference),
+                    ],
+                )
         except UnknownImageReference:
             raise ImageNotFound
         return await cls.from_row(ctx, row)
@@ -588,9 +603,10 @@ class Image(graphene.ObjectType):
         if is_installed is not None:
             items = [*filter(lambda item: item.installed == is_installed, items)]
         if is_operation is not None:
+
             def _filter_operation(item):
                 for label in item.labels:
-                    if label.key == 'ai.backend.features' and 'operation' in label.value:
+                    if label.key == "ai.backend.features" and "operation" in label.value:
                         return not is_operation
                 return not is_operation
 
@@ -607,6 +623,7 @@ class Image(graphene.ObjectType):
         is_operation: bool = None,
     ) -> Sequence[Image]:
         from .domain import domains
+
         async with ctx.db.begin() as conn:
             query = (
                 sa.select([domains.c.allowed_docker_registries])
@@ -615,17 +632,14 @@ class Image(graphene.ObjectType):
             )
             result = await conn.execute(query)
             allowed_docker_registries = result.scalar()
-        items = [
-            item for item in items
-            if item.registry in allowed_docker_registries
-        ]
+        items = [item for item in items if item.registry in allowed_docker_registries]
         if is_installed is not None:
             items = [*filter(lambda item: item.installed == is_installed, items)]
         if is_operation is not None:
 
             def _filter_operation(item):
                 for label in item.labels:
-                    if label.key == 'ai.backend.features' and 'operation' in label.value:
+                    if label.key == "ai.backend.features" and "operation" in label.value:
                         return not is_operation
                 return not is_operation
 
@@ -652,7 +666,7 @@ class PreloadImage(graphene.Mutation):
         references: Sequence[str],
         target_agents: Sequence[str],
     ) -> PreloadImage:
-        return PreloadImage(ok=False, msg='Not implemented.', task_id=None)
+        return PreloadImage(ok=False, msg="Not implemented.", task_id=None)
 
 
 class UnloadImage(graphene.Mutation):
@@ -674,7 +688,7 @@ class UnloadImage(graphene.Mutation):
         references: Sequence[str],
         target_agents: Sequence[str],
     ) -> UnloadImage:
-        return UnloadImage(ok=False, msg='Not implemented.', task_id=None)
+        return UnloadImage(ok=False, msg="Not implemented.", task_id=None)
 
 
 class RescanImages(graphene.Mutation):
@@ -694,15 +708,17 @@ class RescanImages(graphene.Mutation):
         info: graphene.ResolveInfo,
         registry: str = None,
     ) -> RescanImages:
-        log.info('rescanning docker registry {0} by API request',
-                 f'({registry})' if registry else '(all)')
+        log.info(
+            "rescanning docker registry {0} by API request",
+            f"({registry})" if registry else "(all)",
+        )
         ctx: GraphQueryContext = info.context
 
         async def _rescan_task(reporter: ProgressReporter) -> None:
             await rescan_images(ctx.etcd, ctx.db, registry, reporter=reporter)
 
         task_id = await ctx.background_task_manager.start(_rescan_task)
-        return RescanImages(ok=True, msg='', task_id=task_id)
+        return RescanImages(ok=True, msg="", task_id=task_id)
 
 
 class ForgetImage(graphene.Mutation):
@@ -723,15 +739,18 @@ class ForgetImage(graphene.Mutation):
         reference: str,
         architecture: str,
     ) -> ForgetImage:
-        log.info('forget image {0} by API request', reference)
+        log.info("forget image {0} by API request", reference)
         ctx: GraphQueryContext = info.context
         async with ctx.db.begin_session() as session:
-            image_row = await ImageRow.resolve(session, [
-                ImageRef(reference, ['*'], architecture),
-                ImageAlias(reference),
-            ])
+            image_row = await ImageRow.resolve(
+                session,
+                [
+                    ImageRef(reference, ["*"], architecture),
+                    ImageAlias(reference),
+                ],
+            )
             await session.delete(image_row)
-        return ForgetImage(ok=True, msg='')
+        return ForgetImage(ok=True, msg="")
 
 
 class AliasImage(graphene.Mutation):
@@ -754,8 +773,8 @@ class AliasImage(graphene.Mutation):
         target: str,
         architecture: str,
     ) -> AliasImage:
-        image_ref = ImageRef(target, ['*'], architecture)
-        log.info('alias image {0} -> {1} by API request', alias, image_ref)
+        image_ref = ImageRef(target, ["*"], architecture)
+        log.info("alias image {0} -> {1} by API request", alias, image_ref)
         ctx: GraphQueryContext = info.context
         try:
             async with ctx.db.begin_session() as session:
@@ -767,7 +786,7 @@ class AliasImage(graphene.Mutation):
                     image_row.aliases.append(ImageAliasRow(alias=alias, image_id=image_row.id))
         except ValueError as e:
             return AliasImage(ok=False, msg=str(e))
-        return AliasImage(ok=True, msg='')
+        return AliasImage(ok=True, msg="")
 
 
 class DealiasImage(graphene.Mutation):
@@ -786,20 +805,19 @@ class DealiasImage(graphene.Mutation):
         info: graphene.ResolveInfo,
         alias: str,
     ) -> DealiasImage:
-        log.info('dealias image {0} by API request', alias)
+        log.info("dealias image {0} by API request", alias)
         ctx: GraphQueryContext = info.context
         try:
             async with ctx.db.begin_session() as session:
                 existing_alias = await session.scalar(
-                    sa.select(ImageAliasRow)
-                    .where(ImageAliasRow.alias == alias),
+                    sa.select(ImageAliasRow).where(ImageAliasRow.alias == alias),
                 )
                 if existing_alias is None:
-                    raise DealiasImage(ok=False, msg=str('No such alias'))
+                    raise DealiasImage(ok=False, msg=str("No such alias"))
                 await session.delete(existing_alias)
         except ValueError as e:
             return DealiasImage(ok=False, msg=str(e))
-        return DealiasImage(ok=True, msg='')
+        return DealiasImage(ok=True, msg="")
 
 
 class ClearImages(graphene.Mutation):
@@ -822,15 +840,17 @@ class ClearImages(graphene.Mutation):
         try:
             async with ctx.db.begin_session() as session:
                 result = await session.execute(
-                    sa.select(ImageRow).where(ImageRow.registry == registry))
+                    sa.select(ImageRow).where(ImageRow.registry == registry)
+                )
                 image_ids = [x.id for x in result.scalars().all()]
 
                 await session.execute(
-                    sa.delete(ImageAliasRow).where(ImageAliasRow.image_id.in_(image_ids)))
+                    sa.delete(ImageAliasRow).where(ImageAliasRow.image_id.in_(image_ids))
+                )
                 await session.execute(sa.delete(ImageRow).where(ImageRow.registry == registry))
         except ValueError as e:
             return ClearImages(ok=False, msg=str(e))
-        return ClearImages(ok=True, msg='')
+        return ClearImages(ok=True, msg="")
 
 
 class ModifyImageInput(graphene.InputObjectType):
@@ -870,40 +890,43 @@ class ModifyImage(graphene.Mutation):
     ) -> AliasImage:
         ctx: GraphQueryContext = info.context
         data: MutableMapping[str, Any] = {}
-        set_if_set(props, data, 'name')
-        set_if_set(props, data, 'registry')
-        set_if_set(props, data, 'image')
-        set_if_set(props, data, 'tag')
-        set_if_set(props, data, 'architecture')
-        set_if_set(props, data, 'size_bytes')
-        set_if_set(props, data, 'type')
-        set_if_set(props, data, 'digest', target_key='config_digest')
+        set_if_set(props, data, "name")
+        set_if_set(props, data, "registry")
+        set_if_set(props, data, "image")
+        set_if_set(props, data, "tag")
+        set_if_set(props, data, "architecture")
+        set_if_set(props, data, "size_bytes")
+        set_if_set(props, data, "type")
+        set_if_set(props, data, "digest", target_key="config_digest")
         set_if_set(
-            props, data, 'supported_accelerators',
-            clean_func=lambda v: ','.join(v), target_key='accelerators',
+            props,
+            data,
+            "supported_accelerators",
+            clean_func=lambda v: ",".join(v),
+            target_key="accelerators",
         )
-        set_if_set(props, data, 'labels', clean_func=lambda v: {pair.key: pair.value for pair in v})
+        set_if_set(props, data, "labels", clean_func=lambda v: {pair.key: pair.value for pair in v})
 
         if props.resource_limits is not None:
             resources_data = {}
             for limit_option in props.resource_limits:
                 limit_data = {}
                 if limit_option.min is not None and len(limit_option.min) > 0:
-                    limit_data['min'] = limit_option.min
+                    limit_data["min"] = limit_option.min
                 if limit_option.max is not None and len(limit_option.max) > 0:
-                    limit_data['max'] = limit_option.max
+                    limit_data["max"] = limit_option.max
                 resources_data[limit_option.key] = limit_data
-            data['resources'] = resources_data
+            data["resources"] = resources_data
 
         try:
             async with ctx.db.begin_session() as session:
-                image_ref = ImageRef(target, ['*'], architecture)
+                image_ref = ImageRef(target, ["*"], architecture)
                 try:
                     row = await ImageRow.from_image_ref(session, image_ref)
                 except UnknownImageReference:
-                    return ModifyImage(ok=False, msg='Image not found')
+                    return ModifyImage(ok=False, msg="Image not found")
                 for k, v in data.items():
                     setattr(row, k, v)
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
-        return ModifyImage(ok=True, msg='')
+        return ModifyImage(ok=True, msg="")

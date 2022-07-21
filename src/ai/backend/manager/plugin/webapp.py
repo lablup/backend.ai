@@ -19,10 +19,11 @@ class WebappPlugin(AbstractPlugin, metaclass=ABCMeta):
 
     @abstractmethod
     async def create_app(
-        self, cors_options: CORSOptions,
+        self,
+        cors_options: CORSOptions,
     ) -> Tuple[web.Application, Sequence[WebMiddleware]]:
         pass
 
 
 class WebappPluginContext(BasePluginContext[WebappPlugin]):
-    plugin_group = 'backendai_webapp_v20'
+    plugin_group = "backendai_webapp_v20"

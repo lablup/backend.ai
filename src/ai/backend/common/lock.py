@@ -27,7 +27,6 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class AbstractDistributedLock(metaclass=abc.ABCMeta):
-
     def __init__(self, *, lifetime: Optional[float] = None) -> None:
         self._lifetime = lifetime
 
@@ -141,16 +140,18 @@ class EtcdLock(AbstractDistributedLock):
             timeout=self._timeout,
             ttl=int(self._lifetime) if self._lifetime is not None else None,
         )
-        assert self._con_mgr is not None  # FIXME: not required if with_lock() has an explicit return type.
+        assert (
+            self._con_mgr is not None
+        )  # FIXME: not required if with_lock() has an explicit return type.
         communicator = await self._con_mgr.__aenter__()
         if self._debug:
-            log.debug('etcd lock acquired')
+            log.debug("etcd lock acquired")
         return communicator
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         assert self._con_mgr is not None
         await self._con_mgr.__aexit__(*exc_info)
         if self._debug:
-            log.debug('etcd lock released')
+            log.debug("etcd lock released")
         self._con_mgr = None
         return None

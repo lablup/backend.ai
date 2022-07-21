@@ -23,7 +23,7 @@ def domain():
 
 @domain.command()
 @pass_ctx_obj
-@click.argument('name', type=str)
+@click.argument("name", type=str)
 def info(ctx: CLIContext, name: str) -> None:
     """
     Show the information about the given domain.
@@ -56,19 +56,25 @@ def list(ctx: CLIContext) -> None:
 
 @domain.command()
 @pass_ctx_obj
-@click.argument('name', type=str, metavar='NAME')
-@click.option('-d', '--description', type=str, default='',
-              help='Description of new domain')
-@click.option('-i', '--inactive', is_flag=True,
-              help='New domain will be inactive.')
-@click.option('--total-resource-slots', type=str, default='{}',
-              help='Set total resource slots.')
-@click.option('--allowed-vfolder-hosts', type=str, multiple=True,
-              help='Allowed virtual folder hosts.')
-@click.option('--allowed-docker-registries', type=str, multiple=True,
-              help='Allowed docker registries.')
-def add(ctx: CLIContext, name, description, inactive, total_resource_slots,
-        allowed_vfolder_hosts, allowed_docker_registries):
+@click.argument("name", type=str, metavar="NAME")
+@click.option("-d", "--description", type=str, default="", help="Description of new domain")
+@click.option("-i", "--inactive", is_flag=True, help="New domain will be inactive.")
+@click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
+@click.option(
+    "--allowed-vfolder-hosts", type=str, multiple=True, help="Allowed virtual folder hosts."
+)
+@click.option(
+    "--allowed-docker-registries", type=str, multiple=True, help="Allowed docker registries."
+)
+def add(
+    ctx: CLIContext,
+    name,
+    description,
+    inactive,
+    total_resource_slots,
+    allowed_vfolder_hosts,
+    allowed_docker_registries,
+):
     """
     Add a new domain.
 
@@ -87,37 +93,46 @@ def add(ctx: CLIContext, name, description, inactive, total_resource_slots,
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='domain',
-                action_name='add',
+                item_name="domain",
+                action_name="add",
             )
             sys.exit(1)
-        if not data['ok']:
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='domain',
-                action_name='add',
+                msg=data["msg"],
+                item_name="domain",
+                action_name="add",
             )
             sys.exit(1)
         ctx.output.print_mutation_result(
             data,
-            item_name='domain',
+            item_name="domain",
         )
 
 
 @domain.command()
 @pass_ctx_obj
-@click.argument('name', type=str, metavar='NAME')
-@click.option('--new-name', type=str, help='New name of the domain')
-@click.option('--description', type=str, help='Description of the domain')
-@click.option('--is-active', type=bool, help='Set domain inactive.')
-@click.option('--total-resource-slots', type=str,
-              help='Update total resource slots.')
-@click.option('--allowed-vfolder-hosts', type=str, multiple=True,
-              help='Allowed virtual folder hosts.')
-@click.option('--allowed-docker-registries', type=str, multiple=True,
-              help='Allowed docker registries.')
-def update(ctx: CLIContext, name, new_name, description, is_active, total_resource_slots,
-           allowed_vfolder_hosts, allowed_docker_registries):
+@click.argument("name", type=str, metavar="NAME")
+@click.option("--new-name", type=str, help="New name of the domain")
+@click.option("--description", type=str, help="Description of the domain")
+@click.option("--is-active", type=bool, help="Set domain inactive.")
+@click.option("--total-resource-slots", type=str, help="Update total resource slots.")
+@click.option(
+    "--allowed-vfolder-hosts", type=str, multiple=True, help="Allowed virtual folder hosts."
+)
+@click.option(
+    "--allowed-docker-registries", type=str, multiple=True, help="Allowed docker registries."
+)
+def update(
+    ctx: CLIContext,
+    name,
+    new_name,
+    description,
+    is_active,
+    total_resource_slots,
+    allowed_vfolder_hosts,
+    allowed_docker_registries,
+):
     """
     Update an existing domain.
 
@@ -137,28 +152,28 @@ def update(ctx: CLIContext, name, new_name, description, is_active, total_resour
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='domain',
-                action_name='update',
+                item_name="domain",
+                action_name="update",
             )
             sys.exit(1)
-        if not data['ok']:
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='domain',
-                action_name='update',
+                msg=data["msg"],
+                item_name="domain",
+                action_name="update",
             )
             sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                'name': name,
+                "name": name,
             },
         )
 
 
 @domain.command()
 @pass_ctx_obj
-@click.argument('name', type=str, metavar='NAME')
+@click.argument("name", type=str, metavar="NAME")
 def delete(ctx: CLIContext, name):
     """
     Inactive an existing domain.
@@ -171,28 +186,28 @@ def delete(ctx: CLIContext, name):
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='domain',
-                action_name='deletion',
+                item_name="domain",
+                action_name="deletion",
             )
             sys.exit(1)
-        if not data['ok']:
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='domain',
-                action_name='deletion',
+                msg=data["msg"],
+                item_name="domain",
+                action_name="deletion",
             )
             sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                'name': name,
+                "name": name,
             },
         )
 
 
 @domain.command()
 @pass_ctx_obj
-@click.argument('name', type=str, metavar='NAME')
+@click.argument("name", type=str, metavar="NAME")
 def purge(ctx: CLIContext, name):
     """
     Delete an existing domain.
@@ -202,26 +217,26 @@ def purge(ctx: CLIContext, name):
     with Session() as session:
         try:
             if not ask_yn():
-                print_info('Cancelled')
+                print_info("Cancelled")
                 sys.exit(1)
             data = session.Domain.purge(name)
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='domain',
-                action_name='purge',
+                item_name="domain",
+                action_name="purge",
             )
             sys.exit(1)
-        if not data['ok']:
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='domain',
-                action_name='purge',
+                msg=data["msg"],
+                item_name="domain",
+                action_name="purge",
             )
             sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                'name': name,
+                "name": name,
             },
         )

@@ -19,7 +19,7 @@ from .utils import interrupt
 @pytest.mark.redis
 @pytest.mark.asyncio
 @pytest.mark.xfail
-@pytest.mark.parametrize("disruption_method", ['stop', 'pause'])
+@pytest.mark.parametrize("disruption_method", ["stop", "pause"])
 async def test_pubsub(redis_container: str, disruption_method: str) -> None:
     do_pause = asyncio.Event()
     paused = asyncio.Event()
@@ -39,7 +39,7 @@ async def test_pubsub(redis_container: str, disruption_method: str) -> None:
             pass
 
     r = RedisConnectionInfo(
-        aioredis.from_url(url='redis://localhost:9379', socket_timeout=0.5),
+        aioredis.from_url(url="redis://localhost:9379", socket_timeout=0.5),
         service_name=None,
     )
     assert isinstance(r.client, aioredis.Redis)
@@ -49,14 +49,16 @@ async def test_pubsub(redis_container: str, disruption_method: str) -> None:
         await pubsub.subscribe("ch1")
 
         subscribe_task = asyncio.create_task(subscribe(pubsub))
-        interrupt_task = asyncio.create_task(interrupt(
-            disruption_method,
-            DockerRedisNode("node", 9379, redis_container),
-            do_pause=do_pause,
-            do_unpause=do_unpause,
-            paused=paused,
-            unpaused=unpaused,
-        ))
+        interrupt_task = asyncio.create_task(
+            interrupt(
+                disruption_method,
+                DockerRedisNode("node", 9379, redis_container),
+                do_pause=do_pause,
+                do_unpause=do_unpause,
+                paused=paused,
+                unpaused=unpaused,
+            )
+        )
         await asyncio.sleep(0)
 
         for i in range(5):
@@ -66,10 +68,10 @@ async def test_pubsub(redis_container: str, disruption_method: str) -> None:
         await paused.wait()
         for i in range(5):
             # The Redis server is dead temporarily...
-            if disruption_method == 'stop':
+            if disruption_method == "stop":
                 with pytest.raises(aioredis.exceptions.ConnectionError):
                     await r.client.publish("ch1", str(5 + i))
-            elif disruption_method == 'pause':
+            elif disruption_method == "pause":
                 with pytest.raises(asyncio.TimeoutError):
                     await r.client.publish("ch1", str(5 + i))
             else:
@@ -86,12 +88,12 @@ async def test_pubsub(redis_container: str, disruption_method: str) -> None:
         await subscribe_task
         assert subscribe_task.done()
 
-    if disruption_method == 'stop':
+    if disruption_method == "stop":
         all_messages = set(map(int, received_messages))
         assert set(range(0, 5)) <= all_messages
         assert set(range(13, 15)) <= all_messages  # more msgs may be lost during restart
         assert all_messages <= set(range(0, 15))
-    elif disruption_method == 'pause':
+    elif disruption_method == "pause":
         # Temporary pause of the container makes the kernel TCP stack to keep the packets.
         assert [*map(int, received_messages)] == [*range(0, 15)]
     else:
@@ -101,7 +103,7 @@ async def test_pubsub(redis_container: str, disruption_method: str) -> None:
 @pytest.mark.redis
 @pytest.mark.asyncio
 @pytest.mark.xfail
-@pytest.mark.parametrize("disruption_method", ['stop', 'pause'])
+@pytest.mark.parametrize("disruption_method", ["stop", "pause"])
 async def test_pubsub_with_retrying_pub(redis_container: str, disruption_method: str) -> None:
     do_pause = asyncio.Event()
     paused = asyncio.Event()
@@ -121,7 +123,7 @@ async def test_pubsub_with_retrying_pub(redis_container: str, disruption_method:
             pass
 
     r = RedisConnectionInfo(
-        aioredis.from_url(url='redis://localhost:9379', socket_timeout=0.5),
+        aioredis.from_url(url="redis://localhost:9379", socket_timeout=0.5),
         service_name=None,
     )
     assert isinstance(r.client, aioredis.Redis)
@@ -131,14 +133,16 @@ async def test_pubsub_with_retrying_pub(redis_container: str, disruption_method:
         await pubsub.subscribe("ch1")
 
         subscribe_task = asyncio.create_task(subscribe(pubsub))
-        interrupt_task = asyncio.create_task(interrupt(
-            disruption_method,
-            DockerRedisNode("node", 9379, redis_container),
-            do_pause=do_pause,
-            do_unpause=do_unpause,
-            paused=paused,
-            unpaused=unpaused,
-        ))
+        interrupt_task = asyncio.create_task(
+            interrupt(
+                disruption_method,
+                DockerRedisNode("node", 9379, redis_container),
+                do_pause=do_pause,
+                do_unpause=do_unpause,
+                paused=paused,
+                unpaused=unpaused,
+            )
+        )
         await asyncio.sleep(0)
 
         for i in range(5):
