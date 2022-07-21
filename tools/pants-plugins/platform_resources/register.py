@@ -84,9 +84,7 @@ async def inject_platform_specific_dependencies(
 
 
 def target_types():
-    return (
-        PlatformResourcesTarget,
-    )
+    return (PlatformResourcesTarget,)
 
 
 def rules():

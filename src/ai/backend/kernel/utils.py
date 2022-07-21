@@ -4,23 +4,23 @@ from pathlib import Path
 from async_timeout import timeout
 
 __all__ = (
-    'current_loop',
-    'find_executable',
-    'safe_close_task',
-    'wait_local_port_open',
+    "current_loop",
+    "find_executable",
+    "safe_close_task",
+    "wait_local_port_open",
 )
 
 
-if hasattr(asyncio, 'get_running_loop'):
+if hasattr(asyncio, "get_running_loop"):
     current_loop = asyncio.get_running_loop  # type: ignore  # noqa
 else:
-    current_loop = asyncio.get_event_loop    # type: ignore  # noqa
+    current_loop = asyncio.get_event_loop  # type: ignore  # noqa
 
 
 def find_executable(*paths):
-    '''
+    """
     Find the first executable regular file in the given list of paths.
-    '''
+    """
     for path in paths:
         if isinstance(path, (str, bytes)):
             path = Path(path)
@@ -42,7 +42,7 @@ async def wait_local_port_open(port):
     while True:
         try:
             with timeout(10.0):
-                reader, writer = await asyncio.open_connection('127.0.0.1', port)
+                reader, writer = await asyncio.open_connection("127.0.0.1", port)
         except ConnectionRefusedError:
             await asyncio.sleep(0.1)
             continue
@@ -52,6 +52,6 @@ async def wait_local_port_open(port):
             raise
         else:
             writer.close()
-            if hasattr(writer, 'wait_closed'):
+            if hasattr(writer, "wait_closed"):
                 await writer.wait_closed()
             break

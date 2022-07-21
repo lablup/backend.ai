@@ -1,9 +1,7 @@
 from ..request import Request
 from .base import BaseFunction, api_function
 
-__all__ = (
-    'Auth',
-)
+__all__ = ("Auth",)
 
 
 class Auth(BaseFunction):
@@ -20,16 +18,18 @@ class Auth(BaseFunction):
         a dictionary with ``"authenticated"`` boolean field and
         JSON-encoded raw cookie data.
         """
-        rqst = Request('POST', '/server/login')
-        rqst.set_json({
-            'username': user_id,
-            'password': password,
-        })
+        rqst = Request("POST", "/server/login")
+        rqst.set_json(
+            {
+                "username": user_id,
+                "password": password,
+            }
+        )
         async with rqst.fetch(anonymous=True) as resp:
             data = await resp.json()
-            data['cookies'] = resp.raw_response.cookies
-            data['config'] = {
-                'username': user_id,
+            data["cookies"] = resp.raw_response.cookies
+            data["config"] = {
+                "username": user_id,
             }
             return data
 
@@ -40,21 +40,25 @@ class Auth(BaseFunction):
         Log-out from the endpoint.
         It clears the server-side web session.
         """
-        rqst = Request('POST', '/server/logout')
+        rqst = Request("POST", "/server/logout")
         async with rqst.fetch() as resp:
             resp.raw_response.raise_for_status()
 
     @api_function
     @classmethod
-    async def update_password(cls, old_password: str, new_password: str, new_password2: str) -> dict:
+    async def update_password(
+        cls, old_password: str, new_password: str, new_password2: str
+    ) -> dict:
         """
         Update user's password. This API works only for account owner.
         """
-        rqst = Request('POST', '/auth/update-password')
-        rqst.set_json({
-            'old_password': old_password,
-            'new_password': new_password,
-            'new_password2': new_password2,
-        })
+        rqst = Request("POST", "/auth/update-password")
+        rqst.set_json(
+            {
+                "old_password": old_password,
+                "new_password": new_password,
+                "new_password2": new_password2,
+            }
+        )
         async with rqst.fetch() as resp:
             return await resp.json()
