@@ -581,6 +581,9 @@ fi
 show_info "Checking and installing Python dependencies..."
 install_pybuild_deps
 
+show_info "Setting additional git configs..."
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+
 show_info "Checking and installing git lfs support..."
 install_git_lfs
 
