@@ -2,7 +2,7 @@ import abc
 import sqlite3
 import uuid
 from pathlib import Path
-from typing import Dict, Final, Iterable, List, Optional
+from typing import Dict, Final, Iterable, List, Optional, Tuple
 
 from redis.asyncio import Redis
 
@@ -24,6 +24,10 @@ class AbstractLogStorage(abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
+    async def slice(self, start: int, stop: Optional[int] = None) -> Tuple[raft_pb2.Log, ...]:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
     async def splice(self, index: int) -> None:
         raise NotImplementedError()
 
@@ -32,7 +36,7 @@ class AbstractLogStorage(abc.ABC):
         raise NotImplementedError()
 
 
-class InMemoryLogStorage(aobject, AbstractLogStorage):
+class MemoryLogStorage(aobject, AbstractLogStorage):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._storage: List[raft_pb2.Log] = []
@@ -52,8 +56,13 @@ class InMemoryLogStorage(aobject, AbstractLogStorage):
     async def last(self) -> Optional[raft_pb2.Log]:
         return self._storage[-1] if self._storage else None
 
+    async def slice(self, start: int, stop: Optional[int] = None) -> Tuple[raft_pb2.Log, ...]:
+        if stop is not None:
+            return tuple(filter(lambda x: start <= x.index < stop, self._storage))
+        return tuple(filter(lambda x: start <= x.index, self._storage))
+
     async def splice(self, index: int) -> None:
-        self._storage = list(filter(lambda x: x.index < index, self._storage))
+        self._storage = list(filter(lambda x: x.index <= index, self._storage))
 
     async def size(self) -> int:
         return len(self._storage)
@@ -107,6 +116,17 @@ class SqliteLogStorage(aobject, AbstractLogStorage):
                 row = raft_pb2.Log(index=row[0], term=row[1], command=row[2])
             return row
 
+    async def slice(self, start: int, stop: Optional[int] = None) -> Tuple[raft_pb2.Log, ...]:
+        with sqlite3.connect(self.database) as conn:
+            cur = conn.cursor()
+            sql = f"SELECT * FROM {self._table} WHERE idx >= :start"
+            parameters = {"start": start}
+            if stop is not None:
+                sql += " AND idx < :stop"
+                parameters.update({"stop": stop})
+            rows = cur.execute(sql, parameters).fetchall()
+            return tuple(map(lambda r: raft_pb2.Log(index=r[0], term=r[1], command=r[2]), rows))
+
     async def splice(self, index: int) -> None:
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
@@ -155,6 +175,9 @@ class RedisLogStorage(aobject, AbstractLogStorage):
         return log
 
     async def last(self) -> Optional[raft_pb2.Log]:
+        raise NotImplementedError()
+
+    async def slice(self, start: int, stop: Optional[int] = None) -> Tuple[raft_pb2.Log, ...]:
         raise NotImplementedError()
 
     async def splice(self, index: int) -> None:

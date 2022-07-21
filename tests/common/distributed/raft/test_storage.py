@@ -34,3 +34,21 @@ async def test_sqlite_storage() -> None:
 
     count = await storage.size()
     assert count == (random_index - 1)
+
+
+@pytest.mark.asyncio
+async def test_sqlite_storage__slice() -> None:
+    storage = SqliteLogStorage(volatile=True)
+
+    n = 16
+    entries = tuple(
+        raft_pb2.Log(index=i, term=pow(i, 2), command="+OK\r\n")
+        for i in range(1, n + 1)
+    )
+    await storage.append_entries(entries)
+
+    i, j = 3, 10
+    rows = await storage.slice(i, j)
+    assert len(rows) == (j - i)
+    assert rows[0].index == i
+    assert rows[-1].index == (j - 1)
