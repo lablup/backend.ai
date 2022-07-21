@@ -793,6 +793,85 @@ class VirtualFolder(graphene.ObjectType):
             ]
 
     @classmethod
+    async def load_count_shared(
+        cls,
+        graph_ctx: GraphQueryContext,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+    ) -> int:
+        from .user import users
+        j = (
+            vfolder_permissions
+            .join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder)
+            .join(users, users.c.uuid == vfolder_permissions.c.user)
+        )
+        query = (
+            sa.select([sa.func.count()])
+            .select_from(j)
+        )
+        if domain_name is not None:
+            query = query.where(users.c.domain_name == domain_name)
+        if group_id is not None:
+            query = query.where(vfolders.c.group == group_id)
+        if user_id is not None:
+            query = query.where(vfolders.c.user == user_id)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with graph_ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.scalar()
+
+    @classmethod
+    async def load_slice_shared(
+        cls,
+        graph_ctx: GraphQueryContext,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> Sequence[VirtualFolder]:
+        from .group import groups
+        from .user import users
+        j = (
+            vfolder_permissions
+            .join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder)
+            .join(users, users.c.uuid == vfolder_permissions.c.user)
+        )
+        query = (
+            sa.select([vfolder_permissions, vfolders, users.c.email, groups.c.name.label('groups_name')])
+            .select_from(j)
+            .limit(limit)
+            .offset(offset)
+        )
+        if domain_name is not None:
+            query = query.where(users.c.domain_name == domain_name)
+        if group_id is not None:
+            query = query.where(vfolders.c.group == group_id)
+        if user_id is not None:
+            query = query.where(vfolders.c.user == user_id)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        if order is not None:
+            qoparser = QueryOrderParser(cls._queryorder_colmap)
+            query = qoparser.append_ordering(query, order)
+        else:
+            query = query.order_by(vfolders.c.created_at.desc())
+        async with graph_ctx.db.begin_readonly() as conn:
+            return [
+                obj async for row in (await conn.stream(query))
+                if (obj := cls.from_row(graph_ctx, row)) is not None
+            ]
+
+    @classmethod
     async def batch_load_by_user(
         cls,
         graph_ctx: GraphQueryContext,

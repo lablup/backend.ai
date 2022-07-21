@@ -395,6 +395,15 @@ class Queries(graphene.ObjectType):
         access_key=graphene.String(),  # must be empty for user requests
     )
 
+    # super-admin only
+    shared_vfolder_list = graphene.Field(
+        VirtualFolderList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+    )
+
     vfolders = graphene.List(  # legacy non-paginated list
         VirtualFolder,
         domain_name=graphene.String(),
@@ -1063,6 +1072,39 @@ class Queries(graphene.ObjectType):
             filter=filter,
         )
         items = await VirtualFolder.load_slice(
+            info.context,
+            limit,
+            offset,
+            domain_name=domain_name,  # scope
+            group_id=group_id,        # scope
+            user_id=user_id,          # scope
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderList(items, total_count)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_shared_vfolder_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderList:
+        total_count = await VirtualFolder.load_count_shared(
+            info.context,
+            domain_name=domain_name,  # scope
+            group_id=group_id,        # scope
+            user_id=user_id,          # scope
+            filter=filter,
+        )
+        items = await VirtualFolder.load_slice_shared(
             info.context,
             limit,
             offset,
