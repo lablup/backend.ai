@@ -562,7 +562,7 @@ if [ "$DISTRO" = "Darwin" ]; then
   echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
 fi
 
-if [ $ENABLE_CUDA -eq 1 ] & [ $ENABLE_CUDA_MOCK -eq 1 ]; then
+if [ $ENABLE_CUDA -eq 1 ] && [ $ENABLE_CUDA_MOCK -eq 1 ]; then
   show_error "You can't use both CUDA and CUDA mock plugins at once!"
   show_error "Please remove --enable-cuda or --enable-cuda-mock flag to continue."
   exit -1
@@ -657,7 +657,7 @@ check_snappy
 $PANTS export '::'
 
 if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-  cp "configs/accelerator/cuda-mock-enterprise.toml" cuda-mock.toml
+  cp "configs/accelerator/cuda-mock.toml" cuda-mock.toml
 fi
 
 # configure manager
