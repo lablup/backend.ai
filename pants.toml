@@ -4,6 +4,7 @@ pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
     "pants.backend.python",
+    "pants.backend.python.lint.black",
     "pants.backend.python.lint.flake8",
     "pants.backend.python.lint.isort",
     "pants.backend.python.typecheck.mypy",
@@ -58,16 +59,21 @@ known_versions = [
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 
+[black]
+version = "black~=22.6"
+interpreter_constraints = ["CPython>=3.10,<4"]
+lockfile = "tools/black.lock"
+
 [flake8]
 version = "flake8>=4.0.1"
 extra_requirements.add = [
-    "flake8-commas>=2.1",
     "setuptools>=60.0",
 ]
 lockfile = "tools/flake8.lock"
 
 [isort]
 lockfile = "tools/isort.lock"
+interpreter_constraints = ["CPython>=3.10,<4"]
 
 [pytest]
 version = "pytest>=7.1.2"
@@ -85,6 +91,7 @@ timeout_default = 300
 
 [mypy]
 version = "mypy>=0.961"
+interpreter_constraints = ["CPython>=3.10,<4"]
 extra_requirements.add = [
 ]
 lockfile = "tools/mypy.lock"
