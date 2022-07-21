@@ -688,7 +688,7 @@ elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
 else
   sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = []/" ./agent.toml
 fi
-sed_inplace "s/var-base-path = .*$/var-base-path = \"${VAR_BASE_PATH}\"/" ./agent.toml
+sed_inplace 's@var-base-path = .*$@var-base-path = "'"${VAR_BASE_PATH}"'"@' ./agent.toml
 
 # configure storage-proxy
 cp configs/storage-proxy/sample.toml ./storage-proxy.toml
