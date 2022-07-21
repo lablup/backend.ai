@@ -605,9 +605,9 @@ class FetchContextManager:
 
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         assert self._rqst_ctx is not None
-        ret = await self._rqst_ctx.__aexit__(*exc_info)
+        await self._rqst_ctx.__aexit__(*exc_info)
         self._rqst_ctx = None
-        return ret
+        return None
 
 
 class WebSocketResponse(BaseResponse):
@@ -752,9 +752,9 @@ class WebSocketContextManager:
 
     async def __aexit__(self, *args) -> Optional[bool]:
         assert self._ws_ctx is not None
-        ret = await self._ws_ctx.__aexit__(*args)
+        await self._ws_ctx.__aexit__(*args)
         self._ws_ctx = None
-        return ret
+        return None
 
 
 @attr.s(auto_attribs=True, slots=True, frozen=True)
@@ -909,6 +909,6 @@ class SSEContextManager:
 
     async def __aexit__(self, *args) -> Optional[bool]:
         assert self._rqst_ctx is not None
-        ret = await self._rqst_ctx.__aexit__(*args)
+        await self._rqst_ctx.__aexit__(*args)
         self._rqst_ctx = None
-        return ret
+        return None
