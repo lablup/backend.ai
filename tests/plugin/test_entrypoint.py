@@ -4,7 +4,7 @@ from pathlib import Path
 
 from ai.backend.plugin.entrypoint import (
     extract_entrypoints_from_buildscript,
-    match_blocklist,
+    match_plugin_list,
 )
 
 
@@ -67,7 +67,7 @@ def test_parse_build():
 
 
 def test_match_blocklist():
-    assert match_blocklist("ai.backend.manager:abc", {"ai.backend.manager"})
-    assert not match_blocklist("ai.backend.manager:abc", {"ai.backend.agent"})
-    assert match_blocklist("ai.backend.manager.scheduler.fifo:FIFOScheduler", {"ai.backend.manager"})
-    assert not match_blocklist("ai.backend.common.monitor:ErrorMonitor", {"ai.backend.manager"})
+    assert match_plugin_list("ai.backend.manager:abc", {"ai.backend.manager"})
+    assert not match_plugin_list("ai.backend.manager:abc", {"ai.backend.agent"})
+    assert match_plugin_list("ai.backend.manager.scheduler.fifo:FIFOScheduler", {"ai.backend.manager"})
+    assert not match_plugin_list("ai.backend.common.monitor:ErrorMonitor", {"ai.backend.manager"})

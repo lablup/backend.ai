@@ -10,6 +10,7 @@ import os
 import pwd
 import re
 import uuid
+from collections.abc import Iterable
 from decimal import Decimal
 from pathlib import Path as _Path
 from pathlib import PurePath as _PurePath
@@ -611,3 +612,11 @@ class URL(t.Trafaret):
             return yarl.URL(value)
         except ValueError as e:
             self._failure(f"cannot convert the given value to URL (error: {e!r})", value=value)
+
+
+class ToSet(t.Trafaret):
+    def check_and_return(self, value: Any) -> set:
+        if isinstance(value, Iterable):
+            return set(value)
+        else:
+            self._failure('value must be Iterable')

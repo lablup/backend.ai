@@ -16,6 +16,55 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.06.0b2 (2022-07-18)
+
+### Features
+* Add `backend.ai session watch` command to display the event stream of target session. ([#440](https://github.com/lablup/backend.ai/issues/440))
+* Add support for Weka.IO storage backend. ([#443](https://github.com/lablup/backend.ai/issues/443))
+* Add support for auto-removal of kernels reported for abusing or abnormal activities by separate detectors ([#449](https://github.com/lablup/backend.ai/issues/449))
+* Add a watchdog task to `FileLock` to unlock implicitly after given timeout. ([#467](https://github.com/lablup/backend.ai/issues/467))
+* Replace redis library from aioredis to redis-py. ([#468](https://github.com/lablup/backend.ai/issues/468))
+* Add `kernels.status_history` JSONB column for tracking time record on status transition of compute session. ([#480](https://github.com/lablup/backend.ai/issues/480))
+* client,cli: Add `session status-history` command and its corresponding functional API to query the status transition history of compute sessions, with addition of the `status_history` GraphQL field in the manager ([#483](https://github.com/lablup/backend.ai/issues/483))
+* Support for openSUSE release versions (both Leap and Tumbleweed) installation ([#485](https://github.com/lablup/backend.ai/issues/485))
+* install-dev: Support editable installation of the web UI (`src/ai/backend/webui`) for ease of new frontend developers ([#501](https://github.com/lablup/backend.ai/issues/501))
+* Add web handler to sending up-requests to pipeline server ([#503](https://github.com/lablup/backend.ai/issues/503))
+* install-dev: Ensure that the user is on the build root directory (the repository's topmost directory). ([#524](https://github.com/lablup/backend.ai/issues/524))
+* Allow general users to force termination of their own sessions. ([#525](https://github.com/lablup/backend.ai/issues/525))
+* agent: Add `var-base-path` to `config.toml` to persistently store the last registry file, with automatic relocation of existing file upon agent startup ([#529](https://github.com/lablup/backend.ai/issues/529))
+* client: Bump the compatible manager API version range to v6.20220615 ([#533](https://github.com/lablup/backend.ai/issues/533))
+
+### Fixes
+* Use `uname -m` instead of `uname -p` for better compatibility with many Linux variants and macOS when configuring the image registry and pulling the base Python image ([#505](https://github.com/lablup/backend.ai/issues/505))
+* Fix `prepare()` not running when `start_session()` call hangs without raising Exception ([#514](https://github.com/lablup/backend.ai/issues/514))
+* Update the sample docker-compose configuration so that the healthcheck for Redis container takes care of "loading" status of the Redis server ([#527](https://github.com/lablup/backend.ai/issues/527))
+* Fix background tasks exiting without notice due to inappropriate exception handling inside task ([#530](https://github.com/lablup/backend.ai/issues/530))
+* Fix agent crashing with `AttributeError: 'DockerKernel' object has no attribute 'runner'` error. ([#534](https://github.com/lablup/backend.ai/issues/534))
+* logging: Fix accessing the missing `level` attribute of `LogRecord` objects ([#538](https://github.com/lablup/backend.ai/issues/538))
+* Re-add null-check of the `'level'` key of the log record removed in #538 ([#540](https://github.com/lablup/backend.ai/issues/540))
+* Set the minimum redis-py version to 4.3.4 due to an incompatible change of the `XAUTOCLAIM` API ([#541](https://github.com/lablup/backend.ai/issues/541))
+* Ignore if a scanned `BUILD` or `build` target is a directory when scanning them to discover plugin entrypoints ([#550](https://github.com/lablup/backend.ai/issues/550))
+* Fix typo & check file on install-dev.sh ([#551](https://github.com/lablup/backend.ai/issues/551))
+* Upgrade external dependencies which provide new binary wheels for Python 3.10 and latest bug fixes ([#560](https://github.com/lablup/backend.ai/issues/560))
+
+### Documentation Changes
+* Add a daily development workflow guide for editable install of a package subset in this mon-repo to other projects ([#513](https://github.com/lablup/backend.ai/issues/513))
+
+### Miscellaneous
+* Upgrade the CPython version requirement to 3.10.5 ([#481](https://github.com/lablup/backend.ai/issues/481))
+* Introduce `isort` as our linter and formatter to ensure consistency of the code style of import statements ([#495](https://github.com/lablup/backend.ai/issues/495))
+* Let git ignore `/scratches` directory that kernels use. ([#497](https://github.com/lablup/backend.ai/issues/497))
+* Manually upgrade pex version to 2.1.93 to avoid alternating platform tags in lockfiles depending on at which architecture the lockfiles are generated ([#498](https://github.com/lablup/backend.ai/issues/498))
+* Upgrade pex to 2.1.94 which addresses a fresh `./pants expor` regression in #498's manual upgrade to 2.1.93 ([#506](https://github.com/lablup/backend.ai/issues/506))
+* Upgrade Pants to 2.12.0rc3 to 2.12.0 ([#508](https://github.com/lablup/backend.ai/issues/508))
+* Let `scripts/install-dev.sh` configure the standard git pre-push hook that runs fmt for all files and lint/check against the changed files ([#518](https://github.com/lablup/backend.ai/issues/518))
+* Improve the latency of git pre push hook with better defaults and auto-detection of release branches ([#519](https://github.com/lablup/backend.ai/issues/519))
+* Add git pre-commit hook to run a quick lint check and improve `install-dev.sh` script to properly create-or-update the git hook scripts ([#520](https://github.com/lablup/backend.ai/issues/520))
+* Introduce https://dist.backend.ai/pypi/simple to serve custom prebuilt wheels and workaround upstream issues in a timely manner ([#545](https://github.com/lablup/backend.ai/issues/545))
+* Remove manual grpcio wheel building section from `scripts/install-dev.sh` ([#547](https://github.com/lablup/backend.ai/issues/547))
+* Upgrade pex to 2.1.99 to resolve intermittent failures in CI and venv generation in development setups ([#552](https://github.com/lablup/backend.ai/issues/552))
+
+
 ## 22.06.0b1 (2022-06-26)
 
 ### Breaking Changes

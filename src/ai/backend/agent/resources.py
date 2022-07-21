@@ -365,9 +365,10 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     def discover_plugins(
         cls,
         plugin_group: str,
+        allowlist: set[str] = None,
         blocklist: set[str] = None,
     ) -> Iterator[Tuple[str, Type[AbstractComputePlugin]]]:
-        scanned_plugins = [*super().discover_plugins(plugin_group, blocklist)]
+        scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
         def accel_lt_intrinsic(item):
             # push back "intrinsic" plugins (if exists)

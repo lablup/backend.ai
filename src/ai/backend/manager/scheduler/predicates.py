@@ -1,12 +1,11 @@
 import logging
 from datetime import datetime
-from typing import List
 
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common import redis
+from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 
@@ -16,10 +15,9 @@ from ..models import (
     groups,
     kernels,
     keypair_resource_policies,
-    query_allowed_sgroups,
     session_dependencies,
 )
-from ..models.utils import execute_with_retry, reenter_txn
+from ..models.utils import execute_with_retry
 from .types import PendingSession, PredicateResult, SchedulingContext
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.scheduler'))
@@ -81,7 +79,7 @@ async def check_concurrency(
         return result.first()['max_concurrent_sessions']
 
     max_concurrent_sessions = await execute_with_retry(_get_max_concurrent_sessions)
-    ok, concurrency_used = await redis.execute_script(
+    ok, concurrency_used = await redis_helper.execute_script(
         sched_ctx.registry.redis_stat,
         'check_keypair_concurrency_used',
         _check_keypair_concurrency_script,
@@ -224,68 +222,4 @@ async def check_domain_resource_limit(
                 total_domain_allowed.to_humanized(sched_ctx.known_slot_types).items()
             )),
         )
-    return PredicateResult(True)
-
-
-async def check_scaling_group(
-    db_conn: SAConnection,
-    sched_ctx: SchedulingContext,
-    sess_ctx: PendingSession,
-) -> PredicateResult:
-
-    async def _query():
-        async with reenter_txn(sched_ctx.registry.db, db_conn) as _conn:
-            return await query_allowed_sgroups(
-                _conn,
-                sess_ctx.domain_name,
-                sess_ctx.group_id,
-                sess_ctx.access_key,
-            )
-
-    sgroups = await execute_with_retry(_query)
-    if not sgroups:
-        return PredicateResult(
-            False,
-            "You do not have any scaling groups allowed to use.",
-            permanent=True,
-        )
-    target_sgroup_names: List[str] = []
-    preferred_sgroup_name = sess_ctx.scaling_group
-    if preferred_sgroup_name is not None:
-        # Consider only the preferred scaling group.
-        for sgroup in sgroups:
-            if preferred_sgroup_name == sgroup['name']:
-                break
-        else:
-            return PredicateResult(
-                False,
-                f"You do not have access to the scaling group '{preferred_sgroup_name}'.",
-                permanent=True,
-            )
-        allowed_session_types = sgroup['scheduler_opts'].allowed_session_types
-        if sess_ctx.session_type.value.lower() not in allowed_session_types:
-            return PredicateResult(
-                False,
-                f"The scaling group '{preferred_sgroup_name}' does not accept "
-                f"the session type '{sess_ctx.session_type}'. ",
-                permanent=True,
-            )
-        target_sgroup_names = [preferred_sgroup_name]
-    else:
-        # Consider all allowed scaling groups.
-        usable_sgroups = []
-        for sgroup in sgroups:
-            allowed_session_types = sgroup['scheduler_opts'].allowed_session_types
-            if sess_ctx.session_type.value.lower() in allowed_session_types:
-                usable_sgroups.append(sgroup)
-        if not usable_sgroups:
-            return PredicateResult(
-                False,
-                f"No scaling groups accept the session type '{sess_ctx.session_type}'.",
-                permanent=True,
-            )
-        target_sgroup_names = [sgroup['name'] for sgroup in usable_sgroups]
-    assert target_sgroup_names
-    log.debug("scaling groups considered for s:{} are {}", sess_ctx.session_id, target_sgroup_names)
-    sess_ctx.target_sgroup_names.extend(target_sgroup_names)
     return PredicateResult(True)

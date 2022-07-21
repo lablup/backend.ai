@@ -373,7 +373,6 @@ class KernelAgentBinding:
 class PredicateResult:
     passed: bool
     message: Optional[str] = None
-    permanent: bool = False
 
 
 class SchedulingPredicate(Protocol):

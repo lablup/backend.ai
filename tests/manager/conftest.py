@@ -7,6 +7,7 @@ import secrets
 import shutil
 import tempfile
 import textwrap
+import uuid
 from datetime import datetime
 from functools import partial
 from pathlib import Path
@@ -45,6 +46,7 @@ from ai.backend.manager.config import load as load_config
 from ai.backend.manager.models import (
     agents,
     domains,
+    groups,
     kernels,
     keypairs,
     scaling_groups,
@@ -708,3 +710,48 @@ async def registry_ctx(mocker):
         )
     finally:
         await registry.shutdown()
+
+
+@pytest.fixture(scope="function")
+async def session_info(database_engine):
+    user_uuid = str(uuid.uuid4()).replace("-", "")
+    postfix = str(uuid.uuid4()).split("-")[1]
+    domain_name = str(uuid.uuid4()).split("-")[0]
+    group_id = str(uuid.uuid4()).replace("-", "")
+    group_name = str(uuid.uuid4()).split("-")[0]
+    session_id = str(uuid.uuid4()).replace("-", "")
+
+    async with database_engine.begin() as conn:
+        await conn.execute(users.insert().values({
+            "uuid": user_uuid,
+            "username": f"TestCaseRunner-{postfix}",
+            "email": f"tc.runner-{postfix}@lablup.com",
+        }))
+        await conn.execute(domains.insert().values({
+            "name": domain_name,
+            "total_resource_slots": {},
+        }))
+        await conn.execute(groups.insert().values({
+            "id": group_id,
+            "name": group_name,
+            "domain_name": domain_name,
+            "total_resource_slots": {},
+        }))
+        await conn.execute(kernels.insert().values({
+            "session_id": session_id,
+            "domain_name": domain_name,
+            "group_id": group_id,
+            "user_uuid": user_uuid,
+            "occupied_slots": {},
+            "repl_in_port": 0,
+            "repl_out_port": 0,
+            "stdin_port": 0,
+            "stdout_port": 0,
+        }))
+
+        yield session_id, conn
+
+        await conn.execute(kernels.delete().where(kernels.c.session_id == session_id))
+        await conn.execute(groups.delete().where(groups.c.id == group_id))
+        await conn.execute(domains.delete().where(domains.c.name == domain_name))
+        await conn.execute(users.delete().where(users.c.uuid == user_uuid))

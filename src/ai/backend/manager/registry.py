@@ -7,6 +7,7 @@ import logging
 import re
 import secrets
 import time
+import typing
 import uuid
 import weakref
 from collections import defaultdict
@@ -27,12 +28,12 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    TypeAlias,
     Union,
     cast,
 )
 
 import aiodocker
-import aioredis
 import aiotools
 import snappy
 import sqlalchemy as sa
@@ -44,11 +45,12 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.tz import tzutc
+from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.sql.expression import true
 from yarl import URL
 
-from ai.backend.common import msgpack, redis
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -144,6 +146,7 @@ if TYPE_CHECKING:
         SchedulingContext,
     )
 
+MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 __all__ = ['AgentRegistry', 'InstanceNotFound']
 
 log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.registry'))
@@ -792,28 +795,17 @@ class AgentRegistry:
             )
 
         async with self.db.begin_readonly() as conn:
-            # Check scaling group availability if scaling_group parameter is given.
-            # If scaling_group is not provided, it will be selected as the first one among
-            # the list of allowed scaling groups.
-            sgroups = await query_allowed_sgroups(
-                conn, user_scope.domain_name, user_scope.group_id, access_key,
+
+            checked_scaling_group = await check_scaling_group(
+                conn, scaling_group, session_type,
+                access_key, user_scope.domain_name, user_scope.group_id,
             )
-            if not sgroups:
-                raise ScalingGroupNotFound("You have no scaling groups allowed to use.")
             if scaling_group is None:
-                scaling_group = sgroups[0]['name']
                 log.warning(
                     f"enqueue_session(s:{session_name}, ak:{access_key}): "
                     f"The client did not specify the scaling group for session; "
-                    f"falling back to {scaling_group}",
+                    f"falling back to {checked_scaling_group}",
                 )
-            else:
-                for sgroup in sgroups:
-                    if scaling_group == sgroup['name']:
-                        break
-                else:
-                    raise ScalingGroupNotFound(f"The scaling group {scaling_group} does not exist.")
-            assert scaling_group is not None
 
             # Translate mounts/mount_map into vfolder mounts
             requested_mounts = kernel_enqueue_configs[0]['creation_config'].get('mounts') or []
@@ -881,6 +873,9 @@ class AgentRegistry:
             'agent': sa.bindparam('mapped_agent'),
             'id': sa.bindparam('kernel_id'),
             'status': KernelStatus.PENDING,
+            'status_history': {
+                KernelStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+            },
             'session_creation_id': session_creation_id,
             'session_id': session_id,
             'session_name': session_name,
@@ -890,7 +885,7 @@ class AgentRegistry:
             'cluster_role': sa.bindparam('cluster_role'),
             'cluster_idx': sa.bindparam('cluster_idx'),
             'cluster_hostname': sa.bindparam('cluster_hostname'),
-            'scaling_group': scaling_group,
+            'scaling_group': checked_scaling_group,
             'domain_name': user_scope.domain_name,
             'group_id': user_scope.group_id,
             'user_uuid': user_scope.user_uuid,
@@ -1349,6 +1344,13 @@ class AgentRegistry:
                             'stdin_port': created_info['stdin_port'],
                             'stdout_port': created_info['stdout_port'],
                             'service_ports': service_ports,
+                            'status_history': sql_json_merge(
+                                kernels.c.status_history,
+                                (),
+                                {
+                                    KernelStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
+                                },
+                            ),
                         }
                         actual_allocs = self.convert_resource_spec_to_resource_slot(
                             created_info['resource_spec']['allocations'])
@@ -1693,28 +1695,28 @@ class AgentRegistry:
         # Update keypair resource usage for keypairs with running containers.
         kp_key = 'keypair.concurrency_used'
 
-        async def _update(r: aioredis.Redis):
-            updates: Mapping[str, int] = \
+        async def _update(r: Redis):
+            updates = \
                 {f'{kp_key}.{k}': concurrency_used_per_key[k] for k in concurrency_used_per_key}
             if updates:
-                await r.mset(updates)
+                await r.mset(typing.cast(MSetType, updates))
 
-        async def _update_by_fullscan(r: aioredis.Redis):
-            updates: Dict[str, int] = {}
+        async def _update_by_fullscan(r: Redis):
+            updates = {}
             keys = await r.keys(f'{kp_key}.*')
             for ak in keys:
                 usage = concurrency_used_per_key.get(ak, 0)
                 updates[f'{kp_key}.{ak}'] = usage
             if updates:
-                await r.mset(updates)
+                await r.mset(typing.cast(MSetType, updates))
 
         if do_fullscan:
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_stat,
                 _update_by_fullscan,
             )
         else:
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_stat,
                 _update,
             )
@@ -1833,6 +1835,13 @@ class AgentRegistry:
                                         'status_info': reason,
                                         'status_changed': now,
                                         'terminated_at': now,
+                                        'status_history': sql_json_merge(
+                                            kernels.c.status_history,
+                                            (),
+                                            {
+                                                KernelStatus.CANCELLED.name: now.isoformat(),
+                                            },
+                                        ),
                                     })
                                     .where(kernels.c.id == kernel['id']),
                                 )
@@ -1868,7 +1877,7 @@ class AgentRegistry:
                             destroyed_kernels.append(kernel)
 
                         async def _update() -> None:
-                            kern_stat = await redis.execute(
+                            kern_stat = await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.get(str(kernel['id'])),
                             )
@@ -1878,6 +1887,13 @@ class AgentRegistry:
                                     'status_info': reason,
                                     'status_changed': now,
                                     'terminated_at': now,
+                                    'status_history': sql_json_merge(
+                                        kernels.c.status_history,
+                                        (),
+                                        {
+                                            KernelStatus.TERMINATED.name: now.isoformat(),
+                                        },
+                                    ),
                                 }
                                 if kern_stat:
                                     values['last_stat'] = msgpack.unpackb(kern_stat)
@@ -1890,7 +1906,7 @@ class AgentRegistry:
                         if kernel['cluster_role'] == DEFAULT_ROLE:
                             # The main session is terminated;
                             # decrement the user's concurrency counter
-                            await redis.execute(
+                            await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.incrby(
                                     f"keypair.concurrency_used.{kernel['access_key']}",
@@ -1916,6 +1932,13 @@ class AgentRegistry:
                                             "kernel": {"exit_code": None},
                                             "session": {"status": "terminating"},
                                         },
+                                        'status_history': sql_json_merge(
+                                            kernels.c.status_history,
+                                            (),
+                                            {
+                                                KernelStatus.TERMINATING.name: now.isoformat(),
+                                            },
+                                        ),
                                     })
                                     .where(kernels.c.id == kernel['id']),
                                 )
@@ -1923,7 +1946,7 @@ class AgentRegistry:
                         if kernel['cluster_role'] == DEFAULT_ROLE:
                             # The main session is terminated;
                             # decrement the user's concurrency counter
-                            await redis.execute(
+                            await redis_helper.execute(
                                 self.redis_stat,
                                 lambda r: r.incrby(
                                     f"keypair.concurrency_used.{kernel['access_key']}",
@@ -1971,7 +1994,7 @@ class AgentRegistry:
                             last_stat: Optional[Dict[str, Any]]
                             last_stat = None
                             try:
-                                raw_last_stat = await redis.execute(
+                                raw_last_stat = await redis_helper.execute(
                                     self.redis_stat,
                                     lambda r: r.get(str(kernel['id'])))
                                 if raw_last_stat is not None:
@@ -2094,6 +2117,13 @@ class AgentRegistry:
                             kernels.update()
                             .values({
                                 'status': KernelStatus.RESTARTING,
+                                'status_history': sql_json_merge(
+                                    kernels.c.status_history,
+                                    (),
+                                    {
+                                        KernelStatus.RESTARTING.name: datetime.now(tzutc()).isoformat(),
+                                    },
+                                ),
                             })
                             .where(kernels.c.id == kernel['id'])
                         )
@@ -2126,6 +2156,13 @@ class AgentRegistry:
                                 'stdin_port': kernel_info['stdin_port'],
                                 'stdout_port': kernel_info['stdout_port'],
                                 'service_ports': kernel_info.get('service_ports', []),
+                                'status_history': sql_json_merge(
+                                    kernels.c.status_history,
+                                    (),
+                                    {
+                                        KernelStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
+                                    },
+                                ),
                             })
                             .where(kernels.c.id == kernel['id'])
                         )
@@ -2380,7 +2417,7 @@ class AgentRegistry:
             instance_rejoin = False
 
             # Update "last seen" timestamp for liveness tracking
-            await redis.execute(
+            await redis_helper.execute(
                 self.redis_live,
                 lambda r: r.hset('agent.last_seen', agent_id, now.timestamp()),
             )
@@ -2487,13 +2524,13 @@ class AgentRegistry:
             known_registries = await get_known_registries(self.shared_config.etcd)
             loaded_images = msgpack.unpackb(snappy.decompress(agent_info['images']))
 
-            def _pipe_builder(r: aioredis.Redis):
+            async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
                 for image in loaded_images:
                     image_ref = ImageRef(image[0], known_registries, agent_info['architecture'])
-                    pipe.sadd(image_ref.canonical, agent_id)
+                    await pipe.sadd(image_ref.canonical, agent_id)
                 return pipe
-            await redis.execute(self.redis_image, _pipe_builder)
+            await redis_helper.execute(self.redis_image, _pipe_builder)
 
         await self.hook_plugin_ctx.notify(
             'POST_AGENT_HEARTBEAT',
@@ -2501,12 +2538,12 @@ class AgentRegistry:
         )
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
-        await redis.execute(self.redis_live, lambda r: r.hdel('agent.last_seen', agent_id))
+        await redis_helper.execute(self.redis_live, lambda r: r.hdel('agent.last_seen', agent_id))
 
-        async def _pipe_builder(r: aioredis.Redis):
+        async def _pipe_builder(r: Redis):
             pipe = r.pipeline()
             async for imgname in r.scan_iter():
-                pipe.srem(imgname, agent_id)
+                await pipe.srem(imgname, agent_id)
             return pipe
 
         async def _update() -> None:
@@ -2542,7 +2579,7 @@ class AgentRegistry:
                 )
                 await conn.execute(update_query)
 
-        await redis.execute(self.redis_image, _pipe_builder)
+        await redis_helper.execute(self.redis_image, _pipe_builder)
         await execute_with_retry(_update)
 
     async def set_session_status(
@@ -2558,6 +2595,13 @@ class AgentRegistry:
             'status': status,
             'status_info': reason,
             'status_changed': now,
+            'status_history': sql_json_merge(
+                kernels.c.status_history,
+                (),
+                {
+                    status.name: now.isoformat(),
+                },
+            ),
         }
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data['terminated_at'] = now
@@ -2591,6 +2635,13 @@ class AgentRegistry:
             'status': status,
             'status_info': reason,
             'status_changed': now,
+            'status_history': sql_json_merge(
+                kernels.c.status_history,
+                (),
+                {
+                    status.name: now.isoformat(),   # ["PULLING", "PREPARING"]
+                },
+            ),
         }
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data['terminated_at'] = now
@@ -2635,7 +2686,7 @@ class AgentRegistry:
         log.debug('sync_kernel_stats(k:{!r})', kernel_ids)
         for kernel_id in kernel_ids:
             raw_kernel_id = str(kernel_id)
-            kern_stat = await redis.execute(
+            kern_stat = await redis_helper.execute(
                 self.redis_stat,
                 lambda r: r.get(raw_kernel_id),
             )
@@ -2681,7 +2732,7 @@ class AgentRegistry:
             except asyncio.CancelledError:
                 pass
 
-        kern_stat = await redis.execute(
+        kern_stat = await redis_helper.execute(
             self.redis_stat,
             lambda r: r.get(str(kernel_id)),
         )
@@ -2725,6 +2776,13 @@ class AgentRegistry:
                         kernels.c.status_data,
                         ("kernel",),
                         {"exit_code": exit_code},
+                    ),
+                    'status_history': sql_json_merge(
+                        kernels.c.status_history,
+                        (),
+                        {
+                            KernelStatus.TERMINATED.name: now.isoformat(),
+                        },
                     ),
                     'terminated_at': now,
                 }
@@ -2805,6 +2863,13 @@ class AgentRegistry:
                                     "status": "terminated",
                                 },
                             ),
+                            status_history=sql_json_merge(
+                                kernels.c.status_history,
+                                (),
+                                {
+                                    KernelStatus.TERMINATED.name: datetime.now(tzutc()).isoformat(),
+                                },
+                            ),
                         )
                         .where(
                             (kernels.c.session_id == session_id),
@@ -2826,3 +2891,53 @@ class AgentRegistry:
         reason: str,
     ) -> None:
         await self.clean_session(session_id)
+
+
+async def check_scaling_group(
+    conn: SAConnection,
+    scaling_group: str | None,
+    session_type: SessionTypes,
+    access_key: AccessKey,
+    domain_name: str,
+    group_id: Union[uuid.UUID, str],
+) -> str:
+    # Check scaling group availability if scaling_group parameter is given.
+    # If scaling_group is not provided, it will be selected as the first one among
+    # the list of allowed scaling groups.
+    candidates = await query_allowed_sgroups(
+        conn, domain_name, group_id, access_key,
+    )
+    if not candidates:
+        raise ScalingGroupNotFound("You have no scaling groups allowed to use.")
+
+    stype = session_type.value.lower()
+    if scaling_group is None:
+        for sgroup in candidates:
+            allowed_session_types = sgroup['scheduler_opts'].allowed_session_types
+            if stype in allowed_session_types:
+                scaling_group = sgroup['name']
+                break
+        else:
+            raise ScalingGroupNotFound(
+                f"No scaling groups accept the session type '{session_type}'.",
+            )
+    else:
+        err_msg = (
+            f"The scaling group '{scaling_group}' does not exist "
+            f"or you do not have access to the scaling group '{scaling_group}'."
+        )
+        for sgroup in candidates:
+            if scaling_group == sgroup['name']:
+                # scaling_group's unique key is 'name' field for now,
+                # but we will change scaling_group's unique key to new 'id' field.
+                allowed_session_types = sgroup['scheduler_opts'].allowed_session_types
+                if stype in allowed_session_types:
+                    break
+                err_msg = (
+                    f"The scaling group '{scaling_group}' does not accept "
+                    f"the session type '{session_type}'. "
+                )
+        else:
+            raise ScalingGroupNotFound(err_msg)
+    assert scaling_group is not None
+    return scaling_group
