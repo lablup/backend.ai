@@ -913,7 +913,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def detect_resources(
         self,
-    ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal],]:
+    ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
         return await detect_resources(self.etcd, self.local_config)
 
     async def enumerate_containers(
