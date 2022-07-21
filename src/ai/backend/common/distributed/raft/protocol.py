@@ -1,5 +1,5 @@
 import abc
-from typing import Iterable
+from typing import Iterable, Tuple
 
 from .protos import raft_pb2
 from .types import PeerId
@@ -16,7 +16,7 @@ class AbstractRaftProtocol(abc.ABC):
         prev_log_term: int,
         entries: Iterable[raft_pb2.Log],    # type: ignore
         leader_commit: int,
-    ) -> bool:
+    ) -> Tuple[int, bool]:
         """Receiver implementation:
         1. Reply false if term < currentTerm
         2. Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm
@@ -38,6 +38,7 @@ class AbstractRaftProtocol(abc.ABC):
 
         Returns
         -------
+        :param int term: currentTerm, for leader to update itself
         :param bool success: true if follower contained entry matching prevLogIndex and prevLogTerm
         -------
         """
@@ -51,7 +52,7 @@ class AbstractRaftProtocol(abc.ABC):
         candidate_id: PeerId,
         last_log_index: int,
         last_log_term: int,
-    ) -> bool:
+    ) -> Tuple[int, bool]:
         """Receiver implementation:
         1. Reply false if term < currentTerm
         2. If votedFor is null or candidateId, and candidate's log is
@@ -67,6 +68,7 @@ class AbstractRaftProtocol(abc.ABC):
 
         Returns
         -------
+        :param int term: currentTerm, for candidate to update itself
         :param bool vote_granted: true means candidate received vote
         -------
         """

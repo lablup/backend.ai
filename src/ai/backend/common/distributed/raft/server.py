@@ -51,12 +51,12 @@ class GrpcRaftServer(AbstractRaftServer, raft_pb2_grpc.RaftServiceServicer):
     ) -> raft_pb2.AppendEntriesResponse:
         if (protocol := self._protocol) is None:
             return raft_pb2.AppendEntriesResponse(term=request.term, success=False)
-        success = await protocol.on_append_entries(
+        term, success = await protocol.on_append_entries(
             term=request.term, leader_id=request.leader_id,
             prev_log_index=request.prev_log_index, prev_log_term=request.prev_log_term,
             entries=request.entries, leader_commit=request.leader_commit,
         )
-        return raft_pb2.AppendEntriesResponse(term=request.term, success=success)
+        return raft_pb2.AppendEntriesResponse(term=term, success=success)
 
     async def RequestVote(
         self,
@@ -65,8 +65,8 @@ class GrpcRaftServer(AbstractRaftServer, raft_pb2_grpc.RaftServiceServicer):
     ) -> raft_pb2.RequestVoteResponse:
         if (protocol := self._protocol) is None:
             return raft_pb2.RequestVoteResponse(term=request.term, vote_granted=False)
-        vote_granted = await protocol.on_request_vote(
+        term, vote_granted = await protocol.on_request_vote(
             term=request.term, candidate_id=request.candidate_id,
             last_log_index=request.last_log_index, last_log_term=request.last_log_term,
         )
-        return raft_pb2.RequestVoteResponse(term=request.term, vote_granted=vote_granted)
+        return raft_pb2.RequestVoteResponse(term=term, vote_granted=vote_granted)

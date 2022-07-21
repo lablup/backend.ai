@@ -225,14 +225,14 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         prev_log_term: int,
         entries: Iterable[raft_pb2.Log],    # type: ignore
         leader_commit: int,
-    ) -> bool:
+    ) -> Tuple[int, bool]:
         await self.reset_timeout()
-        if term < self.current_term:
-            return False
+        if term < (current_term := self.current_term):
+            return (current_term, False)
         await self._synchronize_term(term)
 
         if (log := await self._log.get(prev_log_index)) and (log.term != prev_log_term):
-            return False
+            return (self.current_term, False)
 
         self._leader_id = leader_id
 
@@ -252,7 +252,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         if leader_commit > self._commit_index:
             self._commit_index = min(leader_commit, entries[-1].entry)
 
-        return True
+        return (self.current_term, True)
 
     async def on_request_vote(
         self,
@@ -261,18 +261,18 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         candidate_id: PeerId,
         last_log_index: int,
         last_log_term: int,
-    ) -> bool:
+    ) -> Tuple[int, bool]:
         await self.reset_timeout()
-        if term < self.current_term:
-            return False
+        if term < (current_term := self.current_term):
+            return (current_term, False)
         await self._synchronize_term(term)
 
         if self.voted_for is None:
             self._voted_for = candidate_id
-            return True
+            return (self.current_term, True)
         elif self.voted_for == candidate_id:
-            return True
-        return False
+            return (self.current_term, True)
+        return (self.current_term, False)
 
     async def reset_timeout(self) -> None:
         self._elapsed_time: float = 0.0
