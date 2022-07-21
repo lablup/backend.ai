@@ -1114,7 +1114,7 @@ class AbstractAgent(
     @abstractmethod
     async def detect_resources(
         self,
-    ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal],]:
+    ) -> Tuple[Mapping[DeviceName, AbstractComputePlugin], Mapping[SlotName, Decimal]]:
         """
         Scan and define the amount of available resource slots in this node.
         """
