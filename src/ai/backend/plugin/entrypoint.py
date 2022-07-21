@@ -11,6 +11,7 @@ log = logging.getLogger(__name__)
 
 def scan_entrypoints(
     group_name: str,
+    allowlist: Optional[set[str]] = None,
     blocklist: Optional[set[str]] = None,
 ) -> Iterator[EntryPoint]:
     if blocklist is None:
@@ -21,7 +22,9 @@ def scan_entrypoints(
         scan_entrypoint_from_plugin_checkouts(group_name),
         scan_entrypoint_from_package_metadata(group_name),
     ):
-        if match_blocklist(entrypoint.value, blocklist):
+        if allowlist is not None and not match_plugin_list(entrypoint.value, allowlist):
+            continue
+        if match_plugin_list(entrypoint.value, blocklist):
             continue
         if existing_entrypoint := existing_names.get(entrypoint.name, None):
             if existing_entrypoint.value == entrypoint.value:
@@ -43,14 +46,14 @@ def scan_entrypoints(
         yield entrypoint
 
 
-def match_blocklist(entry_path: str, blocklist: set[str]) -> bool:
+def match_plugin_list(entry_path: str, plugin_list: set[str]) -> bool:
     """
-    Checks if the given module attribute reference is in the blocklist.
-    The blocklist items are assumeed to be prefixes of package import paths
+    Checks if the given module attribute reference is in the plugin_list.
+    The plugin_list items are assumeed to be prefixes of package import paths
     or the package namespaces.
     """
     mod_path = entry_path.partition(":")[0]
-    for block_pattern in blocklist:
+    for block_pattern in plugin_list:
         if mod_path.startswith(block_pattern + ".") or mod_path == block_pattern:
             return True
     return False
