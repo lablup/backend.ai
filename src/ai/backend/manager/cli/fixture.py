@@ -45,7 +45,7 @@ def populate(cli_ctx: CLIContext, fixture_path) -> None:
         )
         try:
             await populate_fixture(engine, fixture)
-        except:
+        except Exception:
             log.exception("Failed to populate fixtures due to the following error:")
         else:
             log.info("Done")

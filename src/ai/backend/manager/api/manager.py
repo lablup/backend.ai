@@ -137,7 +137,7 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
                     "active_sessions": active_sessions_num,  # legacy?
                 }
             )
-    except:
+    except Exception:
         log.exception("GET_MANAGER_STATUS: exception")
         raise
 

@@ -40,7 +40,7 @@ async def test_blist(redis_container: tuple[str, HostPortPair], disruption_metho
                     received_messages.append(msg)
         except asyncio.CancelledError:
             pass
-        except:
+        except Exception:
             traceback.print_exc()
 
     addr = redis_container[1]

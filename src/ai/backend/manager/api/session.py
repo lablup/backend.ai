@@ -1896,7 +1896,7 @@ async def restart(request: web.Request) -> web.Response:
     except BackendError:
         log.exception("RESTART: exception")
         raise
-    except:
+    except Exception:
         await root_ctx.error_monitor.capture_exception(context={"user": request["user"]["uuid"]})
         log.exception("RESTART: unexpected error")
         raise web.HTTPInternalServerError

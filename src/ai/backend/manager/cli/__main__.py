@@ -241,7 +241,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                             lambda r: r.execute_command("BGSAVE SCHEDULE"),
                         )
                         log.info("Issued BGSAVE to the Redis database.")
-            except:
+            except Exception:
                 log.exception("Unexpected error while cleaning up redis history")
 
         asyncio.run(_clear_redis_history())

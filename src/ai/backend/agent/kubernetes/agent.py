@@ -251,7 +251,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
 
         try:
             await core_api.read_namespaced_config_map(f"ssh-keypair-{hash}", "backend-ai")
-        except:
+        except Exception:
             # Keypair not stored on ConfigMap, create one
             cm = ConfigMap("", f"kernel-{self.kernel_id}-ssh-keypair-{hash}")
             cm.put("public", sshkey["public_key"])
@@ -797,7 +797,7 @@ class KubernetesAgent(
 
             try:
                 await core_api.create_persistent_volume(body=new_pv.to_dict())
-            except:
+            except Exception:
                 raise
 
         pvc = await core_api.list_persistent_volume_claim_for_all_namespaces(
@@ -945,7 +945,7 @@ class KubernetesAgent(
 
         try:
             kernel = self.kernel_registry[kernel_id]
-        except:
+        except Exception:
             log.warning("_destroy_kernel({0}) kernel missing (already dead?)", kernel_id)
             await asyncio.shield(self.k8s_ptask_group.create_task(force_cleanup()))
             return None
@@ -954,7 +954,7 @@ class KubernetesAgent(
             await core_api.delete_namespaced_service(f"{deployment_name}-service", "backend-ai")
             await core_api.delete_namespaced_service(f"{deployment_name}-nodeport", "backend-ai")
             await apps_api.delete_namespaced_deployment(f"{deployment_name}", "backend-ai")
-        except:
+        except Exception:
             log.warning("_destroy({0}) kernel missing (already dead?)", kernel_id)
 
     async def clean_kernel(
