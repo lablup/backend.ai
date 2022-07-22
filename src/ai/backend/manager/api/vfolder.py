@@ -2044,9 +2044,6 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
             users, users.c.uuid == vfolder_permissions.c.user
         )
         query = sa.select(
-            [vfolder_permissions, vfolders.c.id, vfolders.c.name, vfolders.c.creator, users.c.email]
-        ).select_from(j)
-        query = sa.select(
             [vfolder_permissions, vfolders.c.id, vfolders.c.name, users.c.email]
         ).select_from(j)
         if target_vfid is not None:
@@ -2055,11 +2052,12 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         shared_list = result.fetchall()
     shared_info = []
     for shared in shared_list:
+        shared_by = shared.group if shared.group else shared.user
         shared_info.append(
             {
                 "vfolder_id": str(shared.id),
                 "vfolder_name": str(shared.name),
-                "shared_by": str(shared.creator),
+                "shared_by": shared_by,
                 "shared_to": {
                     "uuid": str(shared.user),
                     "email": shared.email,
