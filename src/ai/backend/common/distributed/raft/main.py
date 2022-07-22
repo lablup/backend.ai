@@ -13,8 +13,9 @@ _cleanup_coroutines: List[Coroutine] = []
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", "-p", type=int, default=50051)
-    parser.add_argument("peers", metavar="peers", type=str, nargs="+",
-                        help='"<HOST>:<PORT>" list of peers.')
+    parser.add_argument(
+        "peers", metavar="peers", type=str, nargs="+", help='"<HOST>:<PORT>" list of peers.'
+    )
     return parser.parse_args()
 
 
@@ -23,14 +24,19 @@ async def _main():
 
     server = GrpcRaftServer()
     client = GrpcRaftClient()
-    raft = await RaftConsensusModule.new(peers=args.peers, server=server, client=client, id=str(args.port))
+    raft = await RaftConsensusModule.new(
+        peers=args.peers, server=server, client=client, id=str(args.port)
+    )
 
-    done, pending = await asyncio.wait({
-        asyncio.create_task(
-            server.run(cleanup_coroutines=_cleanup_coroutines, port=args.port),
-        ),
-        asyncio.create_task(raft.main()),
-    }, return_when=asyncio.FIRST_EXCEPTION)
+    done, pending = await asyncio.wait(
+        {
+            asyncio.create_task(
+                server.run(cleanup_coroutines=_cleanup_coroutines, port=args.port),
+            ),
+            asyncio.create_task(raft.main()),
+        },
+        return_when=asyncio.FIRST_EXCEPTION,
+    )
     for task in pending:
         task.cancel()
         with suppress(asyncio.CancelledError):
@@ -43,6 +49,7 @@ async def main():
     finally:
         await asyncio.gather(*_cleanup_coroutines)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     with suppress(KeyboardInterrupt):
         asyncio.run(main())

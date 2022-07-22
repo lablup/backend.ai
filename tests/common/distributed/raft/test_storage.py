@@ -12,8 +12,7 @@ async def test_sqlite_storage() -> None:
 
     n = 16
     entries = tuple(
-        raft_pb2.Log(index=i, term=pow(i, 2), command="+OK\r\n")
-        for i in range(1, n + 1)
+        raft_pb2.Log(index=i, term=pow(i, 2), command="+OK\r\n") for i in range(1, n + 1)
     )
     await storage.append_entries(entries)
 
@@ -42,8 +41,7 @@ async def test_sqlite_storage__slice() -> None:
 
     n = 16
     entries = tuple(
-        raft_pb2.Log(index=i, term=pow(i, 2), command="+OK\r\n")
-        for i in range(1, n + 1)
+        raft_pb2.Log(index=i, term=pow(i, 2), command="+OK\r\n") for i in range(1, n + 1)
     )
     await storage.append_entries(entries)
 

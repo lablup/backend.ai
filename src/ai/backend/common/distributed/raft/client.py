@@ -18,7 +18,7 @@ class AbstractRaftClient(abc.ABC):
         leader_id: PeerId,
         prev_log_index: int,
         prev_log_term: int,
-        entries: Iterable[raft_pb2.Log],    # type: ignore
+        entries: Iterable[raft_pb2.Log],  # type: ignore
         leader_commit: int,
     ) -> Tuple[int, bool]:
         """
@@ -79,6 +79,7 @@ class GrpcRaftClient(AbstractRaftClient):
     """
     A grpc-based implementation of `AbstractRaftClient`.
     """
+
     def __init__(self, credentials: Optional[grpc.ChannelCredentials] = None):
         self._credentials: Optional[grpc.ChannelCredentials] = credentials
 
@@ -90,13 +91,15 @@ class GrpcRaftClient(AbstractRaftClient):
         leader_id: PeerId,
         prev_log_index: int,
         prev_log_term: int,
-        entries: Iterable[raft_pb2.Log],    # type: ignore
+        entries: Iterable[raft_pb2.Log],  # type: ignore
         leader_commit: int,
         timeout: float = 5.0,
     ) -> Tuple[int, bool]:
         try:
             term, success = await asyncio.wait_for(
-                self._append_entries(address, term, leader_id, prev_log_index, prev_log_term, entries, leader_commit),
+                self._append_entries(
+                    address, term, leader_id, prev_log_index, prev_log_term, entries, leader_commit
+                ),
                 timeout=timeout,
             )
             return term, success
@@ -111,7 +114,7 @@ class GrpcRaftClient(AbstractRaftClient):
         leader_id: PeerId,
         prev_log_index: int,
         prev_log_term: int,
-        entries: Iterable[raft_pb2.Log],    # type: ignore
+        entries: Iterable[raft_pb2.Log],  # type: ignore
         leader_commit: int,
     ) -> Tuple[int, bool]:
         if credentials := self._credentials:
@@ -121,9 +124,12 @@ class GrpcRaftClient(AbstractRaftClient):
 
         stub = raft_pb2_grpc.RaftServiceStub(channel)
         request = raft_pb2.AppendEntriesRequest(
-            term=term, leader_id=leader_id,
-            prev_log_index=prev_log_index, prev_log_term=prev_log_term,
-            entries=entries, leader_commit=leader_commit,
+            term=term,
+            leader_id=leader_id,
+            prev_log_index=prev_log_index,
+            prev_log_term=prev_log_term,
+            entries=entries,
+            leader_commit=leader_commit,
         )
         try:
             response = await stub.AppendEntries(request)
@@ -168,8 +174,10 @@ class GrpcRaftClient(AbstractRaftClient):
 
         stub = raft_pb2_grpc.RaftServiceStub(channel)
         request = raft_pb2.RequestVoteRequest(
-            term=term, candidate_id=candidate_id,
-            last_log_index=last_log_index, last_log_term=last_log_term,
+            term=term,
+            candidate_id=candidate_id,
+            last_log_index=last_log_index,
+            last_log_term=last_log_term,
         )
         try:
             response = await stub.RequestVote(request)

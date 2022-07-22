@@ -77,10 +77,12 @@ class SqliteLogStorage(aobject, AbstractLogStorage):
 
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            cur.execute(f"""
+            cur.execute(
+                f"""
                 CREATE TABLE IF NOT EXISTS {self._table}
                 (idx INTEGER PRIMARY KEY, term INTEGER, command TEXT)
-            """)
+            """
+            )
             conn.commit()
 
     def __del__(self):
@@ -95,16 +97,18 @@ class SqliteLogStorage(aobject, AbstractLogStorage):
         pass
 
     async def append_entries(self, entries: Iterable[raft_pb2.Log]) -> None:
-        entries = tuple((entry.index, entry.term, entry.command) for entry in entries)   # type: ignore
+        entries = tuple((entry.index, entry.term, entry.command) for entry in entries)  # type: ignore
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            cur.executemany(f"INSERT INTO {self._table} VALUES (?, ?, ?)", entries)   # type: ignore
+            cur.executemany(f"INSERT INTO {self._table} VALUES (?, ?, ?)", entries)  # type: ignore
             conn.commit()
 
     async def get(self, index: int) -> Optional[raft_pb2.Log]:
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            if row := cur.execute(f"SELECT * FROM {self._table} WHERE idx = :index", {"index": index}).fetchone():
+            if row := cur.execute(
+                f"SELECT * FROM {self._table} WHERE idx = :index", {"index": index}
+            ).fetchone():
                 row = raft_pb2.Log(index=row[0], term=row[1], command=row[2])
             return row
 
@@ -112,7 +116,9 @@ class SqliteLogStorage(aobject, AbstractLogStorage):
         count = await self.size()
         with sqlite3.connect(self.database) as conn:
             cur = conn.cursor()
-            if row := cur.execute(f"SELECT * FROM {self._table} LIMIT 1 OFFSET {count - 1}").fetchone():
+            if row := cur.execute(
+                f"SELECT * FROM {self._table} LIMIT 1 OFFSET {count - 1}"
+            ).fetchone():
                 row = raft_pb2.Log(index=row[0], term=row[1], command=row[2])
             return row
 
@@ -148,10 +154,10 @@ class RedisLogStorage(aobject, AbstractLogStorage):
     def __init__(self, *args, **kwargs) -> None:
         self._namespace: str = str(uuid.uuid4())
 
-    async def __ainit__(self, *args, host: str = '127.0.0.1', port: int = 8111, **kwargs) -> None:
+    async def __ainit__(self, *args, host: str = "127.0.0.1", port: int = 8111, **kwargs) -> None:
         keepalive_options: Dict[str, str] = {}
         self._redis = await Redis.from_url(
-            f'redis://{host}:{port}',
+            f"redis://{host}:{port}",
             socket_keepalive=True,
             socket_keepalive_options=keepalive_options,
         )
@@ -170,7 +176,7 @@ class RedisLogStorage(aobject, AbstractLogStorage):
         if item is None:
             return None
 
-        log = raft_pb2.Log()    # type: ignore
+        log = raft_pb2.Log()  # type: ignore
         log.ParseFromString(item)
         return log
 

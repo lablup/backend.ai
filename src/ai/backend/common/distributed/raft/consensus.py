@@ -20,7 +20,7 @@ from .utils import AtomicInteger
 
 logging.basicConfig(level=logging.INFO)
 
-__all__ = ('RaftConsensusModule', 'RaftState')
+__all__ = ("RaftConsensusModule", "RaftState")
 
 
 def randrangef(start: float, stop: float) -> float:
@@ -64,6 +64,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
     - If there exists an N such that N > commitIndex, a majority of matchIndex[i] >= N, and log[N].term == currentTerm:
       set commitIndex = N
     """
+
     def __init__(
         self,
         peers: Iterable[PeerId],
@@ -79,7 +80,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._client: Final[AbstractRaftClient] = client
         self._on_state_changed: Optional[Callable[[RaftState], Awaitable]] = on_state_changed
 
-        self._election_timeout: Final[float] = randrangef(0.15, 0.3)    # 0.01 ~ 0.5
+        self._election_timeout: Final[float] = randrangef(0.15, 0.3)  # 0.01 ~ 0.5
         self._heartbeat_interval: Final[float] = 0.1
         self._leader_id: Optional[PeerId] = None
 
@@ -94,7 +95,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
 
     async def __ainit__(self, *args, **kwargs) -> None:
         await self._execute_transition(RaftState.FOLLOWER)
-        self._log = await SqliteLogStorage.new(id=self.id)    # type: ignore
+        self._log = await SqliteLogStorage.new(id=self.id)  # type: ignore
 
         if last_log := (await self._log.last()):
             self._prev_log_index = last_log.index
@@ -153,7 +154,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         while True:
             await asyncio.sleep(3.0)
             command = str(uuid.uuid4())
-            logging.info(f'[LEADER] Storage size: {await self._log.size()}')
+            logging.info(f"[LEADER] Storage size: {await self._log.size()}")
             next_index = self._prev_log_index + 1
             entry = raft_pb2.Log(index=next_index, term=self.current_term, command=command)
             await self._log.append_entries((entry,))
@@ -167,7 +168,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
     async def main(self) -> None:
         _append_random_entry_task: Optional[asyncio.Task] = None
         while True:
-            logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} state={self._state}')
+            logging.info(f"[{datetime.now().isoformat()}] pid={os.getpid()} state={self._state}")
             if task := _append_random_entry_task:
                 task.cancel()
                 try:
@@ -189,8 +190,12 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                             break
                         await asyncio.sleep(self._election_timeout)
                 case RaftState.LEADER:
-                    logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} LEADER({self.id.split("-")[0]})')
-                    _append_random_entry_task = asyncio.create_task(self._append_random_entry_coro())
+                    logging.info(
+                        f'[{datetime.now().isoformat()}] pid={os.getpid()} LEADER({self.id.split("-")[0]})'
+                    )
+                    _append_random_entry_task = asyncio.create_task(
+                        self._append_random_entry_coro()
+                    )
                     self._leader_id = self.id
                     while self._state is RaftState.LEADER:
                         await self._publish_heartbeat()
@@ -201,20 +206,29 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         await self.replicate_logs(entries=())
 
     async def replicate_logs(self, entries: Tuple[raft_pb2.Log, ...]) -> bool:
-        terms, succeeds = zip(*await asyncio.gather(*[
-            asyncio.create_task(
-                self._client.append_entries(
-                    address=address, term=self.current_term, leader_id=self.id,
-                    prev_log_index=self._prev_log_index, prev_log_term=self._prev_log_term,
-                    entries=entries, leader_commit=self._commit_index,
-                ),
+        terms, succeeds = zip(
+            *await asyncio.gather(
+                *[
+                    asyncio.create_task(
+                        self._client.append_entries(
+                            address=address,
+                            term=self.current_term,
+                            leader_id=self.id,
+                            prev_log_index=self._prev_log_index,
+                            prev_log_term=self._prev_log_term,
+                            entries=entries,
+                            leader_commit=self._commit_index,
+                        ),
+                    )
+                    for address in self._peers
+                ]
             )
-            for address in self._peers
-        ]))
+        )
         if entries:
             logging.info(
-                f'[{datetime.now().isoformat()}] replicate(entries={entries[-1].index}, '
-                f'total={await self._log.size()})')
+                f"[{datetime.now().isoformat()}] replicate(entries={entries[-1].index}, "
+                f"total={await self._log.size()})"
+            )
         for term in terms:
             if term > self.current_term:
                 await self._synchronize_term(term)
@@ -228,7 +242,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         leader_id: PeerId,
         prev_log_index: int,
         prev_log_term: int,
-        entries: Iterable[raft_pb2.Log],    # type: ignore
+        entries: Iterable[raft_pb2.Log],  # type: ignore
         leader_commit: int,
     ) -> Tuple[int, bool]:
         await self.reset_timeout()
@@ -251,8 +265,10 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
 
         if entries:
             await self._log.append_entries(entries)
-            logging.info(f'[{datetime.now()}] pid={os.getpid()} on_append_entries(term={term}, index={entries[-1].index}, '
-                         f'total={await self._log.size()})')
+            logging.info(
+                f"[{datetime.now()}] pid={os.getpid()} on_append_entries(term={term}, index={entries[-1].index}, "
+                f"total={await self._log.size()})"
+            )
 
         if leader_commit > self._commit_index:
             self._commit_index = min(leader_commit, entries[-1].entry)
@@ -291,19 +307,28 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._current_term.increase()
         self._voted_for = self.id
         term = self.current_term
-        logging.info(f'[{datetime.now().isoformat()}] pid={os.getpid()} start_election(term={term})')
+        logging.info(
+            f"[{datetime.now().isoformat()}] pid={os.getpid()} start_election(term={term})"
+        )
         last_log = await self._log.last()
         last_log_index = last_log.index if last_log else 0
         last_log_term = last_log.term if last_log else 0
-        terms, grants = zip(*await asyncio.gather(*[
-            asyncio.create_task(
-                self._client.request_vote(
-                    address=address, term=term, candidate_id=self.id,
-                    last_log_index=last_log_index, last_log_term=last_log_term,
-                ),
+        terms, grants = zip(
+            *await asyncio.gather(
+                *[
+                    asyncio.create_task(
+                        self._client.request_vote(
+                            address=address,
+                            term=term,
+                            candidate_id=self.id,
+                            last_log_index=last_log_index,
+                            last_log_term=last_log_term,
+                        ),
+                    )
+                    for address in self._peers
+                ]
             )
-            for address in self._peers
-        ]))
+        )
         for term in terms:
             if term > self.current_term:
                 await self._synchronize_term(term)

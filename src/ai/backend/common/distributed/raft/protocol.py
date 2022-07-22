@@ -14,7 +14,7 @@ class AbstractRaftProtocol(abc.ABC):
         leader_id: PeerId,
         prev_log_index: int,
         prev_log_term: int,
-        entries: Iterable[raft_pb2.Log],    # type: ignore
+        entries: Iterable[raft_pb2.Log],  # type: ignore
         leader_commit: int,
     ) -> Tuple[int, bool]:
         """Receiver implementation:
