@@ -88,9 +88,9 @@ class ExtendedAsyncSAEngine(SAEngine):
                     self._readonly_txn_count -= 1
 
     @actxmgr
-    async def begin_session(self) -> AsyncIterator[SASession]:
+    async def begin_session(self, expire_on_commit=False) -> AsyncIterator[SASession]:
         async with self.begin() as conn:
-            session = SASession(bind=conn)
+            session = SASession(bind=conn, expire_on_commit=expire_on_commit)
             try:
                 yield session
                 await session.commit()
@@ -99,9 +99,11 @@ class ExtendedAsyncSAEngine(SAEngine):
                 raise e
 
     @actxmgr
-    async def begin_readonly_session(self, deferrable: bool = False) -> AsyncIterator[SASession]:
+    async def begin_readonly_session(
+        self, deferrable: bool = False, expire_on_commit=False
+    ) -> AsyncIterator[SASession]:
         async with self.begin_readonly(deferrable=deferrable) as conn:
-            yield SASession(bind=conn)
+            yield SASession(bind=conn, expire_on_commit=expire_on_commit)
 
     @actxmgr
     async def advisory_lock(self, lock_id: LockID) -> AsyncIterator[None]:
@@ -189,6 +191,24 @@ async def reenter_txn(
     else:
         async with conn.begin_nested():
             yield conn
+
+
+@actxmgr
+async def reenter_txn_session(
+    pool: ExtendedAsyncSAEngine,
+    sess: SASession,
+    read_only: bool = False,
+) -> AsyncIterator[SAConnection]:
+    if sess is None:
+        if read_only:
+            async with pool.begin_readonly_session() as sess:
+                yield sess
+        else:
+            async with pool.begin_session() as sess:
+                yield sess
+    else:
+        async with sess.begin_nested():
+            yield sess
 
 
 TQueryResult = TypeVar("TQueryResult")
