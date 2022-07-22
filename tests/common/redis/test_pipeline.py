@@ -19,7 +19,7 @@ from .types import RedisClusterInfo
 async def test_pipeline_single_instance(redis_container: Tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     rconn = RedisConnectionInfo(
-        Redis.from_url(url=f'redis://{addr.host}:{addr.port}', socket_timeout=0.5),
+        Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
         service_name=None,
     )
 
@@ -42,14 +42,14 @@ async def test_pipeline_single_instance(redis_container: Tuple[str, HostPortPair
 async def test_pipeline_single_instance_retries(redis_container: Tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     rconn = RedisConnectionInfo(
-        Redis.from_url(url=f'redis://{addr.host}:{addr.port}', socket_timeout=0.5),
+        Redis.from_url(url=f"redis://{addr.host}:{addr.port}", socket_timeout=0.5),
         service_name=None,
     )
 
     build_count = 0
 
     patcher = mock.patch(
-        'redis.asyncio.client.Pipeline._execute_pipeline',
+        "redis.asyncio.client.Pipeline._execute_pipeline",
         side_effect=[ConnectionResetError, ConnectionResetError, mock.DEFAULT],
     )
     patcher.start()
@@ -80,10 +80,10 @@ async def test_pipeline_sentinel_cluster(redis_cluster: RedisClusterInfo) -> Non
     rconn = RedisConnectionInfo(
         Sentinel(
             redis_cluster.sentinel_addrs,
-            password='develove',
+            password="develove",
             socket_timeout=0.5,
         ),
-        service_name='mymaster',
+        service_name="mymaster",
     )
 
     async def _build_pipeline_async(r: Redis) -> Pipeline:

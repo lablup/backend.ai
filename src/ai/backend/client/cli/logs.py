@@ -9,18 +9,19 @@ from .pretty import print_error
 
 
 @main.command()
-@click.argument('task_id', metavar='TASKID')
+@click.argument("task_id", metavar="TASKID")
 def task_logs(task_id):
-    '''
+    """
     Shows the output logs of a batch task.
 
     \b
     TASKID: An UUID of a task (or kernel).
-    '''
+    """
+
     async def _task_logs():
         async with AsyncSession() as session:
             async for chunk in session.ComputeSession.get_task_logs(task_id):
-                print(chunk.decode('utf8', errors='replace'), end='')
+                print(chunk.decode("utf8", errors="replace"), end="")
 
     try:
         asyncio_run(_task_logs())

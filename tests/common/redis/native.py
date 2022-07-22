@@ -25,7 +25,7 @@ class NativeRedisNode(AbstractRedisNode):
 
     @property
     def addr(self) -> Tuple[str, int]:
-        return ('127.0.0.1', self.port)
+        return ("127.0.0.1", self.port)
 
     def __str__(self) -> str:
         if self.proc is None:
@@ -50,7 +50,9 @@ class NativeRedisNode(AbstractRedisNode):
             else:
                 self.proc.terminate()
             exit_code = await self.proc.wait()
-            print(f"Redis {self.node_type} (pid:{self.proc.pid}) has terminated with exit code {exit_code}.")
+            print(
+                f"Redis {self.node_type} (pid:{self.proc.pid}) has terminated with exit code {exit_code}."
+            )
         except ProcessLookupError:
             print(f"Redis {self.node_type} (pid:{self.proc.pid}) already terminated")
         finally:
@@ -68,12 +70,12 @@ class NativeRedisNode(AbstractRedisNode):
 
 
 class NativeRedisSentinelCluster(AbstractRedisSentinelCluster):
-
     @contextlib.asynccontextmanager
     async def make_cluster(self) -> AsyncIterator[RedisClusterInfo]:
         nodes = []
         sentinels = []
-        sentinel_config = textwrap.dedent(f"""
+        sentinel_config = textwrap.dedent(
+            f"""
         sentinel resolve-hostnames yes
         sentinel monitor {self.service_name} 127.0.0.1 16379 2
         sentinel auth-pass {self.service_name} {self.password}
@@ -81,7 +83,8 @@ class NativeRedisSentinelCluster(AbstractRedisSentinelCluster):
         sentinel failover-timeout {self.service_name} 5000
         sentinel parallel-syncs {self.service_name} 2
         protected-mode no
-        """).lstrip()
+        """
+        ).lstrip()
         for node_port in [16379, 16380, 16381]:
             rdb_path = Path(f"node.{node_port}.rdb")
             try:
@@ -93,19 +96,25 @@ class NativeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 node_port,
                 [
                     "redis-server",
-                    "--bind", "127.0.0.1",
-                    "--port", str(node_port),
-                    "--requirepass", self.password,
-                    "--masterauth", self.password,
-                ] + (
-                    []
-                    if node_port == 16379
-                    else ["--slaveof", "127.0.0.1", "16379"]
-                ) + [
-                    "--cluster-announce-ip", "127.0.0.1",
-                    "--min-slaves-to-write", "1",
-                    "--min-slaves-max-lag", "10",
-                    "--dbfilename", str(rdb_path),
+                    "--bind",
+                    "127.0.0.1",
+                    "--port",
+                    str(node_port),
+                    "--requirepass",
+                    self.password,
+                    "--masterauth",
+                    self.password,
+                ]
+                + ([] if node_port == 16379 else ["--slaveof", "127.0.0.1", "16379"])
+                + [
+                    "--cluster-announce-ip",
+                    "127.0.0.1",
+                    "--min-slaves-to-write",
+                    "1",
+                    "--min-slaves-max-lag",
+                    "10",
+                    "--dbfilename",
+                    str(rdb_path),
                 ],
             )
             nodes.append(node)
@@ -120,8 +129,10 @@ class NativeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 [
                     "redis-server",
                     os.fsencode(sentinel_conf_path),
-                    "--bind", "127.0.0.1",
-                    "--port", str(sentinel_port),
+                    "--bind",
+                    "127.0.0.1",
+                    "--port",
+                    str(sentinel_port),
                     "--sentinel",
                 ],
             )
@@ -132,15 +143,15 @@ class NativeRedisSentinelCluster(AbstractRedisSentinelCluster):
         try:
             yield RedisClusterInfo(
                 node_addrs=[
-                    ('127.0.0.1', 16379),
-                    ('127.0.0.1', 16380),
-                    ('127.0.0.1', 16381),
+                    ("127.0.0.1", 16379),
+                    ("127.0.0.1", 16380),
+                    ("127.0.0.1", 16381),
                 ],
                 nodes=nodes,
                 sentinel_addrs=[
-                    ('127.0.0.1', 26379),
-                    ('127.0.0.1', 26380),
-                    ('127.0.0.1', 26381),
+                    ("127.0.0.1", 26379),
+                    ("127.0.0.1", 26380),
+                    ("127.0.0.1", 26381),
                 ],
                 sentinels=sentinels,
             )
@@ -156,7 +167,9 @@ async def main():
     loop = asyncio.get_running_loop()
 
     async def redis_task():
-        native_cluster = NativeRedisSentinelCluster("testing", "testing-main", "develove", "testing")
+        native_cluster = NativeRedisSentinelCluster(
+            "testing", "testing-main", "develove", "testing"
+        )
         async with native_cluster.make_cluster():
             while True:
                 await asyncio.sleep(10)

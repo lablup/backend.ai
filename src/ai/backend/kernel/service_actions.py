@@ -14,24 +14,23 @@ async def write_file(
     variables: Mapping[str, Any],
     filename: str,
     body: Iterable[str],
-    mode: str = '644',
+    mode: str = "644",
     append: bool = False,
 ) -> None:
     filename = filename.format_map(variables)
-    open_mode = 'w' + ('+' if append else '')
+    open_mode = "w" + ("+" if append else "")
     with open(filename, open_mode) as fw:
         for line in body:
-            fw.write(line.format_map(variables) + '\n')
+            fw.write(line.format_map(variables) + "\n")
     os.chmod(filename, int(mode, 8))
 
 
 async def write_tempfile(
     variables: Mapping[str, Any],
     body: Iterable[str],
-    mode: str = '644',
+    mode: str = "644",
 ) -> Optional[str]:
-    with tempfile.NamedTemporaryFile(
-            'w', encoding='utf-8', suffix='.py', delete=False) as config:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".py", delete=False) as config:
         for line in body:
             config.write(line.format_map(variables))
     os.chmod(config.name, int(mode, 8))
@@ -42,11 +41,13 @@ async def run_command(
     variables: Mapping[str, Any],
     command: Iterable[str],
 ) -> Optional[MutableMapping[str, str]]:
-    proc = await create_subprocess_exec(*(
-        str(piece).format_map(variables) for piece in command
-    ), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = await create_subprocess_exec(
+        *(str(piece).format_map(variables) for piece in command),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
     out, err = await proc.communicate()
-    return {'out': out.decode('utf8'), 'err': err.decode('utf8')}
+    return {"out": out.decode("utf8"), "err": err.decode("utf8")}
 
 
 async def mkdir(
@@ -61,7 +62,7 @@ async def log(
     message: str,
     debug: bool = False,
 ) -> None:
-    message = message.format_map(variables).replace('{', '{{').replace('}', '}}')
+    message = message.format_map(variables).replace("{", "{{").replace("}", "}}")
     if debug:
         logger.debug(message)
     else:

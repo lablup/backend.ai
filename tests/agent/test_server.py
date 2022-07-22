@@ -13,7 +13,7 @@ def test_dummy():
 
 
 # TODO: rewrite
-'''
+"""
 @pytest.fixture
 async def agent(request, tmpdir, event_loop):
     config = argparse.Namespace()
@@ -367,4 +367,4 @@ async def test_reset(agent, docker):
                 cinfo = None
             if cinfo and cinfo['State']['Status'] != 'removing':
                 await container.delete(force=True)
-'''
+"""

@@ -17,18 +17,20 @@ if TYPE_CHECKING:
 
 
 disruptions: Final = {
-    'stop': {
-        'begin': 'stop',
-        'end': 'start',
+    "stop": {
+        "begin": "stop",
+        "end": "start",
     },
-    'pause': {
-        'begin': 'pause',
-        'end': 'unpause',
+    "pause": {
+        "begin": "pause",
+        "end": "unpause",
     },
 }
 
 
-async def simple_run_cmd(cmdargs: Sequence[Union[str, bytes]], **kwargs) -> asyncio.subprocess.Process:
+async def simple_run_cmd(
+    cmdargs: Sequence[Union[str, bytes]], **kwargs
+) -> asyncio.subprocess.Process:
     p = await asyncio.create_subprocess_exec(*cmdargs, **kwargs)
     await p.wait()
     return p
@@ -48,7 +50,7 @@ async def wait_redis_ready(host: str, port: int, password: str = None) -> None:
             ConnectionError,
             RedisConnectionError,
         ):
-            print('connectionError, retrying')
+            print("connectionError, retrying")
             await asyncio.sleep(0.1)
         except RedisTimeoutError:
             pass
@@ -88,22 +90,27 @@ async def interrupt(
     unpaused.set()
 
 
-_TReturn = TypeVar('_TReturn')
-_PInner = ParamSpec('_PInner')
+_TReturn = TypeVar("_TReturn")
+_PInner = ParamSpec("_PInner")
 
 
 # FIXME: mypy 0.910 does not support PEP-612 (ParamSpec) yet...
 
-def with_timeout(t: float) -> Callable[        # type: ignore
+
+def with_timeout(
+    t: float,
+) -> Callable[  # type: ignore
     [Callable[_PInner, Awaitable[_TReturn]]],
     Callable[_PInner, Awaitable[_TReturn]],
 ]:
     def wrapper(
         corofunc: Callable[_PInner, Awaitable[_TReturn]],  # type: ignore
-    ) -> Callable[_PInner, Awaitable[_TReturn]]:           # type: ignore
+    ) -> Callable[_PInner, Awaitable[_TReturn]]:  # type: ignore
         @functools.wraps(corofunc)
         async def run(*args: _PInner.args, **kwargs: _PInner.kwargs) -> _TReturn:  # type: ignore
             async with async_timeout.timeout(t):
                 return await corofunc(*args, **kwargs)
+
         return run
+
     return wrapper
