@@ -308,8 +308,13 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_LOCK,
     )
-    for redis_info in (root_ctx.redis_live, root_ctx.redis_stat,
-                       root_ctx.redis_image, root_ctx.redis_stream, root_ctx.redis_lock):
+    for redis_info in (
+        root_ctx.redis_live,
+        root_ctx.redis_stat,
+        root_ctx.redis_image,
+        root_ctx.redis_stream,
+        root_ctx.redis_lock,
+    ):
         assert isinstance(redis_info.client, Redis)
         await redis_helper.ping_redis_connection(redis_info.client)
     yield
