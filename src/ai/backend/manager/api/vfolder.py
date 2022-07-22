@@ -498,6 +498,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                     "cloneable": entry["cloneable"],
                     "max_files": entry["max_files"],
                     "max_size": entry["max_size"],
+                    "shared_type": entry["shared_type"].value,
                 }
             )
     return web.json_response(resp, status=200)
