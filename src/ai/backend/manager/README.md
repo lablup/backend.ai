@@ -117,7 +117,7 @@ Set up the public Docker registry:
 ```console
 $ backend.ai mgr etcd put config/docker/registry/index.docker.io "https://registry-1.docker.io"
 $ backend.ai mgr etcd put config/docker/registry/index.docker.io/username "lablup"
-$ backend.ai mgr etcd rescan-images index.docker.io
+$ backend.ai mgr image rescan index.docker.io
 ```
 
 Set up the vfolder paths:

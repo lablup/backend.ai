@@ -95,6 +95,7 @@ class BasePluginContext(Generic[P]):
     local_config: Mapping[str, Any]
     plugins: Dict[str, P]
     plugin_group: ClassVar[str] = "backendai_XXX_v10"
+    allowlist: ClassVar[Optional[set[str]]] = None
     blocklist: ClassVar[Optional[set[str]]] = None
 
     _config_watchers: WeakSet[asyncio.Task]
@@ -120,7 +121,11 @@ class BasePluginContext(Generic[P]):
     ) -> Iterator[Tuple[str, Type[P]]]:
         cls_blocklist = set() if cls.blocklist is None else cls.blocklist
         arg_blocklist = set() if blocklist is None else blocklist
-        for entrypoint in scan_entrypoints(plugin_group, cls_blocklist | arg_blocklist):
+        for entrypoint in scan_entrypoints(
+            plugin_group,
+            allowlist=cls_allowlist | arg_allowlist if allowlist_enabled else None,
+            blocklist=cls_blocklist | arg_blocklist,
+        ):
             log.info("loading plugin (group:{}): {}", plugin_group, entrypoint.name)
             yield entrypoint.name, entrypoint.load()
 

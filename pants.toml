@@ -61,8 +61,8 @@ known_versions = [
 
 [black]
 version = "black~=22.6"
+interpreter_constraints = ["CPython>=3.10,<4"]
 lockfile = "tools/black.lock"
-interpreter_constraints = ["CPython>=3.8,<4"]
 
 [flake8]
 version = "flake8>=4.0.1"
@@ -73,6 +73,7 @@ lockfile = "tools/flake8.lock"
 
 [isort]
 lockfile = "tools/isort.lock"
+interpreter_constraints = ["CPython>=3.10,<4"]
 
 [pytest]
 version = "pytest>=7.1.2"
@@ -90,6 +91,7 @@ timeout_default = 300
 
 [mypy]
 version = "mypy>=0.961"
+interpreter_constraints = ["CPython>=3.10,<4"]
 extra_requirements.add = [
 ]
 lockfile = "tools/mypy.lock"
