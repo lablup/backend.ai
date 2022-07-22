@@ -28,7 +28,7 @@ from sqlalchemy.engine import Row
 
 import ai.backend.common.validators as tx
 from ai.backend.common import msgpack
-from ai.backend.common import redis as redis_helper
+from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AbstractEvent,
@@ -69,8 +69,8 @@ class AppStreamingStatus(enum.Enum):
 
 
 class ThresholdOperator(enum.Enum):
-    AND = 'and'
-    OR = 'or'
+    AND = "and"
+    OR = "or"
 
 
 class IdleCheckerHost:
@@ -93,17 +93,19 @@ class IdleCheckerHost:
         self._event_producer = event_producer
         self._lock_factory = lock_factory
         self._redis_live = redis_helper.get_redis_object(
-            self._shared_config.data['redis'],
+            self._shared_config.data["redis"],
             db=REDIS_LIVE_DB,
         )
         self._redis_stat = redis_helper.get_redis_object(
-            self._shared_config.data['redis'],
+            self._shared_config.data["redis"],
             db=REDIS_STAT_DB,
         )
 
     def add_checker(self, checker: BaseIdleChecker):
         if self._frozen:
-            raise RuntimeError("Cannot add a new idle checker after the idle checker host is frozen.")
+            raise RuntimeError(
+                "Cannot add a new idle checker after the idle checker host is frozen."
+            )
         self._checkers.append(checker)
 
     async def start(self) -> None:
@@ -155,8 +157,7 @@ class IdleCheckerHost:
                 sa.select([kernels])
                 .select_from(kernels)
                 .where(
-                    (kernels.c.status.in_(LIVE_STATUS)) &
-                    (kernels.c.cluster_role == DEFAULT_ROLE),
+                    (kernels.c.status.in_(LIVE_STATUS)) & (kernels.c.cluster_role == DEFAULT_ROLE),
                 )
             )
             result = await conn.execute(query)
@@ -183,7 +184,8 @@ class IdleCheckerHost:
                     if not (await checker.check_session(session, conn, policy)):
                         log.info(
                             "The {} idle checker triggered termination of s:{}",
-                            checker.name, session['id'],
+                            checker.name,
+                            session["id"],
                         )
                         await self._event_producer.produce_event(
                             DoTerminateSessionEvent(session["id"], f"idle-{checker.name}"),
@@ -291,7 +293,9 @@ class TimeoutIdleChecker(BaseIdleChecker):
         await redis_helper.execute(
             self._redis_live,
             lambda r: r.set(
-                f"session.{session_id}.last_access", "0", xx=True,
+                f"session.{session_id}.last_access",
+                "0",
+                xx=True,
             ),
         )
 
@@ -340,18 +344,18 @@ class TimeoutIdleChecker(BaseIdleChecker):
             self._redis_live,
             lambda r: r.zcount(
                 f"session.{session_id}.active_app_connections",
-                float('-inf'), float('+inf'),
+                float("-inf"),
+                float("+inf"),
             ),
         )
         if active_streams is not None and active_streams > 0:
             return True
         t = await redis_helper.execute(self._redis_live, lambda r: r.time())
         t = t[0] + (t[1] / (10**6))
-        raw_last_access = \
-            await redis_helper.execute(
-                self._redis_live,
-                lambda r: r.get(f"session.{session_id}.last_access"),
-            )
+        raw_last_access = await redis_helper.execute(
+            self._redis_live,
+            lambda r: r.get(f"session.{session_id}.last_access"),
+        )
         if raw_last_access is None or raw_last_access == "0":
             return True
         last_access = float(raw_last_access)
@@ -399,8 +403,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
         {
             t.Key("time-window", default="10m"): tx.TimeDuration(),
             t.Key("initial-grace-period", default="5m"): tx.TimeDuration(),
-            t.Key("thresholds-check-operator", default=ThresholdOperator.AND):
-            tx.Enum(ThresholdOperator),
+            t.Key("thresholds-check-operator", default=ThresholdOperator.AND): tx.Enum(
+                ThresholdOperator
+            ),
             t.Key("resource-thresholds"): t.Dict(
                 {
                     t.Key("cpu_util", default=None): t.Null | t.Dict({t.Key("average"): t.Float}),
@@ -418,25 +423,26 @@ class UtilizationIdleChecker(BaseIdleChecker):
     initial_grace_period: timedelta
     _evhandlers: List[EventHandler[None, AbstractEvent]]
     slot_resource_map: Mapping[str, Set[str]] = {
-        'cpu': {'cpu_util'},
-        'mem': {'mem'},
-        'cuda': {'cuda_util', 'cuda_mem'},
+        "cpu": {"cpu_util"},
+        "mem": {"mem"},
+        "cuda": {"cuda_util", "cuda_mem"},
     }
 
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = self._config_iv.check(raw_config)
         self.resource_thresholds = {
-            k: nmget(v, 'average') for k, v in config.get('resource-thresholds').items()
+            k: nmget(v, "average") for k, v in config.get("resource-thresholds").items()
         }
         self.thresholds_check_operator = config.get("thresholds-check-operator")
         self.time_window = config.get("time-window")
         self.initial_grace_period = config.get("initial-grace-period")
 
-        thresholds_log = " ".join([f"{k}({threshold})," for k,
-                                   threshold in self.resource_thresholds.items()])
+        thresholds_log = " ".join(
+            [f"{k}({threshold})," for k, threshold in self.resource_thresholds.items()]
+        )
         log.info(
             f"UtilizationIdleChecker(%): {thresholds_log} "
-            f"thresholds-check-operator(\"{self.thresholds_check_operator}\"), "
+            f'thresholds-check-operator("{self.thresholds_check_operator}"), '
             f"time-window({self.time_window.total_seconds()}s)",
         )
 
@@ -470,7 +476,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
         # Example: {cuda.device: 0, cuda.shares: 0.5} -> {cuda: 0.5}.
         unique_res_map: DefaultDict[str, Any] = defaultdict(Decimal)
         for k, v in occupied_slots.items():
-            unique_key = k.split('.')[0]
+            unique_key = k.split(".")[0]
             unique_res_map[unique_key] += v
 
         # Do not take into account unallocated resources. For example, do not garbage collect
@@ -491,8 +497,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 sa.select([kernels.c.id])
                 .select_from(kernels)
                 .where(
-                    (kernels.c.session_id == session_id) &
-                    (kernels.c.status.in_(LIVE_STATUS)),
+                    (kernels.c.session_id == session_id) & (kernels.c.status.in_(LIVE_STATUS)),
                 )
             )
             result = await dbconn.execute(query)
@@ -506,7 +511,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Update utilization time-series data.
         not_enough_data = False
-        raw_util_series = await redis_helper.execute(self._redis_live, lambda r: r.get(util_series_key))
+        raw_util_series = await redis_helper.execute(
+            self._redis_live, lambda r: r.get(util_series_key)
+        )
 
         try:
             util_series = msgpack.unpackb(raw_util_series, use_list=True)
@@ -554,8 +561,12 @@ class UtilizationIdleChecker(BaseIdleChecker):
         else:  # "and" operation is the default
             check_result = any(sufficiently_utilized.values())
         if not check_result:
-            log.info("utilization timeout: {} ({}, {})",
-                     session_id, avg_utils, self.thresholds_check_operator)
+            log.info(
+                "utilization timeout: {} ({}, {})",
+                session_id,
+                avg_utils,
+                self.thresholds_check_operator,
+            )
         return check_result
 
     async def get_current_utilization(
@@ -583,21 +594,19 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 }
 
                 utilizations = {
-                    k: utilizations[k] + kernel_utils[k]
-                    for k in self.resource_thresholds.keys()
+                    k: utilizations[k] + kernel_utils[k] for k in self.resource_thresholds.keys()
                 }
             utilizations = {
-                k: utilizations[k] / len(kernel_ids)
-                for k in self.resource_thresholds.keys()
+                k: utilizations[k] / len(kernel_ids) for k in self.resource_thresholds.keys()
             }
 
             # NOTE: Manual calculation of mem utilization.
             # mem.capacity does not report total amount of memory allocated to
             # the container, and mem.pct always report >90% even when nothing is
             # executing. So, we just replace it with the value of occupied slot.
-            mem_slots = float(occupied_slots.get('mem', 0))
+            mem_slots = float(occupied_slots.get("mem", 0))
             mem_current = float(nmget(live_stat, "mem.current", 0.0))
-            utilizations['mem'] = mem_current / mem_slots * 100 if mem_slots > 0 else 0
+            utilizations["mem"] = mem_current / mem_slots * 100 if mem_slots > 0 else 0
             return utilizations
         except Exception as e:
             log.warning("Unable to collect utilization for idleness check", exc_info=e)
@@ -621,7 +630,9 @@ async def init_idle_checkers(
     Create an instance of session idleness checker
     from the given configuration and using the given event dispatcher.
     """
-    checker_host = IdleCheckerHost(db, shared_config, event_dispatcher, event_producer, lock_factory)
+    checker_host = IdleCheckerHost(
+        db, shared_config, event_dispatcher, event_producer, lock_factory
+    )
     checker_init_args = (event_dispatcher, checker_host._redis_live, checker_host._redis_stat)
     log.info("Initializing idle checker: session_lifetime")
     checker_host.add_checker(SessionLifetimeChecker(*checker_init_args))  # enabled by default

@@ -12,11 +12,11 @@ if TYPE_CHECKING:
     import yarl
 
 __all__ = (
-    'find_free_port',
-    'curl',
+    "find_free_port",
+    "curl",
 )
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 async def curl(
@@ -43,7 +43,7 @@ async def curl(
         return default_value
 
 
-def find_free_port(bind_addr: str = '127.0.0.1') -> int:
+def find_free_port(bind_addr: str = "127.0.0.1") -> int:
     """
     Find a freely available TCP port in the current host.
     Note that since under certain conditions this may have races.

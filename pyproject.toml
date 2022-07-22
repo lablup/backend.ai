@@ -54,7 +54,26 @@ mypy_path = "stubs:src"
 namespace_packages = true
 explicit_package_bases = true
 
+[tool.black]
+line-length = 100
+
 [tool.isort]
 profile = "black"
+line_length = 100
 sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 known_first_party = ["ai.backend"]
+skip_glob = [
+    "dist",
+    "plugins",
+    "docs",
+    "scratches",
+    "vfroot",
+    "volumes",
+    ".tmp",
+    ".git",
+    ".pants.d",
+    ".pytest_cache",
+    ".vscode",
+    "tools/pants-src",
+    "src/ai/backend/webui",
+]

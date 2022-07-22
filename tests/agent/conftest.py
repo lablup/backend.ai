@@ -15,54 +15,57 @@ from ai.backend.testutils.bootstrap import etcd_container, redis_container  # no
 from ai.backend.testutils.pants import get_parallel_slot
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def test_id():
-    return f'testing-{secrets.token_urlsafe(8)}'
+    return f"testing-{secrets.token_urlsafe(8)}"
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def local_config(test_id, etcd_container, redis_container):  # noqa: F811
-    # ipc_base_path = Path.cwd() / f'tmp/backend.ai/ipc-{test_id}'
-    ipc_base_path = Path.cwd() / f'ipc/ipc-{test_id}'
+    ipc_base_path = Path.cwd() / f".tmp/{test_id}/agent-ipc"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
+    var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"
+    var_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
 
     cfg = {
-        'agent': {
-            'region': f"rg-{test_id}",
-            'id': f"i-{test_id}",
-            'scaling-group': f"sg-{test_id}",
-            'ipc-base-path': ipc_base_path,
-            'backend': 'docker',
-            'rpc-listen-addr': HostPortPair('', 6001),
-            'agent-sock-port': 6009,
+        "agent": {
+            "region": f"rg-{test_id}",
+            "id": f"i-{test_id}",
+            "scaling-group": f"sg-{test_id}",
+            "ipc-base-path": ipc_base_path,
+            "var-base-path": var_base_path,
+            "backend": "docker",
+            "rpc-listen-addr": HostPortPair("", 6001),
+            "agent-sock-port": 6009,
+            "allow-compute-plugins": set(),
         },
-        'container': {
-            'scratch-type': 'hostdir',
-            'stats-type': 'docker',
-            'port-range': [
+        "container": {
+            "scratch-type": "hostdir",
+            "stats-type": "docker",
+            "port-range": [
                 19000 + 200 * get_parallel_slot(),
                 19200 + 200 * get_parallel_slot(),
             ],
         },
-        'resource': {
-            'reserved-cpu': 1,
-            'reserved-mem': tx.BinarySize().check('256M'),
-            'reserved-disk': tx.BinarySize().check('1G'),
+        "resource": {
+            "reserved-cpu": 1,
+            "reserved-mem": tx.BinarySize().check("256M"),
+            "reserved-disk": tx.BinarySize().check("1G"),
         },
-        'logging': {},
-        'debug': defaultdict(lambda: False),
-        'etcd': {
-            'addr': etcd_addr,
-            'namespace': f'ns-{test_id}',
+        "logging": {},
+        "debug": defaultdict(lambda: False),
+        "etcd": {
+            "addr": etcd_addr,
+            "namespace": f"ns-{test_id}",
         },
-        'redis': EtcdRedisConfig(
+        "redis": EtcdRedisConfig(
             addr=redis_container[1],
             sentinel=None,
             service_name=None,
             password=None,
         ),
-        'plugins': {},
+        "plugins": {},
     }
 
     def _override_if_exists(src: dict, dst: dict, key: str) -> None:
@@ -72,26 +75,26 @@ def local_config(test_id, etcd_container, redis_container):  # noqa: F811
 
     try:
         # Override external database config with the current environment's config.
-        fs_local_config, cfg_src_path = config.read_from_file(None, 'agent')
-        cfg['etcd']['addr'] = fs_local_config['etcd']['addr']
-        _override_if_exists(fs_local_config['etcd'], cfg['etcd'], 'user')
-        _override_if_exists(fs_local_config['etcd'], cfg['etcd'], 'password')
+        fs_local_config, cfg_src_path = config.read_from_file(None, "agent")
+        cfg["etcd"]["addr"] = fs_local_config["etcd"]["addr"]
+        _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "user")
+        _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "password")
     except config.ConfigurationError:
         pass
     yield cfg
     shutil.rmtree(ipc_base_path)
 
 
-@pytest.fixture(scope='session', autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def test_local_instance_id(local_config, session_mocker, test_id):
-    ipc_base_path = local_config['agent']['ipc-base-path']
-    registry_state_path = ipc_base_path / f'last_registry.{test_id}.dat'
+    var_base_path = local_config["agent"]["var-base-path"]
+    registry_state_path = var_base_path / f"last_registry.{test_id}.dat"
     try:
         os.unlink(registry_state_path)
     except FileNotFoundError:
         pass
     mock_generate_local_instance_id = session_mocker.patch(
-        'ai.backend.agent.agent.generate_local_instance_id',
+        "ai.backend.agent.agent.generate_local_instance_id",
     )
     mock_generate_local_instance_id.return_value = f"i-{test_id}"
     yield
@@ -101,14 +104,13 @@ def test_local_instance_id(local_config, session_mocker, test_id):
         pass
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def prepare_images():
-
     async def pull():
         docker = aiodocker.Docker()
         images_to_pull = [
-            'alpine:3.8',
-            'nginx:1.17-alpine',
+            "alpine:3.8",
+            "nginx:1.17-alpine",
         ]
         for img in images_to_pull:
             try:
@@ -127,7 +129,7 @@ def prepare_images():
     try:
         old_loop = asyncio.get_event_loop()
     except RuntimeError as exc:
-        if 'no current event loop' not in str(exc):
+        if "no current event loop" not in str(exc):
             raise
     try:
         asyncio.run(pull())
@@ -153,7 +155,7 @@ async def create_container(test_id, docker):
         nonlocal container
         container = await docker.containers.create_or_replace(
             config=config,
-            name=f'kernel.{test_id}-{cont_id}',
+            name=f"kernel.{test_id}-{cont_id}",
         )
         return container
 

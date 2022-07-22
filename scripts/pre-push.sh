@@ -7,7 +7,7 @@ else
 fi
 CURRENT_COMMIT=$(git rev-parse --short HEAD)
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-if [ -n "$(echo "$CURRENT_BRANCH" | sed -n '/^[0-9]\+\.[0-9]\+$/p')" ]; then
+if [ -n "$(echo "$CURRENT_BRANCH" | sed -n '/[[:digit:]]\{1,\}\.[[:digit:]]\{1,\}/p')" ]; then
   # if we are on the release branch, use it as the base branch.
   BASE_BRANCH="$CURRENT_BRANCH"
 else

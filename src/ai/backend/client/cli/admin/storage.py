@@ -21,20 +21,20 @@ def storage() -> None:
 
 @storage.command()
 @pass_ctx_obj
-@click.argument('vfolder_host')
+@click.argument("vfolder_host")
 def info(ctx: CLIContext, vfolder_host: str) -> None:
     """
     Show the information about the given storage volume.
     (super-admin privilege required)
     """
     fields = [
-        storage_fields['id'],
-        storage_fields['backend'],
-        storage_fields['capabilities'],
-        storage_fields['path'],
-        storage_fields['fsprefix'],
-        storage_fields['hardware_metadata'],
-        storage_fields['performance_metric'],
+        storage_fields["id"],
+        storage_fields["backend"],
+        storage_fields["capabilities"],
+        storage_fields["path"],
+        storage_fields["fsprefix"],
+        storage_fields["hardware_metadata"],
+        storage_fields["performance_metric"],
     ]
     with Session() as session:
         try:
@@ -50,23 +50,19 @@ def info(ctx: CLIContext, vfolder_host: str) -> None:
 
 @storage.command()
 @pass_ctx_obj
-@click.option('--filter', 'filter_', default=None,
-              help='Set the query filter expression.')
-@click.option('--order', default=None,
-              help='Set the query ordering expression.')
-@click.option('--offset', default=0,
-              help='The index of the current page start for pagination.')
-@click.option('--limit', default=None,
-              help='The page size for pagination.')
+@click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
+@click.option("--order", default=None, help="Set the query ordering expression.")
+@click.option("--offset", default=0, help="The index of the current page start for pagination.")
+@click.option("--limit", default=None, help="The page size for pagination.")
 def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
     """
     List storage volumes.
     (super-admin privilege required)
     """
     fields = [
-        storage_fields['id'],
-        storage_fields['backend'],
-        storage_fields['capabilities'],
+        storage_fields["id"],
+        storage_fields["backend"],
+        storage_fields["capabilities"],
     ]
     try:
         with Session() as session:

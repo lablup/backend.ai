@@ -9,17 +9,17 @@ log = logging.getLogger()
 
 class Runner(BaseRunner):
 
-    log_prefix = 'scheme-kernel'
-    default_runtime_path = '/usr/bin/rustc'
+    log_prefix = "scheme-kernel"
+    default_runtime_path = "/usr/bin/rustc"
     default_child_env = {
-        'TERM': 'xterm',
-        'LANG': 'C.UTF-8',
-        'SHELL': '/bin/ash',
-        'USER': 'work',
-        'HOME': '/home/work',
-        'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-        'LD_LIBRARY_PATH': os.environ.get('LD_LIBRARY_PATH', ''),
-        'LD_PRELOAD': os.environ.get('LD_PRELOAD', ''),
+        "TERM": "xterm",
+        "LANG": "C.UTF-8",
+        "SHELL": "/bin/ash",
+        "USER": "work",
+        "HOME": "/home/work",
+        "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+        "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
+        "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
     }
 
     def __init__(self, *args, **kwargs):
@@ -35,10 +35,10 @@ class Runner(BaseRunner):
         pass
 
     async def query(self, code_text) -> int:
-        with tempfile.NamedTemporaryFile(suffix='.scm', dir='.') as tmpf:
-            tmpf.write(code_text.encode('utf8'))
+        with tempfile.NamedTemporaryFile(suffix=".scm", dir=".") as tmpf:
+            tmpf.write(code_text.encode("utf8"))
             tmpf.flush()
-            cmd = f'scheme --quiet < {tmpf.name}'
+            cmd = f"scheme --quiet < {tmpf.name}"
             return await self.run_subproc(cmd)
 
     async def complete(self, data):
