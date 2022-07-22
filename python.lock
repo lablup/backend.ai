@@ -60,6 +60,7 @@
 //     "pytest-dependency>=0.5.1",
 //     "pytest~=7.1",
 //     "python-dateutil>=2.8",
+//     "python-dotenv~=0.20.0",
 //     "python-json-logger>=2.0.1",
 //     "python-snappy~=0.6.0",
 //     "pyzmq~=23.2.0",
@@ -2871,6 +2872,26 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "d92a187be61fe482e4fd675b6d52200e7be63a12b724abbf931a40ce4fa92938",
+              "url": "https://files.pythonhosted.org/packages/30/5f/2e5c564bd86349fe6b82ca840f46acf6f4bb76d79ba9057fce3d3e008864/python_dotenv-0.20.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "b7e3b04a59693c42c36f9ab1cc2acc46fa5df8c78e178fc33a8d4cd05c8d498f",
+              "url": "https://files.pythonhosted.org/packages/02/ee/43e1c862a3e7259a1f264958eaea144f0a2fac9f175c1659c674c34ea506/python-dotenv-0.20.0.tar.gz"
+            }
+          ],
+          "project_name": "python-dotenv",
+          "requires_dists": [
+            "click>=5.0; extra == \"cli\""
+          ],
+          "requires_python": ">=3.5",
+          "version": "0.20"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "1bf6e860a8ad52a14c3ee1252d5dc25b2030618ed80c022598f00176adc8367d",
               "url": "https://files.pythonhosted.org/packages/c6/d3/201fc3abe391bbae6606e6f1d598c15d367033332bd54352b12f35513717/python_editor-1.0.4-py3-none-any.whl"
             },
@@ -3665,19 +3686,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ab1e27ecb3efe73e3c86d22f327ce00587743b900560a5348d321bc91bcd7c21",
-              "url": "https://files.pythonhosted.org/packages/35/74/45efa669e5b6b8e74e76777f539041cbcc1d02dc0ae59795de394beb2e2b/types_aiofiles-0.8.9-py3-none-any.whl"
+              "hash": "ced29372faf9fe95a5b617c844b3c10db3b288c85f8fabdd8b58f4cdb0101bcd",
+              "url": "https://files.pythonhosted.org/packages/2d/a9/dbe69d34a02f8dc006bf75387ed4206ec2f37e5d7dddbad79b2d7e194d1e/types_aiofiles-0.8.10-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ed4e35cee4cd7b51da6e6764405ff4d7cf3bd83e0db9db85ef09878e16fe3125",
-              "url": "https://files.pythonhosted.org/packages/96/14/c215c2a3cd144054581df2a5344450364818f6bdd73fd88f626cad2ab44f/types-aiofiles-0.8.9.tar.gz"
+              "hash": "d006ed6894c1da9ed148325b80f3b13c45332474ec31335e6342493cf134e6d4",
+              "url": "https://files.pythonhosted.org/packages/e4/9a/7906a7d7667a953d1241552dc003eccff23980215fad8610c8f60753765e/types-aiofiles-0.8.10.tar.gz"
             }
           ],
           "project_name": "types-aiofiles",
           "requires_dists": [],
           "requires_python": null,
-          "version": "0.8.9"
+          "version": "0.8.10"
         },
         {
           "artifacts": [
@@ -4237,6 +4258,7 @@
     "pytest-dependency>=0.5.1",
     "pytest~=7.1",
     "python-dateutil>=2.8",
+    "python-dotenv~=0.20.0",
     "python-json-logger>=2.0.1",
     "python-snappy~=0.6.0",
     "pyzmq~=23.2.0",
