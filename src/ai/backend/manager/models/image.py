@@ -191,6 +191,8 @@ class ImageRow(Base):
         nullable=False,
     )
     aliases: relationship
+    sessions = relationship("SessionRow", back_populates="image_row")
+    kernels = relationship("KernelRow", back_populates="image_row")
 
     def __init__(
         self,

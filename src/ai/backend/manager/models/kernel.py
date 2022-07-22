@@ -30,6 +30,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import (
@@ -49,6 +50,7 @@ from ai.backend.common.types import (
 from ..defs import DEFAULT_ROLE
 from .base import (
     GUID,
+    Base,
     BigInt,
     EnumType,
     Item,
@@ -60,7 +62,7 @@ from .base import (
     URLColumn,
     batch_multiresult,
     batch_result,
-    metadata,
+    mapper_registry,
 )
 from .group import groups
 from .minilang.ordering import QueryOrderParser
@@ -72,6 +74,7 @@ if TYPE_CHECKING:
 
 __all__ = (
     "kernels",
+    "KernelRow",
     "session_dependencies",
     "KernelStatistics",
     "KernelStatus",
@@ -156,7 +159,7 @@ def default_hostname(context) -> str:
 
 kernels = sa.Table(
     "kernels",
-    metadata,
+    mapper_registry.metadata,
     # The Backend.AI-side UUID for each kernel
     # (mapped to a container in the docker backend and a pod in the k8s backend)
     KernelIDColumn(),
@@ -307,9 +310,17 @@ kernels = sa.Table(
     ),
 )
 
+
+class KernelRow(Base):
+    __table__ = kernels
+    session = relationship("SessionRow", back_populates="kernels")
+    image_row = relationship("ImageRow", back_populates="kernels")
+    agent_row = relationship("AgentRow", back_populates="kernels")
+
+
 session_dependencies = sa.Table(
     "session_dependencies",
-    metadata,
+    mapper_registry.metadata,
     sa.Column(
         "session_id",
         GUID,

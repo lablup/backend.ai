@@ -10,18 +10,20 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata, ResourceSlot
 
 from .base import (
+    Base,
     EnumType,
     Item,
     PaginatedList,
     ResourceSlotColumn,
     batch_result,
-    metadata,
+    mapper_registry,
     privileged_mutation,
     set_if_set,
     simple_db_mutate,
@@ -36,6 +38,7 @@ if TYPE_CHECKING:
 
 __all__: Sequence[str] = (
     "agents",
+    "AgentRow",
     "AgentStatus",
     "AgentList",
     "Agent",
@@ -53,7 +56,7 @@ class AgentStatus(enum.Enum):
 
 agents = sa.Table(
     "agents",
-    metadata,
+    mapper_registry.metadata,
     sa.Column("id", sa.String(length=64), primary_key=True),
     sa.Column(
         "status", EnumType(AgentStatus), nullable=False, index=True, default=AgentStatus.ALIVE
@@ -78,6 +81,12 @@ agents = sa.Table(
     sa.Column("architecture", sa.String(length=32), nullable=False),
     sa.Column("compute_plugins", pgsql.JSONB(), nullable=False, default={}),
 )
+
+
+class AgentRow(Base):
+    __table__ = agents
+    kernels = relationship("KernelRow", back_populates="agent_row")
+    scaling_group_row = relationship("ScalingGroupRow", back_populates="agents")
 
 
 class Agent(graphene.ObjectType):

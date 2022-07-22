@@ -7,9 +7,12 @@ import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.orm import relationship
 
 from ai.backend.common.types import ClusterMode, SessionResult, SessionTypes, VFolderMount
 
+from ..api.exceptions import MainKernelNotFound, TooManyKernelsFound
+from ..defs import DEFAULT_ROLE
 from .base import (
     Base,
     BigInt,
@@ -21,7 +24,7 @@ from .base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from .kernel import ComputeContainer, KernelStatus
+from .kernel import ComputeContainer, KernelRow, KernelStatus
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -177,11 +180,13 @@ class SessionRow(Base):
         server_default=ClusterMode.SINGLE_NODE.name,
     )
     cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
+    kernels = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
     scaling_group_name = sa.Column(
         "scaling_group_name", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
     )
+    scaling_group = relationship("ScalingGroupRow", back_populates="sessions")
     target_sgroup_names = sa.Column(
         "target_sgroup_names",
         sa.ARRAY(sa.String(length=64)),
@@ -192,12 +197,17 @@ class SessionRow(Base):
     domain_name = sa.Column(
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
+    domain = relationship("DomainRow", back_populates="sessions")
     group_id = ForeignKeyIDColumn("group_id", "groups.id", nullable=False)
+    group = relationship("GroupRow", back_populates="sessions")
     user_uuid = ForeignKeyIDColumn("user_uuid", "users.uuid", nullable=False)
+    user = relationship("UserRow", back_populates="sessions")
     access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
+    access_key_row = relationship("KeyPairRow", back_populates="sessions")
 
     # if image_id is null, should find a image field from related kernel row.
     image_id = ForeignKeyIDColumn("image_id", "images.id")
+    image_row = relationship("ImageRow", back_populates="sessions")
     tag = sa.Column("tag", sa.String(length=64), nullable=True)
 
     # Resource occupation
@@ -292,6 +302,19 @@ class SessionRow(Base):
             unique=False,
         ),
     )
+
+    @property
+    def main_kernel(self) -> KernelRow:
+        kerns = tuple(kern for kern in self.kernels if kern.cluster_role == DEFAULT_ROLE)
+        if len(kerns) > 1:
+            raise TooManyKernelsFound(
+                f"Session (id: {self.id}) " "has more than 1 main kernel.",
+            )
+        if len(kerns) == 0:
+            raise MainKernelNotFound(
+                f"Session (id: {self.id}) has no main kernel.",
+            )
+        return kerns[0]
 
 
 class ComputeSession(graphene.ObjectType):
