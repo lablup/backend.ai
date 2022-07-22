@@ -2040,15 +2040,12 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
     target_vfid = params["vfolder_id"]
     log.info("VFOLDER.LIST_SHARED_VFOLDERS (ak:{})", access_key)
     async with root_ctx.db.begin() as conn:
-        j = (
-            vfolder_permissions
-            .join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder)
-            .join(users, users.c.uuid == vfolder_permissions.c.user)
+        j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
+            users, users.c.uuid == vfolder_permissions.c.user
         )
-        query = (
-            sa.select([vfolder_permissions, vfolders.c.id, vfolders.c.name, vfolders.c.creator, users.c.email])
-            .select_from(j)
-        )
+        query = sa.select(
+            [vfolder_permissions, vfolders.c.id, vfolders.c.name, vfolders.c.creator, users.c.email]
+        ).select_from(j)
         query = sa.select(
             [vfolder_permissions, vfolders.c.id, vfolders.c.name, users.c.email]
         ).select_from(j)
@@ -2058,17 +2055,19 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         shared_list = result.fetchall()
     shared_info = []
     for shared in shared_list:
-        shared_info.append({
-            'vfolder_id': str(shared.id),
-            'vfolder_name': str(shared.name),
-            'shared_by': str(shared.creator),
-            'shared_to': {
-                'uuid': str(shared.user),
-                'email': shared.email,
-            },
-            'perm': shared.permission.value,
-        })
-    resp = {'shared': shared_info}
+        shared_info.append(
+            {
+                "vfolder_id": str(shared.id),
+                "vfolder_name": str(shared.name),
+                "shared_by": str(shared.creator),
+                "shared_to": {
+                    "uuid": str(shared.user),
+                    "email": shared.email,
+                },
+                "perm": shared.permission.value,
+            }
+        )
+    resp = {"shared": shared_info}
     return web.json_response(resp, status=200)
 
 
