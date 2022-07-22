@@ -31,6 +31,7 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
+from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
@@ -287,12 +288,13 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-
     root_ctx.redis_live = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"], db=REDIS_LIVE_DB
+        root_ctx.shared_config.data["redis"],
+        db=REDIS_LIVE_DB,
     )
     root_ctx.redis_stat = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"], db=REDIS_STAT_DB
+        root_ctx.shared_config.data["redis"],
+        db=REDIS_STAT_DB,
     )
     root_ctx.redis_image = redis_helper.get_redis_object(
         root_ctx.shared_config.data["redis"],
@@ -306,6 +308,15 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_LOCK,
     )
+    for redis_info in (
+        root_ctx.redis_live,
+        root_ctx.redis_stat,
+        root_ctx.redis_image,
+        root_ctx.redis_stream,
+        root_ctx.redis_lock,
+    ):
+        assert isinstance(redis_info.client, Redis)
+        await redis_helper.ping_redis_connection(redis_info.client)
     yield
     await root_ctx.redis_stream.close()
     await root_ctx.redis_image.close()
