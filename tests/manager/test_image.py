@@ -12,17 +12,17 @@ from ai.backend.manager.models import ImageAliasRow, ImageRow, update_aliases_fr
 from ai.backend.manager.models.base import metadata as old_metadata
 from ai.backend.manager.models.utils import regenerate_table
 
-column_keys = ['nullable', 'index', 'unique', 'primary_key']
+column_keys = ["nullable", "index", "unique", "primary_key"]
 
 
 @pytest.fixture
 async def virtual_image_db():
-    engine = create_async_engine('sqlite+aiosqlite:///:memory:', echo=True)
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=True)
     base = declarative_base()
     metadata = base.metadata
 
-    regenerate_table(old_metadata.tables['images'], metadata)
-    regenerate_table(old_metadata.tables['image_aliases'], metadata)
+    regenerate_table(old_metadata.tables["images"], metadata)
+    regenerate_table(old_metadata.tables["image_aliases"], metadata)
     ImageAliasRow.metadata = metadata
     ImageRow.metadata = metadata
     async_session = sessionmaker(engine, class_=AsyncSession, autoflush=False)
@@ -31,17 +31,31 @@ async def virtual_image_db():
         await conn.commit()
     async with async_session() as session:
         image_1 = ImageRow(
-            'index.docker.io/lablup/test-python:latest', 'x86_64',
-            'index.docker.io', 'lablup/test-python', 'latest',
-            'sha256:2d577a600afe2d1b38d78bc2ee5abe3bd350890d0652e48096249694e074f9c3',
-            123123123, 'COMPUTE', '', {}, {},
+            "index.docker.io/lablup/test-python:latest",
+            "x86_64",
+            "index.docker.io",
+            "lablup/test-python",
+            "latest",
+            "sha256:2d577a600afe2d1b38d78bc2ee5abe3bd350890d0652e48096249694e074f9c3",
+            123123123,
+            "COMPUTE",
+            "",
+            {},
+            {},
         )
         image_1.id = uuid.uuid4()
         image_2 = ImageRow(
-            'index.docker.io/lablup/test-python:3.6-debian', 'aarch64',
-            'index.docker.io', 'lablup/test-python', '3.6-debian',
-            'sha256:2d577a600afe2d1b38d78bc2ee5abe3bd350890d0652e48096249694e074f9c3',
-            123123123, 'COMPUTE', '', {}, {},
+            "index.docker.io/lablup/test-python:3.6-debian",
+            "aarch64",
+            "index.docker.io",
+            "lablup/test-python",
+            "3.6-debian",
+            "sha256:2d577a600afe2d1b38d78bc2ee5abe3bd350890d0652e48096249694e074f9c3",
+            123123123,
+            "COMPUTE",
+            "",
+            {},
+            {},
         )
         image_2.id = uuid.uuid4()
         session.add(image_1)
@@ -53,12 +67,12 @@ async def virtual_image_db():
 
 @pytest.fixture
 async def image_aliases(tmpdir):
-    content = '''
+    content = """
 aliases:
   - ['my-python',     'test-python:latest', 'x86_64']
   - ['my-python:3.6', 'test-python:3.6-debian', 'aarch64']  # preferred
-'''
-    p = Path(tmpdir) / 'test-image-aliases.yml'
+"""
+    p = Path(tmpdir) / "test-image-aliases.yml"
     p.write_text(content)
 
     yield p
@@ -79,6 +93,6 @@ async def test_update_aliases_from_file(virtual_image_db, image_aliases):
         for row in result.scalars().all():
             aliases[row.alias] = row.image.image_ref
         assert aliases == {
-            'my-python': ImageRef('lablup/test-python:latest', architecture='x86_64'),
-            'my-python:3.6': ImageRef('lablup/test-python:3.6-debian', architecture='aarch64'),
+            "my-python": ImageRef("lablup/test-python:latest", architecture="x86_64"),
+            "my-python:3.6": ImageRef("lablup/test-python:3.6-debian", architecture="aarch64"),
         }

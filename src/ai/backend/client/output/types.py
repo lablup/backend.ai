@@ -2,16 +2,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from collections import UserDict
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Generic,
-    Mapping,
-    Optional,
-    Sequence,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, Callable, Generic, Mapping, Optional, Sequence, TypeVar
 
 import attr
 
@@ -84,7 +75,7 @@ class FieldSpec:
     def __attrs_post_init__(self) -> None:
         if self.subfields:
             subfields = " ".join(f.field_ref for f in self.subfields.values())
-            object.__setattr__(self, 'field_ref', f"{self.field_name} {{ {subfields} }}")
+            object.__setattr__(self, "field_ref", f"{self.field_name} {{ {subfields} }}")
 
     @humanized_name.default
     def _autogen_humanized_name(self) -> str:
@@ -107,18 +98,16 @@ class FieldSpec:
     @formatter.default
     def _default_formatter(self) -> AbstractOutputFormatter:
         from .formatters import default_output_formatter  # avoid circular import
+
         return default_output_formatter
 
 
 class FieldSet(UserDict, Mapping[str, FieldSpec]):
-
     def __init__(self, fields: Sequence[FieldSpec]) -> None:
-        super().__init__({
-            f.alt_name: f for f in fields
-        })
+        super().__init__({f.alt_name: f for f in fields})
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 @attr.define(slots=True)
@@ -129,7 +118,6 @@ class PaginatedResult(Generic[T]):
 
 
 class BaseOutputHandler(metaclass=ABCMeta):
-
     def __init__(self, cli_context: CLIContext) -> None:
         self.ctx = cli_context
 
@@ -182,7 +170,7 @@ class BaseOutputHandler(metaclass=ABCMeta):
     def print_mutation_error(
         self,
         error: Optional[Exception] = None,
-        msg: str = 'Failed',
+        msg: str = "Failed",
         item_name: Optional[str] = None,
         action_name: Optional[str] = None,
         extra_info: Mapping = {},

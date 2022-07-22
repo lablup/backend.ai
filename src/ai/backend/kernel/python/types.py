@@ -1,27 +1,45 @@
 from namedlist import FACTORY, namedtuple
 
-InputRequest = namedtuple('InputRequest', [
-    ('is_password', False),
-])
+InputRequest = namedtuple(
+    "InputRequest",
+    [
+        ("is_password", False),
+    ],
+)
 
-ControlRecord = namedtuple('ControlRecord', [
-    ('event', None),
-])
+ControlRecord = namedtuple(
+    "ControlRecord",
+    [
+        ("event", None),
+    ],
+)
 
-CompletionRecord = namedtuple('CompletionRecord', [
-    ('matches', FACTORY(list)),
-])
+CompletionRecord = namedtuple(
+    "CompletionRecord",
+    [
+        ("matches", FACTORY(list)),
+    ],
+)
 
-ConsoleRecord = namedtuple('ConsoleRecord', [
-    ('target', 'stdout'),  # or 'stderr'
-    ('data', ''),
-])
+ConsoleRecord = namedtuple(
+    "ConsoleRecord",
+    [
+        ("target", "stdout"),  # or 'stderr'
+        ("data", ""),
+    ],
+)
 
-MediaRecord = namedtuple('MediaRecord', [
-    ('type', None),  # mime-type
-    ('data', None),
-])
+MediaRecord = namedtuple(
+    "MediaRecord",
+    [
+        ("type", None),  # mime-type
+        ("data", None),
+    ],
+)
 
-HTMLRecord = namedtuple('HTMLRecord', [
-    ('html', None),  # raw HTML string
-])
+HTMLRecord = namedtuple(
+    "HTMLRecord",
+    [
+        ("html", None),  # raw HTML string
+    ],
+)

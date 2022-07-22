@@ -34,33 +34,33 @@ from .types import EtcdRedisConfig, RedisConnectionInfo
 from .validators import DelimiterSeperatedList, HostPortPair
 
 __all__ = (
-    'execute',
-    'subscribe',
-    'blpop',
-    'read_stream',
-    'read_stream_by_group',
-    'get_redis_object',
+    "execute",
+    "subscribe",
+    "blpop",
+    "read_stream",
+    "read_stream_by_group",
+    "get_redis_object",
 )
 
 _keepalive_options: MutableMapping[int, int] = {}
 
 # macOS does not support several TCP_ options
 # so check if socket package includes TCP options before adding it
-if hasattr(socket, 'TCP_KEEPIDLE'):
+if hasattr(socket, "TCP_KEEPIDLE"):
     _keepalive_options[socket.TCP_KEEPIDLE] = 20
 
-if hasattr(socket, 'TCP_KEEPINTVL'):
+if hasattr(socket, "TCP_KEEPINTVL"):
     _keepalive_options[socket.TCP_KEEPINTVL] = 5
 
-if hasattr(socket, 'TCP_KEEPCNT'):
+if hasattr(socket, "TCP_KEEPCNT"):
     _keepalive_options[socket.TCP_KEEPCNT] = 3
 
 
 _default_conn_opts: Mapping[str, Any] = {
-    'socket_timeout': 3.0,
-    'socket_connect_timeout': 0.3,
-    'socket_keepalive': True,
-    'socket_keepalive_options': _keepalive_options,
+    "socket_timeout": 3.0,
+    "socket_connect_timeout": 0.3,
+    "socket_keepalive": True,
+    "socket_keepalive_options": _keepalive_options,
 }
 
 
@@ -75,12 +75,12 @@ class ConnectionNotAvailable(Exception):
 
 def _calc_delay_exp_backoff(initial_delay: float, retry_count: float, time_limit: float) -> float:
     if time_limit > 0:
-        return min(initial_delay * (2 ** retry_count), time_limit / 2)
-    return min(initial_delay * (2 ** retry_count), 30.0)
+        return min(initial_delay * (2**retry_count), time_limit / 2)
+    return min(initial_delay * (2**retry_count), 30.0)
 
 
 def _parse_stream_msg_id(msg_id: bytes) -> Tuple[int, int]:
-    timestamp, _, sequence = msg_id.partition(b'-')
+    timestamp, _, sequence = msg_id.partition(b"-")
     return int(timestamp), int(sequence)
 
 
@@ -93,6 +93,7 @@ async def subscribe(
     An async-generator wrapper for pub-sub channel subscription.
     It automatically recovers from server shutdowns until explicitly cancelled.
     """
+
     async def _reset_chan():
         channel.connection = None
         try:
@@ -148,7 +149,7 @@ async def blpop(
     """
     _conn_opts = {
         **_default_conn_opts,
-        'socket_connect_timeout': reconnect_poll_interval,
+        "socket_connect_timeout": reconnect_poll_interval,
     }
     if isinstance(redis_obj, RedisConnectionInfo):
         redis_client = redis_obj.client
@@ -212,7 +213,7 @@ async def execute(
     """
     _conn_opts = {
         **_default_conn_opts,
-        'socket_connect_timeout': reconnect_poll_interval,
+        "socket_connect_timeout": reconnect_poll_interval,
     }
     if isinstance(redis_obj, RedisConnectionInfo):
         redis_client = redis_obj.client
@@ -244,15 +245,18 @@ async def execute(
                 if callable(func):
                     aw_or_pipe = func(r)
                 else:
-                    raise TypeError('The func must be a function or a coroutinefunction '
-                                    'with no arguments.')
+                    raise TypeError(
+                        "The func must be a function or a coroutinefunction " "with no arguments."
+                    )
                 if isinstance(aw_or_pipe, Pipeline):
                     result = await aw_or_pipe.execute()
                 elif inspect.isawaitable(aw_or_pipe):
                     result = await aw_or_pipe
                 else:
-                    raise TypeError('The return value must be an awaitable'
-                                    'or redis.asyncio.client.Pipeline object')
+                    raise TypeError(
+                        "The return value must be an awaitable"
+                        "or redis.asyncio.client.Pipeline object"
+                    )
                 if isinstance(result, Pipeline):
                     # This happens when func is an async function that returns a pipeline.
                     result = await result.execute()
@@ -275,7 +279,7 @@ async def execute(
             await asyncio.sleep(reconnect_poll_interval)
             continue
         except redis.exceptions.ConnectionError as e:
-            log.exception(f'execute(): Connecting to redis failed: {e}')
+            log.exception(f"execute(): Connecting to redis failed: {e}")
             await asyncio.sleep(reconnect_poll_interval)
             continue
         except redis.exceptions.ResponseError as e:
@@ -296,7 +300,9 @@ async def execute_script(
     script_id: str,
     script: str,
     keys: Sequence[str],
-    args: Sequence[Union[bytes, memoryview, str, int, float]],  # redis.asyncio.connection.EncodableT
+    args: Sequence[
+        Union[bytes, memoryview, str, int, float]
+    ],  # redis.asyncio.connection.EncodableT
 ) -> Any:
     """
     Auto-load and execute the given script.
@@ -311,21 +317,25 @@ async def execute_script(
         keys: The Redis keys that will be passed to the script.
         args: The arguments that will be passed to the script.
     """
-    script_hash = _scripts.get(script_id, 'x')
+    script_hash = _scripts.get(script_id, "x")
     while True:
         try:
-            ret = await execute(redis_obj, lambda r: r.evalsha(
-                script_hash,
-                len(keys),
-                *keys, *args,
-            ))
+            ret = await execute(
+                redis_obj,
+                lambda r: r.evalsha(
+                    script_hash,
+                    len(keys),
+                    *keys,
+                    *args,
+                ),
+            )
             break
         except redis.exceptions.NoScriptError:
             # Redis may have been restarted.
             script_hash = await execute(redis_obj, lambda r: r.script_load(script))
             _scripts[script_id] = script_hash
         except redis.exceptions.ResponseError as e:
-            if 'NOSCRIPT' in e.args[0]:
+            if "NOSCRIPT" in e.args[0]:
                 # Redis may have been restarted.
                 script_hash = await execute(redis_obj, lambda r: r.script_load(script))
                 _scripts[script_id] = script_hash
@@ -344,7 +354,7 @@ async def read_stream(
     """
     A high-level wrapper for the XREAD command.
     """
-    last_id = b'$'
+    last_id = b"$"
     while True:
         try:
             reply = await execute(
@@ -391,7 +401,7 @@ async def read_stream_by_group(
     while True:
         try:
             messages = []
-            autoclaim_start_id = b'0-0'
+            autoclaim_start_id = b"0-0"
             while True:
                 reply = await execute(
                     r,
@@ -406,7 +416,7 @@ async def read_stream_by_group(
                 )
                 for msg_id, msg_data in reply[1]:
                     messages.append((msg_id, msg_data))
-                if reply[0] == b'0-0':
+                if reply[0] == b"0-0":
                     break
                 autoclaim_start_id = reply[0]
             reply = await execute(
@@ -443,7 +453,7 @@ async def read_stream_by_group(
                         lambda r: r.xgroup_create(
                             stream_key,
                             group_name,
-                            '$',
+                            "$",
                             mkstream=True,
                         ),
                     )
@@ -461,17 +471,19 @@ def get_redis_object(
     db: int = 0,
     **kwargs,
 ) -> RedisConnectionInfo:
-    if _sentinel_addresses := redis_config.get('sentinel'):
+    if _sentinel_addresses := redis_config.get("sentinel"):
         sentinel_addresses: Any = None
         if isinstance(_sentinel_addresses, str):
-            sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(_sentinel_addresses)
+            sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
+                _sentinel_addresses
+            )
         else:
             sentinel_addresses = _sentinel_addresses
 
-        assert redis_config.get('service_name') is not None
+        assert redis_config.get("service_name") is not None
         sentinel = Sentinel(
             [(str(host), port) for host, port in sentinel_addresses],
-            password=redis_config.get('password'),
+            password=redis_config.get("password"),
             db=str(db),
             sentinel_kwargs={
                 **kwargs,
@@ -479,17 +491,14 @@ def get_redis_object(
         )
         return RedisConnectionInfo(
             client=sentinel,
-            service_name=redis_config.get('service_name'),
+            service_name=redis_config.get("service_name"),
         )
     else:
-        redis_url = redis_config.get('addr')
+        redis_url = redis_config.get("addr")
         assert redis_url is not None
-        url = (
-            yarl.URL('redis://host')
-            .with_host(str(redis_url[0]))
-            .with_port(redis_url[1])
-            .with_password(redis_config.get('password')) / str(db)
-        )
+        url = yarl.URL("redis://host").with_host(str(redis_url[0])).with_port(
+            redis_url[1]
+        ).with_password(redis_config.get("password")) / str(db)
         return RedisConnectionInfo(
             client=Redis.from_url(str(url), **kwargs),
             service_name=None,
@@ -500,5 +509,5 @@ async def ping_redis_connection(client: Redis) -> bool:
     try:
         return await client.ping()
     except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError) as e:
-        log.exception(f'ping_redis_connection(): Connecting to redis failed: {e}')
+        log.exception(f"ping_redis_connection(): Connecting to redis failed: {e}")
         raise e

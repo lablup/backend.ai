@@ -80,7 +80,10 @@ ENV/
 .idea
 *.swp
 *.swo
-.vscode
+.vscode/
+.vimrc
+.nvimrc
+.exrc
 
 # Pants
 /.pants.d/
@@ -89,7 +92,6 @@ ENV/
 /.pants.rc
 /pants-local
 /tools/pants-src
-/tools/pants-local
 
 # Local configurations
 /manager.toml
@@ -111,5 +113,11 @@ ENV/
 /*.pid
 /scratches/
 
+# Additional clones for editable components
+/src/ai/backend/webui/
+
 # Release artifacts
 /CHANGELOG_RELEASE.md
+
+# macOS specific
+.DS_Store
