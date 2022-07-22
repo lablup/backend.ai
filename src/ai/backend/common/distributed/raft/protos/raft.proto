@@ -36,3 +36,17 @@ message Log {
     uint64 term = 2;
     string command = 3;
 }
+
+service CommandService {
+    rpc Command(CommandRequest) returns (CommandResponse);
+}
+
+message CommandRequest {
+    string id = 1;
+    string command = 2;
+}
+
+message CommandResponse {
+    bool success = 1;
+    optional string redirect = 2;
+}

@@ -1,4 +1,5 @@
 import abc
+import random
 from typing import Coroutine, List, Optional
 
 import grpc
@@ -13,7 +14,9 @@ class AbstractRaftServer(abc.ABC):
         raise NotImplementedError()
 
 
-class GrpcRaftServer(AbstractRaftServer, raft_pb2_grpc.RaftServiceServicer):
+class GrpcRaftServer(
+    AbstractRaftServer, raft_pb2_grpc.RaftServiceServicer, raft_pb2_grpc.CommandServiceServicer
+):
     """
     A grpc-based implementation of `AbstractRaftServer`.
     """
@@ -28,6 +31,7 @@ class GrpcRaftServer(AbstractRaftServer, raft_pb2_grpc.RaftServiceServicer):
     async def run(self, cleanup_coroutines: List[Coroutine], port: int = 50051):
         server = grpc.aio.server()
         raft_pb2_grpc.add_RaftServiceServicer_to_server(self, server)
+        raft_pb2_grpc.add_CommandServiceServicer_to_server(self, server)
 
         if credentials := self._credentials:
             server.add_secure_port(f"[::]:{port}", credentials)
@@ -77,3 +81,28 @@ class GrpcRaftServer(AbstractRaftServer, raft_pb2_grpc.RaftServiceServicer):
             last_log_term=request.last_log_term,
         )
         return raft_pb2.RequestVoteResponse(term=term, vote_granted=vote_granted)
+
+    """
+    raft_pb2_grpc.CommandServiceServicer
+    """
+
+    async def Command(
+        self,
+        request: raft_pb2.CommandRequest,
+        context: grpc.aio.ServicerContext,
+    ) -> raft_pb2.CommandResponse:
+        print(
+            f"[ai.backend.common.distributed.raft] Command(id={request.id}, command={request.command})"
+        )
+        if random.random() >= 0.7:
+            peer = random.choice(
+                [
+                    "127.0.0.1:50051",
+                    "127.0.0.1:50052",
+                    "127.0.0.1:50053",
+                    "127.0.0.1:50054",
+                    "127.0.0.1:50055",
+                ]
+            )
+            return raft_pb2.CommandResponse(success=False, redirect=peer)
+        return raft_pb2.CommandResponse(success=True, redirect=None)

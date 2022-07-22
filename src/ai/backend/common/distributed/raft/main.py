@@ -14,7 +14,10 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", "-p", type=int, default=50051)
     parser.add_argument(
-        "peers", metavar="peers", type=str, nargs="+", help='"<HOST>:<PORT>" list of peers.'
+        "peers",
+        type=str,
+        nargs="+",
+        help="List of raft peer's address. (e.g. 127.0.0.1:50051)",
     )
     return parser.parse_args()
 
