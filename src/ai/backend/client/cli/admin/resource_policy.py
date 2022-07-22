@@ -68,8 +68,9 @@ def list(ctx):
     help="Default behavior for unspecified resources: " "LIMITED, UNLIMITED",
 )
 @click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
-@click.option('--max-session-lifetime', type=int, default=0,
-              help='Maximum lifetime to keep session alive.')
+@click.option(
+    "--max-session-lifetime", type=int, default=0, help="Maximum lifetime to keep session alive."
+)
 @click.option(
     "--max-concurrent-sessions", type=int, default=30, help="Number of maximum concurrent sessions."
 )
@@ -157,8 +158,9 @@ def add(
     help="Default behavior for unspecified resources: " "LIMITED, UNLIMITED",
 )
 @click.option("--total-resource-slots", type=str, help="Set total resource slots.")
-@click.option('--max-session-lifetime', type=int, default=0,
-              help='Maximum lifetime to keep session alive.')
+@click.option(
+    "--max-session-lifetime", type=int, default=0, help="Maximum lifetime to keep session alive."
+)
 @click.option("--max-concurrent-sessions", type=int, help="Number of maximum concurrent sessions.")
 @click.option(
     "--max-containers-per-session", type=int, help="Number of maximum containers per session."
