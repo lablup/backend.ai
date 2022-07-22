@@ -295,6 +295,21 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
             return (self.current_term, True)
         return (self.current_term, False)
 
+    async def on_install_snapshot(
+        self,
+        *,
+        term: int,
+        leader_id: PeerId,
+        last_included_index: int,
+        last_included_term: int,
+        offset: int,
+        data: bytes,
+        done: bool,
+    ) -> int:
+        if term < self.current_term:
+            return self.current_term
+        return self.current_term
+
     async def reset_timeout(self) -> None:
         self._elapsed_time: float = 0.0
 

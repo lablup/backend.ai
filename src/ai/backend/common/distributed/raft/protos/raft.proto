@@ -3,6 +3,7 @@ syntax = "proto3";
 service RaftService {
     rpc AppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse);
     rpc RequestVote(RequestVoteRequest) returns (RequestVoteResponse);
+    rpc InstallSnapshot(stream InstallSnapshotRequest) returns (InstallSnapshotResponse);
 }
 
 message AppendEntriesRequest {
@@ -35,6 +36,20 @@ message Log {
     uint64 index = 1;
     uint64 term = 2;
     string command = 3;
+}
+
+message InstallSnapshotRequest {
+    uint64 term = 1;                // leader's term
+    string leader_id = 2;           // so follower can redirect clients
+    uint64 last_included_index = 3; // the snapshot replaces all entries up through and including this index
+    uint64 last_included_term = 4;  // term of lastIncludedIndex
+    uint64 offset = 5;              // byte offset where chunk is positioned in the snapshot file
+    bytes data = 6;                 // raw bytes of the snapshot chunk, starting at offset
+    bool done = 7;                  // true if this is the last chunk
+}
+
+message InstallSnapshotResponse {
+    uint64 term = 1;                // currentTerm, for leader to update itself
 }
 
 service CommandService {

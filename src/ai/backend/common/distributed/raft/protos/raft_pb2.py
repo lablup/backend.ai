@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n\nraft.proto"\x94\x01\n\x14\x41ppendEntriesRequest\x12\x0c\n\x04term\x18\x01 \x01(\x04\x12\x11\n\tleader_id\x18\x02 \x01(\t\x12\x16\n\x0eprev_log_index\x18\x03 \x01(\x04\x12\x15\n\rprev_log_term\x18\x04 \x01(\x04\x12\x15\n\x07\x65ntries\x18\x05 \x03(\x0b\x32\x04.Log\x12\x15\n\rleader_commit\x18\x06 \x01(\x04"6\n\x15\x41ppendEntriesResponse\x12\x0c\n\x04term\x18\x01 \x01(\x04\x12\x0f\n\x07success\x18\x02 \x01(\x08"g\n\x12RequestVoteRequest\x12\x0c\n\x04term\x18\x01 \x01(\x04\x12\x14\n\x0c\x63\x61ndidate_id\x18\x02 \x01(\t\x12\x16\n\x0elast_log_index\x18\x03 \x01(\x04\x12\x15\n\rlast_log_term\x18\x04 \x01(\x04"9\n\x13RequestVoteResponse\x12\x0c\n\x04term\x18\x01 \x01(\x04\x12\x14\n\x0cvote_granted\x18\x02 \x01(\x08"3\n\x03Log\x12\r\n\x05index\x18\x01 \x01(\x04\x12\x0c\n\x04term\x18\x02 \x01(\x04\x12\x0f\n\x07\x63ommand\x18\x03 \x01(\t"-\n\x0e\x43ommandRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ommand\x18\x02 \x01(\t"F\n\x0f\x43ommandResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x15\n\x08redirect\x18\x02 \x01(\tH\x00\x88\x01\x01\x42\x0b\n\t_redirect2\x87\x01\n\x0bRaftService\x12>\n\rAppendEntries\x12\x15.AppendEntriesRequest\x1a\x16.AppendEntriesResponse\x12\x38\n\x0bRequestVote\x12\x13.RequestVoteRequest\x1a\x14.RequestVoteResponse2>\n\x0e\x43ommandService\x12,\n\x07\x43ommand\x12\x0f.CommandRequest\x1a\x10.CommandResponseb\x06proto3'
+    b'\n\nraft.proto"\x94\x01\n\x14\x41ppendEntriesRequest\x12\x0c\n\x04term\x18\x01 \x01(\x04\x12\x11\n\tleader_id\x18\x02 \x01(\t\x12\x16\n\x0eprev_log_index\x18\x03 \x01(\x04\x12\x15\n\rprev_log_term\x18\x04 \x01(\x04\x12\x15\n\x07\x65ntries\x18\x05 \x03(\x0b\x32\x04.Log\x12\x15\n\rleader_commit\x18\x06 \x01(\x04"6\n\x15\x41ppendEntriesResponse\x12\x0c\n\x04term\x18\x01 \x01(\x04\x12\x0f\n\x07success\x18\x02 \x01(\x08"g\n\x12RequestVoteRequest\x12\x0c\n\x04term\x18\x01 \x01(\x04\x12\x14\n\x0c\x63\x61ndidate_id\x18\x02 \x01(\t\x12\x16\n\x0elast_log_index\x18\x03 \x01(\x04\x12\x15\n\rlast_log_term\x18\x04 \x01(\x04"9\n\x13RequestVoteResponse\x12\x0c\n\x04term\x18\x01 \x01(\x04\x12\x14\n\x0cvote_granted\x18\x02 \x01(\x08"3\n\x03Log\x12\r\n\x05index\x18\x01 \x01(\x04\x12\x0c\n\x04term\x18\x02 \x01(\x04\x12\x0f\n\x07\x63ommand\x18\x03 \x01(\t"\x9e\x01\n\x16InstallSnapshotRequest\x12\x0c\n\x04term\x18\x01 \x01(\x04\x12\x11\n\tleader_id\x18\x02 \x01(\t\x12\x1b\n\x13last_included_index\x18\x03 \x01(\x04\x12\x1a\n\x12last_included_term\x18\x04 \x01(\x04\x12\x0e\n\x06offset\x18\x05 \x01(\x04\x12\x0c\n\x04\x64\x61ta\x18\x06 \x01(\x0c\x12\x0c\n\x04\x64one\x18\x07 \x01(\x08"\'\n\x17InstallSnapshotResponse\x12\x0c\n\x04term\x18\x01 \x01(\x04"-\n\x0e\x43ommandRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ommand\x18\x02 \x01(\t"F\n\x0f\x43ommandResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x15\n\x08redirect\x18\x02 \x01(\tH\x00\x88\x01\x01\x42\x0b\n\t_redirect2\xcf\x01\n\x0bRaftService\x12>\n\rAppendEntries\x12\x15.AppendEntriesRequest\x1a\x16.AppendEntriesResponse\x12\x38\n\x0bRequestVote\x12\x13.RequestVoteRequest\x1a\x14.RequestVoteResponse\x12\x46\n\x0fInstallSnapshot\x12\x17.InstallSnapshotRequest\x1a\x18.InstallSnapshotResponse(\x01\x32>\n\x0e\x43ommandService\x12,\n\x07\x43ommand\x12\x0f.CommandRequest\x1a\x10.CommandResponseb\x06proto3'
 )
 
 
@@ -23,6 +23,8 @@ _APPENDENTRIESRESPONSE = DESCRIPTOR.message_types_by_name["AppendEntriesResponse
 _REQUESTVOTEREQUEST = DESCRIPTOR.message_types_by_name["RequestVoteRequest"]
 _REQUESTVOTERESPONSE = DESCRIPTOR.message_types_by_name["RequestVoteResponse"]
 _LOG = DESCRIPTOR.message_types_by_name["Log"]
+_INSTALLSNAPSHOTREQUEST = DESCRIPTOR.message_types_by_name["InstallSnapshotRequest"]
+_INSTALLSNAPSHOTRESPONSE = DESCRIPTOR.message_types_by_name["InstallSnapshotResponse"]
 _COMMANDREQUEST = DESCRIPTOR.message_types_by_name["CommandRequest"]
 _COMMANDRESPONSE = DESCRIPTOR.message_types_by_name["CommandResponse"]
 AppendEntriesRequest = _reflection.GeneratedProtocolMessageType(
@@ -80,6 +82,28 @@ Log = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(Log)
 
+InstallSnapshotRequest = _reflection.GeneratedProtocolMessageType(
+    "InstallSnapshotRequest",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _INSTALLSNAPSHOTREQUEST,
+        "__module__": "raft_pb2"
+        # @@protoc_insertion_point(class_scope:InstallSnapshotRequest)
+    },
+)
+_sym_db.RegisterMessage(InstallSnapshotRequest)
+
+InstallSnapshotResponse = _reflection.GeneratedProtocolMessageType(
+    "InstallSnapshotResponse",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _INSTALLSNAPSHOTRESPONSE,
+        "__module__": "raft_pb2"
+        # @@protoc_insertion_point(class_scope:InstallSnapshotResponse)
+    },
+)
+_sym_db.RegisterMessage(InstallSnapshotResponse)
+
 CommandRequest = _reflection.GeneratedProtocolMessageType(
     "CommandRequest",
     (_message.Message,),
@@ -117,12 +141,16 @@ if not _descriptor._USE_C_DESCRIPTORS:
     _REQUESTVOTERESPONSE._serialized_end = 383
     _LOG._serialized_start = 385
     _LOG._serialized_end = 436
-    _COMMANDREQUEST._serialized_start = 438
-    _COMMANDREQUEST._serialized_end = 483
-    _COMMANDRESPONSE._serialized_start = 485
-    _COMMANDRESPONSE._serialized_end = 555
-    _RAFTSERVICE._serialized_start = 558
-    _RAFTSERVICE._serialized_end = 693
-    _COMMANDSERVICE._serialized_start = 695
-    _COMMANDSERVICE._serialized_end = 757
+    _INSTALLSNAPSHOTREQUEST._serialized_start = 439
+    _INSTALLSNAPSHOTREQUEST._serialized_end = 597
+    _INSTALLSNAPSHOTRESPONSE._serialized_start = 599
+    _INSTALLSNAPSHOTRESPONSE._serialized_end = 638
+    _COMMANDREQUEST._serialized_start = 640
+    _COMMANDREQUEST._serialized_end = 685
+    _COMMANDRESPONSE._serialized_start = 687
+    _COMMANDRESPONSE._serialized_end = 757
+    _RAFTSERVICE._serialized_start = 760
+    _RAFTSERVICE._serialized_end = 967
+    _COMMANDSERVICE._serialized_start = 969
+    _COMMANDSERVICE._serialized_end = 1031
 # @@protoc_insertion_point(module_scope)

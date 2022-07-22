@@ -73,3 +73,46 @@ class AbstractRaftProtocol(abc.ABC):
         -------
         """
         raise NotImplementedError()
+
+    @abc.abstractmethod
+    async def on_install_snapshot(
+        self,
+        *,
+        term: int,
+        leader_id: PeerId,
+        last_included_index: int,
+        last_included_term: int,
+        offset: int,
+        data: bytes,
+        done: bool,
+    ) -> int:
+        """Receiver implementation:
+        1. Reply immediately if term < currentTerm
+        2. Create new snapshot file if first chunk (offset is 0)
+        3. Write data into snapshot file at given offset
+        4. Reply and wait for more data chunks if done is false
+        5. Save snapshot file, discard any existing or partial snapshot with a smaller index
+        6. If existing log entry has same index and term as snapshot's last included entry,
+           retain log entries following it and reply
+        7. Discard the entire log
+        8. Reset state machine using snapshot contents (and load snapshot's cluster configuration)
+
+        Arguments
+        ---------
+        :param int term: leader's term
+        :param ai.backend.common.distributed.raft.types.PeerId leader_id:
+            so follower can redirect clients
+        :param int last_included_index:
+            the snapshot replaces all entries up through and including this index
+        :param int last_included_term: term of lastIncludedIndex
+        :param int offset: byte offset where chunk is positioned in the snapshot file
+        :param bytes data: raw bytes of the snapshot chunk, starting at offset
+        :param bool done: true if this is the last chunk
+        ---------
+
+        Returns
+        -------
+        :param int term: currentTerm, for leader to update itself
+        -------
+        """
+        raise NotImplementedError()

@@ -21,8 +21,7 @@ class AbstractRaftClient(abc.ABC):
         entries: Iterable[raft_pb2.Log],  # type: ignore
         leader_commit: int,
     ) -> Tuple[int, bool]:
-        """
-        Send `AppendEntries` request to follower.
+        """Invoked by leader to replicate log entries; also used as heartbeat.
 
         Arguments
         ---------
@@ -54,8 +53,7 @@ class AbstractRaftClient(abc.ABC):
         last_log_index: int,
         last_log_term: int,
     ) -> Tuple[int, bool]:
-        """
-        Send `RequestVote` request to follower.
+        """Invoked by candidates to gather votes.
 
         Arguments
         ---------
@@ -70,6 +68,42 @@ class AbstractRaftClient(abc.ABC):
         -------
         :param int term: follower's currentTerm, for candidate to update itself
         :param bool vote_granted: true means candidate received vote
+        -------
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    async def install_snapshot(
+        self,
+        *,
+        address: str,
+        term: int,
+        leader_id: PeerId,
+        last_included_index: int,
+        last_included_term: int,
+        offset: int,
+        data: bytes,
+        done: bool,
+    ) -> int:
+        """Invoked by leader to send chunks of a snapshot to a follower.
+        Leaders always send chunks in order.
+
+        Arguments
+        ---------
+        :param int term: leader's term
+        :param ai.backend.common.distributed.raft.types.PeerId leader_id:
+            so follower can redirect clients
+        :param int last_included_index:
+            the snapshot replaces all entries up through and including this index
+        :param int last_included_term: term of lastIncludedIndex
+        :param int offset: byte offset where chunk is positioned in the snapshot file
+        :param bytes data: raw bytes of the snapshot chunk, starting at offset
+        :param bool done: true if this is the last chunk
+        ---------
+
+        Returns
+        -------
+        :param int term: currentTerm, for leader to update itself
         -------
         """
         raise NotImplementedError()
@@ -117,11 +151,7 @@ class GrpcRaftClient(AbstractRaftClient):
         entries: Iterable[raft_pb2.Log],  # type: ignore
         leader_commit: int,
     ) -> Tuple[int, bool]:
-        if credentials := self._credentials:
-            channel = grpc.aio.secure_channel(address, credentials)
-        else:
-            channel = grpc.aio.insecure_channel(address)
-
+        channel = self.make_channel(address)
         stub = raft_pb2_grpc.RaftServiceStub(channel)
         request = raft_pb2.AppendEntriesRequest(
             term=term,
@@ -137,6 +167,7 @@ class GrpcRaftClient(AbstractRaftClient):
         except grpc.aio.AioRpcError:
             return term, False
         finally:
+            # FIXME: contextmanager using with statement?
             await channel.close()
 
     async def request_vote(
@@ -167,11 +198,7 @@ class GrpcRaftClient(AbstractRaftClient):
         last_log_index: int,
         last_log_term: int,
     ) -> Tuple[int, bool]:
-        if credentials := self._credentials:
-            channel = grpc.aio.secure_channel(address, credentials)
-        else:
-            channel = grpc.aio.insecure_channel(address)
-
+        channel = self.make_channel(address)
         stub = raft_pb2_grpc.RaftServiceStub(channel)
         request = raft_pb2.RequestVoteRequest(
             term=term,
@@ -185,4 +212,42 @@ class GrpcRaftClient(AbstractRaftClient):
         except grpc.aio.AioRpcError:
             return term, False
         finally:
+            # FIXME: contextmanager using with statement?
             await channel.close()
+
+    async def install_snapshot(
+        self,
+        *,
+        address: str,
+        term: int,
+        leader_id: PeerId,
+        last_included_index: int,
+        last_included_term: int,
+        offset: int,
+        data: bytes,
+        done: bool,
+    ) -> int:
+        channel = self.make_channel(address)
+        stub = raft_pb2_grpc.RaftServiceStub(channel)
+        request = raft_pb2.InstallSnapshotRequest(
+            term=term,
+            leader_id=leader_id,
+            last_included_index=last_included_index,
+            last_included_term=last_included_term,
+            offset=offset,
+            data=data,
+            done=done,
+        )
+        try:
+            response = await stub.InstallSnapshot(request)
+            return response.term
+        except grpc.aio.AioRpcError:
+            return 0
+        finally:
+            # FIXME: contextmanager using with statement?
+            await channel.close()
+
+    def make_channel(self, address: str) -> grpc.aio.Channel:
+        if credentials := self._credentials:
+            return grpc.aio.secure_channel(address, credentials)
+        return grpc.aio.insecure_channel(address)

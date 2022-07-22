@@ -1,6 +1,6 @@
 import abc
 import random
-from typing import Coroutine, List, Optional
+from typing import Coroutine, Iterable, List, Optional, Union
 
 import grpc
 
@@ -81,6 +81,15 @@ class GrpcRaftServer(
             last_log_term=request.last_log_term,
         )
         return raft_pb2.RequestVoteResponse(term=term, vote_granted=vote_granted)
+
+    async def InstallSnapshot(
+        self,
+        request_iterator: Union[
+            Iterable[raft_pb2.InstallSnapshotRequest], grpc._cython.cygrpc._MessageReceiver
+        ],
+        context: grpc.aio.ServicerContext,
+    ) -> raft_pb2.InstallSnapshotResponse:
+        pass
 
     """
     raft_pb2_grpc.CommandServiceServicer
