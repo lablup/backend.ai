@@ -12,12 +12,7 @@ from aiohttp import web
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize
 
-from .exceptions import (
-    WekaAPIError,
-    WekaInvalidBodyError,
-    WekaNotFoundError,
-    WekaUnauthorizedError,
-)
+from .exceptions import WekaAPIError, WekaInvalidBodyError, WekaNotFoundError, WekaUnauthorizedError
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -175,7 +170,7 @@ class WekaAPIClient:
             case "DELETE":
                 func = sess.delete
             case _:
-                raise WekaAPIError(f'Unsupported request method {method}')
+                raise WekaAPIError(f"Unsupported request method {method}")
 
         if not self._is_token_valid:
             await self._login(sess)
@@ -234,7 +229,7 @@ class WekaAPIClient:
                 f"/fileSystems/{fs_uid}/quota",
             )
             data = await response.json()
-        if isinstance(data['data'], list):
+        if isinstance(data["data"], list):
             return [
                 WekaQuota.from_json(quota_info["quota_id"], quota_info)
                 for quota_info in data["data"]

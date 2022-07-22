@@ -9,16 +9,7 @@ import uuid
 from collections import OrderedDict
 from datetime import timedelta
 from itertools import chain
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Iterable,
-    Iterator,
-    Mapping,
-    Tuple,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Iterable, Iterator, Mapping, Tuple, TypeVar, Union
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -39,8 +30,8 @@ from .files import AsyncFileWriter  # for legacy imports  # noqa
 from .networking import curl, find_free_port  # for legacy imports  # noqa
 from .types import BinarySize
 
-KT = TypeVar('KT')
-VT = TypeVar('VT')
+KT = TypeVar("KT")
+VT = TypeVar("VT")
 
 
 def env_info() -> str:
@@ -48,16 +39,16 @@ def env_info() -> str:
     Returns a string that contains the Python version and runtime path.
     """
     v = sys.version_info
-    pyver = f'Python {v.major}.{v.minor}.{v.micro}'
-    if v.releaselevel == 'alpha':
-        pyver += 'a'
-    if v.releaselevel == 'beta':
-        pyver += 'b'
-    if v.releaselevel == 'candidate':
-        pyver += 'rc'
-    if v.releaselevel != 'final':
+    pyver = f"Python {v.major}.{v.minor}.{v.micro}"
+    if v.releaselevel == "alpha":
+        pyver += "a"
+    if v.releaselevel == "beta":
+        pyver += "b"
+    if v.releaselevel == "candidate":
+        pyver += "rc"
+    if v.releaselevel != "final":
         pyver += str(v.serial)
-    return f'{pyver} (env: {sys.prefix})'
+    return f"{pyver} (env: {sys.prefix})"
 
 
 def odict(*args: Tuple[KT, VT]) -> OrderedDict[KT, VT]:
@@ -85,7 +76,7 @@ def dict2kvlist(o: Mapping[KT, VT]) -> Iterable[Union[KT, VT]]:
 def generate_uuid() -> str:
     u = uuid.uuid4()
     # Strip the last two padding characters because u always has fixed length.
-    return base64.urlsafe_b64encode(u.bytes)[:-2].decode('ascii')
+    return base64.urlsafe_b64encode(u.bytes)[:-2].decode("ascii")
 
 
 def get_random_seq(length: float, num_points: int, min_distance: float) -> Iterator[float]:
@@ -99,8 +90,9 @@ def get_random_seq(length: float, num_points: int, min_distance: float) -> Itera
 
     :return: An iterator over the generated sequence
     """
-    assert num_points * min_distance <= length + min_distance, \
-           'There are too many points or it has a too large distance which cannot be fit into the given length.'
+    assert (
+        num_points * min_distance <= length + min_distance
+    ), "There are too many points or it has a too large distance which cannot be fit into the given length."
     extra = length - (num_points - 1) * min_distance
     ro = [random.uniform(0, 1) for _ in range(num_points + 1)]
     sum_ro = sum(ro)
@@ -116,7 +108,7 @@ def nmget(
     o: Mapping[str, Any],
     key_path: str,
     def_val: Any = None,
-    path_delimiter: str = '.',
+    path_delimiter: str = ".",
     null_as_default: bool = True,
 ) -> Any:
     """
@@ -175,23 +167,25 @@ def str_to_timedelta(tstr: str) -> timedelta:
     >>> str_to_timedelta('-1day')
     datetime.timedelta(days=-1)
     """
-    _rx = re.compile(r'(?P<sign>[+|-])?\s*'
-                     r'((?P<days>\d+(\.\d+)?)(d|day|days))?\s*'
-                     r'((?P<hours>\d+(\.\d+)?)(h|hr|hrs|hour|hours))?\s*'
-                     r'((?P<minutes>\d+(\.\d+)?)(m|min|mins|minute|minutes))?\s*'
-                     r'((?P<seconds>\d+(\.\d+)?)(s|sec|secs|second|seconds))?$')
+    _rx = re.compile(
+        r"(?P<sign>[+|-])?\s*"
+        r"((?P<days>\d+(\.\d+)?)(d|day|days))?\s*"
+        r"((?P<hours>\d+(\.\d+)?)(h|hr|hrs|hour|hours))?\s*"
+        r"((?P<minutes>\d+(\.\d+)?)(m|min|mins|minute|minutes))?\s*"
+        r"((?P<seconds>\d+(\.\d+)?)(s|sec|secs|second|seconds))?$"
+    )
     match = _rx.match(tstr)
     if not match:
         try:
             return timedelta(seconds=float(tstr))  # consider bare number string as seconds
         except TypeError:
             pass
-        raise ValueError('Invalid time expression')
+        raise ValueError("Invalid time expression")
     groups = match.groupdict()
-    sign = groups.pop('sign', None)
+    sign = groups.pop("sign", None)
     if set(groups.values()) == {None}:
-        raise ValueError('Invalid time expression')
-    params = {n: -float(t) if sign == '-' else float(t) for n, t in groups.items() if t}
+        raise ValueError("Invalid time expression")
+    params = {n: -float(t) if sign == "-" else float(t) for n, t in groups.items() if t}
     return timedelta(**params)  # type: ignore
 
 
@@ -199,12 +193,13 @@ class FstabEntry:
     """
     Entry class represents a non-comment line on the `fstab` file.
     """
+
     def __init__(self, device, mountpoint, fstype, options, d=0, p=0) -> None:
         self.device = device
         self.mountpoint = mountpoint
         self.fstype = fstype
         if not options:
-            options = 'defaults'
+            options = "defaults"
         self.options = options
         self.d = d
         self.p = p
@@ -213,12 +208,9 @@ class FstabEntry:
         return str(self) == str(o)
 
     def __str__(self):
-        return "{} {} {} {} {} {}".format(self.device,
-                                          self.mountpoint,
-                                          self.fstype,
-                                          self.options,
-                                          self.d,
-                                          self.p)
+        return "{} {} {} {} {} {}".format(
+            self.device, self.mountpoint, self.fstype, self.options, self.d, self.p
+        )
 
 
 class Fstab:
@@ -232,11 +224,12 @@ class Fstab:
           and to support async I/O.
           (https://gist.github.com/niedbalski/507e974ed2d54a87ad37)
     """
+
     def __init__(self, fp) -> None:
         self._fp = fp
 
     def _hydrate_entry(self, line):
-        return FstabEntry(*[x for x in line.strip('\n').split(' ') if x not in ('', None)])
+        return FstabEntry(*[x for x in line.strip("\n").split(" ") if x not in ("", None)])
 
     async def get_entries(self):
         await self._fp.seek(0)
@@ -256,9 +249,9 @@ class Fstab:
         return None
 
     async def add_entry(self, entry):
-        if await self.get_entry_by_attr('device', entry.device):
+        if await self.get_entry_by_attr("device", entry.device):
             return False
-        await self._fp.write(str(entry) + '\n')
+        await self._fp.write(str(entry) + "\n")
         await self._fp.truncate()
         return entry
 
@@ -281,12 +274,12 @@ class Fstab:
             return False
         lines.remove(line)
         await self._fp.seek(0)
-        await self._fp.write(''.join(lines))
+        await self._fp.write("".join(lines))
         await self._fp.truncate()
         return True
 
     async def remove_by_mountpoint(self, mountpoint):
-        entry = await self.get_entry_by_attr('mountpoint', mountpoint)
+        entry = await self.get_entry_by_attr("mountpoint", mountpoint)
         if entry:
             return await self.remove_entry(entry)
         return False

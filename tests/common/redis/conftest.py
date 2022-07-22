@@ -23,12 +23,10 @@ async def redis_cluster(test_ns, test_case_ns) -> AsyncIterator[RedisClusterInfo
     cluster = impl(test_ns, test_case_ns, password="develove", service_name="mymaster")
     async with cluster.make_cluster() as info:
         node_wait_tasks = [
-            wait_redis_ready(host, port, "develove")
-            for host, port in info.node_addrs
+            wait_redis_ready(host, port, "develove") for host, port in info.node_addrs
         ]
         sentinel_wait_tasks = [
-            wait_redis_ready(host, port, None)
-            for host, port in info.sentinel_addrs
+            wait_redis_ready(host, port, None) for host, port in info.sentinel_addrs
         ]
         await asyncio.gather(*node_wait_tasks, *sentinel_wait_tasks)
         yield info

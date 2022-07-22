@@ -21,22 +21,22 @@ def agent():
 
 @agent.command()
 @pass_ctx_obj
-@click.argument('agent_id')
+@click.argument("agent_id")
 def info(ctx: CLIContext, agent_id: str) -> None:
     """
     Show the information about the given agent.
     """
     fields = [
-        agent_fields['id'],
-        agent_fields['status'],
-        agent_fields['region'],
-        agent_fields['architecture'],
-        agent_fields['first_contact'],
-        agent_fields['cpu_cur_pct'],
-        agent_fields['available_slots'],
-        agent_fields['occupied_slots'],
-        agent_fields['hardware_metadata'],
-        agent_fields['live_stat'],
+        agent_fields["id"],
+        agent_fields["status"],
+        agent_fields["region"],
+        agent_fields["architecture"],
+        agent_fields["first_contact"],
+        agent_fields["cpu_cur_pct"],
+        agent_fields["available_slots"],
+        agent_fields["occupied_slots"],
+        agent_fields["hardware_metadata"],
+        agent_fields["live_stat"],
     ]
     with Session() as session:
         try:
@@ -49,18 +49,20 @@ def info(ctx: CLIContext, agent_id: str) -> None:
 
 @agent.command()
 @pass_ctx_obj
-@click.option('-s', '--status', type=str, default='ALIVE',
-              help='Filter agents by the given status.')
-@click.option('--scaling-group', '--sgroup', type=str, default=None,
-              help='Filter agents by the scaling group.')
-@click.option('--filter', 'filter_', default=None,
-              help='Set the query filter expression.')
-@click.option('--order', default=None,
-              help='Set the query ordering expression.')
-@click.option('--offset', default=0,
-              help='The index of the current page start for pagination.')
-@click.option('--limit', default=None,
-              help='The page size for pagination.')
+@click.option(
+    "-s", "--status", type=str, default="ALIVE", help="Filter agents by the given status."
+)
+@click.option(
+    "--scaling-group",
+    "--sgroup",
+    type=str,
+    default=None,
+    help="Filter agents by the scaling group.",
+)
+@click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
+@click.option("--order", default=None, help="Set the query ordering expression.")
+@click.option("--offset", default=0, help="The index of the current page start for pagination.")
+@click.option("--limit", default=None, help="The page size for pagination.")
 def list(
     ctx: CLIContext,
     status: str,
@@ -75,16 +77,16 @@ def list(
     (super-admin privilege required)
     """
     fields = [
-        agent_fields['id'],
-        agent_fields['status'],
-        agent_fields['architecture'],
-        agent_fields['scaling_group'],
-        agent_fields['region'],
-        agent_fields['first_contact'],
-        agent_fields['cpu_cur_pct'],
-        agent_fields['mem_cur_bytes'],
-        agent_fields['available_slots'],
-        agent_fields['occupied_slots'],
+        agent_fields["id"],
+        agent_fields["status"],
+        agent_fields["architecture"],
+        agent_fields["scaling_group"],
+        agent_fields["region"],
+        agent_fields["first_contact"],
+        agent_fields["cpu_cur_pct"],
+        agent_fields["mem_cur_bytes"],
+        agent_fields["available_slots"],
+        agent_fields["occupied_slots"],
     ]
     try:
         with Session() as session:
@@ -118,7 +120,7 @@ def watcher():
 
 @watcher.command()
 @pass_ctx_obj
-@click.argument('agent', type=str)
+@click.argument("agent", type=str)
 def status(ctx: CLIContext, agent: str) -> None:
     """
     Get agent and watcher status.
@@ -138,7 +140,7 @@ def status(ctx: CLIContext, agent: str) -> None:
 
 @watcher.command()
 @pass_ctx_obj
-@click.argument('agent', type=str)
+@click.argument("agent", type=str)
 def agent_start(ctx: CLIContext, agent: str) -> None:
     """
     Start agent service.
@@ -158,7 +160,7 @@ def agent_start(ctx: CLIContext, agent: str) -> None:
 
 @watcher.command()
 @pass_ctx_obj
-@click.argument('agent', type=str)
+@click.argument("agent", type=str)
 def agent_stop(ctx: CLIContext, agent: str) -> None:
     """
     Stop agent service.
@@ -178,7 +180,7 @@ def agent_stop(ctx: CLIContext, agent: str) -> None:
 
 @watcher.command()
 @pass_ctx_obj
-@click.argument('agent', type=str)
+@click.argument("agent", type=str)
 def agent_restart(ctx: CLIContext, agent: str) -> None:
     """
     Restart agent service.
