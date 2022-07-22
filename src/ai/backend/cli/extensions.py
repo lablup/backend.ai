@@ -18,12 +18,12 @@ class InterruptAwareCommandMixin(click.BaseCommand):
     def main(self, *args, **kwargs):
         try:
             _interrupted = False
-            kwargs.pop('standalone_mode', None)
-            kwargs.pop('prog_name', None)
+            kwargs.pop("standalone_mode", None)
+            kwargs.pop("prog_name", None)
             super().main(
                 *args,
                 standalone_mode=False,
-                prog_name='backend.ai',
+                prog_name="backend.ai",
                 **kwargs,
             )
         except KeyboardInterrupt:
@@ -53,7 +53,7 @@ class InterruptAwareCommandMixin(click.BaseCommand):
             if _interrupted:
                 # Override the exit code when it's interrupted,
                 # referring https://github.com/python/cpython/pull/11862
-                if sys.platform.startswith('win'):
+                if sys.platform.startswith("win"):
                     # Use STATUS_CONTROL_C_EXIT to notify cmd.exe
                     # for interrupted exit
                     sys.exit(-1073741510)
@@ -70,13 +70,14 @@ class AliasGroupMixin(click.Group):
 
     ref) https://github.com/click-contrib/click-aliases
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._commands = {}
         self._aliases = {}
 
     def command(self, *args, **kwargs):
-        aliases = kwargs.pop('aliases', [])
+        aliases = kwargs.pop("aliases", [])
         decorator = super().command(*args, **kwargs)
         if not aliases:
             return decorator
@@ -88,12 +89,13 @@ class AliasGroupMixin(click.Group):
                 for alias in aliases:
                     self._aliases[alias] = cmd.name
             return cmd
+
         return _decorator
 
     def group(self, *args, **kwargs):
-        aliases = kwargs.pop('aliases', [])
+        aliases = kwargs.pop("aliases", [])
         # keep the same class type
-        kwargs['cls'] = type(self)
+        kwargs["cls"] = type(self)
         decorator = super().group(*args, **kwargs)
         if not aliases:
             return decorator
@@ -105,6 +107,7 @@ class AliasGroupMixin(click.Group):
                 for alias in aliases:
                     self._aliases[alias] = cmd.name
             return cmd
+
         return _decorator
 
     def get_command(self, ctx, cmd_name):
@@ -124,8 +127,8 @@ class AliasGroupMixin(click.Group):
             if cmd.hidden:
                 continue
             if subcommand in self._commands:
-                aliases = ','.join(sorted(self._commands[subcommand]))
-                subcommand = '{0} ({1})'.format(subcommand, aliases)
+                aliases = ",".join(sorted(self._commands[subcommand]))
+                subcommand = "{0} ({1})".format(subcommand, aliases)
             commands.append((subcommand, cmd))
 
         # allow for 3 times the default spacing
@@ -136,7 +139,7 @@ class AliasGroupMixin(click.Group):
                 help = cmd.get_short_help_str(limit)
                 rows.append((subcommand, help))
             if rows:
-                with formatter.section('Commands'):
+                with formatter.section("Commands"):
                     formatter.write_dl(rows)
 
 

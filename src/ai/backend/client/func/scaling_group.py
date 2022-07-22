@@ -9,28 +9,26 @@ from ..request import Request
 from ..session import api_session
 from .base import BaseFunction, api_function
 
-__all__ = (
-    'ScalingGroup',
-)
+__all__ = ("ScalingGroup",)
 
 _default_list_fields = (
-    scaling_group_fields['name'],
-    scaling_group_fields['description'],
-    scaling_group_fields['is_active'],
-    scaling_group_fields['created_at'],
-    scaling_group_fields['driver'],
-    scaling_group_fields['scheduler'],
+    scaling_group_fields["name"],
+    scaling_group_fields["description"],
+    scaling_group_fields["is_active"],
+    scaling_group_fields["created_at"],
+    scaling_group_fields["driver"],
+    scaling_group_fields["scheduler"],
 )
 
 _default_detail_fields = (
-    scaling_group_fields['name'],
-    scaling_group_fields['description'],
-    scaling_group_fields['is_active'],
-    scaling_group_fields['created_at'],
-    scaling_group_fields['driver'],
-    scaling_group_fields['driver_opts'],
-    scaling_group_fields['scheduler'],
-    scaling_group_fields['scheduler_opts'],
+    scaling_group_fields["name"],
+    scaling_group_fields["description"],
+    scaling_group_fields["is_active"],
+    scaling_group_fields["created_at"],
+    scaling_group_fields["driver"],
+    scaling_group_fields["driver_opts"],
+    scaling_group_fields["scheduler"],
+    scaling_group_fields["scheduler_opts"],
 )
 
 
@@ -54,13 +52,14 @@ class ScalingGroup(BaseFunction):
         considering the user, the user's domain, and the designated user group.
         """
         rqst = Request(
-            'GET', '/scaling-groups',
-            params={'group': group},
+            "GET",
+            "/scaling-groups",
+            params={"group": group},
         )
         async with rqst.fetch() as resp:
             data = await resp.json()
             print(data)
-            return data['scaling_groups']
+            return data["scaling_groups"]
 
     @api_function
     @classmethod
@@ -72,17 +71,19 @@ class ScalingGroup(BaseFunction):
         List available scaling groups for the current user,
         considering the user, the user's domain, and the designated user group.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($is_active: Boolean) {
                 scaling_groups(is_active: $is_active) {
                     $fields
                 }
             }
-        """)
-        query = query.replace('$fields', ' '.join(f.field_ref for f in fields))
-        variables = {'is_active': None}
+        """
+        )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {"is_active": None}
         data = await api_session.get().Admin._query(query, variables)
-        return data['scaling_groups']
+        return data["scaling_groups"]
 
     @api_function
     @classmethod
@@ -97,81 +98,101 @@ class ScalingGroup(BaseFunction):
         :param name: Name of the scaling group.
         :param fields: Additional per-scaling-group query fields.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($name: String) {
                 scaling_group(name: $name) {$fields}
             }
-        """)
-        query = query.replace('$fields', ' '.join(f.field_ref for f in fields))
-        variables = {'name': name}
+        """
+        )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
-        return data['scaling_group']
+        return data["scaling_group"]
 
     @api_function
     @classmethod
-    async def create(cls, name: str, description: str = '', is_active: bool = True,
-                     driver: str = None, driver_opts: Mapping[str, str] = None,
-                     scheduler: str = None, scheduler_opts: Mapping[str, str] = None,
-                     fields: Iterable[str] = None) -> dict:
+    async def create(
+        cls,
+        name: str,
+        description: str = "",
+        is_active: bool = True,
+        driver: str = None,
+        driver_opts: Mapping[str, str] = None,
+        scheduler: str = None,
+        scheduler_opts: Mapping[str, str] = None,
+        fields: Iterable[str] = None,
+    ) -> dict:
         """
         Creates a new scaling group with the given options.
         """
         if fields is None:
-            fields = ('name',)
-        query = textwrap.dedent("""\
+            fields = ("name",)
+        query = textwrap.dedent(
+            """\
             mutation($name: String!, $input: CreateScalingGroupInput!) {
                 create_scaling_group(name: $name, props: $input) {
                     ok msg scaling_group {$fields}
                 }
             }
-        """)
-        query = query.replace('$fields', ' '.join(fields))
+        """
+        )
+        query = query.replace("$fields", " ".join(fields))
         variables = {
-            'name': name,
-            'input': {
-                'description': description,
-                'is_active': is_active,
-                'driver': driver,
-                'driver_opts': json.dumps(driver_opts),
-                'scheduler': scheduler,
-                'scheduler_opts': json.dumps(scheduler_opts),
+            "name": name,
+            "input": {
+                "description": description,
+                "is_active": is_active,
+                "driver": driver,
+                "driver_opts": json.dumps(driver_opts),
+                "scheduler": scheduler,
+                "scheduler_opts": json.dumps(scheduler_opts),
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data['create_scaling_group']
+        return data["create_scaling_group"]
 
     @api_function
     @classmethod
-    async def update(cls, name: str, description: str = '', is_active: bool = True,
-                     driver: str = None, driver_opts: Mapping[str, str] = None,
-                     scheduler: str = None, scheduler_opts: Mapping[str, str] = None,
-                     fields: Iterable[str] = None) -> dict:
+    async def update(
+        cls,
+        name: str,
+        description: str = "",
+        is_active: bool = True,
+        driver: str = None,
+        driver_opts: Mapping[str, str] = None,
+        scheduler: str = None,
+        scheduler_opts: Mapping[str, str] = None,
+        fields: Iterable[str] = None,
+    ) -> dict:
         """
         Update existing scaling group.
         """
         if fields is None:
-            fields = ('name',)
-        query = textwrap.dedent("""\
+            fields = ("name",)
+        query = textwrap.dedent(
+            """\
             mutation($name: String!, $input: ModifyScalingGroupInput!) {
                 modify_scaling_group(name: $name, props: $input) {
                     ok msg
                 }
             }
-        """)
-        query = query.replace('$fields', ' '.join(fields))
+        """
+        )
+        query = query.replace("$fields", " ".join(fields))
         variables = {
-            'name': name,
-            'input': {
-                'description': description,
-                'is_active': is_active,
-                'driver': driver,
-                'driver_opts': None if driver_opts is None else json.dumps(driver_opts),
-                'scheduler': scheduler,
-                'scheduler_opts': None if scheduler_opts is None else json.dumps(scheduler_opts),
+            "name": name,
+            "input": {
+                "description": description,
+                "is_active": is_active,
+                "driver": driver,
+                "driver_opts": None if driver_opts is None else json.dumps(driver_opts),
+                "scheduler": scheduler,
+                "scheduler_opts": None if scheduler_opts is None else json.dumps(scheduler_opts),
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data['modify_scaling_group']
+        return data["modify_scaling_group"]
 
     @api_function
     @classmethod
@@ -179,16 +200,18 @@ class ScalingGroup(BaseFunction):
         """
         Deletes an existing scaling group.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($name: String!) {
                 delete_scaling_group(name: $name) {
                     ok msg
                 }
             }
-        """)
-        variables = {'name': name}
+        """
+        )
+        variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
-        return data['delete_scaling_group']
+        return data["delete_scaling_group"]
 
     @api_function
     @classmethod
@@ -199,17 +222,19 @@ class ScalingGroup(BaseFunction):
         :param scaling_group: The name of a scaling group.
         :param domain: The name of a domain.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($scaling_group: String!, $domain: String!) {
                 associate_scaling_group_with_domain(
                         scaling_group: $scaling_group, domain: $domain) {
                     ok msg
                 }
             }
-        """)
-        variables = {'scaling_group': scaling_group, 'domain': domain}
+        """
+        )
+        variables = {"scaling_group": scaling_group, "domain": domain}
         data = await api_session.get().Admin._query(query, variables)
-        return data['associate_scaling_group_with_domain']
+        return data["associate_scaling_group_with_domain"]
 
     @api_function
     @classmethod
@@ -220,17 +245,19 @@ class ScalingGroup(BaseFunction):
         :param scaling_group: The name of a scaling group.
         :param domain: The name of a domain.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($scaling_group: String!, $domain: String!) {
                 disassociate_scaling_group_with_domain(
                         scaling_group: $scaling_group, domain: $domain) {
                     ok msg
                 }
             }
-        """)
-        variables = {'scaling_group': scaling_group, 'domain': domain}
+        """
+        )
+        variables = {"scaling_group": scaling_group, "domain": domain}
         data = await api_session.get().Admin._query(query, variables)
-        return data['disassociate_scaling_group_with_domain']
+        return data["disassociate_scaling_group_with_domain"]
 
     @api_function
     @classmethod
@@ -240,16 +267,18 @@ class ScalingGroup(BaseFunction):
 
         :param domain: The name of a domain.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($domain: String!) {
                 disassociate_all_scaling_groups_with_domain(domain: $domain) {
                     ok msg
                 }
             }
-        """)
-        variables = {'domain': domain}
+        """
+        )
+        variables = {"domain": domain}
         data = await api_session.get().Admin._query(query, variables)
-        return data['disassociate_all_scaling_groups_with_domain']
+        return data["disassociate_all_scaling_groups_with_domain"]
 
     @api_function
     @classmethod
@@ -260,17 +289,19 @@ class ScalingGroup(BaseFunction):
         :param scaling_group: The name of a scaling group.
         :param group_id: The ID of a group.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($scaling_group: String!, $user_group: UUID!) {
                 associate_scaling_group_with_user_group(
                         scaling_group: $scaling_group, user_group: $user_group) {
                     ok msg
                 }
             }
-        """)
-        variables = {'scaling_group': scaling_group, 'user_group': group_id}
+        """
+        )
+        variables = {"scaling_group": scaling_group, "user_group": group_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data['associate_scaling_group_with_user_group']
+        return data["associate_scaling_group_with_user_group"]
 
     @api_function
     @classmethod
@@ -281,17 +312,19 @@ class ScalingGroup(BaseFunction):
         :param scaling_group: The name of a scaling group.
         :param group_id: The ID of a group.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($scaling_group: String!, $user_group: String!) {
                 disassociate_scaling_group_with_user_group(
                         scaling_group: $scaling_group, user_group: $user_group) {
                     ok msg
                 }
             }
-        """)
-        variables = {'scaling_group': scaling_group, 'user_group': group_id}
+        """
+        )
+        variables = {"scaling_group": scaling_group, "user_group": group_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data['disassociate_scaling_group_with_user_group']
+        return data["disassociate_scaling_group_with_user_group"]
 
     @api_function
     @classmethod
@@ -301,13 +334,15 @@ class ScalingGroup(BaseFunction):
 
         :param group_id: The ID of a group.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($group_id: UUID!) {
                 disassociate_all_scaling_groups_with_group(user_group: $group_id) {
                     ok msg
                 }
             }
-        """)
-        variables = {'group_id': group_id}
+        """
+        )
+        variables = {"group_id": group_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data['disassociate_all_scaling_groups_with_group']
+        return data["disassociate_all_scaling_groups_with_group"]

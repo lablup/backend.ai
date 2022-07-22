@@ -9,18 +9,20 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = '1e8531583e20'
-down_revision = 'ce209920f654'
+revision = "1e8531583e20"
+down_revision = "ce209920f654"
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
     op.add_column(
-        'keypairs',
-        sa.Column('dotfiles', sa.LargeBinary(length=64 * 1024), nullable=False, server_default='\\x90')
+        "keypairs",
+        sa.Column(
+            "dotfiles", sa.LargeBinary(length=64 * 1024), nullable=False, server_default="\\x90"
+        ),
     )
 
 
 def downgrade():
-    op.drop_column('keypairs', 'dotfiles')
+    op.drop_column("keypairs", "dotfiles")

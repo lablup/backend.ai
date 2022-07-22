@@ -41,7 +41,10 @@ def ask_number(prompt: str, default: Numeric, min_value: Numeric, max_value: Num
         try:
             if user_reply == "":
                 return default
-            if user_reply.isdigit() and min_value <= convert_str_into_numeric(user_reply) <= max_value:
+            if (
+                user_reply.isdigit()
+                and min_value <= convert_str_into_numeric(user_reply) <= max_value
+            ):
                 user_reply_numeric = convert_str_into_numeric(user_reply)
                 break
         except ValueError:
@@ -52,12 +55,12 @@ def ask_number(prompt: str, default: Numeric, min_value: Numeric, max_value: Num
 def ask_string(prompt: str, default: str = "", use_default: bool = True) -> str:
     while True:
         if use_default:
-            user_reply = input(f"{prompt} (default: \"{default}\"): ")
+            user_reply = input(f'{prompt} (default: "{default}"): ')
             if user_reply == "":
                 return default
             return user_reply
         else:
-            user_reply = input(f"{prompt} (if you don\'t want, just leave empty): ")
+            user_reply = input(f"{prompt} (if you don't want, just leave empty): ")
             return user_reply
 
 
@@ -69,10 +72,14 @@ def ask_string_in_array(prompt: str, choices: list, default: str) -> Optional[st
         choices.remove("")
 
     if default:
-        question = f"{prompt} (choices: {'/'.join(choices)}, " \
-                   f"if left empty, this will use default value: {default}): "
+        question = (
+            f"{prompt} (choices: {'/'.join(choices)}, "
+            f"if left empty, this will use default value: {default}): "
+        )
     else:
-        question = f"{prompt} (choices: {'/'.join(choices)}, if left empty, this will remove this key): "
+        question = (
+            f"{prompt} (choices: {'/'.join(choices)}, if left empty, this will remove this key): "
+        )
 
     while True:
         user_reply = input(question)
@@ -109,41 +116,41 @@ def ask_path(prompt: str, is_file=True, is_directory=True) -> Path:
     return path
 
 
-def ask_yn(prompt: str = 'Are you sure?', default: str = 'y') -> bool:
-    if default == 'y':
-        choices = 'Y/n'
-    elif default == 'n':
-        choices = 'y/N'
+def ask_yn(prompt: str = "Are you sure?", default: str = "y") -> bool:
+    if default == "y":
+        choices = "Y/n"
+    elif default == "n":
+        choices = "y/N"
     else:
         raise ValueError("default must be given either 'y' or 'n'.")
     while True:
         user_reply = input("{0} [{1}] ".format(prompt, choices)).lower()
-        if user_reply == '':
+        if user_reply == "":
             user_reply = default
-        if user_reply in ('y', 'yes', 'n', 'no'):
+        if user_reply in ("y", "yes", "n", "no"):
             break
         else:
             print("Please answer in y/yes/n/no.")
-    if user_reply[:1].lower() == 'y':
+    if user_reply[:1].lower() == "y":
         return True
     return False
 
 
-def ask_tf(prompt: str = 'Are you sure?', default: str = 'true') -> bool:
-    if default == 't':
-        choices = 'T/f'
-    elif default == 'f':
-        choices = 't/F'
+def ask_tf(prompt: str = "Are you sure?", default: str = "true") -> bool:
+    if default == "t":
+        choices = "T/f"
+    elif default == "f":
+        choices = "t/F"
     else:
         raise ValueError("default must be given either 'true' or 'n'.")
     while True:
         user_reply = input(f"{prompt} [{choices}] ").lower()
-        if user_reply == '':
+        if user_reply == "":
             user_reply = default
-        if user_reply in ('t', 'true', 'f', 'false'):
+        if user_reply in ("t", "true", "f", "false"):
             break
         else:
             print("Please answer in t/true/f/false.")
-    if user_reply[:1].lower() == 't':
+    if user_reply[:1].lower() == "t":
         return True
     return False
