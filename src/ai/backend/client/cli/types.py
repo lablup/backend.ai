@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 
 
 class OutputMode(enum.Enum):
-    CONSOLE = 'console'
-    JSON = 'json'
+    CONSOLE = "console"
+    JSON = "json"
 
 
 @attr.define(slots=True)

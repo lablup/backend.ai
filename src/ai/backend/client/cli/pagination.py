@@ -23,7 +23,7 @@ def tabulate_items(
     *,
     page_size: int = None,
     item_formatter: Callable[[_Item], None] = None,
-    tablefmt: Literal['simple', 'plain', 'github'] = 'simple',
+    tablefmt: Literal["simple", "plain", "github"] = "simple",
 ) -> Iterator[str]:
     is_first = True
     output_count = 0
@@ -31,29 +31,25 @@ def tabulate_items(
 
     # check table header/footer sizes
     header_height = 0
-    if tablefmt in ('simple', 'github'):
+    if tablefmt in ("simple", "github"):
         header_height = 2
     assert header_height >= 0
 
     def _tabulate_buffer() -> Iterator[str]:
         table = tabulate(
             [
-                [
-                    f.formatter.format_console(v, f) for f, v in zip(fields, item.values())
-                ] for item in buffered_items
+                [f.formatter.format_console(v, f) for f, v in zip(fields, item.values())]
+                for item in buffered_items
             ],
-            headers=(
-                [] if tablefmt == 'plain'
-                else [field.humanized_name for field in fields]
-            ),
+            headers=([] if tablefmt == "plain" else [field.humanized_name for field in fields]),
             tablefmt=tablefmt,
         )
         table_rows = table.splitlines()
         if is_first:
-            yield from (row + '\n' for row in table_rows)
+            yield from (row + "\n" for row in table_rows)
         else:
             # strip the header for continued page outputs
-            yield from (row + '\n' for row in table_rows[header_height:])
+            yield from (row + "\n" for row in table_rows[header_height:])
 
     # If we iterate until the end of items, pausing the terminal output
     # would not have effects for avoiding unnecessary queries for subsequent pages.
@@ -91,18 +87,18 @@ def echo_via_pager(
     terminal_height = shutil.get_terminal_size((80, 20)).lines
     line_count = 0
     for text in text_generator:
-        line_count += text.count('\n')
+        line_count += text.count("\n")
         click.echo(text, nl=False)
         if line_count == terminal_height - 1:
             if sys.stdin.isatty() and sys.stdout.isatty():
-                click.echo(':', nl=False)
+                click.echo(":", nl=False)
                 # Pause the terminal so that we don't execute next-page queries indefinitely.
                 # Since click.pause() ignores KeyboardInterrupt, we just use click.getchar()
                 # to allow user interruption.
                 k = click.getchar(echo=False)
-                if k in ('q', 'Q'):
+                if k in ("q", "Q"):
                     if break_callback is not None:
                         break_callback()
                     break
-                click.echo('\r', nl=False)
+                click.echo("\r", nl=False)
             line_count = 0

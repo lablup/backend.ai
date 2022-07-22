@@ -1,9 +1,7 @@
 from ..request import Request
 from .base import BaseFunction, api_function
 
-__all__ = (
-    'EtcdConfig',
-)
+__all__ = ("EtcdConfig",)
 
 
 class EtcdConfig(BaseFunction):
@@ -25,14 +23,16 @@ class EtcdConfig(BaseFunction):
         :param key: Name of the key to fetch.
         :param prefix: get all keys prefixed with the give key.
         """
-        rqst = Request('POST', '/config/get')
-        rqst.set_json({
-            'key': key,
-            'prefix': prefix,
-        })
+        rqst = Request("POST", "/config/get")
+        rqst.set_json(
+            {
+                "key": key,
+                "prefix": prefix,
+            }
+        )
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return data.get('result', None)
+            return data.get("result", None)
 
     @api_function
     @classmethod
@@ -43,11 +43,13 @@ class EtcdConfig(BaseFunction):
         :param key: Name of the key to set.
         :param value: Value to set.
         """
-        rqst = Request('POST', '/config/set')
-        rqst.set_json({
-            'key': key,
-            'value': value,
-        })
+        rqst = Request("POST", "/config/set")
+        rqst.set_json(
+            {
+                "key": key,
+                "value": value,
+            }
+        )
         async with rqst.fetch() as resp:
             data = await resp.json()
             return data
@@ -61,11 +63,13 @@ class EtcdConfig(BaseFunction):
         :param key: Name of the key to delete.
         :param prefix: delete all keys prefixed with the give key.
         """
-        rqst = Request('POST', '/config/delete')
-        rqst.set_json({
-            'key': key,
-            'prefix': prefix,
-        })
+        rqst = Request("POST", "/config/delete")
+        rqst.set_json(
+            {
+                "key": key,
+                "prefix": prefix,
+            }
+        )
         async with rqst.fetch() as resp:
             data = await resp.json()
             return data

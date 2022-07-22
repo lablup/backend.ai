@@ -44,24 +44,22 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class SchedulerOps(enum.Enum):
-    INCLUDE_AGENTS = 'include-agents'
-    EXCLUDE_AGENTS = 'exclude-agents'
+    INCLUDE_AGENTS = "include-agents"
+    EXCLUDE_AGENTS = "exclude-agents"
 
 
 def server_status_required(allowed_status: FrozenSet[ManagerStatus]):
-
     def decorator(handler):
-
         @functools.wraps(handler)
         async def wrapped(request, *args, **kwargs):
-            root_ctx: RootContext = request.app['_root.context']
+            root_ctx: RootContext = request.app["_root.context"]
             status = await root_ctx.shared_config.get_manager_status()
             if status not in allowed_status:
                 if status == ManagerStatus.FROZEN:
                     raise ServerFrozen
-                msg = f'Server is not in the required status: {allowed_status}'
+                msg = f"Server is not in the required status: {allowed_status}"
                 raise ServiceUnavailable(msg)
-            return (await handler(request, *args, **kwargs))
+            return await handler(request, *args, **kwargs)
 
         return wrapped
 
@@ -73,11 +71,12 @@ ALL_ALLOWED: Final = frozenset({ManagerStatus.RUNNING})
 
 
 class GQLMutationUnfrozenRequiredMiddleware:
-
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         graph_ctx: GraphQueryContext = info.context
-        if info.operation.operation == 'mutation' and \
-                graph_ctx.manager_status == ManagerStatus.FROZEN:
+        if (
+            info.operation.operation == "mutation"
+            and graph_ctx.manager_status == ManagerStatus.FROZEN
+        ):
             raise ServerFrozen
         return next(root, info, **args)
 
@@ -86,74 +85,85 @@ async def detect_status_update(root_ctx: RootContext) -> None:
     try:
         async with aclosing(root_ctx.shared_config.watch_manager_status()) as agen:
             async for ev in agen:
-                if ev.event == 'put':
+                if ev.event == "put":
                     root_ctx.shared_config.get_manager_status.cache_clear()
                     updated_status = await root_ctx.shared_config.get_manager_status()
-                    log.debug('Process-{0} detected manager status update: {1}',
-                              root_ctx.pidx, updated_status)
+                    log.debug(
+                        "Process-{0} detected manager status update: {1}",
+                        root_ctx.pidx,
+                        updated_status,
+                    )
     except asyncio.CancelledError:
         pass
 
 
 async def fetch_manager_status(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app['_root.context']
-    log.info('MANAGER.FETCH_MANAGER_STATUS ()')
+    root_ctx: RootContext = request.app["_root.context"]
+    log.info("MANAGER.FETCH_MANAGER_STATUS ()")
     try:
         status = await root_ctx.shared_config.get_manager_status()
         # etcd_info = await root_ctx.shared_config.get_manager_nodes_info()
-        configs = root_ctx.local_config['manager']
+        configs = root_ctx.local_config["manager"]
 
         async with root_ctx.db.begin() as conn:
             query = (
                 sa.select([sa.func.count()])
                 .select_from(kernels)
                 .where(
-                    (kernels.c.cluster_role == DEFAULT_ROLE) &
-                    (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+                    (kernels.c.cluster_role == DEFAULT_ROLE)
+                    & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
                 )
             )
             active_sessions_num = await conn.scalar(query)
 
-            _id = configs['id'] if configs.get('id') else socket.gethostname()
+            _id = configs["id"] if configs.get("id") else socket.gethostname()
             nodes = [
                 {
-                    'id': _id,
-                    'num_proc': configs['num-proc'],
-                    'service_addr': str(configs['service-addr']),
-                    'heartbeat_timeout': configs['heartbeat-timeout'],
-                    'ssl_enabled': configs['ssl-enabled'],
-                    'active_sessions': active_sessions_num,
-                    'status': status.value,
-                    'version': __version__,
-                    'api_version': request['api_version'],
+                    "id": _id,
+                    "num_proc": configs["num-proc"],
+                    "service_addr": str(configs["service-addr"]),
+                    "heartbeat_timeout": configs["heartbeat-timeout"],
+                    "ssl_enabled": configs["ssl-enabled"],
+                    "active_sessions": active_sessions_num,
+                    "status": status.value,
+                    "version": __version__,
+                    "api_version": request["api_version"],
                 },
             ]
-            return web.json_response({
-                'nodes': nodes,
-                'status': status.value,                  # legacy?
-                'active_sessions': active_sessions_num,  # legacy?
-            })
-    except:
-        log.exception('GET_MANAGER_STATUS: exception')
+            return web.json_response(
+                {
+                    "nodes": nodes,
+                    "status": status.value,  # legacy?
+                    "active_sessions": active_sessions_num,  # legacy?
+                }
+            )
+    except Exception:
+        log.exception("GET_MANAGER_STATUS: exception")
         raise
 
 
 @superadmin_required
 @check_api_params(
-    t.Dict({
-        t.Key('status'): tx.Enum(ManagerStatus, use_name=True),
-        t.Key('force_kill', default=False): t.ToBool,
-    }))
+    t.Dict(
+        {
+            t.Key("status"): tx.Enum(ManagerStatus, use_name=True),
+            t.Key("force_kill", default=False): t.ToBool,
+        }
+    )
+)
 async def update_manager_status(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app['_root.context']
-    log.info('MANAGER.UPDATE_MANAGER_STATUS (status:{}, force_kill:{})',
-             params['status'], params['force_kill'])
+    root_ctx: RootContext = request.app["_root.context"]
+    log.info(
+        "MANAGER.UPDATE_MANAGER_STATUS (status:{}, force_kill:{})",
+        params["status"],
+        params["force_kill"],
+    )
     try:
         params = await request.json()
-        status = params['status']
-        force_kill = params['force_kill']
+        status = params["status"]
+        force_kill = params["force_kill"]
     except json.JSONDecodeError:
-        raise InvalidAPIParameters(extra_msg='No request body!')
+        raise InvalidAPIParameters(extra_msg="No request body!")
     except (AssertionError, ValueError) as e:
         raise InvalidAPIParameters(extra_msg=str(e.args[0]))
 
@@ -165,29 +175,32 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
 
 
 async def get_announcement(request: web.Request) -> web.Response:
-    root_ctx: RootContext = request.app['_root.context']
-    data = await root_ctx.shared_config.etcd.get('manager/announcement')
+    root_ctx: RootContext = request.app["_root.context"]
+    data = await root_ctx.shared_config.etcd.get("manager/announcement")
     if data is None:
-        ret = {'enabled': False, 'message': ''}
+        ret = {"enabled": False, "message": ""}
     else:
-        ret = {'enabled': True, 'message': data}
+        ret = {"enabled": True, "message": data}
     return web.json_response(ret)
 
 
 @superadmin_required
 @check_api_params(
-    t.Dict({
-        t.Key('enabled', default='false'): t.ToBool,
-        t.Key('message', default=None): t.Null | t.String,
-    }))
+    t.Dict(
+        {
+            t.Key("enabled", default="false"): t.ToBool,
+            t.Key("message", default=None): t.Null | t.String,
+        }
+    )
+)
 async def update_announcement(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app['_root.context']
-    if params['enabled']:
-        if not params['message']:
-            raise InvalidAPIParameters(extra_msg='Empty message not allowed to enable announcement')
-        await root_ctx.shared_config.etcd.put('manager/announcement', params['message'])
+    root_ctx: RootContext = request.app["_root.context"]
+    if params["enabled"]:
+        if not params["message"]:
+            raise InvalidAPIParameters(extra_msg="Empty message not allowed to enable announcement")
+        await root_ctx.shared_config.etcd.put("manager/announcement", params["message"])
     else:
-        await root_ctx.shared_config.etcd.delete('manager/announcement')
+        await root_ctx.shared_config.etcd.delete("manager/announcement")
     return web.Response(status=204)
 
 
@@ -199,27 +212,26 @@ iv_scheduler_ops_args = {
 
 @superadmin_required
 @check_api_params(
-    t.Dict({
-        t.Key('op'): tx.Enum(SchedulerOps),
-        t.Key('args'): t.Any,
-    }))
+    t.Dict(
+        {
+            t.Key("op"): tx.Enum(SchedulerOps),
+            t.Key("args"): t.Any,
+        }
+    )
+)
 async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Response:
-    root_ctx: RootContext = request.app['_root.context']
+    root_ctx: RootContext = request.app["_root.context"]
     try:
-        args = iv_scheduler_ops_args[params['op']].check(params['args'])
+        args = iv_scheduler_ops_args[params["op"]].check(params["args"])
     except t.DataError as e:
         raise InvalidAPIParameters(
             f"Input validation failed for args with {params['op']}",
             extra_data=e.as_dict(),
         )
-    if params['op'] in (SchedulerOps.INCLUDE_AGENTS, SchedulerOps.EXCLUDE_AGENTS):
-        schedulable = (params['op'] == SchedulerOps.INCLUDE_AGENTS)
+    if params["op"] in (SchedulerOps.INCLUDE_AGENTS, SchedulerOps.EXCLUDE_AGENTS):
+        schedulable = params["op"] == SchedulerOps.INCLUDE_AGENTS
         async with root_ctx.db.begin() as conn:
-            query = (
-                agents.update()
-                .values(schedulable=schedulable)
-                .where(agents.c.id.in_(args))
-            )
+            query = agents.update().values(schedulable=schedulable).where(agents.c.id.in_(args))
             result = await conn.execute(query)
             if result.rowcount < len(args):
                 raise InstanceNotFound()
@@ -227,7 +239,7 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
             # trigger scheduler
             await root_ctx.event_producer.produce_event(DoScheduleEvent())
     else:
-        raise GenericBadRequest('Unknown scheduler operation')
+        raise GenericBadRequest("Unknown scheduler operation")
     return web.Response(status=204)
 
 
@@ -237,30 +249,32 @@ class PrivateContext:
 
 
 async def init(app: web.Application) -> None:
-    root_ctx: RootContext = app['_root.context']
-    app_ctx: PrivateContext = app['manager.context']
+    root_ctx: RootContext = app["_root.context"]
+    app_ctx: PrivateContext = app["manager.context"]
     app_ctx.status_watch_task = asyncio.create_task(detect_status_update(root_ctx))
 
 
 async def shutdown(app: web.Application) -> None:
-    app_ctx: PrivateContext = app['manager.context']
+    app_ctx: PrivateContext = app["manager.context"]
     if app_ctx.status_watch_task is not None:
         app_ctx.status_watch_task.cancel()
         await app_ctx.status_watch_task
 
 
-def create_app(default_cors_options: CORSOptions) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+def create_app(
+    default_cors_options: CORSOptions,
+) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
-    app['api_versions'] = (2, 3, 4)
-    app['manager.context'] = PrivateContext()
+    app["api_versions"] = (2, 3, 4)
+    app["manager.context"] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-    status_resource = cors.add(app.router.add_resource('/status'))
-    cors.add(status_resource.add_route('GET', fetch_manager_status))
-    cors.add(status_resource.add_route('PUT', update_manager_status))
-    announcement_resource = cors.add(app.router.add_resource('/announcement'))
-    cors.add(announcement_resource.add_route('GET', get_announcement))
-    cors.add(announcement_resource.add_route('POST', update_announcement))
-    cors.add(app.router.add_route('POST', '/scheduler/operation', perform_scheduler_ops))
+    status_resource = cors.add(app.router.add_resource("/status"))
+    cors.add(status_resource.add_route("GET", fetch_manager_status))
+    cors.add(status_resource.add_route("PUT", update_manager_status))
+    announcement_resource = cors.add(app.router.add_resource("/announcement"))
+    cors.add(announcement_resource.add_route("GET", get_announcement))
+    cors.add(announcement_resource.add_route("POST", update_announcement))
+    cors.add(app.router.add_route("POST", "/scheduler/operation", perform_scheduler_ops))
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     return app, []
