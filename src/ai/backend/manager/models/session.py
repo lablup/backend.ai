@@ -207,6 +207,8 @@ class SessionRow(Base):
 
     # if image_id is null, should find a image field from related kernel row.
     image_id = ForeignKeyIDColumn("image_id", "images.id")
+    # `image` column is identical to kernels `image` column.
+    image = sa.Column("image", sa.String(length=512))
     image_row = relationship("ImageRow", back_populates="sessions")
     tag = sa.Column("tag", sa.String(length=64), nullable=True)
 

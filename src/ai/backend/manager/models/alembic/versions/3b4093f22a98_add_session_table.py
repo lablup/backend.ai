@@ -176,6 +176,8 @@ def upgrade():
 
         # if image_id is null, should find a image field from related kernel row.
         image_id = sa.Column("image_id", GUID(), nullable=True)
+        # `image` column is identical to kernels `image` column.
+        image = sa.Column("image", sa.String(length=512))
         tag = sa.Column("tag", sa.String(length=64), nullable=True)
 
         # Resource occupation
@@ -297,6 +299,7 @@ def upgrade():
                 "user_uuid": row["user_uuid"],
                 "access_key": row["access_key"],
                 "image_id": img_map[row["image"]],
+                "image": row["image"],
                 "tag": row["tag"],
                 "occupying_slots": row["occupied_slots"],
                 "requested_slots": row["occupied_slots"],
