@@ -138,6 +138,7 @@ from .exceptions import (
     UnknownImageReferenceError,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
+from .scaling_group import query_wsproxy_status
 from .types import CORSOptions, WebMiddleware
 from .utils import catch_unexpected, check_api_params, get_access_key_scopes, undefined
 
@@ -1245,6 +1246,11 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     wsproxy_addr = sgroup["wsproxy_addr"]
     if not wsproxy_addr:
         raise ServiceUnavailable("No coordinator configured for this resource group")
+    wsproxy_status = await query_wsproxy_status(wsproxy_addr)
+    if wsproxy_status.get("advertise_address"):
+        wsproxy_advertise_addr = wsproxy_status["advertise_address"]
+    else:
+        wsproxy_advertise_addr = wsproxy_addr
 
     if kernel["kernel_host"] is None:
         kernel_host = urlparse(kernel["agent_addr"]).hostname
@@ -1304,7 +1310,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
             return web.json_response(
                 {
                     "token": token_json["token"],
-                    "wsproxy_addr": wsproxy_addr,
+                    "wsproxy_addr": wsproxy_advertise_addr,
                 }
             )
 
