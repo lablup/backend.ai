@@ -76,7 +76,6 @@ if TYPE_CHECKING:
 __all__ = (
     "kernels",
     "KernelRow",
-    "session_dependencies",
     "KernelStatistics",
     "KernelStatus",
     "ComputeContainer",
@@ -319,26 +318,6 @@ class KernelRow(Base):
     image_row = relationship("ImageRow", back_populates="kernels")
     agent_row = relationship("AgentRow", back_populates="kernels")
 
-
-session_dependencies = sa.Table(
-    "session_dependencies",
-    mapper_registry.metadata,
-    sa.Column(
-        "session_id",
-        GUID,
-        sa.ForeignKey("kernels.id", onupdate="CASCADE", ondelete="CASCADE"),
-        index=True,
-        nullable=False,
-    ),
-    sa.Column(
-        "depends_on",
-        GUID,
-        sa.ForeignKey("kernels.id", onupdate="CASCADE", ondelete="CASCADE"),
-        index=True,
-        nullable=False,
-    ),
-    sa.PrimaryKeyConstraint("session_id", "depends_on"),
-)
 
 DEFAULT_SESSION_ORDERING = [
     sa.desc(
@@ -1111,35 +1090,6 @@ class ComputeSession(graphene.ObjectType):
             query = query.order_by(*DEFAULT_SESSION_ORDERING)
         async with ctx.db.begin_readonly() as conn:
             return [cls.from_row(ctx, r) async for r in (await conn.stream(query))]
-
-    @classmethod
-    async def batch_load_by_dependency(
-        cls,
-        ctx: GraphQueryContext,
-        session_ids: Sequence[SessionId],
-    ) -> Sequence[Sequence[ComputeSession]]:
-        j = sa.join(
-            kernels,
-            session_dependencies,
-            kernels.c.session_id == session_dependencies.c.depends_on,
-        )
-        query = (
-            sa.select([kernels])
-            .select_from(j)
-            .where(
-                (kernels.c.cluster_role == DEFAULT_ROLE)
-                & (session_dependencies.c.session_id.in_(session_ids)),
-            )
-        )
-        async with ctx.db.begin_readonly() as conn:
-            return await batch_multiresult(
-                ctx,
-                conn,
-                query,
-                cls,
-                session_ids,
-                lambda row: row["id"],
-            )
 
     @classmethod
     async def batch_load_detail(

@@ -24,6 +24,7 @@ from ai.backend.common.types import (
 from ..api.exceptions import MainKernelNotFound, SessionNotFound, TooManyKernelsFound
 from ..defs import DEFAULT_ROLE
 from .base import (
+    GUID,
     Base,
     BigInt,
     EnumType,
@@ -33,6 +34,7 @@ from .base import (
     SessionIDColumn,
     StructuredJSONObjectListColumn,
     URLColumn,
+    batch_multiresult,
 )
 from .kernel import ComputeContainer, KernelRow, KernelStatus
 
@@ -46,6 +48,10 @@ __all__ = (
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "USER_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "SessionRow",
+    "match_sessions",
+    "match_sessions_by_id",
+    "SessionDependencyRow",
+    "check_all_dependencies",
     "ComputeSession",
 )
 
@@ -497,6 +503,51 @@ async def get_sessions_by_name(
     return result.scalars().all()
 
 
+class SessionDependencyRow(Base):
+    __tablename__ = "session_dependencies"
+    session_id = sa.Column(
+        "session_id",
+        GUID,
+        sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    depends_on = sa.Column(
+        "depends_on",
+        GUID,
+        sa.ForeignKey("sessions.id", onupdate="CASCADE", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    __table_args__ = (
+        # constraint
+        sa.PrimaryKeyConstraint("session_id", "depends_on", name="sess_dep_pk"),
+    )
+
+
+async def check_all_dependencies(
+    db_session: SASession,
+    sess_ctx: SessionRow,
+) -> List[SessionRow]:
+    j = sa.join(
+        SessionDependencyRow,
+        SessionRow,
+        SessionDependencyRow.depends_on == SessionDependencyRow.session_id,
+    )
+    query = (
+        sa.select(SessionRow.id, SessionRow.name, SessionRow.result)
+        .select_from(j)
+        .where(SessionDependencyRow.session_id == sess_ctx.id)
+    )
+    result = await db_session.execute(query)
+    rows = result.scalars().all()
+    pending_dependencies = [
+        sess_row for sess_row in rows if sess_row.result != SessionResult.SUCCESS
+    ]
+    return pending_dependencies
+
+
 class ComputeSession(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -605,3 +656,32 @@ class ComputeSession(graphene.ObjectType):
             return None
         props = cls.parse_row(ctx, row)
         return cls(**props)
+
+    @classmethod
+    async def batch_load_by_dependency(
+        cls,
+        ctx: GraphQueryContext,
+        session_ids: Sequence[SessionId],
+    ) -> Sequence[Sequence[ComputeSession]]:
+        j = sa.join(
+            SessionRow,
+            SessionDependencyRow,
+            SessionRow.id == SessionDependencyRow.depends_on,
+        )
+        query = (
+            sa.select(SessionRow)
+            .select_from(j)
+            .where(
+                (SessionRow.cluster_role == DEFAULT_ROLE)
+                & (SessionDependencyRow.session_id.in_(session_ids)),
+            )
+        )
+        async with ctx.db.begin_readonly() as conn:
+            return await batch_multiresult(
+                ctx,
+                conn,
+                query,
+                cls,
+                session_ids,
+                lambda row: row["id"],
+            )

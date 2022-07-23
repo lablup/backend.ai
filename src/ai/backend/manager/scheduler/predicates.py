@@ -11,11 +11,12 @@ from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 
 from ..models import (
     DefaultForUnspecified,
+    SessionDependencyRow,
+    SessionRow,
     domains,
     groups,
     kernels,
     keypair_resource_policies,
-    session_dependencies,
 )
 from ..models.utils import execute_with_retry
 from .types import PendingSession, PredicateResult, SchedulingContext
@@ -105,20 +106,18 @@ async def check_dependencies(
     sess_ctx: PendingSession,
 ) -> PredicateResult:
     j = sa.join(
-        session_dependencies,
-        kernels,
-        session_dependencies.c.depends_on == kernels.c.session_id,
+        SessionDependencyRow,
+        SessionRow,
+        SessionDependencyRow.depends_on == SessionRow.id,
     )
     query = (
         sa.select(
-            [
-                kernels.c.session_id,
-                kernels.c.session_name,
-                kernels.c.result,
-            ]
+            SessionRow.id,
+            SessionRow.name,
+            SessionRow.result,
         )
         .select_from(j)
-        .where(session_dependencies.c.session_id == sess_ctx.session_id)
+        .where(SessionDependencyRow.session_id == sess_ctx.session_id)
     )
     result = await db_conn.execute(query)
     rows = result.fetchall()
