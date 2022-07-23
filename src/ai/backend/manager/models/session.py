@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import enum
-from typing import TYPE_CHECKING, Any, List, Mapping, Sequence, Union
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Sequence, Union
 from uuid import UUID
 
 import aiotools
 import graphene
 import sqlalchemy as sa
+from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -15,9 +17,11 @@ from sqlalchemy.orm import noload, relationship, selectinload
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
+    ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
+    SlotName,
     VFolderMount,
 )
 
@@ -30,13 +34,19 @@ from .base import (
     EnumType,
     ForeignKeyIDColumn,
     Item,
+    PaginatedList,
     ResourceSlotColumn,
     SessionIDColumn,
     StructuredJSONObjectListColumn,
     URLColumn,
-    batch_multiresult,
+    batch_multiresult_in_session,
+    batch_result_in_session,
 )
+from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
+from .minilang.ordering import QueryOrderParser
+from .minilang.queryfilter import QueryFilterParser
+from .user import UserRow
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -53,6 +63,7 @@ __all__ = (
     "SessionDependencyRow",
     "check_all_dependencies",
     "ComputeSession",
+    "ComputeSessionList",
 )
 
 
@@ -548,6 +559,17 @@ async def check_all_dependencies(
     return pending_dependencies
 
 
+DEFAULT_SESSION_ORDERING = [
+    sa.desc(
+        sa.func.greatest(
+            SessionRow.created_at,
+            SessionRow.terminated_at,
+            SessionRow.status_changed,
+        )
+    ),
+]
+
+
 class ComputeSession(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -657,6 +679,206 @@ class ComputeSession(graphene.ObjectType):
         props = cls.parse_row(ctx, row)
         return cls(**props)
 
+    async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        """
+        Calculate the sum of occupied resource slots of all sub-kernels,
+        and return the JSON-serializable object from the sum result.
+        """
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
+        containers = await loader.load(self.session_id)
+        zero = ResourceSlot()
+        return sum(
+            (
+                ResourceSlot({SlotName(k): Decimal(v) for k, v in c.occupied_slots.items()})
+                for c in containers
+            ),
+            start=zero,
+        ).to_json()
+
+    async def resolve_containers(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> Iterable[ComputeContainer]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
+        return await loader.load(self.session_id)
+
+    async def resolve_dependencies(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> Iterable[ComputeSession]:
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeSession.by_dependency")
+        return await loader.load(self.id)
+
+    _queryfilter_fieldspec = {
+        "type": ("kernels_session_type", lambda s: SessionTypes[s]),
+        "name": ("kernels_session_name", None),
+        "image": ("kernels_image", None),
+        "architecture": ("kernels_architecture", None),
+        "domain_name": ("kernels_domain_name", None),
+        "group_name": ("groups_group_name", None),
+        "user_email": ("users_email", None),
+        "access_key": ("kernels_access_key", None),
+        "scaling_group": ("kernels_scaling_group", None),
+        "cluster_mode": ("kernels_cluster_mode", lambda s: ClusterMode[s]),
+        "cluster_template": ("kernels_cluster_template", None),
+        "cluster_size": ("kernels_cluster_size", None),
+        "status": ("kernels_status", lambda s: KernelStatus[s]),
+        "status_info": ("kernels_status_info", None),
+        "status_changed": ("kernels_status_changed", dtparse),
+        "result": ("kernels_result", lambda s: SessionResult[s]),
+        "created_at": ("kernels_created_at", dtparse),
+        "terminated_at": ("kernels_terminated_at", dtparse),
+        "starts_at": ("kernels_starts_at", dtparse),
+        "startup_command": ("kernels_startup_command", None),
+        "agent": ("kernels_agent", None),
+        "agents": ("kernels_agent", None),
+    }
+
+    _queryorder_colmap = {
+        "id": "kernels_id",
+        "type": "kernels_session_type",
+        "name": "kernels_session_name",
+        "image": "kernels_image",
+        "architecture": "kernels_architecture",
+        "domain_name": "kernels_domain_name",
+        "group_name": "kernels_group_name",
+        "user_email": "users_email",
+        "access_key": "kernels_access_key",
+        "scaling_group": "kernels_scaling_group",
+        "cluster_mode": "kernels_cluster_mode",
+        "cluster_template": "kernels_cluster_template",
+        "cluster_size": "kernels_cluster_size",
+        "status": "kernels_status",
+        "status_info": "kernels_status_info",
+        "status_changed": "kernels_status_info",
+        "result": "kernels_result",
+        "created_at": "kernels_created_at",
+        "terminated_at": "kernels_terminated_at",
+        "starts_at": "kernels_starts_at",
+    }
+
+    @classmethod
+    async def load_count(
+        cls,
+        ctx: GraphQueryContext,
+        *,
+        domain_name: str = None,
+        group_id: UUID = None,
+        access_key: str = None,
+        status: str = None,
+        filter: str = None,
+    ) -> int:
+        if isinstance(status, str):
+            status_list = [SessionStatus[s] for s in status.split(",")]
+        elif isinstance(status, SessionStatus):
+            status_list = [status]
+        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+            SessionRow, UserRow, SessionRow.user_uuid == UserRow.uuid
+        )
+        query = sa.select([sa.func.count()]).select_from(j)
+        if domain_name is not None:
+            query = query.where(SessionRow.domain_name == domain_name)
+        if group_id is not None:
+            query = query.where(SessionRow.group_id == group_id)
+        if access_key is not None:
+            query = query.where(SessionRow.access_key == access_key)
+        if status is not None:
+            query = query.where(SessionRow.status.in_(status_list))
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.scalar()
+
+    @classmethod
+    async def load_slice(
+        cls,
+        ctx: GraphQueryContext,
+        limit: int,
+        offset: int,
+        *,
+        domain_name: str = None,
+        group_id: UUID = None,
+        access_key: str = None,
+        status: str = None,
+        filter: str = None,
+        order: str = None,
+    ) -> Sequence[ComputeSession | None]:
+        if isinstance(status, str):
+            status_list = [SessionStatus[s] for s in status.split(",")]
+        elif isinstance(status, SessionStatus):
+            status_list = [status]
+        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+            SessionRow, UserRow, SessionRow.user_uuid == UserRow.uuid
+        )
+        query = (
+            sa.select(
+                SessionRow,
+                GroupRow.name.label("group_name"),
+                UserRow.email,
+            )
+            .select_from(j)
+            .limit(limit)
+            .offset(offset)
+        )
+        if domain_name is not None:
+            query = query.where(SessionRow.domain_name == domain_name)
+        if group_id is not None:
+            query = query.where(SessionRow.group_id == group_id)
+        if access_key is not None:
+            query = query.where(SessionRow.access_key == access_key)
+        if status is not None:
+            query = query.where(SessionRow.status.in_(status_list))
+        if filter is not None:
+            parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = parser.append_filter(query, filter)
+        if order is not None:
+            qoparser = QueryOrderParser(cls._queryorder_colmap)
+            query = qoparser.append_ordering(query, order)
+        else:
+            query = query.order_by(*DEFAULT_SESSION_ORDERING)
+        async with ctx.db.begin_readonly() as conn:
+            return [cls.from_row(ctx, r) async for r in (await conn.stream(query))]
+
+    @classmethod
+    async def batch_load_detail(
+        cls,
+        ctx: GraphQueryContext,
+        session_ids: Sequence[SessionId],
+        *,
+        domain_name: str = None,
+        access_key: str = None,
+    ) -> Sequence[ComputeSession | None]:
+        j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
+            SessionRow, UserRow, SessionRow.user_uuid == UserRow.uuid
+        )
+        query = (
+            sa.select(
+                SessionRow,
+                GroupRow.name.label("group_name"),
+                UserRow.email,
+            )
+            .select_from(j)
+            .where(SessionRow.id.in_(session_ids))
+        )
+        if domain_name is not None:
+            query = query.where(SessionRow.domain_name == domain_name)
+        if access_key is not None:
+            query = query.where(SessionRow.access_key == access_key)
+        async with ctx.db.begin_readonly_session() as db_sess:
+            return await batch_result_in_session(
+                ctx,
+                db_sess,
+                query,
+                cls,
+                session_ids,
+                lambda row: row["id"],
+            )
+
     @classmethod
     async def batch_load_by_dependency(
         cls,
@@ -671,17 +893,21 @@ class ComputeSession(graphene.ObjectType):
         query = (
             sa.select(SessionRow)
             .select_from(j)
-            .where(
-                (SessionRow.cluster_role == DEFAULT_ROLE)
-                & (SessionDependencyRow.session_id.in_(session_ids)),
-            )
+            .where(SessionDependencyRow.session_id.in_(session_ids))
         )
-        async with ctx.db.begin_readonly() as conn:
-            return await batch_multiresult(
+        async with ctx.db.begin_readonly_session() as db_sess:
+            return await batch_multiresult_in_session(
                 ctx,
-                conn,
+                db_sess,
                 query,
                 cls,
                 session_ids,
                 lambda row: row["id"],
             )
+
+
+class ComputeSessionList(graphene.ObjectType):
+    class Meta:
+        interfaces = (PaginatedList,)
+
+    items = graphene.List(ComputeSession, required=True)

@@ -42,6 +42,7 @@ from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
@@ -538,6 +539,50 @@ async def batch_multiresult(
     for key in key_list:
         objs_per_key[key] = list()
     async for row in (await db_conn.stream(query)):
+        objs_per_key[key_getter(row)].append(
+            obj_type.from_row(graph_ctx, row),
+        )
+    return [*objs_per_key.values()]
+
+
+async def batch_result_in_session(
+    graph_ctx: GraphQueryContext,
+    db_sess: SASession,
+    query: sa.sql.Select,
+    obj_type: Type[_GenericSQLBasedGQLObject],
+    key_list: Iterable[_Key],
+    key_getter: Callable[[Row], _Key],
+) -> Sequence[Optional[_GenericSQLBasedGQLObject]]:
+    """
+    A batched query adaptor for (key -> item) resolving patterns.
+    stream the result in async session.
+    """
+    objs_per_key: Dict[_Key, Optional[_GenericSQLBasedGQLObject]]
+    objs_per_key = collections.OrderedDict()
+    for key in key_list:
+        objs_per_key[key] = None
+    async for row in (await db_sess.stream(query)):
+        objs_per_key[key_getter(row)] = obj_type.from_row(graph_ctx, row)
+    return [*objs_per_key.values()]
+
+
+async def batch_multiresult_in_session(
+    graph_ctx: GraphQueryContext,
+    db_sess: SASession,
+    query: sa.sql.Select,
+    obj_type: Type[_GenericSQLBasedGQLObject],
+    key_list: Iterable[_Key],
+    key_getter: Callable[[Row], _Key],
+) -> Sequence[Sequence[_GenericSQLBasedGQLObject]]:
+    """
+    A batched query adaptor for (key -> [item]) resolving patterns.
+    stream the result in async session.
+    """
+    objs_per_key: Dict[_Key, List[_GenericSQLBasedGQLObject]]
+    objs_per_key = collections.OrderedDict()
+    for key in key_list:
+        objs_per_key[key] = list()
+    async for row in (await db_sess.stream(query)):
         objs_per_key[key_getter(row)].append(
             obj_type.from_row(graph_ctx, row),
         )
