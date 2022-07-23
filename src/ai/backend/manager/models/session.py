@@ -1,17 +1,27 @@
 from __future__ import annotations
 
 import enum
-from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, List, Mapping, Sequence, Union
+from uuid import UUID
 
+import aiotools
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import relationship
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import noload, relationship, selectinload
 
-from ai.backend.common.types import ClusterMode, SessionResult, SessionTypes, VFolderMount
+from ai.backend.common.types import (
+    AccessKey,
+    ClusterMode,
+    SessionId,
+    SessionResult,
+    SessionTypes,
+    VFolderMount,
+)
 
-from ..api.exceptions import MainKernelNotFound, TooManyKernelsFound
+from ..api.exceptions import MainKernelNotFound, SessionNotFound, TooManyKernelsFound
 from ..defs import DEFAULT_ROLE
 from .base import (
     Base,
@@ -317,6 +327,174 @@ class SessionRow(Base):
                 f"Session (id: {self.id}) has no main kernel.",
             )
         return kerns[0]
+
+
+async def match_sessions(
+    db_session: SASession,
+    session_name_or_id: Union[str, UUID],
+    access_key: AccessKey,
+    *,
+    allow_prefix: bool = False,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    max_matches: int = 10,
+    load_kernels: bool = False,
+) -> List[SessionRow]:
+    """
+    Match the prefix of session ID or session name among the sessions
+    that belongs to the given access key, and return the list of SessionRow.
+    """
+
+    query_list = [aiotools.apartial(get_sessions_by_name, allow_prefix=allow_prefix)]
+    try:
+        UUID(str(session_name_or_id))
+    except ValueError:
+        pass
+    else:
+        query_list.append(aiotools.apartial(match_sessions_by_id, allow_prefix=False))
+        if allow_prefix:
+            query_list.append(aiotools.apartial(match_sessions_by_id, allow_prefix=True))
+
+    for fetch_func in query_list:
+        rows = await fetch_func(
+            db_session,
+            session_name_or_id,
+            access_key,
+            allow_stale=allow_stale,
+            for_update=for_update,
+            max_matches=max_matches,
+            load_kernels=load_kernels,
+        )
+        if not rows:
+            continue
+        return rows
+    return []
+
+
+def _build_session_fetch_query(
+    base_cond,
+    access_key: AccessKey | None = None,
+    *,
+    max_matches: int | None,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    do_ordering: bool = False,
+    load_kernels: bool = False,
+):
+    cond = base_cond
+    if access_key:
+        cond = cond & (SessionRow.access_key == access_key)
+    if not allow_stale:
+        cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
+    query = (
+        sa.select(SessionRow)
+        .where(cond)
+        .order_by(sa.desc(SessionRow.created_at))
+        .execution_options(populate_existing=True)
+    )
+    if max_matches:
+        query = query.limit(max_matches).offset(0)
+    if for_update:
+        query = query.with_for_update()
+    if do_ordering:
+        query = query.order_by(SessionRow.created_at)
+
+    query = query.options(
+        noload("*"),
+        selectinload(SessionRow.image).noload("*"),
+    )
+    if load_kernels:
+        query = query.options(
+            noload("*"),
+            selectinload(SessionRow.kernels).options(
+                noload("*"),
+                selectinload(KernelRow.image).noload("*"),
+                selectinload(KernelRow.agent).noload("*"),
+            ),
+        )
+
+    return query
+
+
+async def match_sessions_by_id(
+    db_session: SASession,
+    session_id: SessionId,
+    access_key: AccessKey | None = None,
+    *,
+    max_matches: int | None = None,
+    allow_prefix: bool = False,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    load_kernels: bool = False,
+) -> List[SessionRow]:
+    if allow_prefix:
+        cond = sa.sql.expression.cast(SessionRow.id, sa.String).like(f"{session_id}%")
+    else:
+        cond = SessionRow.id == session_id
+    query = _build_session_fetch_query(
+        cond,
+        access_key,
+        max_matches=max_matches,
+        allow_stale=allow_stale,
+        for_update=for_update,
+        load_kernels=load_kernels,
+    )
+
+    result = await db_session.execute(query)
+    return result.scalars().all()
+
+
+async def get_session_by_id(
+    db_session: SASession,
+    session_id: SessionId,
+    access_key: AccessKey | None = None,
+    *,
+    max_matches: int | None = None,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    load_kernels: bool = False,
+) -> SessionRow:
+    sessions = await match_sessions_by_id(
+        db_session,
+        session_id,
+        access_key,
+        max_matches=max_matches,
+        allow_stale=allow_stale,
+        for_update=for_update,
+        load_kernels=load_kernels,
+        allow_prefix=False,
+    )
+    try:
+        return sessions[0]
+    except IndexError:
+        raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+
+
+async def get_sessions_by_name(
+    db_session: SASession,
+    session_name: str,
+    access_key: AccessKey,
+    *,
+    max_matches: int | None,
+    allow_prefix: bool = False,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    load_kernels: bool = False,
+) -> List[SessionRow]:
+    if allow_prefix:
+        cond = sa.sql.expression.cast(SessionRow.name, sa.String).like(f"{session_name}%")
+    else:
+        cond = SessionRow.name == session_name
+    query = _build_session_fetch_query(
+        cond,
+        access_key,
+        max_matches=max_matches,
+        allow_stale=allow_stale,
+        for_update=for_update,
+        load_kernels=load_kernels,
+    )
+    result = await db_session.execute(query)
+    return result.scalars().all()
 
 
 class ComputeSession(graphene.ObjectType):
