@@ -80,7 +80,11 @@ ENV/
 .idea
 *.swp
 *.swo
-.vscode
+.vscode/
+.vimrc
+.nvimrc
+.exrc
+.vim/
 
 # Pants
 /.pants.d/
