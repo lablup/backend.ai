@@ -223,8 +223,6 @@ Set the following keys in the workspace settings:
 
 * ``mypy``: ``python.linting.mypyPath``
 
-  - Also add a mypy argument: ``--python-executable=dist/export/python/virtualenvs/python-default/3.10.5/bin/python``
-
 * ``black``: ``python.formatting.blackPath``
 
 * ``isort``: ``python.sortImports.path``
@@ -255,17 +253,10 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
 .. code-block:: vim
 
    let s:cwd = getcwd()
-   let s:pants_config_lines = readfile('pants.toml')
-   let s:match = matchlist(s:pants_config_lines, '"CPython==\([^"]\+\)"')
-   if (empty(s:match))
-       throw "Could not detect Python version from pants.toml"
-   endif
-   let s:pyver = s:match[1]
    let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/tools/isort/bin/isort'  " requires absolute path
    let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/tools/black/bin/black'  " requires absolute path
    let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/tools/flake8/bin/flake8'
    let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/tools/mypy/bin/mypy'
-   let g:ale_python_mypy_options = '--python-executable=dist/export/python/virtualenvs/python-default/' . s:pyver . '/bin/python'
    let g:ale_fixers = {'python': ['isort', 'black']}
    let g:ale_fix_on_save = 1
 
