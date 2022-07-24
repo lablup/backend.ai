@@ -277,14 +277,17 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
 .. code-block:: json
 
    {
-       "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.5/bin/python",
-       "python.python.formatting.provider": "black",
-       "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
-       "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
-       "python.linting.mypyEnabled": true,
-       "python.linting.mypyPath": "dist/export/python/virtualenvs/tools/mypy/bin/mypy",
-       "python.linting.flake8Enabled": true,
-       "python.linting.flake8Path": "dist/export/python/virtualenvs/tools/flake8/bin/flake8"
+     "coc.preferences.formatOnType": true,
+     "coc.preferences.formatOnSaveFiletypes": ["python"],
+     "coc.preferences.willSaveHandlerTimeout": 5000,
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.5/bin/python",
+     "python.formatting.provider": "black",
+     "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
+     "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
+     "python.linting.mypyEnabled": true,
+     "python.linting.flake8Enabled": true,
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/tools/mypy/bin/mypy",
+     "python.linting.flake8Path": "dist/export/python/virtualenvs/tools/flake8/bin/flake8"
    }
 
 
