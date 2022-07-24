@@ -34,6 +34,13 @@ root_patterns = [
 
 [python]
 enable_resolves = true
+# When changing this main Python version:
+# * Update and commit:
+#   - Regenerate lockfiles
+#   - pyproject.toml: [tool.mypy].python_executable
+# * Let other developers do:
+#   - Run `./pants export ::` again
+#   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.10.5"]
 lockfile_generator = "pex"
 
