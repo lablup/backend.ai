@@ -1247,8 +1247,8 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     if not wsproxy_addr:
         raise ServiceUnavailable("No coordinator configured for this resource group")
     wsproxy_status = await query_wsproxy_status(wsproxy_addr)
-    if wsproxy_status.get("advertise_address"):
-        wsproxy_advertise_addr = wsproxy_status["advertise_address"]
+    if advertise_addr := wsproxy_status.get("advertise_address"):
+        wsproxy_advertise_addr = advertise_addr
     else:
         wsproxy_advertise_addr = wsproxy_addr
 

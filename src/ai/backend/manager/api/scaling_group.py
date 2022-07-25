@@ -33,7 +33,7 @@ class WSProxyVersionQueryParams:
 @aiotools.lru_cache(expire_after=30)  # expire after 30 seconds
 async def query_wsproxy_status(
     wsproxy_addr: str,
-) -> str:
+) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
         async with session.get(wsproxy_addr + "/status") as resp:
             return await resp.json()
