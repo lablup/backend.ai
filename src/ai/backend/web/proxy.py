@@ -352,7 +352,7 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
         api_endpoint = random.choice(configured_endpoints)
         if "api_endpoints" not in session:
             session["api_endpoints"] = {}
-        session["api_endpoints"][app] = api_endpoint
+        session["api_endpoints"][app] = str(api_endpoint)
         should_save_session = True
 
     if is_anonymous:
