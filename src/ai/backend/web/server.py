@@ -188,7 +188,7 @@ async def config_ini_handler(request: web.Request) -> web.Response:
             "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
             "endpoint_text": config["api"]["text"],
             "site_description": config["ui"]["brand"],
-            "default_environment": config["ui"].get("default_environment"),
+            "default_environment": config["ui"]["default_environment"],
             "proxy_url": config["service"]["wsproxy"]["url"],
         }
     )
@@ -362,8 +362,8 @@ async def login_handler(request: web.Request) -> web.Response:
         await request.app["redis"].set(key, value)
 
     # Block login if there are too many consecutive failed login attempts.
-    BLOCK_TIME = config["session"].get("login_block_time", 1200)
-    ALLOWED_FAIL_COUNT = config["session"].get("login_allowed_fail_count", 10)
+    BLOCK_TIME = config["session"]["login_block_time"]
+    ALLOWED_FAIL_COUNT = config["session"]["login_allowed_fail_count"]
     login_time = time.time()
     login_history = await _get_login_history()
     last_login_attempt = login_history.get("last_login_attempt", 0)
@@ -396,7 +396,7 @@ async def login_handler(request: web.Request) -> web.Response:
             access_key="",
             secret_key="",  # anonymous session
             user_agent=user_agent,
-            skip_sslcert_validation=not config["api"].get("ssl_verify", True),
+            skip_sslcert_validation=not config["api"]["ssl_verify"],
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
@@ -476,17 +476,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
         )
 
     # Check if auth token is delivered through cookie.
-    auth_token_name = config["api"].get("auth_token_name")
-    if not auth_token_name:
-        return web.HTTPBadRequest(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/invalid-api-params",
-                    "title": "Auth token name is not defined",
-                }
-            ),
-            content_type="application/problem+json",
-        )
+    auth_token_name = config["api"]["auth_token_name"]
     auth_token = request.cookies.get(auth_token_name)
     if not auth_token:
         return web.HTTPBadRequest(
@@ -513,7 +503,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
             access_key="",
             secret_key="",  # anonymous session
             user_agent=user_agent,
-            skip_sslcert_validation=not config["api"].get("ssl-verify", True),
+            skip_sslcert_validation=not config["api"]["ssl_verify"],
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
@@ -584,9 +574,7 @@ async def server_main(
 
     redis_url = yarl.URL("redis://host").with_host(config["session"]["redis"]["host"]).with_port(
         config["session"]["redis"]["port"]
-    ).with_password(config["session"]["redis"].get("password", None)) / str(
-        config["session"]["redis"].get("db", 0)
-    )  # noqa
+    ).with_password(config["session"]["redis"]["password"]) / str(config["session"]["redis"]["db"])
     keepalive_options = {}
     if hasattr(socket, "TCP_KEEPIDLE"):
         keepalive_options[socket.TCP_KEEPIDLE] = 20
@@ -606,7 +594,7 @@ async def server_main(
         socket_keepalive_options=keepalive_options,
     )
 
-    if pidx == 0 and config["session"].get("flush_on_startup", False):
+    if pidx == 0 and config["session"]["flush_on_startup"]:
         await app["redis"].flushdb()
         log.info("flushed session storage.")
     redis_storage = RedisStorage(
