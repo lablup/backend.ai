@@ -4,6 +4,7 @@ on: [push, pull_request]
 
 jobs:
   lint:
+    if: !contains(github.event.pull_request.labels.*.name, 'skip:ci')
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -53,6 +54,7 @@ jobs:
 
 
   typecheck:
+    if: !contains(github.event.pull_request.labels.*.name, 'skip:ci')
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -99,6 +101,7 @@ jobs:
       if: always()  # We want the log even on failures.
 
   test:
+    if: !contains(github.event.pull_request.labels.*.name, 'skip:ci')
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
