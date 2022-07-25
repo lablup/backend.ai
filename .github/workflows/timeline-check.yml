@@ -4,7 +4,7 @@ on: [pull_request]
 
 jobs:
   towncrier:
-    if: !contains(github.event.pull_request.labels.*.name, 'skip:changelog')
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') }}
     runs-on: ubuntu-latest
     steps:
     - name: Sparse-checkout
