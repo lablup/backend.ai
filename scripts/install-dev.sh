@@ -685,11 +685,11 @@ sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 if [ $ENABLE_CUDA -eq 1 ]; then
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
 elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
 else
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = []/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
 fi
 sed_inplace 's@var-base-path = .*$@var-base-path = "'"${VAR_BASE_PATH}"'"@' ./agent.toml
 
