@@ -52,9 +52,9 @@ async def get_api_session(
         )
     ak, sk = token["access_key"], token["secret_key"]
     config = APIConfig(
-        domain=config['api']['domain'],
-        endpoint=config['api']['endpoint'],
-        endpoint_type='api',
+        domain=config["api"]["domain"],
+        endpoint=config["api"]["endpoint"],
+        endpoint_type="api",
         access_key=ak,
         secret_key=sk,
         user_agent=user_agent,
@@ -72,11 +72,11 @@ async def get_anonymous_session(
         config = copy.deepcopy(config)
         config["api"]["endpoint"] = api_endpoint
     config = APIConfig(
-        domain=config['api']['domain'],
-        endpoint=config['api']['endpoint'],
-        endpoint_type='api',
-        access_key='',
-        secret_key='',
+        domain=config["api"]["domain"],
+        endpoint=config["api"]["endpoint"],
+        endpoint_type="api",
+        access_key="",
+        secret_key="",
         user_agent=user_agent,
         skip_sslcert_validation=not config["api"].get("ssl-verify", True),
     )
