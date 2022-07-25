@@ -128,10 +128,10 @@ class WebSocketProxy:
 
 
 async def decrypt_payload(request: web.Request) -> str:
-    config = request.app["config"]
-    scheme = config["service"]["force-endpoint-protocol"]
     if not request.content:
         return ""
+    config = request.app["config"]
+    scheme = config["service"]["force-endpoint-protocol"]
     if scheme is None:
         scheme = request.scheme
     api_endpoint = f"{scheme}://{request.host}"
