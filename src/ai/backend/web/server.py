@@ -17,7 +17,6 @@ import aiohttp_cors
 import aiotools
 import click
 import jinja2
-import pkg_resources
 import tomli
 import uvloop
 import yarl
@@ -34,6 +33,7 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 
 from . import __version__, user_agent
+from .config import config_iv
 from .logging import BraceStyleAdapter
 from .proxy import (
     decrypt_payload,
@@ -44,22 +44,19 @@ from .proxy import (
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
-static_path = Path(pkg_resources.resource_filename("ai.backend.web", "static")).resolve()
-assert static_path.is_dir()
-
 
 console_config_ini_template = jinja2.Template(
     """[general]
-apiEndpoint = {{endpoint_url}}
-apiEndpointText = {{endpoint_text}}
+apiEndpoint = {{ endpoint_url | tojson }}
+apiEndpointText = {{ endpoint_text | tojson }}
 {% if default_environment %}
-defaultSessionEnvironment = "{{default_environment}}"
+defaultSessionEnvironment = {{ default_environment | tojson }}
 {% endif %}
-siteDescription = {{site_description}}
+siteDescription = {{ site_description | tojson }}
 connectionMode = "SESSION"
 
 [wsproxy]
-proxyURL = {{proxy_url}}/
+proxyURL = {{ proxy_url | tojson }}
 proxyBaseURL =
 proxyListenIP =
 """
@@ -67,207 +64,61 @@ proxyListenIP =
 
 console_config_toml_template = jinja2.Template(
     """[general]
-apiEndpoint = "{{endpoint_url}}"
-apiEndpointText = "{{endpoint_text}}"
+apiEndpoint = {{ endpoint_url | tojson }}
+apiEndpointText = {{ endpoint_text | tojson }}
 {% if default_environment %}
-defaultSessionEnvironment = "{{default_environment}}"
+defaultSessionEnvironment = {{ default_environment | tojson }}
 {% endif %}
 {% if default_import_environment %}
-defaultImportEnvironment = "{{default_import_environment}}"
+defaultImportEnvironment = {{ default_import_environment | tojson }}
 {% endif %}
-siteDescription = "{{site_description}}"
+siteDescription = {{ site_description | tojson }}
 connectionMode = "SESSION"
-signupSupport = {{signup_support}}
-allowChangeSigninMode = {{allow_change_signin_mode}}
-allowAnonymousChangePassword = {{allow_anonymous_change_password}}
-allowProjectResourceMonitor = {{allow_project_resource_monitor}}
-allowManualImageNameForSession = {{allow_manual_image_name_for_session}}
-allowSignupWithoutConfirmation = {{allow_signup_without_confirmation}}
-autoLogout = {{auto_logout}}
-debug = {{webui_debug}}
-maskUserInfo = {{mask_user_info}}
+signupSupport = {{ signup_support | tojson }}
+allowChangeSigninMode = {{ allow_change_signin_mode | tojson }}
+allowAnonymousChangePassword = {{ allow_anonymous_change_password | tojson }}
+allowProjectResourceMonitor = {{ allow_project_resource_monitor | tojson }}
+allowManualImageNameForSession = {{ allow_manual_image_name_for_session | tojson }}
+allowSignupWithoutConfirmation = {{ allow_signup_without_confirmation | tojson }}
+autoLogout = {{ auto_logout | tojson }}
+debug = {{ webui_debug | tojson }}
+maskUserInfo = {{ mask_user_info | tojson }}
 
 [resources]
-openPortToPublic = {{open_port_to_public}}
-maxCPUCoresPerContainer = {{max_cpu_cores_per_container}}
-maxMemoryPerContainer = {{max_memory_per_container}}
-maxCUDADevicesPerContainer = {{max_cuda_devices_per_container}}
-maxCUDASharesPerContainer = {{max_cuda_shares_per_container}}
-maxShmPerContainer = {{max_shm_per_container}}
-maxFileUploadSize = {{max_file_upload_size}}
+openPortToPublic = {{ open_port_to_public | tojson }}
+maxCPUCoresPerContainer = {{ max_cpu_cores_per_container | tojson }}
+maxMemoryPerContainer = {{ max_memory_per_container | tojson }}
+maxCUDADevicesPerContainer = {{ max_cuda_devices_per_container | tojson }}
+maxCUDASharesPerContainer = {{ max_cuda_shares_per_container | tojson }}
+maxShmPerContainer = {{ max_shm_per_container | tojson }}
+maxFileUploadSize = {{ max_file_upload_size | tojson }}
 
 [environments]
 {% if environment_allowlist %}
-allowlist = "{{environment_allowlist}}"
+allowlist = {{ environment_allowlist | join(",") | tojson }}
 {% endif %}
 
 [menu]
 {% if menu_blocklist %}
-blocklist = "{{menu_blocklist}}"
+blocklist = {{ menu_blocklist | join(",") | tojson }}
 {% endif %}
 
 {% if console_menu_plugins %}
 [plugin]
-page = "{{console_menu_plugins}}"
+page = {{ console_menu_plugins | join(",") | tojson }}
 
 {% endif %}
 [wsproxy]
-proxyURL = "{{proxy_url}}/"
+proxyURL = {{ proxy_url | tojson }}
 #proxyBaseURL =
 #proxyListenIP =
 
 [license]
-edition = "{{license_edition}}"
-validSince = "{{license_valid_since}}"
-validUntil = "{{license_valid_until}}"
+edition = {{ license_edition | tojson }}
+validSince = {{ license_valid_since | tojson }}
+validUntil = {{ license_valid_until | tojson }}
 """
 )
-
-
-async def static_handler(request: web.Request) -> web.StreamResponse:
-    request_path = request.match_info["path"]
-    file_path = (static_path / request_path).resolve()
-    try:
-        file_path.relative_to(static_path)
-    except (ValueError, FileNotFoundError):
-        return web.HTTPNotFound(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/generic-not-found",
-                    "title": "Not Found",
-                }
-            ),
-            content_type="application/problem+json",
-        )
-    if file_path.is_file():
-        return header_handler(web.FileResponse(file_path), request_path)
-    return web.HTTPNotFound(
-        text=json.dumps(
-            {
-                "type": "https://api.backend.ai/probs/generic-not-found",
-                "title": "Not Found",
-            }
-        ),
-        content_type="application/problem+json",
-    )
-
-
-async def console_handler(request: web.Request) -> web.StreamResponse:
-    request_path = request.match_info["path"]
-    file_path = (static_path / request_path).resolve()
-    config = request.app["config"]
-    scheme = config["service"].get("force-endpoint-protocol")
-    if scheme is None:
-        scheme = request.scheme
-
-    if request_path == "config.ini":
-        config_content = console_config_ini_template.render(
-            **{
-                "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-                "endpoint_text": config["api"]["text"],
-                "site_description": config["ui"]["brand"],
-                "default_environment": config["ui"].get("default_environment"),
-                "proxy_url": config["service"]["wsproxy"]["url"],
-            }
-        )
-        return web.Response(text=config_content)
-
-    if request_path == "config.toml":
-        if "license" in config:
-            license_edition = config["license"].get("edition", "Open Source")
-            license_valid_since = config["license"].get("valid_since", "")
-            license_valid_until = config["license"].get("valid_until", "")
-        else:
-            license_edition = "Open Source"
-            license_valid_since = ""
-            license_valid_until = ""
-        if "resources" in config:
-            open_port_to_public = (
-                "true" if config["resources"].get("open_port_to_public") else "false"
-            )
-            max_cpu_cores_per_container = config["resources"].get("max_cpu_cores_per_container", 64)
-            max_memory_per_container = config["resources"].get("max_memory_per_container", 64)
-            max_cuda_devices_per_container = config["resources"].get(
-                "max_cuda_devices_per_container", 16
-            )
-            max_cuda_shares_per_container = config["resources"].get(
-                "max_cuda_shares_per_container", 16
-            )
-            max_shm_per_container = config["resources"].get("max_shm_per_container", 2)
-            max_file_upload_size = config["resources"].get("max_file_upload_size", 4294967296)
-        else:
-            open_port_to_public = "false"
-            max_cpu_cores_per_container = 64
-            max_memory_per_container = 64
-            max_cuda_devices_per_container = 16
-            max_cuda_shares_per_container = 16
-            max_shm_per_container = 2
-            max_file_upload_size = 4294967296
-        if "plugin" in config:
-            console_menu_plugins = config["plugin"].get("page", "")
-        else:
-            console_menu_plugins = False
-        config_content = console_config_toml_template.render(
-            **{
-                "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-                "endpoint_text": config["api"]["text"],
-                "site_description": config["ui"]["brand"],
-                "default_environment": config["ui"].get("default_environment"),
-                "default_import_environment": config["ui"].get("default_import_environment"),
-                "proxy_url": config["service"]["wsproxy"]["url"],
-                "signup_support": "true" if config["service"]["enable_signup"] else "false",
-                "allow_change_signin_mode": "true"
-                if config["service"].get("allow_change_signin_mode")
-                else "false",
-                "allow_anonymous_change_password": "true"
-                if config["service"].get("allow_anonymous_change_password")
-                else "false",
-                "allow_project_resource_monitor": "true"
-                if config["service"]["allow_project_resource_monitor"]
-                else "false",
-                "allow_manual_image_name_for_session": "true"
-                if config["service"].get("allow_manual_image_name_for_session")
-                else "false",
-                "allow_signup_without_confirmation": "true"
-                if config["service"].get("allow_signup_without_confirmation")
-                else "false",
-                "webui_debug": "true" if config["service"].get("webui_debug") else "false",
-                "auto_logout": "true" if config["session"].get("auto_logout") else "false",
-                "mask_user_info": "true" if config["service"].get("mask_user_info") else "false",
-                "open_port_to_public": open_port_to_public,
-                "max_cpu_cores_per_container": max_cpu_cores_per_container,
-                "max_memory_per_container": max_memory_per_container,
-                "max_cuda_devices_per_container": max_cuda_devices_per_container,
-                "max_cuda_shares_per_container": max_cuda_shares_per_container,
-                "max_shm_per_container": max_shm_per_container,
-                "max_file_upload_size": max_file_upload_size,
-                "environment_allowlist": config["environments"].get("allowlist", ""),
-                "menu_blocklist": config["ui"].get("menu_blocklist", ""),
-                "console_menu_plugins": console_menu_plugins,
-                "license_edition": license_edition,
-                "license_valid_since": license_valid_since,
-                "license_valid_until": license_valid_until,
-            }
-        )
-        return web.Response(text=config_content)
-    # SECURITY: only allow reading files under static_path
-    try:
-        file_path.relative_to(static_path)
-    except (ValueError, FileNotFoundError):
-        return web.HTTPNotFound(
-            text=json.dumps(
-                {
-                    "type": "https://api.backend.ai/probs/generic-not-found",
-                    "title": "Not Found",
-                }
-            ),
-            content_type="application/problem+json",
-        )
-    if file_path.is_file():
-        return header_handler(web.FileResponse(file_path), request_path)
-
-    return header_handler(web.FileResponse(static_path / "index.html"), "index.html")
-
 
 cache_patterns = {
     r"\.(?:manifest|appcache|html?|xml|json|ini|toml)$": {
@@ -289,13 +140,127 @@ cache_patterns = {
 _cache_patterns = {re.compile(k): v for k, v in cache_patterns.items()}
 
 
-def header_handler(response: web.StreamResponse, path: str) -> web.StreamResponse:
+def apply_cache_headers(response: web.StreamResponse, path: str) -> web.StreamResponse:
     for regex, headers in _cache_patterns.items():
         mo = regex.search(path)
         if mo is not None:
             response.headers.update(headers)
             break
     return response
+
+
+async def static_handler(request: web.Request) -> web.StreamResponse:
+    request_path = request.match_info["path"]
+    static_path = request.app["config"]["service"]["static_path"]
+    file_path = (static_path / request_path).resolve()
+    try:
+        file_path.relative_to(static_path)
+    except (ValueError, FileNotFoundError):
+        return web.HTTPNotFound(
+            text=json.dumps(
+                {
+                    "type": "https://api.backend.ai/probs/generic-not-found",
+                    "title": "Not Found",
+                }
+            ),
+            content_type="application/problem+json",
+        )
+    if file_path.is_file():
+        return apply_cache_headers(web.FileResponse(file_path), request_path)
+    return web.HTTPNotFound(
+        text=json.dumps(
+            {
+                "type": "https://api.backend.ai/probs/generic-not-found",
+                "title": "Not Found",
+            }
+        ),
+        content_type="application/problem+json",
+    )
+
+
+async def config_ini_handler(request: web.Request) -> web.Response:
+    config = request.app["config"]
+    scheme = config["service"]["force_endpoint_protocol"]
+    if scheme is None:
+        scheme = request.scheme
+    config_content = console_config_ini_template.render(
+        **{
+            "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
+            "endpoint_text": config["api"]["text"],
+            "site_description": config["ui"]["brand"],
+            "default_environment": config["ui"].get("default_environment"),
+            "proxy_url": config["service"]["wsproxy"]["url"],
+        }
+    )
+    return web.Response(text=config_content)
+
+
+async def config_toml_handler(request: web.Request) -> web.Response:
+    config = request.app["config"]
+    scheme = config["service"]["force_endpoint_protocol"]
+    if scheme is None:
+        scheme = request.scheme
+    config_content = console_config_toml_template.render(
+        **{
+            "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
+            "endpoint_text": config["api"]["text"],
+            "site_description": config["ui"]["brand"],
+            "default_environment": config["ui"]["default_environment"],
+            "default_import_environment": config["ui"]["default_import_environment"],
+            "proxy_url": config["service"]["wsproxy"]["url"],
+            "signup_support": config["service"]["enable_signup"],
+            "allow_change_signin_mode": config["service"]["allow_change_signin_mode"],
+            "allow_anonymous_change_password": config["service"]["allow_anonymous_change_password"],
+            "allow_project_resource_monitor": config["service"]["allow_project_resource_monitor"],
+            "allow_manual_image_name_for_session": config["service"][
+                "allow_manual_image_name_for_session"
+            ],
+            "allow_signup_without_confirmation": config["service"][
+                "allow_signup_without_confirmation"
+            ],
+            "webui_debug": config["service"]["webui_debug"],
+            "auto_logout": config["session"]["auto_logout"],
+            "mask_user_info": config["service"]["mask_user_info"],
+            "open_port_to_public": config["resources"]["open_port_to_public"],
+            "max_cpu_cores_per_container": config["resources"]["max_cpu_cores_per_container"],
+            "max_memory_per_container": config["resources"]["max_memory_per_container"],
+            "max_cuda_devices_per_container": config["resources"]["max_cuda_devices_per_container"],
+            "max_cuda_shares_per_container": config["resources"]["max_cuda_shares_per_container"],
+            "max_shm_per_container": config["resources"]["max_shm_per_container"],
+            "max_file_upload_size": config["resources"]["max_file_upload_size"],
+            "environment_allowlist": config["environments"]["allowlist"],
+            "menu_blocklist": config["ui"]["menu_blocklist"],
+            "console_menu_plugins": config["plugin"]["page"],
+            "license_edition": config["license"]["edition"],
+            "license_valid_since": config["license"]["valid_since"],
+            "license_valid_until": config["license"]["valid_until"],
+        }
+    )
+    return web.Response(text=config_content)
+
+
+async def console_handler(request: web.Request) -> web.StreamResponse:
+    request_path = request.match_info["path"]
+    config = request.app["config"]
+    static_path = config["service"]["static_path"]
+    file_path = (static_path / request_path).resolve()
+    # SECURITY: only allow reading files under static_path
+    try:
+        file_path.relative_to(static_path)
+    except (ValueError, FileNotFoundError):
+        return web.HTTPNotFound(
+            text=json.dumps(
+                {
+                    "type": "https://api.backend.ai/probs/generic-not-found",
+                    "title": "Not Found",
+                }
+            ),
+            content_type="application/problem+json",
+        )
+    if file_path.is_file():
+        return apply_cache_headers(web.FileResponse(file_path), request_path)
+    # Fallback to index.html to support the URL routing for single-page application.
+    return apply_cache_headers(web.FileResponse(static_path / "index.html"), "index.html")
 
 
 async def login_check_handler(request: web.Request) -> web.Response:
@@ -334,8 +299,11 @@ async def login_handler(request: web.Request) -> web.Response:
     request_headers = extra_config_headers.check(request.headers)
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     if secure_context:
-        creds = await decrypt_payload(request)
-        creds = json.loads(creds)
+        raw_creds = await decrypt_payload(request)
+        if not raw_creds:
+            creds = {}
+        else:
+            creds = json.loads(raw_creds)
     else:
         creds = await request.json()
     if "username" not in creds or not creds["username"]:
@@ -362,73 +330,73 @@ async def login_handler(request: web.Request) -> web.Response:
         "authenticated": False,
         "data": None,
     }
-    try:
 
-        async def _get_login_history():
-            login_history = await request.app["redis"].get(
-                f'login_history_{creds["username"]}',
-            )
-            if not login_history:
-                login_history = {
-                    "last_login_attempt": 0,
-                    "login_fail_count": 0,
-                }
-            else:
-                login_history = json.loads(login_history)
-            if login_history["last_login_attempt"] < 0:
-                login_history["last_login_attempt"] = 0
-            if login_history["login_fail_count"] < 0:
-                login_history["login_fail_count"] = 0
-            return login_history
+    async def _get_login_history():
+        login_history = await request.app["redis"].get(
+            f'login_history_{creds["username"]}',
+        )
+        if not login_history:
+            login_history = {
+                "last_login_attempt": 0,
+                "login_fail_count": 0,
+            }
+        else:
+            login_history = json.loads(login_history)
+        if login_history["last_login_attempt"] < 0:
+            login_history["last_login_attempt"] = 0
+        if login_history["login_fail_count"] < 0:
+            login_history["login_fail_count"] = 0
+        return login_history
 
-        async def _set_login_history(last_login_attempt, login_fail_count):
-            """
-            Set login history per email (not in browser session).
-            """
-            key = f'login_history_{creds["username"]}'
-            value = json.dumps(
+    async def _set_login_history(last_login_attempt, login_fail_count):
+        """
+        Set login history per email (not in browser session).
+        """
+        key = f'login_history_{creds["username"]}'
+        value = json.dumps(
+            {
+                "last_login_attempt": last_login_attempt,
+                "login_fail_count": login_fail_count,
+            }
+        )
+        await request.app["redis"].set(key, value)
+
+    # Block login if there are too many consecutive failed login attempts.
+    BLOCK_TIME = config["session"].get("login_block_time", 1200)
+    ALLOWED_FAIL_COUNT = config["session"].get("login_allowed_fail_count", 10)
+    login_time = time.time()
+    login_history = await _get_login_history()
+    last_login_attempt = login_history.get("last_login_attempt", 0)
+    login_fail_count = login_history.get("login_fail_count", 0)
+    if login_time - last_login_attempt > BLOCK_TIME:
+        # If last attempt is far past, allow login again.
+        login_fail_count = 0
+    last_login_attempt = login_time
+    if login_fail_count >= ALLOWED_FAIL_COUNT:
+        log.info(
+            "Too many consecutive login attempts for {}: {}",
+            creds["username"],
+            login_fail_count,
+        )
+        await _set_login_history(last_login_attempt, login_fail_count)
+        return web.HTTPTooManyRequests(
+            text=json.dumps(
                 {
-                    "last_login_attempt": last_login_attempt,
-                    "login_fail_count": login_fail_count,
+                    "type": "https://api.backend.ai/probs/too-many-requests",
+                    "title": "Too many failed login attempts",
                 }
-            )
-            await request.app["redis"].set(key, value)
+            ),
+            content_type="application/problem+json",
+        )
 
-        # Block login if there are too many consecutive failed login attempts.
-        BLOCK_TIME = config["session"].get("login_block_time", 1200)
-        ALLOWED_FAIL_COUNT = config["session"].get("login_allowed_fail_count", 10)
-        login_time = time.time()
-        login_history = await _get_login_history()
-        last_login_attempt = login_history.get("last_login_attempt", 0)
-        login_fail_count = login_history.get("login_fail_count", 0)
-        if login_time - last_login_attempt > BLOCK_TIME:
-            # If last attempt is far past, allow login again.
-            login_fail_count = 0
-        last_login_attempt = login_time
-        if login_fail_count >= ALLOWED_FAIL_COUNT:
-            log.info(
-                "Too many consecutive login attempts for {}: {}",
-                creds["username"],
-                login_fail_count,
-            )
-            await _set_login_history(last_login_attempt, login_fail_count)
-            return web.HTTPTooManyRequests(
-                text=json.dumps(
-                    {
-                        "type": "https://api.backend.ai/probs/too-many-requests",
-                        "title": "Too many failed login attempts",
-                    }
-                ),
-                content_type="application/problem+json",
-            )
-
+    try:
         anon_api_config = APIConfig(
             domain=config["api"]["domain"],
             endpoint=config["api"]["endpoint"],
             access_key="",
             secret_key="",  # anonymous session
             user_agent=user_agent,
-            skip_sslcert_validation=not config["api"].get("ssl-verify", True),
+            skip_sslcert_validation=not config["api"].get("ssl_verify", True),
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
@@ -483,7 +451,7 @@ async def logout_handler(request: web.Request) -> web.Response:
     return web.Response(status=201)
 
 
-async def webserver_healthcheck(request: web.Request) -> web.Response:
+async def webserver_healthcheck(_: web.Request) -> web.Response:
     result = {
         "version": __version__,
         "details": "Success",
@@ -613,6 +581,7 @@ async def server_main(
     config = args[0]
     app = web.Application()
     app["config"] = config
+
     redis_url = yarl.URL("redis://host").with_host(config["session"]["redis"]["host"]).with_port(
         config["session"]["redis"]["port"]
     ).with_password(config["session"]["redis"].get("password", None)) / str(
@@ -688,6 +657,8 @@ async def server_main(
     cors.add(app.router.add_route("PATCH", "/pipeline/{path:.*$}", web_handler))
     cors.add(app.router.add_route("DELETE", "/pipeline/{path:.*$}", web_handler))
     if config["service"]["mode"] == "webui":
+        cors.add(app.router.add_route("GET", "/config.ini", config_ini_handler))
+        cors.add(app.router.add_route("GET", "/config.toml", config_toml_handler))
         fallback_handler = console_handler
     elif config["service"]["mode"] == "static":
         fallback_handler = static_handler
@@ -699,11 +670,11 @@ async def server_main(
     app.on_cleanup.append(server_cleanup)
 
     ssl_ctx = None
-    if "ssl-enabled" in config["service"] and config["service"]["ssl-enabled"]:
+    if config["service"]["ssl_enabled"]:
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_ctx.load_cert_chain(
-            str(config["service"]["ssl-cert"]),
-            str(config["service"]["ssl-privkey"]),
+            str(config["service"]["ssl_cert"]),
+            str(config["service"]["ssl_privkey"]),
         )
 
     runner = web.AppRunner(app)
@@ -737,7 +708,8 @@ async def server_main(
 )
 @click.option("--debug", is_flag=True, default=False, help="Use more verbose logging.")
 def main(config_path: str, debug: bool) -> None:
-    config = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
+    raw_config = tomli.loads(Path(config_path).read_text(encoding="utf-8"))
+    config = config_iv.check(raw_config)
     config["debug"] = debug
     if config["debug"]:
         debugFlag = "DEBUG"
@@ -784,8 +756,9 @@ def main(config_path: str, debug: bool) -> None:
     log.info("runtime: {0}", sys.prefix)
     log_config = logging.getLogger("ai.backend.web.config")
     log_config.debug("debug mode enabled.")
-    print("== Web Server configuration ==")
-    pprint(config)
+    if debug:
+        print("== Web Server configuration ==")
+        pprint(config)
     log.info("serving at {0}:{1}", config["service"]["ip"], config["service"]["port"])
 
     try:

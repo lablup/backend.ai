@@ -127,11 +127,11 @@ class WebSocketProxy:
             await self.up_conn.close()
 
 
-async def decrypt_payload(request):
+async def decrypt_payload(request: web.Request) -> str:
     config = request.app["config"]
-    scheme = config["service"].get("force-endpoint-protocol")
+    scheme = config["service"]["force-endpoint-protocol"]
     if not request.content:
-        return request
+        return ""
     if scheme is None:
         scheme = request.scheme
     api_endpoint = f"{scheme}://{request.host}"
