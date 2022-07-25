@@ -271,7 +271,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
             )
 
         if leader_commit > self._commit_index:
-            self._commit_index = min(leader_commit, entries[-1].entry)
+            self._commit_index = min(leader_commit, entries[-1].index)
 
         return (self.current_term, True)
 

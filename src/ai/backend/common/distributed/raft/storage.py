@@ -58,11 +58,11 @@ class MemoryLogStorage(aobject, AbstractLogStorage):
 
     async def slice(self, start: int, stop: Optional[int] = None) -> Tuple[raft_pb2.Log, ...]:
         if stop is not None:
-            return tuple(filter(lambda x: start <= x.index < stop, self._storage))
-        return tuple(filter(lambda x: start <= x.index, self._storage))
+            return tuple(log for log in self._storage if start <= log.index < stop)
+        return tuple(log for log in self._storage if start <= log.index)
 
     async def splice(self, index: int) -> None:
-        self._storage = list(filter(lambda x: x.index <= index, self._storage))
+        self._storage = [log for log in self._storage if log.index < index]
 
     async def size(self) -> int:
         return len(self._storage)

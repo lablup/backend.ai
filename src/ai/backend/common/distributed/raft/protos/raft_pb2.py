@@ -128,7 +128,7 @@ _sym_db.RegisterMessage(CommandResponse)
 
 _RAFTSERVICE = DESCRIPTOR.services_by_name["RaftService"]
 _COMMANDSERVICE = DESCRIPTOR.services_by_name["CommandService"]
-if not _descriptor._USE_C_DESCRIPTORS:
+if _descriptor._USE_C_DESCRIPTORS is False:
 
     DESCRIPTOR._options = None
     _APPENDENTRIESREQUEST._serialized_start = 15
