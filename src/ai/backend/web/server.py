@@ -392,7 +392,7 @@ async def login_handler(request: web.Request) -> web.Response:
     try:
         anon_api_config = APIConfig(
             domain=config["api"]["domain"],
-            endpoint=config["api"]["endpoint"],
+            endpoint=config["api"]["endpoint"][0],
             access_key="",
             secret_key="",  # anonymous session
             user_agent=user_agent,
@@ -499,7 +499,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
     try:
         anon_api_config = APIConfig(
             domain=config["api"]["domain"],
-            endpoint=config["api"]["endpoint"],
+            endpoint=config["api"]["endpoint"][0],
             access_key="",
             secret_key="",  # anonymous session
             user_agent=user_agent,
