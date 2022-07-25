@@ -550,7 +550,7 @@ install_script_deps
 $bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
 
 # Codespaces always have docker installed, so it's safe to skip this process.
-if [ $CODESPACES -eq "true" ]; then
+if [ $CODESPACES = "true" ]; then
   $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
     exit 1
@@ -908,10 +908,10 @@ configure_backendai() {
   echo " "
 }
 
-if [ $CODESPACES -ne "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
+if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   setup_environment()
 fi
-if [ $CODESPACES -ne "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
+if [ $CODESPACES != "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
   configure_backendai()
 fi
 
