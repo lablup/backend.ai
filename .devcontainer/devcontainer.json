@@ -2,8 +2,24 @@
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.187.0/containers/ubuntu
 {
   "name": "Ubuntu",
-  "postCreateCommand": "bash /workspaces/backend.ai/.devcontainer/bootstrap.sh",
-  "forwardPorts": [6022, 8090, 8091],
+  "onCreateCommand": "bash /workspaces/backend.ai/install-dev.sh --codespaces-on-create >> install-oncreate.log 2>&1",
+  "postCreateCommand": "bash /workspaces/backend.ai/install-dev.sh --codespaces-post-create >> install-postcreate.log 2>&1",
+  "forwardPorts": [
+    6022, // storage-proxy
+    8090, // webserver
+    8091, // manager API
+    // wsproxy ports
+    10200,
+    10201,
+    10202,
+    10203,
+    10204,
+    10205,
+    10206,
+    10207,
+    10208,
+    10209
+  ],
   "customizations": {
     "codespaces": {
       "repositories": {

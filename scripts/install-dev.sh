@@ -232,6 +232,8 @@ VFOLDER_REL_PATH="vfroot/local"
 LOCAL_STORAGE_PROXY="local"
 # MUST be one of the real storage volumes
 LOCAL_STORAGE_VOLUME="volume1"
+CODESPACES_ON_CREATE=0
+CODESPACES_POST_CREATE=0
 
 while [ $# -gt 0 ]; do
   case $1 in
@@ -257,6 +259,8 @@ while [ $# -gt 0 ]; do
     --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
     --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
     --agent-watcher-port=*) AGENT_WATCHER_PORT="${1#*=}" ;;
+    --codespaces-on-create) CODESPACES_ON_CREATE=1 ;;
+    --codespaces-post-create) CODESPACES_POST_CREATE=1 ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
@@ -544,101 +548,32 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 $bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
-$bpython scripts/check-docker.py
-if [ $? -ne 0 ]; then
-  exit 1
-fi
-if [ "$DISTRO" = "Darwin" ]; then
-  echo "validating Docker Desktop mount permissions..."
-  docker pull alpine:3.8 > /dev/null
-  docker run --rm -v "$HOME/.pyenv:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
-  if [ $? -ne 0 ]; then
-    # backend.ai-krunner-DISTRO pkgs are installed in pyenv's virtualenv,
-    # so ~/.pyenv must be mountable.
-    show_error "You must allow mount of '$HOME/.pyenv' in the File Sharing preference of the Docker Desktop app."
-    exit 1
-  fi
-  docker run --rm -v "$ROOT_PATH:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
-  if [ $? -ne 0 ]; then
-    show_error "You must allow mount of '$ROOT_PATH' in the File Sharing preference of the Docker Desktop app."
-    exit 1
-  fi
-  echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
-fi
 
-# Install pyenv
-read -r -d '' pyenv_init_script <<"EOS"
-export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)"
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
-EOS
-if ! type "pyenv" >/dev/null 2>&1; then
-  # TODO: ask if install pyenv
-  show_info "Installing pyenv..."
-  set -e
-  curl https://pyenv.run | sh
-  for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
-  do
-    if [ -e "${HOME}/.${PROFILE_FILE}" ]
-    then
-      echo "$pyenv_init_script" >> "${HOME}/.${PROFILE_FILE}"
+# Codespaces always have docker installed, so it's safe to skip this process.
+if [ $CODESPACES -eq "true" ]; then
+  $bpython scripts/check-docker.py
+  if [ $? -ne 0 ]; then
+    exit 1
+  fi
+
+  if [ "$DISTRO" = "Darwin" ]; then
+    echo "validating Docker Desktop mount permissions..."
+    docker pull alpine:3.8 > /dev/null
+    docker run --rm -v "$HOME/.pyenv:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+      # backend.ai-krunner-DISTRO pkgs are installed in pyenv's virtualenv,
+      # so ~/.pyenv must be mountable.
+      show_error "You must allow mount of '$HOME/.pyenv' in the File Sharing preference of the Docker Desktop app."
+      exit 1
     fi
-  done
-  set +e
-  eval "$pyenv_init_script"
-  pyenv
-else
-  eval "$pyenv_init_script"
+    docker run --rm -v "$ROOT_PATH:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+      show_error "You must allow mount of '$ROOT_PATH' in the File Sharing preference of the Docker Desktop app."
+      exit 1
+    fi
+    echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
+  fi
 fi
-
-# Install Python and pyenv virtualenvs
-show_info "Checking and installing Python dependencies..."
-install_pybuild_deps
-
-show_info "Checking and installing git lfs support..."
-install_git_lfs
-
-show_info "Ensuring checkout of LFS files..."
-git lfs pull
-
-show_info "Ensuring checkout of submodules..."
-git submodule update --init --checkout --recursive
-
-show_info "Configuring the standard git hooks..."
-install_git_hooks
-
-show_info "Installing Python..."
-install_python
-
-show_info "Checking Python features..."
-check_python
-pyenv shell "${PYTHON_VERSION}"
-
-show_info "Bootstrapping the Pants build system..."
-bootstrap_pants
-
-set -e
-
-# Make directories
-show_info "Using the current working-copy directory as the installation path..."
-
-# Install postgresql, etcd packages via docker
-show_info "Launching the docker compose \"halfstack\"..."
-mkdir -p "$HALFSTACK_VOLUME_PATH"
-SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
-if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
-  SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
-fi
-cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
-sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
-sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
-sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
-mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
-mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
-$docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
-$docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
 check_snappy() {
   pip download python-snappy
@@ -650,244 +585,334 @@ check_snappy() {
   rm -f $pkgfile
 }
 
-show_info "Creating the unified virtualenv for IDEs..."
-check_snappy
-$PANTS export '::'
+setup_environment() {
 
-if [ $ENABLE_CUDA -eq 1 ]; then
-  if [ "$CUDA_BRANCH" == "mock" ]; then
-    PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda-mock"
-    cp "${PLUGIN_PATH}/backend.ai-accelerator-cuda-mock/configs/sample-mig.toml" cuda-mock.toml
+  # Install pyenv
+  read -r -d '' pyenv_init_script <<"EOS"
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init --path)"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+EOS
+
+  if ! type "pyenv" >/dev/null 2>&1; then
+    # TODO: ask if install pyenv
+    show_info "Installing pyenv..."
+    set -e
+    curl https://pyenv.run | sh
+    for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
+    do
+      if [ -e "${HOME}/.${PROFILE_FILE}" ]
+      then
+        echo "$pyenv_init_script" >> "${HOME}/.${PROFILE_FILE}"
+      fi
+    done
+    set +e
+    eval "$pyenv_init_script"
+    pyenv
   else
-    PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda"
+    eval "$pyenv_init_script"
   fi
-fi
 
-# configure manager
-show_info "Copy default configuration files to manager / agent root..."
-cp configs/manager/halfstack.toml ./manager.toml
-sed_inplace "s/num-proc = .*/num-proc = 1/" ./manager.toml
-sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
-sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
-sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
-cp configs/manager/halfstack.alembic.ini ./alembic.ini
-sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
-./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
-cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
-MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
-sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
-sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
+  # Install Python and pyenv virtualenvs
+  show_info "Checking and installing Python dependencies..."
+  install_pybuild_deps
 
-# configure halfstack ports
-cp configs/agent/halfstack.toml ./agent.toml
-mkdir -p "$VAR_BASE_PATH"
-sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
-sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
-sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
-sed_inplace 's@var-base-path = .*$@var-base-path = "'"${VAR_BASE_PATH}"'"@' ./agent.toml
+  show_info "Checking and installing git lfs support..."
+  install_git_lfs
 
-# configure storage-proxy
-cp configs/storage-proxy/sample.toml ./storage-proxy.toml
-STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
-sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
-sed_inplace "s/secret = \"some-secret-shared-with-manager\"/secret = \"${MANAGER_AUTH_KEY}\"/" ./storage-proxy.toml
-# comment out all sample volumes
-sed_inplace "s/^\[volume\./# \[volume\./" ./storage-proxy.toml
-sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
-sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
-sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
-sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
-# add LOCAL_STORAGE_VOLUME vfs volume
-echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
+  show_info "Ensuring checkout of LFS files..."
+  git lfs pull
 
-# configure webserver
-cp configs/webserver/sample.conf ./webserver.conf
-sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
-sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
-sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
-sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
+  show_info "Ensuring checkout of submodules..."
+  git submodule update --init --checkout --recursive
 
-# install and configure webui
-if [ $EDITABLE_WEBUI -eq 1 ]; then
-  install_editable_webui
-fi
+  show_info "Configuring the standard git hooks..."
+  install_git_hooks
 
-# configure tester
-echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-admin-api.sh" > ./env-tester-admin.sh
-echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user-api.sh" > ./env-tester-user.sh
+  show_info "Installing Python..."
+  install_python
 
-# initialize the DB schema
-show_info "Setting up databases..."
-./backend.ai mgr schema oneshot
-./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
-./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
+  show_info "Checking Python features..."
+  check_python
+  pyenv shell "${PYTHON_VERSION}"
 
-# Docker registry setup
-show_info "Configuring the Lablup's official image registry..."
-./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
-./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
-else
-  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
-fi
+  show_info "Bootstrapping the Pants build system..."
+  bootstrap_pants
 
-# Scan the container image registry
-show_info "Scanning the image registry..."
-./backend.ai mgr etcd rescan-images cr.backend.ai
-if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-  ./backend.ai mgr etcd alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
-else
-  ./backend.ai mgr etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
-fi
+  set -e
 
-# Virtual folder setup
-show_info "Setting up virtual folder..."
-mkdir -p "${ROOT_PATH}/${VFOLDER_REL_PATH}"
-./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
-mkdir -p scratches
-POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
-$docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-$docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-$docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-$docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
+  # Make directories
+  show_info "Using the current working-copy directory as the installation path..."
 
-# Client backend endpoint configuration shell script
-CLIENT_ADMIN_CONF_FOR_API="env-local-admin-api.sh"
-CLIENT_ADMIN_CONF_FOR_SESSION="env-local-admin-session.sh"
-echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_ADMIN_CONF_FOR_API}"
-echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .access_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .secret_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_ADMIN_CONF_FOR_API}"
-chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
-echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" > "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-chmod +x "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-CLIENT_DOMAINADMIN_CONF_FOR_API="env-local-domainadmin-api.sh"
-CLIENT_DOMAINADMIN_CONF_FOR_SESSION="env-local-domainadmin-session.sh"
-echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .access_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .secret_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
-echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-CLIENT_USER_CONF_FOR_API="env-local-user-api.sh"
-CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
-echo "# Directly access to the manager using API keypair (user)" > "${CLIENT_USER_CONF_FOR_API}"
-echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER_CONF_FOR_API}"
-echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .access_key')" >> "${CLIENT_USER_CONF_FOR_API}"
-echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .secret_key')" >> "${CLIENT_USER_CONF_FOR_API}"
-echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER_CONF_FOR_API}"
-chmod +x "${CLIENT_USER_CONF_FOR_API}"
-echo "# Indirectly access to the manager via the web server a using cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
-echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
+  show_info "Creating the unified virtualenv for IDEs..."
+  check_snappy
+  $PANTS export '::'
 
-# TODO: Update tester env script
-## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-admin.sh
-## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_ADMIN_CONF_FOR_API}@" ./env-tester-admin.sh
-## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-user.sh
-## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_USER_CONF_FOR_API}@" ./env-tester-user.sh
-
-show_info "Pre-pulling frequently used kernel images..."
-echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
-if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-  $docker_sudo docker pull "cr.backend.ai/multiarch/python:3.9-ubuntu20.04"
-else
-  $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
-  if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
-    $docker_sudo docker pull "cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"
-    $docker_sudo docker pull "cr.backend.ai/stable/python-pytorch:1.8-py38-cuda11.1"
+  # Install postgresql, etcd packages via docker
+  show_info "Creating docker compose configuration file for \"halfstack\"..."
+  mkdir -p "$HALFSTACK_VOLUME_PATH"
+  SOURCE_COMPOSE_PATH="docker-compose.halfstack-${CURRENT_BRANCH//.}.yml"
+  if [ ! -f "${SOURCE_COMPOSE_PATH}" ]; then
+    SOURCE_COMPOSE_PATH="docker-compose.halfstack-main.yml"
   fi
-fi
+  cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/8100:5432/${POSTGRES_PORT}:5432/" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
+  sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
-show_info "Installation finished."
-show_note "Check out the default API keypairs and account credentials for local development and testing:"
-echo "> ${WHITE}cat env-local-admin-api.sh${NC}"
-echo "> ${WHITE}cat env-local-admin-session.sh${NC}"
-echo "> ${WHITE}cat env-local-domainadmin-api.sh${NC}"
-echo "> ${WHITE}cat env-local-domainadmin-session.sh${NC}"
-echo "> ${WHITE}cat env-local-user-api.sh${NC}"
-echo "> ${WHITE}cat env-local-user-session.sh${NC}"
-show_note "To apply the client config, source one of the configs like:"
-echo "> ${WHITE}source env-local-user-session.sh${NC}"
-echo " "
-show_note "Your pants invocation command:"
-echo "> ${WHITE}${PANTS}${NC}"
-echo " "
-show_important_note "You should change your default admin API keypairs for production environment!"
-show_note "How to run Backend.AI manager:"
-echo "> ${WHITE}./backend.ai mgr start-server --debug${NC}"
-show_note "How to run Backend.AI agent:"
-echo "> ${WHITE}./backend.ai ag start-server --debug${NC}"
-show_note "How to run Backend.AI storage-proxy:"
-echo "> ${WHITE}./py -m ai.backend.storage.server${NC}"
-show_note "How to run Backend.AI web server (for ID/Password login):"
-echo "> ${WHITE}./py -m ai.backend.web.server${NC}"
-show_note "How to run your first code:"
-echo "> ${WHITE}./backend.ai --help${NC}"
-echo "> ${WHITE}source env-local-admin-api.sh${NC}"
-echo "> ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
-echo " "
-echo "${GREEN}Development environment is now ready.${NC}"
-show_note "How to run docker-compose:"
-if [ ! -z "$docker_sudo" ]; then
-  echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
-else
-  echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+  show_info "Pre-pulling frequently used kernel images..."
+  echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
+  if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
+    $docker_sudo docker pull "cr.backend.ai/multiarch/python:3.9-ubuntu20.04"
+  else
+    $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
+    if [ $DOWNLOAD_BIG_IMAGES -eq 1 ]; then
+      $docker_sudo docker pull "cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"
+      $docker_sudo docker pull "cr.backend.ai/stable/python-pytorch:1.8-py38-cuda11.1"
+    fi
+  fi
+}
+
+configure_backendai() {
+  show_info "Creating docker compose \"halfstack\"..."
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
+
+  if [ $ENABLE_CUDA -eq 1 ]; then
+    if [ "$CUDA_BRANCH" == "mock" ]; then
+      PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda-mock"
+      cp "${PLUGIN_PATH}/backend.ai-accelerator-cuda-mock/configs/sample-mig.toml" cuda-mock.toml
+    else
+      PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda"
+    fi
+  fi
+
+  # configure manager
+  show_info "Copy default configuration files to manager / agent root..."
+  cp configs/manager/halfstack.toml ./manager.toml
+  sed_inplace "s/num-proc = .*/num-proc = 1/" ./manager.toml
+  sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
+  sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
+  sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
+  cp configs/manager/halfstack.alembic.ini ./alembic.ini
+  sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
+  ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
+  cp configs/manager/sample.etcd.volumes.json ./dev.etcd.volumes.json
+  MANAGER_AUTH_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
+  sed_inplace "s/\"secret\": \"some-secret-shared-with-storage-proxy\"/\"secret\": \"${MANAGER_AUTH_KEY}\"/" ./dev.etcd.volumes.json
+  sed_inplace "s/\"default_host\": .*$/\"default_host\": \"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\",/" ./dev.etcd.volumes.json
+
+  # configure halfstack ports
+  cp configs/agent/halfstack.toml ./agent.toml
+  mkdir -p "$VAR_BASE_PATH"
+  sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
+  sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
+  sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
+  sed_inplace 's@var-base-path = .*$@var-base-path = "'"${VAR_BASE_PATH}"'"@' ./agent.toml
+
+  # configure storage-proxy
+  cp configs/storage-proxy/sample.toml ./storage-proxy.toml
+  STORAGE_PROXY_RANDOM_KEY=$(python -c 'import secrets; print(secrets.token_hex(32), end="")')
+  sed_inplace "s/secret = \"some-secret-private-for-storage-proxy\"/secret = \"${STORAGE_PROXY_RANDOM_KEY}\"/" ./storage-proxy.toml
+  sed_inplace "s/secret = \"some-secret-shared-with-manager\"/secret = \"${MANAGER_AUTH_KEY}\"/" ./storage-proxy.toml
+  # comment out all sample volumes
+  sed_inplace "s/^\[volume\./# \[volume\./" ./storage-proxy.toml
+  sed_inplace "s/^backend =/# backend =/" ./storage-proxy.toml
+  sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
+  sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
+  sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
+  # add LOCAL_STORAGE_VOLUME vfs volume
+  echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
+
+  # configure webserver
+  cp configs/webserver/sample.conf ./webserver.conf
+  sed_inplace "s/^port = 8080$/port = ${WEBSERVER_PORT}/" ./webserver.conf
+  sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
+  sed_inplace "s/ssl-verify = true/ssl-verify = false/" ./webserver.conf
+  sed_inplace "s/redis.port = 6379/redis.port = ${REDIS_PORT}/" ./webserver.conf
+
+  # install and configure webui
+  if [ $EDITABLE_WEBUI -eq 1 ]; then
+    install_editable_webui
+  fi
+
+  # configure tester
+  echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-admin-api.sh" > ./env-tester-admin.sh
+  echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user-api.sh" > ./env-tester-user.sh
+
+  # initialize the DB schema
+  show_info "Setting up databases..."
+  ./backend.ai mgr schema oneshot
+  ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
+
+  # Docker registry setup
+  show_info "Configuring the Lablup's official image registry..."
+  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
+  ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
+  if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
+    ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community,multiarch"
+  else
+    ./backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
+  fi
+
+  # Scan the container image registry
+  show_info "Scanning the image registry..."
+  ./backend.ai mgr etcd rescan-images cr.backend.ai
+  if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
+    ./backend.ai mgr etcd alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
+  else
+    ./backend.ai mgr etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
+  fi
+
+  # Virtual folder setup
+  show_info "Setting up virtual folder..."
+  mkdir -p "${ROOT_PATH}/${VFOLDER_REL_PATH}"
+  ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
+  mkdir -p scratches
+  POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
+
+  # Client backend endpoint configuration shell script
+  CLIENT_ADMIN_CONF_FOR_API="env-local-admin-api.sh"
+  CLIENT_ADMIN_CONF_FOR_SESSION="env-local-admin-session.sh"
+  echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_ADMIN_CONF_FOR_API}"
+  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+  echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .access_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="admin@lablup.com") | .secret_key')" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+  echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_ADMIN_CONF_FOR_API}"
+  chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
+  echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" > "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .password')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  chmod +x "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+  CLIENT_DOMAINADMIN_CONF_FOR_API="env-local-domainadmin-api.sh"
+  CLIENT_DOMAINADMIN_CONF_FOR_SESSION="env-local-domainadmin-session.sh"
+  echo "# Directly access to the manager using API keypair (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+  echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .access_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="domain-admin@lablup.com") | .secret_key')" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+  echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+  chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
+  echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .password')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+  CLIENT_USER_CONF_FOR_API="env-local-user-api.sh"
+  CLIENT_USER_CONF_FOR_SESSION="env-local-user-session.sh"
+  echo "# Directly access to the manager using API keypair (user)" > "${CLIENT_USER_CONF_FOR_API}"
+  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER_CONF_FOR_API}"
+  echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .access_key')" >> "${CLIENT_USER_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .secret_key')" >> "${CLIENT_USER_CONF_FOR_API}"
+  echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER_CONF_FOR_API}"
+  chmod +x "${CLIENT_USER_CONF_FOR_API}"
+  echo "# Indirectly access to the manager via the web server a using cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  echo "echo 'Password: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .password')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+  chmod +x "${CLIENT_USER_CONF_FOR_SESSION}"
+
+  # TODO: Update tester env script
+  ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-admin.sh
+  ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_ADMIN_CONF_FOR_API}@" ./env-tester-admin.sh
+  ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-user.sh
+  ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_USER_CONF_FOR_API}@" ./env-tester-user.sh
+
+  show_info "Installation finished."
+  show_note "Check out the default API keypairs and account credentials for local development and testing:"
+  echo "> ${WHITE}cat env-local-admin-api.sh${NC}"
+  echo "> ${WHITE}cat env-local-admin-session.sh${NC}"
+  echo "> ${WHITE}cat env-local-domainadmin-api.sh${NC}"
+  echo "> ${WHITE}cat env-local-domainadmin-session.sh${NC}"
+  echo "> ${WHITE}cat env-local-user-api.sh${NC}"
+  echo "> ${WHITE}cat env-local-user-session.sh${NC}"
+  show_note "To apply the client config, source one of the configs like:"
+  echo "> ${WHITE}source env-local-user-session.sh${NC}"
+  echo " "
+  show_note "Your pants invocation command:"
+  echo "> ${WHITE}${PANTS}${NC}"
+  echo " "
+  show_important_note "You should change your default admin API keypairs for production environment!"
+  show_note "How to run Backend.AI manager:"
+  echo "> ${WHITE}./backend.ai mgr start-server --debug${NC}"
+  show_note "How to run Backend.AI agent:"
+  echo "> ${WHITE}./backend.ai ag start-server --debug${NC}"
+  show_note "How to run Backend.AI storage-proxy:"
+  echo "> ${WHITE}./py -m ai.backend.storage.server${NC}"
+  show_note "How to run Backend.AI web server (for ID/Password login):"
+  echo "> ${WHITE}./py -m ai.backend.web.server${NC}"
+  show_note "How to run your first code:"
+  echo "> ${WHITE}./backend.ai --help${NC}"
+  echo "> ${WHITE}source env-local-admin-api.sh${NC}"
+  echo "> ${WHITE}./backend.ai run python -c \"print('Hello World\\!')\"${NC}"
+  echo " "
+  echo "${GREEN}Development environment is now ready.${NC}"
+  show_note "How to run docker-compose:"
+  if [ ! -z "$docker_sudo" ]; then
+    echo "  > ${WHITE}${docker_sudo} docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+  else
+    echo "  > ${WHITE}docker compose -f docker-compose.halfstack.current.yml up -d ...${NC}"
+  fi
+  if [ $EDITABLE_WEBUI -eq 1 ]; then
+    show_note "How to run the editable checkout of webui:"
+    echo "(Terminal 1)"
+    echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
+    echo "(Terminal 2)"
+    echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
+    echo "(Terminal 3)"
+    echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
+  fi
+  show_note "Manual configuration for the client accessible hostname in various proxies"
+  echo " "
+  echo "If you use a VM for this development setup but access it from a web browser outside the VM or remote nodes,"
+  echo "you must manually modify the following configurations to use an IP address or a DNS hostname"
+  echo "that can be accessible from both the client SDK and the web browser."
+  echo " "
+  echo " - ${YELLOW}volumes/proxies/local/client_api${CYAN} etcd key${NC}"
+  echo " - ${YELLOW}apiEndpoint${NC}, ${YELLOW}proxyURL${NC}, ${YELLOW}webServerURL${NC} of ${CYAN}src/ai/backend/webui/config.toml${NC}"
+  echo " - ${YELLOW}PROXYBASEHOST${NC} of ${CYAN}src/ai/backend/webui/.env${NC}"
+  echo " "
+  echo "We recommend setting ${BOLD}/etc/hosts${NC}${WHITE} in both the VM and your web browser's host${NC} to keep a consistent DNS hostname"
+  echo "of the storage-proxy's client API endpoint."
+  echo " "
+  echo "An example command to change the value of that key:"
+  echo "  > ${WHITE}./backend.ai mgr etcd put volumes/proxies/local/client_api http://my-dev-machine:6021${NC}"
+  echo "where /etc/hosts in the VM contains:"
+  echo "  ${WHITE}127.0.0.1      my-dev-machine${NC}"
+  echo "and where /etc/hosts in the web browser host contains:"
+  echo "  ${WHITE}192.168.99.99  my-dev-machine${NC}"
+  show_note "How to reset this setup:"
+  echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
+  echo " "
+}
+
+if [ $CODESPACES -ne "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
+  setup_environment()
 fi
-if [ $EDITABLE_WEBUI -eq 1 ]; then
-  show_note "How to run the editable checkout of webui:"
-  echo "(Terminal 1)"
-  echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
-  echo "(Terminal 2)"
-  echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
-  echo "(Terminal 3)"
-  echo "  > ${WHITE}cd src/ai/backend/webui; npm run wsproxy${NC}"
+if [ $CODESPACES -ne "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
+  configure_backendai()
 fi
-show_note "Manual configuration for the client accessible hostname in various proxies"
-echo " "
-echo "If you use a VM for this development setup but access it from a web browser outside the VM or remote nodes,"
-echo "you must manually modify the following configurations to use an IP address or a DNS hostname"
-echo "that can be accessible from both the client SDK and the web browser."
-echo " "
-echo " - ${YELLOW}volumes/proxies/local/client_api${CYAN} etcd key${NC}"
-echo " - ${YELLOW}apiEndpoint${NC}, ${YELLOW}proxyURL${NC}, ${YELLOW}webServerURL${NC} of ${CYAN}src/ai/backend/webui/config.toml${NC}"
-echo " - ${YELLOW}PROXYBASEHOST${NC} of ${CYAN}src/ai/backend/webui/.env${NC}"
-echo " "
-echo "We recommend setting ${BOLD}/etc/hosts${NC}${WHITE} in both the VM and your web browser's host${NC} to keep a consistent DNS hostname"
-echo "of the storage-proxy's client API endpoint."
-echo " "
-echo "An example command to change the value of that key:"
-echo "  > ${WHITE}./backend.ai mgr etcd put volumes/proxies/local/client_api http://my-dev-machine:6021${NC}"
-echo "where /etc/hosts in the VM contains:"
-echo "  ${WHITE}127.0.0.1      my-dev-machine${NC}"
-echo "and where /etc/hosts in the web browser host contains:"
-echo "  ${WHITE}192.168.99.99  my-dev-machine${NC}"
-show_note "How to reset this setup:"
-echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
-echo " "
 
 # vim: tw=0 sts=2 sw=2 et
