@@ -44,7 +44,7 @@ def event_loop():
 
 @pytest.fixture(scope="session", autouse=True)
 def test_ns():
-    return f'test-{secrets.token_hex(8)}'
+    return f"test-{secrets.token_hex(8)}"
 
 
 @pytest.fixture
@@ -58,20 +58,20 @@ async def etcd(etcd_container, test_ns):  # noqa: F811
         addr=etcd_container[1],
         namespace=test_ns,
         scope_prefix_map={
-            ConfigScopes.GLOBAL: 'global',
-            ConfigScopes.SGROUP: 'sgroup/testing',
-            ConfigScopes.NODE: 'node/i-test',
+            ConfigScopes.GLOBAL: "global",
+            ConfigScopes.SGROUP: "sgroup/testing",
+            ConfigScopes.NODE: "node/i-test",
         },
     )
     try:
-        await etcd.delete_prefix('', scope=ConfigScopes.GLOBAL)
-        await etcd.delete_prefix('', scope=ConfigScopes.SGROUP)
-        await etcd.delete_prefix('', scope=ConfigScopes.NODE)
+        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
+        await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
+        await etcd.delete_prefix("", scope=ConfigScopes.NODE)
         yield etcd
     finally:
-        await etcd.delete_prefix('', scope=ConfigScopes.GLOBAL)
-        await etcd.delete_prefix('', scope=ConfigScopes.SGROUP)
-        await etcd.delete_prefix('', scope=ConfigScopes.NODE)
+        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
+        await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
+        await etcd.delete_prefix("", scope=ConfigScopes.NODE)
         await etcd.close()
         del etcd
 
@@ -82,20 +82,19 @@ async def gateway_etcd(etcd_container, test_ns):  # noqa: F811
         addr=etcd_container[1],
         namespace=test_ns,
         scope_prefix_map={
-            ConfigScopes.GLOBAL: '',
+            ConfigScopes.GLOBAL: "",
         },
     )
     try:
-        await etcd.delete_prefix('', scope=ConfigScopes.GLOBAL)
+        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
         yield etcd
     finally:
-        await etcd.delete_prefix('', scope=ConfigScopes.GLOBAL)
+        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
         del etcd
 
 
 @pytest.fixture
 async def chaos_generator():
-
     async def _chaos():
         try:
             while True:
@@ -118,7 +117,7 @@ def mock_time(mocker):
     call_count = 0
     base_time = time.monotonic()
     accum_time = Decimal(0)
-    q = Decimal('.000000')
+    q = Decimal(".000000")
 
     async def _mock_async_sleep(delay: float) -> None:
         nonlocal total_delay, call_count, accum_time, q

@@ -74,13 +74,10 @@ usage() {
   echo "    TenosrFlow CUDA kernel for testing/demo."
   echo "    (default: false)"
   echo ""
-  echo "  ${LWHITE}--cuda-branch NAME${NC}"
-  echo "    The branch of git clone for the CUDA accelerator "
-  echo "    plugin; only valid if ${LWHITE}--enable-cuda${NC} is specified."
-  echo "    If set as ${LWHITE}\"mock\"${NC}, it will install the mockup version "
-  echo "    plugin so that you may develop and test CUDA integration "
-  echo "    features without real GPUs."
-  echo "    (default: main)"
+  echo "  ${LWHITE}--enable-cuda-mock${NC}"
+  echo "    Install CUDA accelerator mock plugin and pull a"
+  echo "    TenosrFlow CUDA kernel for testing/demo."
+  echo "    (default: false)"
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
   echo "    Install the webui as an editable repository under src/ai/backend/webui."
@@ -210,7 +207,7 @@ PYTHON_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("CPytho
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 DOWNLOAD_BIG_IMAGES=0
 ENABLE_CUDA=0
-CUDA_BRANCH="main"
+ENABLE_CUDA_MOCK=0
 EDITABLE_WEBUI=0
 # POSTGRES_PORT="8100"
 # REDIS_PORT="8110"
@@ -241,9 +238,8 @@ while [ $# -gt 0 ]; do
     --python-version)      PYTHON_VERSION=$2; shift ;;
     --python-version=*)    PYTHON_VERSION="${1#*=}" ;;
     --enable-cuda)         ENABLE_CUDA=1 ;;
+    --enable-cuda-mock)    ENABLE_CUDA_MOCK=1 ;;
     --download-big-images) DOWNLOAD_BIG_IMAGES=1 ;;
-    --cuda-branch)         CUDA_BRANCH=$2; shift ;;
-    --cuda-branch=*)       CUDA_BRANCH="${1#*=}" ;;
     --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
@@ -575,6 +571,12 @@ if [ $CODESPACES = "true" ]; then
   fi
 fi
 
+if [ $ENABLE_CUDA -eq 1 ] & [ $ENABLE_CUDA_MOCK -eq 1 ]; then
+  show_error "You can't use both CUDA and CUDA mock plugins at once!"
+  show_error "Please remove --enable-cuda or --enable-cuda-mock flag to continue."
+  exit -1
+fi
+
 check_snappy() {
   pip download python-snappy
   local pkgfile=$(ls | grep snappy)
@@ -618,6 +620,9 @@ EOS
   # Install Python and pyenv virtualenvs
   show_info "Checking and installing Python dependencies..."
   install_pybuild_deps
+
+  show_info "Setting additional git configs..."
+  git config blame.ignoreRevsFile .git-blame-ignore-revs
 
   show_info "Checking and installing git lfs support..."
   install_git_lfs
@@ -683,13 +688,8 @@ configure_backendai() {
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see three containers here.
 
-  if [ $ENABLE_CUDA -eq 1 ]; then
-    if [ "$CUDA_BRANCH" == "mock" ]; then
-      PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda-mock"
-      cp "${PLUGIN_PATH}/backend.ai-accelerator-cuda-mock/configs/sample-mig.toml" cuda-mock.toml
-    else
-      PLUGIN_BRANCH=$CUDA_BRANCH scripts/install-plugin.sh "lablup/backend.ai-accelerator-cuda"
-    fi
+  if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
+    cp "configs/accelerator/cuda-mock-enterprise.toml" cuda-mock.toml
   fi
 
   # configure manager
@@ -713,6 +713,13 @@ configure_backendai() {
   sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
   sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
   sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
+  if [ $ENABLE_CUDA -eq 1 ]; then
+    sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
+  elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
+    sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
+  else
+    sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = []/" ./agent.toml
+  fi
   sed_inplace 's@var-base-path = .*$@var-base-path = "'"${VAR_BASE_PATH}"'"@' ./agent.toml
 
   # configure storage-proxy
@@ -763,11 +770,11 @@ configure_backendai() {
 
   # Scan the container image registry
   show_info "Scanning the image registry..."
-  ./backend.ai mgr etcd rescan-images cr.backend.ai
+  ./backend.ai mgr image rescan cr.backend.ai
   if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-    ./backend.ai mgr etcd alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
+    ./backend.ai mgr image alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
   else
-    ./backend.ai mgr etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
+    ./backend.ai mgr image alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
   fi
 
   # Virtual folder setup

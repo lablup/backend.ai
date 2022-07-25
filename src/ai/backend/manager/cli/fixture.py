@@ -26,27 +26,26 @@ def cli():
 
 
 @cli.command()
-@click.argument('fixture_path', type=Path)
+@click.argument("fixture_path", type=Path)
 @click.pass_obj
 def populate(cli_ctx: CLIContext, fixture_path) -> None:
-
     async def _impl():
         log.info("Populating fixture '{0}' ...", fixture_path)
         try:
-            fixture = json.loads(fixture_path.read_text(encoding='utf8'))
+            fixture = json.loads(fixture_path.read_text(encoding="utf8"))
         except AttributeError:
-            log.error('No such fixture.')
+            log.error("No such fixture.")
             return
-        db_username = cli_ctx.local_config['db']['user']
-        db_password = cli_ctx.local_config['db']['password']
-        db_addr = cli_ctx.local_config['db']['addr']
-        db_name = cli_ctx.local_config['db']['name']
+        db_username = cli_ctx.local_config["db"]["user"]
+        db_password = cli_ctx.local_config["db"]["password"]
+        db_addr = cli_ctx.local_config["db"]["addr"]
+        db_name = cli_ctx.local_config["db"]["name"]
         engine = sa.ext.asyncio.create_async_engine(
             f"postgresql+asyncpg://{urlquote(db_username)}:{urlquote(db_password)}@{db_addr}/{db_name}",
         )
         try:
             await populate_fixture(engine, fixture)
-        except:
+        except Exception:
             log.exception("Failed to populate fixtures due to the following error:")
         else:
             log.info("Done")
@@ -64,4 +63,4 @@ def populate(cli_ctx: CLIContext, fixture_path) -> None:
 def list(cli_ctx: CLIContext) -> None:
     """List all available fixtures."""
     with cli_ctx.logger:
-        log.warning('This command is deprecated.')
+        log.warning("This command is deprecated.")

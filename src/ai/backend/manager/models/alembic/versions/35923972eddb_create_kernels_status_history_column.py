@@ -10,15 +10,17 @@ from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
 
 # revision identifiers, used by Alembic.
-revision = '35923972eddb'
-down_revision = '81c264528f20'
+revision = "35923972eddb"
+down_revision = "81c264528f20"
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
-    op.add_column('kernels', sa.Column('status_history', pgsql.JSONB(), nullable=True, default=sa.null()))
+    op.add_column(
+        "kernels", sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
+    )
 
 
 def downgrade():
-    op.drop_column('kernels', 'status_history')
+    op.drop_column("kernels", "status_history")

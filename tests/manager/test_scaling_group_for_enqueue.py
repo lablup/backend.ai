@@ -12,26 +12,32 @@ from ai.backend.manager.registry import check_scaling_group
 
 
 @pytest.mark.asyncio
-@mock.patch('ai.backend.manager.registry.query_allowed_sgroups')
+@mock.patch("ai.backend.manager.registry.query_allowed_sgroups")
 async def test_allowed_session_types_check(mock_query):
     mock_query.return_value = [
         {
-            'name': 'a',
-            'scheduler_opts': ScalingGroupOpts().from_json({
-                'allowed_session_types': ['batch'],
-            }),
+            "name": "a",
+            "scheduler_opts": ScalingGroupOpts().from_json(
+                {
+                    "allowed_session_types": ["batch"],
+                }
+            ),
         },
         {
-            'name': 'b',
-            'scheduler_opts': ScalingGroupOpts().from_json({
-                'allowed_session_types': ['interactive'],
-            }),
+            "name": "b",
+            "scheduler_opts": ScalingGroupOpts().from_json(
+                {
+                    "allowed_session_types": ["interactive"],
+                }
+            ),
         },
         {
-            'name': 'c',
-            'scheduler_opts': ScalingGroupOpts().from_json({
-                'allowed_session_types': ['batch', 'interactive'],
-            }),
+            "name": "c",
+            "scheduler_opts": ScalingGroupOpts().from_json(
+                {
+                    "allowed_session_types": ["batch", "interactive"],
+                }
+            ),
         },
     ]
     mock_conn = MagicMock()
@@ -40,38 +46,38 @@ async def test_allowed_session_types_check(mock_query):
     # Preferred scaling group with one match in allowed sgroups
 
     session_type = SessionTypes.BATCH
-    scaling_group = 'a'
+    scaling_group = "a"
     result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
     assert result == scaling_group
 
     session_type = SessionTypes.BATCH
-    scaling_group = 'b'
+    scaling_group = "b"
     mock_sess_ctx.target_sgroup_names = []
     with pytest.raises(ScalingGroupNotFound) as e:
         result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
     assert f"'{scaling_group}' does not accept" in str(e.value)
 
     session_type = SessionTypes.BATCH
-    scaling_group = 'c'
+    scaling_group = "c"
     mock_sess_ctx.target_sgroup_names = []
     result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
     assert result == scaling_group
 
     session_type = SessionTypes.INTERACTIVE
-    scaling_group = 'a'
+    scaling_group = "a"
     mock_sess_ctx.target_sgroup_names = []
     with pytest.raises(ScalingGroupNotFound) as e:
         result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
     assert f"'{scaling_group}' does not accept" in str(e.value)
 
     session_type = SessionTypes.INTERACTIVE
-    scaling_group = 'b'
+    scaling_group = "b"
     mock_sess_ctx.target_sgroup_names = []
     result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
     assert result == scaling_group
 
     mock_sess_ctx.session_type = SessionTypes.INTERACTIVE
-    mock_sess_ctx.scaling_group = 'c'
+    mock_sess_ctx.scaling_group = "c"
     mock_sess_ctx.target_sgroup_names = []
     result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
     assert result == scaling_group
@@ -79,7 +85,7 @@ async def test_allowed_session_types_check(mock_query):
     # Non-existent/disallowed preferred scaling group
 
     session_type = SessionTypes.INTERACTIVE
-    scaling_group = 'x'
+    scaling_group = "x"
     mock_sess_ctx.target_sgroup_names = []
     with pytest.raises(ScalingGroupNotFound) as e:
         result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
@@ -94,27 +100,27 @@ async def test_allowed_session_types_check(mock_query):
     scaling_group = None
     mock_sess_ctx.target_sgroup_names = []
     result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
-    assert result == 'a'
+    assert result == "a"
 
     session_type = SessionTypes.INTERACTIVE
     scaling_group = None
     mock_sess_ctx.target_sgroup_names = []
     result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
-    assert result == 'b'
+    assert result == "b"
 
     # No preferred scaling group with an empty list of allowed sgroups
 
     mock_query.return_value = []
 
     session_type = SessionTypes.BATCH
-    scaling_group = 'x'
+    scaling_group = "x"
     mock_sess_ctx.target_sgroup_names = []
     with pytest.raises(ScalingGroupNotFound) as e:
         result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
     assert "You have no scaling groups allowed to use." in str(e.value)
 
     session_type = SessionTypes.INTERACTIVE
-    scaling_group = 'x'
+    scaling_group = "x"
     mock_sess_ctx.target_sgroup_names = []
     with pytest.raises(ScalingGroupNotFound) as e:
         result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
@@ -124,10 +130,12 @@ async def test_allowed_session_types_check(mock_query):
 
     mock_query.return_value = [
         {
-            'name': 'a',
-            'scheduler_opts': ScalingGroupOpts.from_json({
-                'allowed_session_types': ['batch'],
-            }),
+            "name": "a",
+            "scheduler_opts": ScalingGroupOpts.from_json(
+                {
+                    "allowed_session_types": ["batch"],
+                }
+            ),
         },
     ]
 
@@ -135,7 +143,7 @@ async def test_allowed_session_types_check(mock_query):
     scaling_group = None
     mock_sess_ctx.target_sgroup_names = []
     result = await check_scaling_group(mock_conn, scaling_group, session_type, None, None, None)
-    assert result == 'a'
+    assert result == "a"
 
     session_type = SessionTypes.INTERACTIVE
     scaling_group = None
