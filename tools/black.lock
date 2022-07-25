@@ -202,7 +202,6 @@
           "requires_dists": [],
           "requires_python": ">=3.7",
           "version": "2.0.1"
-           },
         }
       ],
       "platform_tag": null
