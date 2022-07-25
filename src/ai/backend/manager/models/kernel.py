@@ -28,6 +28,7 @@ from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack, redis_helper
@@ -1209,23 +1210,23 @@ class LegacyComputeSessionList(graphene.ObjectType):
 
 
 async def recalc_concurrency_used(
-    db_conn: SAConnection,
+    db_sess: SASession,
     redis_stat: RedisConnectionInfo,
     access_key: AccessKey,
 ) -> None:
 
     concurrency_used: int
-    async with db_conn.begin_nested():
-        query = (
-            sa.select([sa.func.count()])
-            .select_from(kernels)
+    async with db_sess.begin_nested():
+        result = await db_sess.execute(
+            sa.select(sa.func.count())
+            .select_from(KernelRow)
             .where(
-                (kernels.c.access_key == access_key)
-                & (kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
-            )
+                (KernelRow.access_key == access_key)
+                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+            ),
         )
-        result = await db_conn.execute(query)
-        concurrency_used = result.first()[0]
+        concurrency_used = result.scalar()
+        assert isinstance(concurrency_used, int)
 
     await redis_helper.execute(
         redis_stat,

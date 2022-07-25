@@ -78,6 +78,7 @@ from ai.backend.common.types import (
     KernelId,
     RedisConnectionInfo,
     ResourceSlot,
+    SessionEnqueueingConfig,
     SessionId,
     SessionResult,
     SessionTypes,
@@ -112,7 +113,11 @@ from .models import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AgentStatus,
     ImageRow,
+    KernelRow,
     KernelStatus,
+    SessionDependencyRow,
+    SessionRow,
+    SessionStatus,
     agents,
     kernels,
     keypair_resource_policies,
@@ -121,9 +126,9 @@ from .models import (
     query_allowed_sgroups,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
-    session_dependencies,
 )
 from .models.kernel import get_all_kernels, get_main_kernels, match_session_ids
+from .models.session import match_sessions_by_id
 from .models.utils import ExtendedAsyncSAEngine, execute_with_retry, reenter_txn, sql_json_merge
 from .types import SessionGetter, UserScope
 
@@ -789,7 +794,7 @@ class AgentRegistry:
         session_creation_id: str,
         session_name: str,
         access_key: AccessKey,
-        kernel_enqueue_configs: List[KernelEnqueueingConfig],
+        session_enqueue_configs: SessionEnqueueingConfig,
         scaling_group: Optional[str],
         session_type: SessionTypes,
         resource_policy: dict,
@@ -806,6 +811,10 @@ class AgentRegistry:
     ) -> SessionId:
 
         session_id = SessionId(uuid.uuid4())
+
+        kernel_enqueue_configs = session_enqueue_configs["kernel_configs"]
+        session_image_ref = session_enqueue_configs["image_ref"]
+        session_creation_config = session_enqueue_configs["creation_config"]
 
         # Check keypair resource limit
         if cluster_size > int(resource_policy["max_containers_per_session"]):
@@ -832,10 +841,8 @@ class AgentRegistry:
                 )
 
             # Translate mounts/mount_map into vfolder mounts
-            requested_mounts = kernel_enqueue_configs[0]["creation_config"].get("mounts") or []
-            requested_mount_map = (
-                kernel_enqueue_configs[0]["creation_config"].get("mount_map") or {}
-            )
+            requested_mounts = session_enqueue_configs["creation_config"].get("mounts") or []
+            requested_mount_map = session_enqueue_configs["creation_config"].get("mount_map") or {}
             allowed_vfolder_types = await self.shared_config.get_vfolder_types()
             vfolder_mounts = await prepare_vfolder_mounts(
                 conn,
@@ -897,57 +904,64 @@ class AgentRegistry:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
-        kernel_bulk_insert_query = kernels.insert().values(
-            {
-                "agent": sa.bindparam("mapped_agent"),
-                "id": sa.bindparam("kernel_id"),
-                "status": KernelStatus.PENDING,
-                "status_history": {
-                    KernelStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
-                },
-                "session_creation_id": session_creation_id,
-                "session_id": session_id,
-                "session_name": session_name,
-                "session_type": session_type,
-                "cluster_mode": cluster_mode.value,
-                "cluster_size": cluster_size,
-                "cluster_role": sa.bindparam("cluster_role"),
-                "cluster_idx": sa.bindparam("cluster_idx"),
-                "cluster_hostname": sa.bindparam("cluster_hostname"),
-                "scaling_group": checked_scaling_group,
-                "domain_name": user_scope.domain_name,
-                "group_id": user_scope.group_id,
-                "user_uuid": user_scope.user_uuid,
-                "access_key": access_key,
-                "image": sa.bindparam("image"),
-                "registry": sa.bindparam("registry"),
-                "tag": session_tag,
-                "starts_at": starts_at,
-                "internal_data": internal_data,
-                "callback_url": callback_url,
-                "startup_command": sa.bindparam("startup_command"),
-                "occupied_slots": sa.bindparam("occupied_slots"),
-                "occupied_shares": {},
-                "resource_opts": sa.bindparam("resource_opts"),
-                "environ": sa.bindparam("environ"),
-                "mounts": [mount.name for mount in vfolder_mounts],  # TODO: keep for legacy?
-                "vfolder_mounts": vfolder_mounts,
-                "bootstrap_script": sa.bindparam("bootstrap_script"),
-                "repl_in_port": 0,
-                "repl_out_port": 0,
-                "stdin_port": 0,
-                "stdout_port": 0,
-                "preopen_ports": sa.bindparam("preopen_ports"),
-            }
-        )
+        session_data = {
+            "id": session_id,
+            "status": SessionStatus.PENDING,
+            "status_history": {
+                SessionStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+            },
+            "creation_id": session_creation_id,
+            "name": session_name,
+            "session_type": session_type,
+            "cluster_mode": cluster_mode.value,
+            "cluster_size": cluster_size,
+            "scaling_group_name": checked_scaling_group,
+            "domain_name": user_scope.domain_name,
+            "group_id": user_scope.group_id,
+            "user_uuid": user_scope.user_uuid,
+            "access_key": access_key,
+            "tag": session_tag,
+            "starts_at": starts_at,
+            "callback_url": callback_url,
+            "occupying_slots": ResourceSlot(),
+            "requested_slots": ResourceSlot(),
+            "vfolder_mounts": vfolder_mounts,
+            "image": session_image_ref.canonical,
+        }
+
+        kernel_shared_data = {
+            "status": KernelStatus.PENDING,
+            "status_history": {
+                KernelStatus.PENDING.name: datetime.now(tzutc()).isoformat(),
+            },
+            "session_creation_id": session_creation_id,
+            "session_id": session_id,
+            "session_name": session_name,
+            "session_type": session_type,
+            "cluster_mode": cluster_mode.value,
+            "cluster_size": cluster_size,
+            "scaling_group": checked_scaling_group,
+            "domain_name": user_scope.domain_name,
+            "group_id": user_scope.group_id,
+            "user_uuid": user_scope.user_uuid,
+            "access_key": access_key,
+            "tag": session_tag,
+            "starts_at": starts_at,
+            "internal_data": internal_data,
+            "callback_url": callback_url,
+            "occupied_shares": {},
+            "mounts": [mount.name for mount in vfolder_mounts],  # TODO: keep for legacy?
+            "vfolder_mounts": vfolder_mounts,
+            "repl_in_port": 0,
+            "repl_out_port": 0,
+            "stdin_port": 0,
+            "stdout_port": 0,
+        }
+
         kernel_data = []
 
         for idx, kernel in enumerate(kernel_enqueue_configs):
-            kernel_id: KernelId
-            if kernel["cluster_role"] == DEFAULT_ROLE:
-                kernel_id = cast(KernelId, session_id)
-            else:
-                kernel_id = KernelId(uuid.uuid4())
+            kernel_id = KernelId(uuid.uuid4())
             creation_config = kernel["creation_config"]
             image_ref = kernel["image_ref"]
             resource_opts = creation_config.get("resource_opts") or {}
@@ -1071,7 +1085,10 @@ class AgentRegistry:
                     ),
                 )
 
-            environ = kernel_enqueue_configs[0]["creation_config"].get("environ") or {}
+            # Add requested resource slot data to session
+            session_data["requested_slots"] += requested_slots
+
+            environ = session_creation_config.get("environ") or {}
 
             # Create kernel object in PENDING state.
             mapped_agent = None
@@ -1082,16 +1099,20 @@ class AgentRegistry:
 
             kernel_data.append(
                 {
-                    "mapped_agent": mapped_agent,
-                    "kernel_id": kernel_id,
+                    **kernel_shared_data,
+                    "id": kernel_id,
+                    "agent_id": mapped_agent,
                     "cluster_role": kernel["cluster_role"],
                     "cluster_idx": kernel["cluster_idx"],
-                    "cluster_hostname": f"{kernel['cluster_role']}{kernel['cluster_idx']}",
+                    "cluster_hostname": f"{kernel['cluster_role']}{kernel['cluster_idx']}"
+                    if not kernel["cluster_hostname"]
+                    else kernel["cluster_hostname"],
                     "image": image_ref.canonical,
                     "architecture": image_ref.architecture,
                     "registry": image_ref.registry,
                     "startup_command": kernel.get("startup_command"),
-                    "occupied_slots": requested_slots,
+                    "occupied_slots": ResourceSlot(),
+                    "requested_slots": requested_slots,
                     "resource_opts": resource_opts,
                     "environ": [f"{k}={v}" for k, v in environ.items()],
                     "bootstrap_script": kernel.get("bootstrap_script"),
@@ -1102,36 +1123,35 @@ class AgentRegistry:
         try:
 
             async def _enqueue() -> None:
-                async with self.db.begin() as conn:
-                    await conn.execute(kernel_bulk_insert_query, kernel_data)
-                    if dependency_sessions:
-                        matched_dependency_session_ids = []
-                        for dependency_id in dependency_sessions:
-                            match_info = await match_session_ids(
-                                dependency_id,
-                                access_key,
-                                db_connection=conn,
+                async with self.db.begin_session() as db_sess:
+                    session = SessionRow(**session_data)
+                    kernels = [KernelRow(**kernel) for kernel in kernel_data]
+                    db_sess.add(session)
+                    db_sess.add_all(kernels)
+
+                    if not dependency_sessions:
+                        return
+
+                    matched_dependency_session_ids = []
+                    for dependency_id in dependency_sessions:
+                        match_info = await match_sessions_by_id(
+                            db_sess,
+                            dependency_id,
+                            access_key,
+                        )
+                        if match_info:
+                            matched_dependency_session_ids.append(match_info[0].id)
+                        else:
+                            raise InvalidAPIParameters(
+                                "Unknown session ID or name in the dependency list",
+                                extra_data={"session_ref": dependency_id},
                             )
-                            if match_info:
-                                matched_dependency_session_ids.append(match_info[0]["session_id"])
-                            else:
-                                raise InvalidAPIParameters(
-                                    "Unknown session ID or name in the dependency list",
-                                    extra_data={"session_ref": dependency_id},
-                                )
-                        dependency_bulk_insert_query = session_dependencies.insert().values(
-                            {
-                                "session_id": session_id,
-                                "depends_on": sa.bindparam("dependency_id"),
-                            },
-                        )
-                        await conn.execute(
-                            dependency_bulk_insert_query,
-                            [
-                                {"dependency_id": dependency_id}
-                                for dependency_id in matched_dependency_session_ids
-                            ],
-                        )
+                    dependency_rows = [
+                        SessionDependencyRow(session_id=session_id, depends_on=depend_id)
+                        for depend_id in matched_dependency_session_ids
+                    ]
+                    db_sess.add_all(dependency_rows)
+                    await db_sess.commit()
 
             await execute_with_retry(_enqueue)
         except DBAPIError as e:

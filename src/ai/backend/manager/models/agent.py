@@ -10,6 +10,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import true
 
@@ -44,6 +45,7 @@ __all__: Sequence[str] = (
     "Agent",
     "ModifyAgent",
     "recalc_agent_resource_occupancy",
+    "list_schedulable_agents_by_sgroup",
 )
 
 
@@ -87,6 +89,20 @@ class AgentRow(Base):
     __table__ = agents
     kernels = relationship("KernelRow", back_populates="agent_row")
     scaling_group_row = relationship("ScalingGroupRow", back_populates="agents")
+
+
+async def list_schedulable_agents_by_sgroup(
+    db_sess: SASession,
+    sgroup_name: str,
+) -> Sequence[AgentRow]:
+    query = sa.select(AgentRow).where(
+        (AgentRow.status == AgentStatus.ALIVE)
+        & (AgentRow.scaling_group_name == sgroup_name)
+        & (AgentRow.schedulable == true()),
+    )
+
+    result = await db_sess.execute(query)
+    return result.scalars().all()
 
 
 class Agent(graphene.ObjectType):

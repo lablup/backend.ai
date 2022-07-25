@@ -60,6 +60,8 @@ __all__ = (
     "SessionRow",
     "match_sessions",
     "match_sessions_by_id",
+    "get_session_by_id",
+    "get_sgroup_managed_sessions",
     "SessionDependencyRow",
     "check_all_dependencies",
     "ComputeSession",
@@ -511,6 +513,28 @@ async def get_sessions_by_name(
         load_kernels=load_kernels,
     )
     result = await db_session.execute(query)
+    return result.scalars().all()
+
+
+async def get_sgroup_managed_sessions(
+    db_sess: SASession,
+    sgroup_name: str,
+) -> List[SessionRow]:
+    candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
+    query = (
+        sa.select(SessionRow)
+        .where(
+            (SessionRow.scaling_group_name == sgroup_name)
+            & (SessionRow.status.in_(candidate_statues))
+        )
+        .options(
+            noload("*"),
+            selectinload(SessionRow.group).options(noload("*")),
+            selectinload(SessionRow.domain).options(noload("*")),
+            selectinload(SessionRow.access_key_row).options(noload("*")),
+        )
+    )
+    result = await db_sess.execute(query)
     return result.scalars().all()
 
 

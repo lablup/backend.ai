@@ -40,7 +40,7 @@ from ai.backend.common.types import (
 )
 
 from ..defs import DEFAULT_ROLE
-from ..models import kernels, keypairs
+from ..models import AgentRow, SessionRow, kernels, keypairs
 from ..models.scaling_group import ScalingGroupOpts
 from ..registry import AgentRegistry
 
@@ -407,8 +407,8 @@ class AbstractScheduler(metaclass=ABCMeta):
     def pick_session(
         self,
         total_capacity: ResourceSlot,
-        pending_sessions: Sequence[PendingSession],
-        existing_sessions: Sequence[ExistingSession],
+        pending_sessions: Sequence[SessionRow],
+        existing_sessions: Sequence[SessionRow],
     ) -> Optional[SessionId]:
         """
         Pick a session to try schedule.
@@ -419,8 +419,8 @@ class AbstractScheduler(metaclass=ABCMeta):
     @abstractmethod
     def assign_agent_for_session(
         self,
-        possible_agents: Sequence[AgentContext],
-        pending_session: PendingSession,
+        possible_agents: Sequence[AgentRow],
+        pending_session: SessionRow,
     ) -> Optional[AgentId]:
         """
         Assign an agent for the entire session, only considering the total requested
@@ -435,7 +435,7 @@ class AbstractScheduler(metaclass=ABCMeta):
     @abstractmethod
     def assign_agent_for_kernel(
         self,
-        possible_agents: Sequence[AgentContext],
+        possible_agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
     ) -> Optional[AgentId]:
         """

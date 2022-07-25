@@ -423,7 +423,3 @@ class KernelExecutionFailed(BackendAgentError, web.HTTPInternalServerError):
 
 class UnknownImageReferenceError(ObjectNotFound):
     object_name = "image reference"
-
-
-class UnknownDependencySession(Exception):
-    pass
