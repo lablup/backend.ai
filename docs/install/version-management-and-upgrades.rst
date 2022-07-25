@@ -46,6 +46,6 @@ You can upgrade the installed Python packages using ``pip install -U ...`` comma
 If you have cloned the stable version of source code from git, then pull and check out the next ``x.y`` release branch.
 It is recommended to re-run ``pip install -U -r requirements.txt`` as dependencies might be updated.
 
-For the manager, ensure that your database schema is up-to-date by running ``alembic upgrade head``. If you setup your development environment with Pants and `install-dev.sh` script, make your database schema via ``./py -m alembic upgrade head`` instead of plain alembic command above.
+For the manager, ensure that your database schema is up-to-date by running ``alembic upgrade head``. If you setup your development environment with Pants and `install-dev.sh` script, keep your database schema up-to-date via ``./py -m alembic upgrade head`` instead of plain alembic command above.
 
 Also check if any manual etcd configuration scheme change is required, though we will try to keep it compatible and automatically upgrade when first executed.
