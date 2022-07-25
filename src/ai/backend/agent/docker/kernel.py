@@ -127,6 +127,29 @@ class DockerKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
+    async def commit(self, dst: str):
+        assert self.runner is not None
+        work_dir = PurePosixPath(dst)
+        container_id: str = str(self.data["container_id"])
+
+        proc = await asyncio.create_subprocess_exec(
+            *[
+                "docker",
+                "export",
+                f"--output={work_dir}",
+                container_id,
+            ],
+        )
+        if await proc.wait() != 0:
+            log.error(
+                "{0}: committing container failed: {1} -> {2}",
+                self.kernel_id,
+                container_id,
+                work_dir,
+            )
+            return
+        log.info("Container(id: {0}) has committed to {1}", container_id, work_dir)
+
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()
         work_dir = self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"

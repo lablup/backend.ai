@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -2981,6 +2982,37 @@ class AgentRegistry:
         reason: str,
     ) -> None:
         await self.clean_session(session_id)
+
+    async def commit_session(
+        self,
+        session_name_or_id: Union[str, SessionId],
+        access_key: AccessKey,
+        dst: str | None,
+    ) -> None:
+        """
+        Commit a main kernel's container of the given session.
+        """
+
+        kernel = await self.get_session(session_name_or_id, access_key)
+        if dst is None:
+            now = datetime.now(tzutc())
+            # TODO: get path from toml or cfg
+            dst = (
+                Path("/etc/backend.ai/commit")
+                / str(kernel["user_uuid"])
+                / (now.isoformat() + ".img.tar.gz")
+            )
+            dst = str(dst)
+
+        async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
+            async with RPCContext(
+                kernel["agent"],
+                kernel["agent_addr"],
+                invoke_timeout=None,
+                order_key=kernel["id"],
+                keepalive_timeout=self.rpc_keepalive_timeout,
+            ) as rpc:
+                return await rpc.call.commit(str(kernel["id"]), dst)
 
 
 async def check_scaling_group(

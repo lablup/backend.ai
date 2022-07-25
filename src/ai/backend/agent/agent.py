@@ -1883,6 +1883,9 @@ class AbstractAgent(
         except Exception:
             log.exception("unhandled exception while shutting down service app ${}", service)
 
+    async def commit(self, kernel_id: KernelId, dst: str):
+        return await self.kernel_registry[kernel_id].commit(dst)
+
     async def accept_file(self, kernel_id: KernelId, filename: str, filedata):
         return await self.kernel_registry[kernel_id].accept_file(filename, filedata)
 

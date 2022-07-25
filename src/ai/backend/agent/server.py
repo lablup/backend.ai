@@ -502,6 +502,19 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def commit(
+        self,
+        kernel_id,  # type: str
+        dst,  # type: str
+    ):
+        log.info("rpc::commit(k:{1})", kernel_id)
+        return await self.agent.commit(
+            KernelId(UUID(kernel_id)),
+            dst,
+        )
+
+    @rpc_function
+    @collect_error
     async def shutdown_service(
         self,
         kernel_id,  # type: str

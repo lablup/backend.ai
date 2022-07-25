@@ -1315,6 +1315,36 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
             )
 
 
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("login_session_token", default=None): t.Null | t.String,
+            # if `dst` is None, it will be agent's default destination.
+            tx.AliasedKey(["dst", "dest"], default=None): t.Null | t.String,
+        }
+    ),
+    loads=_json_loads,
+)
+async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name: str = request.match_info["session_name"]
+    app_ctx: PrivateContext = request.app["session.context"]
+    access_key: AccessKey = request["keypair"]["access_key"]
+    dst: str | None = params["dst"]
+
+    myself = asyncio.current_task()
+    assert myself is not None
+
+    await asyncio.shield(
+        app_ctx.rpc_ptask_group.create_task(
+            root_ctx.registry.commit_session(session_name, access_key, dst),
+        ),
+    )
+    return web.json_response(status=204)
+
+
 async def handle_kernel_creation_lifecycle(
     app: web.Application,
     source: AgentId,
@@ -2517,4 +2547,5 @@ def create_app(
     cors.add(app.router.add_route("GET", "/{session_name}/download_single", download_single))
     cors.add(app.router.add_route("GET", "/{session_name}/files", list_files))
     cors.add(app.router.add_route("POST", "/{session_name}/start-service", start_service))
+    cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
     return app, []

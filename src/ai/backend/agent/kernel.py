@@ -277,6 +277,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    async def commit(self, dst):
+        raise NotImplementedError
+
+    @abstractmethod
     async def get_service_apps(self):
         raise NotImplementedError
 

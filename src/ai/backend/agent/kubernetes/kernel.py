@@ -202,6 +202,25 @@ class KubernetesKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
+    async def commit(self, dst: str):
+        log.error("Committing in Kubernetes is not supported yet.")
+        # assert self.runner is not None
+
+        # work_dir = Path(dst)
+        # core_api = kube_client.CoreV1Api()
+        # async with watch.Watch().stream(
+        #     core_api.connect_get_namespaced_pod_exec,
+        #     self.kernel_id,
+        #     "backend-ai",
+        #     stderr=True,
+        #     stdin=True,
+        #     stdout=True,
+        #     tty=False,
+        #     _preload_content=False,
+        # ) as stream:
+        #     async for event in stream:
+        #         log.debug("stream: {}", event)
+
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()
         work_dir = self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
