@@ -909,10 +909,10 @@ configure_backendai() {
 }
 
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-  setup_environment()
+  setup_environment
 fi
 if [ $CODESPACES != "true" ] || [ $CODESPACES_POST_CREATE -eq 1 ]; then
-  configure_backendai()
+  configure_backendai
 fi
 
 # vim: tw=0 sts=2 sw=2 et

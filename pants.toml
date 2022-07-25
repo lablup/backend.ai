@@ -16,6 +16,7 @@ pants_ignore = [
     "scripts",
     "plugins",
     "docs",  # TODO: docs build config
+    "*.log"
 ]
 # use_deprecated_directory_cli_args_semantics = false  # for 2.13 or later
 
