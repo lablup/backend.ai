@@ -14,8 +14,8 @@ from ai.backend.common.argparse import (
     positive_int,
 )
 
-localhost_ipv4 = ipaddress.ip_address('127.0.0.1')
-localhost_ipv6 = ipaddress.ip_address('::1')
+localhost_ipv4 = ipaddress.ip_address("127.0.0.1")
+localhost_ipv6 = ipaddress.ip_address("::1")
 
 
 def test_port_no():
@@ -34,26 +34,26 @@ def test_port_no():
 
 
 def test_port_range():
-    assert port_range('1-2') == (1, 2)
-    assert port_range('1000-2000') == (1000, 2000)
-    assert port_range('1-65535') == (1, 65535)
+    assert port_range("1-2") == (1, 2)
+    assert port_range("1000-2000") == (1000, 2000)
+    assert port_range("1-65535") == (1, 65535)
 
     with pytest.raises(argparse.ArgumentTypeError):
-        port_range('0-65535')
+        port_range("0-65535")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_range('1-65536')
+        port_range("1-65536")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_range('1-2-3')
+        port_range("1-2-3")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_range('1')
+        port_range("1")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_range('xxx')
+        port_range("xxx")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_range('-')
+        port_range("-")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_range('')
+        port_range("")
     with pytest.raises(argparse.ArgumentTypeError):
-        port_range('10-5')
+        port_range("10-5")
 
 
 def test_positive_int():
@@ -80,72 +80,72 @@ def test_non_positive_int():
 
 
 def test_host_port_pair_direct_creation():
-    ip = ipaddress.ip_address('1.2.3.4')
+    ip = ipaddress.ip_address("1.2.3.4")
     pair = HostPortPair(ip, 8000)
 
-    assert pair.as_sockaddr() == ('1.2.3.4', 8000)
-    assert '{}'.format(pair) == '1.2.3.4:8000'
-    assert str(pair) == '1.2.3.4:8000'
+    assert pair.as_sockaddr() == ("1.2.3.4", 8000)
+    assert "{}".format(pair) == "1.2.3.4:8000"
+    assert str(pair) == "1.2.3.4:8000"
 
 
 def test_host_port_pair_parse():
     with pytest.raises(argparse.ArgumentTypeError):
-        host_port_pair('oihasdfoih')
+        host_port_pair("oihasdfoih")
     with pytest.raises(argparse.ArgumentTypeError):
-        host_port_pair('99999')
+        host_port_pair("99999")
     with pytest.raises(argparse.ArgumentTypeError):
-        host_port_pair('oihasdfoih:oixzcghboihx')
+        host_port_pair("oihasdfoih:oixzcghboihx")
     with pytest.raises(argparse.ArgumentTypeError):
-        host_port_pair('oihasdfoih:-1')
+        host_port_pair("oihasdfoih:-1")
     with pytest.raises(argparse.ArgumentTypeError):
-        host_port_pair('oihasdfoih:99999')
+        host_port_pair("oihasdfoih:99999")
     with pytest.raises(argparse.ArgumentTypeError):
-        host_port_pair('oihasdfoih:123.45')
+        host_port_pair("oihasdfoih:123.45")
     with pytest.raises(argparse.ArgumentTypeError):
-        host_port_pair(':')
+        host_port_pair(":")
     with pytest.raises(argparse.ArgumentTypeError):
-        host_port_pair('::')
+        host_port_pair("::")
     with pytest.raises(argparse.ArgumentTypeError):
-        host_port_pair(':::')
+        host_port_pair(":::")
 
-    a = host_port_pair('oihasdfoih:123')
-    assert a.host == 'oihasdfoih'
+    a = host_port_pair("oihasdfoih:123")
+    assert a.host == "oihasdfoih"
     assert a.port == 123
 
-    a = host_port_pair('[::1]:9871')
+    a = host_port_pair("[::1]:9871")
     assert a.host == localhost_ipv6
     assert a.port == 9871
 
-    a = host_port_pair('::1:9871')
+    a = host_port_pair("::1:9871")
     assert a.host == localhost_ipv6
     assert a.port == 9871
 
 
 def test_host_port_pair_comparison():
-    a = host_port_pair('oihasdfoih:123')
-    b = host_port_pair('oihasdfoih:123')
+    a = host_port_pair("oihasdfoih:123")
+    b = host_port_pair("oihasdfoih:123")
     assert a == b
-    b = host_port_pair('oihasdfoih:124')
+    b = host_port_pair("oihasdfoih:124")
     assert a != b
-    b = host_port_pair('oihasdfoix:123')
+    b = host_port_pair("oihasdfoix:123")
     assert a != b
 
 
 def test_ipaddr():
-    assert ipaddr('[192.168.0.1]') == ipaddress.ip_address('192.168.0.1')
-    assert ipaddr('192.168.0.1') == ipaddress.ip_address('192.168.0.1')
-    assert ipaddr('2001:DB8::1') == ipaddress.ip_address('2001:DB8::1')
+    assert ipaddr("[192.168.0.1]") == ipaddress.ip_address("192.168.0.1")
+    assert ipaddr("192.168.0.1") == ipaddress.ip_address("192.168.0.1")
+    assert ipaddr("2001:DB8::1") == ipaddress.ip_address("2001:DB8::1")
 
     with pytest.raises(argparse.ArgumentTypeError):
-        ipaddr('50')
+        ipaddr("50")
     with pytest.raises(argparse.ArgumentTypeError):
-        ipaddr('1.1')
+        ipaddr("1.1")
     with pytest.raises(argparse.ArgumentTypeError):
-        ipaddr('1.1.1')
+        ipaddr("1.1.1")
 
 
 def test_path(tmpdir):
     assert path(None) is None
     assert path(tmpdir) == tmpdir
     with pytest.raises(argparse.ArgumentTypeError):
-        assert path('/path/not/exist/')
+        assert path("/path/not/exist/")

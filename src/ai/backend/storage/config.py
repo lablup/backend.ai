@@ -47,10 +47,8 @@ local_config_iv = (
                                 allow_blank_host=True,
                             ),
                             t.Key("ssl-enabled"): t.ToBool,
-                            t.Key("ssl-cert", default=None): t.Null
-                            | tx.Path(type="file"),
-                            t.Key("ssl-privkey", default=None): t.Null
-                            | tx.Path(type="file"),
+                            t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
+                            t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
                         },
                     ),
                     t.Key("manager"): t.Dict(
@@ -59,10 +57,8 @@ local_config_iv = (
                                 allow_blank_host=True,
                             ),
                             t.Key("ssl-enabled"): t.ToBool,
-                            t.Key("ssl-cert", default=None): t.Null
-                            | tx.Path(type="file"),
-                            t.Key("ssl-privkey", default=None): t.Null
-                            | tx.Path(type="file"),
+                            t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
+                            t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
                             t.Key("secret"): t.String,  # used to authenticate managers
                         },
                     ),
