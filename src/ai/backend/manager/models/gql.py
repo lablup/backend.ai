@@ -96,7 +96,12 @@ from .user import (
     UserRole,
     UserStatus,
 )
-from .vfolder import VirtualFolder, VirtualFolderList
+from .vfolder import (
+    VirtualFolder,
+    VirtualFolderList,
+    VirtualFolderPermission,
+    VirtualFolderPermissionList,
+)
 
 
 @attr.s(auto_attribs=True, slots=True)
@@ -396,7 +401,7 @@ class Queries(graphene.ObjectType):
 
     # super-admin only
     shared_vfolder_list = graphene.Field(
-        VirtualFolderList,
+        VirtualFolderPermissionList,
         limit=graphene.Int(required=True),
         offset=graphene.Int(required=True),
         filter=graphene.String(),
@@ -1122,30 +1127,24 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
-    ) -> VirtualFolderList:
-        total_count = await VirtualFolder.load_count_shared(
+    ) -> VirtualFolderPermissionList:
+        total_count = await VirtualFolderPermission.load_count(
             info.context,
-            domain_name=domain_name,  # scope
-            group_id=group_id,        # scope
-            user_id=user_id,          # scope
+            user_id=user_id,
             filter=filter,
         )
-        items = await VirtualFolder.load_slice_shared(
+        items = await VirtualFolderPermission.load_slice(
             info.context,
             limit,
             offset,
-            domain_name=domain_name,  # scope
-            group_id=group_id,        # scope
-            user_id=user_id,          # scope
+            user_id=user_id,
             filter=filter,
             order=order,
         )
-        return VirtualFolderList(items, total_count)
+        return VirtualFolderPermissionList(items, total_count)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
