@@ -1337,11 +1337,15 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     myself = asyncio.current_task()
     assert myself is not None
 
-    await asyncio.shield(
-        app_ctx.rpc_ptask_group.create_task(
-            root_ctx.registry.commit_session(session_name, access_key, dst),
-        ),
-    )
+    try:
+        await asyncio.shield(
+            app_ctx.rpc_ptask_group.create_task(
+                root_ctx.registry.commit_session(session_name, access_key, dst),
+            ),
+        )
+    except BackendError:
+        log.exception("COMMIT_SESSION: exception")
+        raise
     return web.json_response(status=204)
 
 
