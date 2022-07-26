@@ -414,10 +414,10 @@ install_git_hooks() {
       :
     else
       echo "" >> .git/hooks/pre-commit
-      cat scripts/pre-commit.sh >> .git/hooks/pre-commit
+      cat scripts/pre-commit >> .git/hooks/pre-commit
     fi
   else
-    cp scripts/pre-commit.sh .git/hooks/pre-commit
+    cp scripts/pre-commit .git/hooks/pre-commit
     chmod +x .git/hooks/pre-commit
   fi
   local magic_str="monorepo standard pre-push hook"
@@ -427,10 +427,10 @@ install_git_hooks() {
       :
     else
       echo "" >> .git/hooks/pre-push
-      cat scripts/pre-push.sh >> .git/hooks/pre-push
+      cat scripts/pre-push >> .git/hooks/pre-push
     fi
   else
-    cp scripts/pre-push.sh .git/hooks/pre-push
+    cp scripts/pre-push .git/hooks/pre-push
     chmod +x .git/hooks/pre-push
   fi
 }
@@ -545,13 +545,26 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 $bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
-
-# Codespaces always have docker installed, so it's safe to skip this process.
 if [ $CODESPACES = "true" ]; then
   $bpython scripts/check-docker.py
   if [ $? -ne 0 ]; then
     exit 1
   fi
+  # checking docker compose v2 -f flag
+  if $(docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+    show_error "When run as a user, 'docker compose' seems not to be a compatible version (v2)."
+    show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on ${HOME}/.docker/cli-plugins"
+    exit 1
+  fi
+  if $(sudo docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+    show_error "When run as the root, 'docker compose' seems not to be a compatible version (v2)"
+    show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on /usr/local/lib/docker/cli-plugins"
+    exit 1
+  fi
+  if [ "$DISTRO" = "Darwin" ]; then
+    echo "validating Docker Desktop mount permissions..."
+    docker pull alpine:3.8 > /dev/null
+    docker run --rm -v "$HOME/.pyenv:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
 
   if [ "$DISTRO" = "Darwin" ]; then
     echo "validating Docker Desktop mount permissions..."
@@ -575,7 +588,7 @@ fi
 if [ $ENABLE_CUDA -eq 1 ] && [ $ENABLE_CUDA_MOCK -eq 1 ]; then
   show_error "You can't use both CUDA and CUDA mock plugins at once!"
   show_error "Please remove --enable-cuda or --enable-cuda-mock flag to continue."
-  exit -1
+  exit 1
 fi
 
 check_snappy() {
@@ -715,11 +728,11 @@ configure_backendai() {
   sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
   sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
   if [ $ENABLE_CUDA -eq 1 ]; then
-    sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-    sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
   else
-    sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = []/" ./agent.toml
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
   sed_inplace 's@var-base-path = .*$@var-base-path = "'"${VAR_BASE_PATH}"'"@' ./agent.toml
 
