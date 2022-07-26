@@ -6,6 +6,7 @@ from typing import Coroutine, List
 from ai.backend.common.distributed.raft import RaftConsensusModule
 from ai.backend.common.distributed.raft.client import GrpcRaftClient
 from ai.backend.common.distributed.raft.server import GrpcRaftServer
+from ai.backend.common.distributed.raft.utils import build_local_ip
 
 _cleanup_coroutines: List[Coroutine] = []
 
@@ -24,17 +25,22 @@ def parse_args():
 
 async def _main():
     args = parse_args()
+    public_ip = build_local_ip()
+    public_id = f"{public_ip}:{args.port}"
 
     server = GrpcRaftServer()
     client = GrpcRaftClient()
     raft = await RaftConsensusModule.new(
-        peers=args.peers, server=server, client=client, id=str(args.port)
+        peers=args.peers,
+        server=server,
+        client=client,
+        id=public_id,
     )
 
     done, pending = await asyncio.wait(
         {
             asyncio.create_task(
-                server.run(cleanup_coroutines=_cleanup_coroutines, port=args.port),
+                server.run(cleanup_coroutines=_cleanup_coroutines, host="0.0.0.0", port=args.port),
             ),
             asyncio.create_task(raft.main()),
         },

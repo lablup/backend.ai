@@ -2,7 +2,7 @@ import abc
 from typing import Iterable, Tuple
 
 from .protos import raft_pb2
-from .types import PeerId
+from .types import CommandResponse, PeerId
 
 
 class AbstractRaftProtocol(abc.ABC):
@@ -115,4 +115,15 @@ class AbstractRaftProtocol(abc.ABC):
         :param int term: currentTerm, for leader to update itself
         -------
         """
+        raise NotImplementedError()
+
+
+class AbstractRaftServiceProtocol(abc.ABC):
+    @abc.abstractmethod
+    async def on_command(
+        self,
+        *,
+        id: str,
+        command: str,
+    ) -> CommandResponse:
         raise NotImplementedError()

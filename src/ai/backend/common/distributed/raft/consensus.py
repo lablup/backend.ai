@@ -11,11 +11,11 @@ from typing import Awaitable, Callable, Dict, Final, Iterable, Optional, Tuple
 
 from ...types import aobject
 from .client import AbstractRaftClient
-from .protocol import AbstractRaftProtocol
+from .protocol import AbstractRaftProtocol, AbstractRaftServiceProtocol
 from .protos import raft_pb2
 from .server import AbstractRaftServer
 from .storage import AbstractLogStorage, SqliteLogStorage
-from .types import PeerId
+from .types import CommandResponse, PeerId
 from .utils import AtomicInteger
 
 logging.basicConfig(level=logging.INFO)
@@ -33,7 +33,7 @@ class RaftState(enum.Enum):
     LEADER = 2
 
 
-class RaftConsensusModule(aobject, AbstractRaftProtocol):
+class RaftConsensusModule(aobject, AbstractRaftProtocol, AbstractRaftServiceProtocol):
     """Rules for Servers
     All Servers
     - If commitIndex > lastApplied: increment lastApplied, apply log[lastApplied] to state machine
@@ -83,6 +83,8 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._election_timeout: Final[float] = randrangef(0.15, 0.3)  # 0.01 ~ 0.5
         self._heartbeat_interval: Final[float] = 0.1
         self._leader_id: Optional[PeerId] = None
+        # A variable for preventing redirect to None.
+        self._leader_id_cache: Optional[PeerId] = None
 
         self._reinitialize_persistent_state()
         self._reinitialize_volatile_state()
@@ -91,7 +93,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         self._prev_log_index: int = 0
         self._prev_log_term: int = 0
 
-        self._server.bind(self)
+        self._server.bind(raft_protocol=self, raft_service_protocol=self)
 
     async def __ainit__(self, *args, **kwargs) -> None:
         await self._execute_transition(RaftState.FOLLOWER)
@@ -154,7 +156,6 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         while True:
             await asyncio.sleep(3.0)
             command = str(uuid.uuid4())
-            logging.info(f"[LEADER] Storage size: {await self._log.size()}")
             next_index = self._prev_log_index + 1
             entry = raft_pb2.Log(index=next_index, term=self.current_term, command=command)
             await self._log.append_entries((entry,))
@@ -197,6 +198,7 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                         self._append_random_entry_coro()
                     )
                     self._leader_id = self.id
+                    self._leader_id_cache = self.id
                     while self._state is RaftState.LEADER:
                         await self._publish_heartbeat()
                         await asyncio.sleep(self._heartbeat_interval)
@@ -224,11 +226,6 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                 ]
             )
         )
-        if entries:
-            logging.info(
-                f"[{datetime.now().isoformat()}] replicate(entries={entries[-1].index}, "
-                f"total={await self._log.size()})"
-            )
         for term in terms:
             if term > self.current_term:
                 await self._synchronize_term(term)
@@ -253,7 +250,9 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
         if (log := await self._log.get(prev_log_index)) and (log.term != prev_log_term):
             return (self.current_term, False)
 
+        # self._leader_id_cache = self._leader_id = leader_id
         self._leader_id = leader_id
+        self._leader_id_cache = leader_id
 
         for entry in (entries := tuple(entries)):
             if (old_entry := await self._log.get(entry.index)) and (old_entry.term != entry.term):
@@ -265,10 +264,6 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
 
         if entries:
             await self._log.append_entries(entries)
-            logging.info(
-                f"[{datetime.now()}] pid={os.getpid()} on_append_entries(term={term}, index={entries[-1].index}, "
-                f"total={await self._log.size()})"
-            )
 
         if leader_commit > self._commit_index:
             self._commit_index = min(leader_commit, entries[-1].index)
@@ -310,6 +305,19 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
             return self.current_term
         return self.current_term
 
+    async def on_command(
+        self,
+        *,
+        id: str,
+        command: str,
+    ) -> CommandResponse:
+        logging.info(f"[Command] id={id} command={command}")
+        if not self.is_leader:
+            logging.info(f"[Command] Redirect to {self._leader_id}")
+            return CommandResponse(success=False, redirect=str(self._leader_id))
+        # TODO: ...
+        return CommandResponse(success=True)
+
     async def reset_timeout(self) -> None:
         self._elapsed_time: float = 0.0
 
@@ -344,6 +352,14 @@ class RaftConsensusModule(aobject, AbstractRaftProtocol):
                 ]
             )
         )
+
+        """FIXME: pythonic?
+        terms = filter(lambda t: t > self.current_term, terms)
+        if term := next(terms, None):
+            await self._synchronize_term(term)
+        elif sum(grants) + 1 >= self.quorum:
+            await self._execute_transition(RaftState.LEADER)
+        """
         for term in terms:
             if term > self.current_term:
                 await self._synchronize_term(term)

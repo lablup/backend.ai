@@ -1,10 +1,9 @@
 import abc
-import random
 from typing import Coroutine, Iterable, List, Optional, Union
 
 import grpc
 
-from .protocol import AbstractRaftProtocol
+from .protocol import AbstractRaftProtocol, AbstractRaftServiceProtocol
 from .protos import raft_pb2, raft_pb2_grpc
 
 
@@ -22,21 +21,27 @@ class GrpcRaftServer(
     """
 
     def __init__(self, credentials: Optional[grpc.ServerCredentials] = None):
-        self._protocol: Optional[AbstractRaftProtocol] = None
+        self._raft_protocol: Optional[AbstractRaftProtocol] = None
+        self._raft_service_protocol: Optional[AbstractRaftServiceProtocol] = None
         self._credentials: Optional[grpc.ServerCredentials] = credentials
 
-    def bind(self, protocol: AbstractRaftProtocol):
-        self._protocol = protocol
+    def bind(
+        self,
+        raft_protocol: AbstractRaftProtocol,
+        raft_service_protocol: AbstractRaftServiceProtocol,
+    ):
+        self._raft_protocol = raft_protocol
+        self._raft_service_protocol = raft_service_protocol
 
-    async def run(self, cleanup_coroutines: List[Coroutine], port: int = 50051):
+    async def run(self, cleanup_coroutines: List[Coroutine], host: str = "[::]", port: int = 50051):
         server = grpc.aio.server()
         raft_pb2_grpc.add_RaftServiceServicer_to_server(self, server)
         raft_pb2_grpc.add_CommandServiceServicer_to_server(self, server)
 
         if credentials := self._credentials:
-            server.add_secure_port(f"[::]:{port}", credentials)
+            server.add_secure_port(f"{host}:{port}", credentials)
         else:
-            server.add_insecure_port(f"[::]:{port}")
+            server.add_insecure_port(f"{host}:{port}")
 
         async def server_graceful_shutdown():
             await server.stop(5)
@@ -55,7 +60,7 @@ class GrpcRaftServer(
         request: raft_pb2.AppendEntriesRequest,
         context: grpc.aio.ServicerContext,
     ) -> raft_pb2.AppendEntriesResponse:
-        if (protocol := self._protocol) is None:
+        if (protocol := self._raft_protocol) is None:
             return raft_pb2.AppendEntriesResponse(term=request.term, success=False)
         term, success = await protocol.on_append_entries(
             term=request.term,
@@ -72,7 +77,7 @@ class GrpcRaftServer(
         request: raft_pb2.RequestVoteRequest,
         context: grpc.aio.ServicerContext,
     ) -> raft_pb2.RequestVoteResponse:
-        if (protocol := self._protocol) is None:
+        if (protocol := self._raft_protocol) is None:
             return raft_pb2.RequestVoteResponse(term=request.term, vote_granted=False)
         term, vote_granted = await protocol.on_request_vote(
             term=request.term,
@@ -103,15 +108,7 @@ class GrpcRaftServer(
         print(
             f"[ai.backend.common.distributed.raft] Command(id={request.id}, command={request.command})"
         )
-        if random.random() >= 0.7:
-            peer = random.choice(
-                [
-                    "127.0.0.1:50051",
-                    "127.0.0.1:50052",
-                    "127.0.0.1:50053",
-                    "127.0.0.1:50054",
-                    "127.0.0.1:50055",
-                ]
-            )
-            return raft_pb2.CommandResponse(success=False, redirect=peer)
-        return raft_pb2.CommandResponse(success=True, redirect=None)
+        if (protocol := self._raft_service_protocol) is None:
+            return raft_pb2.CommandResponse(success=False)
+        response = await protocol.on_command(id=request.id, command=request.command)
+        return raft_pb2.CommandResponse(success=response.success, redirect=response.redirect)
