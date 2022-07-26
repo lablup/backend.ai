@@ -17,12 +17,12 @@ fi
 if [ "$1" != "origin" ]; then
     # extract the owner name of the target repo
     ORIGIN="$(echo "$1" | grep -o '://[^/]\+/[^/]\+/' | grep -o '/[^/]\+/$' | tr -d '/')"
-    git remote add "$ORIGIN" "$1"
-    git fetch -q --depth=1 --no-tags "$ORIGIN" "$BASE_BRANCH"
     cleanup_remote() {
         git remote remove "$ORIGIN"
     }
     trap cleanup_remote EXIT
+    git remote add "$ORIGIN" "$1"
+    git fetch -q --depth=1 --no-tags "$ORIGIN" "$BASE_BRANCH"
 else
     ORIGIN="origin"
 fi
