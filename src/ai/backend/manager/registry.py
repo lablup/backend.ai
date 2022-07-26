@@ -2997,7 +2997,10 @@ class AgentRegistry:
         kernel = await self.get_session(session_name_or_id, access_key)
         if dst is None:
             # TODO: get path from toml or cfg
-            dst = str((Path("/tmp/backend.ai/commit") / str(kernel["user_uuid"])))
+            dst = str(Path("/tmp/backend.ai/commit") / str(kernel["user_uuid"]))
+
+        # async def _mark_session_committing():
+        #     pass
 
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(

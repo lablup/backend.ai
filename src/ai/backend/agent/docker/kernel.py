@@ -10,7 +10,7 @@ import textwrap
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Set, Tuple
 
 import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
@@ -27,6 +27,9 @@ from ai.backend.common.utils import current_loop
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 from ..utils import closing_async, get_arch_name
+
+# TODO: set the commit tags directory from toml or cfg
+COMMIT_TAG_DIR = Path(f"/tmp/backend.ai/commit/tags")
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -131,12 +134,27 @@ class DockerKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
+    async def check_commit_tag(self, get_lock: bool = False):
+        container_id: str = str(self.data["container_id"])
+        tag_path = COMMIT_TAG_DIR / container_id
+        try:
+            with open(tag_path, mode="x") as f:
+                if get_lock:
+                    f.write("")
+        except FileExistsError:
+            return False
+        return True
+
     async def commit(self, dst: str):
         assert self.runner is not None
 
+        container_id: str = str(self.data["container_id"])
+
+        if not (await self.check_commit_tag(get_lock=True)):
+            return False
+
         now = datetime.now(tzutc())
         filename = f"{now.isoformat()}.tar.gz"
-        container_id: str = str(self.data["container_id"])
         filepath = PurePosixPath(dst) / container_id / filename
 
         try:
@@ -144,18 +162,26 @@ class DockerKernel(AbstractKernel):
         except ValueError:  # parent_path does not start with work_dir!
             raise AssertionError("malformed committed path.")
 
+        loop = current_loop()
         async with closing_async(Docker()) as docker:
             async with docker._query(
                 f"containers/{container_id}/export",
                 method="GET",
             ) as response:
-                data: bytes = await response.read()
-                tar_info = tarfile.TarInfo(filename)
-                tar_info.size = len(data)
-                with tarfile.open(name=filepath, mode="x:gz") as tar:
-                    tar.addfile(tar_info, fileobj=BytesIO(data))
 
+                data: bytes = await response.read()
+
+                def _save_tar():
+                    tar_info = tarfile.TarInfo(filename)
+                    tar_info.size = len(data)
+                    with tarfile.open(name=filepath, mode="x:gz") as tar:
+                        tar.addfile(tar_info, fileobj=BytesIO(data))
+
+                await loop.run_in_executor(None, _save_tar)
+        tag_path = COMMIT_TAG_DIR / container_id
+        os.remove(tag_path)
         log.info("Container has committed to {}", filepath)
+        return True
 
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()
