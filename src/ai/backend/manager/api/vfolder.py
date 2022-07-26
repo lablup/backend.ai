@@ -1809,15 +1809,15 @@ async def leave_request(request: web.Request, params: Any) -> web.Response:
     """
     Common request for leaving a shared vfolder.
     """
-    root_ctx: RootContext = request.app['_root.context']
+    root_ctx: RootContext = request.app["_root.context"]
 
-    if params['vfolder_id'] is None:
-        raise InvalidAPIParameters('Missing vfolder_id paramater.')
-    if params['user_uuid'] is None:
-        params['user_uuid'] = request['user']['uuid']
+    if params["vfolder_id"] is None:
+        raise InvalidAPIParameters("Missing vfolder_id paramater.")
+    if params["user_uuid"] is None:
+        params["user_uuid"] = request["user"]["uuid"]
 
-    vfolder_id = params['vfolder_id']
-    user_uuid = params['user_uuid']
+    vfolder_id = params["vfolder_id"]
+    user_uuid = params["user_uuid"]
     async with root_ctx.db.begin() as conn:
         query = (
             sa.delete(vfolder_permissions)
@@ -1825,7 +1825,7 @@ async def leave_request(request: web.Request, params: Any) -> web.Response:
             .where(vfolder_permissions.c.user == user_uuid)
         )
         await conn.execute(query)
-    resp = {'msg': 'left the shared vfolder'}
+    resp = {"msg": "left the shared vfolder"}
     return web.json_response(resp, status=200)
 
 
@@ -1838,19 +1838,24 @@ async def leave(request: web.Request, row: VFolderRow) -> web.Response:
 
     Cannot leave a group vfolder or a vfolder that the requesting user owns.
     """
-    if row['ownership_type'] == VFolderOwnershipType.GROUP:
-        raise InvalidAPIParameters('Cannot leave a group vfolder.')
-    if row['is_owner']:
-        raise InvalidAPIParameters('Cannot leave a vfolder owned by the requesting user.')
+    if row["ownership_type"] == VFolderOwnershipType.GROUP:
+        raise InvalidAPIParameters("Cannot leave a group vfolder.")
+    if row["is_owner"]:
+        raise InvalidAPIParameters("Cannot leave a vfolder owned by the requesting user.")
 
-    access_key = request['keypair']['access_key']
-    perm = row['permission']
+    access_key = request["keypair"]["access_key"]
+    perm = row["permission"]
     params = {
-        'vfolder_id': row['id'],
-        'user_uuid': request['user']['uuid'],
+        "vfolder_id": row["id"],
+        "user_uuid": request["user"]["uuid"],
     }
-    log.info('VFOLDER.LEAVE(ak:{}, vfid:{}, uid:{}, perm:{})',
-             access_key, params['vfolder_id'], params['user_uuid'], perm)
+    log.info(
+        "VFOLDER.LEAVE(ak:{}, vfid:{}, uid:{}, perm:{})",
+        access_key,
+        params["vfolder_id"],
+        params["user_uuid"],
+        perm,
+    )
     return await leave_request(request, params)
 
 
@@ -1858,9 +1863,11 @@ async def leave(request: web.Request, row: VFolderRow) -> web.Response:
 @server_status_required(ALL_ALLOWED)
 @vfolder_permission_required(VFolderPermission.READ_ONLY)
 @check_api_params(
-    t.Dict({
-        tx.AliasedKey(['shared_user_id', 'sharedUserId']): t.String,
-    }),
+    t.Dict(
+        {
+            tx.AliasedKey(["shared_user_id", "sharedUserId"]): t.String,
+        }
+    ),
 )
 async def force_leave(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     """
@@ -1868,17 +1875,22 @@ async def force_leave(request: web.Request, params: Any, row: VFolderRow) -> web
 
     Cannot leave a group vfolder but a vfolder owned by others can be left.
     """
-    if row['ownership_type'] == VFolderOwnershipType.GROUP:
-        raise InvalidAPIParameters('Cannot leave a group vfolder.')
+    if row["ownership_type"] == VFolderOwnershipType.GROUP:
+        raise InvalidAPIParameters("Cannot leave a group vfolder.")
 
-    access_key = request['keypair']['access_key']
-    perm = row['permission']
+    access_key = request["keypair"]["access_key"]
+    perm = row["permission"]
     rqst_params = {
-        'vfolder_id': row['id'],
-        'user_uuid': params['shared_user_id'],
+        "vfolder_id": row["id"],
+        "user_uuid": params["shared_user_id"],
     }
-    log.info('VFOLDER.FORCE_LEAVE(ak:{}, vfid:{}, uid:{}, perm:{})',
-             access_key, rqst_params['vfolder_id'], rqst_params['user_uuid'], perm)
+    log.info(
+        "VFOLDER.FORCE_LEAVE(ak:{}, vfid:{}, uid:{}, perm:{})",
+        access_key,
+        rqst_params["vfolder_id"],
+        rqst_params["user_uuid"],
+        perm,
+    )
     return await leave_request(request, rqst_params)
 
 
@@ -2604,7 +2616,7 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/{name}/files", list_files))
     cors.add(add_route("POST", r"/{name}/invite", invite))
     cors.add(add_route("POST", r"/{name}/leave", leave))
-    cors.add(add_route('POST', r'/{name}/force-leave', force_leave))
+    cors.add(add_route("POST", r"/{name}/force-leave", force_leave))
     cors.add(add_route("POST", r"/{name}/share", share))
     cors.add(add_route("DELETE", r"/{name}/unshare", unshare))
     cors.add(add_route("POST", r"/{name}/clone", clone))
