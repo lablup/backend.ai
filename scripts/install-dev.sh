@@ -397,10 +397,10 @@ install_git_hooks() {
       :
     else
       echo "" >> .git/hooks/pre-commit
-      cat scripts/pre-commit.sh >> .git/hooks/pre-commit
+      cat scripts/pre-commit >> .git/hooks/pre-commit
     fi
   else
-    cp scripts/pre-commit.sh .git/hooks/pre-commit
+    cp scripts/pre-commit .git/hooks/pre-commit
     chmod +x .git/hooks/pre-commit
   fi
   local magic_str="monorepo standard pre-push hook"
@@ -410,10 +410,10 @@ install_git_hooks() {
       :
     else
       echo "" >> .git/hooks/pre-push
-      cat scripts/pre-push.sh >> .git/hooks/pre-push
+      cat scripts/pre-push >> .git/hooks/pre-push
     fi
   else
-    cp scripts/pre-push.sh .git/hooks/pre-push
+    cp scripts/pre-push .git/hooks/pre-push
     chmod +x .git/hooks/pre-push
   fi
 }
