@@ -137,6 +137,8 @@ class DockerKernel(AbstractKernel):
     async def check_commit_tag(self, get_lock: bool = False):
         container_id: str = str(self.data["container_id"])
         tag_path = COMMIT_TAG_DIR / container_id
+
+        COMMIT_TAG_DIR.mkdir(parents=True, exist_ok=True)
         try:
             with open(tag_path, mode="x") as f:
                 if get_lock:
