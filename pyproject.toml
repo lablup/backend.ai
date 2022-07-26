@@ -53,9 +53,14 @@ ignore_missing_imports = true
 mypy_path = "stubs:src"
 namespace_packages = true
 explicit_package_bases = true
+python_executable = "dist/export/python/virtualenvs/python-default/3.10.5/bin/python"
+
+[tool.black]
+line-length = 100
 
 [tool.isort]
 profile = "black"
+line_length = 100
 sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 known_first_party = ["ai.backend"]
 skip_glob = [

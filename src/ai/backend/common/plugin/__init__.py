@@ -4,18 +4,7 @@ import asyncio
 import logging
 import re
 from abc import ABCMeta, abstractmethod
-from typing import (
-    Any,
-    ClassVar,
-    Dict,
-    Generic,
-    Iterator,
-    Mapping,
-    Optional,
-    Tuple,
-    Type,
-    TypeVar,
-)
+from typing import Any, ClassVar, Dict, Generic, Iterator, Mapping, Optional, Tuple, Type, TypeVar
 from weakref import WeakSet
 
 from ai.backend.common.asyncio import cancel_tasks
@@ -27,8 +16,8 @@ from ..logging_utils import BraceStyleAdapter
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 __all__ = (
-    'AbstractPlugin',
-    'BasePluginContext',
+    "AbstractPlugin",
+    "BasePluginContext",
 )
 
 
@@ -91,7 +80,7 @@ class AbstractPlugin(metaclass=ABCMeta):
         self.plugin_config = plugin_config
 
 
-P = TypeVar('P', bound=AbstractPlugin)
+P = TypeVar("P", bound=AbstractPlugin)
 
 
 class BasePluginContext(Generic[P]):
@@ -105,7 +94,7 @@ class BasePluginContext(Generic[P]):
     etcd: AsyncEtcd
     local_config: Mapping[str, Any]
     plugins: Dict[str, P]
-    plugin_group: ClassVar[str] = 'backendai_XXX_v10'
+    plugin_group: ClassVar[str] = "backendai_XXX_v10"
     allowlist: ClassVar[Optional[set[str]]] = None
     blocklist: ClassVar[Optional[set[str]]] = None
 
@@ -116,7 +105,7 @@ class BasePluginContext(Generic[P]):
         self.local_config = local_config
         self.plugins = {}
         self._config_watchers = WeakSet()
-        if m := re.search(r'^backendai_(\w+)_v(\d+)$', self.plugin_group):
+        if m := re.search(r"^backendai_(\w+)_v(\d+)$", self.plugin_group):
             self._group_key = m.group(1)
         else:
             raise TypeError(
@@ -141,7 +130,7 @@ class BasePluginContext(Generic[P]):
             allowlist=cls_allowlist | arg_allowlist if allowlist_enabled else None,
             blocklist=cls_blocklist | arg_blocklist,
         ):
-            log.info('loading plugin (group:{}): {}', plugin_group, entrypoint.name)
+            log.info("loading plugin (group:{}): {}", plugin_group, entrypoint.name)
             yield entrypoint.name, entrypoint.load()
 
     async def init(
@@ -163,7 +152,7 @@ class BasePluginContext(Generic[P]):
                 plugin_instance = plugin_entry(plugin_config, self.local_config)
                 await plugin_instance.init(context=context)
             except Exception:
-                log.exception('error during initialization of plugin: {}', plugin_name)
+                log.exception("error during initialization of plugin: {}", plugin_name)
                 continue
             else:
                 self.plugins[plugin_name] = plugin_instance

@@ -7,24 +7,28 @@ from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 
 @pytest.fixture
 def virtual_grid_db():
-    engine = sa.engine.create_engine('sqlite:///:memory:', echo=False)
+    engine = sa.engine.create_engine("sqlite:///:memory:", echo=False)
     base = declarative_base()
     metadata = base.metadata
     grid = sa.Table(
-        'users', metadata,
-        sa.Column('id', sa.Integer, sa.Sequence('user_id_seq'), primary_key=True),
-        sa.Column('data1', sa.Integer),
-        sa.Column('data2', sa.Float),
-        sa.Column('data3', sa.String(10)),
+        "users",
+        metadata,
+        sa.Column("id", sa.Integer, sa.Sequence("user_id_seq"), primary_key=True),
+        sa.Column("data1", sa.Integer),
+        sa.Column("data2", sa.Float),
+        sa.Column("data3", sa.String(10)),
     )
     metadata.create_all(engine)
     with engine.connect() as conn:
-        conn.execute(grid.insert(), [
-            {'data1': 10, 'data2': 0.2, 'data3': 'a'},
-            {'data1': 10, 'data2': 0.1, 'data3': 'c'},
-            {'data1': 20, 'data2': 0.0, 'data3': 'b'},
-            {'data1': 20, 'data2': -0.1, 'data3': 'd'},
-        ])
+        conn.execute(
+            grid.insert(),
+            [
+                {"data1": 10, "data2": 0.2, "data3": "a"},
+                {"data1": 10, "data2": 0.1, "data3": "c"},
+                {"data1": 20, "data2": 0.0, "data3": "b"},
+                {"data1": 20, "data2": -0.1, "data3": "d"},
+            ],
+        )
         yield conn, grid
     engine.dispose()
 
@@ -93,11 +97,13 @@ def test_select_queries(virtual_grid_db) -> None:
 
 def test_column_map(virtual_grid_db) -> None:
     conn, grid = virtual_grid_db
-    parser = QueryOrderParser({
-        "v1": "data1",
-        "v2": "data2",
-        "v3": "data3",
-    })
+    parser = QueryOrderParser(
+        {
+            "v1": "data1",
+            "v2": "data2",
+            "v3": "data3",
+        }
+    )
 
     sa_query = parser.append_ordering(
         sa.select([grid.c.id]).select_from(grid),

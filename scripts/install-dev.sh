@@ -409,10 +409,10 @@ install_git_hooks() {
       :
     else
       echo "" >> .git/hooks/pre-commit
-      cat scripts/pre-commit.sh >> .git/hooks/pre-commit
+      cat scripts/pre-commit >> .git/hooks/pre-commit
     fi
   else
-    cp scripts/pre-commit.sh .git/hooks/pre-commit
+    cp scripts/pre-commit .git/hooks/pre-commit
     chmod +x .git/hooks/pre-commit
   fi
   local magic_str="monorepo standard pre-push hook"
@@ -422,10 +422,10 @@ install_git_hooks() {
       :
     else
       echo "" >> .git/hooks/pre-push
-      cat scripts/pre-push.sh >> .git/hooks/pre-push
+      cat scripts/pre-push >> .git/hooks/pre-push
     fi
   else
-    cp scripts/pre-push.sh .git/hooks/pre-push
+    cp scripts/pre-push .git/hooks/pre-push
     chmod +x .git/hooks/pre-push
   fi
 }
@@ -515,13 +515,13 @@ install_editable_webui() {
     # (e.g., separate debugging of Electron's renderer and main threads)
     sed_inplace "s@debug = true@debug = false@" config.toml
     # The webserver endpoint to use in the session mode.
-    sed_inplace "s@#apiEndpoint =@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
-    sed_inplace "s@#apiEndpointText =@apiEndpointText = "'"'"${site_name}"'"@' config.toml
+    sed_inplace "s@#[[:space:]]*apiEndpoint =.*@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
+    sed_inplace "s@#[[:space:]]*apiEndpointText =.*@apiEndpointText = "'"'"${site_name}"'"@' config.toml
     # webServerURL lets the electron app use the web UI contents from the server.
     # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.web.server` instance.
     # In the former case, you may live-edit the webui sources while running them in the electron app.
-    sed_inplace "s@webServerURL =@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
-    sed_inplace "s@proxyURL =@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
+    sed_inplace "s@webServerURL =.*@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
+    sed_inplace "s@proxyURL =.*@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
     echo "PROXYLISTENIP=0.0.0.0" >> .env
     echo "PROXYBASEHOST=localhost" >> .env
     echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
@@ -544,6 +544,17 @@ $bpython scripts/check-docker.py
 if [ $? -ne 0 ]; then
   exit 1
 fi
+# checking docker compose v2 -f flag
+if $(docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+  show_error "When run as a user, 'docker compose' seems not to be a compatible version (v2)."
+  show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on ${HOME}/.docker/cli-plugins"
+  exit 1
+fi
+if $(sudo docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+  show_error "When run as the root, 'docker compose' seems not to be a compatible version (v2)"
+  show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on /usr/local/lib/docker/cli-plugins"
+  exit 1
+fi
 if [ "$DISTRO" = "Darwin" ]; then
   echo "validating Docker Desktop mount permissions..."
   docker pull alpine:3.8 > /dev/null
@@ -562,10 +573,10 @@ if [ "$DISTRO" = "Darwin" ]; then
   echo "${REWRITELN}validating Docker Desktop mount permissions: ok"
 fi
 
-if [ $ENABLE_CUDA -eq 1 ] & [ $ENABLE_CUDA_MOCK -eq 1 ]; then
+if [ $ENABLE_CUDA -eq 1 ] && [ $ENABLE_CUDA_MOCK -eq 1 ]; then
   show_error "You can't use both CUDA and CUDA mock plugins at once!"
   show_error "Please remove --enable-cuda or --enable-cuda-mock flag to continue."
-  exit -1
+  exit 1
 fi
 
 # Install pyenv
@@ -598,6 +609,9 @@ fi
 # Install Python and pyenv virtualenvs
 show_info "Checking and installing Python dependencies..."
 install_pybuild_deps
+
+show_info "Setting additional git configs..."
+git config blame.ignoreRevsFile .git-blame-ignore-revs
 
 show_info "Checking and installing git lfs support..."
 install_git_lfs
@@ -657,7 +671,7 @@ check_snappy
 $PANTS export '::'
 
 if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-  cp "configs/accelerator/cuda-mock-enterprise.toml" cuda-mock.toml
+  cp "configs/accelerator/cuda-mock.toml" cuda-mock.toml
 fi
 
 # configure manager
@@ -682,11 +696,11 @@ sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 if [ $ENABLE_CUDA -eq 1 ]; then
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
 elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
 else
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = []/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
 fi
 sed_inplace 's@var-base-path = .*$@var-base-path = "'"${VAR_BASE_PATH}"'"@' ./agent.toml
 
@@ -738,11 +752,11 @@ fi
 
 # Scan the container image registry
 show_info "Scanning the image registry..."
-./backend.ai mgr etcd rescan-images cr.backend.ai
+./backend.ai mgr image rescan cr.backend.ai
 if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-  ./backend.ai mgr etcd alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
+  ./backend.ai mgr image alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
 else
-  ./backend.ai mgr etcd alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
+  ./backend.ai mgr image alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
 fi
 
 # Virtual folder setup

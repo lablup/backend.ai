@@ -3,5 +3,9 @@ from .color import Color, Colors
 from .turtle import Turtle, Vec2D
 
 __all__ = (
-    'Canvas', 'Color', 'Colors', 'Turtle', 'Vec2D',
+    "Canvas",
+    "Color",
+    "Colors",
+    "Turtle",
+    "Vec2D",
 )

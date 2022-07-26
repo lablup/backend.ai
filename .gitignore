@@ -84,6 +84,7 @@ ENV/
 .vimrc
 .nvimrc
 .exrc
+.vim/
 
 # Pants
 /.pants.d/
