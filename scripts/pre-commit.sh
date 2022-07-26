@@ -1,6 +1,5 @@
-# backend.ai monorepo standard pre-commit hook
+# implementation: backend.ai monorepo standard pre-commit hook
 BASE_PATH=$(pwd)
-cd "${BASE_PATH}"
 if [ -f "$BASE_PATH/pants-local" ]; then
   PANTS="$BASE_PATH/pants-local"
 else
