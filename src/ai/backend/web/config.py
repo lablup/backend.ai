@@ -8,6 +8,12 @@ from ai.backend.common import validators as tx
 
 default_static_path = Path(pkg_resources.resource_filename("ai.backend.web", "static")).resolve()
 
+license_defs = {
+    "edition": "Open Source",
+    "valid_since": "",
+    "valid_until": "",
+}
+
 config_iv = t.Dict(
     {
         t.Key("service"): t.Dict(
@@ -101,11 +107,15 @@ config_iv = t.Dict(
                 t.Key("auto_logout", default=False): t.ToBool,
             }
         ).allow_extra("*"),
-        t.Key("license"): t.Dict(
+        t.Key("license", default=license_defs): t.Dict(
             {
-                t.Key("edition", default="Open Source"): t.String,
-                t.Key("valid_since", default=""): t.String(allow_blank=True),
-                t.Key("valid_until", default=""): t.String(allow_blank=True),
+                t.Key("edition", default=license_defs["edition"]): t.String,
+                t.Key("valid_since", default=license_defs["valid_since"]): t.String(
+                    allow_blank=True
+                ),
+                t.Key("valid_until", default=license_defs["valid_until"]): t.String(
+                    allow_blank=True
+                ),
             }
         ).allow_extra("*"),
     }
