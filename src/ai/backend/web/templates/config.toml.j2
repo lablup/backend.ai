@@ -1,0 +1,47 @@
+[general]
+apiEndpoint = {{ endpoint_url | tojson }}
+apiEndpointText = {{ config["api"]["text"] | tojson }}
+defaultSessionEnvironment = {{ config["ui"]["default_environment"] | tojson }}
+defaultImportEnvironment = {{ config["ui"]["default_import_environment"] | tojson }}
+siteDescription = {{ config["ui"]["brand"] | tojson }}
+connectionMode = "SESSION"
+signupSupport = {{ config["service"]["enable_signup"] | tojson }}
+allowChangeSigninMode = {{ config["service"]["allow_change_signin_mode"] | tojson }}
+allowAnonymousChangePassword = {{ config["service"]["allow_anonymous_change_password"] | tojson }}
+allowProjectResourceMonitor = {{ config["service"]["allow_project_resource_monitor"] | tojson }}
+allowManualImageNameForSession = {{ config["service"]["allow_manual_image_name_for_session"] | tojson }}
+allowSignupWithoutConfirmation = {{ config["service"]["allow_signup_without_confirmation"] | tojson }}
+autoLogout = {{ config["session"]["auto_logout"] | tojson }}
+debug = {{ config["service"]["webui_debug"] | tojson }}
+maskUserInfo = {{ config["service"]["mask_user_info"] | tojson }}
+
+[resources]
+openPortToPublic = {{ config["resources"]["open_port_to_public"] | tojson }}
+maxCPUCoresPerContainer = {{ config["resources"]["max_cpu_cores_per_container"] | tojson }}
+maxMemoryPerContainer = {{ config["resources"]["max_memory_per_container"] | tojson }}
+maxCUDADevicesPerContainer = {{ config["resources"]["max_cuda_devices_per_container"] | tojson }}
+maxCUDASharesPerContainer = {{ config["resources"]["max_cuda_shares_per_container"] | tojson }}
+maxShmPerContainer = {{ config["resources"]["max_shm_per_container"] | tojson }}
+maxFileUploadSize = {{ config["resources"]["max_file_upload_size"] | tojson }}
+
+[environments]
+allowlist = {{ config["environments"]["allowlist"] | join(",") | tojson }}
+
+[menu]
+blocklist = {{ config["ui"]["menu_blocklist"] | join(",") | tojson }}
+
+[plugin]
+{% if config["plugin"]["page"] -%}
+page = {{ config["plugin"]["page"] | join(",") | tojson }}
+{%- endif %}
+
+[wsproxy]
+proxyURL = {{ config["service"]["wsproxy"]["url"] | tojson }}
+#proxyBaseURL =
+#proxyListenIP =
+
+[license]
+edition = {{ config["license"]["edition"] | tojson }}
+validSince = {{ config["license"]["valid_since"] | tojson }}
+validUntil = {{ config["license"]["valid_until"] | tojson }}
+

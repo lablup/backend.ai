@@ -1,0 +1,11 @@
+[general]
+apiEndpoint = {{ endpoint_url | tojson }}
+apiEndpointText = {{ config["api"]["text"] | tojson }}
+defaultSessionEnvironment = {{ config["ui"]["default_environment"] | tojson }}
+siteDescription = {{ config["ui"]["brand"] | tojson }}
+connectionMode = "SESSION"
+
+[wsproxy]
+proxyURL = {{ config["service"]["wsproxy"]["url"] | tojson }}
+proxyBaseURL =
+proxyListenIP =

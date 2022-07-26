@@ -17,6 +17,7 @@ import aiohttp_cors
 import aiotools
 import click
 import jinja2
+import pkg_resources
 import tomli
 import uvloop
 import yarl
@@ -46,78 +47,15 @@ from .proxy import (
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
 
 console_config_ini_template = jinja2.Template(
-    """[general]
-apiEndpoint = {{ endpoint_url | tojson }}
-apiEndpointText = {{ endpoint_text | tojson }}
-{% if default_environment %}
-defaultSessionEnvironment = {{ default_environment | tojson }}
-{% endif %}
-siteDescription = {{ site_description | tojson }}
-connectionMode = "SESSION"
-
-[wsproxy]
-proxyURL = {{ proxy_url | tojson }}
-proxyBaseURL =
-proxyListenIP =
-"""
+    Path(pkg_resources.resource_filename("ai.backend.web", "templates/config_ini.toml.j2"))
+    .resolve()
+    .read_text()
 )
 
 console_config_toml_template = jinja2.Template(
-    """[general]
-apiEndpoint = {{ endpoint_url | tojson }}
-apiEndpointText = {{ endpoint_text | tojson }}
-{% if default_environment %}
-defaultSessionEnvironment = {{ default_environment | tojson }}
-{% endif %}
-{% if default_import_environment %}
-defaultImportEnvironment = {{ default_import_environment | tojson }}
-{% endif %}
-siteDescription = {{ site_description | tojson }}
-connectionMode = "SESSION"
-signupSupport = {{ signup_support | tojson }}
-allowChangeSigninMode = {{ allow_change_signin_mode | tojson }}
-allowAnonymousChangePassword = {{ allow_anonymous_change_password | tojson }}
-allowProjectResourceMonitor = {{ allow_project_resource_monitor | tojson }}
-allowManualImageNameForSession = {{ allow_manual_image_name_for_session | tojson }}
-allowSignupWithoutConfirmation = {{ allow_signup_without_confirmation | tojson }}
-autoLogout = {{ auto_logout | tojson }}
-debug = {{ webui_debug | tojson }}
-maskUserInfo = {{ mask_user_info | tojson }}
-
-[resources]
-openPortToPublic = {{ open_port_to_public | tojson }}
-maxCPUCoresPerContainer = {{ max_cpu_cores_per_container | tojson }}
-maxMemoryPerContainer = {{ max_memory_per_container | tojson }}
-maxCUDADevicesPerContainer = {{ max_cuda_devices_per_container | tojson }}
-maxCUDASharesPerContainer = {{ max_cuda_shares_per_container | tojson }}
-maxShmPerContainer = {{ max_shm_per_container | tojson }}
-maxFileUploadSize = {{ max_file_upload_size | tojson }}
-
-[environments]
-{% if environment_allowlist %}
-allowlist = {{ environment_allowlist | join(",") | tojson }}
-{% endif %}
-
-[menu]
-{% if menu_blocklist %}
-blocklist = {{ menu_blocklist | join(",") | tojson }}
-{% endif %}
-
-{% if console_menu_plugins %}
-[plugin]
-page = {{ console_menu_plugins | join(",") | tojson }}
-
-{% endif %}
-[wsproxy]
-proxyURL = {{ proxy_url | tojson }}
-#proxyBaseURL =
-#proxyListenIP =
-
-[license]
-edition = {{ license_edition | tojson }}
-validSince = {{ license_valid_since | tojson }}
-validUntil = {{ license_valid_until | tojson }}
-"""
+    Path(pkg_resources.resource_filename("ai.backend.web", "templates/config.toml.j2"))
+    .resolve()
+    .read_text()
 )
 
 cache_patterns = {
@@ -186,10 +124,7 @@ async def config_ini_handler(request: web.Request) -> web.Response:
     config_content = console_config_ini_template.render(
         **{
             "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-            "endpoint_text": config["api"]["text"],
-            "site_description": config["ui"]["brand"],
-            "default_environment": config["ui"]["default_environment"],
-            "proxy_url": config["service"]["wsproxy"]["url"],
+            "config": config,
         }
     )
     return web.Response(text=config_content)
@@ -203,37 +138,7 @@ async def config_toml_handler(request: web.Request) -> web.Response:
     config_content = console_config_toml_template.render(
         **{
             "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
-            "endpoint_text": config["api"]["text"],
-            "site_description": config["ui"]["brand"],
-            "default_environment": config["ui"]["default_environment"],
-            "default_import_environment": config["ui"]["default_import_environment"],
-            "proxy_url": config["service"]["wsproxy"]["url"],
-            "signup_support": config["service"]["enable_signup"],
-            "allow_change_signin_mode": config["service"]["allow_change_signin_mode"],
-            "allow_anonymous_change_password": config["service"]["allow_anonymous_change_password"],
-            "allow_project_resource_monitor": config["service"]["allow_project_resource_monitor"],
-            "allow_manual_image_name_for_session": config["service"][
-                "allow_manual_image_name_for_session"
-            ],
-            "allow_signup_without_confirmation": config["service"][
-                "allow_signup_without_confirmation"
-            ],
-            "webui_debug": config["service"]["webui_debug"],
-            "auto_logout": config["session"]["auto_logout"],
-            "mask_user_info": config["service"]["mask_user_info"],
-            "open_port_to_public": config["resources"]["open_port_to_public"],
-            "max_cpu_cores_per_container": config["resources"]["max_cpu_cores_per_container"],
-            "max_memory_per_container": config["resources"]["max_memory_per_container"],
-            "max_cuda_devices_per_container": config["resources"]["max_cuda_devices_per_container"],
-            "max_cuda_shares_per_container": config["resources"]["max_cuda_shares_per_container"],
-            "max_shm_per_container": config["resources"]["max_shm_per_container"],
-            "max_file_upload_size": config["resources"]["max_file_upload_size"],
-            "environment_allowlist": config["environments"]["allowlist"],
-            "menu_blocklist": config["ui"]["menu_blocklist"],
-            "console_menu_plugins": config["plugin"]["page"],
-            "license_edition": config["license"]["edition"],
-            "license_valid_since": config["license"]["valid_since"],
-            "license_valid_until": config["license"]["valid_until"],
+            "config": config,
         }
     )
     return web.Response(text=config_content)
