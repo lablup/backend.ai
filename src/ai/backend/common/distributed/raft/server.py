@@ -9,7 +9,11 @@ from .protos import raft_pb2, raft_pb2_grpc
 
 class AbstractRaftServer(abc.ABC):
     @abc.abstractmethod
-    def bind(self, protocol: AbstractRaftProtocol):
+    def bind(
+        self,
+        raft_protocol: AbstractRaftProtocol,
+        raft_service_protocol: AbstractRaftServiceProtocol,
+    ):
         raise NotImplementedError()
 
 

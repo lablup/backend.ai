@@ -25,10 +25,8 @@ class RespInterpreter:
             case "GET":
                 assert len(args) >= 1, "Not enough arguments are provided. (Required: GET <key>)"
                 key, *_ = args
-                if value := self._dict.get(key):
-                    return value.value
-                return value
-
+                if atomic_value := self._dict.get(key):
+                    return atomic_value.value
             case "SET":
                 assert (
                     len(args) >= 2
@@ -38,3 +36,4 @@ class RespInterpreter:
                     self._dict[key] = AtomicInteger(int(value))
                 except ValueError:
                     pass
+        return None

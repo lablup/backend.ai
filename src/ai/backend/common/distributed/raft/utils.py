@@ -33,9 +33,9 @@ def build_local_ip() -> str:
     ps_ifconfig.wait()
     ps_grep.wait()
 
-    if output := output.decode("utf-8").strip().split("\n"):
+    if outputs := output.decode("utf-8").strip().split("\n"):
         # ["inet 255.255.255.255 netmask 0xffff0000 broadcast 255.255.255.255"]
-        return output[0].split()[1]
+        return outputs[0].split()[1]
     return "127.0.0.1"
 
 
