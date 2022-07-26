@@ -1321,6 +1321,37 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     t.Dict(
         {
             t.Key("login_session_token", default=None): t.Null | t.String,
+        }
+    ),
+    loads=_json_loads,
+)
+async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name: str = request.match_info["session_name"]
+    app_ctx: PrivateContext = request.app["session.context"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    myself = asyncio.current_task()
+    assert myself is not None
+
+    log.info(
+        "GET_COMMIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+    )
+    try:
+        is_ongoing = await root_ctx.registry.get_commit_status(session_name, owner_access_key)
+    except BackendError:
+        log.exception("GET_COMMIT_STATUS: exception")
+        raise
+    resp = {"stats": is_ongoing}
+    return web.json_response(resp, status=200)
+
+
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("login_session_token", default=None): t.Null | t.String,
             # if `dst` is None, it will be agent's default destination.
             tx.AliasedKey(["dst", "dest"], default=None): t.Null | t.String,
         }
@@ -1341,7 +1372,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
         "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     try:
-        await asyncio.shield(
+        is_success = await asyncio.shield(
             app_ctx.rpc_ptask_group.create_task(
                 root_ctx.registry.commit_session(session_name, owner_access_key, dst),
             ),
@@ -1349,7 +1380,8 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     except BackendError:
         log.exception("COMMIT_SESSION: exception")
         raise
-    return web.json_response(status=204)
+    status = 200 if is_success else 409
+    return web.json_response(status=status)
 
 
 async def handle_kernel_creation_lifecycle(
@@ -2555,4 +2587,5 @@ def create_app(
     cors.add(app.router.add_route("GET", "/{session_name}/files", list_files))
     cors.add(app.router.add_route("POST", "/{session_name}/start-service", start_service))
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
+    cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
     return app, []

@@ -1886,6 +1886,9 @@ class AbstractAgent(
     async def commit(self, kernel_id: KernelId, dst: str):
         return await self.kernel_registry[kernel_id].commit(dst)
 
+    async def get_commit_status(self, kernel_id: KernelId):
+        return await self.kernel_registry[kernel_id].check_commit_tag()
+
     async def accept_file(self, kernel_id: KernelId, filename: str, filedata):
         return await self.kernel_registry[kernel_id].accept_file(filename, filedata)
 

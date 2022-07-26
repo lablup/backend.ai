@@ -502,6 +502,17 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def get_commit_status(
+        self,
+        kernel_id,  # type: str
+    ):
+        log.info("rpc::get_commit_status(k:{})", kernel_id)
+        return await self.agent.get_commit_status(
+            KernelId(UUID(kernel_id)),
+        )
+
+    @rpc_function
+    @collect_error
     async def commit(
         self,
         kernel_id,  # type: str

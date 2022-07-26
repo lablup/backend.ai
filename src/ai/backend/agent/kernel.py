@@ -277,6 +277,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    async def check_commit_tag(self):
+        raise NotImplementedError
+
+    @abstractmethod
     async def commit(self, dst):
         raise NotImplementedError
 

@@ -2984,12 +2984,29 @@ class AgentRegistry:
     ) -> None:
         await self.clean_session(session_id)
 
+    async def get_commit_status(
+        self,
+        session_name_or_id: Union[str, SessionId],
+        access_key: AccessKey,
+    ) -> bool:
+        kernel = await self.get_session(session_name_or_id, access_key)
+
+        async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
+            async with RPCContext(
+                kernel["agent"],
+                kernel["agent_addr"],
+                invoke_timeout=None,
+                order_key=kernel["id"],
+                keepalive_timeout=self.rpc_keepalive_timeout,
+            ) as rpc:
+                return await rpc.call.get_commit_status(str(kernel["id"]))
+
     async def commit_session(
         self,
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
         dst: str | None,
-    ) -> None:
+    ) -> bool:
         """
         Commit a main kernel's container of the given session.
         """
@@ -2998,9 +3015,6 @@ class AgentRegistry:
         if dst is None:
             # TODO: get path from toml or cfg
             dst = str(Path("/tmp/backend.ai/commit") / str(kernel["user_uuid"]))
-
-        # async def _mark_session_committing():
-        #     pass
 
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
