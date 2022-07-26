@@ -544,6 +544,17 @@ $bpython scripts/check-docker.py
 if [ $? -ne 0 ]; then
   exit 1
 fi
+# checking docker compose v2 -f flag
+if $(docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+  show_error "When run as a user, 'docker compose' seems not to be a compatible version (v2)."
+  show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on ${HOME}/.docker/cli-plugins"
+  exit 1
+fi
+if $(sudo docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+  show_error "When run as the root, 'docker compose' seems not to be a compatible version (v2)"
+  show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on /usr/local/lib/docker/cli-plugins"
+  exit 1
+fi
 if [ "$DISTRO" = "Darwin" ]; then
   echo "validating Docker Desktop mount permissions..."
   docker pull alpine:3.8 > /dev/null
@@ -685,11 +696,11 @@ sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 if [ $ENABLE_CUDA -eq 1 ]; then
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
 elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
 else
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = []/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
 fi
 sed_inplace 's@var-base-path = .*$@var-base-path = "'"${VAR_BASE_PATH}"'"@' ./agent.toml
 
