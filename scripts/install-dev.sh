@@ -532,6 +532,17 @@ $bpython scripts/check-docker.py
 if [ $? -ne 0 ]; then
   exit 1
 fi
+# checking docker compose v2 -f flag
+if $(docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+  show_error "When run as a user, 'docker compose' seems not to be a compatible version (v2)."
+  show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on ${HOME}/.docker/cli-plugins"
+  exit 1
+fi
+if $(sudo docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+  show_error "When run as the root, 'docker compose' seems not to be a compatible version (v2)"
+  show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on /usr/local/lib/docker/cli-plugins"
+  exit 1
+fi
 if [ "$DISTRO" = "Darwin" ]; then
   echo "validating Docker Desktop mount permissions..."
   docker pull alpine:3.8 > /dev/null
