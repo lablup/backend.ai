@@ -15,16 +15,16 @@ else
   BASE_BRANCH="main"
 fi
 if [ "$1" != "origin" ]; then
-    # extract the owner name of the target repo
-    ORIGIN="$(echo "$1" | grep -o '://[^/]\+/[^/]\+/' | grep -o '/[^/]\+/$' | tr -d '/')"
-    cleanup_remote() {
-        git remote remove "$ORIGIN"
-    }
-    trap cleanup_remote EXIT
-    git remote add "$ORIGIN" "$1"
-    git fetch -q --depth=1 --no-tags "$ORIGIN" "$BASE_BRANCH"
+  # extract the owner name of the target repo
+  ORIGIN="$(echo "$1" | grep -o '://[^/]\+/[^/]\+/' | grep -o '/[^/]\+/$' | tr -d '/')"
+  cleanup_remote() {
+    git remote remove "$ORIGIN"
+  }
+  trap cleanup_remote EXIT
+  git remote add "$ORIGIN" "$1"
+  git fetch -q --depth=1 --no-tags "$ORIGIN" "$BASE_BRANCH"
 else
-    ORIGIN="origin"
+  ORIGIN="origin"
 fi
 echo "Performing lint and check on ${ORIGIN}/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT} ..."
 "$PANTS" tailor --check update-build-files --check
