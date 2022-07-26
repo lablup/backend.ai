@@ -1331,16 +1331,19 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     app_ctx: PrivateContext = request.app["session.context"]
-    access_key: AccessKey = request["keypair"]["access_key"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
     dst: str | None = params["dst"]
 
     myself = asyncio.current_task()
     assert myself is not None
 
+    log.info(
+        "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+    )
     try:
         await asyncio.shield(
             app_ctx.rpc_ptask_group.create_task(
-                root_ctx.registry.commit_session(session_name, access_key, dst),
+                root_ctx.registry.commit_session(session_name, owner_access_key, dst),
             ),
         )
     except BackendError:

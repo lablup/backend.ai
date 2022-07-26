@@ -5,7 +5,10 @@ import os
 import re
 import shutil
 import subprocess
+import tarfile
 import textwrap
+from datetime import datetime
+from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
 
@@ -13,6 +16,7 @@ import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
+from dateutil.tz import tzutc
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
@@ -129,26 +133,29 @@ class DockerKernel(AbstractKernel):
 
     async def commit(self, dst: str):
         assert self.runner is not None
-        work_dir = PurePosixPath(dst)
-        container_id: str = str(self.data["container_id"])
 
-        proc = await asyncio.create_subprocess_exec(
-            *[
-                "docker",
-                "export",
-                f"--output={work_dir}",
-                container_id,
-            ],
-        )
-        if await proc.wait() != 0:
-            log.error(
-                "{0}: committing container failed: {1} -> {2}",
-                self.kernel_id,
-                container_id,
-                work_dir,
-            )
-            return
-        log.info("Container(id: {0}) has committed to {1}", container_id, work_dir)
+        now = datetime.now(tzutc())
+        filename = f"{now.isoformat()}.tar.gz"
+        container_id: str = str(self.data["container_id"])
+        filepath = PurePosixPath(dst) / container_id / filename
+
+        try:
+            (Path(dst) / container_id).mkdir(exist_ok=True, parents=True)
+        except ValueError:  # parent_path does not start with work_dir!
+            raise AssertionError("malformed committed path.")
+
+        async with closing_async(Docker()) as docker:
+            async with docker._query(
+                f"containers/{container_id}/export",
+                method="GET",
+            ) as response:
+                data: bytes = await response.read()
+                tar_info = tarfile.TarInfo(filename)
+                tar_info.size = len(data)
+                with tarfile.open(name=filepath, mode="x:gz") as tar:
+                    tar.addfile(tar_info, fileobj=BytesIO(data))
+
+        log.info("Container has committed to {}", filepath)
 
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()

@@ -507,7 +507,7 @@ class AgentRPCServer(aobject):
         kernel_id,  # type: str
         dst,  # type: str
     ):
-        log.info("rpc::commit(k:{1})", kernel_id)
+        log.info("rpc::commit(k:{})", kernel_id)
         return await self.agent.commit(
             KernelId(UUID(kernel_id)),
             dst,

@@ -953,6 +953,26 @@ def rename(session_id, new_id):
             sys.exit(1)
 
 
+@session.command()
+@click.argument("session_id", metavar="SESSID")
+def commit(session_id):
+    """
+    Commit a running session to tar file.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    """
+
+    with Session() as session:
+        try:
+            kernel = session.ComputeSession(session_id)
+            kernel.commit()
+            print_done("Session committed.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(1)
+
+
 def _ssh_cmd(docs: str = None):
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.option(

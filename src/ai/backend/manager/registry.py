@@ -359,6 +359,7 @@ class AgentRegistry:
             "list_files": KernelExecutionFailed,
             "get_logs_from_agent": KernelExecutionFailed,
             "refresh_session": KernelExecutionFailed,
+            "commit_session": KernelExecutionFailed,
         }
         exc_class = op_exc[op]
         # NOTE: Error logging is done outside of this actxmanager.
@@ -2995,14 +2996,8 @@ class AgentRegistry:
 
         kernel = await self.get_session(session_name_or_id, access_key)
         if dst is None:
-            now = datetime.now(tzutc())
             # TODO: get path from toml or cfg
-            dst = (
-                Path("/etc/backend.ai/commit")
-                / str(kernel["user_uuid"])
-                / (now.isoformat() + ".img.tar.gz")
-            )
-            dst = str(dst)
+            dst = str((Path("/tmp/backend.ai/commit") / str(kernel["user_uuid"])))
 
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
