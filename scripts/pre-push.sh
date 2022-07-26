@@ -19,10 +19,13 @@ if [ "$1" != "origin" ]; then
     ORIGIN="$(echo "$1" | grep -o '://[^/]\+/[^/]\+/' | grep -o '/[^/]\+/$' | tr -d '/')"
     git remote add "$ORIGIN" "$1"
     git fetch -q --depth=1 --no-tags "$ORIGIN" "$BASE_BRANCH"
+    cleanup_remote() {
+        git remote remove "$ORIGIN"
+    }
+    trap cleanup_remote EXIT
 else
     ORIGIN="origin"
 fi
 echo "Performing lint and check on ${ORIGIN}/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT} ..."
 "$PANTS" tailor --check update-build-files --check
 "$PANTS" lint check --changed-since="${ORIGIN}/${BASE_BRANCH}"
-git remote remove "$ORIGIN"
