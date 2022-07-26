@@ -409,10 +409,10 @@ install_git_hooks() {
       :
     else
       echo "" >> .git/hooks/pre-commit
-      cat scripts/pre-commit.sh >> .git/hooks/pre-commit
+      cat scripts/pre-commit >> .git/hooks/pre-commit
     fi
   else
-    cp scripts/pre-commit.sh .git/hooks/pre-commit
+    cp scripts/pre-commit .git/hooks/pre-commit
     chmod +x .git/hooks/pre-commit
   fi
   local magic_str="monorepo standard pre-push hook"
@@ -422,10 +422,10 @@ install_git_hooks() {
       :
     else
       echo "" >> .git/hooks/pre-push
-      cat scripts/pre-push.sh >> .git/hooks/pre-push
+      cat scripts/pre-push >> .git/hooks/pre-push
     fi
   else
-    cp scripts/pre-push.sh .git/hooks/pre-push
+    cp scripts/pre-push .git/hooks/pre-push
     chmod +x .git/hooks/pre-push
   fi
 }
@@ -542,6 +542,17 @@ install_script_deps
 $bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
 $bpython scripts/check-docker.py
 if [ $? -ne 0 ]; then
+  exit 1
+fi
+# checking docker compose v2 -f flag
+if $(docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+  show_error "When run as a user, 'docker compose' seems not to be a compatible version (v2)."
+  show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on ${HOME}/.docker/cli-plugins"
+  exit 1
+fi
+if $(sudo docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+  show_error "When run as the root, 'docker compose' seems not to be a compatible version (v2)"
+  show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on /usr/local/lib/docker/cli-plugins"
   exit 1
 fi
 if [ "$DISTRO" = "Darwin" ]; then
