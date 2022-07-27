@@ -1328,7 +1328,6 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
 async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
-    app_ctx: PrivateContext = request.app["session.context"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
 
     myself = asyncio.current_task()
