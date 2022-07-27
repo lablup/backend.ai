@@ -25,6 +25,7 @@ from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import quote_plus as urlquote
 
 import aiohttp
+import asyncpg
 import pytest
 import sqlalchemy as sa
 from aiohttp import web
@@ -281,8 +282,16 @@ def database(request, local_config, test_db):
             connect_args=pgsql_connect_opts,
             isolation_level="AUTOCOMMIT",
         )
-        async with engine.connect() as conn:
-            await conn.execute(sa.text(f'CREATE DATABASE "{test_db}";'))
+        while True:
+            try:
+                async with engine.connect() as conn:
+                    await conn.execute(sa.text(f'CREATE DATABASE "{test_db}";'))
+            except (asyncpg.exceptions.CannotConnectNowError, ConnectionError):
+                # Workaround intermittent test failures in GitHub Actions
+                await asyncio.sleep(0.1)
+                continue
+            else:
+                break
         await engine.dispose()
 
     asyncio.run(init_db())
