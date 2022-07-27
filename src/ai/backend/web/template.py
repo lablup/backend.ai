@@ -1,4 +1,5 @@
-from typing import List
+import json
+from typing import Any, List
 
 from jinja2 import lexer, nodes
 from jinja2.ext import Extension
@@ -32,8 +33,7 @@ class TOMLField(Extension):
         )
 
     def _transform(self, field_value: nodes.Expr) -> nodes.Expr:
-        field_value = nodes.Filter(field_value, "tojson", [], [], None, None)
-        field_value = nodes.Filter(field_value, "safe", [], [], None, None)
+        field_value = nodes.Filter(field_value, "toml_scalar", [], [], None, None)
         return field_value
 
 
@@ -43,6 +43,21 @@ class TOMLStringListField(TOMLField):
 
     def _transform(self, field_value: nodes.Expr) -> nodes.Expr:
         field_value = nodes.Filter(field_value, "join", [nodes.Const(",")], [], None, None)
-        field_value = nodes.Filter(field_value, "tojson", [], [], None, None)
-        field_value = nodes.Filter(field_value, "safe", [], [], None, None)
+        field_value = nodes.Filter(field_value, "toml_scalar", [], [], None, None)
         return field_value
+
+
+def toml_scalar(s: Any) -> str:
+    """
+    Encodes an arbitry Python object into a TOML-compatible string representation.
+    The implementation borrows most of it from `json.dumps()`.
+
+    Note that Jinja's default `tojson` filter uses its own HTML-safe unicode escaping for
+    '<', '>', '&', "'" after applying `json.loads()` but we need to avoid doing so.
+
+    ref) https://github.com/pallets/jinja/blob/7fb13bf/src/jinja2/utils.py#L657-L663
+    """
+    # If our custom tags are used, null values must be handled as commenting out the
+    # entire field line and should not be passed to this filter.
+    assert s is not None, "null is not allowed as a TOML scalar value"
+    return json.dumps(s, ensure_ascii=False)

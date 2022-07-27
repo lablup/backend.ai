@@ -42,6 +42,7 @@ from .proxy import (
     web_plugin_handler,
     websocket_handler,
 )
+from .template import toml_scalar
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
 
@@ -116,7 +117,7 @@ async def config_ini_handler(request: web.Request) -> web.Response:
             "config": config,
         }
     )
-    return web.Response(text=config_content, content_type="application/toml")
+    return web.Response(text=config_content, content_type="text/plain")
 
 
 async def config_toml_handler(request: web.Request) -> web.Response:
@@ -132,7 +133,7 @@ async def config_toml_handler(request: web.Request) -> web.Response:
             "config": config,
         }
     )
-    return web.Response(text=config_content, content_type="application/toml")
+    return web.Response(text=config_content, content_type="text/plain")
 
 
 async def console_handler(request: web.Request) -> web.StreamResponse:
@@ -467,14 +468,15 @@ async def server_main(
     config = args[0]
     app = web.Application()
     app["config"] = config
-    app["j2env"] = jinja2.Environment(
+    j2env = jinja2.Environment(
         extensions=[
             "ai.backend.web.template.TOMLField",
             "ai.backend.web.template.TOMLStringListField",
         ],
         loader=jinja2.PackageLoader("ai.backend.web", "templates"),
     )
-    app["j2env"].policies["json.dumps_function"] = partial(json.dumps, ensure_ascii=False)
+    j2env.filters["toml_scalar"] = toml_scalar
+    app["j2env"] = j2env
 
     redis_url = yarl.URL("redis://host").with_host(config["session"]["redis"]["host"]).with_port(
         config["session"]["redis"]["port"]
