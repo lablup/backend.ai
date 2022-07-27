@@ -40,7 +40,7 @@ from ai.backend.common.types import (
 )
 
 from ..defs import DEFAULT_ROLE
-from ..models import AgentRow, SessionRow, kernels, keypairs
+from ..models import AgentRow, KernelRow, SessionRow, kernels, keypairs
 from ..models.scaling_group import ScalingGroupOpts
 from ..registry import AgentRegistry
 
@@ -368,7 +368,7 @@ class KernelInfo:
 
 @attr.s(auto_attribs=True, slots=True)
 class KernelAgentBinding:
-    kernel: KernelInfo
+    kernel: KernelRow
     agent_alloc_ctx: AgentAllocationContext
 
 

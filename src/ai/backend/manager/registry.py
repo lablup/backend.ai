@@ -111,16 +111,18 @@ from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    AgentRow,
     AgentStatus,
     ImageRow,
     KernelRow,
     KernelStatus,
+    KeyPairResourcePolicyRow,
+    KeyPairRow,
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
     agents,
     kernels,
-    keypair_resource_policies,
     prepare_dotfiles,
     prepare_vfolder_mounts,
     query_allowed_sgroups,
@@ -1108,6 +1110,7 @@ class AgentRegistry:
                     if not kernel["cluster_hostname"]
                     else kernel["cluster_hostname"],
                     "image": image_ref.canonical,
+                    "image_id": image_row.id,
                     "architecture": image_ref.architecture,
                     "registry": image_ref.registry,
                     "startup_command": kernel.get("startup_command"),
@@ -1175,7 +1178,7 @@ class AgentRegistry:
     async def start_session(
         self,
         sched_ctx: SchedulingContext,
-        scheduled_session: PendingSession,
+        scheduled_session: SessionRow,
     ) -> None:
         from .scheduler.types import AgentAllocationContext, KernelAgentBinding
 
@@ -1183,20 +1186,20 @@ class AgentRegistry:
             KernelAgentBinding(
                 kernel=k,
                 agent_alloc_ctx=AgentAllocationContext(
-                    agent_id=k.agent_id,
+                    agent_id=k.agent,
                     agent_addr=k.agent_addr,
                     scaling_group=scheduled_session.scaling_group,
                 ),
             )
             for k in scheduled_session.kernels
         ]
-        session_creation_id = scheduled_session.session_creation_id
+        session_creation_id = scheduled_session.creation_id
 
         hook_result = await self.hook_plugin_ctx.dispatch(
             "PRE_START_SESSION",
             (
-                scheduled_session.session_id,
-                scheduled_session.session_name,
+                scheduled_session.id,
+                scheduled_session.name,
                 scheduled_session.access_key,
             ),
             return_when=ALL_COMPLETED,
@@ -1206,28 +1209,32 @@ class AgentRegistry:
 
         # Get resource policy for the session
         # TODO: memoize with TTL
-        async with self.db.begin_readonly() as conn:
-            query = (
-                sa.select([keypair_resource_policies])
-                .select_from(keypair_resource_policies)
-                .where(keypair_resource_policies.c.name == scheduled_session.resource_policy)
+        async with self.db.begin_readonly_session() as db_sess:
+            resouce_policy_q = sa.select(KeyPairRow.resource_policy).where(
+                KeyPairRow.access_key == scheduled_session.access_key
             )
-            result = await conn.execute(query)
-            resource_policy = result.first()
+            query = sa.select(KeyPairResourcePolicyRow).where(
+                KeyPairResourcePolicyRow.name == resouce_policy_q.scalar_subquery()
+            )
+            result = await db_sess.execute(query)
+            resource_policy = result.scalars().first()
         auto_pull = await self.shared_config.get_raw("config/docker/image/auto_pull")
 
         # Aggregate image registry information
-        keyfunc = lambda item: item.kernel.image_ref
-        image_infos = {}
+        keyfunc = lambda item: item.kernel.image_id
+        image_infos: MutableMapping[str, ImageRow] = {}
         async with self.db.begin_readonly_session() as session:
-            for image_ref, _ in itertools.groupby(
+            for image_id, _ in itertools.groupby(
                 sorted(kernel_agent_bindings, key=keyfunc),
                 key=keyfunc,
             ):
+                img_query = sa.select(ImageRow).where(ImageRow.id == image_id)
+                img_row: ImageRow = (await session.execute(img_query)).scalars().first()
+                image_ref = img_row.image_ref
                 log.debug(
                     "start_session(): image ref => {} ({})", image_ref, image_ref.architecture
                 )
-                image_infos[image_ref] = await ImageRow.resolve(session, [image_ref])
+                image_infos[image_id] = img_row
                 registry_url, registry_creds = await get_registry_info(
                     self.shared_config.etcd, image_ref.registry
                 )
@@ -1242,15 +1249,15 @@ class AgentRegistry:
         network_name: Optional[str] = None
         if scheduled_session.cluster_mode == ClusterMode.SINGLE_NODE:
             if scheduled_session.cluster_size > 1:
-                network_name = f"bai-singlenode-{scheduled_session.session_id}"
+                network_name = f"bai-singlenode-{scheduled_session.id}"
                 assert kernel_agent_bindings[0].agent_alloc_ctx.agent_id is not None
-                assert scheduled_session.session_id is not None
+                assert scheduled_session.id is not None
                 try:
                     async with RPCContext(
                         kernel_agent_bindings[0].agent_alloc_ctx.agent_id,
                         kernel_agent_bindings[0].agent_alloc_ctx.agent_addr,
                         invoke_timeout=None,
-                        order_key=str(scheduled_session.session_id),
+                        order_key=str(scheduled_session.id),
                         keepalive_timeout=self.rpc_keepalive_timeout,
                     ) as rpc:
                         await rpc.call.create_local_network(network_name)
@@ -1261,7 +1268,7 @@ class AgentRegistry:
                 network_name = None
         elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
             # Create overlay network for multi-node sessions
-            network_name = f"bai-multinode-{scheduled_session.session_id}"
+            network_name = f"bai-multinode-{scheduled_session.id}"
             mtu = await self.shared_config.get_raw("config/network/overlay/mtu")
             try:
                 # Overlay networks can only be created at the Swarm manager.
@@ -1301,8 +1308,8 @@ class AgentRegistry:
         )
         scheduled_session.environ.update(
             {
-                "BACKENDAI_SESSION_ID": str(scheduled_session.session_id),
-                "BACKENDAI_SESSION_NAME": str(scheduled_session.session_name),
+                "BACKENDAI_SESSION_ID": str(scheduled_session.id),
+                "BACKENDAI_SESSION_NAME": str(scheduled_session.name),
                 "BACKENDAI_CLUSTER_SIZE": str(scheduled_session.cluster_size),
                 "BACKENDAI_CLUSTER_REPLICAS": ",".join(f"{k}:{v}" for k, v in replicas.items()),
                 "BACKENDAI_CLUSTER_HOSTS": ",".join(
@@ -1354,13 +1361,13 @@ class AgentRegistry:
             await self.settle_agent_alloc(kernel_agent_bindings)
         # If all is well, let's say the session is ready.
         await self.event_producer.produce_event(
-            SessionStartedEvent(scheduled_session.session_id, session_creation_id),
+            SessionStartedEvent(scheduled_session.id, session_creation_id),
         )
         await self.hook_plugin_ctx.notify(
             "POST_START_SESSION",
             (
-                scheduled_session.session_id,
-                scheduled_session.session_name,
+                scheduled_session.id,
+                scheduled_session.name,
                 scheduled_session.access_key,
             ),
         )
@@ -1458,7 +1465,7 @@ class AgentRegistry:
     async def _create_kernels_in_one_agent(
         self,
         agent_alloc_ctx: AgentAllocationContext,
-        scheduled_session: PendingSession,
+        scheduled_session: SessionRow,
         items: Sequence[KernelAgentBinding],
         image_info,
         cluster_info,
@@ -1467,65 +1474,66 @@ class AgentRegistry:
         registry_url = image_info["registry_url"]
         registry_creds = image_info["registry_creds"]
         image_infos = image_info["image_infos"]
-        resource_policy = image_info["resource_policy"]
+        resource_policy: KeyPairResourcePolicyRow = image_info["resource_policy"]
         auto_pull = image_info["auto_pull"]
         assert agent_alloc_ctx.agent_id is not None
-        assert scheduled_session.session_id is not None
+        assert scheduled_session.id is not None
         async with RPCContext(
             agent_alloc_ctx.agent_id,
             agent_alloc_ctx.agent_addr,
             invoke_timeout=None,
-            order_key=str(scheduled_session.session_id),
+            order_key=str(scheduled_session.id),
             keepalive_timeout=self.rpc_keepalive_timeout,
         ) as rpc:
             kernel_creation_id = secrets.token_urlsafe(16)
             # Prepare kernel_started event handling
             for binding in items:
-                self.kernel_creation_tracker[binding.kernel.kernel_id] = loop.create_future()
+                self.kernel_creation_tracker[binding.kernel.id] = loop.create_future()
             # Spawn post-processing tasks
             post_tasks = []
             for binding in items:
-                self._post_kernel_creation_infos[binding.kernel.kernel_id] = loop.create_future()
+                self._post_kernel_creation_infos[binding.kernel.id] = loop.create_future()
                 post_task = asyncio.create_task(
                     self._post_create_kernel(
                         agent_alloc_ctx,
-                        binding.kernel.kernel_id,
+                        binding.kernel.id,
                     )
                 )
-                self._post_kernel_creation_tasks[binding.kernel.kernel_id] = post_task
+                self._post_kernel_creation_tasks[binding.kernel.id] = post_task
                 post_tasks.append(post_task)
             try:
+                get_image_ref = lambda k: image_infos[k.image_id].image_ref
                 # Issue a batched RPC call to create kernels on this agent
                 created_infos = await rpc.call.create_kernels(
                     kernel_creation_id,
-                    str(scheduled_session.session_id),
-                    [str(binding.kernel.kernel_id) for binding in items],
+                    str(scheduled_session.id),
+                    [str(binding.kernel.id) for binding in items],
                     [
                         {
                             "image": {
                                 "registry": {
-                                    "name": binding.kernel.image_ref.registry,
+                                    "name": get_image_ref(binding.kernel).registry,
                                     "url": str(registry_url),
                                     **registry_creds,  # type: ignore
                                 },
-                                "digest": image_infos[binding.kernel.image_ref].config_digest,
+                                "digest": image_infos[binding.kernel.image_id].config_digest,
                                 "repo_digest": None,
-                                "canonical": binding.kernel.image_ref.canonical,
-                                "architecture": binding.kernel.image_ref.architecture,
-                                "labels": image_infos[binding.kernel.image_ref].labels,
+                                "canonical": get_image_ref(binding.kernel).canonical,
+                                "architecture": get_image_ref(binding.kernel).architecture,
+                                "labels": image_infos[binding.kernel.image_id].labels,
                             },
                             "session_type": scheduled_session.session_type.value,
                             "cluster_role": binding.kernel.cluster_role,
                             "cluster_idx": binding.kernel.cluster_idx,
                             "cluster_hostname": binding.kernel.cluster_hostname,
-                            "idle_timeout": resource_policy["idle_timeout"],
+                            "idle_timeout": resource_policy.idle_timeout,
                             "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
                             "environ": {
                                 # inherit per-session environment variables
                                 **scheduled_session.environ,
                                 # set per-kernel environment variables
-                                "BACKENDAI_KERNEL_ID": str(binding.kernel.kernel_id),
-                                "BACKENDAI_KERNEL_IMAGE": str(binding.kernel.image_ref),
+                                "BACKENDAI_KERNEL_ID": str(binding.kernel.id),
+                                "BACKENDAI_KERNEL_IMAGE": str(get_image_ref(binding.kernel)),
                                 "BACKENDAI_CLUSTER_ROLE": binding.kernel.cluster_role,
                                 "BACKENDAI_CLUSTER_IDX": str(binding.kernel.cluster_idx),
                                 "BACKENDAI_CLUSTER_HOST": str(binding.kernel.cluster_hostname),
@@ -1534,9 +1542,9 @@ class AgentRegistry:
                             "resource_opts": binding.kernel.resource_opts,
                             "bootstrap_script": binding.kernel.bootstrap_script,
                             "startup_command": binding.kernel.startup_command,
-                            "internal_data": scheduled_session.internal_data,
+                            "internal_data": scheduled_session.main_kernel.internal_data,
                             "auto_pull": auto_pull,
-                            "preopen_ports": scheduled_session.preopen_ports,
+                            "preopen_ports": scheduled_session.main_kernel.preopen_ports,
                         }
                         for binding in items
                     ],
@@ -1544,9 +1552,9 @@ class AgentRegistry:
                 )
                 log.debug(
                     "start_session(s:{}, ak:{}, k:{}) -> created on ag:{}",
-                    scheduled_session.session_name,
+                    scheduled_session.name,
                     scheduled_session.access_key,
-                    [binding.kernel.kernel_id for binding in items],
+                    [binding.kernel.id for binding in items],
                     agent_alloc_ctx.agent_id,
                 )
                 # Pass the return value of RPC calls to post-processing tasks
@@ -1558,7 +1566,7 @@ class AgentRegistry:
                 # The agent has already cancelled or issued the destruction lifecycle event
                 # for this batch of kernels.
                 for binding in items:
-                    kernel_id = binding.kernel.kernel_id
+                    kernel_id = binding.kernel.id
                     self.kernel_creation_tracker[kernel_id].cancel()
                     self._post_kernel_creation_infos[kernel_id].set_exception(e)
                 await asyncio.gather(*post_tasks, return_exceptions=True)
@@ -1683,39 +1691,31 @@ class AgentRegistry:
             for kernel_agent_binding in group_iterator:
                 # this value must be set while running _post_create_kernel
                 actual_allocated_slot = self._kernel_actual_allocated_resources.get(
-                    kernel_agent_binding.kernel.kernel_id
+                    kernel_agent_binding.kernel.id
                 )
                 requested_slots += kernel_agent_binding.kernel.requested_slots
                 if actual_allocated_slot is not None:
                     actual_allocated_slots += ResourceSlot.from_json(actual_allocated_slot)
-                    del self._kernel_actual_allocated_resources[
-                        kernel_agent_binding.kernel.kernel_id
-                    ]
+                    del self._kernel_actual_allocated_resources[kernel_agent_binding.kernel.id]
                 else:  # something's wrong; just fall back to requested slot value
                     actual_allocated_slots += kernel_agent_binding.kernel.requested_slots
 
             # perform DB update only if requested slots and actual allocated value differs
             if actual_allocated_slots != requested_slots:
                 log.debug("calibrating resource slot usage for agent {}", agent_id)
-                async with self.db.begin() as conn:
-                    select_query = (
-                        sa.select([agents.c.occupied_slots])
-                        .select_from(agents)
-                        .where(agents.c.id == agent_id)
-                    )
-                    result = await conn.execute(select_query)
+                async with self.db.begin_session() as db_sess:
+                    select_query = sa.select(AgentRow.occupied_slots).where(AgentRow.id == agent_id)
+                    result = await db_sess.execute(select_query)
                     occupied_slots: ResourceSlot = result.scalar()
                     diff = actual_allocated_slots - requested_slots
                     update_query = (
-                        sa.update(agents)
+                        sa.update(AgentRow)
                         .values(
-                            {
-                                "occupied_slots": ResourceSlot.from_json(occupied_slots) + diff,
-                            }
+                            occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
                         )
-                        .where(agents.c.id == agent_id)
+                        .where(AgentRow.id == agent_id)
                     )
-                    await conn.execute(update_query)
+                    await db_sess.execute(update_query)
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         concurrency_used_per_key: MutableMapping[str, int] = defaultdict(lambda: 0)

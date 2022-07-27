@@ -161,7 +161,14 @@ kernels = sa.Table(
     # session_id == id when the kernel is the main container in a multi-container session or a
     # single-container session.
     # Otherwise, it refers the kernel ID of the main contaienr of the belonged multi-container session.
-    sa.Column("session_id", SessionIDColumnType, unique=False, index=True, nullable=False),
+    sa.Column(
+        "session_id",
+        SessionIDColumnType,
+        sa.ForeignKey("sessions.id"),
+        unique=False,
+        index=True,
+        nullable=False,
+    ),
     sa.Column("session_creation_id", sa.String(length=32), unique=False, index=False),
     sa.Column("session_name", sa.String(length=64), unique=False, index=True),  # previously sess_id
     sa.Column(
@@ -201,6 +208,7 @@ kernels = sa.Table(
     # Resource occupation
     sa.Column("container_id", sa.String(length=64)),
     sa.Column("occupied_slots", ResourceSlotColumn(), nullable=False),
+    sa.Column("requested_slots", ResourceSlotColumn(), nullable=True),
     sa.Column("occupied_shares", pgsql.JSONB(), nullable=False, default={}),  # legacy
     sa.Column("environ", sa.ARRAY(sa.String), nullable=True),
     sa.Column("mounts", sa.ARRAY(sa.String), nullable=True),  # list of list; legacy since 22.03

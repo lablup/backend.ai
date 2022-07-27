@@ -14,6 +14,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import noload, selectinload
 
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
@@ -869,40 +870,62 @@ class SchedulerDispatcher(aobject):
             async with self.lock_factory(LockID.LOCKID_PREPARE, 600):
                 now = datetime.now(tzutc())
 
-                async def _mark_session_preparing() -> Sequence[PendingSession]:
-                    async with self.db.begin() as conn:
+                async def _mark_session_preparing() -> Sequence[SessionRow]:
+                    async with self.db.begin_session() as db_sess:
                         update_query = (
-                            sa.update(kernels)
+                            sa.update(KernelRow)
                             .values(
-                                {
-                                    "status": KernelStatus.PREPARING,
-                                    "status_changed": now,
-                                    "status_info": "",
-                                    "status_data": {},
-                                    "status_history": sql_json_merge(
-                                        kernels.c.status_history,
-                                        (),
-                                        {
-                                            KernelStatus.PREPARING.name: now.isoformat(),
-                                        },
-                                    ),
-                                }
+                                status=KernelStatus.PREPARING,
+                                status_changed=now,
+                                status_info="",
+                                status_data={},
+                                status_history=sql_json_merge(
+                                    KernelRow.status_history,
+                                    (),
+                                    {
+                                        KernelStatus.PREPARING.name: now.isoformat(),
+                                    },
+                                ),
                             )
                             .where(
-                                (kernels.c.status == KernelStatus.SCHEDULED),
+                                (KernelRow.status == KernelStatus.SCHEDULED),
                             )
-                            .returning(kernels.c.id)
                         )
-                        rows = (await conn.execute(update_query)).fetchall()
+                        await db_sess.execute(update_query)
+                        update_sess_query = (
+                            sa.update(SessionRow)
+                            .values(
+                                status=SessionStatus.PREPARING,
+                                status_changed=now,
+                                status_info="",
+                                status_data={},
+                                status_history=sql_json_merge(
+                                    SessionRow.status_history,
+                                    (),
+                                    {
+                                        SessionStatus.PREPARING.name: now.isoformat(),
+                                    },
+                                ),
+                            )
+                            .where(SessionRow.status == SessionStatus.SCHEDULED)
+                            .returning(SessionRow.id)
+                        )
+                        rows = (await db_sess.execute(update_sess_query)).fetchall()
                         if len(rows) == 0:
                             return []
-                        target_kernel_ids = [r["id"] for r in rows]
-                        select_query = PendingSession.base_query().where(
-                            kernels.c.id.in_(target_kernel_ids),
+                        target_session_ids = [r["id"] for r in rows]
+                        select_query = (
+                            sa.select(SessionRow)
+                            .where(SessionRow.id.in_(target_session_ids))
+                            .options(
+                                noload("*"),
+                                selectinload(SessionRow.kernels),
+                            )
                         )
-                        rows = (await conn.execute(select_query)).fetchall()
-                        return PendingSession.from_rows(rows)
+                        result = await db_sess.execute(select_query)
+                        return result.scalars().all()
 
+                scheduled_sessions: Sequence[SessionRow]
                 scheduled_sessions = await execute_with_retry(_mark_session_preparing)
                 log.debug("prepare(): preparing {} session(s)", len(scheduled_sessions))
                 async with (
@@ -912,8 +935,8 @@ class SchedulerDispatcher(aobject):
                     for scheduled_session in scheduled_sessions:
                         await self.registry.event_producer.produce_event(
                             SessionPreparingEvent(
-                                scheduled_session.session_id,
-                                scheduled_session.session_creation_id,
+                                scheduled_session.id,
+                                scheduled_session.creation_id,
                             ),
                         )
                         tg.create_task(
@@ -937,10 +960,10 @@ class SchedulerDispatcher(aobject):
     async def start_session(
         self,
         sched_ctx: SchedulingContext,
-        session: PendingSession,
+        session: SessionRow,
     ) -> None:
         log_fmt = (
-            "prepare(s:{0.session_id}, type:{0.session_type}, name:{0.session_name}, "
+            "prepare(s:{0.id}, type:{0.session_type}, name:{0.name}, "
             "ak:{0.access_key}, cluster_mode:{0.cluster_mode}): "
         )
         log_args = (session,)
@@ -956,60 +979,77 @@ class SchedulerDispatcher(aobject):
 
             async def _mark_session_cancelled() -> None:
                 async with self.db.begin() as db_conn:
-                    affected_agents = set(k.agent_id for k in session.kernels)
+                    affected_agents = set(k.agent for k in session.kernels)
                     for agent_id in affected_agents:
                         await recalc_agent_resource_occupancy(db_conn, agent_id)
                     await _rollback_predicate_mutations(db_conn, sched_ctx, session)
                     now = datetime.now(tzutc())
                     update_query = (
-                        sa.update(kernels)
+                        sa.update(KernelRow)
                         .values(
-                            {
-                                "status": KernelStatus.CANCELLED,
-                                "status_changed": now,
-                                "status_info": "failed-to-start",
-                                "status_data": status_data,
-                                "terminated_at": now,
-                                "status_history": sql_json_merge(
-                                    kernels.c.status_history,
-                                    (),
-                                    {
-                                        KernelStatus.CANCELLED.name: now.isoformat(),
-                                    },
-                                ),
-                            }
+                            status=KernelStatus.CANCELLED,
+                            status_changed=now,
+                            status_info="failed-to-start",
+                            status_data=status_data,
+                            terminated_at=now,
+                            status_history=sql_json_merge(
+                                KernelRow.status_history,
+                                (),
+                                {
+                                    KernelStatus.CANCELLED.name: now.isoformat(),
+                                },
+                            ),
                         )
-                        .where(kernels.c.session_id == session.session_id)
+                        .where(KernelRow.session_id == session.id)
                     )
-                    await db_conn.execute(update_query)
+                    await SASession(db_conn).execute(update_query)
+                    update_sess_query = (
+                        sa.update(SessionRow)
+                        .values(
+                            status=SessionStatus.CANCELLED,
+                            status_changed=now,
+                            status_info="failed-to-start",
+                            status_data=status_data,
+                            terminated_at=now,
+                            status_history=sql_json_merge(
+                                SessionRow.status_history,
+                                (),
+                                {
+                                    SessionStatus.CANCELLED.name: now.isoformat(),
+                                },
+                            ),
+                        )
+                        .where(SessionRow.id == session.id)
+                    )
+                    await SASession(db_conn).execute(update_sess_query)
 
             log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
             try:
                 await execute_with_retry(_mark_session_cancelled)
                 await self.registry.event_producer.produce_event(
                     SessionCancelledEvent(
-                        session.session_id,
-                        session.session_creation_id,
+                        session.id,
+                        session.creation_id,
                         "failed-to-start",
                     ),
                 )
-                async with self.db.begin_readonly() as db_conn:
-                    query = sa.select([kernels.c.id, kernels.c.container_id]).where(
-                        kernels.c.session_id == session.session_id
+                async with self.db.begin_readonly_session() as db_sess:
+                    query = sa.select(KernelRow.id, KernelRow.container_id).where(
+                        KernelRow.session_id == session.id
                     )
-                    rows = (await db_conn.execute(query)).fetchall()
+                    rows = (await db_sess.execute(query)).fetchall()
                     cid_map = {row["id"]: row["container_id"] for row in rows}
                 destroyed_kernels = [
                     {
-                        "agent": k.agent_id,
+                        "agent": k.agent,
                         "agent_addr": k.agent_addr,
-                        "id": k.kernel_id,
-                        "container_id": cid_map[k.kernel_id],
+                        "id": k.id,
+                        "container_id": cid_map[k.id],
                     }
                     for k in session.kernels
                 ]
                 await self.registry.destroy_session_lowlevel(
-                    session.session_id,
+                    session.id,
                     destroyed_kernels,
                 )
                 await self.registry.recalc_resource_usage()
