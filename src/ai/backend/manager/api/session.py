@@ -1352,7 +1352,7 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
         {
             t.Key("login_session_token", default=None): t.Null | t.String,
             # if `dst` is None, it will be agent's default destination.
-            tx.AliasedKey(["dst", "dest"], default=None): t.Null | t.String,
+            tx.AliasedKey(["filename", "fname"], default=None): t.Null | t.String,
         }
     ),
     loads=_json_loads,
@@ -1362,7 +1362,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     session_name: str = request.match_info["session_name"]
     app_ctx: PrivateContext = request.app["session.context"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
-    dst: str | None = params["dst"]
+    filename: str | None = params["filename"]
 
     myself = asyncio.current_task()
     assert myself is not None
@@ -1373,7 +1373,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     try:
         is_success = await asyncio.shield(
             app_ctx.rpc_ptask_group.create_task(
-                root_ctx.registry.commit_session(session_name, owner_access_key, dst),
+                root_ctx.registry.commit_session(session_name, owner_access_key, filename),
             ),
         )
     except BackendError:

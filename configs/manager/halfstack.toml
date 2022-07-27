@@ -28,7 +28,6 @@ pid-file = "./manager.pid"             # env: BACKEND_PID_FILE
 disabled-plugins = []
 
 hide-agents = true
-image-commit-path = "/etc/backend.ai/commit/"
 
 
 [docker-registry]

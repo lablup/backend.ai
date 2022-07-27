@@ -3006,24 +3006,28 @@ class AgentRegistry:
         self,
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
-        dst: str | None,
+        filename: str | None,
     ) -> bool:
         """
         Commit a main kernel's container of the given session.
         """
 
         kernel = await self.get_session(session_name_or_id, access_key)
-        if dst is None:
-            async with self.db.begin_readonly() as db_conn:
-                query = (
-                    sa.select([users.c.email])
-                    .select_from(users)
-                    .where(users.c.uuid == kernel["user_uuid"])
-                )
-                result = await db_conn.execute(query)
-                user_email = result.scalar()
-            # TODO: get path from toml or cfg
-            dst = str(Path("/tmp/backend.ai/commit") / str(user_email) / str(kernel["session_id"]))
+        if filename is None:
+            now = datetime.now(tzutc())
+            filename = f"{now.isoformat()}.tar.gz"
+        assert filename is not None
+
+        async with self.db.begin_readonly() as db_conn:
+            query = (
+                sa.select([users.c.email])
+                .select_from(users)
+                .where(users.c.uuid == kernel["user_uuid"])
+            )
+            result = await db_conn.execute(query)
+            user_email = result.scalar()
+        # TODO: get path from toml or cfg
+        path = Path(str(user_email), str(kernel["session_id"]), filename)
 
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
@@ -3033,7 +3037,7 @@ class AgentRegistry:
                 order_key=kernel["id"],
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                return await rpc.call.commit(str(kernel["id"]), dst)
+                return await rpc.call.commit(str(kernel["id"]), str(path))
 
 
 async def check_scaling_group(

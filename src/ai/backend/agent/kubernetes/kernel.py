@@ -205,7 +205,7 @@ class KubernetesKernel(AbstractKernel):
     async def check_commit_tag(self):
         log.error("Committing in Kubernetes is not supported yet.")
 
-    async def commit(self, dst: str):
+    async def commit(self, image_commit_path, path):
         log.error("Committing in Kubernetes is not supported yet.")
         # assert self.runner is not None
         # work_dir = Path(dst)

@@ -516,13 +516,10 @@ class AgentRPCServer(aobject):
     async def commit(
         self,
         kernel_id,  # type: str
-        dst,  # type: str
+        path,  # type: str
     ):
         log.info("rpc::commit(k:{})", kernel_id)
-        return await self.agent.commit(
-            KernelId(UUID(kernel_id)),
-            dst,
-        )
+        return await self.agent.commit(KernelId(UUID(kernel_id)), path)
 
     @rpc_function
     @collect_error
@@ -827,6 +824,8 @@ def main(
             cfg["debug"]["coredump"]["core_path"] = Path(core_pattern).parent
 
         cfg["agent"]["pid-file"].write_text(str(os.getpid()))
+        image_commit_path = cfg["agent"]["image-commit-path"]
+        image_commit_path.mkdir(parents=True, exist_ok=True)
         ipc_base_path = cfg["agent"]["ipc-base-path"]
         log_sockpath = ipc_base_path / f"agent-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)

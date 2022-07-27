@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import tarfile
 import textwrap
-from datetime import datetime
 from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
@@ -16,7 +15,6 @@ import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
-from dateutil.tz import tzutc
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
@@ -29,7 +27,7 @@ from ..resources import KernelResourceSpec
 from ..utils import closing_async, get_arch_name
 
 # TODO: set the commit tags directory from toml or cfg
-COMMIT_TAG_DIR = Path("/tmp/backend.ai/commit/tags")
+COMMIT_DIR = Path("/tmp/backend.ai/commit/")
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -134,11 +132,11 @@ class DockerKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
-    async def check_commit_tag(self, get_lock: bool = False):
+    async def check_commit_tag(self, commit_path: Path, get_lock: bool = False):
         container_id: str = str(self.data["container_id"])
-        tag_path = COMMIT_TAG_DIR / container_id
+        tag_path = commit_path / "tags" / container_id
 
-        COMMIT_TAG_DIR.mkdir(parents=True, exist_ok=True)
+        tag_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             with open(tag_path, mode="x") as f:
                 if get_lock:
@@ -147,21 +145,20 @@ class DockerKernel(AbstractKernel):
             return False
         return True
 
-    async def commit(self, dst: str):
+    async def commit(self, image_commit_path: Path, path: str):
         assert self.runner is not None
 
         container_id: str = str(self.data["container_id"])
 
-        if not (await self.check_commit_tag(get_lock=True)):
+        if not (await self.check_commit_tag(image_commit_path, get_lock=True)):
             log.warning("Container (id={}) is already being committed", container_id)
             return False
 
-        now = datetime.now(tzutc())
-        filename = f"{now.isoformat()}.tar.gz"
-        filepath = PurePosixPath(dst) / filename
+        filepath = image_commit_path / path
+        filename = Path(filepath).name
 
         try:
-            Path(dst).mkdir(exist_ok=True, parents=True)
+            Path(filepath).parent.mkdir(exist_ok=True, parents=True)
         except ValueError:  # parent_path does not start with work_dir!
             raise AssertionError("malformed committed path.")
 
@@ -181,7 +178,7 @@ class DockerKernel(AbstractKernel):
                         tar.addfile(tar_info, fileobj=BytesIO(data))
 
                 await loop.run_in_executor(None, _save_tar)
-        tag_path = COMMIT_TAG_DIR / container_id
+        tag_path = COMMIT_DIR / "tags" / container_id
         os.remove(tag_path)
         log.info("Container has committed to {}", filepath)
         return True
