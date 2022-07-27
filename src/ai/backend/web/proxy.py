@@ -127,11 +127,11 @@ class WebSocketProxy:
             await self.up_conn.close()
 
 
-async def decrypt_payload(request):
-    config = request.app["config"]
-    scheme = config["service"].get("force-endpoint-protocol")
+async def decrypt_payload(request: web.Request) -> str:
     if not request.content:
-        return request
+        return ""
+    config = request.app["config"]
+    scheme = config["service"]["force_endpoint_protocol"]
     if scheme is None:
         scheme = request.scheme
     api_endpoint = f"{scheme}://{request.host}"
@@ -166,9 +166,10 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             request_headers = extra_config_headers.check(request.headers)
             request_api_version = request_headers.get("X-BackendAI-Version", None)
             secure_context = request_headers.get("X-BackendAI-Encoded", None)
+            decrypted_payload_length = 0
             if secure_context:
                 payload = await decrypt_payload(request)
-                payload_length = len(payload)
+                decrypted_payload_length = len(payload)
             else:
                 payload = request.content
             # Send X-Forwarded-For header for token authentication with the client IP.
@@ -196,7 +197,7 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             if "Content-Length" in request.headers and not secure_context:
                 api_rqst.headers["Content-Length"] = request.headers["Content-Length"]
             if "Content-Length" in request.headers and secure_context:
-                api_rqst.headers["Content-Length"] = str(payload_length)
+                api_rqst.headers["Content-Length"] = str(decrypted_payload_length)
             for hdr in HTTP_HEADERS_TO_FORWARD:
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
@@ -342,16 +343,16 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     # Choose a specific Manager endpoint for persistent web app connection.
     api_endpoint = None
     should_save_session = False
-    _endpoints = request.app["config"]["api"]["endpoint"].split(",")
-    _endpoints = [e.strip() for e in _endpoints]
+    configured_endpoints = request.app["config"]["api"]["endpoint"]
     if session.get("api_endpoints", {}).get(app):
-        if session["api_endpoints"][app] in _endpoints:
+        stringified_endpoints = [str(e) for e in configured_endpoints]
+        if session["api_endpoints"][app] in stringified_endpoints:
             api_endpoint = session["api_endpoints"][app]
     if api_endpoint is None:
-        api_endpoint = random.choice(_endpoints)
+        api_endpoint = random.choice(configured_endpoints)
         if "api_endpoints" not in session:
             session["api_endpoints"] = {}
-        session["api_endpoints"][app] = api_endpoint
+        session["api_endpoints"][app] = str(api_endpoint)
         should_save_session = True
 
     if is_anonymous:
@@ -361,12 +362,11 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     try:
         async with api_session:
             request_api_version = request.headers.get("X-BackendAI-Version", None)
-            params = request.query if request.query else None
             api_rqst = Request(
                 request.method,
                 path,
                 request.content,
-                params=params,
+                params=request.query,
                 content_type=request.content_type,
                 override_api_version=request_api_version,
             )
