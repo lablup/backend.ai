@@ -202,3 +202,56 @@ def umount_host(name, edit_fstab):
             print(" ", aid)
             for k, v in data.items():
                 print("   ", k, ":", v)
+
+@vfolder.command
+@click.argument("vfolder_id", type=str)
+def shared_vfolders_info(vfolder_id):
+    """Show the shared information of the given virtual folder.
+    
+    \b
+    VFOLDER_ID: ID of a virtual folder.
+    """
+    with Session() as session:
+        try:
+            resp = session.VFolder.list_shared_folders(vfolder_id)
+            result = resp.get("shared", [])
+            if len(result) > 0:
+                _result = result[0]
+                print('Virtual folder "{0}" (ID: {1})'.format(_result["vfolder_name"], _result["vfolder_id"]))
+                print("- Owner: {0}".format(_result["owner"]))
+                print("- Permission: {0}".format(_result["perm"]))
+                print("- Folder Type: {0}".format(_result["type"]))
+                shared_to = _result.get("shared_to", [])
+                if len(shared_to) > 0:
+                    print("- Shared to:")
+                    for k, v in shared_to.items():
+                        print("\t- {0}: {1}\n".format(k, v))
+        except Exception as e:
+            print_error(e)
+            sys.exit(1)
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=str)
+@click.argument("user_id", type=str)
+@click.option(
+    "-p", "--permission", type=str, metavar="PERMISSION", help="Folder's innate permission."
+)
+def update_shared_vfolder(vfolder_id, user_id, permission):
+    """
+    Update permission for shared vfolders.
+    If permission is None, remove user's permission for the vfolder.
+
+    \b
+    VFOLDER_ID: ID of a virtual folder.
+    USER_ID: ID of user who shared the vfolder.
+    PERMISSION: Permission to update. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).
+    """
+    with Session() as session:
+        try:
+            resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, permission)
+            print("Updated.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(1)
+        print(resp)
