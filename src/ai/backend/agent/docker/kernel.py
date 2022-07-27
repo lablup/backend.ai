@@ -153,14 +153,15 @@ class DockerKernel(AbstractKernel):
         container_id: str = str(self.data["container_id"])
 
         if not (await self.check_commit_tag(get_lock=True)):
+            log.warning("Container (id={}) is already being committed", container_id)
             return False
 
         now = datetime.now(tzutc())
         filename = f"{now.isoformat()}.tar.gz"
-        filepath = PurePosixPath(dst) / container_id / filename
+        filepath = PurePosixPath(dst) / filename
 
         try:
-            (Path(dst) / container_id).mkdir(exist_ok=True, parents=True)
+            Path(dst).mkdir(exist_ok=True, parents=True)
         except ValueError:  # parent_path does not start with work_dir!
             raise AssertionError("malformed committed path.")
 

@@ -123,6 +123,7 @@ from .models import (
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
     session_dependencies,
+    users,
 )
 from .models.kernel import get_all_kernels, get_main_kernels, match_session_ids
 from .models.utils import ExtendedAsyncSAEngine, execute_with_retry, reenter_txn, sql_json_merge
@@ -3013,8 +3014,16 @@ class AgentRegistry:
 
         kernel = await self.get_session(session_name_or_id, access_key)
         if dst is None:
+            async with self.db.begin_readonly() as db_conn:
+                query = (
+                    sa.select([users.c.email])
+                    .select_from(users)
+                    .where(users.c.uuid == kernel["user_uuid"])
+                )
+                result = await db_conn.execute(query)
+                user_email = result.scalar()
             # TODO: get path from toml or cfg
-            dst = str(Path("/tmp/backend.ai/commit") / str(kernel["user_uuid"]))
+            dst = str(Path("/tmp/backend.ai/commit") / str(user_email) / str(kernel["session_id"]))
 
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(

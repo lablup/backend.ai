@@ -1380,8 +1380,15 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     except BackendError:
         log.exception("COMMIT_SESSION: exception")
         raise
-    status = 200 if is_success else 409
-    return web.json_response(status=status)
+    if not is_success:
+        return web.json_response(
+            {
+                "title": "The given session is already being committed",
+                "message": "The given session is already being committed",
+            },
+            status=409,
+        )
+    return web.json_response(status=204)
 
 
 async def handle_kernel_creation_lifecycle(

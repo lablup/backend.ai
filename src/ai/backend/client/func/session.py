@@ -588,9 +588,8 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/commit",
             params=params,
         )
-        async with rqst.fetch() as resp:
-            if resp.status != 200:
-                raise BackendClientError("Failed to commit session.")
+        async with rqst.fetch():
+            pass
 
     @api_function
     async def interrupt(self):
