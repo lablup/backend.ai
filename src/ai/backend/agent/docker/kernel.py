@@ -10,7 +10,7 @@ import textwrap
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
 
 import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
@@ -29,7 +29,7 @@ from ..resources import KernelResourceSpec
 from ..utils import closing_async, get_arch_name
 
 # TODO: set the commit tags directory from toml or cfg
-COMMIT_TAG_DIR = Path(f"/tmp/backend.ai/commit/tags")
+COMMIT_TAG_DIR = Path("/tmp/backend.ai/commit/tags")
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
