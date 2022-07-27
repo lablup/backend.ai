@@ -1,11 +1,11 @@
 [general]
-apiEndpoint = {{ endpoint_url | tojson }}
-apiEndpointText = {{ config["api"]["text"] | tojson }}
-defaultSessionEnvironment = {{ config["ui"]["default_environment"] | tojson }}
-siteDescription = {{ config["ui"]["brand"] | tojson }}
+{% toml_field "apiEndpoint" endpoint_url %}
+{% toml_field "apiEndpointText" config["api"]["text"] %}
+{% toml_field "defaultSessionEnvironment" config["ui"]["default_environment"] %}
+{% toml_field "siteDescription" config["ui"]["brand"] %}
 connectionMode = "SESSION"
 
 [wsproxy]
-proxyURL = {{ config["service"]["wsproxy"]["url"] | tojson }}
-proxyBaseURL =
-proxyListenIP =
+{% toml_field "proxyURL" config["service"]["wsproxy"]["url"] %}
+# proxyBaseURL =
+# proxyListenIP =

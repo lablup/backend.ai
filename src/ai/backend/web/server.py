@@ -17,7 +17,6 @@ import aiohttp_cors
 import aiotools
 import click
 import jinja2
-import pkg_resources
 import tomli
 import uvloop
 import yarl
@@ -45,18 +44,6 @@ from .proxy import (
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
-
-console_config_ini_template = jinja2.Template(
-    Path(pkg_resources.resource_filename("ai.backend.web", "templates/config_ini.toml.j2"))
-    .resolve()
-    .read_text()
-)
-
-console_config_toml_template = jinja2.Template(
-    Path(pkg_resources.resource_filename("ai.backend.web", "templates/config.toml.j2"))
-    .resolve()
-    .read_text()
-)
 
 cache_patterns = {
     r"\.(?:manifest|appcache|html?|xml|json|ini|toml)$": {
@@ -121,13 +108,15 @@ async def config_ini_handler(request: web.Request) -> web.Response:
     scheme = config["service"]["force_endpoint_protocol"]
     if scheme is None:
         scheme = request.scheme
-    config_content = console_config_ini_template.render(
-        **{
+    j2env: jinja2.Environment = request.app["j2env"]
+    tpl = j2env.get_template("config_ini.toml.j2")
+    config_content = tpl.render(
+        {
             "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
             "config": config,
         }
     )
-    return web.Response(text=config_content)
+    return web.Response(text=config_content, content_type="application/toml")
 
 
 async def config_toml_handler(request: web.Request) -> web.Response:
@@ -135,13 +124,15 @@ async def config_toml_handler(request: web.Request) -> web.Response:
     scheme = config["service"]["force_endpoint_protocol"]
     if scheme is None:
         scheme = request.scheme
-    config_content = console_config_toml_template.render(
-        **{
+    j2env: jinja2.Environment = request.app["j2env"]
+    tpl = j2env.get_template("config.toml.j2")
+    config_content = tpl.render(
+        {
             "endpoint_url": f"{scheme}://{request.host}",  # must be absolute
             "config": config,
         }
     )
-    return web.Response(text=config_content)
+    return web.Response(text=config_content, content_type="application/toml")
 
 
 async def console_handler(request: web.Request) -> web.StreamResponse:
@@ -476,6 +467,14 @@ async def server_main(
     config = args[0]
     app = web.Application()
     app["config"] = config
+    app["j2env"] = jinja2.Environment(
+        extensions=[
+            "ai.backend.web.template.TOMLField",
+            "ai.backend.web.template.TOMLStringListField",
+        ],
+        loader=jinja2.PackageLoader("ai.backend.web", "templates"),
+    )
+    app["j2env"].policies["json.dumps_function"] = partial(json.dumps, ensure_ascii=False)
 
     redis_url = yarl.URL("redis://host").with_host(config["session"]["redis"]["host"]).with_port(
         config["session"]["redis"]["port"]

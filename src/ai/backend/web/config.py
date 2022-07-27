@@ -60,12 +60,13 @@ config_iv = t.Dict(
         ).allow_extra("*"),
         t.Key("environments"): t.Dict(
             {
-                t.Key("allowlist", default=""): tx.StringList(empty_str_as_empty_list=True),
+                t.Key("allowlist", default=None): t.Null
+                | tx.StringList(empty_str_as_empty_list=True),
             }
         ).allow_extra("*"),
         t.Key("plugin"): t.Dict(
             {
-                t.Key("page", default=False): t.ToBool | t.String(allow_blank=True),
+                t.Key("page", default=None): t.Null | t.String(allow_blank=True),
             }
         ).allow_extra("*"),
         t.Key("pipeline"): t.Dict(
@@ -78,7 +79,8 @@ config_iv = t.Dict(
                 t.Key("brand"): t.String,
                 t.Key("default_environment", default=None): t.Null | t.String,
                 t.Key("default_import_environment", default=None): t.Null | t.String,
-                t.Key("menu_blocklist", default=""): tx.StringList(empty_str_as_empty_list=True),
+                t.Key("menu_blocklist", default=None): t.Null
+                | tx.StringList(empty_str_as_empty_list=True),
             }
         ).allow_extra("*"),
         t.Key("api"): t.Dict(
