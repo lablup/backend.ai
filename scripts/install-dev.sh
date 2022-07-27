@@ -71,7 +71,7 @@ usage() {
   echo ""
   echo "  ${LWHITE}--enable-cuda${NC}"
   echo "    Install CUDA accelerator plugin and pull a"
-  echo "    TenosrFlow CUDA kernel for testing/demo."
+  echo "    TensorFlow CUDA kernel for testing/demo."
   echo "    (default: false)"
   echo ""
   echo "  ${LWHITE}--cuda-branch NAME${NC}"
