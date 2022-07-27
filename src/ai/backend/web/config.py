@@ -53,8 +53,8 @@ config_iv = t.Dict(
                 t.Key("max_cpu_cores_per_container", default=64): t.ToInt,
                 t.Key("max_memory_per_container", default=64): t.ToInt,
                 t.Key("max_cuda_devices_per_container", default=16): t.ToInt,
-                t.Key("max_cuda_shares_per_container", default=16): t.ToFloat,
-                t.Key("max_shm_per_container", default=2): t.ToInt,
+                t.Key("max_cuda_shares_per_container", default=16): t.ToInt,
+                t.Key("max_shm_per_container", default=2): t.ToFloat,
                 t.Key("max_file_upload_size", default=4294967296): t.ToInt,
             }
         ).allow_extra("*"),
