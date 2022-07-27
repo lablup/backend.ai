@@ -203,11 +203,12 @@ def umount_host(name, edit_fstab):
             for k, v in data.items():
                 print("   ", k, ":", v)
 
+
 @vfolder.command
 @click.argument("vfolder_id", type=str)
 def shared_vfolders_info(vfolder_id):
     """Show the shared information of the given virtual folder.
-    
+
     \b
     VFOLDER_ID: ID of a virtual folder.
     """
@@ -217,7 +218,11 @@ def shared_vfolders_info(vfolder_id):
             result = resp.get("shared", [])
             if len(result) > 0:
                 _result = result[0]
-                print('Virtual folder "{0}" (ID: {1})'.format(_result["vfolder_name"], _result["vfolder_id"]))
+                print(
+                    'Virtual folder "{0}" (ID: {1})'.format(
+                        _result["vfolder_name"], _result["vfolder_id"]
+                    )
+                )
                 print("- Owner: {0}".format(_result["owner"]))
                 print("- Permission: {0}".format(_result["perm"]))
                 print("- Folder Type: {0}".format(_result["type"]))
