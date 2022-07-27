@@ -25,13 +25,17 @@ maxShmPerContainer = {{ config["resources"]["max_shm_per_container"] | tojson }}
 maxFileUploadSize = {{ config["resources"]["max_file_upload_size"] | tojson }}
 
 [environments]
+{% if config["environments"]["allowlist"] -%}{# This list should not be present if not used #}
 allowlist = {{ config["environments"]["allowlist"] | join(",") | tojson }}
+{%- endif %}
 
 [menu]
+{% if config["ui"]["menu_blocklist"] -%}{# This list should not be present if not used #}
 blocklist = {{ config["ui"]["menu_blocklist"] | join(",") | tojson }}
+{%- endif %}
 
 [plugin]
-{% if config["plugin"]["page"] -%}
+{% if config["plugin"]["page"] -%}{# This list should not be present if not used #}
 page = {{ config["plugin"]["page"] | join(",") | tojson }}
 {%- endif %}
 
