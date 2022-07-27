@@ -75,9 +75,10 @@ async def infer_platform_specific_dependencies(
     request: InferPlatformSpecificDependenciesRequest,
     subsystem: PlatformResourcesSusbystem,
 ) -> InferredDependencies:
+    logger.info("infer_platform_specific_dependencies")
     logger.info(
         "configured target platform (%s) = %s",
-        request.field_set.dependencies.address,
+        request.field_set.address,
         subsystem.platform.value,
     )
     platform_resources_unparsed_address = request.field_set.dependency_map.get(
@@ -89,7 +90,7 @@ async def infer_platform_specific_dependencies(
         Addresses,
         UnparsedAddressInputs(
             (platform_resources_unparsed_address,),
-            owning_address=request.field_set.dependencies.address,
+            owning_address=request.field_set.address,
         ),
     )
     return InferredDependencies(Addresses(parsed_addresses))

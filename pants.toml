@@ -19,6 +19,7 @@ pants_ignore = [
     "docs",  # TODO: docs build config
 ]
 use_deprecated_directory_cli_args_semantics = false  # for 2.13 or later
+use_deprecated_pex_binary_run_semantics = false
 
 [anonymous-telemetry]
 enabled = false
