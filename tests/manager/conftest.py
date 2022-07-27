@@ -288,7 +288,7 @@ def database(request, local_config, test_db):
             try:
                 async with engine.connect() as conn:
                     await conn.execute(sa.text(f'CREATE DATABASE "{test_db}";'))
-            except asyncpg.exceptions.CannotConnectNowError:
+            except (asyncpg.exceptions.CannotConnectNowError, ConnectionError):
                 # Workaround intermittent test failures in GitHub Actions
                 await asyncio.sleep(0.1)
                 continue
