@@ -16,6 +16,23 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.06.0b3 (2022-07-27)
+
+### Features
+* Migrate [accelerator-cuda](https://github.com/lablup/backend.ai-accelerator-cuda) and [accelerator-cuda-mock](https://github.com/lablup/backend.ai-accelerator-cuda-mock) to monorepo setup ([#511](https://github.com/lablup/backend.ai/issues/511))
+* Move validator which check scaling group by session type from predicate to enqueue_session. ([#565](https://github.com/lablup/backend.ai/issues/565))
+* Support wsproxy v2 when the coordinator's user-accessible URL is different from the manager-accessible URL (usually when the user is separated from the Backend.AI service by NAT) ([#582](https://github.com/lablup/backend.ai/issues/582))
+* Add the `static_path` option to `webserver.conf` for site-specific customization and refactor internal configuration handling and request handlers of the webserver ([#599](https://github.com/lablup/backend.ai/issues/599))
+
+### Fixes
+* Update deprecated manager APIs, such as `etcd alias` and `etcd rescan-images`. ([#509](https://github.com/lablup/backend.ai/issues/509))
+* Use `aioredis.client.Redis.ping()` to ping redis server rather than `aioredis.client.Redis.time()`. ([#512](https://github.com/lablup/backend.ai/issues/512))
+* Revert and simplify changes on `sql_json_merge()` with additional test cases to support empty keys. ([#558](https://github.com/lablup/backend.ai/issues/558))
+* Fixed a Regex/shell escaping issue when updating var-base-path by changing parsing. ([#567](https://github.com/lablup/backend.ai/issues/567))
+* install-dev.sh: Fix "AND" operator when checking `--enable-cuda` &amp; `--enable-cuda-mock` and modify the default-installed `cuda-mock.toml` file ([#578](https://github.com/lablup/backend.ai/issues/578))
+* install-dev: Add compatibility checks for `-f` option of the `docker compose` (v2) commands in the user home directory and system-wide directory ([#602](https://github.com/lablup/backend.ai/issues/602))
+
+
 ## 22.06.0b2 (2022-07-18)
 
 ### Features
