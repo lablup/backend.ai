@@ -43,10 +43,13 @@ from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
 
 from ai.backend.common import config, identity, msgpack, utils
+from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.events import EventProducer
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
+    EtcdRedisConfig,
     HardwareMetadata,
     HostPortPair,
     KernelCreationConfig,
@@ -198,6 +201,7 @@ class AgentRPCServer(aobject):
 
         await self.read_agent_config()
         await self.read_agent_config_container()
+        await self.init_background_task_manager()
 
         self.stats_monitor = AgentStatsPluginContext(self.etcd, self.local_config)
         self.error_monitor = AgentErrorPluginContext(self.etcd, self.local_config)
@@ -282,6 +286,13 @@ class AgentRPCServer(aobject):
         for k, v in container_etcd_config.items():
             self.local_config["container"][k] = v
             log.info("etcd: container-config: {}={}".format(k, v))
+
+    async def init_background_task_manager(self):
+        event_producer = await EventProducer.new(
+            cast(EtcdRedisConfig, self.local_config["redis"]),
+            db=4,  # Identical to manager's REDIS_STREAM_DB
+        )
+        self.local_config["background_task_manager"] = BackgroundTaskManager(event_producer)
 
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
@@ -519,7 +530,11 @@ class AgentRPCServer(aobject):
         path,  # type: str
     ):
         log.info("rpc::commit(k:{})", kernel_id)
-        return await self.agent.commit(KernelId(UUID(kernel_id)), path)
+        bgtask_mgr = self.local_config["background_task_manager"]
+        task_id = await bgtask_mgr.start(
+            self.agent.commit, kernel_id=KernelId(UUID(kernel_id)), path=path
+        )
+        return task_id
 
     @rpc_function
     @collect_error

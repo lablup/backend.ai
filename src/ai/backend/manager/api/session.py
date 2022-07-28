@@ -1371,7 +1371,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
         "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     try:
-        is_success = await asyncio.shield(
+        task_id: str = await asyncio.shield(
             app_ctx.rpc_ptask_group.create_task(
                 root_ctx.registry.commit_session(session_name, owner_access_key, filename),
             ),
@@ -1379,15 +1379,8 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     except BackendError:
         log.exception("COMMIT_SESSION: exception")
         raise
-    if not is_success:
-        return web.json_response(
-            {
-                "title": "The given session is already being committed",
-                "message": "The given session is already being committed",
-            },
-            status=409,
-        )
-    return web.json_response(status=204)
+    data = {"data": task_id}
+    return web.json_response(data, status=201)
 
 
 async def handle_kernel_creation_lifecycle(

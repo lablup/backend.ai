@@ -202,7 +202,7 @@ class KubernetesKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
-    async def check_commit_tag(self):
+    async def check_commit_tag(self, commit_path, get_lock):
         log.error("Committing in Kubernetes is not supported yet.")
 
     async def commit(self, image_commit_path, path):

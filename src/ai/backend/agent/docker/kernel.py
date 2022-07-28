@@ -142,8 +142,8 @@ class DockerKernel(AbstractKernel):
                 if get_lock:
                     f.write("")
         except FileExistsError:
-            return False
-        return True
+            return int(False)
+        return int(True)
 
     async def commit(self, image_commit_path: Path, path: str):
         assert self.runner is not None
@@ -152,7 +152,7 @@ class DockerKernel(AbstractKernel):
 
         if not (await self.check_commit_tag(image_commit_path, get_lock=True)):
             log.warning("Container (id={}) is already being committed", container_id)
-            return False
+            return int(False)
 
         filepath = image_commit_path / path
         filename = Path(filepath).name
@@ -181,7 +181,7 @@ class DockerKernel(AbstractKernel):
         tag_path = COMMIT_DIR / "tags" / container_id
         os.remove(tag_path)
         log.info("Container has committed to {}", filepath)
-        return True
+        return int(True)
 
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()

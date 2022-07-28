@@ -194,13 +194,14 @@ class BackgroundTaskManager:
         self,
         func: BackgroundTask,
         name: str = None,
-    ) -> uuid.UUID:
+        **kwargs,
+    ) -> str:
         task_id = uuid.uuid4()
         redis_producer = self.event_producer.redis_client
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline()
-            tracker_key = f"bgtask.{task_id}"
+            tracker_key = f"bgtask.{str(task_id)}"
             now = str(time.time())
             await pipe.hset(
                 tracker_key,
@@ -218,15 +219,16 @@ class BackgroundTaskManager:
 
         await redis_helper.execute(redis_producer, _pipe_builder)
 
-        task = asyncio.create_task(self._wrapper_task(func, task_id, name))
+        task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
         self.ongoing_tasks.add(task)
-        return task_id
+        return str(task_id)
 
     async def _wrapper_task(
         self,
         func: BackgroundTask,
         task_id: uuid.UUID,
         task_name: Optional[str],
+        **kwargs,
     ) -> None:
         task_result: TaskResult
         reporter = ProgressReporter(self.event_producer, task_id)
@@ -235,7 +237,7 @@ class BackgroundTaskManager:
             BgtaskFailedEvent
         ] = BgtaskDoneEvent
         try:
-            message = await func(reporter) or ""
+            message = await func(reporter, **kwargs) or ""
             task_result = "bgtask_done"
         except asyncio.CancelledError:
             task_result = "bgtask_cancelled"
@@ -250,11 +252,11 @@ class BackgroundTaskManager:
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
-                tracker_key = f"bgtask.{task_id}"
+                tracker_key = f"bgtask.{str(task_id)}"
                 await pipe.hset(
                     tracker_key,
                     mapping={
-                        "status": task_result[7:],  # strip "bgtask_"
+                        "status": task_result[len("bgtask_") :],  # strip "bgtask_"
                         "msg": message,
                         "last_update": str(time.time()),
                     },
