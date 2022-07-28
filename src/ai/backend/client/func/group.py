@@ -46,7 +46,7 @@ class Group(BaseFunction):
         cls,
         name: str,
         *,
-        fields: Iterable[FieldSpec] = None,
+        fields: Iterable[FieldSpec | str] = None,
         domain_name: str = None,
     ) -> Sequence[dict]:
         """
@@ -67,7 +67,10 @@ class Group(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        resolved_fields = tuple(
+            f.field_ref if isinstance(f, FieldSpec) else group_fields[f].field_ref for f in fields
+        )
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "domain_name": domain_name,
@@ -140,14 +143,14 @@ class Group(BaseFunction):
         total_resource_slots: str = None,
         allowed_vfolder_hosts: Iterable[str] = None,
         integration_id: str = None,
-        fields: Iterable[FieldSpec] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new group with the given options.
         You need an admin privilege for this operation.
         """
         if fields is None:
-            fields = (FieldSpec("id"), FieldSpec("domain_name"), FieldSpec("name"))
+            fields = (group_fields["id"], group_fields["domain_name"], group_fields["name"])
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: GroupInput!) {
@@ -157,7 +160,10 @@ class Group(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        resolved_fields = tuple(
+            f.field_ref if isinstance(f, FieldSpec) else group_fields[f].field_ref for f in fields
+        )
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "input": {
@@ -183,7 +189,7 @@ class Group(BaseFunction):
         total_resource_slots: str = None,
         allowed_vfolder_hosts: Iterable[str] = None,
         integration_id: str = None,
-        fields: Iterable[FieldSpec] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Update existing group.
@@ -253,7 +259,7 @@ class Group(BaseFunction):
     @api_function
     @classmethod
     async def add_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec] = None
+        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
     ) -> dict:
         """
         Add users to a group.
@@ -281,7 +287,7 @@ class Group(BaseFunction):
     @api_function
     @classmethod
     async def remove_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec] = None
+        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
     ) -> dict:
         """
         Remove users from a group.

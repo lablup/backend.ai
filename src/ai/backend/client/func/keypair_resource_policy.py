@@ -54,14 +54,14 @@ class KeypairResourcePolicy(BaseFunction):
         max_vfolder_size: int,
         idle_timeout: int,
         allowed_vfolder_hosts: Sequence[str],
-        fields: Iterable[FieldSpec] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new keypair resource policy with the given options.
         You need an admin privilege for this operation.
         """
         if fields is None:
-            fields = (FieldSpec("name"),)
+            fields = (keypair_resource_policy_fields["name"],)
         q = (
             "mutation($name: String!, $input: CreateKeyPairResourcePolicyInput!) {"
             + "  create_keypair_resource_policy(name: $name, props: $input) {"
@@ -69,7 +69,11 @@ class KeypairResourcePolicy(BaseFunction):
             "  }"
             "}"
         )
-        q = q.replace("$fields", " ".join(f.field_ref for f in fields))
+        resolved_fields = tuple(
+            f.field_ref if isinstance(f, FieldSpec) else keypair_resource_policy_fields[f].field_ref
+            for f in fields
+        )
+        q = q.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "input": {

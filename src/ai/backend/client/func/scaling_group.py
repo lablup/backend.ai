@@ -121,13 +121,13 @@ class ScalingGroup(BaseFunction):
         driver_opts: Mapping[str, str] = None,
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
-        fields: Iterable[FieldSpec] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new scaling group with the given options.
         """
         if fields is None:
-            fields = (FieldSpec("name"),)
+            fields = (scaling_group_fields["name"],)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: CreateScalingGroupInput!) {
@@ -137,7 +137,11 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        resolved_fields = tuple(
+            f.field_ref if isinstance(f, FieldSpec) else scaling_group_fields[f].field_ref
+            for f in fields
+        )
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "input": {
@@ -163,13 +167,13 @@ class ScalingGroup(BaseFunction):
         driver_opts: Mapping[str, str] = None,
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
-        fields: Iterable[FieldSpec] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Update existing scaling group.
         """
         if fields is None:
-            fields = (FieldSpec("name"),)
+            fields = (scaling_group_fields["name"],)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: ModifyScalingGroupInput!) {
@@ -179,7 +183,11 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        resolved_fields = tuple(
+            f.field_ref if isinstance(f, FieldSpec) else scaling_group_fields[f].field_ref
+            for f in fields
+        )
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "input": {

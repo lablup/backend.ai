@@ -253,7 +253,7 @@ class User(BaseFunction):
         need_password_change: bool = False,
         description: str = "",
         group_ids: Iterable[str] = None,
-        fields: Iterable[FieldSpec] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new user with the given options.
@@ -261,10 +261,10 @@ class User(BaseFunction):
         """
         if fields is None:
             fields = (
-                FieldSpec("domain_name"),
-                FieldSpec("email"),
-                FieldSpec("username"),
-                FieldSpec("uuid"),
+                user_fields["domain_name"],
+                user_fields["email"],
+                user_fields["username"],
+                user_fields["uuid"],
             )
         query = textwrap.dedent(
             """\
@@ -275,7 +275,10 @@ class User(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        resolved_fields = tuple(
+            f.field_ref if isinstance(f, FieldSpec) else user_fields[f].field_ref for f in fields
+        )
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "email": email,
             "input": {
@@ -307,7 +310,7 @@ class User(BaseFunction):
         need_password_change: bool = None,
         description: str = None,
         group_ids: Iterable[str] = None,
-        fields: Iterable[FieldSpec] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Update existing user.

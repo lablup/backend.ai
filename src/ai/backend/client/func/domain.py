@@ -102,14 +102,14 @@ class Domain(BaseFunction):
         allowed_vfolder_hosts: Iterable[str] = None,
         allowed_docker_registries: Iterable[str] = None,
         integration_id: str = None,
-        fields: Iterable[FieldSpec] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new domain with the given options.
         You need an admin privilege for this operation.
         """
         if fields is None:
-            fields = (FieldSpec("name"),)
+            fields = (domain_fields["name"],)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: DomainInput!) {
@@ -119,7 +119,10 @@ class Domain(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        resolved_fields = tuple(
+            f.field_ref if isinstance(f, FieldSpec) else domain_fields[f].field_ref for f in fields
+        )
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "input": {
@@ -146,7 +149,7 @@ class Domain(BaseFunction):
         allowed_vfolder_hosts: Iterable[str] = None,
         allowed_docker_registries: Iterable[str] = None,
         integration_id: str = None,
-        fields: Iterable[FieldSpec] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Update existing domain.
