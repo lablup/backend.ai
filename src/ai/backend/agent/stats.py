@@ -382,12 +382,12 @@ class StatContext:
         """
         async with self._lock:
             kernel_id_map: Dict[ContainerId, KernelId] = {}
-            stale_kernel_id_list = []
+            stale_kernel_id_list: List[KernelId] = []
             for kid, info in self.agent.kernel_registry.items():
                 try:
                     cid = info["container_id"]
                 except KeyError:
-                    stale_kernel_id_list.append(kid)
+                    stale_kernel_id_list.append(KernelId(kid))
                     log.warning("collect_container_stat(): no container for kernel {}", kid)
                 else:
                     kernel_id_map[ContainerId(cid)] = kid
