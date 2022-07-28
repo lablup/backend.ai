@@ -260,7 +260,12 @@ class User(BaseFunction):
         You need an admin privilege for this operation.
         """
         if fields is None:
-            fields = ("domain_name", "email", "username", "uuid")
+            fields = (
+                FieldSpec("domain_name"),
+                FieldSpec("email"),
+                FieldSpec("username"),
+                FieldSpec("uuid"),
+            )
         query = textwrap.dedent(
             """\
             mutation($email: String!, $input: UserInput!) {

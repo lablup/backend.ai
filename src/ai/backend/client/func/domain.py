@@ -109,7 +109,7 @@ class Domain(BaseFunction):
         You need an admin privilege for this operation.
         """
         if fields is None:
-            fields = ("name",)
+            fields = (FieldSpec("name"),)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: DomainInput!) {

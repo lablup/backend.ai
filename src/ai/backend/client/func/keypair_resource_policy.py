@@ -61,7 +61,7 @@ class KeypairResourcePolicy(BaseFunction):
         You need an admin privilege for this operation.
         """
         if fields is None:
-            fields = ("name",)
+            fields = (FieldSpec("name"),)
         q = (
             "mutation($name: String!, $input: CreateKeyPairResourcePolicyInput!) {"
             + "  create_keypair_resource_policy(name: $name, props: $input) {"

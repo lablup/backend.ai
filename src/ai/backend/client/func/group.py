@@ -147,7 +147,7 @@ class Group(BaseFunction):
         You need an admin privilege for this operation.
         """
         if fields is None:
-            fields = ("id", "domain_name", "name")
+            fields = (FieldSpec("id"), FieldSpec("domain_name"), FieldSpec("name"))
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: GroupInput!) {

@@ -127,7 +127,7 @@ class ScalingGroup(BaseFunction):
         Creates a new scaling group with the given options.
         """
         if fields is None:
-            fields = ("name",)
+            fields = (FieldSpec("name"),)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: CreateScalingGroupInput!) {
@@ -169,7 +169,7 @@ class ScalingGroup(BaseFunction):
         Update existing scaling group.
         """
         if fields is None:
-            fields = ("name",)
+            fields = (FieldSpec("name"),)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: ModifyScalingGroupInput!) {
