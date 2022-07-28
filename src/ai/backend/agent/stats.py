@@ -382,7 +382,7 @@ class StatContext:
         """
         async with self._lock:
             kernel_id_map: Dict[ContainerId, KernelId] = {}
-            stale_kernel_id_list: List[KernelId] = []
+            stale_kernel_id_list = []
             for kid, info in self.agent.kernel_registry.items():
                 try:
                     cid = info["container_id"]
