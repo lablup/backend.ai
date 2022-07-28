@@ -539,6 +539,45 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
+
+# Install pyenv
+read -r -d '' pyenv_init_script <<"EOS"
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init --path)"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+EOS
+if ! type "pyenv" >/dev/null 2>&1; then
+  # TODO: ask if install pyenv
+  show_info "Installing pyenv..."
+  set -e
+  curl https://pyenv.run | sh
+  for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
+  do
+    if [ -e "${HOME}/.${PROFILE_FILE}" ]
+    then
+      echo "$pyenv_init_script" >> "${HOME}/.${PROFILE_FILE}"
+    fi
+  done
+  set +e
+  eval "$pyenv_init_script"
+  pyenv
+else
+  eval "$pyenv_init_script"
+fi
+
+# Install Python and pyenv virtualenvs
+show_info "Checking and installing Python dependencies..."
+install_pybuild_deps
+
+show_info "Installing Python..."
+install_python
+
+show_info "Checking Python features..."
+check_python
+pyenv shell "${PYTHON_VERSION}"
+
 $bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
 $bpython scripts/check-docker.py
 if [ $? -ne 0 ]; then
@@ -579,37 +618,6 @@ if [ $ENABLE_CUDA -eq 1 ] && [ $ENABLE_CUDA_MOCK -eq 1 ]; then
   exit 1
 fi
 
-# Install pyenv
-read -r -d '' pyenv_init_script <<"EOS"
-export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)"
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
-EOS
-if ! type "pyenv" >/dev/null 2>&1; then
-  # TODO: ask if install pyenv
-  show_info "Installing pyenv..."
-  set -e
-  curl https://pyenv.run | sh
-  for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
-  do
-    if [ -e "${HOME}/.${PROFILE_FILE}" ]
-    then
-      echo "$pyenv_init_script" >> "${HOME}/.${PROFILE_FILE}"
-    fi
-  done
-  set +e
-  eval "$pyenv_init_script"
-  pyenv
-else
-  eval "$pyenv_init_script"
-fi
-
-# Install Python and pyenv virtualenvs
-show_info "Checking and installing Python dependencies..."
-install_pybuild_deps
-
 show_info "Setting additional git configs..."
 git config blame.ignoreRevsFile .git-blame-ignore-revs
 
@@ -624,13 +632,6 @@ git submodule update --init --checkout --recursive
 
 show_info "Configuring the standard git hooks..."
 install_git_hooks
-
-show_info "Installing Python..."
-install_python
-
-show_info "Checking Python features..."
-check_python
-pyenv shell "${PYTHON_VERSION}"
 
 show_info "Bootstrapping the Pants build system..."
 bootstrap_pants
