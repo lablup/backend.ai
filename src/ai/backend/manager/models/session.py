@@ -53,6 +53,7 @@ if TYPE_CHECKING:
 
 
 __all__ = (
+    "aggregate_kernel_status",
     "SessionStatus",
     "DEAD_SESSION_STATUSES",
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",

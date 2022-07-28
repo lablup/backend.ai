@@ -1505,10 +1505,10 @@ async def invoke_session_callback(
         "when": datetime.now(tzutc()).isoformat(),
     }
     try:
-        async with root_ctx.db.begin_readonly() as db:
+        async with root_ctx.db.begin_readonly_session() as db:
             session = await root_ctx.registry.get_session_by_session_id(
                 event.session_id,
-                db_connection=db,
+                db_session=db,
             )
     except SessionNotFound:
         return
