@@ -54,7 +54,7 @@ class KeypairResourcePolicy(BaseFunction):
         max_vfolder_size: int,
         idle_timeout: int,
         allowed_vfolder_hosts: Sequence[str],
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec] = None,
     ) -> dict:
         """
         Creates a new keypair resource policy with the given options.
@@ -69,7 +69,7 @@ class KeypairResourcePolicy(BaseFunction):
             "  }"
             "}"
         )
-        q = q.replace("$fields", " ".join(fields))
+        q = q.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "name": name,
             "input": {

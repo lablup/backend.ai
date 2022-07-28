@@ -102,7 +102,7 @@ class Domain(BaseFunction):
         allowed_vfolder_hosts: Iterable[str] = None,
         allowed_docker_registries: Iterable[str] = None,
         integration_id: str = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec] = None,
     ) -> dict:
         """
         Creates a new domain with the given options.
@@ -119,7 +119,7 @@ class Domain(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "name": name,
             "input": {
@@ -146,7 +146,7 @@ class Domain(BaseFunction):
         allowed_vfolder_hosts: Iterable[str] = None,
         allowed_docker_registries: Iterable[str] = None,
         integration_id: str = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec] = None,
     ) -> dict:
         """
         Update existing domain.

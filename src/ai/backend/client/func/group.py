@@ -46,7 +46,7 @@ class Group(BaseFunction):
         cls,
         name: str,
         *,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec] = None,
         domain_name: str = None,
     ) -> Sequence[dict]:
         """
@@ -67,7 +67,7 @@ class Group(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "name": name,
             "domain_name": domain_name,
@@ -140,7 +140,7 @@ class Group(BaseFunction):
         total_resource_slots: str = None,
         allowed_vfolder_hosts: Iterable[str] = None,
         integration_id: str = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec] = None,
     ) -> dict:
         """
         Creates a new group with the given options.
@@ -157,7 +157,7 @@ class Group(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "name": name,
             "input": {
@@ -183,7 +183,7 @@ class Group(BaseFunction):
         total_resource_slots: str = None,
         allowed_vfolder_hosts: Iterable[str] = None,
         integration_id: str = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec] = None,
     ) -> dict:
         """
         Update existing group.
@@ -253,7 +253,7 @@ class Group(BaseFunction):
     @api_function
     @classmethod
     async def add_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[str] = None
+        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec] = None
     ) -> dict:
         """
         Add users to a group.
@@ -281,7 +281,7 @@ class Group(BaseFunction):
     @api_function
     @classmethod
     async def remove_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[str] = None
+        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec] = None
     ) -> dict:
         """
         Remove users from a group.

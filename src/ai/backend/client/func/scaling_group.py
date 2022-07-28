@@ -121,7 +121,7 @@ class ScalingGroup(BaseFunction):
         driver_opts: Mapping[str, str] = None,
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec] = None,
     ) -> dict:
         """
         Creates a new scaling group with the given options.
@@ -137,7 +137,7 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "name": name,
             "input": {
@@ -163,7 +163,7 @@ class ScalingGroup(BaseFunction):
         driver_opts: Mapping[str, str] = None,
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec] = None,
     ) -> dict:
         """
         Update existing scaling group.
@@ -179,7 +179,7 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "name": name,
             "input": {

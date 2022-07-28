@@ -253,7 +253,7 @@ class User(BaseFunction):
         need_password_change: bool = False,
         description: str = "",
         group_ids: Iterable[str] = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec] = None,
     ) -> dict:
         """
         Creates a new user with the given options.
@@ -270,7 +270,7 @@ class User(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
             "email": email,
             "input": {
@@ -302,7 +302,7 @@ class User(BaseFunction):
         need_password_change: bool = None,
         description: str = None,
         group_ids: Iterable[str] = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec] = None,
     ) -> dict:
         """
         Update existing user.
