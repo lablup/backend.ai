@@ -42,5 +42,6 @@ resources(
     sources=[
         "**/py.typed",
         "static/**/*",
+        "templates/**/*",
     ],
 )

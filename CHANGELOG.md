@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.06.0b4 (2022-07-28)
+
+### Fixes
+* web: Include missing `templates` directory in the package ([#611](https://github.com/lablup/backend.ai/issues/611))
+
+
 ## 22.06.0b3 (2022-07-27)
 
 ### Features
