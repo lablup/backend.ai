@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, SubsystemRule, collect_rules, rule
 from pants.engine.target import (
