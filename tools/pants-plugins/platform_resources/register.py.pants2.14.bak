@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
-from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
+from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, SubsystemRule, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
     DictStringToStringField,
-    InjectDependenciesRequest,
-    InjectedDependencies,
+    FieldSet,
+    InferDependenciesRequest,
+    InferredDependencies,
     Target,
-    WrappedTarget,
 )
 from pants.engine.unions import UnionRule
 from pants.option.option_types import EnumOption
@@ -38,7 +39,7 @@ class PlatformDependencyMapField(DictStringToStringField):
     help = "Specifies platform-specific dependencies as a dictionary from platform names to dependency lists."
 
 
-class PlatformSpecificDependencies(Dependencies):
+class PlatformSpecificDependenciesField(Dependencies):
     """
     This field will be populated by injection based on the `--platform-specific-resources-target` option
     and from the `dependency_map` field of the `platform_resources` target.
@@ -47,37 +48,52 @@ class PlatformSpecificDependencies(Dependencies):
 
 class PlatformResourcesTarget(Target):
     alias = "platform_resources"
-    core_fields = (*COMMON_TARGET_FIELDS, PlatformDependencyMapField, PlatformSpecificDependencies)
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        PlatformDependencyMapField,
+        PlatformSpecificDependenciesField,
+    )
     help = "A target to declare selective dependency sets for multiple different platforms"
 
 
-class InjectPlatformSpecificDependenciesRequest(InjectDependenciesRequest):
-    inject_for = PlatformSpecificDependencies
+@dataclass(frozen=True)
+class PlatformSpecificDependencyInferenceFieldSet(FieldSet):
+    required_fields = (
+        PlatformSpecificDependenciesField,
+        PlatformDependencyMapField,
+    )
+    dependencies: PlatformSpecificDependenciesField
+    dependency_map: PlatformDependencyMapField
+
+
+class InferPlatformSpecificDependenciesRequest(InferDependenciesRequest):
+    infer_from = PlatformSpecificDependencyInferenceFieldSet
 
 
 @rule
-async def inject_platform_specific_dependencies(
-    request: InjectPlatformSpecificDependenciesRequest,
+async def infer_platform_specific_dependencies(
+    request: InferPlatformSpecificDependenciesRequest,
     subsystem: PlatformResourcesSusbystem,
-) -> InjectedDependencies:
+) -> InferredDependencies:
+    logger.info("infer_platform_specific_dependencies")
     logger.info(
         "configured target platform (%s) = %s",
-        request.dependencies_field.address,
+        request.field_set.address,
         subsystem.platform.value,
     )
-    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
-    platforms = wrapped_target.target.get(PlatformDependencyMapField).value
-    platform_resources_unparsed_address = platforms and platforms.get(subsystem.platform.value)
+    platform_resources_unparsed_address = request.field_set.dependency_map.get(
+        subsystem.platform.value
+    )
     if not platform_resources_unparsed_address:
-        return InjectedDependencies()
+        return InferredDependencies()
     parsed_addresses = await Get(
         Addresses,
         UnparsedAddressInputs(
             (platform_resources_unparsed_address,),
-            owning_address=request.dependencies_field.address,
+            owning_address=request.field_set.address,
         ),
     )
-    return InjectedDependencies(Addresses(parsed_addresses))
+    return InferredDependencies(Addresses(parsed_addresses))
 
 
 # Plugin registration
@@ -91,5 +107,5 @@ def rules():
     return [
         *collect_rules(),
         SubsystemRule(PlatformResourcesSusbystem),
-        UnionRule(InjectDependenciesRequest, InjectPlatformSpecificDependenciesRequest),
+        UnionRule(InferDependenciesRequest, InferPlatformSpecificDependenciesRequest),
     ]
