@@ -2049,7 +2049,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
                 vfolders.c.id,
                 vfolders.c.name,
                 vfolders.c.group,
-                vfolders.c.user,
+                vfolders.c.user.label("vfolder_user"),
                 users.c.email,
             ]
         ).select_from(j)
@@ -2059,7 +2059,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         shared_list = result.fetchall()
     shared_info = []
     for shared in shared_list:
-        owner = shared.group if shared.group else shared.user
+        owner = shared.group if shared.group else shared.vfolder_user
         folder_type = "project" if shared.group else "user"
         shared_info.append(
             {
