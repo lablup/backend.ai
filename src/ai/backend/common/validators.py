@@ -14,7 +14,19 @@ from collections.abc import Iterable
 from decimal import Decimal
 from pathlib import Path as _Path
 from pathlib import PurePath as _PurePath
-from typing import Any, List, Literal, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
+from typing import (
+    Any,
+    Generic,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import dateutil.tz
 from dateutil.relativedelta import relativedelta
@@ -28,7 +40,7 @@ except ImportError:
 import multidict
 import trafaret as t
 import yarl
-from trafaret.base import TrafaretMeta
+from trafaret.base import TrafaretMeta, ensure_trafaret
 from trafaret.lib import _empty
 
 from .types import BinarySize as _BinarySize
@@ -138,30 +150,55 @@ class BinarySize(t.Trafaret):
             self._failure("value is not a valid binary size", value=value)
 
 
-T_commalist = TypeVar("T_commalist", bound=Type)
+TListItem = TypeVar("TListItem")
 
 
-class DelimiterSeperatedList(t.Trafaret):
-    def __init__(self, value_cls: Optional[T_commalist], *, delimiter: str = ",") -> None:
+class DelimiterSeperatedList(t.Trafaret, Generic[TListItem]):
+    def __init__(
+        self,
+        trafaret: Type[t.Trafaret] | t.Trafaret,
+        *,
+        delimiter: str = ",",
+        min_length: Optional[int] = None,
+        empty_str_as_empty_list: bool = False,
+    ) -> None:
         self.delimiter = delimiter
-        self.value_cls = value_cls
+        self.empty_str_as_empty_list = empty_str_as_empty_list
+        self.min_length = min_length
+        self.trafaret = ensure_trafaret(trafaret)
 
-    def check_and_return(self, value: Any) -> Sequence[T_commalist]:
+    def check_and_return(self, value: Any) -> Sequence[TListItem]:
         try:
             if not isinstance(value, str):
                 value = str(value)
+            if self.empty_str_as_empty_list and not value:
+                return []
             splited = value.split(self.delimiter)
-            if self.value_cls:
-                return [self.value_cls().check_and_return(x) for x in splited]
-            else:
-                return splited
+            if self.min_length is not None and len(splited) < self.min_length:
+                self._failure(
+                    f"the number of items should be greater than {self.min_length}",
+                    value=value,
+                )
+            return [self.trafaret.check_and_return(x) for x in splited]
         except ValueError:
             self._failure("value is not a string or not convertible to string", value=value)
 
 
-class StringList(DelimiterSeperatedList):
-    def __init__(self, *, delimiter: str = ",") -> None:
-        super().__init__(None, delimiter=delimiter)
+class StringList(DelimiterSeperatedList[str]):
+    def __init__(
+        self,
+        *,
+        delimiter: str = ",",
+        allow_blank: bool = False,
+        min_length: Optional[int] = None,
+        empty_str_as_empty_list: bool = False,
+    ) -> None:
+        super().__init__(
+            t.String(allow_blank=allow_blank),
+            delimiter=delimiter,
+            min_length=min_length,
+            empty_str_as_empty_list=empty_str_as_empty_list,
+        )
 
 
 T_enum = TypeVar("T_enum", bound=enum.Enum)
