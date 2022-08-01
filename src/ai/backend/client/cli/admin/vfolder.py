@@ -25,18 +25,12 @@ def vfolder() -> None:
 
 
 def _list_cmd(docs: str = None):
-
     @pass_ctx_obj
-    @click.option('-g', '--group', type=str, default=None,
-                help='Filter by group ID.')
-    @click.option('--filter', 'filter_', default=None,
-                help='Set the query filter expression.')
-    @click.option('--order', default=None,
-                help='Set the query ordering expression.')
-    @click.option('--offset', default=0,
-                help='The index of the current page start for pagination.')
-    @click.option('--limit', default=None,
-                help='The page size for pagination.')
+    @click.option("-g", "--group", type=str, default=None, help="Filter by group ID.")
+    @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
+    @click.option("--order", default=None, help="Set the query ordering expression.")
+    @click.option("--offset", default=0, help="The index of the current page start for pagination.")
+    @click.option("--limit", default=None, help="The page size for pagination.")
     def list(ctx: CLIContext, group, filter_, order, offset, limit) -> None:
         """
         List virtual folders.
@@ -78,15 +72,15 @@ def list_hosts():
     with Session() as session:
         try:
             resp = session.VFolder.list_all_hosts()
-            print("Default vfolder host: {}".format(resp['default']))
-            print("Mounted hosts: {}".format(', '.join(resp['allowed'])))
+            print("Default vfolder host: {}".format(resp["default"]))
+            print("Mounted hosts: {}".format(", ".join(resp["allowed"])))
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
-@click.argument('vfolder_host')
+@click.argument("vfolder_host")
 def perf_metric(vfolder_host):
     """
     Show the performance statistics of a vfolder host.
@@ -98,19 +92,24 @@ def perf_metric(vfolder_host):
     with Session() as session:
         try:
             resp = session.VFolder.get_performance_metric(vfolder_host)
-            print(tabulate(
-                [(k, humanize.naturalsize(v, binary=True) if 'bytes' in k else f"{v:.2f}")
-                 for k, v in resp['metric'].items()],
-                headers=('Key', 'Value'),
-            ))
+            print(
+                tabulate(
+                    [
+                        (k, humanize.naturalsize(v, binary=True) if "bytes" in k else f"{v:.2f}")
+                        for k, v in resp["metric"].items()
+                    ],
+                    headers=("Key", "Value"),
+                )
+            )
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
-@click.option('-a', '--agent-id', type=str, default=None,
-              help='Target agent to fetch fstab contents.')
+@click.option(
+    "-a", "--agent-id", type=str, default=None, help="Target agent to fetch fstab contents."
+)
 def get_fstab_contents(agent_id):
     """
     Get contents of fstab file from a node.
@@ -139,22 +138,21 @@ def list_mounts():
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
-        print('manager')
-        for k, v in resp['manager'].items():
-            print(' ', k, ':', v)
-        print('\nagents')
-        for aid, data in resp['agents'].items():
-            print(' ', aid)
+        print("manager")
+        for k, v in resp["manager"].items():
+            print(" ", k, ":", v)
+        print("\nagents")
+        for aid, data in resp["agents"].items():
+            print(" ", aid)
             for k, v in data.items():
-                print('   ', k, ':', v)
+                print("   ", k, ":", v)
 
 
 @vfolder.command()
-@click.argument('fs-location', type=str)
-@click.argument('name', type=str)
-@click.option('-o', '--options', type=str, default=None, help='Mount options.')
-@click.option('--edit-fstab', is_flag=True,
-              help='Edit fstab file to mount permanently.')
+@click.argument("fs-location", type=str)
+@click.argument("name", type=str)
+@click.option("-o", "--options", type=str, default=None, help="Mount options.")
+@click.option("--edit-fstab", is_flag=True, help="Edit fstab file to mount permanently.")
 def mount_host(fs_location, name, options, edit_fstab):
     """
     Mount a host in virtual folder root.
@@ -170,20 +168,19 @@ def mount_host(fs_location, name, options, edit_fstab):
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
-        print('manager')
-        for k, v in resp['manager'].items():
-            print(' ', k, ':', v)
-        print('agents')
-        for aid, data in resp['agents'].items():
-            print(' ', aid)
+        print("manager")
+        for k, v in resp["manager"].items():
+            print(" ", k, ":", v)
+        print("agents")
+        for aid, data in resp["agents"].items():
+            print(" ", aid)
             for k, v in data.items():
-                print('   ', k, ':', v)
+                print("   ", k, ":", v)
 
 
 @vfolder.command()
-@click.argument('name', type=str)
-@click.option('--edit-fstab', is_flag=True,
-              help='Edit fstab file to mount permanently.')
+@click.argument("name", type=str)
+@click.option("--edit-fstab", is_flag=True, help="Edit fstab file to mount permanently.")
 def umount_host(name, edit_fstab):
     """
     Unmount a host from virtual folder root.
@@ -198,11 +195,11 @@ def umount_host(name, edit_fstab):
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
-        print('manager')
-        for k, v in resp['manager'].items():
-            print(' ', k, ':', v)
-        print('agents')
-        for aid, data in resp['agents'].items():
-            print(' ', aid)
+        print("manager")
+        for k, v in resp["manager"].items():
+            print(" ", k, ":", v)
+        print("agents")
+        for aid, data in resp["agents"].items():
+            print(" ", aid)
             for k, v in data.items():
-                print('   ', k, ':', v)
+                print("   ", k, ":", v)

@@ -9,8 +9,7 @@
 //     "CPython==3.10.5"
 //   ],
 //   "generated_with_requirements": [
-//     "flake8-commas>=2.1",
-//     "flake8>=4.0",
+//     "flake8>=4.0.1",
 //     "setuptools>=60.0"
 //   ]
 // }
@@ -47,26 +46,6 @@
           ],
           "requires_python": ">=3.6",
           "version": "4.0.1"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "ebb96c31e01d0ef1d0685a21f3f0e2f8153a0381430e748bf0bbbb5d5b453d54",
-              "url": "https://files.pythonhosted.org/packages/18/0d/41895badcdbbe84893b95c114d5bd4345d69c9d5645a42857f1ccb84d556/flake8_commas-2.1.0-py2.py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "940441ab8ee544df564ae3b3f49f20462d75d5c7cac2463e0b27436e2050f263",
-              "url": "https://files.pythonhosted.org/packages/0e/83/814bc8eb02b8883bc004384a1fb8b1f45b4a0b892e579fec7c80a9368526/flake8-commas-2.1.0.tar.gz"
-            }
-          ],
-          "project_name": "flake8-commas",
-          "requires_dists": [
-            "flake8>=2"
-          ],
-          "requires_python": null,
-          "version": "2.1"
         },
         {
           "artifacts": [
@@ -190,8 +169,7 @@
   "pex_version": "2.1.99",
   "prefer_older_binary": false,
   "requirements": [
-    "flake8-commas>=2.1",
-    "flake8>=4.0",
+    "flake8>=4.0.1",
     "setuptools>=60.0"
   ],
   "requires_python": [

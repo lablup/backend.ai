@@ -3,7 +3,7 @@ import logging
 
 class BraceMessage:
 
-    __slots__ = ('fmt', 'args')
+    __slots__ = ("fmt", "args")
 
     def __init__(self, fmt, args):
         self.fmt = fmt
@@ -14,7 +14,6 @@ class BraceMessage:
 
 
 class BraceStyleAdapter(logging.LoggerAdapter):
-
     def __init__(self, logger, extra=None):
         super().__init__(logger, extra)
 

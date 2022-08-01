@@ -5,6 +5,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, AsyncIterator, Mapping, Type
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.storage.weka import WekaVolume
 
 from .abc import AbstractVolume
 from .exception import InvalidVolumeError
@@ -19,6 +20,7 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     "vfs": BaseVolume,
     "xfs": XfsVolume,
     "netapp": NetAppVolume,
+    "weka": WekaVolume,
 }
 
 
@@ -41,10 +43,7 @@ class Context:
         self.local_config = local_config
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
-        return {
-            name: VolumeInfo(**info)
-            for name, info in self.local_config["volume"].items()
-        }
+        return {name: VolumeInfo(**info) for name, info in self.local_config["volume"].items()}
 
     @actxmgr
     async def get_volume(self, name: str) -> AsyncIterator[AbstractVolume]:

@@ -112,9 +112,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                     },
                 )
     ascii_filename = (
-        file_path.name.encode("ascii", errors="ignore")
-        .decode("ascii")
-        .replace('"', r"\"")
+        file_path.name.encode("ascii", errors="ignore").decode("ascii").replace('"', r"\"")
     )
     encoded_filename = urllib.parse.quote(file_path.name, encoding="utf-8")
     headers = {
@@ -176,9 +174,7 @@ async def download_directory_as_archive(
             # Include an empty directory in the archive as well.
             zf.write(root, Path(root).relative_to(file_path))
     ascii_filename = (
-        zip_filename.encode("ascii", errors="ignore")
-        .decode("ascii")
-        .replace('"', r"\"")
+        zip_filename.encode("ascii", errors="ignore").decode("ascii").replace('"', r"\"")
     )
     encoded_filename = urllib.parse.quote(zip_filename, encoding="utf-8")
     response = web.StreamResponse(

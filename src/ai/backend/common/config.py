@@ -13,68 +13,83 @@ from .etcd import AsyncEtcd, ConfigScopes
 from .exception import ConfigurationError
 
 __all__ = (
-    'ConfigurationError',
-    'etcd_config_iv',
-    'redis_config_iv',
-    'vfolder_config_iv',
-    'read_from_file',
-    'read_from_etcd',
-    'override_key',
-    'override_with_env',
-    'check',
-    'merge',
+    "ConfigurationError",
+    "etcd_config_iv",
+    "redis_config_iv",
+    "vfolder_config_iv",
+    "read_from_file",
+    "read_from_etcd",
+    "override_key",
+    "override_with_env",
+    "check",
+    "merge",
 )
 
 
-etcd_config_iv = t.Dict({
-    t.Key('etcd'): t.Dict({
-        t.Key('namespace'): t.String,
-        t.Key('addr', ('127.0.0.1', 2379)): tx.HostPortPair,
-        t.Key('user', default=''): t.Null | t.String(allow_blank=True),
-        t.Key('password', default=''): t.Null | t.String(allow_blank=True),
-    }).allow_extra('*'),
-}).allow_extra('*')
+etcd_config_iv = t.Dict(
+    {
+        t.Key("etcd"): t.Dict(
+            {
+                t.Key("namespace"): t.String,
+                t.Key("addr", ("127.0.0.1", 2379)): tx.HostPortPair,
+                t.Key("user", default=""): t.Null | t.String(allow_blank=True),
+                t.Key("password", default=""): t.Null | t.String(allow_blank=True),
+            }
+        ).allow_extra("*"),
+    }
+).allow_extra("*")
 
-redis_config_iv = t.Dict({
-    t.Key('addr', default=('127.0.0.1', 6379)): tx.HostPortPair,
-    t.Key('password', default=None): t.Null | t.String,
-}).allow_extra('*')
+redis_config_iv = t.Dict(
+    {
+        t.Key("addr", default=("127.0.0.1", 6379)): tx.HostPortPair,
+        t.Key("password", default=None): t.Null | t.String,
+    }
+).allow_extra("*")
 
-vfolder_config_iv = t.Dict({
-    tx.AliasedKey(['mount', '_mount'], default=None): t.Null | tx.Path(type='dir'),
-    tx.AliasedKey(['fsprefix', '_fsprefix'], default=''):
-        tx.Path(type='dir', resolve=False, relative_only=True, allow_nonexisting=True),
-}).allow_extra('*')
+vfolder_config_iv = t.Dict(
+    {
+        tx.AliasedKey(["mount", "_mount"], default=None): t.Null | tx.Path(type="dir"),
+        tx.AliasedKey(["fsprefix", "_fsprefix"], default=""): tx.Path(
+            type="dir", resolve=False, relative_only=True, allow_nonexisting=True
+        ),
+    }
+).allow_extra("*")
 
 
 def find_config_file(daemon_name: str) -> Path:
-    toml_path_from_env = os.environ.get('BACKEND_CONFIG_FILE', None)
+    toml_path_from_env = os.environ.get("BACKEND_CONFIG_FILE", None)
     if not toml_path_from_env:
         toml_paths = [
-            Path.cwd() / f'{daemon_name}.toml',
+            Path.cwd() / f"{daemon_name}.toml",
         ]
-        if sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+        if sys.platform.startswith("linux") or sys.platform.startswith("darwin"):
             toml_paths += [
-                Path.home() / '.config' / 'backend.ai' / f'{daemon_name}.toml',
-                Path(f'/etc/backend.ai/{daemon_name}.toml'),
+                Path.home() / ".config" / "backend.ai" / f"{daemon_name}.toml",
+                Path(f"/etc/backend.ai/{daemon_name}.toml"),
             ]
         else:
-            raise ConfigurationError({
-                'read_from_file()': f"Unsupported platform for config path auto-discovery: {sys.platform}",
-            })
+            raise ConfigurationError(
+                {
+                    "read_from_file()": f"Unsupported platform for config path auto-discovery: {sys.platform}",
+                }
+            )
     else:
         toml_paths = [Path(toml_path_from_env)]
     for _path in toml_paths:
         if _path.is_file():
             return _path
     else:
-        searched_paths = ','.join(map(str, toml_paths))
-        raise ConfigurationError({
-            'find_config_file()': f"Could not read config from: {searched_paths}",
-        })
+        searched_paths = ",".join(map(str, toml_paths))
+        raise ConfigurationError(
+            {
+                "find_config_file()": f"Could not read config from: {searched_paths}",
+            }
+        )
 
 
-def read_from_file(toml_path: Optional[Union[Path, str]], daemon_name: str) -> Tuple[Dict[str, Any], Path]:
+def read_from_file(
+    toml_path: Optional[Union[Path, str]], daemon_name: str
+) -> Tuple[Dict[str, Any], Path]:
     config: Dict[str, Any]
     discovered_path: Path
     if toml_path is None:
@@ -84,18 +99,20 @@ def read_from_file(toml_path: Optional[Union[Path, str]], daemon_name: str) -> T
     try:
         config = cast(Dict[str, Any], tomli.loads(discovered_path.read_text()))
     except IOError:
-        raise ConfigurationError({
-            'read_from_file()': f"Could not read config from: {discovered_path}",
-        })
+        raise ConfigurationError(
+            {
+                "read_from_file()": f"Could not read config from: {discovered_path}",
+            }
+        )
     else:
         return config, discovered_path
 
 
-async def read_from_etcd(etcd_config: Mapping[str, Any],
-                         scope_prefix_map: Mapping[ConfigScopes, str]) \
-                        -> Optional[Dict[str, Any]]:
-    etcd = AsyncEtcd(etcd_config['addr'], etcd_config['namespace'], scope_prefix_map)
-    raw_value = await etcd.get('daemon/config')
+async def read_from_etcd(
+    etcd_config: Mapping[str, Any], scope_prefix_map: Mapping[ConfigScopes, str]
+) -> Optional[Dict[str, Any]]:
+    etcd = AsyncEtcd(etcd_config["addr"], etcd_config["namespace"], scope_prefix_map)
+    raw_value = await etcd.get("daemon/config")
     if raw_value is None:
         return None
     config: Dict[str, Any]

@@ -10,29 +10,35 @@ from .. import BaseRunner
 
 log = logging.getLogger()
 
-JCC = 'javac'
-JCR = 'java'
+JCC = "javac"
+JCR = "java"
 
 # Let Java respect container resource limits
-DEFAULT_JFLAGS = ['-J-XX:+UnlockExperimentalVMOptions',
-                  '-J-XX:+UseCGroupMemoryLimitForHeap', '-d', '.']
+DEFAULT_JFLAGS = [
+    "-J-XX:+UnlockExperimentalVMOptions",
+    "-J-XX:+UseCGroupMemoryLimitForHeap",
+    "-d",
+    ".",
+]
 
 
 class Runner(BaseRunner):
 
-    log_prefix = 'java-kernel'
-    default_runtime_path = '/usr/lib/jvm/java-1.8-openjdk/bin/java'
+    log_prefix = "java-kernel"
+    default_runtime_path = "/usr/lib/jvm/java-1.8-openjdk/bin/java"
     default_child_env = {
-        'TERM': 'xterm',
-        'LANG': 'C.UTF-8',
-        'SHELL': '/bin/ash',
-        'USER': 'work',
-        'HOME': '/home/work',
-        'PATH': ('/usr/lib/jvm/java-1.8-openjdk/jre/bin:'
-                 '/usr/lib/jvm/java-1.8-openjdk/bin:/usr/local/sbin:'
-                 '/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'),
-        'LD_LIBRARY_PATH': os.environ.get('LD_LIBRARY_PATH', ''),
-        'LD_PRELOAD': os.environ.get('LD_PRELOAD', ''),
+        "TERM": "xterm",
+        "LANG": "C.UTF-8",
+        "SHELL": "/bin/ash",
+        "USER": "work",
+        "HOME": "/home/work",
+        "PATH": (
+            "/usr/lib/jvm/java-1.8-openjdk/jre/bin:"
+            "/usr/lib/jvm/java-1.8-openjdk/bin:/usr/local/sbin:"
+            "/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        ),
+        "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
+        "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
     }
 
     def __init__(self, *args, **kwargs):
@@ -42,38 +48,39 @@ class Runner(BaseRunner):
         # TODO: More elegant way of not touching user code? This method does not work
         #       for batch exec (no way of knowing the main file).
         #       Way of monkey patching System.in?
-        modules = 'import java.io.*;'
-        static_initializer = (r'\1static{BackendInputStream stream = '
-                              r'new BackendInputStream();System.setIn(stream);}')
-        patch = Path(os.path.dirname(__file__)) / 'LablupPatches.java'
-        altered = re.sub(r'(public[\s]+class[\s]+[\w]+[\s]*{)', static_initializer,
-                         code)
+        modules = "import java.io.*;"
+        static_initializer = (
+            r"\1static{BackendInputStream stream = "
+            r"new BackendInputStream();System.setIn(stream);}"
+        )
+        patch = Path(os.path.dirname(__file__)) / "LablupPatches.java"
+        altered = re.sub(r"(public[\s]+class[\s]+[\w]+[\s]*{)", static_initializer, code)
         altered = modules + altered
-        altered = altered + '\n\n' + patch.read_text()
+        altered = altered + "\n\n" + patch.read_text()
         return altered
 
     async def init_with_loop(self):
         self.user_input_queue = asyncio.Queue()
 
     async def build_heuristic(self) -> int:
-        if Path('Main.java').is_file():
-            java_sources = Path('.').glob('**/*.java')
-            java_source_list = ' '.join(map(lambda p: shlex.quote(str(p)), java_sources))
+        if Path("Main.java").is_file():
+            java_sources = Path(".").glob("**/*.java")
+            java_source_list = " ".join(map(lambda p: shlex.quote(str(p)), java_sources))
             cmd = [JCC, *DEFAULT_JFLAGS, java_source_list]
             return await self.run_subproc(cmd)
         else:
-            java_sources = Path('.').glob('**/*.java')
-            java_source_list = ' '.join(map(lambda p: shlex.quote(str(p)), java_sources))
+            java_sources = Path(".").glob("**/*.java")
+            java_source_list = " ".join(map(lambda p: shlex.quote(str(p)), java_sources))
             cmd = [JCC, *DEFAULT_JFLAGS, java_source_list]
             return await self.run_subproc(cmd)
 
     async def execute_heuristic(self) -> int:
-        if Path('./main/Main.class').is_file():
-            return await self.run_subproc([JCR, 'main.Main'])
-        elif Path('./Main.class').is_file():
-            return await self.run_subproc([JCR, 'Main'])
+        if Path("./main/Main.class").is_file():
+            return await self.run_subproc([JCR, "main.Main"])
+        elif Path("./Main.class").is_file():
+            return await self.run_subproc([JCR, "Main"])
         else:
-            log.error('cannot find entry class (main.Main).')
+            log.error("cannot find entry class (main.Main).")
             return 127
 
     async def query(self, code_text) -> int:
@@ -84,19 +91,19 @@ class Runner(BaseRunner):
         #
         # NOTE: This approach won't perfectly handle all edge cases!
         with tempfile.TemporaryDirectory() as tmpdir:
-            m = re.search(r'public[\s]+class[\s]+([\w]+)[\s]*{', code_text)
+            m = re.search(r"public[\s]+class[\s]+([\w]+)[\s]*{", code_text)
             if m:
-                mainpath = Path(tmpdir) / (m.group(1) + '.java')
+                mainpath = Path(tmpdir) / (m.group(1) + ".java")
             else:
                 # TODO: wrap the code using a class skeleton??
-                mainpath = Path(tmpdir) / 'main.java'
+                mainpath = Path(tmpdir) / "main.java"
             code = self._code_for_user_input_server(code_text)
-            with open(mainpath, 'w', encoding='utf-8') as tmpf:
+            with open(mainpath, "w", encoding="utf-8") as tmpf:
                 tmpf.write(code)
             ret = await self.run_subproc([JCC, str(mainpath)])
             if ret != 0:
                 return ret
-            cmd = [JCR, '-classpath', tmpdir, mainpath.stem]
+            cmd = [JCR, "-classpath", tmpdir, mainpath.stem]
             return await self.run_subproc(cmd)
 
     async def complete(self, data):

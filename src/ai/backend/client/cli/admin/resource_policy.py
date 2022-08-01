@@ -27,7 +27,7 @@ def keypair_resource_policy() -> None:
 
 @keypair_resource_policy.command()
 @pass_ctx_obj
-@click.argument('name', type=str)
+@click.argument("name", type=str)
 def info(ctx: CLIContext, name: str) -> None:
     """
     Show details about a keypair resource policy. When `name` option is omitted, the
@@ -61,30 +61,52 @@ def list(ctx):
 
 @keypair_resource_policy.command()
 @pass_ctx_obj
-@click.argument('name', type=str, default=None, metavar='NAME')
-@click.option('--default-for-unspecified', type=str, default='UNLIMITED',
-              help='Default behavior for unspecified resources: '
-                   'LIMITED, UNLIMITED')
-@click.option('--total-resource-slots', type=str, default='{}',
-              help='Set total resource slots.')
-@click.option('--max-concurrent-sessions', type=int, default=30,
-              help='Number of maximum concurrent sessions.')
-@click.option('--max-containers-per-session', type=int, default=1,
-              help='Number of maximum containers per session.')
-@click.option('--max-vfolder-count', type=int, default=10,
-              help='Number of maximum virtual folders allowed.')
-@click.option('--max-vfolder-size', type=int, default=0,
-              help='Maximum virtual folder size (future plan).')
-@click.option('--idle-timeout', type=int, default=1800,
-              help='The maximum period of time allowed for kernels to wait '
-                   'further requests.')
+@click.argument("name", type=str, default=None, metavar="NAME")
+@click.option(
+    "--default-for-unspecified",
+    type=str,
+    default="UNLIMITED",
+    help="Default behavior for unspecified resources: " "LIMITED, UNLIMITED",
+)
+@click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
+@click.option(
+    "--max-concurrent-sessions", type=int, default=30, help="Number of maximum concurrent sessions."
+)
+@click.option(
+    "--max-containers-per-session",
+    type=int,
+    default=1,
+    help="Number of maximum containers per session.",
+)
+@click.option(
+    "--max-vfolder-count", type=int, default=10, help="Number of maximum virtual folders allowed."
+)
+@click.option(
+    "--max-vfolder-size", type=int, default=0, help="Maximum virtual folder size (future plan)."
+)
+@click.option(
+    "--idle-timeout",
+    type=int,
+    default=1800,
+    help="The maximum period of time allowed for kernels to wait " "further requests.",
+)
 # @click.option('--allowed-vfolder-hosts', type=click.Tuple(str), default=['local'],
 #               help='Locations to create virtual folders.')
-@click.option('--allowed-vfolder-hosts', default=['local'],
-              help='Locations to create virtual folders.')
-def add(ctx: CLIContext, name, default_for_unspecified, total_resource_slots, max_concurrent_sessions,
-        max_containers_per_session, max_vfolder_count, max_vfolder_size,
-        idle_timeout, allowed_vfolder_hosts):
+@click.option(
+    "--allowed-vfolder-hosts", default=["local"], help="Locations to create virtual folders."
+)
+def add(
+    ctx: CLIContext,
+    name,
+    default_for_unspecified,
+    total_resource_slots,
+    max_concurrent_sessions,
+    max_containers_per_session,
+    max_vfolder_count,
+    max_vfolder_size,
+    idle_timeout,
+    allowed_vfolder_hosts,
+):
     """
     Add a new keypair resource policy.
 
@@ -106,46 +128,56 @@ def add(ctx: CLIContext, name, default_for_unspecified, total_resource_slots, ma
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='resource_policy',
-                action_name='add',
+                item_name="resource_policy",
+                action_name="add",
             )
             sys.exit(ExitCode.FAILURE)
-        if not data['ok']:
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='resource_policy',
-                action_name='add',
+                msg=data["msg"],
+                item_name="resource_policy",
+                action_name="add",
             )
             sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
-            item_name='resource_policy',
+            item_name="resource_policy",
         )
 
 
 @keypair_resource_policy.command()
 @pass_ctx_obj
-@click.argument('name', type=str, default=None, metavar='NAME')
-@click.option('--default-for-unspecified', type=str,
-              help='Default behavior for unspecified resources: '
-                   'LIMITED, UNLIMITED')
-@click.option('--total-resource-slots', type=str,
-              help='Set total resource slots.')
-@click.option('--max-concurrent-sessions', type=int,
-              help='Number of maximum concurrent sessions.')
-@click.option('--max-containers-per-session', type=int,
-              help='Number of maximum containers per session.')
-@click.option('--max-vfolder-count', type=int,
-              help='Number of maximum virtual folders allowed.')
-@click.option('--max-vfolder-size', type=int,
-              help='Maximum virtual folder size (future plan).')
-@click.option('--idle-timeout', type=int,
-              help='The maximum period of time allowed for kernels to wait '
-                   'further requests.')
-@click.option('--allowed-vfolder-hosts', help='Locations to create virtual folders.')
-def update(ctx: CLIContext, name, default_for_unspecified, total_resource_slots,
-           max_concurrent_sessions, max_containers_per_session, max_vfolder_count,
-           max_vfolder_size, idle_timeout, allowed_vfolder_hosts):
+@click.argument("name", type=str, default=None, metavar="NAME")
+@click.option(
+    "--default-for-unspecified",
+    type=str,
+    help="Default behavior for unspecified resources: " "LIMITED, UNLIMITED",
+)
+@click.option("--total-resource-slots", type=str, help="Set total resource slots.")
+@click.option("--max-concurrent-sessions", type=int, help="Number of maximum concurrent sessions.")
+@click.option(
+    "--max-containers-per-session", type=int, help="Number of maximum containers per session."
+)
+@click.option("--max-vfolder-count", type=int, help="Number of maximum virtual folders allowed.")
+@click.option("--max-vfolder-size", type=int, help="Maximum virtual folder size (future plan).")
+@click.option(
+    "--idle-timeout",
+    type=int,
+    help="The maximum period of time allowed for kernels to wait " "further requests.",
+)
+@click.option("--allowed-vfolder-hosts", help="Locations to create virtual folders.")
+def update(
+    ctx: CLIContext,
+    name,
+    default_for_unspecified,
+    total_resource_slots,
+    max_concurrent_sessions,
+    max_containers_per_session,
+    max_vfolder_count,
+    max_vfolder_size,
+    idle_timeout,
+    allowed_vfolder_hosts,
+):
     """
     Update an existing keypair resource policy.
 
@@ -167,28 +199,28 @@ def update(ctx: CLIContext, name, default_for_unspecified, total_resource_slots,
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='resource_policy',
-                action_name='update',
+                item_name="resource_policy",
+                action_name="update",
             )
             sys.exit(ExitCode.FAILURE)
-        if not data['ok']:
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='resource_policy',
-                action_name='update',
+                msg=data["msg"],
+                item_name="resource_policy",
+                action_name="update",
             )
             sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                'name': name,
+                "name": name,
             },
         )
 
 
 @keypair_resource_policy.command()
 @pass_ctx_obj
-@click.argument('name', type=str, default=None, metavar='NAME')
+@click.argument("name", type=str, default=None, metavar="NAME")
 def delete(ctx: CLIContext, name):
     """
     Delete a keypair resource policy.
@@ -197,27 +229,27 @@ def delete(ctx: CLIContext, name):
     """
     with Session() as session:
         if not ask_yn():
-            print_info('Cancelled.')
+            print_info("Cancelled.")
             sys.exit(ExitCode.FAILURE)
         try:
             data = session.KeypairResourcePolicy.delete(name)
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='resource_policy',
-                action_name='deletion',
+                item_name="resource_policy",
+                action_name="deletion",
             )
             sys.exit(ExitCode.FAILURE)
-        if not data['ok']:
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='resource_policy',
-                action_name='deletion',
+                msg=data["msg"],
+                item_name="resource_policy",
+                action_name="deletion",
             )
             sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                'name': name,
+                "name": name,
             },
         )

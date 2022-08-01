@@ -20,10 +20,13 @@ from .pretty import print_error, print_fail, print_info, print_warn
 
 class WSProxy:
     __slots__ = (
-        'api_session', 'session_name',
-        'app_name',
-        'args', 'envs',
-        'reader', 'writer',
+        "api_session",
+        "session_name",
+        "app_name",
+        "args",
+        "envs",
+        "reader",
+        "writer",
     )
 
     def __init__(
@@ -45,19 +48,16 @@ class WSProxy:
         self.writer = writer
 
     async def run(self) -> None:
-        prefix = get_naming(self.api_session.api_version, 'path')
+        prefix = get_naming(self.api_session.api_version, "path")
         path = f"/stream/{prefix}/{self.session_name}/tcpproxy"
-        params = {'app': self.app_name}
+        params = {"app": self.app_name}
 
         if len(self.args.keys()) > 0:
-            params['arguments'] = json.dumps(self.args)
+            params["arguments"] = json.dumps(self.args)
         if len(self.envs.keys()) > 0:
-            params['envs'] = json.dumps(self.envs)
+            params["envs"] = json.dumps(self.envs)
 
-        api_rqst = Request(
-            "GET", path, b'',
-            params=params,
-            content_type="application/json")
+        api_rqst = Request("GET", path, b"", params=params, content_type="application/json")
         async with api_rqst.connect_websocket() as ws:
 
             async def downstream() -> None:
@@ -103,12 +103,14 @@ class WSProxy:
 
     async def write_error(self, msg: aiohttp.WSMessage) -> None:
         if isinstance(msg.data, bytes):
-            error_msg = msg.data.decode('utf8')
+            error_msg = msg.data.decode("utf8")
         else:
             error_msg = str(msg.data)
-        rsp = 'HTTP/1.1 503 Service Unavailable\r\n' \
-              'Connection: Closed\r\n\r\n' \
-              'WebSocket reply: {}'.format(error_msg)
+        rsp = (
+            "HTTP/1.1 503 Service Unavailable\r\n"
+            "Connection: Closed\r\n\r\n"
+            "WebSocket reply: {}".format(error_msg)
+        )
         self.writer.write(rsp.encode())
         await self.writer.drain()
 
@@ -116,11 +118,16 @@ class WSProxy:
 class ProxyRunnerContext:
 
     __slots__ = (
-        'session_name', 'app_name',
-        'protocol', 'host', 'port',
-        'args', 'envs',
-        'api_session', 'local_server',
-        'exit_code',
+        "session_name",
+        "app_name",
+        "protocol",
+        "host",
+        "port",
+        "args",
+        "envs",
+        "api_session",
+        "local_server",
+        "exit_code",
     )
 
     session_name: str
@@ -141,7 +148,7 @@ class ProxyRunnerContext:
         session_name: str,
         app_name: str,
         *,
-        protocol: str = 'tcp',
+        protocol: str = "tcp",
         args: Sequence[str] = None,
         envs: Sequence[str] = None,
     ) -> None:
@@ -159,9 +166,8 @@ class ProxyRunnerContext:
         if args is not None and len(args) > 0:
             for argline in args:
                 tokens = []
-                for token in shlex.shlex(argline,
-                                         punctuation_chars=True):
-                    kv = token.split('=', maxsplit=1)
+                for token in shlex.shlex(argline, punctuation_chars=True):
+                    kv = token.split("=", maxsplit=1)
                     if len(kv) == 1:
                         tokens.append(shlex.split(token)[0])
                     else:
@@ -176,11 +182,11 @@ class ProxyRunnerContext:
                     self.args[tokens[0]] = tokens[1:]
         if envs is not None and len(envs) > 0:
             for envline in envs:
-                split = envline.strip().split('=', maxsplit=2)
+                split = envline.strip().split("=", maxsplit=2)
                 if len(split) == 2:
                     self.envs[split[0]] = split[1]
                 else:
-                    self.envs[split[0]] = ''
+                    self.envs[split[0]] = ""
 
     async def handle_connection(
         self,
@@ -214,9 +220,9 @@ class ProxyRunnerContext:
             compute_session = self.api_session.ComputeSession(self.session_name)
             all_apps = await compute_session.stream_app_info()
             for app_info in all_apps:
-                if app_info['name'] == self.app_name:
-                    if 'url_template' in app_info.keys():
-                        user_url_template = app_info['url_template']
+                if app_info["name"] == self.app_name:
+                    if "url_template" in app_info.keys():
+                        user_url_template = app_info["url_template"]
                     break
             else:
                 print_fail(f'The app "{self.app_name}" is not supported by the session.')
@@ -224,20 +230,23 @@ class ProxyRunnerContext:
                 return
 
             self.local_server = await asyncio.start_server(
-                self.handle_connection, self.host, self.port)
+                self.handle_connection, self.host, self.port
+            )
             user_url = user_url_template.format(
                 protocol=self.protocol,
                 host=self.host,
                 port=self.port,
             )
             print_info(
-                "A local proxy to the application \"{0}\" ".format(self.app_name) +
-                "provided by the session \"{0}\" ".format(self.session_name) +
-                "is available at:\n{0}".format(user_url),
+                'A local proxy to the application "{0}" '.format(self.app_name)
+                + 'provided by the session "{0}" '.format(self.session_name)
+                + "is available at:\n{0}".format(user_url),
             )
-            if self.host == '0.0.0.0':
-                print_warn('NOTE: Replace "0.0.0.0" with the actual hostname you use '
-                        'to connect with the CLI app proxy.')
+            if self.host == "0.0.0.0":
+                print_warn(
+                    'NOTE: Replace "0.0.0.0" with the actual hostname you use '
+                    "to connect with the CLI app proxy."
+                )
         except Exception:
             await self.api_session.__aexit__(*sys.exc_info())
             raise
@@ -251,20 +260,36 @@ class ProxyRunnerContext:
         await self.api_session.__aexit__(*exc_info)
         assert self.api_session.closed
         if self.local_server is not None:
-            print_info("The local proxy to \"{}\" has terminated."
-                       .format(self.app_name))
+            print_info('The local proxy to "{}" has terminated.'.format(self.app_name))
         self.local_server = None
 
 
 @main.command()
-@click.argument('session_name', type=str, metavar='NAME')
-@click.argument('app', type=str)
-@click.option('-b', '--bind', type=str, default='127.0.0.1:8080', metavar='[HOST:]PORT',
-              help='The IP/host address and the port number to bind this proxy.')
-@click.option('--arg', type=str, multiple=True, metavar='"--option <value>"',
-              help='Add additional argument when starting service.')
-@click.option('-e', '--env', type=str, multiple=True, metavar='"ENVNAME=envvalue"',
-              help='Add additional environment variable when starting service.')
+@click.argument("session_name", type=str, metavar="NAME")
+@click.argument("app", type=str)
+@click.option(
+    "-b",
+    "--bind",
+    type=str,
+    default="127.0.0.1:8080",
+    metavar="[HOST:]PORT",
+    help="The IP/host address and the port number to bind this proxy.",
+)
+@click.option(
+    "--arg",
+    type=str,
+    multiple=True,
+    metavar='"--option <value>"',
+    help="Add additional argument when starting service.",
+)
+@click.option(
+    "-e",
+    "--env",
+    type=str,
+    multiple=True,
+    metavar='"ENVNAME=envvalue"',
+    help="Add additional environment variable when starting service.",
+)
 def app(session_name, app, bind, arg, env):
     """
     Run a local proxy to a service provided by Backend.AI compute sessions.
@@ -275,18 +300,20 @@ def app(session_name, app, bind, arg, env):
     SESSID: The compute session ID.
     APP: The name of service provided by the given session.
     """
-    bind_parts = bind.rsplit(':', maxsplit=1)
+    bind_parts = bind.rsplit(":", maxsplit=1)
     if len(bind_parts) == 1:
-        host = '127.0.0.1'
+        host = "127.0.0.1"
         port = int(bind_parts[0])
     elif len(bind_parts) == 2:
         host = bind_parts[0]
         port = int(bind_parts[1])
     try:
         proxy_ctx = ProxyRunnerContext(
-            host, port,
-            session_name, app,
-            protocol='tcp',
+            host,
+            port,
+            session_name,
+            app,
+            protocol="tcp",
             args=arg,
             envs=env,
         )
@@ -298,19 +325,18 @@ def app(session_name, app, bind, arg, env):
 
 
 @main.command()
-@click.argument('session_name', type=str, metavar='NAME', nargs=1)
-@click.argument('app_name', type=str, metavar='APP', nargs=-1)
-@click.option('-l', '--list-names', is_flag=True,
-              help='Just print all available services.')
+@click.argument("session_name", type=str, metavar="NAME", nargs=1)
+@click.argument("app_name", type=str, metavar="APP", nargs=-1)
+@click.option("-l", "--list-names", is_flag=True, help="Just print all available services.")
 def apps(session_name, app_name, list_names):
-    '''
+    """
     List available additional arguments and environment variables when starting service.
 
     \b
     SESSID: The compute session ID.
     APP: The name of service provided by the given session. Repeatable.
          If none provided, this will print all available services.
-    '''
+    """
 
     async def print_arguments():
         apps = []
@@ -318,23 +344,28 @@ def apps(session_name, app_name, list_names):
             compute_session = api_session.ComputeSession(session_name)
             apps = await compute_session.stream_app_info()
             if len(app_name) > 0:
-                apps = list(filter(lambda x: x['name'] in app_name))
+                apps = list(filter(lambda x: x["name"] in app_name))
         if list_names:
-            print_info('This session provides the following app services: {0}'
-                        .format(', '.join(list(map(lambda x: x['name'], apps)))))
+            print_info(
+                "This session provides the following app services: {0}".format(
+                    ", ".join(list(map(lambda x: x["name"], apps)))
+                )
+            )
             return
         for service in apps:
-            has_arguments = 'allowed_arguments' in service.keys()
-            has_envs = 'allowed_envs' in service.keys()
+            has_arguments = "allowed_arguments" in service.keys()
+            has_envs = "allowed_envs" in service.keys()
 
             if has_arguments or has_envs:
-                print_info('Information for service {0}:'.format(service['name']))
+                print_info("Information for service {0}:".format(service["name"]))
                 if has_arguments:
-                    print('\tAvailable arguments: {0}'.format(service['allowed_arguments']))
+                    print("\tAvailable arguments: {0}".format(service["allowed_arguments"]))
                 if has_envs:
-                    print('\tAvailable environment variables: {0}'.format(service['allowed_envs']))
+                    print("\tAvailable environment variables: {0}".format(service["allowed_envs"]))
             else:
-                print_info('Service {0} does not have customizable arguments.'.format(service['name']))
+                print_info(
+                    "Service {0} does not have customizable arguments.".format(service["name"])
+                )
 
     try:
         asyncio_run(print_arguments())

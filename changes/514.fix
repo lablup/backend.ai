@@ -1,1 +1,0 @@
-Fix `prepare()` not running when `start_session()` call hangs without raising Exception
