@@ -35,7 +35,7 @@ msgid ""
 msgstr ""
 "Backend.AI는 사용자의 요청을 리소스가 제한되고 고립된 환경에서 처리하기 위한 "
 "Docker 컨테이너 실행을 지원합니다. 대부분의 Docker 컨테이너 이미지는 "
-"적절한 메타데이터 어노테이션과 함께 Backend.AI 커널로 *임포트*될 수 있습니다.
+"적절한 메타데이터 어노테이션과 함께 Backend.AI 커널로 *임포트*될 수 있습니다."
 
 #: ../../dev/adding-kernels.rst:10 04c4cda34d7a49949e22e323bae8db62
 msgid ""
