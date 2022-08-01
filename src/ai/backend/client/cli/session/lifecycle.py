@@ -20,8 +20,12 @@ from tabulate import tabulate
 
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
+from ...func.session import ComputeSession
+from ...output.fields import session_fields
+from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
 from ...types import Undefined, undefined
+from .. import events
 from ..main import main
 from ..params import CommaSeparatedListType
 from ..pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
