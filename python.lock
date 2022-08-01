@@ -1581,7 +1581,7 @@
             {
               "algorithm": "sha256",
               "hash": "c6345a0b8188ff915bf33cce6e445d9fd3738faa32640ca6267bd1344249ef6f",
-              "url": "https://raw.githubusercontent.com/lablup/backend.ai-oven/main/pypi/projects/grpcio/grpcio-1.47.0-cp310-cp310-macosx_12_0_arm64.whl"
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/grpcio/grpcio-1.47.0-cp310-cp310-macosx_12_0_arm64.whl#sha256=c6345a0b8188ff915bf33cce6e445d9fd3738faa32640ca6267bd1344249ef6f"
             },
             {
               "algorithm": "sha256",
@@ -1663,8 +1663,8 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "dd5d330230038374e64fc652fc4c1b25d457a8b67b9069bfce83a17ab675650b",
-              "url": "https://files.pythonhosted.org/packages/37/53/e751a848b31cebfff50680a42c304d3c001f46b2b475580e616c88b93881/grpcio_tools-1.47.0-cp310-cp310-macosx_10_10_x86_64.whl"
+              "hash": "8526e7a66a03407e1ca9d83f10dce376471dd7f46af5b093f9024ca9b6e251a6",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/grpcio/grpcio_tools-1.47.0-cp310-cp310-macosx_12_0_arm64.whl#sha256=8526e7a66a03407e1ca9d83f10dce376471dd7f46af5b093f9024ca9b6e251a6"
             },
             {
               "algorithm": "sha256",
