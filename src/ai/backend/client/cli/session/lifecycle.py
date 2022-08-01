@@ -24,21 +24,9 @@ from ...session import AsyncSession, Session
 from ...types import Undefined, undefined
 from ..main import main
 from ..params import CommaSeparatedListType
-from ..pretty import (
-    print_done,
-    print_error,
-    print_fail,
-    print_info,
-    print_wait,
-    print_warn,
-)
+from ..pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 from .args import click_start_option
-from .execute import (
-    format_stats,
-    prepare_env_arg,
-    prepare_mount_arg,
-    prepare_resource_arg,
-)
+from .execute import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
 from .ssh import container_ssh_ctx
 
 list_expr = CommaSeparatedListType()
@@ -50,29 +38,55 @@ def session():
 
 
 def _create_cmd(docs: str = None):
-    @click.argument('image', type=str)
-    @click.option('-o', '--owner', '--owner-access-key', metavar='ACCESS_KEY',
-                  help='Set the owner of the target session explicitly.')
+    @click.argument("image", type=str)
+    @click.option(
+        "-o",
+        "--owner",
+        "--owner-access-key",
+        metavar="ACCESS_KEY",
+        help="Set the owner of the target session explicitly.",
+    )
     # job scheduling options
-    @click.option('-c', '--startup-command', metavar='COMMAND',
-                  help='Set the command to execute for batch-type sessions.')
-    @click.option('--depends', metavar='SESSION_ID', type=str, multiple=True,
-                  help="Set the list of session ID or names that the newly created session depends on. "
-                       "The session will get scheduled after all of them successfully finish.")
+    @click.option(
+        "-c",
+        "--startup-command",
+        metavar="COMMAND",
+        help="Set the command to execute for batch-type sessions.",
+    )
+    @click.option(
+        "--depends",
+        metavar="SESSION_ID",
+        type=str,
+        multiple=True,
+        help="Set the list of session ID or names that the newly created session depends on. "
+        "The session will get scheduled after all of them successfully finish.",
+    )
     # extra options
-    @click.option('--bootstrap-script', metavar='PATH', type=click.File('r'), default=None,
-                  help='A user-defined script to execute on startup.')
+    @click.option(
+        "--bootstrap-script",
+        metavar="PATH",
+        type=click.File("r"),
+        default=None,
+        help="A user-defined script to execute on startup.",
+    )
     # resource spec
-    @click.option('--cluster-mode', metavar='MODE',
-                  type=click.Choice(['single-node', 'multi-node']), default='single-node',
-                  help='The mode of clustering.')
-    @click.option('--preopen', default=None, type=list_expr,
-                  help='Pre-open service ports')
+    @click.option(
+        "--cluster-mode",
+        metavar="MODE",
+        type=click.Choice(["single-node", "multi-node"]),
+        default="single-node",
+        help="The mode of clustering.",
+    )
+    @click.option("--preopen", default=None, type=list_expr, help="Pre-open service ports")
     # resource grouping
-    @click.option('--assign-agent', default=None, type=list_expr,
-                  help='Show mapping list of tuple which mapped containers with agent. '
-                       'When user role is Super Admin. '
-                       '(e.g., --assign-agent agent_id_1,agent_id_2,...)')
+    @click.option(
+        "--assign-agent",
+        default=None,
+        type=list_expr,
+        help="Show mapping list of tuple which mapped containers with agent. "
+        "When user role is Super Admin. "
+        "(e.g., --assign-agent agent_id_1,agent_id_2,...)",
+    )
     @click_start_option()
     def create(
         # base args
@@ -220,30 +234,51 @@ session.command()(_create_cmd())
 
 
 def _create_from_template_cmd(docs: str = None):
-
-    @click.argument('template_id')
-    @click.option('-o', '--owner', '--owner-access-key', metavar='ACCESS_KEY',
-                  default=undefined,
-                  help='Set the owner of the target session explicitly.')
+    @click.argument("template_id")
+    @click.option(
+        "-o",
+        "--owner",
+        "--owner-access-key",
+        metavar="ACCESS_KEY",
+        default=undefined,
+        help="Set the owner of the target session explicitly.",
+    )
     # job scheduling options
-    @click.option('--type', 'type_', metavar='SESSTYPE',
-                  type=click.Choice(['batch', 'interactive', undefined]),  # type: ignore
-                  default=undefined,
-                  help='Either batch or interactive')
-    @click.option('-i', '--image', default=undefined,
-                  help='Set compute_session image to run.')
-    @click.option('-c', '--startup-command', metavar='COMMAND', default=undefined,
-                  help='Set the command to execute for batch-type sessions.')
+    @click.option(
+        "--type",
+        "type_",
+        metavar="SESSTYPE",
+        type=click.Choice(["batch", "interactive", undefined]),  # type: ignore
+        default=undefined,
+        help="Either batch or interactive",
+    )
+    @click.option("-i", "--image", default=undefined, help="Set compute_session image to run.")
+    @click.option(
+        "-c",
+        "--startup-command",
+        metavar="COMMAND",
+        default=undefined,
+        help="Set the command to execute for batch-type sessions.",
+    )
     # template overrides
-    @click.option('--no-mount', is_flag=True,
-                  help='If specified, client.py will tell server not to mount '
-                       'any vFolders specified at template,')
-    @click.option('--no-env', is_flag=True,
-                  help='If specified, client.py will tell server not to add '
-                       'any environs specified at template,')
-    @click.option('--no-resource', is_flag=True,
-                  help='If specified, client.py will tell server not to add '
-                       'any resource specified at template,')
+    @click.option(
+        "--no-mount",
+        is_flag=True,
+        help="If specified, client.py will tell server not to mount "
+        "any vFolders specified at template,",
+    )
+    @click.option(
+        "--no-env",
+        is_flag=True,
+        help="If specified, client.py will tell server not to add "
+        "any environs specified at template,",
+    )
+    @click.option(
+        "--no-resource",
+        is_flag=True,
+        help="If specified, client.py will tell server not to add "
+        "any resource specified at template,",
+    )
     @click_start_option()
     def create_from_template(
         # base args

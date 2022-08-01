@@ -261,32 +261,50 @@ def prepare_mount_arg(
 
 
 @main.command()
-@click.argument('image', type=str)
-@click.argument('files', nargs=-1, type=click.Path())
+@click.argument("image", type=str)
+@click.argument("files", nargs=-1, type=click.Path())
 # query-mode options
 @click.option("-c", "--code", metavar="CODE", help="The code snippet as a single string")
 @click.option("--terminal", is_flag=True, help="Connect to the terminal-type compute_session.")
 # batch-mode options
-@click.option('--clean', metavar='CMD',
-              help='Custom shell command for cleaning up the base directory')
-@click.option('--build', metavar='CMD',
-              help='Custom shell command for building the given files')
-@click.option('--exec', metavar='CMD',
-              help='Custom shell command for executing the given files')
-@click.option('--basedir', metavar='PATH', type=click.Path(), default=None,
-              help='Base directory path of uploaded files. '
-                   'All uploaded files must reside inside this directory.')
+@click.option(
+    "--clean", metavar="CMD", help="Custom shell command for cleaning up the base directory"
+)
+@click.option("--build", metavar="CMD", help="Custom shell command for building the given files")
+@click.option("--exec", metavar="CMD", help="Custom shell command for executing the given files")
+@click.option(
+    "--basedir",
+    metavar="PATH",
+    type=click.Path(),
+    default=None,
+    help="Base directory path of uploaded files. "
+    "All uploaded files must reside inside this directory.",
+)
 # extra options
-@click.option('--bootstrap-script', metavar='PATH', type=click.File('r'), default=None,
-              help='A user-defined script to execute on startup.')
-@click.option('--rm', is_flag=True,
-              help='Terminate the session immediately after running '
-                   'the given code or files')
-@click.option('-s', '--stats', is_flag=True,
-              help='Show resource usage statistics after termination '
-                   '(only works if "--rm" is given)')
-@click.option('-q', '--quiet', is_flag=True,
-              help='Hide execution details but show only the compute_session outputs.')
+@click.option(
+    "--bootstrap-script",
+    metavar="PATH",
+    type=click.File("r"),
+    default=None,
+    help="A user-defined script to execute on startup.",
+)
+@click.option(
+    "--rm",
+    is_flag=True,
+    help="Terminate the session immediately after running " "the given code or files",
+)
+@click.option(
+    "-s",
+    "--stats",
+    is_flag=True,
+    help="Show resource usage statistics after termination " '(only works if "--rm" is given)',
+)
+@click.option(
+    "-q",
+    "--quiet",
+    is_flag=True,
+    help="Hide execution details but show only the compute_session outputs.",
+)
 # experiment support
 @click.option(
     "--env-range",
@@ -317,30 +335,61 @@ def prepare_mount_arg(
     help="The maximum number of parallel sessions.",
 )
 # resource spec
-@click.option('--cluster-mode', metavar='MODE',
-              type=click.Choice(['single-node', 'multi-node']), default='single-node',
-              help='The mode of clustering.')
+@click.option(
+    "--cluster-mode",
+    metavar="MODE",
+    type=click.Choice(["single-node", "multi-node"]),
+    default="single-node",
+    help="The mode of clustering.",
+)
 # resource grouping
-@click.option('--preopen',  default=None, type=list_expr,
-              help='Pre-open service ports')
-@click.option('--assign-agent', default=None, type=list_expr,
-              help='Show mapping list of tuple which mapped containers with agent. '
-                   'When user role is Super Admin. '
-                   '(e.g., --assign-agent agent_id_1,agent_id_2,...)')
+@click.option("--preopen", default=None, type=list_expr, help="Pre-open service ports")
+@click.option(
+    "--assign-agent",
+    default=None,
+    type=list_expr,
+    help="Show mapping list of tuple which mapped containers with agent. "
+    "When user role is Super Admin. "
+    "(e.g., --assign-agent agent_id_1,agent_id_2,...)",
+)
 @click_start_option()
-def run(image, files, name,                                 # base args
-        type, starts_at, enqueue_only, max_wait, no_reuse,  # job scheduling options
-        callback_url,
-        code, terminal,                                     # query-mode options
-        clean, build, exec, basedir,                        # batch-mode options
-        env,                                                # execution environment
-        bootstrap_script, rm, stats, tag, quiet,            # extra options
-        env_range, build_range, exec_range, max_parallel,   # experiment support
-        mount, scaling_group, resources,                    # resource spec
-        cluster_size, cluster_mode,
-        resource_opts,
-        domain, group, preopen, assign_agent,               # resource grouping
-        ):
+def run(
+    image,
+    files,
+    name,  # base args
+    type,
+    starts_at,
+    enqueue_only,
+    max_wait,
+    no_reuse,  # job scheduling options
+    callback_url,
+    code,
+    terminal,  # query-mode options
+    clean,
+    build,
+    exec,
+    basedir,  # batch-mode options
+    env,  # execution environment
+    bootstrap_script,
+    rm,
+    stats,
+    tag,
+    quiet,  # extra options
+    env_range,
+    build_range,
+    exec_range,
+    max_parallel,  # experiment support
+    mount,
+    scaling_group,
+    resources,  # resource spec
+    cluster_size,
+    cluster_mode,
+    resource_opts,
+    domain,
+    group,
+    preopen,
+    assign_agent,  # resource grouping
+):
     """
     Run the given code snippet or files in a session.
     Depending on the session ID you give (default is random),
