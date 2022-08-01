@@ -34,9 +34,9 @@ class ModelFactory(ABC):
         self.defaults = self.get_creation_defaults()
         self.defaults.update(**kwargs)
         await self.before_creation()
-        root_ctx: RootContext = self.app['_root.context']
+        root_ctx: RootContext = self.app["_root.context"]
         async with root_ctx.db.begin() as conn:
-            query = (self.model.insert().returning(self.model).values(self.defaults))
+            query = self.model.insert().returning(self.model).values(self.defaults)
             result = await conn.execute(query)
             row = result.first()
         row = dict(row.items())
@@ -44,17 +44,17 @@ class ModelFactory(ABC):
         return row
 
     async def get(self, **kwargs):
-        root_ctx: RootContext = self.app['_root.context']
+        root_ctx: RootContext = self.app["_root.context"]
         async with root_ctx.db.begin() as conn:
             filters = [sa.sql.column(key) == value for key, value in kwargs.items()]
             query = sa.select([self.model]).where(sa.and_(*filters))
             result = await conn.execute(query)
             rows = result.fetchall()
-            assert len(rows) < 2, 'Multiple items found'
+            assert len(rows) < 2, "Multiple items found"
             return rows[0] if len(rows) == 1 else None
 
     async def list(self, **kwargs):
-        root_ctx: RootContext = self.app['_root.context']
+        root_ctx: RootContext = self.app["_root.context"]
         async with root_ctx.db.begin() as conn:
             filters = [sa.sql.column(key) == value for key, value in kwargs.items()]
             query = sa.select([self.model]).where(sa.and_(*filters))
@@ -68,18 +68,20 @@ class KeyPairFactory(ModelFactory):
 
     def get_creation_defaults(self, **kwargs):
         from ai.backend.manager.models.keypair import generate_keypair
+
         ak, sk = generate_keypair()
         return {
-            'access_key': ak,
-            'secret_key': sk,
-            'is_active': True,
-            'is_admin': False,
-            'resource_policy': 'default',
+            "access_key": ak,
+            "secret_key": sk,
+            "is_active": True,
+            "is_admin": False,
+            "resource_policy": "default",
         }
 
     async def before_creation(self):
-        assert 'user_id' in self.defaults and 'user' in self.defaults, \
-            'user_id and user should be provided to create a keypair'
+        assert (
+            "user_id" in self.defaults and "user" in self.defaults
+        ), "user_id and user should be provided to create a keypair"
 
 
 class UserFactory(ModelFactory):
@@ -87,19 +89,19 @@ class UserFactory(ModelFactory):
     model = models.users
 
     def get_creation_defaults(self, **kwargs):
-        username = f'test-user-{get_random_string()}'
+        username = f"test-user-{get_random_string()}"
         return {
-            'username': username,
-            'email': username + '@lablup.com',
-            'password': get_random_string(),
-            'domain_name': 'default',
+            "username": username,
+            "email": username + "@lablup.com",
+            "password": get_random_string(),
+            "domain_name": "default",
         }
 
     async def after_creation(self, row):
-        kp = await KeyPairFactory(self.app).create(user_id=row['email'], user=row['uuid'])
-        row['keypair'] = {
-            'access_key': kp['access_key'],
-            'secret_key': kp['secret_key'],
+        kp = await KeyPairFactory(self.app).create(user_id=row["email"], user=row["uuid"])
+        row["keypair"] = {
+            "access_key": kp["access_key"],
+            "secret_key": kp["secret_key"],
         }
         return row
 
@@ -110,8 +112,8 @@ class DomainFactory(ModelFactory):
 
     def get_creation_defaults(self, **kwargs):
         return {
-            'name': f'test-domain-{get_random_string()}',
-            'total_resource_slots': {},
+            "name": f"test-domain-{get_random_string()}",
+            "total_resource_slots": {},
         }
 
 
@@ -121,9 +123,9 @@ class GroupFactory(ModelFactory):
 
     def get_creation_defaults(self, **kwargs):
         return {
-            'name': f'test-group-{get_random_string()}',
-            'domain_name': 'default',
-            'total_resource_slots': {},
+            "name": f"test-group-{get_random_string()}",
+            "domain_name": "default",
+            "total_resource_slots": {},
         }
 
 
@@ -135,8 +137,9 @@ class AssociationGroupsUsersFactory(ModelFactory):
         return {}
 
     async def before_creation(self):
-        assert 'user_id' in self.defaults and 'group_id' in self.defaults, \
-            'user_id and group_id should be provided to associate a group and a user'
+        assert (
+            "user_id" in self.defaults and "group_id" in self.defaults
+        ), "user_id and group_id should be provided to associate a group and a user"
 
 
 class VFolderFactory(ModelFactory):
@@ -145,14 +148,14 @@ class VFolderFactory(ModelFactory):
 
     def get_creation_defaults(self, **kwargs):
         return {
-            'host': 'local',
-            'name': f'test-vfolder-{get_random_string()}',
+            "host": "local",
+            "name": f"test-vfolder-{get_random_string()}",
         }
 
     async def before_creation(self):
-        if 'user' not in self.defaults and 'group' not in self.defaults:
+        if "user" not in self.defaults and "group" not in self.defaults:
             user = await UserFactory(self.app).create()
-            self.defaults['user'] = user['uuid']
+            self.defaults["user"] = user["uuid"]
 
 
 class VFolderInvitationFactory(ModelFactory):
@@ -161,20 +164,20 @@ class VFolderInvitationFactory(ModelFactory):
 
     def get_creation_defaults(self, **kwargs):
         return {
-            'permission': models.VFolderPermission('ro'),
-            'state': 'pending',
+            "permission": models.VFolderPermission("ro"),
+            "state": "pending",
         }
 
     async def before_creation(self):
-        if 'vfolder' not in self.defaults:
+        if "vfolder" not in self.defaults:
             vf = await VFolderFactory(self.app).create()
-            self.defaults['vfolder'] = vf['id']
-        if 'inviter' not in self.defaults:
+            self.defaults["vfolder"] = vf["id"]
+        if "inviter" not in self.defaults:
             user = await UserFactory(self.app).create()
-            self.defaults['inviter'] = user['email']
-        if 'invitee' not in self.defaults:
+            self.defaults["inviter"] = user["email"]
+        if "invitee" not in self.defaults:
             user = await UserFactory(self.app).create()
-            self.defaults['invitee'] = user['email']
+            self.defaults["invitee"] = user["email"]
 
 
 class VFolderPermissionFactory(ModelFactory):
@@ -183,13 +186,13 @@ class VFolderPermissionFactory(ModelFactory):
 
     def get_creation_defaults(self, **kwargs):
         return {
-            'permission': models.VFolderPermission('ro'),
+            "permission": models.VFolderPermission("ro"),
         }
 
     async def before_creation(self):
-        if 'vfolder' not in self.defaults:
+        if "vfolder" not in self.defaults:
             vf = await VFolderFactory(self.app).create()
-            self.defaults['vfolder'] = vf['id']
-        if 'user' not in self.defaults:
+            self.defaults["vfolder"] = vf["id"]
+        if "user" not in self.defaults:
             user = await UserFactory(self.app).create()
-            self.defaults['user'] = user['uuid']
+            self.defaults["user"] = user["uuid"]

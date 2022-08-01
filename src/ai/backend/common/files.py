@@ -8,9 +8,7 @@ import janus
 from .asyncio import current_loop
 from .types import Sentinel
 
-__all__ = (
-    'AsyncFileWriter',
-)
+__all__ = ("AsyncFileWriter",)
 
 
 class AsyncFileWriter:
@@ -31,7 +29,7 @@ class AsyncFileWriter:
         self._q: janus.Queue[str | bytes | Sentinel] = janus.Queue(maxsize=max_chunks)
         self._target_filename = target_filename
         self._access_mode = access_mode
-        self._binary_mode = 'b' in access_mode
+        self._binary_mode = "b" in access_mode
         if encode is not None:
             self._encode = encode
         else:

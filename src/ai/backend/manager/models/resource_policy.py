@@ -28,7 +28,7 @@ from .user import UserRole
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.models'))
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models"))
 
 __all__: Sequence[str] = (
     'keypair_resource_policies',
@@ -42,22 +42,24 @@ __all__: Sequence[str] = (
 
 
 keypair_resource_policies = sa.Table(
-    'keypair_resource_policies', metadata,
-    sa.Column('name', sa.String(length=256), primary_key=True),
-    sa.Column('created_at', sa.DateTime(timezone=True),
-              server_default=sa.func.now()),
-    sa.Column('default_for_unspecified',
-              EnumType(DefaultForUnspecified),
-              default=DefaultForUnspecified.LIMITED,
-              nullable=False),
-    sa.Column('total_resource_slots', ResourceSlotColumn(), nullable=False),
-    sa.Column('max_session_lifetime', sa.Integer(), nullable=False, server_default=sa.text('0')),
-    sa.Column('max_concurrent_sessions', sa.Integer(), nullable=False),
-    sa.Column('max_containers_per_session', sa.Integer(), nullable=False),
-    sa.Column('max_vfolder_count', sa.Integer(), nullable=False),
-    sa.Column('max_vfolder_size', sa.BigInteger(), nullable=False),
-    sa.Column('idle_timeout', sa.BigInteger(), nullable=False),
-    sa.Column('allowed_vfolder_hosts', pgsql.ARRAY(sa.String), nullable=False),
+    "keypair_resource_policies",
+    metadata,
+    sa.Column("name", sa.String(length=256), primary_key=True),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    sa.Column(
+        "default_for_unspecified",
+        EnumType(DefaultForUnspecified),
+        default=DefaultForUnspecified.LIMITED,
+        nullable=False,
+    ),
+    sa.Column("total_resource_slots", ResourceSlotColumn(), nullable=False),
+    sa.Column("max_session_lifetime", sa.Integer(), nullable=False, server_default=sa.text("0")),
+    sa.Column("max_concurrent_sessions", sa.Integer(), nullable=False),
+    sa.Column("max_containers_per_session", sa.Integer(), nullable=False),
+    sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
+    sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False),
+    sa.Column("idle_timeout", sa.BigInteger(), nullable=False),
+    sa.Column("allowed_vfolder_hosts", pgsql.ARRAY(sa.String), nullable=False),
     # TODO: implement with a many-to-many association table
     # sa.Column('allowed_scaling_groups', sa.Array(sa.String), nullable=False),
 )
@@ -118,14 +120,16 @@ class KeyPairResourcePolicy(graphene.ObjectType):
         access_key: str,
     ) -> Sequence[KeyPairResourcePolicy]:
         j = sa.join(
-            keypairs, keypair_resource_policies,
+            keypairs,
+            keypair_resource_policies,
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
             sa.select(KeyPairResourcePolicyRow)
             .select_from(j)
             .where(
-                keypairs.c.user_id == (
+                keypairs.c.user_id
+                == (
                     sa.select([keypairs.c.user_id])
                     .select_from(keypairs)
                     .where(keypairs.c.access_key == access_key)
@@ -165,15 +169,16 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     ) -> Sequence[KeyPairResourcePolicy | None]:
         access_key = ctx.access_key
         j = sa.join(
-            keypairs, keypair_resource_policies,
+            keypairs,
+            keypair_resource_policies,
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
             sa.select(KeyPairResourcePolicyRow)
             .select_from(j)
             .where(
-                (keypair_resource_policies.c.name.in_(names)) &
-                (keypairs.c.access_key == access_key),
+                (keypair_resource_policies.c.name.in_(names))
+                & (keypairs.c.access_key == access_key),
             )
             .order_by(keypair_resource_policies.c.name)
         )
@@ -190,7 +195,8 @@ class KeyPairResourcePolicy(graphene.ObjectType):
         access_keys: Sequence[str],
     ) -> Sequence[KeyPairResourcePolicy]:
         j = sa.join(
-            keypairs, keypair_resource_policies,
+            keypairs,
+            keypair_resource_policies,
             keypairs.c.resource_policy == keypair_resource_policies.c.name,
         )
         query = (
@@ -251,24 +257,23 @@ class CreateKeyPairResourcePolicy(graphene.Mutation):
         props: CreateKeyPairResourcePolicyInput,
     ) -> CreateKeyPairResourcePolicy:
         data = {
-            'name': name,
-            'default_for_unspecified':
-                DefaultForUnspecified[props.default_for_unspecified],
-            'total_resource_slots': ResourceSlot.from_user_input(
-                props.total_resource_slots, None),
-            'max_session_lifetime': props.max_session_lifetime,
-            'max_concurrent_sessions': props.max_concurrent_sessions,
-            'max_containers_per_session': props.max_containers_per_session,
-            'idle_timeout': props.idle_timeout,
-            'max_vfolder_count': props.max_vfolder_count,
-            'max_vfolder_size': props.max_vfolder_size,
-            'allowed_vfolder_hosts': props.allowed_vfolder_hosts,
+            "name": name,
+            "default_for_unspecified": DefaultForUnspecified[props.default_for_unspecified],
+            "total_resource_slots": ResourceSlot.from_user_input(props.total_resource_slots, None),
+            "max_session_lifetime": props.max_session_lifetime,
+            "max_concurrent_sessions": props.max_concurrent_sessions,
+            "max_containers_per_session": props.max_containers_per_session,
+            "idle_timeout": props.idle_timeout,
+            "max_vfolder_count": props.max_vfolder_count,
+            "max_vfolder_size": props.max_vfolder_size,
+            "allowed_vfolder_hosts": props.allowed_vfolder_hosts,
         }
-        insert_query = (
-            sa.insert(keypair_resource_policies).values(data)
-        )
+        insert_query = sa.insert(keypair_resource_policies).values(data)
         return await simple_db_mutate_returning_item(
-            cls, info.context, insert_query, item_cls=KeyPairResourcePolicy,
+            cls,
+            info.context,
+            insert_query,
+            item_cls=KeyPairResourcePolicy,
         )
 
 
@@ -292,17 +297,22 @@ class ModifyKeyPairResourcePolicy(graphene.Mutation):
         props: ModifyKeyPairResourcePolicyInput,
     ) -> ModifyKeyPairResourcePolicy:
         data: Dict[str, Any] = {}
-        set_if_set(props, data, 'default_for_unspecified',
-                   clean_func=lambda v: DefaultForUnspecified[v])
-        set_if_set(props, data, 'total_resource_slots',
-                   clean_func=lambda v: ResourceSlot.from_user_input(v, None))
-        set_if_set(props, data, 'max_session_lifetime')
-        set_if_set(props, data, 'max_concurrent_sessions')
-        set_if_set(props, data, 'max_containers_per_session')
-        set_if_set(props, data, 'idle_timeout')
-        set_if_set(props, data, 'max_vfolder_count')
-        set_if_set(props, data, 'max_vfolder_size')
-        set_if_set(props, data, 'allowed_vfolder_hosts')
+        set_if_set(
+            props, data, "default_for_unspecified", clean_func=lambda v: DefaultForUnspecified[v]
+        )
+        set_if_set(
+            props,
+            data,
+            "total_resource_slots",
+            clean_func=lambda v: ResourceSlot.from_user_input(v, None),
+        )
+        set_if_set(props, data, "max_session_lifetime")
+        set_if_set(props, data, "max_concurrent_sessions")
+        set_if_set(props, data, "max_containers_per_session")
+        set_if_set(props, data, "idle_timeout")
+        set_if_set(props, data, "max_vfolder_count")
+        set_if_set(props, data, "max_vfolder_size")
+        set_if_set(props, data, "allowed_vfolder_hosts")
         update_query = (
             sa.update(keypair_resource_policies)
             .values(data)
@@ -328,8 +338,7 @@ class DeleteKeyPairResourcePolicy(graphene.Mutation):
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteKeyPairResourcePolicy:
-        delete_query = (
-            sa.delete(keypair_resource_policies)
-            .where(keypair_resource_policies.c.name == name)
+        delete_query = sa.delete(keypair_resource_policies).where(
+            keypair_resource_policies.c.name == name
         )
         return await simple_db_mutate(cls, info.context, delete_query)

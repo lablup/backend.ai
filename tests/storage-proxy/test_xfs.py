@@ -95,10 +95,7 @@ async def test_xfs_single_vfolder_mgmt(xfs):
     await xfs.delete_vfolder(vfid)
     assert not vfpath.exists()
     assert not vfpath.parent.exists() or not (vfpath.parent / vfid.hex[2:4]).exists()
-    assert (
-        not vfpath.parent.parent.exists()
-        or not (vfpath.parent.parent / vfid.hex[0:2]).exists()
-    )
+    assert not vfpath.parent.parent.exists() or not (vfpath.parent.parent / vfid.hex[0:2]).exists()
     project_id_dict = read_etc_projid()
     vfpath_id_dict = read_etc_projects()
     assert str(vfid) not in project_id_dict
