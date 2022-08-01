@@ -13,6 +13,7 @@ class InvalidArgument(Exception):
     An internal exception class to represent invalid arguments in internal APIs.
     This is wrapped as InvalidAPIParameters in web request handlers.
     """
+
     pass
 
 
@@ -26,7 +27,10 @@ class AgentError(RuntimeError):
     """
 
     __slots__ = (
-        'agent_id', 'exc_name', 'exc_repr', 'exc_tb',
+        "agent_id",
+        "exc_name",
+        "exc_repr",
+        "exc_tb",
     )
 
     def __init__(
@@ -55,7 +59,7 @@ class ErrorDetail(TypedDict, total=False):
     src: str
     name: str
     repr: str
-    agent_id: str          # optional
+    agent_id: str  # optional
     collection: List[Any]  # optional; currently mypy cannot handle recursive types
 
 
@@ -71,9 +75,8 @@ def convert_to_status_data(e: Exception, is_debug: bool = False) -> ErrorStatusI
                 "name": "MultiAgentError",
                 "repr": f"MultiAgentError({len(e.__errors__)})",
                 "collection": [
-                    convert_to_status_data(sub_error, is_debug)['error']
-                    for sub_error in
-                    e.__errors__
+                    convert_to_status_data(sub_error, is_debug)["error"]
+                    for sub_error in e.__errors__
                 ],
             },
         )

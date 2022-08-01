@@ -24,10 +24,10 @@ from typing import (
     Tuple,
 )
 
-import aioredis
 import attr
+from redis.asyncio import Redis
 
-from ai.backend.common import msgpack, redis
+from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
@@ -45,27 +45,27 @@ if TYPE_CHECKING:
     from .agent import AbstractAgent
 
 __all__ = (
-    'StatContext',
-    'StatModes',
-    'MetricTypes',
-    'NodeMeasurement',
-    'ContainerMeasurement',
-    'Measurement',
+    "StatContext",
+    "StatModes",
+    "MetricTypes",
+    "NodeMeasurement",
+    "ContainerMeasurement",
+    "Measurement",
 )
 
-log = BraceStyleAdapter(logging.getLogger('ai.backend.agent.stats'))
+log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.stats"))
 
 
 def check_cgroup_available():
     """
     Check if the host OS provides cgroups.
     """
-    return (not is_containerized() and sys.platform.startswith('linux'))
+    return not is_containerized() and sys.platform.startswith("linux")
 
 
 class StatModes(enum.Enum):
-    CGROUP = 'cgroup'
-    DOCKER = 'docker'
+    CGROUP = "cgroup"
+    DOCKER = "docker"
 
     @staticmethod
     def get_preferred_mode():
@@ -78,9 +78,11 @@ class StatModes(enum.Enum):
 
 
 class MetricTypes(enum.Enum):
-    USAGE = 0        # for instant snapshot (e.g., used memory bytes, used cpu msec)
-    RATE = 1         # for rate of increase (e.g., I/O bps)
-    UTILIZATION = 2  # for ratio of resource occupation time per measurement interval (e.g., CPU util)
+    USAGE = 0  # for instant snapshot (e.g., used memory bytes, used cpu msec)
+    RATE = 1  # for rate of increase (e.g., I/O bps)
+    UTILIZATION = (
+        2  # for ratio of resource occupation time per measurement interval (e.g., CPU util)
+    )
     ACCUMULATED = 3  # for accumulated value (e.g., total number of events)
 
 
@@ -95,6 +97,7 @@ class NodeMeasurement:
     """
     Collection of per-node and per-agent statistics for a specific metric.
     """
+
     # 2-tuple of Decimals mean raw values for (usage, available)
     # Percent values are calculated from them.
     key: str
@@ -103,7 +106,7 @@ class NodeMeasurement:
     per_device: Mapping[DeviceId, Measurement] = attr.Factory(dict)
     unit_hint: Optional[str] = None
     stats_filter: FrozenSet[str] = attr.Factory(frozenset)
-    current_hook: Optional[Callable[['Metric'], Decimal]] = None
+    current_hook: Optional[Callable[["Metric"], Decimal]] = None
 
 
 @attr.s(auto_attribs=True, slots=True)
@@ -111,18 +114,22 @@ class ContainerMeasurement:
     """
     Collection of per-container statistics for a specific metric.
     """
+
     key: str
     type: MetricTypes
     per_container: Mapping[str, Measurement] = attr.Factory(dict)
     unit_hint: Optional[str] = None
     stats_filter: FrozenSet[str] = attr.Factory(frozenset)
-    current_hook: Optional[Callable[['Metric'], Decimal]] = None
+    current_hook: Optional[Callable[["Metric"], Decimal]] = None
 
 
 class MovingStatistics:
     __slots__ = (
-        '_sum', '_count',
-        '_min', '_max', '_last',
+        "_sum",
+        "_count",
+        "_min",
+        "_max",
+        "_last",
     )
     _sum: Decimal
     _count: int
@@ -134,8 +141,8 @@ class MovingStatistics:
         self._last = []
         if initial_value is None:
             self._sum = Decimal(0)
-            self._min = Decimal('inf')
-            self._max = Decimal('-inf')
+            self._min = Decimal("inf")
+            self._max = Decimal("-inf")
             self._count = 0
         else:
             self._sum = initial_value
@@ -181,20 +188,21 @@ class MovingStatistics:
     @property
     def rate(self) -> Decimal:
         if len(self._last) == 2:
-            return ((self._last[-1][0] - self._last[-2][0]) /
-                    Decimal(self._last[-1][1] - self._last[-2][1]))
+            return (self._last[-1][0] - self._last[-2][0]) / Decimal(
+                self._last[-1][1] - self._last[-2][1]
+            )
         return Decimal(0)
 
     def to_serializable_dict(self) -> MovingStatValue:
-        q = Decimal('0.000')
+        q = Decimal("0.000")
         return {
-            'min': str(remove_exponent(self.min.quantize(q))),
-            'max': str(remove_exponent(self.max.quantize(q))),
-            'sum': str(remove_exponent(self.sum.quantize(q))),
-            'avg': str(remove_exponent(self.avg.quantize(q))),
-            'diff': str(remove_exponent(self.diff.quantize(q))),
-            'rate': str(remove_exponent(self.rate.quantize(q))),
-            'version': 2,
+            "min": str(remove_exponent(self.min.quantize(q))),
+            "max": str(remove_exponent(self.max.quantize(q))),
+            "sum": str(remove_exponent(self.sum.quantize(q))),
+            "avg": str(remove_exponent(self.avg.quantize(q))),
+            "diff": str(remove_exponent(self.diff.quantize(q))),
+            "rate": str(remove_exponent(self.rate.quantize(q))),
+            "version": 2,
         }
 
 
@@ -207,7 +215,7 @@ class Metric:
     current: Decimal
     capacity: Optional[Decimal] = None
     unit_hint: Optional[str] = None
-    current_hook: Optional[Callable[['Metric'], Decimal]] = None
+    current_hook: Optional[Callable[["Metric"], Decimal]] = None
 
     def update(self, value: Measurement):
         if value.capacity is not None:
@@ -218,36 +226,44 @@ class Metric:
             self.current = self.current_hook(self)
 
     def to_serializable_dict(self) -> MetricValue:
-        q = Decimal('0.000')
-        q_pct = Decimal('0.00')
+        q = Decimal("0.000")
+        q_pct = Decimal("0.00")
         return {
-            'current': str(remove_exponent(self.current.quantize(q))),
-            'capacity': (str(remove_exponent(self.capacity.quantize(q)))
-                         if self.capacity is not None else None),
-            'pct': (
-                str(remove_exponent(
-                    (Decimal(self.current) / Decimal(self.capacity) * 100).quantize(q_pct)))
-                if (self.capacity is not None and
-                    self.capacity.is_normal() and
-                    self.capacity > 0)
-                else None),
-            'unit_hint': self.unit_hint,
-            **{f'stats.{k}': v  # type: ignore
-               for k, v in self.stats.to_serializable_dict().items()
-               if k in self.stats_filter},
+            "current": str(remove_exponent(self.current.quantize(q))),
+            "capacity": (
+                str(remove_exponent(self.capacity.quantize(q)))
+                if self.capacity is not None
+                else None
+            ),
+            "pct": (
+                str(
+                    remove_exponent(
+                        (Decimal(self.current) / Decimal(self.capacity) * 100).quantize(q_pct)
+                    )
+                )
+                if (self.capacity is not None and self.capacity.is_normal() and self.capacity > 0)
+                else None
+            ),
+            "unit_hint": self.unit_hint,
+            **{
+                f"stats.{k}": v  # type: ignore
+                for k, v in self.stats.to_serializable_dict().items()
+                if k in self.stats_filter
+            },
         }
 
 
 class StatContext:
 
-    agent: 'AbstractAgent'
+    agent: "AbstractAgent"
     mode: StatModes
     node_metrics: Mapping[MetricKey, Metric]
     device_metrics: Mapping[MetricKey, MutableMapping[DeviceId, Metric]]
     kernel_metrics: MutableMapping[KernelId, MutableMapping[MetricKey, Metric]]
 
-    def __init__(self, agent: 'AbstractAgent', mode: StatModes = None, *,
-                 cache_lifespan: int = 120) -> None:
+    def __init__(
+        self, agent: "AbstractAgent", mode: StatModes = None, *, cache_lifespan: int = 120
+    ) -> None:
         self.agent = agent
         self.mode = mode if mode is not None else StatModes.get_preferred_mode()
         self.cache_lifespan = cache_lifespan
@@ -272,7 +288,7 @@ class StatContext:
         last = self._timestamps.get(timestamp_key, None)
         self._timestamps[timestamp_key] = now
         if last is None:
-            return now, float('NaN')
+            return now, float("NaN")
         return now, now - last
 
     async def collect_node_stat(self):
@@ -291,15 +307,15 @@ class StatContext:
             results = await asyncio.gather(*_tasks, return_exceptions=True)
             for result in results:
                 if isinstance(result, Exception):
-                    log.error('collect_node_stat(): gather_node_measures() error',
-                              exc_info=result)
+                    log.error("collect_node_stat(): gather_node_measures() error", exc_info=result)
                     continue
                 for node_measure in result:
                     metric_key = node_measure.key
                     # update node metric
                     if metric_key not in self.node_metrics:
                         self.node_metrics[metric_key] = Metric(
-                            metric_key, node_measure.type,
+                            metric_key,
+                            node_measure.type,
                             current=node_measure.per_node.value,
                             capacity=node_measure.per_node.capacity,
                             unit_hint=node_measure.unit_hint,
@@ -317,7 +333,8 @@ class StatContext:
                             self.device_metrics[metric_key] = {}
                         if dev_id not in self.device_metrics[metric_key]:
                             self.device_metrics[metric_key][dev_id] = Metric(
-                                metric_key, node_measure.type,
+                                metric_key,
+                                node_measure.type,
                                 current=measure.value,
                                 capacity=measure.capacity,
                                 unit_hint=node_measure.unit_hint,
@@ -330,28 +347,29 @@ class StatContext:
 
         # push to the Redis server
         redis_agent_updates = {
-            'node': {
-                key: obj.to_serializable_dict()
-                for key, obj in self.node_metrics.items()
-            },
-            'devices': {
-                metric_key: {dev_id: obj.to_serializable_dict()
-                             for dev_id, obj in per_device.items()}
+            "node": {key: obj.to_serializable_dict() for key, obj in self.node_metrics.items()},
+            "devices": {
+                metric_key: {
+                    dev_id: obj.to_serializable_dict() for dev_id, obj in per_device.items()
+                }
                 for metric_key, per_device in self.device_metrics.items()
             },
         }
-        if self.agent.local_config['debug']['log-stats']:
-            log.debug('stats: node_updates: {0}: {1}',
-                      self.agent.local_config['agent']['id'], redis_agent_updates['node'])
+        if self.agent.local_config["debug"]["log-stats"]:
+            log.debug(
+                "stats: node_updates: {0}: {1}",
+                self.agent.local_config["agent"]["id"],
+                redis_agent_updates["node"],
+            )
         serialized_agent_updates = msgpack.packb(redis_agent_updates)
 
-        async def _pipe_builder(r: aioredis.Redis):
-            async with r.pipeline() as pipe:
-                pipe.set(self.agent.local_config['agent']['id'], serialized_agent_updates)
-                pipe.expire(self.agent.local_config['agent']['id'], self.cache_lifespan)
-                await pipe.execute()
+        async def _pipe_builder(r: Redis):
+            pipe = r.pipeline()
+            await pipe.set(self.agent.local_config["agent"]["id"], serialized_agent_updates)
+            await pipe.expire(self.agent.local_config["agent"]["id"], self.cache_lifespan)
+            return pipe
 
-        await redis.execute(self.agent.redis_stat_pool, _pipe_builder)
+        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
 
     async def collect_container_stat(
         self,
@@ -366,14 +384,14 @@ class StatContext:
             kernel_id_map: Dict[ContainerId, KernelId] = {}
             for kid, info in self.agent.kernel_registry.items():
                 try:
-                    cid = info['container_id']
+                    cid = info["container_id"]
                 except KeyError:
-                    log.warning('collect_container_stat(): no container for kernel {}', kid)
+                    log.warning("collect_container_stat(): no container for kernel {}", kid)
                 else:
                     kernel_id_map[ContainerId(cid)] = kid
             unused_kernel_ids = set(self.kernel_metrics.keys()) - set(kernel_id_map.values())
             for unused_kernel_id in unused_kernel_ids:
-                log.debug('removing kernel_metric for {}', unused_kernel_id)
+                log.debug("removing kernel_metric for {}", unused_kernel_id)
                 self.kernel_metrics.pop(unused_kernel_id, None)
 
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
@@ -382,15 +400,19 @@ class StatContext:
             _tasks = []
             kernel_id = None
             for computer in self.agent.computers.values():
-                _tasks.append(asyncio.create_task(
-                    computer.instance.gather_container_measures(self, container_ids),
-                ))
+                _tasks.append(
+                    asyncio.create_task(
+                        computer.instance.gather_container_measures(self, container_ids),
+                    )
+                )
             results = await asyncio.gather(*_tasks, return_exceptions=True)
             updated_kernel_ids: Set[KernelId] = set()
             for result in results:
                 if isinstance(result, Exception):
-                    log.error('collect_container_stat(): gather_container_measures() error',
-                              exc_info=result)
+                    log.error(
+                        "collect_container_stat(): gather_container_measures() error",
+                        exc_info=result,
+                    )
                     continue
                 for ctnr_measure in result:
                     metric_key = ctnr_measure.key
@@ -405,7 +427,8 @@ class StatContext:
                             self.kernel_metrics[kernel_id] = {}
                         if metric_key not in self.kernel_metrics[kernel_id]:
                             self.kernel_metrics[kernel_id][metric_key] = Metric(
-                                metric_key, ctnr_measure.type,
+                                metric_key,
+                                ctnr_measure.type,
                                 current=measure.value,
                                 capacity=measure.capacity or measure.value,
                                 unit_hint=ctnr_measure.unit_hint,
@@ -416,20 +439,18 @@ class StatContext:
                         else:
                             self.kernel_metrics[kernel_id][metric_key].update(measure)
 
-        async def _pipe_builder(r: aioredis.Redis):
+        async def _pipe_builder(r: Redis):
             async with r.pipeline() as pipe:
                 for kernel_id in updated_kernel_ids:
                     metrics = self.kernel_metrics[kernel_id]
                     serializable_metrics = {
-                        key: obj.to_serializable_dict()
-                        for key, obj in metrics.items()
+                        key: obj.to_serializable_dict() for key, obj in metrics.items()
                     }
-                    if self.agent.local_config['debug']['log-stats']:
-                        log.debug('kernel_updates: {0}: {1}',
-                                kernel_id, serializable_metrics)
+                    if self.agent.local_config["debug"]["log-stats"]:
+                        log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
                     serialized_metrics = msgpack.packb(serializable_metrics)
 
-                    pipe.set(str(kernel_id), serialized_metrics)
-                    await pipe.execute()
+                    await pipe.set(str(kernel_id), serialized_metrics)
+                    return pipe
 
-        await redis.execute(self.agent.redis_stat_pool, _pipe_builder)
+        await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)

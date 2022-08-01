@@ -9,7 +9,7 @@ from .context import CLIContext
 from .utils import CommaSeparatedChoice, CustomUsageArgsCommand
 
 
-@click.group(invoke_without_command=True, context_settings={'help_option_names': ['-h', '--help']})
+@click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
 @click.pass_context
 def main(ctx: click.Context) -> None:
     """
@@ -18,14 +18,25 @@ def main(ctx: click.Context) -> None:
     ctx.obj = CLIContext()
 
 
-@main.command(cls=CustomUsageArgsCommand, context_settings={
-    'ignore_unknown_options': True,
-    'allow_extra_args': True,
-    'allow_interspersed_args': True,
-}, usage_args='[PKGS] [PYTEST_ARGS]')
-@click.argument("pkgs", type=CommaSeparatedChoice([
-    'admin', 'user',
-]), metavar='PKGS')
+@main.command(
+    cls=CustomUsageArgsCommand,
+    context_settings={
+        "ignore_unknown_options": True,
+        "allow_extra_args": True,
+        "allow_interspersed_args": True,
+    },
+    usage_args="[PKGS] [PYTEST_ARGS]",
+)
+@click.argument(
+    "pkgs",
+    type=CommaSeparatedChoice(
+        [
+            "admin",
+            "user",
+        ]
+    ),
+    metavar="PKGS",
+)
 @click.pass_context
 def run_cli(
     ctx: click.Context,
@@ -44,14 +55,18 @@ def run_cli(
       user
     """
     pytest_args = ctx.args
-    result = subprocess.run([
-        sys.executable, '-m', 'pytest',
-        '--pyargs',
-        *(f'ai.backend.test.cli_integration.{pkg}' for pkg in pkgs),
-        *pytest_args,
-    ])
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "--pyargs",
+            *(f"ai.backend.test.cli_integration.{pkg}" for pkg in pkgs),
+            *pytest_args,
+        ]
+    )
     ctx.exit(result.returncode)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

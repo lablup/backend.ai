@@ -32,8 +32,12 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     # proxy_proc is a background process
     proxy_proc = subprocess.Popen(
         [
-            "backend.ai", "app", session_ref,
-            "sshd", "-b", f"127.0.0.1:{port}",
+            "backend.ai",
+            "app",
+            session_ref,
+            "sshd",
+            "-b",
+            f"127.0.0.1:{port}",
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -45,8 +49,10 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
             line = proxy_proc.stdout.readline(1024)
             if not line:
                 proxy_proc.wait()
-                print_fail(f"Unexpected early termination of the sshd app command "
-                           f"(exit: {proxy_proc.returncode}):")
+                print_fail(
+                    f"Unexpected early termination of the sshd app command "
+                    f"(exit: {proxy_proc.returncode}):"
+                )
                 print((b"\n".join(lines)).decode())
                 sys.exit(1)
             if f"127.0.0.1:{port}".encode() in line:

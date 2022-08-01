@@ -91,7 +91,7 @@ msgstr ""
 #: 1b9e1c630e544377b9081d4416a3e555
 msgid ""
 "If you have configured image aliases, you need to udpate them manually as "
-"well, using the ``backend.ai mgr etcd alias`` command. This does not affect "
+"well, using the ``backend.ai mgr image alias`` command. This does not affect "
 "existing sessions running with old aliases."
 msgstr ""
 

@@ -4,14 +4,13 @@ import inspect
 from ..session import AsyncSession, api_session
 
 __all__ = (
-    'APIFunctionMeta',
-    'BaseFunction',
-    'api_function',
+    "APIFunctionMeta",
+    "BaseFunction",
+    "api_function",
 )
 
 
 def _wrap_method(cls, orig_name, meth):
-
     @functools.wraps(meth)
     def _method(*args, **kwargs):
         # We need to keep the original attributes so that they could be correctly
@@ -21,8 +20,7 @@ def _wrap_method(cls, orig_name, meth):
         _api_session = api_session.get()
         if _api_session is None:
             raise RuntimeError(
-                "API functions must be called "
-                "inside the context of a valid API session",
+                "API functions must be called " "inside the context of a valid API session",
             )
         if isinstance(_api_session, AsyncSession):
             return coro
@@ -39,7 +37,7 @@ def api_function(meth):
     """
     Mark the wrapped method as the API function method.
     """
-    setattr(meth, '_backend_api', True)
+    setattr(meth, "_backend_api", True)
     return meth
 
 
@@ -49,13 +47,14 @@ class APIFunctionMeta(type):
     session-aware methods that are either plain Python functions
     or coroutines.
     """
+
     _async = True
 
     def __init__(cls, name, bases, attrs, **kwargs):
         super().__init__(name, bases, attrs)
         for attr_name, attr_value in attrs.items():
-            if hasattr(attr_value, '_backend_api'):
-                orig_name = '_orig_' + attr_name
+            if hasattr(attr_value, "_backend_api"):
+                orig_name = "_orig_" + attr_name
                 setattr(cls, orig_name, attr_value)
                 wrapped = _wrap_method(cls, orig_name, attr_value)
                 setattr(cls, attr_name, wrapped)

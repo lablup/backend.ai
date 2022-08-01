@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import secrets
 import subprocess
 import sys
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import IO, Literal, Sequence
+from typing import IO, List, Literal, Optional, Sequence
 
 import click
+import inquirer
+from async_timeout import timeout
+from dateutil.parser import isoparse
+from dateutil.tz import tzutc
 from humanize import naturalsize
 from tabulate import tabulate
 
@@ -75,11 +80,11 @@ def _create_cmd(docs: str = None):
         name: str | None,
         owner: str | None,
         # job scheduling options
-        type: Literal['batch', 'interactive'],
+        type: Literal["batch", "interactive"],
         starts_at: str | None,
         startup_command: str | None,
         enqueue_only: bool,
-        max_wait: bool,
+        max_wait: int,
         no_reuse: bool,
         depends: Sequence[str],
         callback_url: str,
@@ -93,7 +98,7 @@ def _create_cmd(docs: str = None):
         scaling_group: str | None,
         resources: Sequence[str],
         cluster_size: int,
-        cluster_mode: Literal['single-node', 'multi-node'],
+        cluster_mode: Literal["single-node", "multi-node"],
         resource_opts: Sequence[str],
         preopen: str | None,
         assign_agent: str | None,
@@ -113,7 +118,7 @@ def _create_cmd(docs: str = None):
                runtime or programming language.
         """
         if name is None:
-            name = f'pysdk-{secrets.token_hex(5)}'
+            name = f"pysdk-{secrets.token_hex(5)}"
         else:
             name = name
 
@@ -149,7 +154,9 @@ def _create_cmd(docs: str = None):
                     domain_name=domain,
                     group_name=group,
                     scaling_group=scaling_group,
-                    bootstrap_script=bootstrap_script.read() if bootstrap_script is not None else None,
+                    bootstrap_script=bootstrap_script.read()
+                    if bootstrap_script is not None
+                    else None,
                     tag=tag,
                     preopen_ports=preopen_ports,
                     assign_agent=assigned_agent_list,
@@ -158,41 +165,57 @@ def _create_cmd(docs: str = None):
                 print_error(e)
                 sys.exit(1)
             else:
-                if compute_session.status == 'PENDING':
-                    print_info('Session ID {0} is enqueued for scheduling.'
-                               .format(compute_session.id))
-                elif compute_session.status == 'SCHEDULED':
-                    print_info('Session ID {0} is scheduled and about to be started.'
-                               .format(compute_session.id))
+                if compute_session.status == "PENDING":
+                    print_info(
+                        "Session ID {0} is enqueued for scheduling.".format(compute_session.id)
+                    )
+                elif compute_session.status == "SCHEDULED":
+                    print_info(
+                        "Session ID {0} is scheduled and about to be started.".format(
+                            compute_session.id
+                        )
+                    )
                     return
-                elif compute_session.status == 'RUNNING':
+                elif compute_session.status == "RUNNING":
                     if compute_session.created:
-                        print_info('Session ID {0} is created and ready.'
-                                   .format(compute_session.id))
+                        print_info(
+                            "Session ID {0} is created and ready.".format(compute_session.id)
+                        )
                     else:
-                        print_info('Session ID {0} is already running and ready.'
-                                   .format(compute_session.id))
+                        print_info(
+                            "Session ID {0} is already running and ready.".format(
+                                compute_session.id
+                            )
+                        )
                     if compute_session.service_ports:
-                        print_info('This session provides the following app services: ' +
-                                   ', '.join(sport['name']
-                                             for sport in compute_session.service_ports))
-                elif compute_session.status == 'TERMINATED':
-                    print_warn('Session ID {0} is already terminated.\n'
-                               'This may be an error in the compute_session image.'
-                               .format(compute_session.id))
-                elif compute_session.status == 'TIMEOUT':
-                    print_info('Session ID {0} is still on the job queue.'
-                               .format(compute_session.id))
-                elif compute_session.status in ('ERROR', 'CANCELLED'):
-                    print_fail('Session ID {0} has an error during scheduling/startup or cancelled.'
-                               .format(compute_session.id))
+                        print_info(
+                            "This session provides the following app services: "
+                            + ", ".join(sport["name"] for sport in compute_session.service_ports)
+                        )
+                elif compute_session.status == "TERMINATED":
+                    print_warn(
+                        "Session ID {0} is already terminated.\n"
+                        "This may be an error in the compute_session image.".format(
+                            compute_session.id
+                        )
+                    )
+                elif compute_session.status == "TIMEOUT":
+                    print_info(
+                        "Session ID {0} is still on the job queue.".format(compute_session.id)
+                    )
+                elif compute_session.status in ("ERROR", "CANCELLED"):
+                    print_fail(
+                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
+                            compute_session.id
+                        )
+                    )
 
     if docs is not None:
         create.__doc__ = docs
     return create
 
 
-main.command(aliases=['start'])(_create_cmd(docs="Alias of \"session create\""))
+main.command(aliases=["start"])(_create_cmd(docs='Alias of "session create"'))
 session.command()(_create_cmd())
 
 
@@ -228,7 +251,7 @@ def _create_from_template_cmd(docs: str = None):
         name: str | Undefined,
         owner: str | Undefined,
         # job scheduling options
-        type_: Literal['batch', 'interactive'] | Undefined,
+        type_: Literal["batch", "interactive"] | Undefined,
         starts_at: str | None,
         image: str | Undefined,
         startup_command: str | Undefined,
@@ -266,19 +289,21 @@ def _create_from_template_cmd(docs: str = None):
                runtime or programming language.
         """
         if name is undefined:
-            name = f'pysdk-{secrets.token_hex(5)}'
+            name = f"pysdk-{secrets.token_hex(5)}"
         else:
             name = name
 
         envs = prepare_env_arg(env) if len(env) > 0 or no_env else undefined
-        resources = prepare_resource_arg(resources) if len(resources) > 0 or no_resource else undefined
+        resources = (
+            prepare_resource_arg(resources) if len(resources) > 0 or no_resource else undefined
+        )
         resource_opts = (
             prepare_resource_arg(resource_opts)
-            if len(resource_opts) > 0 or no_resource else undefined
+            if len(resource_opts) > 0 or no_resource
+            else undefined
         )
         prepared_mount, prepared_mount_map = (
-            prepare_mount_arg(mount)
-            if len(mount) > 0 or no_mount else (undefined, undefined)
+            prepare_mount_arg(mount) if len(mount) > 0 or no_mount else (undefined, undefined)
         )
         with Session() as session:
             try:
@@ -310,55 +335,64 @@ def _create_from_template_cmd(docs: str = None):
                 print_error(e)
                 sys.exit(1)
             else:
-                if compute_session.status == 'PENDING':
-                    print_info('Session ID {0} is enqueued for scheduling.'
-                               .format(name))
-                elif compute_session.status == 'SCHEDULED':
-                    print_info('Session ID {0} is scheduled and about to be started.'
-                               .format(name))
+                if compute_session.status == "PENDING":
+                    print_info("Session ID {0} is enqueued for scheduling.".format(name))
+                elif compute_session.status == "SCHEDULED":
+                    print_info("Session ID {0} is scheduled and about to be started.".format(name))
                     return
-                elif compute_session.status == 'RUNNING':
+                elif compute_session.status == "RUNNING":
                     if compute_session.created:
-                        print_info('Session ID {0} is created and ready.'
-                                   .format(name))
+                        print_info("Session ID {0} is created and ready.".format(name))
                     else:
-                        print_info('Session ID {0} is already running and ready.'
-                                   .format(name))
+                        print_info("Session ID {0} is already running and ready.".format(name))
                     if compute_session.service_ports:
-                        print_info('This session provides the following app services: ' +
-                                   ', '.join(sport['name']
-                                             for sport in compute_session.service_ports))
-                elif compute_session.status == 'TERMINATED':
-                    print_warn('Session ID {0} is already terminated.\n'
-                               'This may be an error in the compute_session image.'
-                               .format(name))
-                elif compute_session.status == 'TIMEOUT':
-                    print_info('Session ID {0} is still on the job queue.'
-                               .format(name))
-                elif compute_session.status in ('ERROR', 'CANCELLED'):
-                    print_fail('Session ID {0} has an error during scheduling/startup or cancelled.'
-                               .format(name))
+                        print_info(
+                            "This session provides the following app services: "
+                            + ", ".join(sport["name"] for sport in compute_session.service_ports)
+                        )
+                elif compute_session.status == "TERMINATED":
+                    print_warn(
+                        "Session ID {0} is already terminated.\n"
+                        "This may be an error in the compute_session image.".format(name)
+                    )
+                elif compute_session.status == "TIMEOUT":
+                    print_info("Session ID {0} is still on the job queue.".format(name))
+                elif compute_session.status in ("ERROR", "CANCELLED"):
+                    print_fail(
+                        "Session ID {0} has an error during scheduling/startup or cancelled.".format(
+                            name
+                        )
+                    )
 
     if docs is not None:
         create_from_template.__doc__ = docs
     return create_from_template
 
 
-main.command(aliases=['start-from-template'])(
-    _create_from_template_cmd(docs="Alias of \"session create-from-template\""),
+main.command(aliases=["start-from-template"])(
+    _create_from_template_cmd(docs='Alias of "session create-from-template"'),
 )
 session.command()(_create_from_template_cmd())
 
 
 def _destroy_cmd(docs: str = None):
-
-    @click.argument('session_names', metavar='SESSID', nargs=-1)
-    @click.option('-f', '--forced', is_flag=True,
-                  help='Force-terminate the errored sessions (only allowed for admins)')
-    @click.option('-o', '--owner', '--owner-access-key', metavar='ACCESS_KEY',
-                  help='Specify the owner of the target session explicitly.')
-    @click.option('-s', '--stats', is_flag=True,
-                  help='Show resource usage statistics after termination')
+    @click.argument("session_names", metavar="SESSID", nargs=-1)
+    @click.option(
+        "-f",
+        "--forced",
+        is_flag=True,
+        help="Force-terminate the errored sessions (only allowed for admins)",
+    )
+    @click.option(
+        "-o",
+        "--owner",
+        "--owner-access-key",
+        metavar="ACCESS_KEY",
+        help="Specify the owner of the target session explicitly.",
+    )
+    @click.option(
+        "-s", "--stats", is_flag=True, help="Show resource usage statistics after termination"
+    )
     def destroy(session_names, forced, owner, stats):
         """
         Terminate and destroy the given session.
@@ -368,7 +402,7 @@ def _destroy_cmd(docs: str = None):
         if len(session_names) == 0:
             print_warn('Specify at least one session ID. Check usage with "-h" option.')
             sys.exit(1)
-        print_wait('Terminating the session(s)...')
+        print_wait("Terminating the session(s)...")
         with Session() as session:
             has_failure = False
             for session_name in session_names:
@@ -380,20 +414,21 @@ def _destroy_cmd(docs: str = None):
                     if e.status == 404:
                         print_info(
                             'If you are an admin, use "-o" / "--owner" option '
-                            'to terminate other user\'s session.')
+                            "to terminate other user's session."
+                        )
                     has_failure = True
                 except Exception as e:
                     print_error(e)
                     has_failure = True
             else:
                 if not has_failure:
-                    print_done('Done.')
+                    print_done("Done.")
                 if stats:
-                    stats = ret.get('stats', None) if ret else None
+                    stats = ret.get("stats", None) if ret else None
                     if stats:
                         print(format_stats(stats))
                     else:
-                        print('Statistics is not available.')
+                        print("Statistics is not available.")
             if has_failure:
                 sys.exit(1)
 
@@ -402,13 +437,12 @@ def _destroy_cmd(docs: str = None):
     return destroy
 
 
-main.command(aliases=['rm', 'kill'])(_destroy_cmd(docs="Alias of \"session destroy\""))
-session.command(aliases=['rm', 'kill'])(_destroy_cmd())
+main.command(aliases=["rm", "kill"])(_destroy_cmd(docs='Alias of "session destroy"'))
+session.command(aliases=["rm", "kill"])(_destroy_cmd())
 
 
 def _restart_cmd(docs: str = None):
-
-    @click.argument('session_refs', metavar='SESSION_REFS', nargs=-1)
+    @click.argument("session_refs", metavar="SESSION_REFS", nargs=-1)
     def restart(session_refs):
         """
         Restart the compute session.
@@ -419,7 +453,7 @@ def _restart_cmd(docs: str = None):
         if len(session_refs) == 0:
             print_warn('Specify at least one session ID. Check usage with "-h" option.')
             sys.exit(1)
-        print_wait('Restarting the session(s)...')
+        print_wait("Restarting the session(s)...")
         with Session() as session:
             has_failure = False
             for session_ref in session_refs:
@@ -431,14 +465,15 @@ def _restart_cmd(docs: str = None):
                     if e.status == 404:
                         print_info(
                             'If you are an admin, use "-o" / "--owner" option '
-                            'to terminate other user\'s session.')
+                            "to terminate other user's session."
+                        )
                     has_failure = True
                 except Exception as e:
                     print_error(e)
                     has_failure = True
             else:
                 if not has_failure:
-                    print_done('Done.')
+                    print_done("Done.")
             if has_failure:
                 sys.exit(1)
 
@@ -447,13 +482,13 @@ def _restart_cmd(docs: str = None):
     return restart
 
 
-main.command()(_restart_cmd(docs="Alias of \"session restart\""))
+main.command()(_restart_cmd(docs='Alias of "session restart"'))
 session.command()(_restart_cmd())
 
 
 @session.command()
-@click.argument('session_id', metavar='SESSID')
-@click.argument('files', type=click.Path(exists=True), nargs=-1)
+@click.argument("session_id", metavar="SESSID")
+@click.argument("files", type=click.Path(exists=True), nargs=-1)
 def upload(session_id, files):
     """
     Upload the files to a compute session's home directory.
@@ -473,20 +508,19 @@ def upload(session_id, files):
         return
     with Session() as session:
         try:
-            print_wait('Uploading files...')
+            print_wait("Uploading files...")
             kernel = session.ComputeSession(session_id)
             kernel.upload(files, show_progress=True)
-            print_done('Uploaded.')
+            print_done("Uploaded.")
         except Exception as e:
             print_error(e)
             sys.exit(1)
 
 
 @session.command()
-@click.argument('session_id', metavar='SESSID')
-@click.argument('files', nargs=-1)
-@click.option('--dest', type=Path, default='.',
-              help='Destination path to store downloaded file(s)')
+@click.argument("session_id", metavar="SESSID")
+@click.argument("files", nargs=-1)
+@click.option("--dest", type=Path, default=".", help="Destination path to store downloaded file(s)")
 def download(session_id, files, dest):
     """
     Download files from a compute session's home directory.
@@ -506,19 +540,18 @@ def download(session_id, files, dest):
         return
     with Session() as session:
         try:
-            print_wait('Downloading file(s) from {}...'
-                       .format(session_id))
+            print_wait("Downloading file(s) from {}...".format(session_id))
             kernel = session.ComputeSession(session_id)
             kernel.download(files, dest, show_progress=True)
-            print_done('Downloaded to {}.'.format(dest.resolve()))
+            print_done("Downloaded to {}.".format(dest.resolve()))
         except Exception as e:
             print_error(e)
             sys.exit(1)
 
 
 @session.command()
-@click.argument('session_id', metavar='SESSID')
-@click.argument('path', metavar='PATH', nargs=1, default='/home/work')
+@click.argument("session_id", metavar="SESSID")
+@click.argument("path", metavar="PATH", nargs=1, default="/home/work")
 def ls(session_id, path):
     """
     List files in a path of a running compute session.
@@ -535,20 +568,20 @@ def ls(session_id, path):
             kernel = session.ComputeSession(session_id)
             result = kernel.list_files(path)
 
-            if 'errors' in result and result['errors']:
-                print_fail(result['errors'])
+            if "errors" in result and result["errors"]:
+                print_fail(result["errors"])
                 sys.exit(1)
 
-            files = json.loads(result['files'])
+            files = json.loads(result["files"])
             table = []
-            headers = ['File name', 'Size', 'Modified', 'Mode']
+            headers = ["File name", "Size", "Modified", "Mode"]
             for file in files:
-                mdt = datetime.fromtimestamp(file['mtime'])
-                fsize = naturalsize(file['size'], binary=True)
-                mtime = mdt.strftime('%b %d %Y %H:%M:%S')
-                row = [file['filename'], fsize, mtime, file['mode']]
+                mdt = datetime.fromtimestamp(file["mtime"])
+                fsize = naturalsize(file["size"], binary=True)
+                mtime = mdt.strftime("%b %d %Y %H:%M:%S")
+                row = [file["filename"], fsize, mtime, file["mode"]]
                 table.append(row)
-            print_done('Retrived.')
+            print_done("Retrived.")
             print(tabulate(table, headers=headers))
         except Exception as e:
             print_error(e)
@@ -556,54 +589,98 @@ def ls(session_id, path):
 
 
 @session.command()
-@click.argument('session_id', metavar='SESSID')
+@click.argument("session_id", metavar="SESSID")
 def logs(session_id):
-    '''
+    """
     Shows the full console log of a compute session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
-    '''
+    """
     with Session() as session:
         try:
-            print_wait('Retrieving live container logs...')
+            print_wait("Retrieving live container logs...")
             kernel = session.ComputeSession(session_id)
-            result = kernel.get_logs().get('result')
-            logs = result.get('logs') if 'logs' in result else ''
+            result = kernel.get_logs().get("result")
+            logs = result.get("logs") if "logs" in result else ""
             print(logs)
-            print_done('End of logs.')
+            print_done("End of logs.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(1)
+
+
+@session.command("status-history")
+@click.argument("session_id", metavar="SESSID")
+def status_history(session_id):
+    """
+    Shows the status transition history of the compute session.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    """
+    with Session() as session:
+        print_wait("Retrieving status history...")
+        kernel = session.ComputeSession(session_id)
+        try:
+            status_history = kernel.get_status_history().get("result")
+            print_info(f"status_history: {status_history}")
+            if (preparing := status_history.get("preparing")) is None:
+                result = {
+                    "result": {
+                        "seconds": 0,
+                        "microseconds": 0,
+                    },
+                }
+            elif (terminated := status_history.get("terminated")) is None:
+                alloc_time_until_now: timedelta = datetime.now(tzutc()) - isoparse(preparing)
+                result = {
+                    "result": {
+                        "seconds": alloc_time_until_now.seconds,
+                        "microseconds": alloc_time_until_now.microseconds,
+                    },
+                }
+            else:
+                alloc_time: timedelta = isoparse(terminated) - isoparse(preparing)
+                result = {
+                    "result": {
+                        "seconds": alloc_time.seconds,
+                        "microseconds": alloc_time.microseconds,
+                    },
+                }
+            print_done(f"Actual Resource Allocation Time: {result}")
         except Exception as e:
             print_error(e)
             sys.exit(1)
 
 
 @session.command()
-@click.argument('session_id', metavar='SESSID')
-@click.argument('new_id', metavar='NEWID')
+@click.argument("session_id", metavar="SESSID")
+@click.argument("new_id", metavar="NEWID")
 def rename(session_id, new_id):
-    '''
+    """
     Renames session name of running session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
     NEWID: New Session ID to rename to.
-    '''
+    """
 
     with Session() as session:
         try:
             kernel = session.ComputeSession(session_id)
             kernel.rename(new_id)
-            print_done(f'Session renamed to {new_id}.')
+            print_done(f"Session renamed to {new_id}.")
         except Exception as e:
             print_error(e)
             sys.exit(1)
 
 
 def _ssh_cmd(docs: str = None):
-
-    @click.argument("session_ref",  type=str, metavar='SESSION_REF')
-    @click.option('-p', '--port',  type=int, metavar='PORT', default=9922,
-                  help="the port number for localhost")
+    @click.argument("session_ref", type=str, metavar="SESSION_REF")
+    @click.option(
+        "-p", "--port", type=int, metavar="PORT", default=9922, help="the port number for localhost"
+    )
     @click.pass_context
     def ssh(ctx: click.Context, session_ref: str, port: int) -> None:
         """Execute the ssh command against the target compute session.
@@ -618,12 +695,17 @@ def _ssh_cmd(docs: str = None):
                 ssh_proc = subprocess.run(
                     [
                         "ssh",
-                        "-o", "StrictHostKeyChecking=no",
-                        "-o", "UserKnownHostsFile=/dev/null",
-                        "-o", "NoHostAuthenticationForLocalhost=yes",
-                        "-i", key_path,
+                        "-o",
+                        "StrictHostKeyChecking=no",
+                        "-o",
+                        "UserKnownHostsFile=/dev/null",
+                        "-o",
+                        "NoHostAuthenticationForLocalhost=yes",
+                        "-i",
+                        key_path,
                         "work@localhost",
-                        "-p", str(port),
+                        "-p",
+                        str(port),
                         *ctx.args,
                     ],
                     shell=False,
@@ -649,21 +731,26 @@ _ssh_cmd_context_settings = {
 # - backend.ai session ssh
 main.command(
     context_settings=_ssh_cmd_context_settings,
-)(_ssh_cmd(docs="Alias of \"session ssh\""))
+)(_ssh_cmd(docs='Alias of "session ssh"'))
 session.command(
     context_settings=_ssh_cmd_context_settings,
 )(_ssh_cmd())
 
 
 def _scp_cmd(docs: str = None):
-
-    @click.argument("session_ref", type=str, metavar='SESSION_REF')
-    @click.argument("src", type=str, metavar='SRC')
-    @click.argument("dst", type=str, metavar='DST')
-    @click.option('-p', '--port',  type=str, metavar='PORT', default=9922,
-                  help="the port number for localhost")
-    @click.option('-r',  '--recursive', default=False, is_flag=True,
-                  help="recursive flag option to process directories")
+    @click.argument("session_ref", type=str, metavar="SESSION_REF")
+    @click.argument("src", type=str, metavar="SRC")
+    @click.argument("dst", type=str, metavar="DST")
+    @click.option(
+        "-p", "--port", type=str, metavar="PORT", default=9922, help="the port number for localhost"
+    )
+    @click.option(
+        "-r",
+        "--recursive",
+        default=False,
+        is_flag=True,
+        help="recursive flag option to process directories",
+    )
     @click.pass_context
     def scp(
         ctx: click.Context,
@@ -704,13 +791,19 @@ def _scp_cmd(docs: str = None):
                 scp_proc = subprocess.run(
                     [
                         "scp",
-                        "-o", "StrictHostKeyChecking=no",
-                        "-o", "UserKnownHostsFile=/dev/null",
-                        "-o", "NoHostAuthenticationForLocalhost=yes",
-                        "-i", key_path,
-                        "-P", str(port),
+                        "-o",
+                        "StrictHostKeyChecking=no",
+                        "-o",
+                        "UserKnownHostsFile=/dev/null",
+                        "-o",
+                        "NoHostAuthenticationForLocalhost=yes",
+                        "-i",
+                        key_path,
+                        "-P",
+                        str(port),
                         *recursive_args,
-                        src, dst,
+                        src,
+                        dst,
                         *ctx.args,
                     ],
                     shell=False,
@@ -730,19 +823,28 @@ def _scp_cmd(docs: str = None):
 # - backend.ai session scp
 main.command(
     context_settings=_ssh_cmd_context_settings,
-)(_scp_cmd(docs="Alias of \"session scp\""))
+)(_scp_cmd(docs='Alias of "session scp"'))
 session.command(
     context_settings=_ssh_cmd_context_settings,
 )(_scp_cmd())
 
 
 def _events_cmd(docs: str = None):
-
-    @click.argument('session_name_or_id', metavar='SESSION_ID_OR_NAME')
-    @click.option('-o', '--owner', '--owner-access-key', 'owner_access_key', metavar='ACCESS_KEY',
-                  help='Specify the owner of the target session explicitly.')
-    @click.option('--scope', type=click.Choice(['*', 'session', 'kernel']), default='*',
-                  help='Filter the events by kernel-specific ones or session-specific ones.')
+    @click.argument("session_name_or_id", metavar="SESSION_ID_OR_NAME")
+    @click.option(
+        "-o",
+        "--owner",
+        "--owner-access-key",
+        "owner_access_key",
+        metavar="ACCESS_KEY",
+        help="Specify the owner of the target session explicitly.",
+    )
+    @click.option(
+        "--scope",
+        type=click.Choice(["*", "session", "kernel"]),
+        default="*",
+        help="Filter the events by kernel-specific ones or session-specific ones.",
+    )
     def events(session_name_or_id, owner_access_key, scope):
         """
         Monitor the lifecycle events of a compute session.
@@ -759,7 +861,7 @@ def _events_cmd(docs: str = None):
                     compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
                 async with compute_session.listen_events(scope=scope) as response:
                     async for ev in response:
-                        print(click.style(ev.event, fg='cyan', bold=True), json.loads(ev.data))
+                        print(click.style(ev.event, fg="cyan", bold=True), json.loads(ev.data))
 
         try:
             asyncio_run(_run_events())
@@ -774,5 +876,194 @@ def _events_cmd(docs: str = None):
 # Make it available as:
 # - backend.ai events
 # - backend.ai session events
-main.command()(_events_cmd(docs="Alias of \"session events\""))
+main.command()(_events_cmd(docs='Alias of "session events"'))
 session.command()(_events_cmd())
+
+
+def _fetch_session_names():
+    status = ",".join(
+        [
+            "PENDING",
+            "SCHEDULED",
+            "PREPARING",
+            "PULLING",
+            "RUNNING",
+            "RESTARTING",
+            "TERMINATING",
+            "RESIZING",
+            "SUSPENDED",
+            "ERROR",
+        ]
+    )
+    fields: List[FieldSpec] = [
+        session_fields["name"],
+        session_fields["session_id"],
+        session_fields["group_name"],
+        session_fields["kernel_id"],
+        session_fields["image"],
+        session_fields["type"],
+        session_fields["status"],
+        session_fields["status_info"],
+        session_fields["status_changed"],
+        session_fields["result"],
+    ]
+    with Session() as session:
+        sessions = session.ComputeSession.paginated_list(
+            status=status,
+            access_key=None,
+            fields=fields,
+            page_offset=0,
+            page_size=10,
+            filter=None,
+            order=None,
+        )
+
+    return tuple(map(lambda x: x.get("session_id"), sessions.items))
+
+
+def _watch_cmd(docs: Optional[str] = None):
+    @click.argument("session_name_or_id", metavar="SESSION_ID_OR_NAME", nargs=-1)
+    @click.option(
+        "-o",
+        "--owner",
+        "--owner-access-key",
+        "owner_access_key",
+        metavar="ACCESS_KEY",
+        help="Specify the owner of the target session explicitly.",
+    )
+    @click.option(
+        "--scope",
+        type=click.Choice(["*", "session", "kernel"]),
+        default="*",
+        help="Filter the events by kernel-specific ones or session-specific ones.",
+    )
+    @click.option(
+        "--max-wait",
+        metavar="SECONDS",
+        type=int,
+        default=0,
+        help="The maximum duration to wait until the session starts.",
+    )
+    @click.option(
+        "--output",
+        type=click.Choice(["json", "console"]),
+        default="console",
+        help="Set the output style of the command results.",
+    )
+    def watch(
+        session_name_or_id: str, owner_access_key: str, scope: str, max_wait: int, output: str
+    ):
+        """
+        Monitor the lifecycle events of a compute session
+        and display in human-friendly interface.
+        """
+        session_names = _fetch_session_names()
+        if not session_names:
+            if output == "json":
+                sys.stderr.write(f'{json.dumps({"ok": False, "reason": "No matching items."})}\n')
+            else:
+                print_fail("No matching items.")
+            sys.exit(4)
+
+        if not session_name_or_id:
+            questions = [
+                inquirer.List(
+                    "session",
+                    message="Select session to watch.",
+                    choices=session_names,
+                )
+            ]
+            session_name_or_id = inquirer.prompt(questions).get("session")
+        else:
+            for session_name in session_names:
+                if session_name.startswith(session_name_or_id[0]):
+                    session_name_or_id = session_name
+                    break
+            else:
+                if output == "json":
+                    sys.stderr.write(
+                        f'{json.dumps({"ok": False, "reason": "No matching items."})}\n'
+                    )
+                else:
+                    print_fail("No matching items.")
+                sys.exit(4)
+
+        async def handle_console_output(
+            session: ComputeSession, scope: Literal["*", "session", "kernel"] = "*"
+        ):
+            async with session.listen_events(scope=scope) as response:  # AsyncSession
+                async for ev in response:
+                    match ev.event:
+                        case events.SESSION_SUCCESS:
+                            print_done(events.SESSION_SUCCESS)
+                            sys.exit(json.loads(ev.data).get("exitCode", 0))
+                        case events.SESSION_FAILURE:
+                            print_fail(events.SESSION_FAILURE)
+                            sys.exit(json.loads(ev.data).get("exitCode", 1))
+                        case events.KERNEL_CANCELLED:
+                            print_fail(events.KERNEL_CANCELLED)
+                            break
+                        case events.SESSION_TERMINATED:
+                            print_done(events.SESSION_TERMINATED)
+                            break
+                        case _:
+                            print_done(ev.event)
+
+        async def handle_json_output(
+            session: ComputeSession, scope: Literal["*", "session", "kernel"] = "*"
+        ):
+            async with session.listen_events(scope=scope) as response:  # AsyncSession
+                async for ev in response:
+                    event = json.loads(ev.data)
+                    event["event"] = ev.event
+                    click.echo(event)
+
+                    match ev.event:
+                        case events.SESSION_SUCCESS:
+                            sys.exit(event.get("exitCode", 0))
+                        case events.SESSION_FAILURE:
+                            sys.exit(event.get("exitCode", 1))
+                        case events.SESSION_TERMINATED | events.KERNEL_CANCELLED:
+                            break
+
+        async def _run_events():
+            async with AsyncSession() as session:
+                try:
+                    session_id = uuid.UUID(session_name_or_id)
+                    compute_session = session.ComputeSession.from_session_id(session_id)
+                except ValueError:
+                    compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
+
+                if output == "console":
+                    await handle_console_output(session=compute_session, scope=scope)
+                elif output == "json":
+                    await handle_json_output(session=compute_session, scope=scope)
+
+        async def _run_events_with_timeout(max_wait: int):
+            try:
+                async with timeout(max_wait):
+                    await _run_events()
+            except asyncio.TimeoutError:
+                sys.exit(2)
+
+        try:
+            if max_wait > 0:
+                asyncio_run(_run_events_with_timeout(max_wait))
+            else:
+                asyncio_run(_run_events())
+        except Exception as e:
+            print_error(e)
+            sys.exit(1)
+
+        sys.exit(0)
+
+    if docs is not None:
+        watch.__doc__ = docs
+    return watch
+
+
+# Make it available as:
+# - backend.ai watch
+# - backend.ai session watch
+main.command()(_watch_cmd(docs='Alias of "session watch"'))
+session.command()(_watch_cmd())
