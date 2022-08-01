@@ -440,9 +440,7 @@ def rm(name, filenames, recursive):
             if not ask_yn():
                 print_info("Cancelled")
                 sys.exit(ExitCode.FAILURE)
-            session.VFolder(name).delete_files(
-                filenames,
-                recursive=recursive)
+            session.VFolder(name).delete_files(filenames, recursive=recursive)
             print_done("Done.")
         except Exception as e:
             print_error(e)

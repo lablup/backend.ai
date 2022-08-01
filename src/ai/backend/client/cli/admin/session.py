@@ -281,7 +281,7 @@ def _info_cmd(docs: str = None):
                 else:
                     ctx.output.print_fail("There is no such compute session.")
                 sys.exit(ExitCode.FAILURE)
-            ctx.output.print_item(resp['compute_session'], fields)
+            ctx.output.print_item(resp["compute_session"], fields)
 
     if docs is not None:
         info.__doc__ = docs
