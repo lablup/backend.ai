@@ -71,12 +71,12 @@ usage() {
   echo ""
   echo "  ${LWHITE}--enable-cuda${NC}"
   echo "    Install CUDA accelerator plugin and pull a"
-  echo "    TenosrFlow CUDA kernel for testing/demo."
+  echo "    TensorFlow CUDA kernel for testing/demo."
   echo "    (default: false)"
   echo ""
   echo "  ${LWHITE}--enable-cuda-mock${NC}"
   echo "    Install CUDA accelerator mock plugin and pull a"
-  echo "    TenosrFlow CUDA kernel for testing/demo."
+  echo "    TensorFlow CUDA kernel for testing/demo."
   echo "    (default: false)"
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
@@ -409,10 +409,10 @@ install_git_hooks() {
       :
     else
       echo "" >> .git/hooks/pre-commit
-      cat scripts/pre-commit.sh >> .git/hooks/pre-commit
+      cat scripts/pre-commit >> .git/hooks/pre-commit
     fi
   else
-    cp scripts/pre-commit.sh .git/hooks/pre-commit
+    cp scripts/pre-commit .git/hooks/pre-commit
     chmod +x .git/hooks/pre-commit
   fi
   local magic_str="monorepo standard pre-push hook"
@@ -422,10 +422,10 @@ install_git_hooks() {
       :
     else
       echo "" >> .git/hooks/pre-push
-      cat scripts/pre-push.sh >> .git/hooks/pre-push
+      cat scripts/pre-push >> .git/hooks/pre-push
     fi
   else
-    cp scripts/pre-push.sh .git/hooks/pre-push
+    cp scripts/pre-push .git/hooks/pre-push
     chmod +x .git/hooks/pre-push
   fi
 }
@@ -486,12 +486,8 @@ bootstrap_pants() {
     local PANTS_CLONE_VERSION="release_${PANTS_VERSION}"
     set -e
     git -c advice.detachedHead=false clone --branch=$PANTS_CLONE_VERSION --depth=1 https://github.com/pantsbuild/pants tools/pants-src
-    # TODO: remove the manual patch after pants 2.13 or later is released.
     cd tools/pants-src
     local arch_name=$(uname -p)
-    if [ "$arch_name" = "arm64" -o "$arch_name" = "aarch64" ] && [ "$DISTRO" != "Darwin" ]; then
-      git apply ../pants-linux-aarch64.patch
-    fi
     cd ../..
     ln -s tools/pants-local
     ./pants-local version
@@ -515,13 +511,13 @@ install_editable_webui() {
     # (e.g., separate debugging of Electron's renderer and main threads)
     sed_inplace "s@debug = true@debug = false@" config.toml
     # The webserver endpoint to use in the session mode.
-    sed_inplace "s@#apiEndpoint =@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
-    sed_inplace "s@#apiEndpointText =@apiEndpointText = "'"'"${site_name}"'"@' config.toml
+    sed_inplace "s@#[[:space:]]*apiEndpoint =.*@apiEndpoint = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
+    sed_inplace "s@#[[:space:]]*apiEndpointText =.*@apiEndpointText = "'"'"${site_name}"'"@' config.toml
     # webServerURL lets the electron app use the web UI contents from the server.
     # The server may be either a `npm run server:d` instance or a `./py -m ai.backend.web.server` instance.
     # In the former case, you may live-edit the webui sources while running them in the electron app.
-    sed_inplace "s@webServerURL =@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
-    sed_inplace "s@proxyURL =@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
+    sed_inplace "s@webServerURL =.*@webServerURL = "'"'"http://127.0.0.1:${WEBSERVER_PORT}"'"@' config.toml
+    sed_inplace "s@proxyURL =.*@proxyURL = "'"'"http://127.0.0.1:${WSPROXY_PORT}"'"@' config.toml
     echo "PROXYLISTENIP=0.0.0.0" >> .env
     echo "PROXYBASEHOST=localhost" >> .env
     echo "PROXYBASEPORT=${WSPROXY_PORT}" >> .env
@@ -542,6 +538,17 @@ install_script_deps
 $bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
 $bpython scripts/check-docker.py
 if [ $? -ne 0 ]; then
+  exit 1
+fi
+# checking docker compose v2 -f flag
+if $(docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+  show_error "When run as a user, 'docker compose' seems not to be a compatible version (v2)."
+  show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on ${HOME}/.docker/cli-plugins"
+  exit 1
+fi
+if $(sudo docker compose -f 2>&1 | grep -q 'unknown shorthand flag'); then
+  show_error "When run as the root, 'docker compose' seems not to be a compatible version (v2)"
+  show_info "Please check the following link: https://docs.docker.com/compose/install/compose-plugin/#install-the-plugin-manually to install Docker Compose CLI plugin on /usr/local/lib/docker/cli-plugins"
   exit 1
 fi
 if [ "$DISTRO" = "Darwin" ]; then
@@ -565,7 +572,7 @@ fi
 if [ $ENABLE_CUDA -eq 1 ] && [ $ENABLE_CUDA_MOCK -eq 1 ]; then
   show_error "You can't use both CUDA and CUDA mock plugins at once!"
   show_error "Please remove --enable-cuda or --enable-cuda-mock flag to continue."
-  exit -1
+  exit 1
 fi
 
 # Install pyenv
@@ -685,11 +692,11 @@ sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
 sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
 sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
 if [ $ENABLE_CUDA -eq 1 ]; then
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
 elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_mock\"]/" ./agent.toml
 else
-  sed_inplace "s/# allow-compute-plugins/allow-compute-plugins = []/" ./agent.toml
+  sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
 fi
 sed_inplace 's@var-base-path = .*$@var-base-path = "'"${VAR_BASE_PATH}"'"@' ./agent.toml
 
