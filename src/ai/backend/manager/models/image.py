@@ -326,7 +326,7 @@ class ImageRow(Base):
                     return row
             except UnknownImageReference:
                 continue
-        raise ImageNotFound("Unkown image references: " + ", ".join(searched_refs))
+        raise ImageNotFound("Unknown image references: " + ", ".join(searched_refs))
 
     @classmethod
     async def list(cls, session: AsyncSession, load_aliases=False) -> List[ImageRow]:

@@ -1,5 +1,5 @@
-# backend.ai monorepo standard pre-push hook
-BASE_PATH=$(cd "$(dirname "$0")"/../.. && pwd)
+# implementation: backend.ai monorepo standard pre-push hook
+BASE_PATH=$(pwd)
 if [ -f "$BASE_PATH/pants-local" ]; then
   PANTS="$BASE_PATH/pants-local"
 else
@@ -13,6 +13,18 @@ if [ -n "$(echo "$CURRENT_BRANCH" | sed -n '/[[:digit:]]\{1,\}\.[[:digit:]]\{1,\
 else
   BASE_BRANCH="main"
 fi
-echo "Performing lint and check on $1/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT} ..."
-"$PANTS" tailor --check update-build-files --check
-"$PANTS" lint check --changed-since="$1/${BASE_BRANCH}"
+if [ "$1" != "origin" ]; then
+  # extract the owner name of the target repo
+  ORIGIN="$(echo "$1" | grep -o '://[^/]\+/[^/]\+/' | grep -o '/[^/]\+/$' | tr -d '/')"
+  cleanup_remote() {
+    git remote remove "$ORIGIN"
+  }
+  trap cleanup_remote EXIT
+  git remote add "$ORIGIN" "$1"
+  git fetch -q --depth=1 --no-tags "$ORIGIN" "$BASE_BRANCH"
+else
+  ORIGIN="origin"
+fi
+echo "Performing lint and check on ${ORIGIN}/${BASE_BRANCH}..HEAD@${CURRENT_COMMIT} ..."
+"$PANTS" tailor --check update-build-files --check ::
+"$PANTS" lint check --changed-since="${ORIGIN}/${BASE_BRANCH}"
