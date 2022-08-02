@@ -330,13 +330,13 @@ class SchedulerDispatcher(aobject):
                 # continue to next sgroup.
                 return
             for picked_idx, sess_ctx in enumerate(pending_sessions):
-                if sess_ctx.session_id == picked_session_id:
+                if sess_ctx.id == picked_session_id:
                     break
             else:
                 # no matching entry for picked session?
                 raise RuntimeError("should not reach here")
             sess_ctx = pending_sessions.pop(picked_idx)
-            requested_architectures = set([x.image_ref.architecture for x in sess_ctx.kernels])
+            requested_architectures = set([x.image_row.architecture for x in sess_ctx.kernels])
             candidate_agents = list(
                 filter(
                     lambda x: x.architecture in requested_architectures,
@@ -358,25 +358,25 @@ class SchedulerDispatcher(aobject):
 
             async def _check_predicates() -> List[Tuple[str, Union[Exception, PredicateResult]]]:
                 check_results: List[Tuple[str, Union[Exception, PredicateResult]]] = []
-                async with self.db.begin() as kernel_db_conn:
+                async with self.db.begin_session() as db_sess:
                     predicates: Sequence[Tuple[str, Awaitable[PredicateResult]]] = [
                         (
                             "reserved_time",
-                            check_reserved_batch_session(kernel_db_conn, sched_ctx, sess_ctx),
+                            check_reserved_batch_session(db_sess, sched_ctx, sess_ctx),
                         ),
-                        ("concurrency", check_concurrency(kernel_db_conn, sched_ctx, sess_ctx)),
-                        ("dependencies", check_dependencies(kernel_db_conn, sched_ctx, sess_ctx)),
+                        ("concurrency", check_concurrency(db_sess, sched_ctx, sess_ctx)),
+                        ("dependencies", check_dependencies(db_sess, sched_ctx, sess_ctx)),
                         (
                             "keypair_resource_limit",
-                            check_keypair_resource_limit(kernel_db_conn, sched_ctx, sess_ctx),
+                            check_keypair_resource_limit(db_sess, sched_ctx, sess_ctx),
                         ),
                         (
                             "user_group_resource_limit",
-                            check_group_resource_limit(kernel_db_conn, sched_ctx, sess_ctx),
+                            check_group_resource_limit(db_sess, sched_ctx, sess_ctx),
                         ),
                         (
                             "domain_resource_limit",
-                            check_domain_resource_limit(kernel_db_conn, sched_ctx, sess_ctx),
+                            check_domain_resource_limit(db_sess, sched_ctx, sess_ctx),
                         ),
                     ]
                     for predicate_name, check_coro in predicates:
@@ -482,11 +482,12 @@ class SchedulerDispatcher(aobject):
 
                 await execute_with_retry(_update)
 
-            schedulable_sess = await get_session_by_id(
-                db_sess,
-                sess_ctx.id,
-                load_kernels=True,
-            )
+            async with self.db.begin_readonly_session() as db_sess:
+                schedulable_sess = await get_session_by_id(
+                    db_sess,
+                    sess_ctx.id,
+                    load_kernels=True,
+                )
 
             if schedulable_sess.cluster_mode == ClusterMode.SINGLE_NODE:
                 # Single node session can't have multiple containers with different arch
@@ -495,6 +496,8 @@ class SchedulerDispatcher(aobject):
                         "Cannot assign multiple kernels with different architecture"
                         "on single node session",
                     )
+                if not requested_architectures:
+                    return
                 requested_architecture = requested_architectures.pop()
                 candidate_agents = list(
                     filter(
