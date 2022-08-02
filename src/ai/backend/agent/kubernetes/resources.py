@@ -46,7 +46,12 @@ async def detect_resources(
         etcd,
         local_config,
     )
-    await compute_plugin_ctx.init(allowlist=local_config["agent"]["allow-compute-plugins"])
+    allowlist = local_config["agent"]["allow-compute-plugins"]
+    blocklist = local_config["agent"]["block-compute-plugins"]
+    await compute_plugin_ctx.init(
+        allowlist=set(allowlist) if allowlist is not None else None,
+        blocklist=set(blocklist) if blocklist is not None else None,
+    )
     if "cpu" not in compute_plugin_ctx.plugins:
         cpu_config = await etcd.get_prefix("config/plugins/cpu")
         cpu_plugin = CPUPlugin(cpu_config, local_config)
