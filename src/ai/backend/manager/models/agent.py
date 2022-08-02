@@ -97,7 +97,7 @@ async def list_schedulable_agents_by_sgroup(
 ) -> Sequence[AgentRow]:
     query = sa.select(AgentRow).where(
         (AgentRow.status == AgentStatus.ALIVE)
-        & (AgentRow.scaling_group_name == sgroup_name)
+        & (AgentRow.scaling_group == sgroup_name)
         & (AgentRow.schedulable == true()),
     )
 

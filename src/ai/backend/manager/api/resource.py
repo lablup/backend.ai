@@ -23,6 +23,7 @@ from dateutil.relativedelta import relativedelta
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -130,7 +131,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
         keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
-        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(access_key, conn=conn)
+        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(
+            access_key, db_sess=SASession(conn)
+        )
         keypair_remaining = keypair_limits - keypair_occupied
 
         # Check group resource limit and get group_id.

@@ -1,6 +1,6 @@
 import base64
 import secrets
-from typing import TYPE_CHECKING, Any, Iterable, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, Tuple, cast
 
 import aiohttp_cors
 import jinja2
@@ -11,7 +11,7 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import quote as etcd_quote
-from ai.backend.common.types import SessionTypes
+from ai.backend.common.types import SessionEnqueueingConfig, SessionTypes
 
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..models import association_groups_users as agus
@@ -413,14 +413,10 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
         session_creation_id,
         session_id,
         access_key,
-        [
+        cast(
             {
                 "image_ref": importer_image,
-                "cluster_role": DEFAULT_ROLE,
-                "cluster_idx": 1,
-                "cluster_hostname": f"{DEFAULT_ROLE}1",
                 "creation_config": {
-                    "resources": {"cpu": "1", "mem": "2g"},
                     "scaling_group": params["launchOptions"]["scalingGroup"],
                     "environ": {
                         "SRC_IMAGE": source_image.canonical,
@@ -431,10 +427,33 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
                         ),
                     },
                 },
-                "startup_command": "/root/build-image.sh",
-                "bootstrap_script": "",
-            }
-        ],
+                "kernel_configs": [
+                    {
+                        "image_ref": importer_image,
+                        "cluster_role": DEFAULT_ROLE,
+                        "cluster_idx": 1,
+                        "cluster_hostname": f"{DEFAULT_ROLE}1",
+                        "creation_config": {
+                            "resources": {"cpu": "1", "mem": "2g"},
+                            "scaling_group": params["launchOptions"]["scalingGroup"],
+                            "environ": {
+                                "SRC_IMAGE": source_image.canonical,
+                                "TARGET_IMAGE": target_image.canonical,
+                                "RUNTIME_PATH": params["runtimePath"],
+                                "BUILD_SCRIPT": (
+                                    base64.b64encode(dockerfile_content.encode("utf8")).decode(
+                                        "ascii"
+                                    )
+                                ),
+                            },
+                        },
+                        "startup_command": "/root/build-image.sh",
+                        "bootstrap_script": "",
+                    },
+                ],
+            },
+            SessionEnqueueingConfig,
+        ),
         None,
         SessionTypes.BATCH,
         resource_policy,

@@ -49,6 +49,8 @@ from .minilang.queryfilter import QueryFilterParser
 from .user import UserRow
 
 if TYPE_CHECKING:
+    from sqlalchemy.engine import Row
+
     from .gql import GraphQueryContext
 
 
@@ -421,15 +423,15 @@ def _build_session_fetch_query(
 
     query = query.options(
         noload("*"),
-        selectinload(SessionRow.image).noload("*"),
+        selectinload(SessionRow.image_row).noload("*"),
     )
     if load_kernels:
         query = query.options(
             noload("*"),
             selectinload(SessionRow.kernels).options(
                 noload("*"),
-                selectinload(KernelRow.image).noload("*"),
-                selectinload(KernelRow.agent).noload("*"),
+                selectinload(KernelRow.image_row).noload("*"),
+                selectinload(KernelRow.agent_row).noload("*"),
             ),
         )
 
@@ -533,6 +535,9 @@ async def get_sgroup_managed_sessions(
             selectinload(SessionRow.group).options(noload("*")),
             selectinload(SessionRow.domain).options(noload("*")),
             selectinload(SessionRow.access_key_row).options(noload("*")),
+            selectinload(SessionRow.kernels).options(
+                noload("*"), selectinload(KernelRow.image_row).options(noload("*"))
+            ),
         )
     )
     result = await db_sess.execute(query)
@@ -652,8 +657,11 @@ class ComputeSession(graphene.ObjectType):
     dependencies = graphene.List(lambda: ComputeSession)
 
     @classmethod
-    def parse_row(cls, ctx: GraphQueryContext, row: SessionRow) -> Mapping[str, Any]:
+    def parse_row(cls, ctx: GraphQueryContext, row: Row) -> Mapping[str, Any]:
         assert row is not None
+        email = getattr(row, "email")
+        group_name = getattr(row, "group_name")
+        row = row.SessionRow
         return {
             # identity
             "session_id": row.id,
@@ -670,9 +678,9 @@ class ComputeSession(graphene.ObjectType):
             "cluster_size": row.cluster_size,
             # ownership
             "domain_name": row.domain_name,
-            "group_name": row.group.name,
+            "group_name": group_name,
             "group_id": row.group_id,
-            "user_email": row.user.email,
+            "user_email": email,
             "user_id": row.user_uuid,
             "access_key": row.access_key,
             "created_user_email": None,  # TODO: implement
@@ -698,7 +706,7 @@ class ComputeSession(graphene.ObjectType):
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: SessionRow) -> ComputeSession | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row) -> ComputeSession | None:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -801,7 +809,7 @@ class ComputeSession(graphene.ObjectType):
         elif isinstance(status, SessionStatus):
             status_list = [status]
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-            SessionRow, UserRow, SessionRow.user_uuid == UserRow.uuid
+            UserRow, SessionRow.user_uuid == UserRow.uuid
         )
         query = sa.select([sa.func.count()]).select_from(j)
         if domain_name is not None:
@@ -838,7 +846,7 @@ class ComputeSession(graphene.ObjectType):
         elif isinstance(status, SessionStatus):
             status_list = [status]
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-            SessionRow, UserRow, SessionRow.user_uuid == UserRow.uuid
+            UserRow, SessionRow.user_uuid == UserRow.uuid
         )
         query = (
             sa.select(
@@ -847,6 +855,7 @@ class ComputeSession(graphene.ObjectType):
                 UserRow.email,
             )
             .select_from(j)
+            .options(selectinload(SessionRow.kernels))
             .limit(limit)
             .offset(offset)
         )
@@ -866,8 +875,8 @@ class ComputeSession(graphene.ObjectType):
             query = qoparser.append_ordering(query, order)
         else:
             query = query.order_by(*DEFAULT_SESSION_ORDERING)
-        async with ctx.db.begin_readonly() as conn:
-            return [cls.from_row(ctx, r) async for r in (await conn.stream(query))]
+        async with ctx.db.begin_readonly_session() as db_sess:
+            return [cls.from_row(ctx, r) async for r in (await db_sess.stream(query))]
 
     @classmethod
     async def batch_load_detail(
@@ -879,7 +888,7 @@ class ComputeSession(graphene.ObjectType):
         access_key: str = None,
     ) -> Sequence[ComputeSession | None]:
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
-            SessionRow, UserRow, SessionRow.user_uuid == UserRow.uuid
+            UserRow, SessionRow.user_uuid == UserRow.uuid
         )
         query = (
             sa.select(

@@ -418,19 +418,10 @@ def upgrade():
             continue
     connection.execute(query, params)
 
-    op.drop_column("kernels", "image")
     op.create_foreign_key(
         op.f("fk_kernels_image_id_images"), "kernels", "images", ["image_id"], ["id"]
     )
-    op.alter_column("kernels", column_name="agent", new_column_name="agent_id")
     op.add_column("kernels", sa.Column("requested_slots", pgsql.JSONB(), nullable=True))
-
-    # Agent table
-    op.drop_index("ix_agents_scaling_group", table_name="agents")
-    op.alter_column("agents", column_name="scaling_group", new_column_name="scaling_group_name")
-    op.create_index(
-        op.f("ix_agents_scaling_group_name"), "agents", ["scaling_group_name"], unique=False
-    )
 
     ## Association tables
     # groups_users
@@ -465,9 +456,6 @@ def downgrade():
     # Kernel table
     op.drop_constraint(op.f("fk_kernels_session_id_sessions"), "kernels", type_="foreignkey")
     op.drop_constraint(op.f("fk_kernels_image_id_images"), "kernels", type_="foreignkey")
-    op.add_column(
-        "kernels", sa.Column("image", sa.VARCHAR(length=512), autoincrement=False, nullable=True)
-    )
     kernels = sa.Table(
         "kernels",
         metadata,
@@ -497,7 +485,6 @@ def downgrade():
             continue
     connection.execute(query, params)
     op.drop_column("kernels", "image_id")
-    op.alter_column("kernels", column_name="agent_id", new_column_name="agent")
     op.drop_column("kernels", "requested_slots")
 
     # Session dependency table
@@ -562,11 +549,6 @@ def downgrade():
 
     sess_statues.drop(op.get_bind())
     sess_results.drop(op.get_bind())
-
-    # Agent table
-    op.drop_index(op.f("ix_agents_scaling_group_name"), table_name="agents")
-    op.alter_column("agents", column_name="scaling_group_name", new_column_name="scaling_group")
-    op.create_index("ix_agents_scaling_group", "agents", ["scaling_group"], unique=False)
 
     ## Association tables
     # groups users

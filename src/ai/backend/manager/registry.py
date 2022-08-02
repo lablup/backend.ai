@@ -130,8 +130,14 @@ from .models import (
     recalc_concurrency_used,
 )
 from .models.kernel import get_all_kernels, get_main_kernels, match_session_ids
-from .models.session import aggregate_kernel_status, match_sessions_by_id
-from .models.utils import ExtendedAsyncSAEngine, execute_with_retry, reenter_txn, sql_json_merge
+from .models.session import aggregate_kernel_status, match_sessions, match_sessions_by_id
+from .models.utils import (
+    ExtendedAsyncSAEngine,
+    execute_with_retry,
+    reenter_txn,
+    reenter_txn_session,
+    sql_json_merge,
+)
 from .types import SessionGetter, UserScope
 
 if TYPE_CHECKING:
@@ -645,10 +651,11 @@ class AgentRegistry:
         session_name_or_id: Union[str, uuid.UUID],
         access_key: Union[str, AccessKey],
         *,
+        load_kernels: bool = False,
         allow_stale: bool = False,
         for_update: bool = False,
-        db_connection: SAConnection = None,
-    ) -> sa.engine.Row:
+        db_session: SASession = None,
+    ) -> SessionRow:
         """
         Retrieve the session information by kernel's ID, kernel's session UUID
         (session_id), or kernel's name (session_id) paired with access_key.
@@ -662,30 +669,22 @@ class AgentRegistry:
         :param allow_stale: If True, filter "inactive" kernels as well as "active" ones.
                             If False, filter "active" kernels only.
         :param for_update: Apply for_update during select query.
-        :param db_connection: Database connection for reuse.
+        :param db_session: Database connection for reuse.
         :param cluster_role: Filter kernels by role. "main", "sub", or None (all).
         """
-        async with reenter_txn(self.db, db_connection, _read_only_txn_opts) as conn:
-            if allow_stale:
-                extra_cond = None
-            else:
-                extra_cond = ~kernels.c.status.in_(DEAD_KERNEL_STATUSES)
-            session_infos = await match_session_ids(
+        async with reenter_txn_session(self.db, db_session, _read_only_txn_opts) as db_sess:
+            session_list = await match_sessions(
+                db_sess,
                 session_name_or_id,
-                AccessKey(access_key),
+                access_key,
+                allow_stale=allow_stale,
                 for_update=for_update,
-                extra_cond=extra_cond,
-                db_connection=conn,
+                load_kernels=load_kernels,
             )
-            if not session_infos:
-                raise SessionNotFound()
-            if len(session_infos) > 1:
-                raise TooManySessionsMatched(extra_data={"matches": session_infos})
-            kernel_list = await get_main_kernels(
-                [SessionId(session_infos[0]["session_id"])],
-                db_connection=conn,
-            )
-            return kernel_list[0]
+            try:
+                return session_list[0]
+            except IndexError:
+                raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
 
     async def get_session_kernels(
         self,
@@ -1087,7 +1086,7 @@ class AgentRegistry:
                 {
                     **kernel_shared_data,
                     "id": kernel_id,
-                    "agent_id": mapped_agent,
+                    "agent": mapped_agent,
                     "cluster_role": kernel["cluster_role"],
                     "cluster_idx": kernel["cluster_idx"],
                     "cluster_hostname": f"{kernel['cluster_role']}{kernel['cluster_idx']}"
@@ -1577,18 +1576,18 @@ class AgentRegistry:
             "public_key": public_key.decode("utf-8"),
         }
 
-    async def get_keypair_occupancy(self, access_key, *, conn=None):
+    async def get_keypair_occupancy(self, access_key, *, db_sess=None):
         known_slot_types = await self.shared_config.get_resource_slots()
 
         async def _query() -> ResourceSlot:
-            async with reenter_txn(self.db, conn) as _conn:
-                query = sa.select([kernels.c.occupied_slots]).where(
-                    (kernels.c.access_key == access_key)
-                    & (kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+            async with reenter_txn_session(self.db, db_sess) as _sess:
+                query = sa.select(KernelRow.occupied_slots).where(
+                    (KernelRow.access_key == access_key)
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
-                    [row["occupied_slots"] async for row in (await _conn.stream(query))], zero
+                    [row.occupied_slots async for row in (await _sess.stream(query))], zero
                 )
                 # drop no-longer used slot types
                 drops = [k for k in key_occupied.keys() if k not in known_slot_types]
@@ -1598,19 +1597,19 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def get_domain_occupancy(self, domain_name, *, conn=None):
+    async def get_domain_occupancy(self, domain_name, *, db_sess=None):
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.shared_config.get_resource_slots()
 
         async def _query() -> ResourceSlot:
-            async with reenter_txn(self.db, conn) as _conn:
-                query = sa.select([kernels.c.occupied_slots]).where(
-                    (kernels.c.domain_name == domain_name)
-                    & (kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+            async with reenter_txn_session(self.db, db_sess) as _sess:
+                query = sa.select(KernelRow.occupied_slots).where(
+                    (KernelRow.domain_name == domain_name)
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
-                    [row["occupied_slots"] async for row in (await _conn.stream(query))],
+                    [row.occupied_slots async for row in (await _sess.stream(query))],
                     zero,
                 )
                 # drop no-longer used slot types
@@ -1621,19 +1620,19 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def get_group_occupancy(self, group_id, *, conn=None):
+    async def get_group_occupancy(self, group_id, *, db_sess=None):
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.shared_config.get_resource_slots()
 
         async def _query() -> ResourceSlot:
-            async with reenter_txn(self.db, conn) as _conn:
-                query = sa.select([kernels.c.occupied_slots]).where(
-                    (kernels.c.group_id == group_id)
-                    & (kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
+            async with reenter_txn_session(self.db, db_sess) as _sess:
+                query = sa.select(KernelRow.occupied_slots).where(
+                    (KernelRow.group_id == group_id)
+                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
                 )
                 zero = ResourceSlot()
                 key_occupied = sum(
-                    [row["occupied_slots"] async for row in (await _conn.stream(query))],
+                    [row.occupied_slots async for row in (await _sess.stream(query))],
                     zero,
                 )
                 # drop no-longer used slot types
@@ -2022,7 +2021,9 @@ class AgentRegistry:
                     else:
                         destroyed_kernels.append(kernel)
 
-                async def _destroy_kernels_in_agent(session, destroyed_kernels) -> None:
+                async def _destroy_kernels_in_agent(
+                    session, destroyed_kernels: List[KernelRow]
+                ) -> None:
                     nonlocal main_stat
                     async with RPCContext(
                         destroyed_kernels[0].agent,

@@ -502,23 +502,27 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     try:
         # NOTE: We can reuse the session IDs of TERMINATED sessions only.
         # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-        kern = await root_ctx.registry.get_session(params["session_name"], owner_access_key)
-        running_image_ref = ImageRef(kern["image"], [kern["registry"]], kern["architecture"])
+        sess = await root_ctx.registry.get_session(
+            params["session_name"], owner_access_key, load_kernels=True
+        )
+        running_image_ref = ImageRef(
+            sess.image, [sess.main_kernel.registry], sess.main_kernel.architecture
+        )
         if running_image_ref != requested_image_ref:
             # The image must be same if get_or_create() called multiple times
             # against an existing (non-terminated) session
-            raise SessionAlreadyExists(extra_data={"existingSessionId": str(kern["id"])})
+            raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
         if not params["reuse"]:
             # Respond as error since the client did not request to reuse,
             # but provide the overlapping session ID for later use.
-            raise SessionAlreadyExists(extra_data={"existingSessionId": str(kern["id"])})
+            raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
         # Respond as success with the reused session's information.
         return web.json_response(
             {
-                "sessionId": str(kern["id"]),
-                "sessionName": str(kern["session_name"]),
-                "status": kern["status"].name,
-                "service_ports": kern["service_ports"],
+                "sessionId": str(sess.id),
+                "sessionName": str(sess.name),
+                "status": sess.status.name,
+                "service_ports": sess.main_kernel.service_ports,
                 "created": False,
             },
             status=200,
@@ -566,17 +570,21 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                     session_creation_id,
                     params["session_name"],
                     owner_access_key,
-                    [
-                        {
-                            "image_ref": requested_image_ref,
-                            "cluster_role": DEFAULT_ROLE,
-                            "cluster_idx": 1,
-                            "cluster_hostname": f"{DEFAULT_ROLE}1",
-                            "creation_config": params["config"],
-                            "bootstrap_script": params["bootstrap_script"],
-                            "startup_command": params["startup_command"],
-                        }
-                    ],
+                    {
+                        "image_ref": requested_image_ref,
+                        "creation_config": params["config"],
+                        "kernel_configs": [
+                            {
+                                "image_ref": requested_image_ref,
+                                "cluster_role": DEFAULT_ROLE,
+                                "cluster_idx": 1,
+                                "cluster_hostname": f"{DEFAULT_ROLE}1",
+                                "creation_config": params["config"],
+                                "bootstrap_script": params["bootstrap_script"],
+                                "startup_command": params["startup_command"],
+                            }
+                        ],
+                    },
                     params["config"]["scaling_group"],
                     params["session_type"],
                     resource_policy,
@@ -1091,6 +1099,9 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         except AliasResolutionFailed:
             raise ImageNotFound("unknown alias or disallowed registry")
 
+        if node["cluster_role"] == DEFAULT_ROLE:
+            session_image_ref = requested_image_ref
+
         for i in range(node["replicas"]):
             kernel_config["cluster_idx"] = i + 1
             kernel_configs.append(
@@ -1115,7 +1126,14 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
                     session_creation_id,
                     params["session_name"],
                     owner_access_key,
-                    kernel_configs,
+                    {
+                        "image_ref": session_image_ref,
+                        "creation_config": {
+                            "mount_map": mount_map,
+                            "environ": environ,
+                        },
+                        "kernel_configs": kernel_configs,
+                    },
                     params["scaling_group"],
                     params["sess_type"],
                     resource_policy,
@@ -1512,7 +1530,7 @@ async def invoke_session_callback(
             )
     except SessionNotFound:
         return
-    url = session["callback_url"]
+    url = session.callback_url
     if url is None:
         return
     app_ctx.webhook_ptask_group.create_task(
