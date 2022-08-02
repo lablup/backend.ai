@@ -8,7 +8,7 @@ Optionally you may include a parenthesized mention on the primarily changed comp
 When mentioning component names, use the Python module name or the file name without its extension.
 
 A commit message may contain multiple lines of detailed description on individual code changes and any related background contexts in either list items or just a bunch of plain text paragraphs.
-When squash-merging a PR, maintainers should revise the auto-generated commit message from concatenation of all commit messages in the way that it highlights significant changes and technical details without noise.
+When squash-merging a PR, maintainers should revise the commit message auto-generated as a mere concatenation of all commit messages in the way that it highlights significant changes and technical details without noise.
 
 The target audience is the code reviewers and future developers who dig in the history and background of code lines.
 
