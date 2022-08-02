@@ -30,7 +30,7 @@ jobs:
         mkdir .tmp
         ./pants --no-verify-config version
     - name: Check BUILD files
-      run: ./pants tailor --check update-build-files --check # '::' # to add in 2.13+
+      run: ./pants tailor --check update-build-files --check '::'
     - name: Lint
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
