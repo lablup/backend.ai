@@ -504,8 +504,10 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     try:
         # NOTE: We can reuse the session IDs of TERMINATED sessions only.
         # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-        sess = await root_ctx.registry.get_session(
-            params["session_name"], owner_access_key, load_kernels=True
+        sess = await root_ctx.registry.get_session_with_kernels(
+            params["session_name"],
+            owner_access_key,
+            only_main_kern=True,
         )
         running_image_ref = ImageRef(
             sess.image, [sess.main_kernel.registry], sess.main_kernel.architecture
@@ -1246,9 +1248,11 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     myself = asyncio.current_task()
     assert myself is not None
     try:
-        kernel = await asyncio.shield(
+        sess = await asyncio.shield(
             app_ctx.database_ptask_group.create_task(
-                root_ctx.registry.get_session(session_name, access_key),
+                root_ctx.registry.get_session_with_kernels(
+                    session_name, access_key, only_main_kern=True
+                ),
             )
         )
     except (SessionNotFound, TooManySessionsMatched):
@@ -1257,7 +1261,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     query = (
         sa.select([scaling_groups.c.wsproxy_addr])
         .select_from(scaling_groups)
-        .where((scaling_groups.c.name == kernel["scaling_group"]))
+        .where((scaling_groups.c.name == sess.main_kernel.scaling_group))
     )
 
     async with root_ctx.db.begin_readonly() as conn:
@@ -1272,11 +1276,11 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     else:
         wsproxy_advertise_addr = wsproxy_addr
 
-    if kernel["kernel_host"] is None:
-        kernel_host = urlparse(kernel["agent_addr"]).hostname
+    if sess.main_kernel.kernel_host is None:
+        kernel_host = urlparse(sess.main_kernel.agent_addr).hostname
     else:
-        kernel_host = kernel["kernel_host"]
-    for sport in kernel["service_ports"]:
+        kernel_host = sess.main_kernel.kernel_host
+    for sport in sess.main_kernel.service_ports:
         if sport["name"] == service:
             if params["port"]:
                 # using one of the primary/secondary ports of the app
@@ -1868,8 +1872,8 @@ async def get_info(request: web.Request) -> web.Response:
     log.info("GET_INFO (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
     try:
         await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
-        sess = await root_ctx.registry.get_session(
-            session_name, owner_access_key, load_kernels=True
+        sess = await root_ctx.registry.get_session_with_kernels(
+            session_name, owner_access_key, only_main_kern=True
         )
         resp["domainName"] = sess.domain_name
         resp["groupId"] = str(sess.group_id)
@@ -2295,11 +2299,11 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
     )
     resp = {"result": {"logs": ""}}
     async with root_ctx.db.begin_readonly_session() as db_sess:
-        compute_session = await root_ctx.registry.get_session(
+        compute_session = await root_ctx.registry.get_session_with_kernels(
             session_name,
             owner_access_key,
             allow_stale=True,
-            load_kernels=True,
+            only_main_kern=True,
             db_session=db_sess,
         )
         if (

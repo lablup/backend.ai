@@ -652,7 +652,6 @@ class AgentRegistry:
         session_name_or_id: Union[str, uuid.UUID],
         access_key: Union[str, AccessKey],
         *,
-        load_kernels: bool = False,
         allow_stale: bool = False,
         for_update: bool = False,
         db_session: SASession = None,
@@ -665,13 +664,10 @@ class AgentRegistry:
 
         :param session_name_or_id: kernel's id, session_id (session name), or session_id.
         :param access_key: Access key used to create kernels.
-        :param field: If given, it extracts only the raw value of the given field, without
-                      wrapping it as Kernel object.
         :param allow_stale: If True, filter "inactive" kernels as well as "active" ones.
                             If False, filter "active" kernels only.
         :param for_update: Apply for_update during select query.
         :param db_session: Database connection for reuse.
-        :param cluster_role: Filter kernels by role. "main", "sub", or None (all).
         """
         async with reenter_txn_session(self.db, db_session, read_only=True) as db_sess:
             session_list = await match_sessions(
@@ -680,7 +676,42 @@ class AgentRegistry:
                 AccessKey(access_key),
                 allow_stale=allow_stale,
                 for_update=for_update,
-                load_kernels=load_kernels,
+            )
+            try:
+                return session_list[0]
+            except IndexError:
+                raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
+
+    async def get_session_with_kernels(
+        self,
+        session_name_or_id: Union[str, uuid.UUID],
+        access_key: Union[str, AccessKey],
+        *,
+        allow_stale: bool = False,
+        for_update: bool = False,
+        only_main_kern: bool = False,
+        db_session: SASession = None,
+    ) -> SessionRow:
+
+        kernel_rel = SessionRow.kernels
+        if only_main_kern:
+            kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
+        kernel_loading_op = (
+            noload("*"),
+            selectinload(kernel_rel).options(
+                noload("*"),
+                selectinload(KernelRow.image_row).noload("*"),
+                selectinload(KernelRow.agent_row).noload("*"),
+            ),
+        )
+        async with reenter_txn_session(self.db, db_session, read_only=True) as db_sess:
+            session_list = await match_sessions(
+                db_sess,
+                session_name_or_id,
+                AccessKey(access_key),
+                allow_stale=allow_stale,
+                for_update=for_update,
+                eager_loading_op=kernel_loading_op,
             )
             try:
                 return session_list[0]
@@ -2275,7 +2306,9 @@ class AgentRegistry:
         *,
         flush_timeout: float = None,
     ) -> Mapping[str, Any]:
-        sess = await self.get_session(session_name_or_id, access_key)
+        sess = await self.get_session_with_kernels(
+            session_name_or_id, access_key, only_main_kern=True
+        )
         async with self.handle_kernel_exception("execute", sess.id, access_key):
             # The agent aggregates at most 2 seconds of outputs
             # if the kernel runs for a long time.
@@ -2304,7 +2337,9 @@ class AgentRegistry:
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key)
+        session = await self.get_session_with_kernels(
+            session_name_or_id, access_key, only_main_kern=True
+        )
         async with self.handle_kernel_exception("execute", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2322,7 +2357,9 @@ class AgentRegistry:
         text: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key)
+        session = await self.get_session_with_kernels(
+            session_name_or_id, access_key, only_main_kern=True
+        )
         async with self.handle_kernel_exception("execute", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2340,7 +2377,9 @@ class AgentRegistry:
         service: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key)
+        session = await self.get_session_with_kernels(
+            session_name_or_id, access_key, only_main_kern=True
+        )
         async with self.handle_kernel_exception("execute", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2357,7 +2396,9 @@ class AgentRegistry:
         access_key: AccessKey,
         service: str,
     ) -> None:
-        session = await self.get_session(session_name_or_id, access_key)
+        session = await self.get_session_with_kernels(
+            session_name_or_id, access_key, only_main_kern=True
+        )
         async with self.handle_kernel_exception("shutdown_service", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2375,7 +2416,9 @@ class AgentRegistry:
         filename: str,
         payload: bytes,
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key)
+        session = await self.get_session_with_kernels(
+            session_name_or_id, access_key, only_main_kern=True
+        )
         async with self.handle_kernel_exception("upload_file", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2392,7 +2435,9 @@ class AgentRegistry:
         access_key: AccessKey,
         filepath: str,
     ) -> bytes:
-        session = await self.get_session(session_name_or_id, access_key)
+        session = await self.get_session_with_kernels(
+            session_name_or_id, access_key, only_main_kern=True
+        )
         async with self.handle_kernel_exception("download_file", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2409,7 +2454,9 @@ class AgentRegistry:
         access_key: AccessKey,
         path: str,
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key)
+        session = await self.get_session_with_kernels(
+            session_name_or_id, access_key, only_main_kern=True
+        )
         async with self.handle_kernel_exception("list_files", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2425,7 +2472,9 @@ class AgentRegistry:
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
     ) -> str:
-        session = await self.get_session(session_name_or_id, access_key)
+        session = await self.get_session_with_kernels(
+            session_name_or_id, access_key, only_main_kern=True
+        )
         async with self.handle_kernel_exception("get_logs_from_agent", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,

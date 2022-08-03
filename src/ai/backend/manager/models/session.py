@@ -360,7 +360,7 @@ async def match_sessions(
     allow_stale: bool = True,
     for_update: bool = False,
     max_matches: int = 10,
-    load_kernels: bool = False,
+    eager_loading_op=None,
 ) -> List[SessionRow]:
     """
     Match the prefix of session ID or session name among the sessions
@@ -373,7 +373,7 @@ async def match_sessions(
     except ValueError:
         pass
     else:
-        query_list.append(aiotools.apartial(match_sessions_by_id, allow_prefix=False))
+        query_list = [aiotools.apartial(match_sessions_by_id, allow_prefix=False), *query_list]
         if allow_prefix:
             query_list.append(aiotools.apartial(match_sessions_by_id, allow_prefix=True))
 
@@ -385,7 +385,7 @@ async def match_sessions(
             allow_stale=allow_stale,
             for_update=for_update,
             max_matches=max_matches,
-            load_kernels=load_kernels,
+            eager_loading_op=eager_loading_op,
         )
         if not rows:
             continue
@@ -401,7 +401,7 @@ def _build_session_fetch_query(
     allow_stale: bool = True,
     for_update: bool = False,
     do_ordering: bool = False,
-    load_kernels: bool = False,
+    eager_loading_op=None,
 ):
     cond = base_cond
     if access_key:
@@ -425,15 +425,8 @@ def _build_session_fetch_query(
         noload("*"),
         selectinload(SessionRow.image_row).noload("*"),
     )
-    if load_kernels:
-        query = query.options(
-            noload("*"),
-            selectinload(SessionRow.kernels).options(
-                noload("*"),
-                selectinload(KernelRow.image_row).noload("*"),
-                selectinload(KernelRow.agent_row).noload("*"),
-            ),
-        )
+    if eager_loading_op is not None:
+        query = query.options(*eager_loading_op)
 
     return query
 
@@ -447,7 +440,7 @@ async def match_sessions_by_id(
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
-    load_kernels: bool = False,
+    eager_loading_op=None,
 ) -> List[SessionRow]:
     if allow_prefix:
         cond = sa.sql.expression.cast(SessionRow.id, sa.String).like(f"{session_id}%")
@@ -459,7 +452,7 @@ async def match_sessions_by_id(
         max_matches=max_matches,
         allow_stale=allow_stale,
         for_update=for_update,
-        load_kernels=load_kernels,
+        eager_loading_op=eager_loading_op,
     )
 
     result = await db_session.execute(query)
@@ -474,7 +467,7 @@ async def get_session_by_id(
     max_matches: int | None = None,
     allow_stale: bool = True,
     for_update: bool = False,
-    load_kernels: bool = False,
+    eager_loading_op=None,
 ) -> SessionRow:
     sessions = await match_sessions_by_id(
         db_session,
@@ -483,7 +476,7 @@ async def get_session_by_id(
         max_matches=max_matches,
         allow_stale=allow_stale,
         for_update=for_update,
-        load_kernels=load_kernels,
+        eager_loading_op=eager_loading_op,
         allow_prefix=False,
     )
     try:
@@ -501,7 +494,7 @@ async def get_sessions_by_name(
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
-    load_kernels: bool = False,
+    eager_loading_op=None,
 ) -> List[SessionRow]:
     if allow_prefix:
         cond = sa.sql.expression.cast(SessionRow.name, sa.String).like(f"{session_name}%")
@@ -513,7 +506,7 @@ async def get_sessions_by_name(
         max_matches=max_matches,
         allow_stale=allow_stale,
         for_update=for_update,
-        load_kernels=load_kernels,
+        eager_loading_op=eager_loading_op,
     )
     result = await db_session.execute(query)
     return result.scalars().all()
