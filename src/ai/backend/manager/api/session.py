@@ -97,9 +97,11 @@ from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
 from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    DEAD_KERNEL_STATUSES,
+    DEAD_SESSION_STATUSES,
     AgentStatus,
     KernelStatus,
+    SessionRow,
+    SessionStatus,
     UserRole,
 )
 from ..models import association_groups_users as agus
@@ -117,7 +119,7 @@ from ..models import (
     verify_vfolder_name,
     vfolders,
 )
-from ..models.kernel import match_session_ids
+from ..models.session import match_sessions as match_sessions_by_id_or_name
 from ..models.utils import execute_with_retry
 from ..types import UserScope
 from .auth import auth_required
@@ -1440,7 +1442,7 @@ async def handle_destroy_session(
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     await root_ctx.registry.destroy_session(
-        functools.partial(
+        aiotools.apartial(
             root_ctx.registry.get_session_by_session_id,
             event.session_id,
         ),
@@ -1552,7 +1554,7 @@ async def handle_batch_result(
     elif isinstance(event, SessionFailureEvent):
         await root_ctx.registry.set_session_result(event.session_id, False, event.exit_code)
     await root_ctx.registry.destroy_session(
-        functools.partial(
+        aiotools.apartial(
             root_ctx.registry.get_session_by_session_id,
             event.session_id,
         ),
@@ -1746,22 +1748,20 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
         session_name,
         new_name,
     )
-    async with root_ctx.db.begin() as conn:
+    async with root_ctx.db.begin_session() as db_sess:
         compute_session = await root_ctx.registry.get_session(
             session_name,
             owner_access_key,
             allow_stale=True,
-            db_connection=conn,
             for_update=True,
+            db_session=db_sess,
         )
-        if compute_session["status"] != KernelStatus.RUNNING:
+        if compute_session.status != SessionStatus.RUNNING:
             raise InvalidAPIParameters("Can't change name of not running session")
         update_query = (
-            sa.update(kernels)
-            .values(session_name=new_name)
-            .where(kernels.c.session_id == compute_session["session_id"])
+            sa.update(SessionRow).values(name=new_name).where(SessionRow.id == compute_session.id)
         )
-        await conn.execute(update_query)
+        await db_sess.execute(update_query)
 
     return web.Response(status=204)
 
@@ -1797,7 +1797,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         params["forced"],
     )
     last_stat = await root_ctx.registry.destroy_session(
-        functools.partial(
+        aiotools.apartial(
             root_ctx.registry.get_session,
             session_name,
             owner_access_key,
@@ -1834,20 +1834,20 @@ async def match_sessions(request: web.Request, params: Any) -> web.Response:
         id_or_name_prefix,
     )
     matches: List[Dict[str, Any]] = []
-    async with root_ctx.db.begin_readonly() as conn:
-        session_infos = await match_session_ids(
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        sessions = await match_sessions_by_id_or_name(
+            db_sess,
             id_or_name_prefix,
             owner_access_key,
-            db_connection=conn,
         )
-    if session_infos:
+    if sessions:
         matches.extend(
             {
-                "id": str(item["session_id"]),
-                "name": item["session_name"],
-                "status": item["status"].name,
+                "id": str(item.id),
+                "name": item.name,
+                "status": item.status.name,
             }
-            for item in session_infos
+            for item in sessions
         )
     return web.json_response(
         {
@@ -1868,33 +1868,37 @@ async def get_info(request: web.Request) -> web.Response:
     log.info("GET_INFO (ak:{0}/{1}, s:{2})", requester_access_key, owner_access_key, session_name)
     try:
         await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
-        kern = await root_ctx.registry.get_session(session_name, owner_access_key)
-        resp["domainName"] = kern["domain_name"]
-        resp["groupId"] = str(kern["group_id"])
-        resp["userId"] = str(kern["user_uuid"])
-        resp["lang"] = kern["image"]  # legacy
-        resp["image"] = kern["image"]
-        resp["architecture"] = kern["architecture"]
-        resp["registry"] = kern["registry"]
-        resp["tag"] = kern["tag"]
+        sess = await root_ctx.registry.get_session(
+            session_name, owner_access_key, load_kernels=True
+        )
+        resp["domainName"] = sess.domain_name
+        resp["groupId"] = str(sess.group_id)
+        resp["userId"] = str(sess.user_uuid)
+        resp["lang"] = sess.image  # legacy
+        resp["image"] = sess.image
+        resp["architecture"] = sess.main_kernel.architecture
+        resp["registry"] = sess.main_kernel.registry
+        resp["tag"] = sess.tag
 
         # Resource occupation
-        resp["containerId"] = str(kern["container_id"])
-        resp["occupiedSlots"] = str(kern["occupied_slots"])
-        resp["occupiedShares"] = str(kern["occupied_shares"])
-        resp["environ"] = str(kern["environ"])
+        resp["containerId"] = str(sess.main_kernel.container_id)
+        resp["occupiedSlots"] = str(sess.main_kernel.occupied_slots)  # legacy
+        resp["occupyingSlots"] = str(sess.occupying_slots)
+        resp["requestedSlots"] = str(sess.requested_slots)
+        resp["occupiedShares"] = str(sess.main_kernel.occupied_shares)
+        resp["environ"] = str(sess.environ)
 
         # Lifecycle
-        resp["status"] = kern["status"].name  # "e.g. 'KernelStatus.RUNNING' -> 'RUNNING' "
-        resp["statusInfo"] = str(kern["status_info"])
-        resp["statusData"] = kern["status_data"]
-        age = datetime.now(tzutc()) - kern["created_at"]
+        resp["status"] = sess.status.name  # "e.g. 'KernelStatus.RUNNING' -> 'RUNNING' "
+        resp["statusInfo"] = str(sess.status_info)
+        resp["statusData"] = sess.status_data
+        age = datetime.now(tzutc()) - sess.created_at
         resp["age"] = int(age.total_seconds() * 1000)  # age in milliseconds
-        resp["creationTime"] = str(kern["created_at"])
-        resp["terminationTime"] = str(kern["terminated_at"]) if kern["terminated_at"] else None
+        resp["creationTime"] = str(sess.created_at)
+        resp["terminationTime"] = str(sess.terminated_at) if sess.terminated_at else None
 
-        resp["numQueriesExecuted"] = kern["num_queries"]
-        resp["lastStat"] = kern["last_stat"]
+        resp["numQueriesExecuted"] = sess.num_queries
+        resp["lastStat"] = sess.last_stat
 
         # Resource limits collected from agent heartbeats were erased, as they were deprecated
         # TODO: factor out policy/image info as a common repository
@@ -2290,19 +2294,20 @@ async def get_container_logs(request: web.Request, params: Any) -> web.Response:
         "GET_CONTAINER_LOG (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     resp = {"result": {"logs": ""}}
-    async with root_ctx.db.begin_readonly() as conn:
+    async with root_ctx.db.begin_readonly_session() as db_sess:
         compute_session = await root_ctx.registry.get_session(
             session_name,
             owner_access_key,
             allow_stale=True,
-            db_connection=conn,
+            load_kernels=True,
+            db_session=db_sess,
         )
         if (
-            compute_session["status"] in DEAD_KERNEL_STATUSES
-            and compute_session["container_log"] is not None
+            compute_session.status in DEAD_SESSION_STATUSES
+            and compute_session.main_kernel.container_log is not None
         ):
             log.debug("returning log from database record")
-            resp["result"]["logs"] = compute_session["container_log"].decode("utf-8")
+            resp["result"]["logs"] = compute_session.main_kernel.container_log.decode("utf-8")
             return web.json_response(resp, status=200)
     try:
         registry = root_ctx.registry
