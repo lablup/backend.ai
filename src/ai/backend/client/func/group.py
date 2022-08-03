@@ -5,7 +5,7 @@ from ai.backend.client.output.fields import group_fields
 from ai.backend.client.output.types import FieldSpec
 
 from ..session import api_session
-from .base import BaseFunction, api_function
+from .base import BaseFunction, api_function, resolve_field
 
 __all__ = ("Group",)
 
@@ -58,8 +58,6 @@ class Group(BaseFunction):
         :param domain_name: Name of domain to get groups from.
         :param fields: Per-group query fields to fetch.
         """
-        if fields is None:
-            fields = _default_detail_fields
         query = textwrap.dedent(
             """\
             query($name: String!, $domain_name: String) {
@@ -67,9 +65,7 @@ class Group(BaseFunction):
             }
         """
         )
-        resolved_fields = tuple(
-            f.field_ref if isinstance(f, FieldSpec) else group_fields[f].field_ref for f in fields
-        )
+        resolved_fields = resolve_field(fields, group_fields, _default_detail_fields)
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
@@ -149,8 +145,6 @@ class Group(BaseFunction):
         Creates a new group with the given options.
         You need an admin privilege for this operation.
         """
-        if fields is None:
-            fields = (group_fields["id"], group_fields["domain_name"], group_fields["name"])
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: GroupInput!) {
@@ -160,8 +154,10 @@ class Group(BaseFunction):
             }
         """
         )
-        resolved_fields = tuple(
-            f.field_ref if isinstance(f, FieldSpec) else group_fields[f].field_ref for f in fields
+        resolved_fields = resolve_field(
+            fields,
+            group_fields,
+            (group_fields["id"], group_fields["domain_name"], group_fields["name"]),
         )
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {

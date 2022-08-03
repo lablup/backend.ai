@@ -7,7 +7,7 @@ from ai.backend.client.output.types import FieldSpec
 
 from ..request import Request
 from ..session import api_session
-from .base import BaseFunction, api_function
+from .base import BaseFunction, api_function, resolve_field
 
 __all__ = ("ScalingGroup",)
 
@@ -126,8 +126,6 @@ class ScalingGroup(BaseFunction):
         """
         Creates a new scaling group with the given options.
         """
-        if fields is None:
-            fields = (scaling_group_fields["name"],)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: CreateScalingGroupInput!) {
@@ -137,9 +135,8 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        resolved_fields = tuple(
-            f.field_ref if isinstance(f, FieldSpec) else scaling_group_fields[f].field_ref
-            for f in fields
+        resolved_fields = resolve_field(
+            fields, scaling_group_fields, (scaling_group_fields["name"],)
         )
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
@@ -172,8 +169,6 @@ class ScalingGroup(BaseFunction):
         """
         Update existing scaling group.
         """
-        if fields is None:
-            fields = (scaling_group_fields["name"],)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: ModifyScalingGroupInput!) {
@@ -183,9 +178,8 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        resolved_fields = tuple(
-            f.field_ref if isinstance(f, FieldSpec) else scaling_group_fields[f].field_ref
-            for f in fields
+        resolved_fields = resolve_field(
+            fields, scaling_group_fields, (scaling_group_fields["name"],)
         )
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {

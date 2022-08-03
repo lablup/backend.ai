@@ -5,7 +5,7 @@ from ai.backend.client.output.fields import domain_fields
 from ai.backend.client.output.types import FieldSpec
 
 from ..session import api_session
-from .base import BaseFunction, api_function
+from .base import BaseFunction, api_function, resolve_field
 
 __all__ = ("Domain",)
 
@@ -108,8 +108,6 @@ class Domain(BaseFunction):
         Creates a new domain with the given options.
         You need an admin privilege for this operation.
         """
-        if fields is None:
-            fields = (domain_fields["name"],)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: DomainInput!) {
@@ -119,9 +117,7 @@ class Domain(BaseFunction):
             }
         """
         )
-        resolved_fields = tuple(
-            f.field_ref if isinstance(f, FieldSpec) else domain_fields[f].field_ref for f in fields
-        )
+        resolved_fields = resolve_field(fields, domain_fields, (domain_fields["name"],))
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,

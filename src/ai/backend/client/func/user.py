@@ -12,7 +12,7 @@ from ai.backend.client.pagination import generate_paginated_results
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
 
-from .base import BaseFunction, api_function
+from .base import BaseFunction, api_function, resolve_field
 
 __all__ = (
     "User",
@@ -259,13 +259,6 @@ class User(BaseFunction):
         Creates a new user with the given options.
         You need an admin privilege for this operation.
         """
-        if fields is None:
-            fields = (
-                user_fields["domain_name"],
-                user_fields["email"],
-                user_fields["username"],
-                user_fields["uuid"],
-            )
         query = textwrap.dedent(
             """\
             mutation($email: String!, $input: UserInput!) {
@@ -275,9 +268,13 @@ class User(BaseFunction):
             }
         """
         )
-        resolved_fields = tuple(
-            f.field_ref if isinstance(f, FieldSpec) else user_fields[f].field_ref for f in fields
+        default_fields = (
+            user_fields["domain_name"],
+            user_fields["email"],
+            user_fields["username"],
+            user_fields["uuid"],
         )
+        resolved_fields = resolve_field(fields, user_fields, default_fields)
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "email": email,

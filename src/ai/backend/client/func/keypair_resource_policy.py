@@ -4,7 +4,7 @@ from ai.backend.client.output.fields import keypair_resource_policy_fields
 from ai.backend.client.output.types import FieldSpec
 
 from ..session import api_session
-from .base import BaseFunction, api_function
+from .base import BaseFunction, api_function, resolve_field
 
 __all__ = "KeypairResourcePolicy"
 
@@ -60,8 +60,6 @@ class KeypairResourcePolicy(BaseFunction):
         Creates a new keypair resource policy with the given options.
         You need an admin privilege for this operation.
         """
-        if fields is None:
-            fields = (keypair_resource_policy_fields["name"],)
         q = (
             "mutation($name: String!, $input: CreateKeyPairResourcePolicyInput!) {"
             + "  create_keypair_resource_policy(name: $name, props: $input) {"
@@ -69,9 +67,8 @@ class KeypairResourcePolicy(BaseFunction):
             "  }"
             "}"
         )
-        resolved_fields = tuple(
-            f.field_ref if isinstance(f, FieldSpec) else keypair_resource_policy_fields[f].field_ref
-            for f in fields
+        resolved_fields = resolve_field(
+            fields, keypair_resource_policy_fields, (keypair_resource_policy_fields["name"],)
         )
         q = q.replace("$fields", " ".join(resolved_fields))
         variables = {
