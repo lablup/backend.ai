@@ -2,6 +2,7 @@ python_sources(
     name="src",
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
+        "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
         ":resources",
     ],
 )
@@ -26,7 +27,6 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
-        "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(

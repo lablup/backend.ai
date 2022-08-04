@@ -13,6 +13,7 @@ python_tests(
     name="tests",
     dependencies=[
         "//:reqs#aiosqlite",  # not auto-inferred
+        "//:reqs#psycopg2-binary",  # not auto-inferred
     ],
 )
 
