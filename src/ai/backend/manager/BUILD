@@ -1,9 +1,7 @@
 python_sources(
-    name="service",
-    sources=["**/*.py"],
+    name="src",
     dependencies=[
-        "src/ai/backend/cli:lib",
-        "src/ai/backend/common:lib",
+        "src/ai/backend/cli:lib",  # not auto-inferred
         ":resources",
     ],
 )
@@ -11,7 +9,7 @@ python_sources(
 pex_binary(
     name="server",
     dependencies=[
-        ":service",
+        ":src",
     ],
     entry_point="server.py",
 )
@@ -19,7 +17,7 @@ pex_binary(
 pex_binary(
     name="cli",
     dependencies=[
-        ":service",
+        ":src",
     ],
     entry_point="cli/__main__.py",
 )
@@ -27,7 +25,7 @@ pex_binary(
 pex_binary(
     name="dump-gql-schema",
     dependencies=[
-        ":service",
+        ":src",
     ],
     entry_point="api/admin.py",
 )
@@ -35,7 +33,8 @@ pex_binary(
 python_distribution(
     name="dist",
     dependencies=[
-        ":service",
+        ":src",
+        "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
