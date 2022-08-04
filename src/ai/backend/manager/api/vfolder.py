@@ -1805,34 +1805,17 @@ async def delete(request: web.Request) -> web.Response:
     return web.Response(status=204)
 
 
-async def leave_request(request: web.Request, params: Any) -> web.Response:
-    """
-    Common request for leaving a shared vfolder.
-    """
-    root_ctx: RootContext = request.app["_root.context"]
-
-    if params["vfolder_id"] is None:
-        raise InvalidAPIParameters("Missing vfolder_id paramater.")
-    if params["user_uuid"] is None:
-        params["user_uuid"] = request["user"]["uuid"]
-
-    vfolder_id = params["vfolder_id"]
-    user_uuid = params["user_uuid"]
-    async with root_ctx.db.begin() as conn:
-        query = (
-            sa.delete(vfolder_permissions)
-            .where(vfolder_permissions.c.vfolder == vfolder_id)
-            .where(vfolder_permissions.c.user == user_uuid)
-        )
-        await conn.execute(query)
-    resp = {"msg": "left the shared vfolder"}
-    return web.json_response(resp, status=200)
-
-
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @vfolder_permission_required(VFolderPermission.READ_ONLY)
-async def leave(request: web.Request, row: VFolderRow) -> web.Response:
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("shared_user_uuid", default=None): t.String | t.Null,
+        }
+    ),
+)
+async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     """
     Leave a shared vfolder.
 
@@ -1843,55 +1826,31 @@ async def leave(request: web.Request, row: VFolderRow) -> web.Response:
     if row["is_owner"]:
         raise InvalidAPIParameters("Cannot leave a vfolder owned by the requesting user.")
 
+    root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
+    user_role = request["user"]["role"]
+    rqst_user_uuid = request["user"]["uuid"]
+    shared_user_uuid = params["shared_user_uuid"]
+    vfolder_id = row["id"]
     perm = row["permission"]
-    params = {
-        "vfolder_id": row["id"],
-        "user_uuid": request["user"]["uuid"],
-    }
+
+    if rqst_user_uuid != shared_user_uuid and user_role not in (UserRole.SUPERADMIN):
+        raise GenericForbidden("Insufficient permission")
+
+    user_uuid = shared_user_uuid if shared_user_uuid else rqst_user_uuid
+
     log.info(
-        "VFOLDER.LEAVE(ak:{}, vfid:{}, uid:{}, perm:{})",
-        access_key,
-        params["vfolder_id"],
-        params["user_uuid"],
-        perm,
+        "VFOLDER.LEAVE(ak:{}, vfid:{}, uid:{}, perm:{})", access_key, vfolder_id, user_uuid, perm
     )
-    return await leave_request(request, params)
-
-
-@superadmin_required
-@server_status_required(ALL_ALLOWED)
-@vfolder_permission_required(VFolderPermission.READ_ONLY)
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["shared_user_id", "sharedUserId"]): t.String,
-        }
-    ),
-)
-async def force_leave(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    """
-    Leave a shared vfolder.
-
-    Cannot leave a group vfolder but a vfolder owned by others can be left.
-    """
-    if row["ownership_type"] == VFolderOwnershipType.GROUP:
-        raise InvalidAPIParameters("Cannot leave a group vfolder.")
-
-    access_key = request["keypair"]["access_key"]
-    perm = row["permission"]
-    rqst_params = {
-        "vfolder_id": row["id"],
-        "user_uuid": params["shared_user_id"],
-    }
-    log.info(
-        "VFOLDER.FORCE_LEAVE(ak:{}, vfid:{}, uid:{}, perm:{})",
-        access_key,
-        rqst_params["vfolder_id"],
-        rqst_params["user_uuid"],
-        perm,
-    )
-    return await leave_request(request, rqst_params)
+    async with root_ctx.db.begin() as conn:
+        query = (
+            sa.delete(vfolder_permissions)
+            .where(vfolder_permissions.c.vfolder == vfolder_id)
+            .where(vfolder_permissions.c.user == user_uuid)
+        )
+        await conn.execute(query)
+    resp = {"msg": "left the shared vfolder"}
+    return web.json_response(resp, status=200)
 
 
 @auth_required
@@ -2616,7 +2575,6 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/{name}/files", list_files))
     cors.add(add_route("POST", r"/{name}/invite", invite))
     cors.add(add_route("POST", r"/{name}/leave", leave))
-    cors.add(add_route("POST", r"/{name}/force-leave", force_leave))
     cors.add(add_route("POST", r"/{name}/share", share))
     cors.add(add_route("DELETE", r"/{name}/unshare", unshare))
     cors.add(add_route("POST", r"/{name}/clone", clone))
