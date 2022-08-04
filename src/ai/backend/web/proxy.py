@@ -146,12 +146,13 @@ async def decrypt_payload(request: web.Request, handler) -> str:
         b64p = base64.b64decode(real_payload)
         dec = unpad(crypt.decrypt(bytes(b64p)), 16)
         result = dec.decode("UTF-8")
+        log.debug("request.content {}", request.content)
         if not result:
-            request.app["config"]["creds"] = {}
+            request.app["config"]["payload"] = {}
         else:
-            request.app["config"]["creds"] = json.loads(result)
+            request.app["config"]["payload"] = json.loads(result)
     else:
-        request.app["config"]["creds"] = request.json()
+        request.app["config"]["payload"] = request.json()
     res = await handler(request)
     return res
 
@@ -179,7 +180,7 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             secure_context = request_headers.get("X-BackendAI-Encoded", None)
             decrypted_payload_length = 0
             if secure_context:
-                payload = await decrypt_payload(request)
+                payload = request.app["config"]["payload"]
                 decrypted_payload_length = len(payload)
             else:
                 payload = request.content
