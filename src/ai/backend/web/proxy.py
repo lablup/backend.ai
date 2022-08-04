@@ -128,12 +128,13 @@ class WebSocketProxy:
 
 
 @web.middleware
-async def decrypt_payload(request: web.Request, handler) -> str:
+async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     request_headers = extra_config_headers.check(request.headers)
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     if secure_context:
         if not request.content:
-            return ""
+            request.app["config"]["payload"] = ""
+            return await handler(request)
         config = request.app["config"]
         scheme = config["service"]["force_endpoint_protocol"]
         if scheme is None:
@@ -146,15 +147,13 @@ async def decrypt_payload(request: web.Request, handler) -> str:
         b64p = base64.b64decode(real_payload)
         dec = unpad(crypt.decrypt(bytes(b64p)), 16)
         result = dec.decode("UTF-8")
-        log.debug("request.content {}", request.content)
         if not result:
             request.app["config"]["payload"] = {}
         else:
             request.app["config"]["payload"] = json.loads(result)
     else:
-        request.app["config"]["payload"] = request.json()
-    res = await handler(request)
-    return res
+        request.app["config"]["creds"] = request.json()
+    return await handler(request)
 
 
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
