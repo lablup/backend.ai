@@ -22,7 +22,11 @@ def wait_health_check(container_id):
             capture_output=True,
         )
         container_info = json.loads(proc.stdout)
-        if container_info[0]["State"]["Health"]["Status"].lower() != "healthy":
+        try:
+            if container_info[0]["State"]["Health"]["Status"].lower() != "healthy":
+                time.sleep(0.2)
+                continue
+        except KeyError:
             time.sleep(0.2)
             continue
         # Give extra grace period to avoid intermittent connection failure.
