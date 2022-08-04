@@ -22,14 +22,6 @@ pex_binary(
     entry_point="cli/__main__.py",
 )
 
-pex_binary(
-    name="dump-gql-schema",
-    dependencies=[
-        ":src",
-    ],
-    entry_point="api/admin.py",
-)
-
 python_distribution(
     name="dist",
     dependencies=[
