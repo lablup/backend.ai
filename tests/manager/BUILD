@@ -3,6 +3,7 @@ python_test_utils(
     sources=[
         "conftest.py",
         "model_factory.py",
+        "src/ai/backend/manager/api:src",  # indirectly referred via create_app_and_client() fixture
     ],
     dependencies=[
         ":fixtures",
