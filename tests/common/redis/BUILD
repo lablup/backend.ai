@@ -23,8 +23,6 @@ python_test_utils(
 python_tests(
     name="tests",
     dependencies=[
-        "src/ai/backend/common:lib",
-        "src/ai/backend/testutils:lib",
         ":redis-cluster-compose",
     ],
 )
