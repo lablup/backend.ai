@@ -287,7 +287,7 @@ def setup_file_log_handler(config: Mapping[str, Any]) -> logging.Handler:
 
 
 def log_worker(
-    daemon_config: Mapping[str, Any],
+    logging_config: Mapping[str, Any],
     parent_pid: int,
     log_endpoint: str,
     ready_event: threading.Event,
@@ -296,14 +296,14 @@ def log_worker(
     file_handler = None
     logstash_handler = None
 
-    if "console" in daemon_config["drivers"]:
-        console_handler = setup_console_log_handler(daemon_config)
+    if "console" in logging_config["drivers"]:
+        console_handler = setup_console_log_handler(logging_config)
 
-    if "file" in daemon_config["drivers"]:
-        file_handler = setup_file_log_handler(daemon_config)
+    if "file" in logging_config["drivers"]:
+        file_handler = setup_file_log_handler(logging_config)
 
-    if "logstash" in daemon_config["drivers"]:
-        drv_config = daemon_config["logstash"]
+    if "logstash" in logging_config["drivers"]:
+        drv_config = logging_config["logstash"]
         logstash_handler = LogstashHandler(
             endpoint=drv_config["endpoint"],
             protocol=drv_config["protocol"],
@@ -311,7 +311,7 @@ def log_worker(
             ssl_verify=drv_config["ssl-verify"],
             myhost="hostname",  # TODO: implement
         )
-        logstash_handler.setLevel(daemon_config["level"])
+        logstash_handler.setLevel(logging_config["level"])
 
     zctx = zmq.Context()
     agg_sock = zctx.socket(zmq.PULL)
@@ -434,7 +434,7 @@ class RelayHandler(logging.Handler):
 class AbstractLogger(metaclass=ABCMeta):
     def __init__(
         self,
-        daemon_config: MutableMapping[str, Any],
+        logging_config: MutableMapping[str, Any],
     ) -> None:
         pass
 
@@ -450,7 +450,7 @@ class AbstractLogger(metaclass=ABCMeta):
 class NoopLogger(AbstractLogger):
     def __init__(
         self,
-        daemon_config: MutableMapping[str, Any],
+        logging_config: MutableMapping[str, Any],
     ) -> None:
         pass
 
@@ -464,17 +464,17 @@ class NoopLogger(AbstractLogger):
 class LocalLogger(AbstractLogger):
     def __init__(
         self,
-        daemon_config: MutableMapping[str, Any],
+        logging_config: MutableMapping[str, Any],
     ) -> None:
-        cfg = logging_config_iv.check(daemon_config)
+        cfg = logging_config_iv.check(logging_config)
         _check_driver_config_exists_if_activated(cfg, "console")
-        self.daemon_config = cfg
+        self.logging_config = cfg
         log_handlers = []
-        if "console" in self.daemon_config["drivers"]:
-            console_handler = setup_console_log_handler(self.daemon_config)
+        if "console" in self.logging_config["drivers"]:
+            console_handler = setup_console_log_handler(self.logging_config)
             log_handlers.append(console_handler)
-        if "file" in self.daemon_config["drivers"]:
-            file_handler = setup_file_log_handler(self.daemon_config)
+        if "file" in self.logging_config["drivers"]:
+            file_handler = setup_file_log_handler(self.logging_config)
             log_handlers.append(file_handler)
         self.log_config = {
             "version": 1,
@@ -517,13 +517,13 @@ class Logger(AbstractLogger):
 
     is_master: bool
     log_endpoint: str
-    daemon_config: Mapping[str, Any]
+    logging_config: Mapping[str, Any]
     log_config: MutableMapping[str, Any]
     log_worker: threading.Thread
 
     def __init__(
         self,
-        daemon_config: MutableMapping[str, Any],
+        logging_config: MutableMapping[str, Any],
         *,
         is_master: bool,
         log_endpoint: str,
@@ -531,15 +531,15 @@ class Logger(AbstractLogger):
         legacy_logfile_path = os.environ.get("BACKEND_LOG_FILE")
         if legacy_logfile_path:
             p = Path(legacy_logfile_path)
-            config.override_key(daemon_config, ("file", "path"), p.parent)
-            config.override_key(daemon_config, ("file", "filename"), p.name)
-        config.override_with_env(daemon_config, ("file", "backup-count"), "BACKEND_LOG_FILE_COUNT")
+            config.override_key(logging_config, ("file", "path"), p.parent)
+            config.override_key(logging_config, ("file", "filename"), p.name)
+        config.override_with_env(logging_config, ("file", "backup-count"), "BACKEND_LOG_FILE_COUNT")
         legacy_logfile_size = os.environ.get("BACKEND_LOG_FILE_SIZE")
         if legacy_logfile_size:
             legacy_logfile_size = f"{legacy_logfile_size}M"
-            config.override_with_env(daemon_config, ("file", "rotation-size"), legacy_logfile_size)
+            config.override_with_env(logging_config, ("file", "rotation-size"), legacy_logfile_size)
 
-        cfg = logging_config_iv.check(daemon_config)
+        cfg = logging_config_iv.check(logging_config)
 
         _check_driver_config_exists_if_activated(cfg, "console")
         _check_driver_config_exists_if_activated(cfg, "file")
@@ -547,7 +547,7 @@ class Logger(AbstractLogger):
 
         self.is_master = is_master
         self.log_endpoint = log_endpoint
-        self.daemon_config = cfg
+        self.logging_config = cfg
         self.log_config = {
             "version": 1,
             "disable_existing_loggers": False,
@@ -568,7 +568,7 @@ class Logger(AbstractLogger):
         pickling_support.install()  # enable pickling of tracebacks
         self.log_config["handlers"]["relay"] = {
             "class": "ai.backend.common.logging.RelayHandler",
-            "level": self.daemon_config["level"],
+            "level": self.logging_config["level"],
             "endpoint": self.log_endpoint,
         }
         for _logger in self.log_config["loggers"].values():
@@ -582,7 +582,7 @@ class Logger(AbstractLogger):
             self.log_worker = threading.Thread(
                 target=log_worker,
                 name="Logger",
-                args=(self.daemon_config, os.getpid(), self.log_endpoint, self.ready_event),
+                args=(self.logging_config, os.getpid(), self.log_endpoint, self.ready_event),
             )
             self.log_worker.start()
             self.ready_event.wait()
