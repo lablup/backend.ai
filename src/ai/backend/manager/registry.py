@@ -1273,7 +1273,7 @@ class AgentRegistry:
                         kernel_agent_bindings[0].agent_alloc_ctx.agent_id,
                         kernel_agent_bindings[0].agent_alloc_ctx.agent_addr,
                         invoke_timeout=None,
-                        order_key=str(scheduled_session.id),
+                        order_key=str(scheduled_session.main_kernel.id),
                         keepalive_timeout=self.rpc_keepalive_timeout,
                     ) as rpc:
                         await rpc.call.create_local_network(network_name)
@@ -1427,7 +1427,7 @@ class AgentRegistry:
             return
         else:
 
-            async def _finialize_running() -> None:
+            async def _finialize_running() -> SessionId:
                 # Record kernel access information
                 try:
                     async with self.db.begin() as conn:
@@ -1464,13 +1464,47 @@ class AgentRegistry:
                             kernels.update()
                             .values(values)
                             .where(kernels.c.id == created_info["id"])
+                            .returning(kernels.c.session_id)
                         )
-                        await conn.execute(update_query)
+                        return (await conn.execute(update_query)).first()["session_id"]
                 except Exception:
                     log.exception("error while executing _finalize_running")
                     raise
 
-            await execute_with_retry(_finialize_running)
+            session_id = await execute_with_retry(_finialize_running)
+
+            async def _check_session():
+                async with self.db.begin_session() as db_sess:
+                    query = (
+                        sa.select(SessionRow)
+                        .where(SessionRow.id == session_id)
+                        .options(selectinload(SessionRow.kernels))
+                    )
+                    result = await db_sess.execute(query)
+                    session: SessionRow = result.scalars().first()
+                    updated_sess_status = aggregate_kernel_status(
+                        [k.status for k in session.kernels]
+                    )
+                    if updated_sess_status != session.status:
+                        update_query = (
+                            sa.update(SessionRow)
+                            .where(SessionRow.id == session_id)
+                            .values(
+                                status=updated_sess_status,
+                                status_history=sql_json_merge(
+                                    SessionRow.status_history,
+                                    (),
+                                    {
+                                        SessionStatus.RUNNING.name: datetime.now(
+                                            tzutc()
+                                        ).isoformat(),
+                                    },
+                                ),
+                            )
+                        )
+                        await db_sess.execute(update_query)
+
+            await execute_with_retry(_check_session)
         finally:
             try:
                 await asyncio.sleep(1)

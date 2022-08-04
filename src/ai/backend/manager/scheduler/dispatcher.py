@@ -486,7 +486,14 @@ class SchedulerDispatcher(aobject):
                 schedulable_sess = await get_session_by_id(
                     db_sess,
                     sess_ctx.id,
-                    load_kernels=True,
+                    eager_loading_op=(
+                        noload("*"),
+                        selectinload(SessionRow.kernels).options(
+                            noload("*"),
+                            selectinload(KernelRow.image_row).noload("*"),
+                            selectinload(KernelRow.agent_row).noload("*"),
+                        ),
+                    ),
                 )
 
             if schedulable_sess.cluster_mode == ClusterMode.SINGLE_NODE:
@@ -546,10 +553,17 @@ class SchedulerDispatcher(aobject):
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
             agent = sess_ctx.main_kernel.agent_row
+            agent_id: AgentId
             if agent is None:
-                agent = scheduler.assign_agent_for_session(candidate_agents, sess_ctx)
+                cand_agent = scheduler.assign_agent_for_session(candidate_agents, sess_ctx)
+                if cand_agent is None:
+                    raise InstanceNotAvailable("No agent is available.")
+                assert cand_agent is not None
+                agent_id = cand_agent
+            else:
+                agent_id = agent.id
             async with self.db.begin() as agent_db_sess:
-                query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent.id)
+                query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent_id)
                 available_agent_slots = (await agent_db_sess.execute(query)).scalar()
                 # if pass the available test
                 if available_agent_slots is None:
@@ -565,7 +579,7 @@ class SchedulerDispatcher(aobject):
                     sched_ctx,
                     agent_db_sess,
                     sgroup_name,
-                    agent.id,
+                    agent_id,
                     sess_ctx.requested_slots,
                 )
         except InstanceNotAvailable:
@@ -922,7 +936,7 @@ class SchedulerDispatcher(aobject):
                             .where(SessionRow.id.in_(target_session_ids))
                             .options(
                                 noload("*"),
-                                selectinload(SessionRow.kernels),
+                                selectinload(SessionRow.kernels).noload("*"),
                             )
                         )
                         result = await db_sess.execute(select_query)

@@ -162,7 +162,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         group_limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
-        group_occupied = await root_ctx.registry.get_group_occupancy(group_id, conn=conn)
+        group_occupied = await root_ctx.registry.get_group_occupancy(
+            group_id, db_sess=SASession(conn)
+        )
         group_remaining = group_limits - group_occupied
 
         # Check domain resource limit.
@@ -173,7 +175,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         domain_limits = ResourceSlot.from_policy(domain_resource_policy, known_slot_types)
-        domain_occupied = await root_ctx.registry.get_domain_occupancy(domain_name, conn=conn)
+        domain_occupied = await root_ctx.registry.get_domain_occupancy(
+            domain_name, db_sess=SASession(conn)
+        )
         domain_remaining = domain_limits - domain_occupied
 
         # Take minimum remaining resources. There's no need to merge limits and occupied.

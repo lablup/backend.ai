@@ -17,9 +17,6 @@ from ..models import (
     KeyPairRow,
     SessionDependencyRow,
     SessionRow,
-    domains,
-    groups,
-    keypair_resource_policies,
 )
 from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext

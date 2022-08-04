@@ -81,7 +81,7 @@ class FIFOSlotScheduler(AbstractScheduler):
                     requested_slots,
                 ),
             )
-            return chosen_agent.agent_id
+            return chosen_agent.id
         return None
 
     def assign_agent_for_session(
@@ -136,7 +136,7 @@ class LIFOSlotScheduler(AbstractScheduler):
                     requested_slots,
                 ),
             )
-            return chosen_agent.agent_id
+            return chosen_agent.id
         return None
 
     def assign_agent_for_session(

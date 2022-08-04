@@ -99,6 +99,7 @@ from ..models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
     AgentStatus,
+    KernelRow,
     KernelStatus,
     SessionRow,
     SessionStatus,
@@ -555,7 +556,6 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 
     session_creation_id = secrets.token_urlsafe(16)
     start_event = asyncio.Event()
-    kernel_id: Optional[KernelId] = None
     session_creation_tracker = app_ctx.session_creation_tracker
     session_creation_tracker[session_creation_id] = start_event
 
@@ -568,7 +568,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             params["bootstrap_script"] = script
 
     try:
-        kernel_id = await asyncio.shield(
+        session_id = await asyncio.shield(
             app_ctx.database_ptask_group.create_task(
                 root_ctx.registry.enqueue_session(
                     session_creation_id,
@@ -608,7 +608,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 )
             ),
         )
-        resp["sessionId"] = str(kernel_id)  # changed since API v5
+        resp["sessionId"] = str(session_id)  # changed since API v5
         resp["sessionName"] = str(params["session_name"])
         resp["status"] = "PENDING"
         resp["servicePorts"] = []
@@ -627,22 +627,16 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                 resp["status"] = "TIMEOUT"
             else:
                 await asyncio.sleep(0.5)
-                async with root_ctx.db.begin_readonly() as conn:
-                    query = (
-                        sa.select(
-                            [
-                                kernels.c.status,
-                                kernels.c.service_ports,
-                            ]
-                        )
-                        .select_from(kernels)
-                        .where(kernels.c.id == kernel_id)
+                async with root_ctx.db.begin_readonly_session() as db_sess:
+                    query = sa.select(KernelRow.status, KernelRow.service_ports).where(
+                        (KernelRow.session_id == session_id)
+                        & (KernelRow.cluster_role == DEFAULT_ROLE)
                     )
-                    result = await conn.execute(query)
+                    result = await db_sess.execute(query)
                     row = result.first()
-                if row["status"] == KernelStatus.RUNNING:
+                if row.status == KernelStatus.RUNNING:
                     resp["status"] = "RUNNING"
-                    for item in row["service_ports"]:
+                    for item in row.service_ports:
                         response_dict = {
                             "name": item["name"],
                             "protocol": item["protocol"],
@@ -656,7 +650,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                             response_dict["allowed_envs"] = item["allowed_envs"]
                         resp["servicePorts"].append(response_dict)
                 else:
-                    resp["status"] = row["status"].name
+                    resp["status"] = row.status.name
     except asyncio.CancelledError:
         raise
     except BackendError:

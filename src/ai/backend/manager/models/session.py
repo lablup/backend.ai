@@ -401,7 +401,7 @@ def _build_session_fetch_query(
     allow_stale: bool = True,
     for_update: bool = False,
     do_ordering: bool = False,
-    eager_loading_op=None,
+    eager_loading_op: Iterable | None = None,
 ):
     cond = base_cond
     if access_key:
@@ -421,10 +421,6 @@ def _build_session_fetch_query(
     if do_ordering:
         query = query.order_by(SessionRow.created_at)
 
-    query = query.options(
-        noload("*"),
-        selectinload(SessionRow.image_row).noload("*"),
-    )
     if eager_loading_op is not None:
         query = query.options(*eager_loading_op)
 
@@ -663,7 +659,8 @@ class ComputeSession(graphene.ObjectType):
             "name": row.name,
             "type": row.session_type.name,
             # image
-            "image": row.image_id,
+            # "image": row.image_id,
+            "image": row.image,
             "architecture": row.main_kernel.architecture,
             "registry": row.main_kernel.registry,
             "cluster_template": None,  # TODO: implement

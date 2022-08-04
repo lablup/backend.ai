@@ -33,7 +33,7 @@ class MOFScheduler(AbstractScheduler):
         # return min occupied slot agent or None
         return next(
             (
-                one_agent.agent_id
+                one_agent.id
                 for one_agent in (
                     sorted(
                         (

@@ -107,7 +107,7 @@ class DRFScheduler(AbstractScheduler):
 
             # Choose the agent.
             chosen_agent = max(possible_agents, key=lambda a: a.available_slots)
-            return chosen_agent.agent_id
+            return chosen_agent.id
 
         return None
 
