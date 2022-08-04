@@ -127,22 +127,33 @@ class WebSocketProxy:
             await self.up_conn.close()
 
 
-async def decrypt_payload(request: web.Request) -> str:
-    if not request.content:
-        return ""
-    config = request.app["config"]
-    scheme = config["service"]["force_endpoint_protocol"]
-    if scheme is None:
-        scheme = request.scheme
-    api_endpoint = f"{scheme}://{request.host}"
-    payload = await request.text()
-    iv, real_payload = payload.split(":")  # Extract initial vector and actual payload
-    key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + iv + iv)[0:32]
-    crypt = AES.new(bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(iv, encoding="utf8"))
-    b64p = base64.b64decode(real_payload)
-    dec = unpad(crypt.decrypt(bytes(b64p)), 16)
-    result = dec.decode("UTF-8")
-    return result
+@web.middleware
+async def decrypt_payload(request: web.Request, handler) -> str:
+    request_headers = extra_config_headers.check(request.headers)
+    secure_context = request_headers.get("X-BackendAI-Encoded", None)
+    if secure_context:
+        if not request.content:
+            return ""
+        config = request.app["config"]
+        scheme = config["service"]["force_endpoint_protocol"]
+        if scheme is None:
+            scheme = request.scheme
+        api_endpoint = f"{scheme}://{request.host}"
+        payload = await request.text()
+        iv, real_payload = payload.split(":")  # Extract initial vector and actual payload
+        key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + iv + iv)[0:32]
+        crypt = AES.new(bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(iv, encoding="utf8"))
+        b64p = base64.b64decode(real_payload)
+        dec = unpad(crypt.decrypt(bytes(b64p)), 16)
+        result = dec.decode("UTF-8")
+        if not result:
+            request.app["config"]["creds"] = {}
+        else:
+            request.app["config"]["creds"] = json.loads(result)
+    else:
+        request.app["config"]["creds"] = request.json()
+    res = await handler(request)
+    return res
 
 
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
