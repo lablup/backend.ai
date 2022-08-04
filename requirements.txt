@@ -65,6 +65,10 @@ uvloop>=0.16
 yarl>=1.7
 zipstream-new~=1.1.8
 
+# required by ai.backend.test (integration test suite)
+pytest>=7.1.2
+pytest-dependency>=0.5.1
+
 # type stubs
 types-aiofiles
 types-click
