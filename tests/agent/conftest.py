@@ -22,7 +22,18 @@ def test_id():
 
 
 @pytest.fixture(scope="session")
-def local_config(test_id, etcd_container, redis_container):  # noqa: F811
+def logging_config():
+    config = {
+        "drivers": ["console"],
+        "console": {"colored": None, "format": "verbose"},
+    }
+    logger = LocalLogger(config)
+    with logger:
+        yield config
+
+
+@pytest.fixture(scope="session")
+def local_config(test_id, logging_config, etcd_container, redis_container):  # noqa: F811
     ipc_base_path = Path.cwd() / f".tmp/{test_id}/agent-ipc"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"
@@ -54,7 +65,7 @@ def local_config(test_id, etcd_container, redis_container):  # noqa: F811
             "reserved-mem": tx.BinarySize().check("256M"),
             "reserved-disk": tx.BinarySize().check("1G"),
         },
-        "logging": {},
+        "logging": logging_config,
         "debug": defaultdict(lambda: False),
         "etcd": {
             "addr": etcd_addr,
@@ -82,9 +93,7 @@ def local_config(test_id, etcd_container, redis_container):  # noqa: F811
         _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "password")
     except config.ConfigurationError:
         pass
-    logger = LocalLogger(cfg["logging"])
-    with logger:
-        yield cfg
+    yield cfg
     shutil.rmtree(ipc_base_path)
 
 

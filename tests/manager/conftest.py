@@ -109,8 +109,20 @@ def vfolder_host():
 
 
 @pytest.fixture(scope="session")
+def logging_config():
+    config = {
+        "drivers": ["console"],
+        "console": {"colored": None, "format": "verbose"},
+    }
+    logger = LocalLogger(config)
+    with logger:
+        yield config
+
+
+@pytest.fixture(scope="session")
 def local_config(
     test_id,
+    logging_config,
     etcd_container,  # noqa: F811
     redis_container,  # noqa: F811
     postgres_container,  # noqa: F811
@@ -157,10 +169,7 @@ def local_config(
                 "log-scheduler-ticks": False,
                 "periodic-sync-stats": False,
             },
-            "logging": {
-                "drivers": ["console"],
-                "console": {"colored": False, "format": "verbose"},
-            },
+            "logging": logging_config,
         }
     )
 
@@ -182,9 +191,7 @@ def local_config(
         _override_if_exists(fs_local_config["db"], cfg["db"], "password")
     except ConfigurationError:
         pass
-    logger = LocalLogger(cfg["logging"])
-    with logger:
-        yield cfg
+    yield cfg
     try:
         shutil.rmtree(ipc_base_path)
     except IOError:
