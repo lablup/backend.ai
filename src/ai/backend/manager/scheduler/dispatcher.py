@@ -12,7 +12,6 @@ import async_timeout
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
@@ -46,7 +45,6 @@ from ..models import (
     ScalingGroupRow,
     SessionRow,
     SessionStatus,
-    agents,
     get_session_by_id,
     get_sgroup_managed_sessions,
     kernels,
@@ -562,7 +560,7 @@ class SchedulerDispatcher(aobject):
                 agent_id = cand_agent
             else:
                 agent_id = agent.id
-            async with self.db.begin() as agent_db_sess:
+            async with self.db.begin_session() as agent_db_sess:
                 query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent_id)
                 available_agent_slots = (await agent_db_sess.execute(query)).scalar()
                 # if pass the available test
@@ -1116,36 +1114,29 @@ async def _list_managed_sessions(
 
 async def _reserve_agent(
     sched_ctx: SchedulingContext,
-    db_conn: SAConnection,
+    db_sess: SASession,
     scaling_group: str,
     agent_id: Optional[AgentId],
     requested_slots: ResourceSlot,
     extra_conds: Any = None,
 ) -> AgentAllocationContext:
-    query = (
-        sa.select([agents.c.occupied_slots])
-        .select_from(agents)
-        .where(agents.c.id == agent_id)
-        .with_for_update()
-    )
+    query = sa.select(AgentRow.occupied_slots).where(AgentRow.id == agent_id).with_for_update()
     if extra_conds is not None:
         query = query.where(extra_conds)
-    current_occupied_slots = (await db_conn.execute(query)).scalar()
+    current_occupied_slots = (await db_sess.execute(query)).scalar()
     if current_occupied_slots is None:
         raise RuntimeError(f"No agent matching condition: {extra_conds}")
     update_query = (
-        sa.update(agents)
+        sa.update(AgentRow)
         .values(
-            {
-                "occupied_slots": current_occupied_slots + requested_slots,
-            }
+            occupied_slots=(current_occupied_slots + requested_slots),
         )
-        .where(agents.c.id == agent_id)
+        .where(AgentRow.id == agent_id)
     )
-    await db_conn.execute(update_query)
+    await db_sess.execute(update_query)
     # Get the agent address for later RPC calls
-    query = sa.select([agents.c.addr]).where(agents.c.id == agent_id)
-    agent_addr = await db_conn.scalar(query)
+    query = sa.select(AgentRow.addr).where(AgentRow.id == agent_id)
+    agent_addr = await db_sess.scalar(query)
     assert agent_addr is not None
     return AgentAllocationContext(agent_id, agent_addr, scaling_group)
 
