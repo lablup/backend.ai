@@ -2,7 +2,6 @@ python_sources(
     name="service",
     sources=["**/*.py"],
     dependencies=[
-        "src/ai/backend/common:lib",
         ":resources",
     ],
 )

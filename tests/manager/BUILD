@@ -12,9 +12,7 @@ python_test_utils(
 python_tests(
     name="tests",
     dependencies=[
-        "src/ai/backend/manager:service",
-        "src/ai/backend/testutils:lib",
-        "//:reqs#aiosqlite",
+        "//:reqs#aiosqlite",  # not auto-inferred
     ],
 )
 
