@@ -71,12 +71,12 @@ usage() {
   echo ""
   echo "  ${LWHITE}--enable-cuda${NC}"
   echo "    Install CUDA accelerator plugin and pull a"
-  echo "    TenosrFlow CUDA kernel for testing/demo."
+  echo "    TensorFlow CUDA kernel for testing/demo."
   echo "    (default: false)"
   echo ""
   echo "  ${LWHITE}--enable-cuda-mock${NC}"
   echo "    Install CUDA accelerator mock plugin and pull a"
-  echo "    TenosrFlow CUDA kernel for testing/demo."
+  echo "    TensorFlow CUDA kernel for testing/demo."
   echo "    (default: false)"
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
@@ -486,12 +486,8 @@ bootstrap_pants() {
     local PANTS_CLONE_VERSION="release_${PANTS_VERSION}"
     set -e
     git -c advice.detachedHead=false clone --branch=$PANTS_CLONE_VERSION --depth=1 https://github.com/pantsbuild/pants tools/pants-src
-    # TODO: remove the manual patch after pants 2.13 or later is released.
     cd tools/pants-src
     local arch_name=$(uname -p)
-    if [ "$arch_name" = "arm64" -o "$arch_name" = "aarch64" ] && [ "$DISTRO" != "Darwin" ]; then
-      git apply ../pants-linux-aarch64.patch
-    fi
     cd ../..
     ln -s tools/pants-local
     ./pants-local version

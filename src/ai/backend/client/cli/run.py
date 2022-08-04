@@ -16,6 +16,8 @@ import tabulate as tabulate_mod
 from humanize import naturalsize
 from tabulate import tabulate
 
+from ai.backend.cli.types import ExitCode
+
 from ..compat import asyncio_run, current_loop
 from ..config import local_cache_path
 from ..exceptions import BackendError
@@ -525,14 +527,14 @@ def run(
         print(
             "You can run only either source files or command-line " "code snippet.", file=sys.stderr
         )
-        sys.exit(1)
+        sys.exit(ExitCode.INVALID_ARGUMENT)
     if not files and not code:
         print(
             "You should provide the command-line code snippet using "
             '"-c" option if run without files.',
             file=sys.stderr,
         )
-        sys.exit(1)
+        sys.exit(ExitCode.INVALID_ARGUMENT)
 
     envs = prepare_env_arg(env)
     resources = prepare_resource_arg(resources)
@@ -592,10 +594,10 @@ def run(
                 "The number maximum parallel sessions must be " "a positive integer.",
                 file=sys.stderr,
             )
-            sys.exit(1)
+            sys.exit(ExitCode.INVALID_ARGUMENT)
         if terminal:
             print("You cannot run multiple cases with terminal.", file=sys.stderr)
-            sys.exit(1)
+            sys.exit(ExitCode.INVALID_ARGUMENT)
         if not quiet:
             vprint_info("Running multiple sessions for the following combinations:")
             for case in case_set.keys():
@@ -624,7 +626,7 @@ def run(
             )
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         if compute_session.status == "PENDING":
             print_info("Session ID {0} is enqueued for scheduling.".format(name))
             return
@@ -690,7 +692,7 @@ def run(
             vprint_done("[{0}] Execution finished.".format(idx))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         finally:
             if rm:
                 vprint_wait("[{0}] Cleaning up the session...".format(idx))
@@ -888,7 +890,7 @@ def run(
             if any(map(lambda r: isinstance(r, Exception), results)):
                 if is_multi:
                     print_fail("There were failed cases!")
-                sys.exit(1)
+                sys.exit(ExitCode.FAILURE)
 
     try:
         asyncio_run(_run_cases())
