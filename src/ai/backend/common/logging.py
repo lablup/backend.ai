@@ -58,7 +58,7 @@ logging_config_iv = t.Dict(
         t.Key("console", default=None): t.Null
         | t.Dict(
             {
-                t.Key("colored", default=True): t.Bool,
+                t.Key("colored", default=None): t.Null | t.Bool,
                 t.Key("format", default="verbose"): logformat_iv,
             }
         ).allow_extra("*"),
@@ -238,7 +238,10 @@ def setup_console_log_handler(config: Mapping[str, Any]) -> logging.Handler:
     }
     drv_config = config["console"]
     console_formatter: logging.Formatter
-    if drv_config["colored"]:
+    colored = drv_config["colored"]
+    if colored is None:
+        colored = sys.stderr.isatty()
+    if colored:
         console_formatter = coloredlogs.ColoredFormatter(
             log_formats[drv_config["format"]],
             datefmt="%Y-%m-%d %H:%M:%S.%f",  # coloredlogs has intrinsic support for msec
