@@ -113,6 +113,16 @@ def logging_config():
     config = {
         "drivers": ["console"],
         "console": {"colored": None, "format": "verbose"},
+        "level": "DEBUG",
+        "pkg-ns": {
+            "": "INFO",
+            "ai.backend": "DEBUG",
+            "tests": "DEBUG",
+            "alembic": "INFO",
+            "aiotools": "INFO",
+            "aiohttp": "INFO",
+            "sqlalchemy": "WARNING",
+        },
     }
     logger = LocalLogger(config)
     with logger:
