@@ -26,27 +26,3 @@ python_tests(
         ":redis-cluster-compose",
     ],
 )
-
-pex_binary(
-    name="spawn-sentinel-cluster",
-    dependencies=[
-        ":test_utils",
-    ],
-    entry_point="docker.py",
-)
-
-pex_binary(
-    name="spawn-compose-redis-sentinel-cluster",
-    dependencies=[
-        ":test_utils",
-    ],
-    entry_point="docker.py",
-)
-
-pex_binary(
-    name="spawn-native-redis-sentinel-cluster",
-    dependencies=[
-        ":test_utils",
-    ],
-    entry_point="native.py",
-)
