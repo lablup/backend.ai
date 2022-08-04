@@ -4,6 +4,7 @@ import sys
 
 import click
 
+from ai.backend.cli.types import ExitCode
 from ai.backend.client.output.fields import agent_fields
 from ai.backend.client.session import Session
 
@@ -44,7 +45,7 @@ def info(ctx: CLIContext, agent_id: str) -> None:
             ctx.output.print_item(item, fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @agent.command()
@@ -106,7 +107,7 @@ def list(
             )
     except Exception as e:
         ctx.output.print_error(e)
-        sys.exit(1)
+        sys.exit(ExitCode.FAILURE)
 
 
 @admin.group()
@@ -135,7 +136,7 @@ def status(ctx: CLIContext, agent: str) -> None:
             print(status)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @watcher.command()
@@ -155,7 +156,7 @@ def agent_start(ctx: CLIContext, agent: str) -> None:
             print(status)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @watcher.command()
@@ -175,7 +176,7 @@ def agent_stop(ctx: CLIContext, agent: str) -> None:
             print(status)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @watcher.command()
@@ -195,4 +196,4 @@ def agent_restart(ctx: CLIContext, agent: str) -> None:
             print(status)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
