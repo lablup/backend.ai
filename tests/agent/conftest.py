@@ -10,6 +10,7 @@ import pytest
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
+from ai.backend.common.logging import LocalLogger
 from ai.backend.common.types import EtcdRedisConfig, HostPortPair
 from ai.backend.testutils.bootstrap import etcd_container, redis_container  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
@@ -81,7 +82,9 @@ def local_config(test_id, etcd_container, redis_container):  # noqa: F811
         _override_if_exists(fs_local_config["etcd"], cfg["etcd"], "password")
     except config.ConfigurationError:
         pass
-    yield cfg
+    logger = LocalLogger(cfg["logging"])
+    with logger:
+        yield cfg
     shutil.rmtree(ipc_base_path)
 
 
