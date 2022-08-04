@@ -34,6 +34,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
+from ai.backend.common.logging import LocalLogger
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.api.context import RootContext
@@ -181,7 +182,9 @@ def local_config(
         _override_if_exists(fs_local_config["db"], cfg["db"], "password")
     except ConfigurationError:
         pass
-    yield cfg
+    logger = LocalLogger(cfg["logging"])
+    with logger:
+        yield cfg
     try:
         shutil.rmtree(ipc_base_path)
     except IOError:

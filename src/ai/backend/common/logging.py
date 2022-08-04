@@ -47,6 +47,7 @@ logformat_iv = t.Enum("simple", "verbose")
 default_pkg_ns = {
     "": "WARNING",
     "ai.backend": "INFO",
+    "tests": "DEBUG",
 }
 
 logging_config_iv = t.Dict(
@@ -230,6 +231,61 @@ class pretty:
         return pprint.pformat(self.obj)
 
 
+def setup_console_log_handler(config: Mapping[str, Any]) -> logging.Handler:
+    log_formats = {
+        "simple": "%(levelname)s %(message)s",
+        "verbose": "%(asctime)s %(levelname)s %(name)s [%(process)d] %(message)s",
+    }
+    drv_config = config["console"]
+    console_formatter: logging.Formatter
+    if drv_config["colored"]:
+        console_formatter = coloredlogs.ColoredFormatter(
+            log_formats[drv_config["format"]],
+            datefmt="%Y-%m-%d %H:%M:%S.%f",  # coloredlogs has intrinsic support for msec
+            field_styles={
+                "levelname": {"color": 248, "bold": True},
+                "name": {"color": 246, "bold": False},
+                "process": {"color": "cyan"},
+                "asctime": {"color": 240},
+            },
+            level_styles={
+                "debug": {"color": "green"},
+                "verbose": {"color": "green", "bright": True},
+                "info": {"color": "cyan", "bright": True},
+                "notice": {"color": "cyan", "bold": True},
+                "warning": {"color": "yellow"},
+                "error": {"color": "red", "bright": True},
+                "success": {"color": 77},
+                "critical": {"background": "red", "color": 255, "bold": True},
+            },
+        )
+    else:
+        console_formatter = ConsoleFormatter(
+            log_formats[drv_config["format"]],
+            datefmt="%Y-%m-%d %H:%M:%S.%f",
+        )
+    console_handler = logging.StreamHandler(
+        stream=sys.stderr,
+    )
+    console_handler.setLevel(config["level"])
+    console_handler.setFormatter(console_formatter)
+    return console_handler
+
+
+def setup_file_log_handler(config: Mapping[str, Any]) -> logging.Handler:
+    drv_config = config["file"]
+    fmt = "%(timestamp) %(level) %(name) %(processName) %(message)"
+    file_handler = logging.handlers.RotatingFileHandler(
+        filename=drv_config["path"] / drv_config["filename"],
+        backupCount=drv_config["backup-count"],
+        maxBytes=drv_config["rotation-size"],
+        encoding="utf-8",
+    )
+    file_handler.setLevel(config["level"])
+    file_handler.setFormatter(CustomJsonFormatter(fmt))
+    return file_handler
+
+
 def log_worker(
     daemon_config: Mapping[str, Any],
     parent_pid: int,
@@ -240,57 +296,11 @@ def log_worker(
     file_handler = None
     logstash_handler = None
 
-    log_formats = {
-        "simple": "%(levelname)s %(message)s",
-        "verbose": "%(asctime)s %(levelname)s %(name)s [%(process)d] %(message)s",
-    }
-
     if "console" in daemon_config["drivers"]:
-        drv_config = daemon_config["console"]
-        console_formatter: logging.Formatter
-        if drv_config["colored"]:
-            console_formatter = coloredlogs.ColoredFormatter(
-                log_formats[drv_config["format"]],
-                datefmt="%Y-%m-%d %H:%M:%S.%f",  # coloredlogs has intrinsic support for msec
-                field_styles={
-                    "levelname": {"color": 248, "bold": True},
-                    "name": {"color": 246, "bold": False},
-                    "process": {"color": "cyan"},
-                    "asctime": {"color": 240},
-                },
-                level_styles={
-                    "debug": {"color": "green"},
-                    "verbose": {"color": "green", "bright": True},
-                    "info": {"color": "cyan", "bright": True},
-                    "notice": {"color": "cyan", "bold": True},
-                    "warning": {"color": "yellow"},
-                    "error": {"color": "red", "bright": True},
-                    "success": {"color": 77},
-                    "critical": {"background": "red", "color": 255, "bold": True},
-                },
-            )
-        else:
-            console_formatter = ConsoleFormatter(
-                log_formats[drv_config["format"]],
-                datefmt="%Y-%m-%d %H:%M:%S.%f",
-            )
-        console_handler = logging.StreamHandler(
-            stream=sys.stderr,
-        )
-        console_handler.setLevel(daemon_config["level"])
-        console_handler.setFormatter(console_formatter)
+        console_handler = setup_console_log_handler(daemon_config)
 
     if "file" in daemon_config["drivers"]:
-        drv_config = daemon_config["file"]
-        fmt = "%(timestamp) %(level) %(name) %(processName) %(message)"
-        file_handler = logging.handlers.RotatingFileHandler(
-            filename=drv_config["path"] / drv_config["filename"],
-            backupCount=drv_config["backup-count"],
-            maxBytes=drv_config["rotation-size"],
-            encoding="utf-8",
-        )
-        file_handler.setLevel(daemon_config["level"])
-        file_handler.setFormatter(CustomJsonFormatter(fmt))
+        file_handler = setup_file_log_handler(daemon_config)
 
     if "logstash" in daemon_config["drivers"]:
         drv_config = daemon_config["logstash"]
@@ -451,6 +461,58 @@ class NoopLogger(AbstractLogger):
         pass
 
 
+class LocalLogger(AbstractLogger):
+    def __init__(
+        self,
+        daemon_config: MutableMapping[str, Any],
+    ) -> None:
+        cfg = logging_config_iv.check(daemon_config)
+        _check_driver_config_exists_if_activated(cfg, "console")
+        self.daemon_config = cfg
+        log_handlers = []
+        if "console" in self.daemon_config["drivers"]:
+            console_handler = setup_console_log_handler(self.daemon_config)
+            log_handlers.append(console_handler)
+        if "file" in self.daemon_config["drivers"]:
+            file_handler = setup_file_log_handler(self.daemon_config)
+            log_handlers.append(file_handler)
+        self.log_config = {
+            "version": 1,
+            "disable_existing_loggers": True,
+            "handlers": {
+                "null": {"class": "logging.NullHandler"},
+            },
+            "loggers": {
+                "": {
+                    "handlers": [],
+                    "level": cfg["level"],
+                },
+                **{
+                    k: {
+                        "handlers": [],
+                        "level": v,
+                        "propagate": False,
+                    }
+                    for k, v in cfg["pkg-ns"].items()
+                },
+            },
+        }
+        logging.config.dictConfig(self.log_config)
+        root_logger = logging.getLogger(None)
+        for h in log_handlers:
+            root_logger.addHandler(h)
+        for pkg_ns in cfg["pkg-ns"].keys():
+            ns_logger = logging.getLogger(pkg_ns)
+            for h in log_handlers:
+                ns_logger.addHandler(h)
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *exc_info_args):
+        pass
+
+
 class Logger(AbstractLogger):
 
     is_master: bool
@@ -478,12 +540,6 @@ class Logger(AbstractLogger):
             config.override_with_env(daemon_config, ("file", "rotation-size"), legacy_logfile_size)
 
         cfg = logging_config_iv.check(daemon_config)
-
-        def _check_driver_config_exists_if_activated(cfg, driver):
-            if driver in cfg["drivers"] and cfg[driver] is None:
-                raise ConfigurationError(
-                    {"logging": f"{driver} driver is activated but no config given."}
-                )
 
         _check_driver_config_exists_if_activated(cfg, "console")
         _check_driver_config_exists_if_activated(cfg, "file")
@@ -544,3 +600,8 @@ class Logger(AbstractLogger):
             ep_url = yarl.URL(self.log_endpoint)
             if ep_url.scheme.lower() == "ipc" and (ep_sock := Path(ep_url.path)).exists():
                 ep_sock.unlink()
+
+
+def _check_driver_config_exists_if_activated(cfg, driver):
+    if driver in cfg["drivers"] and cfg[driver] is None:
+        raise ConfigurationError({"logging": f"{driver} driver is activated but no config given."})
