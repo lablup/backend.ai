@@ -1834,10 +1834,13 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     vfolder_id = row["id"]
     perm = row["permission"]
 
-    if rqst_user_uuid != shared_user_uuid and user_role not in (UserRole.SUPERADMIN):
-        raise GenericForbidden("Insufficient permission")
-
-    user_uuid = shared_user_uuid if shared_user_uuid else rqst_user_uuid
+    if shared_user_uuid:
+        # Allow only superadmin to leave the shared vfolder of others.
+        if (rqst_user_uuid != shared_user_uuid) and (user_role not in (UserRole.SUPERADMIN)):
+            raise GenericForbidden("Insufficient permission")
+        user_uuid = shared_user_uuid
+    else:
+        user_uuid = rqst_user_uuid
 
     log.info(
         "VFOLDER.LEAVE(ak:{}, vfid:{}, uid:{}, perm:{})", access_key, vfolder_id, user_uuid, perm
