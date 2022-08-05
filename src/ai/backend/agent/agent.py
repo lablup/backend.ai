@@ -942,8 +942,6 @@ class AbstractAgent(
         except Exception:
             log.exception("unhandled exception while processing PAUSE event")
 
-
-
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
             exc_type: Type[Exception],
