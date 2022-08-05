@@ -722,15 +722,22 @@ async def registry_ctx(mocker):
     mock_shared_config.etcd = None
     mock_db = MagicMock()
     mock_dbconn = MagicMock()
+    mock_dbsess = MagicMock()
     mock_dbconn_ctx = MagicMock()
+    mock_dbsess_ctx = MagicMock()
     mock_dbresult = MagicMock()
     mock_dbresult.rowcount = 1
     mock_db.connect = MagicMock(return_value=mock_dbconn_ctx)
     mock_db.begin = MagicMock(return_value=mock_dbconn_ctx)
+    mock_db.begin_session = MagicMock(return_value=mock_dbsess_ctx)
     mock_dbconn_ctx.__aenter__ = AsyncMock(return_value=mock_dbconn)
     mock_dbconn_ctx.__aexit__ = AsyncMock()
+    mock_dbsess_ctx.__aenter__ = AsyncMock(return_value=mock_dbsess)
+    mock_dbsess_ctx.__aexit__ = AsyncMock()
     mock_dbconn.execute = AsyncMock(return_value=mock_dbresult)
     mock_dbconn.begin = MagicMock(return_value=mock_dbconn_ctx)
+    mock_dbsess.execute = AsyncMock(return_value=mock_dbresult)
+    mock_dbsess.begin_session = AsyncMock(return_value=mock_dbsess_ctx)
     mock_redis_stat = MagicMock()
     mock_redis_live = MagicMock()
     mock_redis_live.hset = AsyncMock()
@@ -758,6 +765,7 @@ async def registry_ctx(mocker):
         yield (
             registry,
             mock_dbconn,
+            mock_dbsess,
             mock_dbresult,
             mock_shared_config,
             mock_event_dispatcher,

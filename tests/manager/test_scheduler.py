@@ -396,6 +396,7 @@ def example_pending_sessions():
                     cluster_idx=1,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
                     image_id=common_image.id,
+                    image_row=common_image,
                     image=common_image,
                     resource_opts={},
                     requested_slots=ResourceSlot(
@@ -1088,19 +1089,19 @@ async def test_manually_assign_agent_available(
     mock_local_config = MagicMock()
     (
         registry,
-        mock_db,
+        mock_dbconn,
+        mock_dbsess,
         mock_dbresult,
         mock_shared_config,
         mock_event_dispatcher,
         mock_event_producer,
     ) = registry_ctx
-    sess_ctx = example_pending_sessions[0]
     mock_sched_ctx = MagicMock()
     mock_check_result = MagicMock()
     scheduler = FIFOSlotScheduler(ScalingGroupOpts(), {})
     sgroup_name = example_agents[0].scaling_group
     candidate_agents = example_agents
-    example_pending_sessions[0].agent_id = "i-001"
+    example_pending_sessions[0].kernels[0].agent = example_agents[0].id
     sess_ctx = example_pending_sessions[0]
 
     dispatcher = SchedulerDispatcher(
@@ -1112,7 +1113,7 @@ async def test_manually_assign_agent_available(
         registry=registry,
     )
 
-    # manually assigned agent is None
+    # manually assigned agent has None capacity
     mock_dbresult.scalar = MagicMock(return_value=None)
     await dispatcher._schedule_single_node_session(
         mock_sched_ctx,
@@ -1124,6 +1125,19 @@ async def test_manually_assign_agent_available(
     )
     result = mock_dbresult.scalar()
     assert result is None
+
+    # manually assigned agent has empty capacity
+    mock_dbresult.scalar = MagicMock(return_value={})
+    await dispatcher._schedule_single_node_session(
+        mock_sched_ctx,
+        scheduler,
+        sgroup_name,
+        candidate_agents,
+        sess_ctx,
+        mock_check_result,
+    )
+    result = mock_dbresult.scalar()
+    assert result == {}
 
     # manually assigned agent is enough capacity
     mock_dbresult.scalar = MagicMock(

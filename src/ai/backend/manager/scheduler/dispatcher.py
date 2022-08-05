@@ -559,10 +559,12 @@ class SchedulerDispatcher(aobject):
                 agent_id = agent.id
             async with self.db.begin_session() as agent_db_sess:
                 query = sa.select(AgentRow.available_slots).where(AgentRow.id == agent_id)
-                available_agent_slots = (await agent_db_sess.execute(query)).scalar()
+                result = await agent_db_sess.execute(query)
+                available_agent_slots = result.scalar()
                 # if pass the available test
                 if available_agent_slots is None:
                     raise InstanceNotAvailable("There is no such agent.")
+                assert isinstance(available_agent_slots, ResourceSlot), f"wrong type. type is {type(available_agent_slots)}"
                 insufficient_slots = {
                     slot: val
                     for slot, val in sess_ctx.requested_slots.items()
