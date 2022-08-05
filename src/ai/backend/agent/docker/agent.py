@@ -1376,12 +1376,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         async def handle_action_oom(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
             # When OOM event occurs in containers, we immediately pause them.
             # And, status info is changed to 'out-of-memory'.
-            reason = 'out-of-memory'
+            reason = "out-of-memory"
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.PAUSE,
                 reason,
-                container_id=ContainerId(evdata['Actor']['ID']),
+                container_id=ContainerId(evdata["Actor"]["ID"]),
             )
 
         while True:
@@ -1420,7 +1420,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                         handle_action_start(kernel_id, evdata),
                                     )
                                 )
-                            elif evdata['Action'] == 'oom':
+                            elif evdata["Action"] == "oom":
                                 await asyncio.shield(handle_action_oom(kernel_id, evdata))
                             elif evdata["Action"] == "die":
                                 await asyncio.shield(

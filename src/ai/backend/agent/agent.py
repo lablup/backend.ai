@@ -77,10 +77,10 @@ from ai.backend.common.events import (
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
+    KernelPausedEvent,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
-    KernelPausedEvent,
     KernelTerminatedEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
@@ -912,13 +912,11 @@ class AbstractAgent(
     async def _handle_pause_event(self, ev: ContainerLifecycleEvent) -> None:
         try:
             await self.pause_kernel(ev.kernel_id, ev.container_id)
-            await self.produce_event(
-                KernelPausedEvent(ev.kernel_id, ev.reason)
-            )
+            await self.produce_event(KernelPausedEvent(ev.kernel_id, ev.reason))
         except asyncio.CancelledError:
             pass
         except Exception:
-            log.exception('unhandled exception while processing PAUSE event')
+            log.exception("unhandled exception while processing PAUSE event")
 
     async def _handle_unpause_event(self, ev: ContainerLifecycleEvent) -> None:
         try:
@@ -926,7 +924,7 @@ class AbstractAgent(
         except asyncio.CancelledError:
             pass
         except Exception:
-            log.exception('unhandled exception while processing PAUSE event')
+            log.exception("unhandled exception while processing PAUSE event")
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
