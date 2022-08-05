@@ -1289,7 +1289,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
         except DockerError as e:
             log.exception(e)
-            self.error_monitor.capture_exception()
+            await self.error_monitor.capture_exception()
 
     async def unpause_kernel(
         self,
@@ -1304,7 +1304,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 await container.unpause()
         except DockerError as e:
             log.exception(e)
-            self.error_monitor.capture_exception()
+            await self.error_monitor.capture_exception()
 
     async def create_overlay_network(self, network_name: str) -> None:
         if not self.heartbeat_extra_info["swarm_enabled"]:
