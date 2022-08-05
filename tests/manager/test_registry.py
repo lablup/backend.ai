@@ -16,7 +16,9 @@ from ai.backend.manager.registry import AgentRegistry
 
 @pytest.mark.asyncio
 async def test_handle_heartbeat(
-    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
+    registry_ctx: tuple[
+        AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock
+    ],
     mocker,
 ) -> None:
     mock_get_known_registries = AsyncMock(
@@ -144,7 +146,9 @@ async def test_handle_heartbeat(
 
 @pytest.mark.asyncio
 async def test_convert_resource_spec_to_resource_slot(
-    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
+    registry_ctx: tuple[
+        AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock
+    ],
 ):
     registry, _, _, _, _, _, _ = registry_ctx
     allocations = {
