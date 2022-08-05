@@ -564,7 +564,7 @@ class SchedulerDispatcher(aobject):
                 # if pass the available test
                 if available_agent_slots is None:
                     raise InstanceNotAvailable("There is no such agent.")
-                assert isinstance(available_agent_slots, ResourceSlot), f"wrong type. type is {type(available_agent_slots)}"
+                assert isinstance(available_agent_slots, ResourceSlot)
                 insufficient_slots = {
                     slot: val
                     for slot, val in sess_ctx.requested_slots.items()
