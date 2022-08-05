@@ -7,6 +7,8 @@ from typing import Dict, List, MutableMapping, Optional, Sequence, Union
 import aiohttp
 import click
 
+from ai.backend.cli.types import ExitCode
+
 from ..compat import asyncio_run, asyncio_run_forever
 from ..config import DEFAULT_CHUNK_SIZE
 from ..request import Request
@@ -319,7 +321,7 @@ def app(session_name, app, bind, arg, env):
         sys.exit(proxy_ctx.exit_code)
     except Exception as e:
         print_error(e)
-        sys.exit(1)
+        sys.exit(ExitCode.FAILURE)
 
 
 @main.command()
