@@ -292,6 +292,10 @@ class KernelTerminatedEvent(KernelTerminationEventArgs, AbstractEvent):
     name = "kernel_terminated"
 
 
+class KernelPausedEvent(KernelTerminationEventArgs, AbstractEvent):
+    name = "kernel_paused"
+
+
 @attr.s(slots=True, frozen=True)
 class SessionCreationEventArgs:
     session_id: SessionId = attr.ib()
