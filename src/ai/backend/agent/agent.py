@@ -80,6 +80,7 @@ from ai.backend.common.events import (
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
+    KernelPausedEvent,
     KernelTerminatedEvent,
     SessionFailureEvent,
     SessionSuccessEvent,
@@ -908,6 +909,25 @@ class AbstractAgent(
                     if ev.done_future is not None and not ev.done_future.done():
                         ev.done_future.set_result(None)
 
+    async def _handle_pause_event(self, ev: ContainerLifecycleEvent) -> None:
+        try:
+            await self.pause_kernel(ev.kernel_id, ev.container_id)
+            await self.produce_event(
+                KernelPausedEvent(ev.kernel_id, ev.reason)
+            )
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            log.exception('unhandled exception while processing PAUSE event')
+
+    async def _handle_unpause_event(self, ev: ContainerLifecycleEvent) -> None:
+        try:
+            await self.unpause_kernel(ev.kernel_id, ev.container_id)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            log.exception('unhandled exception while processing PAUSE event')
+
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
             exc_type: Type[Exception],
@@ -935,6 +955,8 @@ class AbstractAgent(
                         tg.create_task(self._handle_destroy_event(ev))
                     elif ev.event == LifecycleEvent.CLEAN:
                         tg.create_task(self._handle_clean_event(ev))
+                    elif ev.event == LifecycleEvent.PAUSE:
+                        tg.create_task(self._handle_pause_event(ev))
                     else:
                         log.warning("unsupported lifecycle event: {!r}", ev)
                 except Exception:
