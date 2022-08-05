@@ -34,7 +34,7 @@ async def test_handle_heartbeat(
 
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
 
-    registry, mock_dbconn, mock_dbresult, mock_shared_config, _, _ = registry_ctx
+    registry, mock_dbconn, mock_dbsess, mock_dbresult, mock_shared_config, _, _ = registry_ctx
     image_data = snappy.compress(
         msgpack.packb(
             [
@@ -146,7 +146,7 @@ async def test_handle_heartbeat(
 async def test_convert_resource_spec_to_resource_slot(
     registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
 ):
-    registry, _, _, _, _, _ = registry_ctx
+    registry, _, _, _, _, _, _ = registry_ctx
     allocations = {
         "cuda": {
             SlotName("cuda.shares"): {
