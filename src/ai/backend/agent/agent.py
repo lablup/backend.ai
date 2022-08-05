@@ -909,6 +909,22 @@ class AbstractAgent(
                     if ev.done_future is not None and not ev.done_future.done():
                         ev.done_future.set_result(None)
 
+    @abstractmethod
+    async def pause_kernel(
+        self,
+        kernel_id: KernelId,
+        container_id: Optional[ContainerId],
+    ) -> None:
+        pass
+
+    @abstractmethod
+    async def unpause_kernel(
+        self,
+        kernel_id: KernelId,
+        container_id: Optional[ContainerId],
+    ) -> None:
+        pass
+
     async def _handle_pause_event(self, ev: ContainerLifecycleEvent) -> None:
         try:
             await self.pause_kernel(ev.kernel_id, ev.container_id)
@@ -925,6 +941,8 @@ class AbstractAgent(
             pass
         except Exception:
             log.exception("unhandled exception while processing PAUSE event")
+
+
 
     async def process_lifecycle_events(self) -> None:
         async def lifecycle_task_exception_handler(
