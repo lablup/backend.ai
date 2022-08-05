@@ -44,10 +44,16 @@ from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
 from ai.backend.manager.cli.etcd import put_json as cli_etcd_put_json
 from ai.backend.manager.config import LocalConfig, SharedConfig
 from ai.backend.manager.config import load as load_config
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
+    DomainRow,
+    GroupRow,
+    KernelRow,
+    ScalingGroupRow,
+    SessionRow,
+    UserRow,
     agents,
     domains,
-    groups,
     kernels,
     keypairs,
     scaling_groups,
@@ -55,6 +61,7 @@ from ai.backend.manager.models import (
     vfolders,
 )
 from ai.backend.manager.models.base import pgsql_connect_opts, populate_fixture
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.utils import connect_database
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.server import build_root_app
@@ -778,59 +785,77 @@ async def registry_ctx(mocker):
 @pytest.fixture(scope="function")
 async def session_info(database_engine):
     user_uuid = str(uuid.uuid4()).replace("-", "")
+    user_password = str(uuid.uuid4()).replace("-", "")
     postfix = str(uuid.uuid4()).split("-")[1]
     domain_name = str(uuid.uuid4()).split("-")[0]
     group_id = str(uuid.uuid4()).replace("-", "")
     group_name = str(uuid.uuid4()).split("-")[0]
+    sgroup_name = str(uuid.uuid4()).split("-")[0]
     session_id = str(uuid.uuid4()).replace("-", "")
+    session_creation_id = str(uuid.uuid4()).replace("-", "")
 
-    async with database_engine.begin() as conn:
-        await conn.execute(
-            users.insert().values(
-                {
-                    "uuid": user_uuid,
-                    "username": f"TestCaseRunner-{postfix}",
-                    "email": f"tc.runner-{postfix}@lablup.com",
-                }
-            )
+    async with database_engine.begin_session() as db_sess:
+        scaling_group = ScalingGroupRow(
+            name=sgroup_name,
+            driver="test",
+            scheduler="test",
+            scheduler_opts=ScalingGroupOpts(),
         )
-        await conn.execute(
-            domains.insert().values(
-                {
-                    "name": domain_name,
-                    "total_resource_slots": {},
-                }
-            )
-        )
-        await conn.execute(
-            groups.insert().values(
-                {
-                    "id": group_id,
-                    "name": group_name,
-                    "domain_name": domain_name,
-                    "total_resource_slots": {},
-                }
-            )
-        )
-        await conn.execute(
-            kernels.insert().values(
-                {
-                    "session_id": session_id,
-                    "domain_name": domain_name,
-                    "group_id": group_id,
-                    "user_uuid": user_uuid,
-                    "occupied_slots": {},
-                    "repl_in_port": 0,
-                    "repl_out_port": 0,
-                    "stdin_port": 0,
-                    "stdout_port": 0,
-                }
-            )
-        )
+        db_sess.add(scaling_group)
 
-        yield session_id, conn
+        domain = DomainRow(name=domain_name, total_resource_slots={})
+        db_sess.add(domain)
 
-        await conn.execute(kernels.delete().where(kernels.c.session_id == session_id))
-        await conn.execute(groups.delete().where(groups.c.id == group_id))
-        await conn.execute(domains.delete().where(domains.c.name == domain_name))
-        await conn.execute(users.delete().where(users.c.uuid == user_uuid))
+        group = GroupRow(
+            id=group_id,
+            name=group_name,
+            domain_name=domain_name,
+            total_resource_slots={},
+        )
+        db_sess.add(group)
+
+        user = UserRow(
+            uuid=user_uuid,
+            email=f"tc.runner-{postfix}@lablup.com",
+            username=f"TestCaseRunner-{postfix}",
+            password=user_password,
+            domain_name=domain_name,
+        )
+        db_sess.add(user)
+
+        sess = SessionRow(
+            id=session_id,
+            creation_id=session_creation_id,
+            cluster_size=1,
+            domain_name=domain_name,
+            scaling_group_name=sgroup_name,
+            group_id=group_id,
+            user_uuid=user_uuid,
+            vfolder_mounts={},
+        )
+        db_sess.add(sess)
+
+        kern = KernelRow(
+            session_id=session_id,
+            domain_name=domain_name,
+            group_id=group_id,
+            user_uuid=user_uuid,
+            cluster_role=DEFAULT_ROLE,
+            occupied_slots={},
+            repl_in_port=0,
+            repl_out_port=0,
+            stdin_port=0,
+            stdout_port=0,
+            vfolder_mounts={},
+        )
+        db_sess.add(kern)
+
+        await db_sess.commit()
+        yield session_id, db_sess
+
+        await db_sess.execute(sa.delete(KernelRow).where(KernelRow.session_id == session_id))
+        await db_sess.execute(sa.delete(SessionRow).where(SessionRow.id == session_id))
+        await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
+        await db_sess.execute(sa.delete(GroupRow).where(GroupRow.id == group_id))
+        await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
+        await db_sess.execute(sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == sgroup_name))

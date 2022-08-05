@@ -1082,7 +1082,7 @@ class DummyEtcd:
 @pytest.mark.asyncio
 async def test_manually_assign_agent_available(
     file_lock_factory,
-    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
+    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
     example_agents,
     example_pending_sessions,
 ):
