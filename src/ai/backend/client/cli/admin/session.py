@@ -80,6 +80,13 @@ def _list_cmd(name: str = "list", docs: str = None):
         "--offset", default=0, type=int, help="The index of the current page start for pagination."
     )
     @click.option("--limit", default=None, type=int, help="The page size for pagination.")
+    @click.option(
+        "-a",
+        "--all",
+        is_flag=True,
+        default=False,
+        help='Alias of "backend.ai ps --status ALL". Show all sessions (default shows just running)',
+    )
     def list(
         ctx: CLIContext,
         status: str | None,
@@ -94,6 +101,7 @@ def _list_cmd(name: str = "list", docs: str = None):
         order: str | None,
         offset: int,
         limit: int | None,
+        all: bool,
     ) -> None:
         """
         List and manage compute sessions.
@@ -175,7 +183,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 ]
             )
             no_match_name = "dead"
-        if status == "ALL":
+        if status == "ALL" or all:
             status = ",".join(
                 [
                     "PENDING",
