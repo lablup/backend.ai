@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 import time
 from typing import Iterator
@@ -8,6 +9,8 @@ from typing import Iterator
 import pytest
 
 from ai.backend.common.types import HostPortPair
+
+log = logging.getLogger(__name__)
 
 
 def wait_health_check(container_id):
