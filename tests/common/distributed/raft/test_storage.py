@@ -19,7 +19,7 @@ async def test_sqlite_storage() -> None:
     count = await storage.size()
     assert count == len(entries)
 
-    random_index = random.randint(0, count - 1)
+    random_index = random.randint(1, count)
     row = await storage.get(random_index)
     assert row is not None
     assert row.index == random_index
