@@ -80,7 +80,6 @@
 //     "types-aiofiles",
 //     "types-cachetools",
 //     "types-click",
-//     "types-protobuf",
 //     "types-python-dateutil",
 //     "types-redis",
 //     "types-setuptools",
@@ -3520,24 +3519,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d291388678af91bb045fafa864f142dc4ac22f5d4cdca097c7d8d8a32fa9b3ab",
-              "url": "https://files.pythonhosted.org/packages/00/0e/0dc8a4b0ce16bb585a8333e8b3a3d6bb15d22cc203e98ed9fa950276b8fd/types_protobuf-3.19.22-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "d2b26861b0cb46a3c8669b0df507b7ef72e487da66d61f9f3576aa76ce028a83",
-              "url": "https://files.pythonhosted.org/packages/41/1f/43011a0441926dbf0d3c6e75aecafb1c0edece9662df56c439e839426930/types-protobuf-3.19.22.tar.gz"
-            }
-          ],
-          "project_name": "types-protobuf",
-          "requires_dists": [],
-          "requires_python": null,
-          "version": "3.19.22"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "6284df1e4783d8fc6e587f0317a81333856b872a6669a282f8a325342bce7fa8",
               "url": "https://files.pythonhosted.org/packages/e9/02/232ffb54d392a41b538eb060ce0a92817366c475f6f49af2d76b89812fac/types_python_dateutil-2.8.19-py3-none-any.whl"
             },
@@ -4018,7 +3999,6 @@
     "types-aiofiles",
     "types-cachetools",
     "types-click",
-    "types-protobuf",
     "types-python-dateutil",
     "types-redis",
     "types-setuptools",
