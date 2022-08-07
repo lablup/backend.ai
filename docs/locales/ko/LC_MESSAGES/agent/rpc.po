@@ -20,4 +20,4 @@ msgstr ""
 
 #: ../../agent/rpc.rst:2 e90ffccf3e0345f2bb78b7fe467399aa
 msgid "RPC Interface for Kernel Management"
-msgstr ""
+msgstr "커널 관리 RPC 인터페이스"
