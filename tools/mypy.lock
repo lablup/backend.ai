@@ -47,6 +47,11 @@
             },
             {
               "algorithm": "sha256",
+              "hash": "25c5750ba5609a0c7550b73a33deb314ecfb559c350bb050b655505e8aed4103",
+              "url": "https://files.pythonhosted.org/packages/9e/01/a81de921bc3efde879f6eab5ff4d4bb33b037581f78eccfa28a47105d0b3/mypy-0.971-cp310-cp310-win_amd64.whl"
+            },
+            {
+              "algorithm": "sha256",
               "hash": "02ef476f6dcb86e6f502ae39a16b93285fef97e7f1ff22932b657d1ef1f28655",
               "url": "https://files.pythonhosted.org/packages/f0/b7/d39405fb53e0ae99c26cba3c8ab50717eafb7aeb64beea6efbd42a17ef82/mypy-0.971-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
             },
@@ -140,10 +145,7 @@
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
-  "target_systems": [
-    "linux",
-    "mac"
-  ],
+  "target_systems": [],
   "transitive": true,
   "use_pep517": null
 }
