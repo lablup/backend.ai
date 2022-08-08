@@ -568,11 +568,9 @@ def run(
 
     if preopen is None:
         preopen = []  # noqa
-    if assign_agent is None:
-        assign_agent = []  # noqa
 
     preopen_ports = preopen
-    assigned_agent_list = assign_agent
+    assigned_agent_list = assign_agent  # should be None if not specified
     for env_vmap, build_vmap, exec_vmap in vmaps_product:
         interpolated_envs = tuple((k, vt.substitute(env_vmap)) for k, vt in env_templates.items())
         if build:
