@@ -421,8 +421,9 @@ async def get_allowed_vfolder_hosts_by_group(
         query = sa.select([groups.c.allowed_vfolder_hosts]).where(
             (groups.c.domain_name == domain_name) & (groups.c.is_active),
         )
-        if results := await conn.scalar(query):
-            allowed_hosts.update(results)
+        if rows := (await conn.execute(query)).fetchall():
+            for row in rows:
+                allowed_hosts.update(row.allowed_vfolder_hosts)
     # Keypair Resource Policy's allowed_vfolder_hosts
     allowed_hosts.update(resource_policy["allowed_vfolder_hosts"])
     return allowed_hosts
@@ -474,8 +475,9 @@ async def get_allowed_vfolder_hosts_by_user(
             (domains.c.name == domain_name) & (groups.c.is_active),
         )
     )
-    if results := await conn.scalar(query):
-        allowed_hosts.update(results)
+    if rows := (await conn.execute(query)).fetchall():
+        for row in rows:
+            allowed_hosts.update(row.allowed_vfolder_hosts)
     # Keypair Resource Policy's allowed_vfolder_hosts
     allowed_hosts.update(resource_policy["allowed_vfolder_hosts"])
     return allowed_hosts
