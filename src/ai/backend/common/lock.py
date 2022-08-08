@@ -45,11 +45,11 @@ class AbstractDistributedLock(metaclass=abc.ABCMeta):
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         raise NotImplementedError
 
-    def enqueue_watchdog_task(self, ttl: float) -> None:
+    def register_watchdog_task(self, ttl: float) -> None:
         assert self._watchdog_task is None
         self._watchdog_task = asyncio.create_task(self._watchdog_timer(ttl=ttl))
 
-    def dequeue_watchdog_task(self) -> None:
+    def unregister_watchdog_task(self) -> None:
         if task := self._watchdog_task:
             if not task.done() and not task.cancelled():
                 task.cancel()
@@ -107,7 +107,7 @@ class FileLock(AbstractDistributedLock):
                     fcntl.flock(self._file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     self._locked = True
                     if lifetime := self._lifetime:
-                        self.enqueue_watchdog_task(ttl=lifetime)
+                        self.register_watchdog_task(ttl=lifetime)
                     if self._debug:
                         log.debug(f"{self.__class__.__name__} acquired: {self._path}")
         except RetryError:
@@ -115,7 +115,7 @@ class FileLock(AbstractDistributedLock):
 
     def release(self) -> None:
         assert self._file is not None
-        self.dequeue_watchdog_task()
+        self.unregister_watchdog_task()
         if self._locked:
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
