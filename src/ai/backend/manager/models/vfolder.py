@@ -390,7 +390,7 @@ async def get_allowed_vfolder_hosts_by_group(
     conn: SAConnection,
     resource_policy,
     domain_name: str,
-    group_id: uuid.UUID = None,
+    group_id: Optional[uuid.UUID] = None,
     domain_admin: bool = False,
 ) -> Set[str]:
     """
@@ -402,11 +402,12 @@ async def get_allowed_vfolder_hosts_by_group(
     from . import domains, groups
 
     # Domain's allowed_vfolder_hosts.
-    allowed_hosts = set()
+    allowed_hosts: set[str] = set()
     query = sa.select([domains.c.allowed_vfolder_hosts]).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
-    allowed_hosts.update(await conn.scalar(query))
+    if results := await conn.scalar(query):
+        allowed_hosts.update(results)
     # Group's allowed_vfolder_hosts.
     if group_id is not None:
         query = sa.select([groups.c.allowed_vfolder_hosts]).where(
@@ -414,14 +415,14 @@ async def get_allowed_vfolder_hosts_by_group(
             & (groups.c.id == group_id)
             & (groups.c.is_active),
         )
-        allowed_hosts.update(await conn.scalar(query))
+        if results := await conn.scalar(query):
+            allowed_hosts.update(results)
     elif domain_admin:
         query = sa.select([groups.c.allowed_vfolder_hosts]).where(
             (groups.c.domain_name == domain_name) & (groups.c.is_active),
         )
-        result = await conn.execute(query)
-        for row in result:
-            allowed_hosts.update(row.allowed_vfolder_hosts)
+        if results := await conn.scalar(query):
+            allowed_hosts.update(results)
     # Keypair Resource Policy's allowed_vfolder_hosts
     allowed_hosts.update(resource_policy["allowed_vfolder_hosts"])
     return allowed_hosts
@@ -432,7 +433,7 @@ async def get_allowed_vfolder_hosts_by_user(
     resource_policy,
     domain_name: str,
     user_uuid: uuid.UUID,
-    group_id: uuid.UUID = None,
+    group_id: Optional[uuid.UUID] = None,
 ) -> Set[str]:
     """
     Union `allowed_vfolder_hosts` from domain, groups, and keypair_resource_policy.
@@ -442,11 +443,12 @@ async def get_allowed_vfolder_hosts_by_user(
     from . import association_groups_users, domains, groups
 
     # Domain's allowed_vfolder_hosts.
-    allowed_hosts = set()
+    allowed_hosts: set[str] = set()
     query = sa.select([domains.c.allowed_vfolder_hosts]).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
-    allowed_hosts.update(await conn.scalar(query))
+    if results := await conn.scalar(query):
+        allowed_hosts.update(results)
     # User's Groups' allowed_vfolder_hosts.
     if group_id is not None:
         j = groups.join(
@@ -472,10 +474,8 @@ async def get_allowed_vfolder_hosts_by_user(
             (domains.c.name == domain_name) & (groups.c.is_active),
         )
     )
-    result = await conn.execute(query)
-    rows = result.fetchall()
-    for row in rows:
-        allowed_hosts.update(row["allowed_vfolder_hosts"])
+    if results := await conn.scalar(query):
+        allowed_hosts.update(results)
     # Keypair Resource Policy's allowed_vfolder_hosts
     allowed_hosts.update(resource_policy["allowed_vfolder_hosts"])
     return allowed_hosts
