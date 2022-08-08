@@ -406,8 +406,8 @@ async def get_allowed_vfolder_hosts_by_group(
     query = sa.select([domains.c.allowed_vfolder_hosts]).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
-    if results := await conn.scalar(query):
-        allowed_hosts.update(results)
+    if values := await conn.scalar(query):
+        allowed_hosts.update(values)
     # Group's allowed_vfolder_hosts.
     if group_id is not None:
         query = sa.select([groups.c.allowed_vfolder_hosts]).where(
@@ -415,8 +415,8 @@ async def get_allowed_vfolder_hosts_by_group(
             & (groups.c.id == group_id)
             & (groups.c.is_active),
         )
-        if results := await conn.scalar(query):
-            allowed_hosts.update(results)
+        if values := await conn.scalar(query):
+            allowed_hosts.update(values)
     elif domain_admin:
         query = sa.select([groups.c.allowed_vfolder_hosts]).where(
             (groups.c.domain_name == domain_name) & (groups.c.is_active),
@@ -448,8 +448,8 @@ async def get_allowed_vfolder_hosts_by_user(
     query = sa.select([domains.c.allowed_vfolder_hosts]).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
-    if results := await conn.scalar(query):
-        allowed_hosts.update(results)
+    if values := await conn.scalar(query):
+        allowed_hosts.update(values)
     # User's Groups' allowed_vfolder_hosts.
     if group_id is not None:
         j = groups.join(
