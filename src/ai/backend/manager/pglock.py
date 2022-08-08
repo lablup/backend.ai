@@ -27,3 +27,6 @@ class PgAdvisoryLock(AbstractDistributedLock):
             return await self._lock_ctx.__aexit__(*exc_info)
         finally:
             self._lock_ctx = None
+
+    async def _watchdog_timer(self, ttl: float) -> None:
+        pass
