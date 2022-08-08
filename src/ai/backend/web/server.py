@@ -187,7 +187,7 @@ async def login_handler(request: web.Request) -> web.Response:
             ),
             content_type="application/problem+json",
         )
-    creds = request.app["config"]["payload"]
+    creds = request["payload"]
     if "username" not in creds or not creds["username"]:
         return web.HTTPBadRequest(
             text=json.dumps(
