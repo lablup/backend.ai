@@ -371,60 +371,6 @@ class TimeoutIdleChecker(BaseIdleChecker):
         return False
 
 
-class V2TimeoutIdleChecker(BaseIdleChecker):
-    name: ClassVar[str] = 'v2_timeout'
-
-    _config_iv = t.Dict(
-        {
-            t.Key("threshold", default="10m"): tx.TimeDuration(),
-        },
-    ).allow_extra("*")
-
-    idle_timeout: timedelta
-    _evhandlers: List[EventHandler[None, AbstractEvent]]
-
-    async def aclose(self) -> None:
-        pass
-
-    async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
-        config = self._config_iv.check(raw_config)
-        self.idle_timeout = config["threshold"]
-        log.info(
-            "V2TimeoutIdleChecker: default idle_timeout = {0:,} seconds",
-            self.idle_timeout.total_seconds(),
-        )
-
-    async def check_session(self, session: Row, dbconn: SAConnection, policy: Row) -> bool:
-        session_id = session['id']
-        if session['session_type'] == SessionTypes.BATCH:
-            return True
-
-        raw_last_access = await redis_helper.execute(
-            self._redis_live,
-            lambda r: r.get(f'session.{session_id}.v2_last_used_time'),
-        )
-
-        if raw_last_access is None or raw_last_access == '0':
-            return True
-
-        t = await redis_helper.execute(self._redis_live, lambda r: r.time())
-        t = t[0] + (t[1] / (10**6))
-        last_access = float(raw_last_access)
-        idle_timeout = self.idle_timeout.total_seconds()
-        # setting idle_timeout:
-        # - zero/inf means "infinite"
-        # - negative means "undefined"
-        if policy["idle_timeout"] >= 0:
-            idle_timeout = float(policy["idle_timeout"])
-        if (
-            (idle_timeout <= 0)
-            or (math.isinf(idle_timeout) and idle_timeout > 0)
-            or (t - last_access <= idle_timeout)
-        ):
-            return True
-        return False
-
-
 class SessionLifetimeChecker(BaseIdleChecker):
 
     name: ClassVar[str] = "session_lifetime"
@@ -660,7 +606,6 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
 checker_registry: Mapping[str, Type[BaseIdleChecker]] = {
     TimeoutIdleChecker.name: TimeoutIdleChecker,
-    V2TimeoutIdleChecker.name: V2TimeoutIdleChecker,
     UtilizationIdleChecker.name: UtilizationIdleChecker,
 }
 
