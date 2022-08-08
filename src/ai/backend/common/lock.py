@@ -75,7 +75,7 @@ class FileLock(AbstractDistributedLock):
         if self._file is not None:
             self._debug = False
             self.release()
-            log.debug("file lock implicitly released: {}", self._path)
+            log.debug(f"{self.__class__.__name__} implicitly released: {self._path}")
 
     async def acquire(self) -> None:
         assert self._file is None
@@ -93,11 +93,12 @@ class FileLock(AbstractDistributedLock):
                     fcntl.flock(self._file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     self._locked = True
                     if self._lifetime is not None:
+                        assert self._watchdog_task is None
                         self._watchdog_task = asyncio.create_task(
                             self._watchdog_timer(ttl=self._lifetime),
                         )
                     if self._debug:
-                        log.debug("file lock acquired: {}", self._path)
+                        log.debug(f"{self.__class__.__name__} acquired: {self._path}")
         except RetryError:
             raise asyncio.TimeoutError(f"failed to lock file: {self._path}")
 
@@ -106,11 +107,12 @@ class FileLock(AbstractDistributedLock):
         if task := self._watchdog_task:
             if not task.done():
                 task.cancel()
+            self._watchdog_task = None
         if self._locked:
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
-                log.debug("file lock explicitly released: {}", self._path)
+                log.debug(f"{self.__class__.__name__} explicitly released: {self._path}")
         self._file.close()
         self._file = None
 
@@ -129,7 +131,7 @@ class FileLock(AbstractDistributedLock):
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
-                log.debug(f"file lock implicitly released by watchdog: {self._path}")
+                log.debug(f"{self.__class__.__name__} implicitly released by watchdog: {self._path}")
 
     @property
     def is_locked(self) -> bool:
