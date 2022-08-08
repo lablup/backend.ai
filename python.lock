@@ -42,6 +42,7 @@
 //     "etcetra~=0.1.8",
 //     "faker~=13.12.0",
 //     "graphene~=2.1.9",
+//     "hiredis~=1.1.0",
 //     "humanize>=3.1.0",
 //     "inquirer~=2.9.2",
 //     "janus>=0.6.1",
@@ -1597,34 +1598,34 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5bac1519194c45e482bc0d989d40baac5b56d450c11b07309911883496017bff",
-              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-2.0.0-cp310-cp310-macosx_10_15_x86_64.whl"
+              "hash": "5b4bdda35b40105b4ee3c87c72393496bec5e7f333befdcdd623511bf2684307",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_12_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "81d6d8e39695f2c37954d1011c0480ef7cf444d4e3ae24bc5e89ee5de360139a",
-              "url": "https://files.pythonhosted.org/packages/0c/39/eae11344d69ba435ec13d6bcc1a9eea3d2278324506fcd0e52d1ed8958c8/hiredis-2.0.0.tar.gz"
+              "hash": "996021ef33e0f50b97ff2d6b5f422a0fe5577de21a8873b58a779a5ddd1c3132",
+              "url": "https://files.pythonhosted.org/packages/3d/9f/abc69e73055f73d42ddf9c46b3e01a08b9e74b579b8fc413cbd31112a749/hiredis-1.1.0.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "692844ea2e808ecaa71538c923d4fa175af16ab2f32b5626ca3ec0370f074172",
-              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-2.0.0-cp310-cp310-linux_aarch64.whl"
+              "hash": "b83f65c1cafe05f915c253ce73f7138ecb1c3b555966f7c70088f7ed144f9926",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-linux_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "260ca152bc042eda506335e7567dc69ece2778941a487efe9af8b86c7cd2b03f",
-              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-2.0.0-cp310-cp310-linux_x86_64.whl"
+              "hash": "8777703e8e1d54bcc1e30294104f626d66b30a8e32ee8c79d3587ff92f9c87fc",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-linux_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "42406856782ae40ba2be60432fe04938e478636d25e2a7b629b1530533dac8c2",
-              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-2.0.0-cp310-cp310-macosx_12_0_arm64.whl"
+              "hash": "951e212c2e5e7328246f241d17d94e5eaef81c639a7d48164f451694ff99b157",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_10_15_x86_64.whl"
             }
           ],
           "project_name": "hiredis",
           "requires_dists": [],
-          "requires_python": ">=3.6",
-          "version": "2"
+          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7",
+          "version": "1.1"
         },
         {
           "artifacts": [
@@ -3083,13 +3084,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "dc2662692f47d99cb8ae15a784529adeed535bcd7c277fee0beccf961522baf6",
-              "url": "https://files.pythonhosted.org/packages/90/2e/109766d7f3cb854a083dd66bfc0bf2bf9e40f373829efedb4b5e0d104aa3/setuptools-63.4.1-py3-none-any.whl"
+              "hash": "73bfae4791da7c1c56882ab17577d00f7a37a0347162aeb9360058de0dc25083",
+              "url": "https://files.pythonhosted.org/packages/10/9f/e6b3ae7c925399e5d210fda0be141cfff052bbb935c2d762019067f52d2e/setuptools-63.4.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "7c7854ee1429a240090297628dc9f75b35318d193537968e2dc14010ee2f5bca",
-              "url": "https://files.pythonhosted.org/packages/63/2e/e1f3e1b02d7ff0baa356413e93ad8a88706accd6b3538e18204a8a00c42d/setuptools-63.4.1.tar.gz"
+              "hash": "abcb76aa4decd7a17cbe0e4b31bdf549d106ba7f668e87e0860f5f7b84b9b3fe",
+              "url": "https://files.pythonhosted.org/packages/00/26/6c26b879cbd65b3c4daf7327a4cb205f8541c695e5d44b0c2c65892c20d1/setuptools-63.4.2.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -3140,7 +3141,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "63.4.1"
+          "version": "63.4.2"
         },
         {
           "artifacts": [
@@ -3164,28 +3165,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "26146c59576dfe9c546c9f45397a7c7c4a90c25679492ff610a7500afc7d03a6",
-              "url": "https://files.pythonhosted.org/packages/3c/78/1caf5af666e20468cb34961db31da6881520d931c9b61fa316fda4c21395/SQLAlchemy-1.4.39-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "23b693876ac7963b6bc7b1a5f3a2642f38d2624af834faad5933913928089d1b",
+              "url": "https://files.pythonhosted.org/packages/8e/35/dfc2d7c2b2064c6a51e8f704e139d583921bcf1e4ac0df57688349592ab1/SQLAlchemy-1.4.40-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8194896038753b46b08a0b0ae89a5d80c897fb601dd51e243ed5720f1f155d27",
-              "url": "https://files.pythonhosted.org/packages/1f/93/e5211e989324793487efb45405343d81b554886e278234066e20f77d434d/SQLAlchemy-1.4.39.tar.gz"
+              "hash": "bb342c0e25cc8f78a0e7c692da3b984f072666b316fbbec2a0e371cb4dfef5f0",
+              "url": "https://files.pythonhosted.org/packages/2c/89/2ca9359bde80e25572e57ec4f2c0d6578ef83ccdc2448d0d91a3fb45e488/SQLAlchemy-1.4.40-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ede13a472caa85a13abe5095e71676af985d7690eaa8461aeac5c74f6600b6c0",
-              "url": "https://files.pythonhosted.org/packages/44/c3/82386d127ff87aa5751ff35052d057ffe0d8d0ca674349f5006b86fe0296/SQLAlchemy-1.4.39-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "1ab08141d93de83559f6a7d9a962830f918623a885b3759ec2b9d1a531ff28fe",
+              "url": "https://files.pythonhosted.org/packages/44/6e/ee91fdeef035a250cb2ca3de022e08e84105a8fe88bb35744aa24aad203b/SQLAlchemy-1.4.40-cp310-cp310-macosx_10_15_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1745987ada1890b0e7978abdb22c133eca2e89ab98dc17939042240063e1ef21",
-              "url": "https://files.pythonhosted.org/packages/9d/e7/1b6a6c46445605ee86663e12bfb741f5adf985a30f9e96a6a2130bb34065/SQLAlchemy-1.4.39-cp310-cp310-macosx_10_15_universal2.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "7f13644b15665f7322f9e0635129e0ef2098409484df67fcd225d954c5861559",
-              "url": "https://files.pythonhosted.org/packages/d8/1c/0f698cae8f02e1b67b987ab2b5522f4b00cc5c9db180748ea090cfba0b49/SQLAlchemy-1.4.39-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+              "hash": "44a660506080cc975e1dfa5776fe5f6315ddc626a77b50bf0eee18b0389ea265",
+              "url": "https://files.pythonhosted.org/packages/4e/72/e36fa6563c45f8e1f2a5781f43f096500c1bca4963a34e72e8d3d8002d77/SQLAlchemy-1.4.40.tar.gz"
             }
           ],
           "project_name": "sqlalchemy",
@@ -3203,7 +3199,7 @@
             "greenlet!=0.4.17; python_version >= \"3\" and extra == \"asyncmy\"",
             "greenlet!=0.4.17; python_version >= \"3\" and extra == \"postgresql_asyncpg\"",
             "importlib-metadata; python_version < \"3.8\"",
-            "mariadb>=1.0.1; python_version >= \"3\" and extra == \"mariadb_connector\"",
+            "mariadb!=1.1.2,>=1.0.1; python_version >= \"3\" and extra == \"mariadb_connector\"",
             "mypy>=0.910; python_version >= \"3\" and extra == \"mypy\"",
             "mysql-connector-python; extra == \"mysql_connector\"",
             "mysqlclient<2,>=1.4.0; python_version < \"3\" and extra == \"mysql\"",
@@ -3222,7 +3218,7 @@
             "typing-extensions!=3.10.0.1; extra == \"aiosqlite\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "1.4.39"
+          "version": "1.4.40"
         },
         {
           "artifacts": [
@@ -3337,19 +3333,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "1c5bebdf19d5051e2e1de6cf70adfc5948d47221f097fcff7a3ffc91e953eaf5",
-              "url": "https://files.pythonhosted.org/packages/be/45/dd46f13f03f763ac6e1f390dcbdc9d73e1bbc5b0e3c42be673ee5858f304/tomlkit-0.11.1-py3-none-any.whl"
+              "hash": "69e0675671a2eed1c08a53f342c955c4ead5d373a10f756219bf39f3d4f0018a",
+              "url": "https://files.pythonhosted.org/packages/db/7c/10e78bd85f92025abfc43d0f4360bc4aa48f7241d850426cc522352e183e/tomlkit-0.11.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "61901f81ff4017951119cd0d1ed9b7af31c821d6845c8c477587bbdcd5e5854e",
-              "url": "https://files.pythonhosted.org/packages/1e/81/93889ea6641154b22f26036bc4ef800b06df84fc647a6ded5abdc2f06dcf/tomlkit-0.11.1.tar.gz"
+              "hash": "d1b49c3e460f5910b22d799b13513504acb4f5fcaee01660ee66f07bd45a271c",
+              "url": "https://files.pythonhosted.org/packages/eb/e3/7b0bcc571314a728c2f84144ba72ca01f6ac68a645a1ac1848f2efd7948d/tomlkit-0.11.2.tar.gz"
             }
           ],
           "project_name": "tomlkit",
           "requires_dists": [],
           "requires_python": "<4.0,>=3.6",
-          "version": "0.11.1"
+          "version": "0.11.2"
         },
         {
           "artifacts": [
@@ -3961,6 +3957,7 @@
     "etcetra~=0.1.8",
     "faker~=13.12.0",
     "graphene~=2.1.9",
+    "hiredis~=1.1.0",
     "humanize>=3.1.0",
     "inquirer~=2.9.2",
     "janus>=0.6.1",
