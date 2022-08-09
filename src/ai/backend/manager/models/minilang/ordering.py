@@ -3,9 +3,7 @@ from typing import Mapping
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
 
-__all__ = (
-    'QueryOrderParser',
-)
+__all__ = ("QueryOrderParser",)
 
 _grammar = r"""
     ?start: expr
@@ -18,13 +16,12 @@ _grammar = r"""
 """
 _parser = Lark(
     _grammar,
-    parser='lalr',
+    parser="lalr",
     maybe_placeholders=False,
 )
 
 
 class QueryOrderTransformer(Transformer):
-
     def __init__(self, sa_table: sa.Table, column_map: Mapping[str, str] = None) -> None:
         super().__init__()
         self._sa_table = sa_table
@@ -56,8 +53,7 @@ class QueryOrderTransformer(Transformer):
     expr = tuple
 
 
-class QueryOrderParser():
-
+class QueryOrderParser:
     def __init__(self, column_map: Mapping[str, str] = None) -> None:
         self._column_map = column_map
         self._parser = _parser

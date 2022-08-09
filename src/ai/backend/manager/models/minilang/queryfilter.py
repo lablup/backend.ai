@@ -6,8 +6,8 @@ from lark import Lark, LarkError, Transformer, Tree
 from . import FieldSpecItem
 
 __all__ = (
-    'FilterableSQLQuery',
-    'QueryFilterParser',
+    "FilterableSQLQuery",
+    "QueryFilterParser",
 )
 
 
@@ -43,13 +43,12 @@ _grammar = r"""
 """
 _parser = Lark(
     _grammar,
-    parser='lalr',
+    parser="lalr",
     maybe_placeholders=False,
 )
 
 
 class QueryFilterTransformer(Transformer):
-
     def __init__(self, sa_table: sa.Table, fieldspec: Mapping[str, FieldSpecItem] = None) -> None:
         super().__init__()
         self._sa_table = sa_table
@@ -58,11 +57,11 @@ class QueryFilterTransformer(Transformer):
     def string(self, s):
         (s,) = s
         # SQL-side escaping is handled by SQLAlchemy
-        return s[1:-1].replace("\\\"", '"')
+        return s[1:-1].replace('\\"', '"')
 
     def number(self, n):
         (n,) = n
-        if '.' in n:
+        if "." in n:
             return float(n)
         return int(n)
 
@@ -112,29 +111,29 @@ class QueryFilterTransformer(Transformer):
         op = children[1].value
         val = self._transform_val(children[0].value, children[2])
         if op == "==":
-            return (col == val)
+            return col == val
         elif op == "!=":
-            return (col != val)
+            return col != val
         elif op == ">":
-            return (col > val)
+            return col > val
         elif op == ">=":
-            return (col >= val)
+            return col >= val
         elif op == "<":
-            return (col < val)
+            return col < val
         elif op == "<=":
-            return (col <= val)
+            return col <= val
         elif op == "contains":
-            return (col.contains(val))
+            return col.contains(val)
         elif op == "in":
-            return (col.in_(val))
+            return col.in_(val)
         elif op == "isnot":
-            return (col.isnot(val))
+            return col.isnot(val)
         elif op == "is":
-            return (col.is_(val))
+            return col.is_(val)
         elif op == "like":
-            return (col.like(val))
+            return col.like(val)
         elif op == "ilike":
-            return (col.ilike(val))
+            return col.ilike(val)
         return args
 
     def unary_expr(self, *args):
@@ -142,7 +141,7 @@ class QueryFilterTransformer(Transformer):
         op = children[0].value
         expr = children[1]
         if op in ("not", "!"):
-            return (sa.not_(expr))
+            return sa.not_(expr)
         return args
 
     def combine_expr(self, *args):
@@ -151,9 +150,9 @@ class QueryFilterTransformer(Transformer):
         expr1 = children[0]
         expr2 = children[2]
         if op == "&":
-            return (sa.and_(expr1, expr2))
+            return sa.and_(expr1, expr2)
         elif op == "|":
-            return (sa.or_(expr1, expr2))
+            return sa.or_(expr1, expr2)
         return args
 
     def paren_expr(self, *args):
@@ -161,8 +160,7 @@ class QueryFilterTransformer(Transformer):
         return children[0]
 
 
-class QueryFilterParser():
-
+class QueryFilterParser:
     def __init__(self, fieldspec: Mapping[str, FieldSpecItem] = None) -> None:
         self._fieldspec = fieldspec
         self._parser = _parser
@@ -183,7 +181,7 @@ class QueryFilterParser():
         elif isinstance(sa_query, sa.sql.Update):
             table = sa_query.table
         else:
-            raise ValueError('Unsupported SQLAlchemy query object type')
+            raise ValueError("Unsupported SQLAlchemy query object type")
         try:
             ast = self._parser.parse(filter_expr)
             where_clause = QueryFilterTransformer(table, self._fieldspec).transform(ast)

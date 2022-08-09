@@ -53,6 +53,12 @@ scaling-group = "default"
 # when the agent starts up. [default: false]
 # skip-manager-detection = false
 
+# Explicitly set allowed compute plugins to avoid conflicts of mock &
+# open-source CUDA plugins in the mono-repo source installation.
+# Regardless of this config, CPUPlugin and MemoryPlugin are always enabled.
+# example: ["ai.backend.accelerator.cuda_mock"]
+# allow-compute-plugins = []
+
 # This directory is used to store the last registry file.
 # var-base-path = "/var/lib/backend.ai"
 

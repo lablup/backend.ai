@@ -9,14 +9,14 @@ import click
 class ByteSizeParamType(click.ParamType):
     name = "byte"
 
-    _rx_digits = re.compile(r'^(\d+(?:\.\d*)?)([kmgtpe]?)$', re.I)
+    _rx_digits = re.compile(r"^(\d+(?:\.\d*)?)([kmgtpe]?)$", re.I)
     _scales = {
-        'k': 2 ** 10,
-        'm': 2 ** 20,
-        'g': 2 ** 30,
-        't': 2 ** 40,
-        'p': 2 ** 50,
-        'e': 2 ** 60,
+        "k": 2**10,
+        "m": 2**20,
+        "g": 2**30,
+        "t": 2**40,
+        "p": 2**50,
+        "e": 2**60,
     }
 
     def convert(self, value, param, ctx):
@@ -25,7 +25,8 @@ class ByteSizeParamType(click.ParamType):
         if not isinstance(value, str):
             self.fail(
                 f"expected string, got {value!r} of type {type(value).__name__}",
-                param, ctx,
+                param,
+                ctx,
             )
         m = self._rx_digits.search(value)
         if m is None:
@@ -44,7 +45,8 @@ class ByteSizeParamCheckType(ByteSizeParamType):
         if not isinstance(value, str):
             self.fail(
                 f"expected string, got {value!r} of type {type(value).__name__}",
-                param, ctx,
+                param,
+                ctx,
             )
         m = self._rx_digits.search(value)
         if m is None:
@@ -61,17 +63,20 @@ class CommaSeparatedKVListParamType(click.ParamType):
         if not isinstance(value, str):
             self.fail(
                 f"expected string, got {value!r} of type {type(value).__name__}",
-                param, ctx,
+                param,
+                ctx,
             )
         override_map = {}
         for assignment in value.split(","):
             try:
                 k, _, v = assignment.partition("=")
-                if k == '' or v == '':
+                if k == "" or v == "":
                     raise ValueError(f"key or value is empty. key = {k}, value = {v}")
             except ValueError:
                 self.fail(
-                    f"{value!r} is not a valid mapping expression", param, ctx,
+                    f"{value!r} is not a valid mapping expression",
+                    param,
+                    ctx,
                 )
             else:
                 override_map[k] = v
@@ -128,36 +133,37 @@ class RangeExprOptionType(click.ParamType):
     Pythonic range: "range:1,10,2" (start, stop[, step]) as in Python's range
     Case range: "case:a,b,c" (comma-separated strings)
     """
-    _rx_range_key = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
-    name = 'Range Expression'
+
+    _rx_range_key = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+    name = "Range Expression"
 
     def convert(self, arg, param, ctx):
-        key, value = arg.split('=', maxsplit=1)
-        assert self._rx_range_key.match(key), 'The key must be a valid slug string.'
+        key, value = arg.split("=", maxsplit=1)
+        assert self._rx_range_key.match(key), "The key must be a valid slug string."
         try:
-            if value.startswith('case:'):
-                return key, value[5:].split(',')
-            elif value.startswith('linspace:'):
-                start, stop, num = value[9:].split(',')
+            if value.startswith("case:"):
+                return key, value[5:].split(",")
+            elif value.startswith("linspace:"):
+                start, stop, num = value[9:].split(",")
                 return key, tuple(drange(Decimal(start), Decimal(stop), int(num)))
-            elif value.startswith('range:'):
-                range_args = map(int, value[6:].split(','))
+            elif value.startswith("range:"):
+                range_args = map(int, value[6:].split(","))
                 return key, tuple(range(*range_args))
             else:
-                self.fail('Unrecognized range expression type', param, ctx)
+                self.fail("Unrecognized range expression type", param, ctx)
         except ValueError as e:
             self.fail(str(e), param, ctx)
 
 
 class CommaSeparatedListType(click.ParamType):
 
-    name = 'List Expression'
+    name = "List Expression"
 
     def convert(self, arg, param, ctx):
         try:
             if isinstance(arg, int):
                 return arg
             elif isinstance(arg, str):
-                return arg.split(',')
+                return arg.split(",")
         except ValueError as e:
             self.fail(repr(e), param, ctx)

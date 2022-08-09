@@ -5,14 +5,13 @@ from tqdm import tqdm
 
 
 class ProgressReportingReader(io.BufferedReader):
-
     def __init__(self, file_path, *, tqdm_instance=None):
-        super().__init__(open(file_path, 'rb'))
+        super().__init__(open(file_path, "rb"))
         self._filename = os.path.basename(file_path)
         if tqdm_instance is None:
             self._owns_tqdm = True
             self.tqdm = tqdm(
-                unit='bytes',
+                unit="bytes",
                 unit_scale=True,
                 total=os.path.getsize(file_path),
             )

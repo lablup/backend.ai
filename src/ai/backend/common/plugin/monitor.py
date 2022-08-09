@@ -7,12 +7,12 @@ from typing import Any, Mapping, Union
 from . import AbstractPlugin, BasePluginContext
 
 __all__ = (
-    'AbstractStatReporterPlugin',
-    'AbstractErrorReporterPlugin',
-    'StatsPluginContext',
-    'ErrorPluginContext',
-    'INCREMENT',
-    'GAUGE',
+    "AbstractStatReporterPlugin",
+    "AbstractErrorReporterPlugin",
+    "StatsPluginContext",
+    "ErrorPluginContext",
+    "INCREMENT",
+    "GAUGE",
 )
 
 
@@ -26,7 +26,6 @@ GAUGE = StatMetricTypes.GAUGE
 
 
 class AbstractStatReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
-
     async def init(self, context: Any = None) -> None:
         pass
 
@@ -64,7 +63,7 @@ class AbstractErrorReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
 
 
 class StatsPluginContext(BasePluginContext[AbstractStatReporterPlugin]):
-    plugin_group = 'backendai_stats_monitor_v20'
+    plugin_group = "backendai_stats_monitor_v20"
 
     async def report_metric(
         self,
@@ -77,7 +76,7 @@ class StatsPluginContext(BasePluginContext[AbstractStatReporterPlugin]):
 
 
 class ErrorPluginContext(BasePluginContext[AbstractErrorReporterPlugin]):
-    plugin_group = 'backendai_error_monitor_v20'
+    plugin_group = "backendai_error_monitor_v20"
 
     async def capture_exception(
         self,

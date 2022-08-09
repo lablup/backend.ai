@@ -5,7 +5,7 @@ import msgpack
 
 def encode_commands(cmdlist):
     bindata = msgpack.packb(cmdlist, use_bin_type=True)
-    return base64.b64encode(bindata).decode('ascii')
+    return base64.b64encode(bindata).decode("ascii")
 
 
 def decode_commands(data):

@@ -31,62 +31,79 @@ from .logging_utils import BraceStyleAdapter
 
 # public APIs of this module
 __all__ = (
-    'AbstractLogger',
-    'Logger',
-    'NoopLogger',
-    'BraceStyleAdapter',
-    'LogstashHandler',
-    'is_active',
-    'pretty',
+    "AbstractLogger",
+    "Logger",
+    "NoopLogger",
+    "BraceStyleAdapter",
+    "LogstashHandler",
+    "is_active",
+    "pretty",
 )
 
-is_active: ContextVar[bool] = ContextVar('is_active', default=False)
+is_active: ContextVar[bool] = ContextVar("is_active", default=False)
 
-loglevel_iv = t.Enum('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'NOTSET')
-logformat_iv = t.Enum('simple', 'verbose')
+loglevel_iv = t.Enum("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NOTSET")
+logformat_iv = t.Enum("simple", "verbose")
 default_pkg_ns = {
-    '': 'WARNING',
-    'ai.backend': 'INFO',
+    "": "WARNING",
+    "ai.backend": "INFO",
+    "tests": "DEBUG",
 }
 
-logging_config_iv = t.Dict({
-    t.Key('level', default='INFO'): loglevel_iv,
-    t.Key('pkg-ns', default=default_pkg_ns): t.Mapping(t.String(allow_blank=True), loglevel_iv),
-    t.Key('drivers', default=['console']): t.List(t.Enum('console', 'logstash', 'file')),
-    t.Key('console', default=None): t.Null | t.Dict({
-        t.Key('colored', default=True): t.Bool,
-        t.Key('format', default='verbose'): logformat_iv,
-    }).allow_extra('*'),
-    t.Key('file', default=None): t.Null | t.Dict({
-        t.Key('path'): tx.Path(type='dir', auto_create=True),
-        t.Key('filename'): t.String,
-        t.Key('backup-count', default=5): t.Int[1:100],
-        t.Key('rotation-size', default='10M'): tx.BinarySize,
-        t.Key('format', default='verbose'): logformat_iv,
-    }).allow_extra('*'),
-    t.Key('logstash', default=None): t.Null | t.Dict({
-        t.Key('endpoint'): tx.HostPortPair,
-        t.Key('protocol', default='tcp'): t.Enum('zmq.push', 'zmq.pub', 'tcp', 'udp'),
-        t.Key('ssl-enabled', default=True): t.Bool,
-        t.Key('ssl-verify', default=True): t.Bool,
-        # NOTE: logstash does not have format optoin.
-    }).allow_extra('*'),
-}).allow_extra('*')
+logging_config_iv = t.Dict(
+    {
+        t.Key("level", default="INFO"): loglevel_iv,
+        t.Key("pkg-ns", default=default_pkg_ns): t.Mapping(t.String(allow_blank=True), loglevel_iv),
+        t.Key("drivers", default=["console"]): t.List(t.Enum("console", "logstash", "file")),
+        t.Key("console", default=None): t.Null
+        | t.Dict(
+            {
+                t.Key("colored", default=None): t.Null | t.Bool,
+                t.Key("format", default="verbose"): logformat_iv,
+            }
+        ).allow_extra("*"),
+        t.Key("file", default=None): t.Null
+        | t.Dict(
+            {
+                t.Key("path"): tx.Path(type="dir", auto_create=True),
+                t.Key("filename"): t.String,
+                t.Key("backup-count", default=5): t.Int[1:100],
+                t.Key("rotation-size", default="10M"): tx.BinarySize,
+                t.Key("format", default="verbose"): logformat_iv,
+            }
+        ).allow_extra("*"),
+        t.Key("logstash", default=None): t.Null
+        | t.Dict(
+            {
+                t.Key("endpoint"): tx.HostPortPair,
+                t.Key("protocol", default="tcp"): t.Enum("zmq.push", "zmq.pub", "tcp", "udp"),
+                t.Key("ssl-enabled", default=True): t.Bool,
+                t.Key("ssl-verify", default=True): t.Bool,
+                # NOTE: logstash does not have format optoin.
+            }
+        ).allow_extra("*"),
+    }
+).allow_extra("*")
 
 
 class PickledException(Exception):
     """
     Serves as a wrapper for exceptions that contain unpicklable arguments.
     """
+
     pass
 
 
 class LogstashHandler(logging.Handler):
-
-    def __init__(self, endpoint, protocol: str, *,
-                 ssl_enabled: bool = True,
-                 ssl_verify: bool = True,
-                 myhost: str = None):
+    def __init__(
+        self,
+        endpoint,
+        protocol: str,
+        *,
+        ssl_enabled: bool = True,
+        ssl_verify: bool = True,
+        myhost: str = None,
+    ):
         super().__init__()
         self._endpoint = endpoint
         self._protocol = protocol
@@ -100,21 +117,21 @@ class LogstashHandler(logging.Handler):
     def _setup_transport(self):
         if self._sock is not None:
             return
-        if self._protocol == 'zmq.push':
+        if self._protocol == "zmq.push":
             self._zmqctx = zmq.Context()
             sock = self._zmqctx.socket(zmq.PUSH)
             sock.setsockopt(zmq.LINGER, 50)
             sock.setsockopt(zmq.SNDHWM, 20)
-            sock.connect(f'tcp://{self._endpoint[0]}:{self._endpoint[1]}')
+            sock.connect(f"tcp://{self._endpoint[0]}:{self._endpoint[1]}")
             self._sock = sock
-        elif self._protocol == 'zmq.pub':
+        elif self._protocol == "zmq.pub":
             self._zmqctx = zmq.Context()
             sock = self._zmqctx.socket(zmq.PUB)
             sock.setsockopt(zmq.LINGER, 50)
             sock.setsockopt(zmq.SNDHWM, 20)
-            sock.connect(f'tcp://{self._endpoint[0]}:{self._endpoint[1]}')
+            sock.connect(f"tcp://{self._endpoint[0]}:{self._endpoint[1]}")
             self._sock = sock
-        elif self._protocol == 'tcp':
+        elif self._protocol == "tcp":
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if self._ssl_enabled:
                 self._sslctx = ssl.create_default_context()
@@ -124,12 +141,14 @@ class LogstashHandler(logging.Handler):
                 sock = self._sslctx.wrap_socket(sock, server_hostname=self._endpoint[0])
             sock.connect((str(self._endpoint.host), self._endpoint.port))
             self._sock = sock
-        elif self._protocol == 'udp':
+        elif self._protocol == "udp":
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.connect((str(self._endpoint.host), self._endpoint.port))
             self._sock = sock
         else:
-            raise ConfigurationError({'logging.LogstashHandler': f'unsupported protocol: {self._protocol}'})
+            raise ConfigurationError(
+                {"logging.LogstashHandler": f"unsupported protocol: {self._protocol}"}
+            )
 
     def cleanup(self):
         if self._sock:
@@ -144,35 +163,36 @@ class LogstashHandler(logging.Handler):
         extra_data = dict()
 
         if record.exc_info:
-            tags.add('has_exception')
+            tags.add("has_exception")
             if self.formatter:
-                extra_data['exception'] = self.formatter.formatException(record.exc_info)
+                extra_data["exception"] = self.formatter.formatException(record.exc_info)
             else:
-                extra_data['exception'] = logging._defaultFormatter.formatException(record.exc_info)
+                extra_data["exception"] = logging._defaultFormatter.formatException(record.exc_info)
 
         # This log format follows logstash's event format.
-        log = OrderedDict([
-            ('@timestamp', datetime.now().isoformat()),
-            ('@version', 1),
-            ('host', self._myhost),
-            ('logger', record.name),
-            ('path', record.pathname),
-            ('func', record.funcName),
-            ('lineno', record.lineno),
-            ('message', record.getMessage()),
-            ('level', record.levelname),
-            ('tags', list(tags)),
-        ])
+        log = OrderedDict(
+            [
+                ("@timestamp", datetime.now().isoformat()),
+                ("@version", 1),
+                ("host", self._myhost),
+                ("logger", record.name),
+                ("path", record.pathname),
+                ("func", record.funcName),
+                ("lineno", record.lineno),
+                ("message", record.getMessage()),
+                ("level", record.levelname),
+                ("tags", list(tags)),
+            ]
+        )
         log.update(extra_data)
-        if self._protocol.startswith('zmq'):
+        if self._protocol.startswith("zmq"):
             self._sock.send_json(log)
         else:
             # TODO: reconnect if disconnected
-            self._sock.sendall(json.dumps(log).encode('utf-8'))
+            self._sock.sendall(json.dumps(log).encode("utf-8"))
 
 
 class ConsoleFormatter(logging.Formatter):
-
     def formatTime(self, record: logging.LogRecord, datefmt: str = None) -> str:
         ct = self.converter(record.created)  # type: ignore
         if datefmt:
@@ -184,22 +204,21 @@ class ConsoleFormatter(logging.Formatter):
 
 
 class CustomJsonFormatter(JsonFormatter):
-
     def add_fields(
         self,
         log_record: dict[str, Any],  # the manipulated entry object
-        record: logging.LogRecord,   # the source log record
+        record: logging.LogRecord,  # the source log record
         message_dict: dict[str, Any],
     ) -> None:
         super().add_fields(log_record, record, message_dict)
-        if not log_record.get('timestamp'):
+        if not log_record.get("timestamp"):
             # this doesn't use record.created, so it is slightly off
-            now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-            log_record['timestamp'] = now
-        if loglevel := log_record.get('level'):
-            log_record['level'] = loglevel.upper()
+            now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            log_record["timestamp"] = now
+        if loglevel := log_record.get("level"):
+            log_record["level"] = loglevel.upper()
         else:
-            log_record['level'] = record.levelname.upper()
+            log_record["level"] = record.levelname.upper()
 
 
 class pretty:
@@ -212,8 +231,66 @@ class pretty:
         return pprint.pformat(self.obj)
 
 
+def setup_console_log_handler(config: Mapping[str, Any]) -> logging.Handler:
+    log_formats = {
+        "simple": "%(levelname)s %(message)s",
+        "verbose": "%(asctime)s %(levelname)s %(name)s [%(process)d] %(message)s",
+    }
+    drv_config = config["console"]
+    console_formatter: logging.Formatter
+    colored = drv_config["colored"]
+    if colored is None:
+        colored = sys.stderr.isatty()
+    if colored:
+        console_formatter = coloredlogs.ColoredFormatter(
+            log_formats[drv_config["format"]],
+            datefmt="%Y-%m-%d %H:%M:%S.%f",  # coloredlogs has intrinsic support for msec
+            field_styles={
+                "levelname": {"color": 248, "bold": True},
+                "name": {"color": 246, "bold": False},
+                "process": {"color": "cyan"},
+                "asctime": {"color": 240},
+            },
+            level_styles={
+                "debug": {"color": "green"},
+                "verbose": {"color": "green", "bright": True},
+                "info": {"color": "cyan", "bright": True},
+                "notice": {"color": "cyan", "bold": True},
+                "warning": {"color": "yellow"},
+                "error": {"color": "red", "bright": True},
+                "success": {"color": 77},
+                "critical": {"background": "red", "color": 255, "bold": True},
+            },
+        )
+    else:
+        console_formatter = ConsoleFormatter(
+            log_formats[drv_config["format"]],
+            datefmt="%Y-%m-%d %H:%M:%S.%f",
+        )
+    console_handler = logging.StreamHandler(
+        stream=sys.stderr,
+    )
+    console_handler.setLevel(config["level"])
+    console_handler.setFormatter(console_formatter)
+    return console_handler
+
+
+def setup_file_log_handler(config: Mapping[str, Any]) -> logging.Handler:
+    drv_config = config["file"]
+    fmt = "%(timestamp) %(level) %(name) %(processName) %(message)"
+    file_handler = logging.handlers.RotatingFileHandler(
+        filename=drv_config["path"] / drv_config["filename"],
+        backupCount=drv_config["backup-count"],
+        maxBytes=drv_config["rotation-size"],
+        encoding="utf-8",
+    )
+    file_handler.setLevel(config["level"])
+    file_handler.setFormatter(CustomJsonFormatter(fmt))
+    return file_handler
+
+
 def log_worker(
-    daemon_config: Mapping[str, Any],
+    logging_config: Mapping[str, Any],
     parent_pid: int,
     log_endpoint: str,
     ready_event: threading.Event,
@@ -222,70 +299,28 @@ def log_worker(
     file_handler = None
     logstash_handler = None
 
-    log_formats = {
-        'simple': '%(levelname)s %(message)s',
-        'verbose': '%(asctime)s %(levelname)s %(name)s [%(process)d] %(message)s',
-    }
+    if "console" in logging_config["drivers"]:
+        console_handler = setup_console_log_handler(logging_config)
 
-    if 'console' in daemon_config['drivers']:
-        drv_config = daemon_config['console']
-        console_formatter: logging.Formatter
-        if drv_config['colored']:
-            console_formatter = coloredlogs.ColoredFormatter(
-                log_formats[drv_config['format']],
-                datefmt="%Y-%m-%d %H:%M:%S.%f",  # coloredlogs has intrinsic support for msec
-                field_styles={'levelname': {'color': 248, 'bold': True},
-                              'name': {'color': 246, 'bold': False},
-                              'process': {'color': 'cyan'},
-                              'asctime': {'color': 240}},
-                level_styles={'debug': {'color': 'green'},
-                              'verbose': {'color': 'green', 'bright': True},
-                              'info': {'color': 'cyan', 'bright': True},
-                              'notice': {'color': 'cyan', 'bold': True},
-                              'warning': {'color': 'yellow'},
-                              'error': {'color': 'red', 'bright': True},
-                              'success': {'color': 77},
-                              'critical': {'background': 'red', 'color': 255, 'bold': True}},
-            )
-        else:
-            console_formatter = ConsoleFormatter(
-                log_formats[drv_config['format']],
-                datefmt="%Y-%m-%d %H:%M:%S.%f",
-            )
-        console_handler = logging.StreamHandler(
-            stream=sys.stderr,
-        )
-        console_handler.setLevel(daemon_config['level'])
-        console_handler.setFormatter(console_formatter)
+    if "file" in logging_config["drivers"]:
+        file_handler = setup_file_log_handler(logging_config)
 
-    if 'file' in daemon_config['drivers']:
-        drv_config = daemon_config['file']
-        fmt = '%(timestamp) %(level) %(name) %(processName) %(message)'
-        file_handler = logging.handlers.RotatingFileHandler(
-            filename=drv_config['path'] / drv_config['filename'],
-            backupCount=drv_config['backup-count'],
-            maxBytes=drv_config['rotation-size'],
-            encoding='utf-8',
-        )
-        file_handler.setLevel(daemon_config['level'])
-        file_handler.setFormatter(CustomJsonFormatter(fmt))
-
-    if 'logstash' in daemon_config['drivers']:
-        drv_config = daemon_config['logstash']
+    if "logstash" in logging_config["drivers"]:
+        drv_config = logging_config["logstash"]
         logstash_handler = LogstashHandler(
-            endpoint=drv_config['endpoint'],
-            protocol=drv_config['protocol'],
-            ssl_enabled=drv_config['ssl-enabled'],
-            ssl_verify=drv_config['ssl-verify'],
-            myhost='hostname',  # TODO: implement
+            endpoint=drv_config["endpoint"],
+            protocol=drv_config["protocol"],
+            ssl_enabled=drv_config["ssl-enabled"],
+            ssl_verify=drv_config["ssl-verify"],
+            myhost="hostname",  # TODO: implement
         )
-        logstash_handler.setLevel(daemon_config['level'])
+        logstash_handler.setLevel(logging_config["level"])
 
     zctx = zmq.Context()
     agg_sock = zctx.socket(zmq.PULL)
     agg_sock.bind(log_endpoint)
     ep_url = yarl.URL(log_endpoint)
-    if ep_url.scheme.lower() == 'ipc':
+    if ep_url.scheme.lower() == "ipc":
         os.chmod(ep_url.path, 0o777)
     try:
         ready_event.set()
@@ -298,14 +333,16 @@ def log_worker(
             except (pickle.PickleError, TypeError):
                 # We have an unpickling error.
                 # Change into a self-created log record with exception info.
-                rec = logging.makeLogRecord({
-                    'name': __name__,
-                    'msg': 'Cannot unpickle the log record (raw data: %r)',
-                    'levelno': logging.ERROR,
-                    'levelname': 'error',
-                    'args': (data,),  # attach the original data for inspection
-                    'exc_info': sys.exc_info(),
-                })
+                rec = logging.makeLogRecord(
+                    {
+                        "name": __name__,
+                        "msg": "Cannot unpickle the log record (raw data: %r)",
+                        "levelno": logging.ERROR,
+                        "levelname": "error",
+                        "args": (data,),  # attach the original data for inspection
+                        "exc_info": sys.exc_info(),
+                    }
+                )
             if rec is None:
                 break
             if console_handler:
@@ -379,15 +416,17 @@ class RelayHandler(logging.Handler):
                     )
                 else:
                     exc_info = record.exc_info
-                record = logging.makeLogRecord({
-                    'name': record.name,
-                    'pathname': record.pathname,
-                    'lineno': record.lineno,
-                    'msg': record.getMessage(),
-                    'levelno': record.levelno,
-                    'levelname': record.levelname,
-                    'exc_info': exc_info,
-                })
+                record = logging.makeLogRecord(
+                    {
+                        "name": record.name,
+                        "pathname": record.pathname,
+                        "lineno": record.lineno,
+                        "msg": record.getMessage(),
+                        "levelno": record.levelno,
+                        "levelname": record.levelname,
+                        "exc_info": exc_info,
+                    }
+                )
             pickled_rec = pickle.dumps(record)
         try:
             self._sock.send(pickled_rec)
@@ -398,7 +437,7 @@ class RelayHandler(logging.Handler):
 class AbstractLogger(metaclass=ABCMeta):
     def __init__(
         self,
-        daemon_config: MutableMapping[str, Any],
+        logging_config: MutableMapping[str, Any],
     ) -> None:
         pass
 
@@ -414,9 +453,61 @@ class AbstractLogger(metaclass=ABCMeta):
 class NoopLogger(AbstractLogger):
     def __init__(
         self,
-        daemon_config: MutableMapping[str, Any],
+        logging_config: MutableMapping[str, Any],
     ) -> None:
         pass
+
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *exc_info_args):
+        pass
+
+
+class LocalLogger(AbstractLogger):
+    def __init__(
+        self,
+        logging_config: MutableMapping[str, Any],
+    ) -> None:
+        cfg = logging_config_iv.check(logging_config)
+        _check_driver_config_exists_if_activated(cfg, "console")
+        self.logging_config = cfg
+        log_handlers = []
+        if "console" in self.logging_config["drivers"]:
+            console_handler = setup_console_log_handler(self.logging_config)
+            log_handlers.append(console_handler)
+        if "file" in self.logging_config["drivers"]:
+            file_handler = setup_file_log_handler(self.logging_config)
+            log_handlers.append(file_handler)
+        self.log_config = {
+            "version": 1,
+            "disable_existing_loggers": True,
+            "handlers": {
+                "null": {"class": "logging.NullHandler"},
+            },
+            "loggers": {
+                "": {
+                    "handlers": [],
+                    "level": cfg["level"],
+                },
+                **{
+                    k: {
+                        "handlers": [],
+                        "level": v,
+                        "propagate": False,
+                    }
+                    for k, v in cfg["pkg-ns"].items()
+                },
+            },
+        }
+        logging.config.dictConfig(self.log_config)
+        root_logger = logging.getLogger(None)
+        for h in log_handlers:
+            root_logger.addHandler(h)
+        for pkg_ns in cfg["pkg-ns"].keys():
+            ns_logger = logging.getLogger(pkg_ns)
+            for h in log_handlers:
+                ns_logger.addHandler(h)
 
     def __enter__(self):
         pass
@@ -429,72 +520,73 @@ class Logger(AbstractLogger):
 
     is_master: bool
     log_endpoint: str
-    daemon_config: Mapping[str, Any]
+    logging_config: Mapping[str, Any]
     log_config: MutableMapping[str, Any]
     log_worker: threading.Thread
 
     def __init__(
         self,
-        daemon_config: MutableMapping[str, Any],
+        logging_config: MutableMapping[str, Any],
         *,
         is_master: bool,
         log_endpoint: str,
     ) -> None:
-        legacy_logfile_path = os.environ.get('BACKEND_LOG_FILE')
+        legacy_logfile_path = os.environ.get("BACKEND_LOG_FILE")
         if legacy_logfile_path:
             p = Path(legacy_logfile_path)
-            config.override_key(daemon_config, ('file', 'path'), p.parent)
-            config.override_key(daemon_config, ('file', 'filename'), p.name)
-        config.override_with_env(daemon_config, ('file', 'backup-count'), 'BACKEND_LOG_FILE_COUNT')
-        legacy_logfile_size = os.environ.get('BACKEND_LOG_FILE_SIZE')
+            config.override_key(logging_config, ("file", "path"), p.parent)
+            config.override_key(logging_config, ("file", "filename"), p.name)
+        config.override_with_env(logging_config, ("file", "backup-count"), "BACKEND_LOG_FILE_COUNT")
+        legacy_logfile_size = os.environ.get("BACKEND_LOG_FILE_SIZE")
         if legacy_logfile_size:
-            legacy_logfile_size = f'{legacy_logfile_size}M'
-            config.override_with_env(daemon_config, ('file', 'rotation-size'), legacy_logfile_size)
+            legacy_logfile_size = f"{legacy_logfile_size}M"
+            config.override_with_env(logging_config, ("file", "rotation-size"), legacy_logfile_size)
 
-        cfg = logging_config_iv.check(daemon_config)
+        cfg = logging_config_iv.check(logging_config)
 
-        def _check_driver_config_exists_if_activated(cfg, driver):
-            if driver in cfg['drivers'] and cfg[driver] is None:
-                raise ConfigurationError({'logging': f'{driver} driver is activated but no config given.'})
-
-        _check_driver_config_exists_if_activated(cfg, 'console')
-        _check_driver_config_exists_if_activated(cfg, 'file')
-        _check_driver_config_exists_if_activated(cfg, 'logstash')
+        _check_driver_config_exists_if_activated(cfg, "console")
+        _check_driver_config_exists_if_activated(cfg, "file")
+        _check_driver_config_exists_if_activated(cfg, "logstash")
 
         self.is_master = is_master
         self.log_endpoint = log_endpoint
-        self.daemon_config = cfg
+        self.logging_config = cfg
         self.log_config = {
-            'version': 1,
-            'disable_existing_loggers': False,
-            'handlers': {
-                'null': {'class': 'logging.NullHandler'},
+            "version": 1,
+            "disable_existing_loggers": False,
+            "handlers": {
+                "null": {"class": "logging.NullHandler"},
             },
-            'loggers': {
-                '': {'handlers': [], 'level': cfg['level']},
-                **{k: {'handlers': [], 'level': v, 'propagate': False} for k, v in cfg['pkg-ns'].items()},
+            "loggers": {
+                "": {"handlers": [], "level": cfg["level"]},
+                **{
+                    k: {"handlers": [], "level": v, "propagate": False}
+                    for k, v in cfg["pkg-ns"].items()
+                },
             },
         }
 
     def __enter__(self):
         tx.fix_trafaret_pickle_support()  # monkey-patch for pickling trafaret.DataError
-        pickling_support.install()        # enable pickling of tracebacks
-        self.log_config['handlers']['relay'] = {
-            'class': 'ai.backend.common.logging.RelayHandler',
-            'level': self.daemon_config['level'],
-            'endpoint': self.log_endpoint,
+        pickling_support.install()  # enable pickling of tracebacks
+        self.log_config["handlers"]["relay"] = {
+            "class": "ai.backend.common.logging.RelayHandler",
+            "level": self.logging_config["level"],
+            "endpoint": self.log_endpoint,
         }
-        for _logger in self.log_config['loggers'].values():
-            _logger['handlers'].append('relay')
+        for _logger in self.log_config["loggers"].values():
+            _logger["handlers"].append("relay")
         logging.config.dictConfig(self.log_config)
         self._is_active_token = is_active.set(True)
         if self.is_master and self.log_endpoint:
-            self.relay_handler = logging.getLogger('').handlers[0]
+            self.relay_handler = logging.getLogger("").handlers[0]
             self.ready_event = threading.Event()
             assert isinstance(self.relay_handler, RelayHandler)
             self.log_worker = threading.Thread(
-                target=log_worker, name='Logger',
-                args=(self.daemon_config, os.getpid(), self.log_endpoint, self.ready_event))
+                target=log_worker,
+                name="Logger",
+                args=(self.logging_config, os.getpid(), self.log_endpoint, self.ready_event),
+            )
             self.log_worker.start()
             self.ready_event.wait()
 
@@ -509,5 +601,10 @@ class Logger(AbstractLogger):
             self.log_worker.join()
             self.relay_handler.close()
             ep_url = yarl.URL(self.log_endpoint)
-            if ep_url.scheme.lower() == 'ipc' and (ep_sock := Path(ep_url.path)).exists():
+            if ep_url.scheme.lower() == "ipc" and (ep_sock := Path(ep_url.path)).exists():
                 ep_sock.unlink()
+
+
+def _check_driver_config_exists_if_activated(cfg, driver):
+    if driver in cfg["drivers"] and cfg[driver] is None:
+        raise ConfigurationError({"logging": f"{driver} driver is activated but no config given."})
