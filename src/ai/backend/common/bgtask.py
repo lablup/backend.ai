@@ -195,7 +195,7 @@ class BackgroundTaskManager:
         func: BackgroundTask,
         name: str = None,
         **kwargs,
-    ) -> str:
+    ) -> uuid.UUID:
         task_id = uuid.uuid4()
         redis_producer = self.event_producer.redis_client
 
@@ -221,7 +221,7 @@ class BackgroundTaskManager:
 
         task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
         self.ongoing_tasks.add(task)
-        return str(task_id)
+        return task_id
 
     async def _wrapper_task(
         self,

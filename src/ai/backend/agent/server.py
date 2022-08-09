@@ -552,7 +552,7 @@ class AgentRPCServer(aobject):
             self.agent.commit, kernel_id=KernelId(UUID(kernel_id)), path=path
         )
         return {
-            "task": task_id,
+            "task": str(task_id),
             "kernel": kernel_id,
             "path": path,
             "status": is_validate,
