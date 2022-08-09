@@ -1,11 +1,9 @@
 import functools
 import inspect
-from typing import TYPE_CHECKING, Iterable
+from typing import Iterable
 
+from ..output.types import FieldSet, FieldSpec
 from ..session import AsyncSession, api_session
-
-if TYPE_CHECKING:
-    from ai.backend.client.output.types import FieldSet, FieldSpec
 
 __all__ = (
     "APIFunctionMeta",
