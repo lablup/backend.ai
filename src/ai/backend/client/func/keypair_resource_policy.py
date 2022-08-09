@@ -4,7 +4,7 @@ from ai.backend.client.output.fields import keypair_resource_policy_fields
 from ai.backend.client.output.types import FieldSpec
 
 from ..session import api_session
-from .base import BaseFunction, api_function, resolve_field
+from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = "KeypairResourcePolicy"
 
@@ -67,7 +67,7 @@ class KeypairResourcePolicy(BaseFunction):
             "  }"
             "}"
         )
-        resolved_fields = resolve_field(
+        resolved_fields = resolve_fields(
             fields, keypair_resource_policy_fields, (keypair_resource_policy_fields["name"],)
         )
         q = q.replace("$fields", " ".join(resolved_fields))

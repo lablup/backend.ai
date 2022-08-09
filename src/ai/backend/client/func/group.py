@@ -5,7 +5,7 @@ from ai.backend.client.output.fields import group_fields
 from ai.backend.client.output.types import FieldSpec
 
 from ..session import api_session
-from .base import BaseFunction, api_function, resolve_field
+from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("Group",)
 
@@ -65,7 +65,7 @@ class Group(BaseFunction):
             }
         """
         )
-        resolved_fields = resolve_field(fields, group_fields, _default_detail_fields)
+        resolved_fields = resolve_fields(fields, group_fields, _default_detail_fields)
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
@@ -154,7 +154,7 @@ class Group(BaseFunction):
             }
         """
         )
-        resolved_fields = resolve_field(
+        resolved_fields = resolve_fields(
             fields,
             group_fields,
             (group_fields["id"], group_fields["domain_name"], group_fields["name"]),

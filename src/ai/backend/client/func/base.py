@@ -11,7 +11,7 @@ __all__ = (
     "APIFunctionMeta",
     "BaseFunction",
     "api_function",
-    "resolve_field",
+    "resolve_fields",
 )
 
 
@@ -46,7 +46,7 @@ def api_function(meth):
     return meth
 
 
-def resolve_field(
+def resolve_fields(
     fields: Iterable[FieldSpec | str] | None,
     base_field_set: FieldSet,
     default_fields: Iterable[FieldSpec],

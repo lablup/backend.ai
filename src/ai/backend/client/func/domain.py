@@ -5,7 +5,7 @@ from ai.backend.client.output.fields import domain_fields
 from ai.backend.client.output.types import FieldSpec
 
 from ..session import api_session
-from .base import BaseFunction, api_function, resolve_field
+from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("Domain",)
 
@@ -117,7 +117,7 @@ class Domain(BaseFunction):
             }
         """
         )
-        resolved_fields = resolve_field(fields, domain_fields, (domain_fields["name"],))
+        resolved_fields = resolve_fields(fields, domain_fields, (domain_fields["name"],))
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,

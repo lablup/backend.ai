@@ -7,7 +7,7 @@ from ai.backend.client.output.types import FieldSpec
 
 from ..request import Request
 from ..session import api_session
-from .base import BaseFunction, api_function, resolve_field
+from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("ScalingGroup",)
 
@@ -135,7 +135,7 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        resolved_fields = resolve_field(
+        resolved_fields = resolve_fields(
             fields, scaling_group_fields, (scaling_group_fields["name"],)
         )
         query = query.replace("$fields", " ".join(resolved_fields))
@@ -178,7 +178,7 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        resolved_fields = resolve_field(
+        resolved_fields = resolve_fields(
             fields, scaling_group_fields, (scaling_group_fields["name"],)
         )
         query = query.replace("$fields", " ".join(resolved_fields))

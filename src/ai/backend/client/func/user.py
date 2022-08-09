@@ -12,7 +12,7 @@ from ai.backend.client.pagination import generate_paginated_results
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
 
-from .base import BaseFunction, api_function, resolve_field
+from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = (
     "User",
@@ -274,7 +274,7 @@ class User(BaseFunction):
             user_fields["username"],
             user_fields["uuid"],
         )
-        resolved_fields = resolve_field(fields, user_fields, default_fields)
+        resolved_fields = resolve_fields(fields, user_fields, default_fields)
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "email": email,
