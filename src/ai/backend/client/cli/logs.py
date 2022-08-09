@@ -2,6 +2,8 @@ import sys
 
 import click
 
+from ai.backend.cli.types import ExitCode
+
 from ..compat import asyncio_run
 from ..session import AsyncSession
 from .main import main
@@ -27,4 +29,4 @@ def task_logs(task_id):
         asyncio_run(_task_logs())
     except Exception as e:
         print_error(e)
-        sys.exit(1)
+        sys.exit(ExitCode.FAILURE)
