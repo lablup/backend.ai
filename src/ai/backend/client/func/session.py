@@ -588,8 +588,8 @@ class ComputeSession(BaseFunction):
             f"/{prefix}/{self.name}/commit",
             params=params,
         )
-        async with rqst.fetch():
-            pass
+        async with rqst.fetch() as resp:
+            return await resp.json()
 
     @api_function
     async def interrupt(self):

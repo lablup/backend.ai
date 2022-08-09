@@ -1890,9 +1890,9 @@ class AbstractAgent(
             path,
         )
 
-    async def get_commit_status(self, kernel_id: KernelId):
+    async def get_commit_status(self, kernel_id: KernelId, get_lock: bool):
         image_commit_path: Path = self.local_config["agent"]["image-commit-path"]
-        return await self.kernel_registry[kernel_id].check_commit_tag(image_commit_path)
+        return await self.kernel_registry[kernel_id].check_commit_tag(image_commit_path, get_lock)
 
     async def accept_file(self, kernel_id: KernelId, filename: str, filedata):
         return await self.kernel_registry[kernel_id].accept_file(filename, filedata)

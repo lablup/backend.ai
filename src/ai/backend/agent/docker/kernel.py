@@ -150,10 +150,6 @@ class DockerKernel(AbstractKernel):
 
         container_id: str = str(self.data["container_id"])
 
-        if not (await self.check_commit_tag(image_commit_path, get_lock=True)):
-            log.warning("Container (id={}) is already being committed", container_id)
-            return int(False)
-
         filepath = image_commit_path / path
         filename = Path(filepath).name
 
@@ -180,8 +176,7 @@ class DockerKernel(AbstractKernel):
                 await loop.run_in_executor(None, _save_tar)
         tag_path = COMMIT_DIR / "tags" / container_id
         os.remove(tag_path)
-        log.info("Container has committed to {}", filepath)
-        return int(True)
+        log.info("Container is being committed to {}", filepath)
 
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()

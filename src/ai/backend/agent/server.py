@@ -518,9 +518,14 @@ class AgentRPCServer(aobject):
         kernel_id,  # type: str
     ):
         log.info("rpc::get_commit_status(k:{})", kernel_id)
-        return await self.agent.get_commit_status(
+        status: int = await self.agent.get_commit_status(
             KernelId(UUID(kernel_id)),
+            get_lock=False,
         )
+        return {
+            "kernel": kernel_id,
+            "status": status,
+        }
 
     @rpc_function
     @collect_error
@@ -529,12 +534,29 @@ class AgentRPCServer(aobject):
         kernel_id,  # type: str
         path,  # type: str
     ):
+        is_validate: int = await self.agent.get_commit_status(
+            KernelId(UUID(kernel_id)),
+            get_lock=True,
+        )
+        if not is_validate:
+            log.warning("Kernel (id={}) is already being committed", kernel_id)
+            return {
+                "task": "-1",
+                "kernel": kernel_id,
+                "path": path,
+                "status": is_validate,
+            }
         log.info("rpc::commit(k:{})", kernel_id)
         bgtask_mgr = self.local_config["background_task_manager"]
         task_id = await bgtask_mgr.start(
             self.agent.commit, kernel_id=KernelId(UUID(kernel_id)), path=path
         )
-        return task_id
+        return {
+            "task": task_id,
+            "kernel": kernel_id,
+            "path": path,
+            "status": is_validate,
+        }
 
     @rpc_function
     @collect_error

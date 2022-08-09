@@ -3007,7 +3007,7 @@ class AgentRegistry:
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
         filename: str | None,
-    ) -> str:
+    ) -> Mapping[str, Any]:
         """
         Commit a main kernel's container of the given session.
         """
@@ -3037,8 +3037,8 @@ class AgentRegistry:
                 order_key=kernel["id"],
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                task_id: str = await rpc.call.commit(str(kernel["id"]), str(path))
-                return task_id
+                resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), str(path))
+                return resp
 
 
 async def check_scaling_group(
