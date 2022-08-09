@@ -24,9 +24,12 @@ def wait_health_check(container_id):
             capture_output=True,
         )
         container_info = json.loads(proc.stdout)
-        if container_info[0]["State"]["Health"]["Status"].lower() != "healthy":
+        health_info = container_info[0]["State"].get("Health")
+        if health_info is not None and health_info["Status"].lower() != "healthy":
             time.sleep(0.2)
             continue
+        if health_info is None and (err_info := container_info[0]["State"].get("Error")):
+            raise RuntimeError(f"Container spawn failed: {err_info}")
         # Give extra grace period to avoid intermittent connection failure.
         time.sleep(0.1)
         return container_info
