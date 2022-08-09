@@ -431,13 +431,20 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ectx = ManagerErrorPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     sctx = ManagerStatsPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
-    await ectx.init(context={"_root.context": root_ctx})
-    await sctx.init()
-    root_ctx.error_monitor = ectx
-    root_ctx.stats_monitor = sctx
+    init_success = False
+    try:
+        await ectx.init(context={"_root.context": root_ctx})
+        await sctx.init()
+    except Exception:
+        log.error("Failed to initialize monitoring plugins")
+    else:
+        init_success = True
+        root_ctx.error_monitor = ectx
+        root_ctx.stats_monitor = sctx
     yield
-    await sctx.cleanup()
-    await ectx.cleanup()
+    if init_success:
+        await sctx.cleanup()
+        await ectx.cleanup()
 
 
 class background_task_ctx:

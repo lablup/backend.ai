@@ -6,17 +6,15 @@ python_test_utils(
     ],
     dependencies=[
         ":fixtures",
+        "src/ai/backend/manager/api:src",  # indirectly referred via create_app_and_client() fixture
+        "src/ai/backend/manager/scheduler:src",  # entrypoint-based import
+        "src/ai/backend/manager/plugin:src",  # entrypoint-based import
+        "//:reqs#psycopg2-binary",  # not auto-inferred
+        "//:reqs#aiosqlite",  # not auto-inferred
     ],
 )
 
-python_tests(
-    name="tests",
-    dependencies=[
-        "src/ai/backend/manager:service",
-        "src/ai/backend/testutils:lib",
-        "//:reqs#aiosqlite",
-    ],
-)
+python_tests(name="tests")
 
 files(
     name="fixtures",
