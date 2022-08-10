@@ -1,7 +1,7 @@
 Backend.AI Client SDK for Python
 ================================
 
-Python 3.8 or higher is required.
+Python 3.10.5 or higher is required.
 
 You can download `its official installer from python.org
 <https://www.python.org/downloads/>`_, or use a 3rd-party package/version manager
@@ -25,12 +25,25 @@ Then install the client library from PyPI.
    (venv-backend-ai) $ pip install -U pip setuptools
    (venv-backend-ai) $ pip install backend.ai-client
 
-Set your API keypair as environment variables:
+Set your API keypair as environment variables (Linux, macOS):
 
 .. code-block:: console
 
    (venv-backend-ai) $ export BACKEND_ACCESS_KEY=AKIA...
    (venv-backend-ai) $ export BACKEND_SECRET_KEY=...
+   (venv-backend-ai) $ export BACKEND_ENDPOINT=https://my-precious-cluster
+   (venv-backend-ai) $ export BACKEND_ENDPOINT_TYPE=api
+
+On Windows, create a batch file as `my-backend-ai.bat` and run it before using the `backend.ai` command:
+
+.. code-block:: bat
+
+   chcp 65001
+   set PYTHONIOENCODING=UTF-8
+   set BACKEND_ACCESS_KEY=...
+   set BACKEND_SECRET_KEY=...
+   set BACKEND_ENDPOINT=https://my-precious-cluster
+   set BACKEND_ENDPOINT_TYPE=api
 
 And then try the first commands:
 

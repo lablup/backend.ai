@@ -7,13 +7,13 @@ Linux/macOS
 We recommend using `pyenv <https://github.com/pyenv/pyenv>`_ to manage your Python
 versions and virtual environments to avoid conflicts with other Python applications.
 
-Create a new virtual environment (Python 3.6 or higher) and activate it on your
+Create a new virtual environment (Python 3.10.5 or higher) and activate it on your
 shell.  Then run the following commands:
 
 .. code-block:: sh
 
   pip install -U pip setuptools
-  pip install -U backend.ai-client-py
+  pip install -U backend.ai-client
 
 Create a shell script ``my-backendai-env.sh`` like:
 
@@ -31,19 +31,19 @@ Run this shell script before using ``backend.ai`` command.
    The console-server users should set ``BACKEND_ENDPOINT_TYPE`` to ``session``.
    For details, check out :doc:`the client configuration document <config>`.
 
-Windows
+Windows (TODO: Verify on Windows machine)
 -------
 
 We recommend using `the Anaconda Navigator <https://www.anaconda.com/download/>`_ to
 manage your Python environments with a slick GUI app.
 
-Create a new environment (Python 3.6 or higher) and launch a terminal (command
+Create a new environment (Python 3.10.5 or higher) and launch a terminal (command
 prompt).  Then run the following commands:
 
 .. code-block:: bat
 
   python -m pip install -U pip setuptools
-  python -m pip install -U backend.ai-client-py
+  python -m pip install -U backend.ai-client
 
 Create a batch file ``my-backendai-env.bat`` like:
 
@@ -64,8 +64,7 @@ for correct display of special characters in the console logs.
 Verification
 ------------
 
-Run ``backend.ai ps`` command and check if it says "there is no compute sessions
-running" or something similar.
+Run ``backend.ai ps`` command and check if it says "No matching items." or something similar.
 
 If you encounter error messages about "ACCESS_KEY", then check if your batch/shell
 scripts have the correct environment variable names.
