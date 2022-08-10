@@ -4,6 +4,7 @@ import asyncio
 import logging
 from contextvars import ContextVar
 from datetime import datetime, timedelta
+from functools import partial
 from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Optional, Sequence, Tuple, Union
 
 import aiotools
@@ -218,9 +219,13 @@ class SchedulerDispatcher(aobject):
                             sched_ctx,
                             sgroup_name,
                         )
-                    except InstanceNotAvailable:
+                    except InstanceNotAvailable as e:
                         # Proceed to the next scaling group and come back later.
-                        log.debug("schedule({}): instance not available", sgroup_name)
+                        log.debug(
+                            "schedule({}): instance not available ({})",
+                            sgroup_name,
+                            e.extra_msg,
+                        )
                     except Exception as e:
                         log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
         except DBAPIError as e:
@@ -537,6 +542,14 @@ class SchedulerDispatcher(aobject):
                 agent_id = sess_ctx.agent_id
             else:
                 agent_id = scheduler.assign_agent_for_session(candidate_agents, sess_ctx)
+                if agent_id is None:
+                    raise InstanceNotAvailable(
+                        extra_msg=(
+                            f"Could not find a contiguous resource region in any agent "
+                            f"big enough to host the session "
+                            f"({sess_ctx.session_id})"
+                        ),
+                    )
             async with self.db.begin() as agent_db_conn:
                 query = (
                     sa.select([agents.c.available_slots])
@@ -546,13 +559,16 @@ class SchedulerDispatcher(aobject):
                 available_agent_slots = (await agent_db_conn.execute(query)).scalar()
                 # if pass the available test
                 if available_agent_slots is None:
-                    raise InstanceNotAvailable("There is no such agent.")
+                    raise ValueError("No such agent", agent_id)
                 for key in available_agent_slots:
                     if available_agent_slots[key] >= sess_ctx.requested_slots[key]:
                         continue
                     else:
                         raise InstanceNotAvailable(
-                            "The resource slot does not have the enough remaining capacity.",
+                            extra_msg=(
+                                f"The designated agent ({agent_id}) does not have "
+                                f"the enough remaining capacity."
+                            ),
                         )
                 agent_alloc_ctx = await _reserve_agent(
                     sched_ctx,
@@ -561,10 +577,10 @@ class SchedulerDispatcher(aobject):
                     agent_id,
                     sess_ctx.requested_slots,
                 )
-        except InstanceNotAvailable:
+        except InstanceNotAvailable as sched_failure:
             log.debug(log_fmt + "no-available-instances", *log_args)
 
-            async def _update() -> None:
+            async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
                 async with self.db.begin() as kernel_db_conn:
                     await _rollback_predicate_mutations(
                         kernel_db_conn,
@@ -581,6 +597,7 @@ class SchedulerDispatcher(aobject):
                                     ("scheduler", "retries"),
                                     parent_updates={
                                         "last_try": datetime.now(tzutc()).isoformat(),
+                                        "msg": exc.extra_msg,
                                     },
                                 ),
                             }
@@ -589,7 +606,7 @@ class SchedulerDispatcher(aobject):
                     )
                     await kernel_db_conn.execute(query)
 
-            await execute_with_retry(_update)
+            await execute_with_retry(partial(_update_sched_failure, sched_failure))
             raise
         except Exception as e:
             log.exception(
@@ -598,7 +615,7 @@ class SchedulerDispatcher(aobject):
             )
             exc_data = convert_to_status_data(e)
 
-            async def _update() -> None:
+            async def _update_generic_failure() -> None:
                 async with self.db.begin() as kernel_db_conn:
                     await _rollback_predicate_mutations(
                         kernel_db_conn,
@@ -617,7 +634,7 @@ class SchedulerDispatcher(aobject):
                     )
                     await kernel_db_conn.execute(query)
 
-            await execute_with_retry(_update)
+            await execute_with_retry(_update_generic_failure)
             raise
 
         async def _finalize_scheduled() -> None:
@@ -686,6 +703,14 @@ class SchedulerDispatcher(aobject):
                             ),
                         )
                         agent_id = scheduler.assign_agent_for_kernel(candidate_agents, kernel)
+                        if agent_id is None:
+                            raise InstanceNotAvailable(
+                                extra_msg=(
+                                    f"Could not find a contiguous resource region in any agent "
+                                    f"big enough to host a kernel in the session "
+                                    f"({sess_ctx.session_id})"
+                                ),
+                            )
                     assert agent_id is not None
 
                     query = (
@@ -695,7 +720,7 @@ class SchedulerDispatcher(aobject):
                     )
                     available_agent_slots = (await agent_db_conn.execute(query)).scalar()
                     if available_agent_slots is None:
-                        raise InstanceNotAvailable("There is no such agent.")
+                        raise ValueError(f"No such agent ({agent_id})")
                     available_test_pass = False
                     for key in available_agent_slots:
                         if available_agent_slots[key] >= kernel.requested_slots[key]:
@@ -703,7 +728,10 @@ class SchedulerDispatcher(aobject):
                             continue
                         else:
                             raise InstanceNotAvailable(
-                                "The resource slot does not have the enough remaining capacity.",
+                                extra_msg=(
+                                    f"The designated agent ({agent_id}) does not have "
+                                    f"the enough remaining capacity."
+                                ),
                             )
                     if available_test_pass:
 
@@ -724,10 +752,10 @@ class SchedulerDispatcher(aobject):
                                 )
 
                         await execute_with_retry(_reserve)
-                except InstanceNotAvailable:
+                except InstanceNotAvailable as sched_failure:
                     log.debug(log_fmt + "no-available-instances", *log_args)
 
-                    async def _update() -> None:
+                    async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
                         async with self.db.begin() as kernel_db_conn:
                             await _rollback_predicate_mutations(
                                 kernel_db_conn,
@@ -744,6 +772,7 @@ class SchedulerDispatcher(aobject):
                                             ("scheduler", "retries"),
                                             parent_updates={
                                                 "last_try": datetime.now(tzutc()).isoformat(),
+                                                "msg": exc.extra_msg,
                                             },
                                         ),
                                     }
@@ -752,7 +781,7 @@ class SchedulerDispatcher(aobject):
                             )
                             await kernel_db_conn.execute(query)
 
-                    await execute_with_retry(_update)
+                    await execute_with_retry(partial(_update_sched_failure, sched_failure))
                     raise
                 except Exception as e:
                     log.exception(
@@ -761,7 +790,7 @@ class SchedulerDispatcher(aobject):
                     )
                     exc_data = convert_to_status_data(e)
 
-                    async def _update() -> None:
+                    async def _update_generic_failure() -> None:
                         async with self.db.begin() as kernel_db_conn:
                             await _rollback_predicate_mutations(
                                 kernel_db_conn,
@@ -780,7 +809,7 @@ class SchedulerDispatcher(aobject):
                             )
                             await kernel_db_conn.execute(query)
 
-                    await execute_with_retry(_update)
+                    await execute_with_retry(_update_generic_failure)
                     raise
                 else:
                     assert agent_alloc_ctx is not None
