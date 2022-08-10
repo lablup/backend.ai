@@ -521,12 +521,21 @@ class SchedulerDispatcher(aobject):
                 "Cannot assign multiple kernels with different architecture"
                 "on single node session",
             )
+        requested_architecture = requested_architectures.pop()
         compatible_candidate_agents = [
             *filter(
-                lambda x: x.architecture in requested_architectures,
+                lambda x: x.architecture == requested_architecture,
                 candidate_agents,
             ),
         ]
+        if not compatible_candidate_agents:
+            raise InstanceNotAvailable(
+                extra_msg=(
+                    f"No agents found to be compatible with the image acrhitecture "
+                    f"(image[0]: {sess_ctx.kernels[0].image_ref}, "
+                    f"arch: {requested_architecture})"
+                ),
+            )
         try:
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
@@ -724,6 +733,14 @@ class SchedulerDispatcher(aobject):
                                 candidate_agents,
                             ),
                         ]
+                        if not compatible_candidate_agents:
+                            raise InstanceNotAvailable(
+                                extra_msg=(
+                                    f"No agents found to be compatible with the image acrhitecture "
+                                    f"(image: {kernel.image_ref}, "
+                                    f"arch: {kernel.image_ref.architecture})"
+                                ),
+                            )
                         # Let the scheduler check the resource availability and decide the target agent
                         agent_id = scheduler.assign_agent_for_kernel(
                             compatible_candidate_agents, kernel
