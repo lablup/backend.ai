@@ -33,6 +33,9 @@ jobs:
       run: ./pants tailor --check update-build-files --check '::'
     - name: Lint
       run: |
+        echo "GITHUB_EVENT_NAME = $GITHUB_EVENT_NAME"
+        echo "GITHUB_HEAD_REF = $GITHUB_HEAD_REF"
+        echo "GITHUB_BASED_REF = $GITHUB_BASE_REF"
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
           echo "(skipping matchers for pull request from local branches)"
         else
