@@ -541,6 +541,8 @@ class TimeDuration(t.Trafaret):
                     return datetime.timedelta(hours=t)
                 elif value[-1] == "m":
                     return datetime.timedelta(minutes=t)
+                elif value[-1] == "s":
+                    return datetime.timedelta(seconds=t)
                 else:
                     self._failure("value is not a known time duration", value=value)
         except ValueError:

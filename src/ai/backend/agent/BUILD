@@ -1,21 +1,21 @@
 python_sources(
-    name="service",
-    sources=["**/*.py"],
+    name="src",
     dependencies=[
-        "src/ai/backend/cli:lib",
-        "src/ai/backend/common:lib",
-        "src/ai/backend/runner:lib",
-        "src/ai/backend/helpers:lib",
-        "src/ai/backend/kernel:lib",
+        "src/ai/backend/cli:src",  # not auto-inferred
+        "src/ai/backend/agent/docker:src",  # not auto-inferred
+        "src/ai/backend/agent/kubernetes:src",  # not auto-inferred
+        "src/ai/backend/runner:src",
+        "src/ai/backend/helpers:src",
+        "src/ai/backend/kernel:src",
+        "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
-        "//:reqs#backend.ai-krunner-static-gnu",
     ],
 )
 
 pex_binary(
     name="server",
     dependencies=[
-        ":service",
+        ":src",
     ],
     entry_point="server.py",
 )
@@ -33,8 +33,8 @@ python_requirement(
 python_distribution(
     name="dist",
     dependencies=[
-        ":service",
-        ":kernel-support",
+        ":src",
+        ":kernel-support",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
@@ -60,12 +60,6 @@ resources(
         ":version",
     ],
     sources=[
-        "**/py.typed",
-        "docker/*.txt",
-        "docker/*.tar.gz",
-        "docker/*.bin",
-        "kubernetes/*.txt",
-        "kubernetes/*.tar.gz",
-        # "kubernetes/*.bin",  # no matching files yet
+        "py.typed",
     ],
 )

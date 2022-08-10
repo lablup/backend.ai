@@ -44,6 +44,7 @@ enable_resolves = true
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.10.5"]
 lockfile_generator = "pex"
+tailor_pex_binary_targets = false
 
 [python-repos]
 indexes.add = ["https://dist.backend.ai/pypi/simple/"]
