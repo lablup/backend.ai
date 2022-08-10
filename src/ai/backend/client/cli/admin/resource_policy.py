@@ -70,6 +70,9 @@ def list(ctx):
 )
 @click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
 @click.option(
+    "--max-session-lifetime", type=int, default=0, help="Maximum lifetime to keep session alive."
+)
+@click.option(
     "--max-concurrent-sessions", type=int, default=30, help="Number of maximum concurrent sessions."
 )
 @click.option(
@@ -100,6 +103,7 @@ def add(
     name,
     default_for_unspecified,
     total_resource_slots,
+    max_session_lifetime,
     max_concurrent_sessions,
     max_containers_per_session,
     max_vfolder_count,
@@ -118,6 +122,7 @@ def add(
                 name,
                 default_for_unspecified=default_for_unspecified,
                 total_resource_slots=total_resource_slots,
+                max_session_lifetime=max_session_lifetime,
                 max_concurrent_sessions=max_concurrent_sessions,
                 max_containers_per_session=max_containers_per_session,
                 max_vfolder_count=max_vfolder_count,
@@ -154,6 +159,9 @@ def add(
     help="Default behavior for unspecified resources: " "LIMITED, UNLIMITED",
 )
 @click.option("--total-resource-slots", type=str, help="Set total resource slots.")
+@click.option(
+    "--max-session-lifetime", type=int, default=0, help="Maximum lifetime to keep session alive."
+)
 @click.option("--max-concurrent-sessions", type=int, help="Number of maximum concurrent sessions.")
 @click.option(
     "--max-containers-per-session", type=int, help="Number of maximum containers per session."
@@ -171,6 +179,7 @@ def update(
     name,
     default_for_unspecified,
     total_resource_slots,
+    max_session_lifetime,
     max_concurrent_sessions,
     max_containers_per_session,
     max_vfolder_count,
@@ -189,6 +198,7 @@ def update(
                 name,
                 default_for_unspecified=default_for_unspecified,
                 total_resource_slots=total_resource_slots,
+                max_session_lifetime=max_session_lifetime,
                 max_concurrent_sessions=max_concurrent_sessions,
                 max_containers_per_session=max_containers_per_session,
                 max_vfolder_count=max_vfolder_count,

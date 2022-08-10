@@ -48,6 +48,7 @@ class KeypairResourcePolicy(BaseFunction):
         name: str,
         default_for_unspecified: int,
         total_resource_slots: int,
+        max_session_lifetime: int,
         max_concurrent_sessions: int,
         max_containers_per_session: int,
         max_vfolder_count: int,
@@ -75,6 +76,7 @@ class KeypairResourcePolicy(BaseFunction):
             "input": {
                 "default_for_unspecified": default_for_unspecified,
                 "total_resource_slots": total_resource_slots,
+                "max_session_lifetime": max_session_lifetime,
                 "max_concurrent_sessions": max_concurrent_sessions,
                 "max_containers_per_session": max_containers_per_session,
                 "max_vfolder_count": max_vfolder_count,
@@ -93,6 +95,7 @@ class KeypairResourcePolicy(BaseFunction):
         name: str,
         default_for_unspecified: int,
         total_resource_slots: int,
+        max_session_lifetime: int,
         max_concurrent_sessions: int,
         max_containers_per_session: int,
         max_vfolder_count: int,
@@ -116,6 +119,7 @@ class KeypairResourcePolicy(BaseFunction):
             "input": {
                 "default_for_unspecified": default_for_unspecified,
                 "total_resource_slots": total_resource_slots,
+                "max_session_lifetime": max_session_lifetime,
                 "max_concurrent_sessions": max_concurrent_sessions,
                 "max_containers_per_session": max_containers_per_session,
                 "max_vfolder_count": max_vfolder_count,
