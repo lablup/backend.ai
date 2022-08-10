@@ -16,6 +16,8 @@ import tabulate as tabulate_mod
 from humanize import naturalsize
 from tabulate import tabulate
 
+from ai.backend.cli.types import ExitCode
+
 from ...compat import asyncio_run, current_loop
 from ...config import local_cache_path
 from ...exceptions import BackendError

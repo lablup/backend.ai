@@ -18,6 +18,8 @@ from dateutil.tz import tzutc
 from humanize import naturalsize
 from tabulate import tabulate
 
+from ai.backend.cli.types import ExitCode
+
 from ...compat import asyncio_run
 from ...exceptions import BackendAPIError
 from ...func.session import ComputeSession
