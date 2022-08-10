@@ -33,9 +33,9 @@ jobs:
       run: ./pants tailor --check update-build-files --check '::'
     - name: Lint
       run: |
-        echo "GITHUB_EVENT_NAME = $GITHUB_EVENT_NAME"
-        echo "GITHUB_HEAD_REF = $GITHUB_HEAD_REF"
-        echo "GITHUB_BASED_REF = $GITHUB_BASE_REF"
+        echo "========"
+        export | grep GITHUB
+        echo "========"
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
           echo "(skipping matchers for pull request from local branches)"
         else
@@ -47,6 +47,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
+        echo "BASE_REF = $BASE_REF"
         ./pants lint --changed-since=$BASE_REF --changed-dependees=transitive
     - name: Upload pants log
       uses: actions/upload-artifact@v3
