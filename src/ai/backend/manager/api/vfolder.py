@@ -61,6 +61,7 @@ from .exceptions import (
     BackendAgentError,
     GenericForbidden,
     GroupNotFound,
+    InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
@@ -1811,7 +1812,7 @@ async def delete(request: web.Request) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("shared_user_uuid", default=None): t.String | t.Null,
+            tx.AliasedKey(["shared_user_id", "sharedUserId"], default=None): t.String | t.Null,
         }
     ),
 )
@@ -1837,7 +1838,7 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     if shared_user_uuid:
         # Allow only superadmin to leave the shared vfolder of others.
         if (rqst_user_uuid != shared_user_uuid) and (user_role not in (UserRole.SUPERADMIN)):
-            raise GenericForbidden("Insufficient permission")
+            raise InsufficientPrivilege("Insufficient permission.")
         user_uuid = shared_user_uuid
     else:
         user_uuid = rqst_user_uuid
