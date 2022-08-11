@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence, Set, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, Union
 
 import attr
 import graphene
@@ -25,7 +25,7 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .group import resolve_group_name_or_id
+from .group import resolve_group_name_or_id, resolve_groups
 from .user import UserRole
 
 if TYPE_CHECKING:
@@ -169,21 +169,25 @@ sgroups_for_keypairs = sa.Table(
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: Union[uuid.UUID, str],
+    group: uuid.UUID | str | Iterable[Union[uuid.UUID, str]],
     access_key: str,
 ) -> Sequence[Row]:
     query = sa.select([sgroups_for_domains]).where(sgroups_for_domains.c.domain == domain_name)
     result = await db_conn.execute(query)
     from_domain = {row["scaling_group"] for row in result}
 
-    group_id = await resolve_group_name_or_id(db_conn, domain_name, group)
+    if isinstance(group, Iterable):
+        group_ids = await resolve_groups(db_conn, domain_name, group)
+    else:
+        group_id = await resolve_group_name_or_id(db_conn, domain_name, group)
+        if group_id is None:
+            group_ids = []
+    group_cond = sgroups_for_groups.c.group.in_(group_ids)
     from_group: Set[str]
-    if group_id is None:
+    if not group_ids:
         from_group = set()  # empty
     else:
-        query = sa.select([sgroups_for_groups]).where(
-            (sgroups_for_groups.c.group == group_id),
-        )
+        query = sa.select([sgroups_for_groups]).where(group_cond)
         result = await db_conn.execute(query)
         from_group = {row["scaling_group"] for row in result}
 

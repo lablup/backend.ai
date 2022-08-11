@@ -4,7 +4,7 @@ import asyncio
 import logging
 import re
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, TypedDict, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence, TypedDict, Union
 
 import aiohttp
 import graphene
@@ -116,31 +116,61 @@ groups = sa.Table(
 )
 
 
+def _build_group_query(cond, domain_name):
+    query = (
+        sa.select([groups.c.id])
+        .select_from(groups)
+        .where(
+            cond & (groups.c.domain_name == domain_name),
+        )
+    )
+    return query
+
+
 async def resolve_group_name_or_id(
     db_conn: SAConnection,
     domain_name: str,
     value: Union[str, uuid.UUID],
 ) -> Optional[uuid.UUID]:
-    if isinstance(value, str):
-        query = (
-            sa.select([groups.c.id])
-            .select_from(groups)
-            .where(
-                (groups.c.name == value) & (groups.c.domain_name == domain_name),
-            )
-        )
-        return await db_conn.scalar(query)
-    elif isinstance(value, uuid.UUID):
-        query = (
-            sa.select([groups.c.id])
-            .select_from(groups)
-            .where(
-                (groups.c.id == value) & (groups.c.domain_name == domain_name),
-            )
-        )
-        return await db_conn.scalar(query)
-    else:
-        raise TypeError("unexpected type for group_name_or_id")
+    match value:
+        case uuid.UUID():
+            cond = groups.c.id == value
+        case str():
+            cond = groups.c.name == value
+        case _:
+            raise TypeError("unexpected type for group_name_or_id")
+    query = _build_group_query(cond, domain_name)
+    return await db_conn.scalar(query)
+
+
+async def resolve_groups(
+    db_conn: SAConnection,
+    domain_name: str,
+    values: Iterable[str | uuid.UUID],
+) -> Iterable[uuid.UUID]:
+    names, ids = [], []
+    for v in values:
+        match v:
+            case uuid.UUID():
+                ids.append(groups.c.id == v)
+            case str():
+                names.append(groups.c.name == v)
+            case _:
+                raise TypeError("unexpected type for group_name_or_id")
+
+    return_val = []
+    if names:
+        name_query = _build_group_query((groups.c.id.in_(names)), domain_name)
+        result = await db_conn.scalar(name_query)
+        if result:
+            return_val.extend(result)
+    if ids:
+        id_query = _build_group_query((groups.c.id.in_(ids)), domain_name)
+        result = await db_conn.scalar(id_query)
+        if result:
+            return_val.extend(result)
+
+    return return_val
 
 
 class Group(graphene.ObjectType):
