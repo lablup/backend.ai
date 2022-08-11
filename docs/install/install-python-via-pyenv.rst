@@ -14,7 +14,7 @@ which does not interfere with system-default Pythons.
 Install dependencies for building Python
 ----------------------------------------
 
-Ubuntu
+Ubuntu / Debian
 ^^^^^^
 
 .. code-block:: console
@@ -29,7 +29,13 @@ Ubuntu
 CentOS / RHEL
 ^^^^^^^^^^^^^
 
-(TODO)
+.. code-block:: console
+
+   $ sudo yum clean expire-cache  # next yum invocation will update package metadata cache
+   $ sudo yum install -y git jq gcc make gcc-c++ \ # generic C/C++ builds
+   > openssl-devel readline-devel gdbm-devel zlib-devel
+   > bzip2-devel sqlite-devel libffi-devel xz-devel # for Python builds
+   > snappy-devel                                   # for Backend.AI dependency builds
 
 Install pyenv
 -------------
