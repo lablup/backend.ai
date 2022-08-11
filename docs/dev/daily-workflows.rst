@@ -398,7 +398,7 @@ Writing documentation
 
   .. code-block:: console
 
-     $ pyenv virtualenv 3.10.4 venv-bai-docs
+     $ pyenv virtualenv 3.10.5 venv-bai-docs
 
 * Activate the virtualenv and run:
 
