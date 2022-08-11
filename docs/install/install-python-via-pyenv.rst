@@ -37,49 +37,41 @@ CentOS / RHEL
    > bzip2-devel sqlite-devel libffi-devel xz-devel # for Python builds
    > snappy-devel                                   # for Backend.AI dependency builds
 
-Install pyenv
+Install pyenv & pyenv-virtualenv plugin
 -------------
 
 **NOTE:** Change ``~/.profile`` accroding to your shell/system (e.g., ``~/.bashrc``\ , ``~/.bash_profile``\ , ``~/.zshrc``\ , ...) -- whichever loaded at startup of your shell! 
 
 .. code-block:: console
 
-   $ git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+   $ curl https://pyenv.run | bash
    ...
    $ echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.profile
-   $ echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.profile
-   $ echo 'eval "$(pyenv init -)"' >> ~/.profile
+   $ echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.profile
+   $ echo 'eval "$(pyenv init --path)"' >> ~/.profile
+   $ echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.profile
    $ exec $SHELL -l
    $ pyenv  # check installation
-   pyenv 1.2.0-6-g9619e6b
+   pyenv 2.3.3
    Usage: pyenv <command> [<args>]
 
    Some useful pyenv commands are:
       ...
 
-Install pyenv's virtualenv plugin
----------------------------------
-
-.. code-block:: console
-
-   $ git clone https://github.com/pyenv/pyenv-virtualenv.git ~/.pyenv/plugins/pyenv-virtualenv
-   ...
-   $ echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.profile
-   $ exec $SHELL -l
    $ pyenv virtualenv  # check installation
    pyenv-virtualenv: no virtualenv name given.
 
 Install Python via pyenv
 ------------------------
 
-Install Python 3.6 latest version.\ :raw-html-m2r:`<br>`
+Install Python 3.10 latest version.\ :raw-html-m2r:`<br>`
 
 .. warning::
-   Currently Python 3.7 is not supported yet.
+   According to `PEP-644 <https://peps.python.org/pep-0644/>`_ , Python 3.10 requires openssl 1.1.1 or newer
 
 .. code-block:: console
 
-   $ pyenv install 3.6.6
+   $ pyenv install 3.10.5
 
 Create a virtualenv using a specific Python version
 ---------------------------------------------------
@@ -88,7 +80,7 @@ Change ``myvenv`` to specific names required in other guide pages.
 
 .. code-block:: console
 
-   $ pyenv virtualenv 3.6.6 myvenv
+   $ pyenv virtualenv 3.10.5 myvenv
 
 Activate the virtualenv for the current shell
 ---------------------------------------------
