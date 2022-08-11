@@ -20,19 +20,19 @@ sessions.
 
   backend.ai ps
 
-The ``ps`` command is an alias of the following ``admin sessions`` command.
+The ``ps`` command is an alias of the following ``admin session list`` command.
 If you have the administrator privilege, you can list sessions owned by
 other users by adding ``--access-key`` option here.
 
 .. code-block:: shell
 
-  backend.ai admin sessions
+  backend.ai admin session list
 
 Both commands offer options to set the status filter as follows.
 For other options, please consult the output of ``--help``.
 
 .. list-table::
-   :widths: 15 85
+   :widths: 20 80
    :header-rows: 1
 
    * - Option
@@ -40,6 +40,7 @@ For other options, please consult the output of ``--help``.
 
    * - (no option)
      - ``PENDING``, ``PREPARING``, ``RUNNING``, ``RESTARTING``,
+
        ``TERMINATING``, ``RESIZING``, ``SUSPENDED``, and ``ERROR``.
 
    * - ``--running``
@@ -47,6 +48,15 @@ For other options, please consult the output of ``--help``.
 
    * - ``--dead``
      - ``CANCELLED`` and ``TERMINATED``.
+
+   * - ``--status``
+     - One of ``PENDING``, ``SCHEDULED``, ``PREPARING``, ``BUILDING``,
+
+       ``RUNNING``, ``RESTARTING``, ``RESIZING``, ``SUSPENDED``,
+
+       ``TERMINATING``, ``TERMINATED``, ``ERROR``, ``CANCELLED``,
+
+       and ``ALL``.
 
 Both commands offer options to specify which fields of sessions should be printed as follows.
 
@@ -58,21 +68,21 @@ Both commands offer options to specify which fields of sessions should be printe
      - Included Session Fields
 
    * - (no option)
-     - ``Session ID``, ``Owner``, ``Image``, ``Type``,
+     - ``Name``, ``Owner Access Key``, ``Session ID``, ``Project/Group``,
 
-       ``Status``, ``Status Info``, ``Last updated``, and ``Result``.
+       ``Kernel ID``, ``Image``, ``Type``, ``Status``, ``Status Info``,
+       
+       ``Last Updated``, and ``Result``.
 
-   * - ``--id-only``
-     - ``Session ID``.
+   * - ``--name-only``
+     - ``Session Name``.
 
    * - ``--detail``
-     - ``Session ID``, ``Owner``, ``Image``, ``Type``,
+     - ``Name``, ``Owner Access Key``, ``Session ID``, ``Project/Group``,
 
-       ``Status``, ``Status Info``, ``Last updated``, ``Result``,
-
-       ``Tag``, ``Created At``, ``Occupied Resource``, ``Used Memory (MiB)``,
-
-       ``Max Used Memory (MiB)``, and ``CPU Using (%)``.
+       ``Kernel ID``, ``Image``, ``Type``, ``Status``, ``Status Info``,
+       
+       ``Last Updated``, ``Result``, ``Tag``, ``Created At``, and ``Occupied Slots``.
 
    * - ``-f``, ``--format``
      - Specified fields by user.
@@ -80,13 +90,13 @@ Both commands offer options to specify which fields of sessions should be printe
 .. note::
     Fields for ``-f/--format`` option can be displayed by specifying comma-separated parameters.
 
-    Available parameters for this option are: ``id``, ``status``, ``status_info``, ``created_at``, ``last_updated``, ``result``, ``image``, ``type``, ``task_id``, ``tag``, ``occupied_slots``, ``used_memory``, ``max_used_memory``, ``cpu_using``.
+    Available parameters for this option are: ``name``, ``access_key``, ``session_id``, ``kernel_id``, ``image``, ``type``, ``status``, ``status_info``, ``result``, ``tag``, ``created_at``, ``occupied_slots``.
 
     For example:
 
     .. code-block:: shell
 
-        backend.ai admin session --format id,status,cpu_using
+        backend.ai admin session list --format name,status,occupied_slots
 
 .. _simple-execution:
 
@@ -100,14 +110,16 @@ the session after execution finishes.
 
 .. code-block:: shell
 
-  backend.ai run --rm -c 'print("hello world")' python:3.6-ubuntu18.04
+  backend.ai run --rm -c 'print("hello world")' cr.backend.ai/multiarch/python:3.9-ubuntu20.04
 
 .. note::
 
-   By default, you need to specify language with full version tag like
-   ``python:3.6-ubuntu18.04``. Depending on the Backend.AI admin's language
+   By default, you need to specify image with full language and version tag like
+   ``cr.backend.ai/multiarch/python:3.9-ubuntu20.04``. Depending on the Backend.AI admin's language
    alias settings, this can be shortened just as ``python``. If you want
    to know defined language aliases, contact the admin of Backend.AI server.
+   If you have the administrator privilege, you can run ``backend.ai admin image list``
+   to list available images.
 
 
 The following command spawns a Python session and executes
@@ -117,7 +129,7 @@ specified in the ``--exec`` option.
 .. code-block:: shell
 
   backend.ai run --rm --exec 'python myscript.py arg1 arg2' \
-             python:3.6-ubuntu18.04 ./myscript.py
+             cr.backend.ai/multiarch/python:3.9-ubuntu20.04 ./myscript.py
 
 
 Please note that your ``run`` command may hang up for a very long time
@@ -142,7 +154,7 @@ try ``backend.ai events <sessionID>`` to receive the lifecycle events
 such as its scheduling and preparation steps.
 
 
-Running sessions with accelerators
+Running sessions with accelerators  # TODO
 ----------------------------------
 
 Use one or more ``-r`` options to specify resource requirements when
@@ -170,7 +182,7 @@ IDs.  You may specifcy multiple session IDs to terminate them at once.
 
 .. code-block:: shell
 
-  backend.ai rm <sessionID> [<sessionID>...]
+  backend.ai session rm <sessionID> [<sessionID>...]
 
 If you terminate ``PENDING`` sessions which are not scheduled yet,
 they are cancelled.
