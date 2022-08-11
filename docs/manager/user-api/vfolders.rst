@@ -37,7 +37,7 @@ Parameters
      - Description
    * - ``all``
      - ``bool``
-     - (optional) If this parameter is ``True``, it returns all virtual folders,
+     - (optional, deprecated) If this parameter is ``True``, it returns all virtual folders,
        including those that do not belong to the current user. Only available for
        superadmin (default: ``False``).
    * - ``group_id``
@@ -167,7 +167,7 @@ Parameters
    * - ``name``
      - ``str``
      - The human-readable name of the virtual folder.
-   * - ``host``
+   * - ``folder_host``
      - ``str``
      - (optional) The name of the virtual folder host.
    * - ``usage_mode``
@@ -180,7 +180,7 @@ Parameters
        The owner of the virtual folder always have ``wd`` permission regardless of
        this parameter. Allowed values are ``ro``, ``rw``, and ``wd``
        (default: ``rw``).
-   * - ``group_id``
+   * - ``group``
      - ``UUID | str``
      - (optional) If this parameter is set, it creates a group-type virtual folder.
        If empty, it creates a user-type virtual folder.
@@ -717,6 +717,50 @@ Response
    * - 404 Not Found
      - There is no such folder or you may not have proper permission
        to rename the file in the folder.
+
+
+Move a File in Virtual Folder
+-------------------------------
+
+Move a file inside a virtual folder.
+
+* URI: ``/folders/:name/move-file``
+* Method: ``POST``
+
+Parameters
+""""""""""
+
+.. list-table::
+   :widths: 15 10 80
+   :header-rows: 1
+
+   * - Parameter
+     - Type
+     - Description
+   * - ``:name``
+     - ``str``
+     - The human-readable name of the virtual folder.
+   * - ``src``
+     - ``str``
+     - The relative path of source file.
+   * - ``dst``
+     - ``str``
+     - The relative path of destination.
+
+Response
+""""""""
+
+.. list-table::
+   :header-rows: 1
+
+   * - HTTP Status Code
+     - Description
+   * - 200 OK
+     - Success.
+   * - 404 Not Found
+     - There is no such folder or you may not have proper permission
+       to move the file in the folder.
+
 
 Listing Invitations for Virtual Folder
 --------------------------------------
