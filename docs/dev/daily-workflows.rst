@@ -474,7 +474,7 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 .. code-block:: console
 
    $ killall -r pantsd   # just `killall pantsd` in macOS
-   $ rm -r .tmp .pants.d ~/.cache/pants
+   $ rm -r .tmp .pants.d .pants.env pants-local ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and
 all cached data as necessary.
