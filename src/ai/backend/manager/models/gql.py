@@ -35,7 +35,7 @@ from ..api.exceptions import (
     ObjectNotFound,
     TooManyKernelsFound,
 )
-from .agent import Agent, AgentList, ModifyAgent
+from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .group import CreateGroup, DeleteGroup, Group, ModifyGroup, PurgeGroup
@@ -214,6 +214,22 @@ class Queries(graphene.ObjectType):
     # super-admin only
     agents = graphene.List(  # legacy non-paginated list
         Agent,
+        scaling_group=graphene.String(),
+        status=graphene.String(),
+    )
+
+    agent_summary = graphene.Field(
+        AgentSummary,
+        agent_id=graphene.String(required=True),
+    )
+
+    agent_summary_list = graphene.Field(
+        AgentSummaryList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # filters
         scaling_group=graphene.String(),
         status=graphene.String(),
     )
@@ -529,6 +545,59 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return AgentList(agent_list, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=True, user_key="access_key")
+    async def resolve_agent_summary(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        agent_id: AgentId,
+        *,
+        access_key: AccessKey,
+        scaling_group: str = None,
+    ) -> AgentSummary:
+        ctx: GraphQueryContext = info.context
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "Agent",
+            raw_status=None,
+            scaling_group=scaling_group,
+            access_key=access_key,
+        )
+        return await loader.load(agent_id)
+
+    @staticmethod
+    @scoped_query(autofill_user=True, user_key="access_key")
+    async def resolve_agent_summary_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        access_key: AccessKey,
+        filter: str = None,
+        order: str = None,
+        scaling_group: str = None,
+        status: str = None,
+    ) -> AgentSummaryList:
+        total_count = await AgentSummary.load_count(
+            info.context,
+            access_key=access_key,
+            scaling_group=scaling_group,
+            raw_status=status,
+            filter=filter,
+        )
+        agent_list = await AgentSummary.load_slice(
+            info.context,
+            limit,
+            offset,
+            access_key=access_key,
+            scaling_group=scaling_group,
+            raw_status=status,
+            filter=filter,
+            order=order,
+        )
+        return AgentSummaryList(agent_list, total_count)
 
     @staticmethod
     async def resolve_domain(

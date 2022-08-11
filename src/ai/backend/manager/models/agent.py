@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import uuid
 from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence
 
 import graphene
@@ -26,10 +27,13 @@ from .base import (
     set_if_set,
     simple_db_mutate,
 )
+from .group import association_groups_users
 from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
+from .keypair import keypairs
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
-from .user import UserRole
+from .scaling_group import query_allowed_sgroups
+from .user import UserRole, users
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.gql import GraphQueryContext
@@ -39,6 +43,8 @@ __all__: Sequence[str] = (
     "AgentStatus",
     "AgentList",
     "Agent",
+    "AgentSummary",
+    "AgentSummaryList",
     "ModifyAgent",
     "recalc_agent_resource_occupancy",
 )
@@ -323,6 +329,174 @@ class AgentList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(Agent, required=True)
+
+
+async def _query_domain_groups_by_ak(
+    db_conn: SAConnection,
+    access_key: str,
+) -> tuple[str, list[uuid.UUID]]:
+    j = sa.join(
+        keypairs,
+        users,
+        keypairs.c.user == users.c.uuid,
+    )
+    query = (
+        sa.select([keypairs, users.c.domain_name])
+        .select_from(j)
+        .where(keypairs.c.access_key == access_key)
+    )
+    result = await db_conn.execute(query)
+    row = result.first()
+    domain_name = row["domain_name"]
+    user_id = row["user"]
+
+    query = (
+        sa.select([association_groups_users.c.group_id])
+        .select_from(association_groups_users)
+        .where(association_groups_users.c.user_id == user_id)
+    )
+    result = await db_conn.execute(query)
+    groud_ids = [row["group_id"] for row in result.fetchall()]
+    return domain_name, groud_ids
+
+
+async def _append_sgroup_from_clause(
+    graph_ctx,
+    query,
+    access_key: str,
+    scaling_group: str | None,
+):
+    if scaling_group is not None:
+        query = query.where(agents.c.scaling_group == scaling_group)
+    else:
+        async with graph_ctx.db.begin_readonly() as conn:
+            domain_name, group_ids = await _query_domain_groups_by_ak(conn, access_key)
+            sgroups = await query_allowed_sgroups(conn, domain_name, group_ids, access_key)
+        query = query.where(agents.c.scaling_group.in_([sgroup["name"] for sgroup in sgroups]))
+    return query
+
+
+class AgentSummary(graphene.ObjectType):
+    """
+    A schema for normal users.
+    """
+
+    class Meta:
+        interfaces = (Item,)
+
+    status = graphene.String()
+    scaling_group = graphene.String()
+    schedulable = graphene.Boolean()
+    available_slots = graphene.JSONString()
+    occupied_slots = graphene.JSONString()
+
+    @classmethod
+    def from_row(
+        cls,
+        ctx: GraphQueryContext,
+        row: Row,
+    ) -> Agent:
+        return cls(
+            id=row["id"],
+            status=row["status"].name,
+            scaling_group=row["scaling_group"],
+            schedulable=row["schedulable"],
+            available_slots=row["available_slots"].to_json(),
+            occupied_slots=row["occupied_slots"].to_json(),
+        )
+
+    @classmethod
+    async def batch_load(
+        cls,
+        graph_ctx: GraphQueryContext,
+        agent_ids: Sequence[AgentId],
+        *,
+        raw_status: str = None,
+        scaling_group: str = None,
+        access_key: str,
+    ) -> Sequence[Agent | None]:
+        query = (
+            sa.select([agents])
+            .select_from(agents)
+            .where(agents.c.id.in_(agent_ids))
+            .order_by(
+                agents.c.id,
+            )
+        )
+        if raw_status is not None:
+            query = query.where(agents.c.status == AgentStatus[raw_status])
+        query = await _append_sgroup_from_clause(graph_ctx, query, access_key, scaling_group)
+        async with graph_ctx.db.begin_readonly() as conn:
+            return await batch_result(
+                graph_ctx,
+                conn,
+                query,
+                cls,
+                agent_ids,
+                lambda row: row["id"],
+            )
+
+    @classmethod
+    async def load_count(
+        cls,
+        graph_ctx: GraphQueryContext,
+        *,
+        scaling_group: str = None,
+        access_key: str,
+        raw_status: str = None,
+        filter: str = None,
+    ) -> int:
+        query = sa.select([sa.func.count()]).select_from(agents)
+        query = await _append_sgroup_from_clause(graph_ctx, query, access_key, scaling_group)
+
+        if raw_status is not None:
+            query = query.where(agents.c.status == AgentStatus[raw_status])
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with graph_ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.scalar()
+
+    @classmethod
+    async def load_slice(
+        cls,
+        graph_ctx: GraphQueryContext,
+        limit: int,
+        offset: int,
+        *,
+        scaling_group: str = None,
+        access_key: str,
+        raw_status: str = None,
+        filter: str = None,
+        order: str = None,
+    ) -> Sequence[Agent]:
+        query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
+        query = await _append_sgroup_from_clause(graph_ctx, query, access_key, scaling_group)
+
+        if raw_status is not None:
+            query = query.where(agents.c.status == AgentStatus[raw_status])
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        if order is not None:
+            qoparser = QueryOrderParser(cls._queryorder_colmap)
+            query = qoparser.append_ordering(query, order)
+        else:
+            query = query.order_by(
+                agents.c.status.asc(),
+                agents.c.scaling_group.asc(),
+                agents.c.id.asc(),
+            )
+        async with graph_ctx.db.begin_readonly() as conn:
+            return [cls.from_row(graph_ctx, row) async for row in (await conn.stream(query))]
+
+
+class AgentSummaryList(graphene.ObjectType):
+    class Meta:
+        interfaces = (PaginatedList,)
+
+    items = graphene.List(AgentSummary, required=True)
 
 
 async def recalc_agent_resource_occupancy(db_conn: SAConnection, agent_id: AgentId) -> None:
