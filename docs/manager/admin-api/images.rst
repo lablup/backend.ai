@@ -7,10 +7,12 @@ Query Schema
 .. code-block:: graphql
 
    type Image {
+     id: UUID
      name: String
      humanized_name: String
      tag: String
      registry: String
+     architecture: String
      digest: String
      labels: [KVPair]
      aliases: [String]
@@ -19,6 +21,7 @@ Query Schema
      supported_accelerators: [String]
      installed: Boolean
      installed_agents: [String]  # super-admin only
+     hash: String
    }
 
 .. code-block:: graphql

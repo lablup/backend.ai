@@ -11,14 +11,21 @@ Query Schema
      host: String
      name: String
      user: UUID
+     user_email: String
      group: UUID
+     group_name: String
+     creator: String        # user email
      unmanaged_path: UUID
+     usage_mode: String
+     permission: String
+     ownership_type: String
      max_files: Int
      max_size: Int
      created_at: DateTime
      last_used: DateTime
      num_files: Int
      cur_size: BigInt
+     cloneable: Boolean
    }
 
    type Query {

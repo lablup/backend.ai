@@ -15,7 +15,10 @@ Query Schema
      full_name: String
      description: String
      is_active: Boolean
+     status: String
+     status_info: String
      created_at: DateTime
+     modified_at: DateTime
      domain_name: String
      role: String
      groups: [UserGroup]

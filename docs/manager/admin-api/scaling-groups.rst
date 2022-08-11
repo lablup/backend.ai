@@ -11,6 +11,7 @@ Query Schema
      description: String
      is_active: Boolean
      created_at: DateTime
+     wsproxy_addr: String
      driver: String
      driver_opts: JSONString
      scheduler: String
@@ -30,9 +31,10 @@ Mutation Schema
 
 .. code-block:: graphql
 
-   input ScalingGroupInput {
+   input CreateScalingGroupInput {
      description: String
      is_active: Boolean
+     wsproxy_addr: String
      driver: String!
      driver_opts: JSONString
      scheduler: String!
@@ -42,6 +44,7 @@ Mutation Schema
    input ModifyScalingGroupInput {
      description: String
      is_active: Boolean
+     wsproxy_addr: String
      driver: String
      driver_opts: JSONString
      scheduler: String

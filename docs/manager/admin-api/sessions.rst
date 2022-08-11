@@ -18,13 +18,16 @@ Query Schema
      id: UUID
      name: String
      type: String
-     id: UUID
      tag: String
+     session_id: UUID
 
      # image
      image: String
+     architecture: String
      registry: String
      cluster_template: String  # reserved for future release
+     cluster_mode: String
+     cluster_size: Int
 
      # ownership
      domain_name: String
@@ -40,8 +43,11 @@ Query Schema
      status: String
      status_changed: DateTime
      status_info: String
+     status_data: JSONString
+     status_history: JSONString
      created_at: DateTime
      terminated_at: DateTime
+     starts_at: DateTime
      startup_command: String
      result: String
 
@@ -101,17 +107,23 @@ Note that the client must assume that ``id`` is different from ``container_id``,
      role: String      # "master" is reserved, other values are defined by cluster templates
      hostname: String  # used by sibling containers in the same session
      session_id: UUID
+     cluster_idx: Int
+     cluster_role: String
+     cluster_hostname: String
 
      # image
      image: String
+     architecture: String
      registry: String
 
      # status
      status: String
      status_changed: DateTime
      status_info: String
+     status_data: JSONString
      created_at: DateTime
      terminated_at: DateTime
+     starts_at: DateTime
 
      # resources
      agent: String               # super-admin only

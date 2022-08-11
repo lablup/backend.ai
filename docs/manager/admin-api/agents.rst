@@ -12,14 +12,17 @@ Query Schema
      status_changed: DateTime
      region: String
      scaling_group: String
+     schedulable: Boolean
      available_slots: JSONString  # ResourceSlot
      occupied_slots: JSONString   # ResourceSlot
      addr: String
+     architecture: String
      first_contact: DateTime
      lost_at: DateTime
      live_stat: JSONString
      version: String
      compute_plugins: JSONString
+     hardware_metadata: JSONString
      compute_containers(status: String): [ComputeContainer]
 
      # legacy fields

@@ -8,6 +8,7 @@ Query Schema
 
    type KeyPair {
      user_id: String
+     full_name: String
      access_key: String
      secret_key: String
      is_active: Boolean
@@ -19,6 +20,7 @@ Query Schema
      rate_limit: Int
      num_queries: Int
      user: UUID
+     user_info: UserInfo
      ssh_public_key: String
      vfolders: [VirtualFolder]
      compute_sessions(status: String): [ComputeSession]
