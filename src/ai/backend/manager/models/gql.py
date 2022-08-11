@@ -193,11 +193,13 @@ class Queries(graphene.ObjectType):
     All available GraphQL queries.
     """
 
+    # super-admin only
     agent = graphene.Field(
         Agent,
         agent_id=graphene.String(required=True),
     )
 
+    # super-admin only
     agent_list = graphene.Field(
         AgentList,
         limit=graphene.Int(required=True),
@@ -469,37 +471,18 @@ class Queries(graphene.ObjectType):
     )
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_agent(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         agent_id: AgentId,
-        *,
-        scaling_group: str = None,
     ) -> Agent:
         ctx: GraphQueryContext = info.context
-        role = ctx.user["role"]
-        local_config = ctx.local_config
-        match role:
-            case UserRole.SUPERADMIN:
-                loader = ctx.dataloader_manager.get_loader(
-                    ctx,
-                    "Agent",
-                    raw_status=None,
-                )
-            case UserRole.ADMIN | UserRole.USER:
-                if local_config["manager"]["hide-agents"]:
-                    raise InsufficientPrivilege
-                if scaling_group is None:
-                    raise InvalidAPIParameters("scaling_group is empty")
-                loader = ctx.dataloader_manager.get_loader(
-                    ctx,
-                    "Agent",
-                    raw_status=None,
-                    scaling_group=scaling_group,
-                )
-            case _:
-                InvalidAPIParameters("Unknown client role")
-        assert loader is not None
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "Agent",
+            raw_status=None,
+        )
         return await loader.load(agent_id)
 
     @staticmethod
@@ -518,6 +501,7 @@ class Queries(graphene.ObjectType):
         )
 
     @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
     async def resolve_agent_list(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
@@ -529,27 +513,14 @@ class Queries(graphene.ObjectType):
         scaling_group: str = None,
         status: str = None,
     ) -> AgentList:
-        ctx: GraphQueryContext = info.context
-        role = ctx.user["role"]
-        local_config = ctx.local_config
-        match role:
-            case UserRole.SUPERADMIN:
-                pass
-            case UserRole.ADMIN | UserRole.USER:
-                if local_config["manager"]["hide-agents"]:
-                    raise InsufficientPrivilege
-                if scaling_group is None:
-                    raise InvalidAPIParameters("scaling_group is empty")
-            case _:
-                InvalidAPIParameters("Unknown client role")
         total_count = await Agent.load_count(
-            ctx,
+            info.context,
             scaling_group=scaling_group,
             raw_status=status,
             filter=filter,
         )
         agent_list = await Agent.load_slice(
-            ctx,
+            info.context,
             limit,
             offset,
             scaling_group=scaling_group,
