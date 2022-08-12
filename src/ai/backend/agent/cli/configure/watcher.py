@@ -1,6 +1,6 @@
 from tomlkit.items import InlineTable, Table
 
-from ai.backend.cli.interaction import ask_host, ask_int, ask_path, ask_choice
+from ai.backend.cli.interaction import ask_choice, ask_host, ask_int, ask_path
 
 
 def config_watcher(config_toml: dict) -> dict:
@@ -32,7 +32,7 @@ def config_watcher(config_toml: dict) -> dict:
         except ValueError:
             raise ValueError
 
-        ssl_enabled = ask_choice("Enable SSL", ["true", "false"], "false")
+        ssl_enabled = ask_choice("Enable SSL", ["true", "false"], default="false")
         config_toml["watcher"]["ssl-enabled"] = ssl_enabled == "true"
         if ssl_enabled == "true":
             ssl_cert = ask_path("SSL cert path")

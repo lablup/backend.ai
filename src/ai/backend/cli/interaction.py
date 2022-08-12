@@ -1,32 +1,35 @@
-import ipaddress
 import functools
+import ipaddress
+import readline
+import socket
 from pathlib import Path
-from typing import Optional, Type, TypeVar, Union, cast
-from urllib.error import HTTPError
-from urllib.request import urlopen
+from typing import Optional, Sequence, Type, TypeVar, Union, cast
 
 T_Number = TypeVar("T_Number", bound=Union[int, float])
 
 
+def rl_input(prompt: str, prefill: str = "") -> str:
+    readline.set_startup_hook(lambda: readline.insert_text(prefill))
+    try:
+        return input(prompt)
+    finally:
+        readline.set_startup_hook()
+
+
 def ask_host(prompt: str, default: str = "127.0.0.1", allow_hostname=False) -> str:
+    prefill = default
     while True:
-        user_reply = input(f"{prompt} (default: {default}): ")
+        user_reply = rl_input(f"{prompt}: ", prefill=prefill)
         if user_reply == "":
             user_reply = default
         try:
             if allow_hostname:
-                url = user_reply
-                if not (user_reply.startswith("http://") or user_reply.startswith("https://")):
-                    url = f"http://{user_reply}"
-                try:
-                    urlopen(url)
-                    break
-                except HTTPError:
-                    print("Please input correct URL.")
+                socket.gethostbyname(user_reply)
             ipaddress.ip_address(user_reply)
             break
-        except ValueError:
+        except (socket.gaierror, ValueError):
             print("Please input correct host.")
+            prefill = user_reply
     return user_reply
 
 
@@ -61,12 +64,9 @@ def ask_number_impl(
     min_value=None,
     max_value=None,
 ) -> T_Number:
-    if default is None:
-        prompt = f"{prompt}: "
-    else:
-        prompt = f"{prompt} (default: {default}): "
+    prefill = "" if default is None else str(default)
     while True:
-        user_reply = input(prompt)
+        user_reply = rl_input(prompt, prefill=prefill)
         if not user_reply:
             if default is not None:
                 return default
@@ -76,13 +76,16 @@ def ask_number_impl(
         try:
             value = cast(T_Number, num_type(user_reply))
         except ValueError:
-            print(f"Could not parse the input as a number: {user_reply}")
+            print("Could not parse the input as a number!")
+            prefill = user_reply
             continue
         if min_value is not None and min_value > value:
             print(f"The number must be equivalent to or greater than {min_value}.")
+            prefill = str(value)
             continue
         if max_value is not None and max_value < value:
             print(f"The number must be equivalent to or less than {max_value}.")
+            prefill = str(value)
             continue
         return value
 
@@ -93,53 +96,47 @@ def ask_string(
     default: Optional[str] = None,
     allow_empty: bool = False,
 ) -> str:
+    prefill = "" if default is None else default
     while True:
         if default is not None:
-            user_reply = input(f'{prompt} (default: "{default}"): ')
+            user_reply = rl_input("{prompt}: ", prefill=prefill)
             if not user_reply:
                 return default
             return user_reply
         else:
-            user_reply = input(f"{prompt} (if you don't want, just leave empty): ")
+            user_reply = rl_input(f"{prompt} (may be left empty): ", prefill=prefill)
             if not user_reply and not allow_empty:
                 print("You must input the value.")
                 continue
             return user_reply
 
 
-def ask_choice(prompt: str, choices: list, default: str) -> Optional[str]:
+def ask_choice(
+    prompt: str,
+    choices: Sequence[str],
+    *,
+    default: Optional[str] = None,
+    allow_empty: bool = False,
+) -> str:
     if default and default not in choices:
-        print("Default value should be in choices args.")
-        return None
-    if "" in choices:
-        choices.remove("")
-
-    if default:
-        question = (
-            f"{prompt} (choices: {'/'.join(choices)}, "
-            f"if left empty, this will use default value: {default}): "
-        )
+        raise ValueError("The default value must be included in the choices.")
+    prefill = "" if default is None else default
+    if allow_empty:
+        prompt = f"{prompt} (choices: {', '.join(choices)}, may be left empty): "
     else:
-        question = (
-            f"{prompt} (choices: {'/'.join(choices)}, if left empty, this will remove this key): "
-        )
-
+        prompt = f"{prompt} (choices: {', '.join(choices)}): "
     while True:
-        user_reply = input(question)
-        if user_reply == "":
-            if default:
-                user_reply = default
-            else:
-                return None
-            break
-        elif user_reply.lower() in choices:
-            break
-        else:
-            print(f"Please answer in {'/'.join(choices)}.")
-    return user_reply
+        user_reply = rl_input(prompt, prefill=prefill)
+        if not user_reply and allow_empty:
+            return ""
+        if user_reply in choices:
+            return user_reply
+        print(f"Please answer one of: {', '.join(choices)}.")
+        prefill = user_reply
 
 
 def ask_path(prompt: str, is_file=True, is_directory=True) -> Path:
+    # TODO: rewrite using rl_input and proper default values
     if not (is_file or is_directory):
         print("One of args(is_file/is_directory) has True value.")
     while True:

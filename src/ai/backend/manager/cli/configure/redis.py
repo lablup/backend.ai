@@ -1,4 +1,3 @@
-import asyncio
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import redis

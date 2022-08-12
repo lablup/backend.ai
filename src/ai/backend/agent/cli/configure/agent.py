@@ -2,7 +2,7 @@ import os
 
 from tomlkit.items import InlineTable, Table
 
-from ai.backend.cli.interaction import ask_host, ask_port, ask_string, ask_choice
+from ai.backend.cli.interaction import ask_choice, ask_host, ask_port, ask_string
 
 
 def config_agent(config_toml: dict) -> dict:
@@ -16,7 +16,7 @@ def config_agent(config_toml: dict) -> dict:
             raise TypeError
         agent_config = dict(config_toml["agent"])
 
-        agent_mode = ask_choice("Agent mode", ["docker", "kubernetes"], "docker")
+        agent_mode = ask_choice("Agent mode", ["docker", "kubernetes"], default="docker")
         config_toml["agent"]["mode"] = agent_mode
 
         try:
@@ -59,13 +59,21 @@ def config_agent(config_toml: dict) -> dict:
         elif pid_path and os.path.exists(pid_path):
             config_toml["agent"]["pid-file"] = pid_path
 
-        event_loop = ask_choice("Event loop", ["asyncio", "uvloop", ""], "")
+        event_loop = ask_choice(
+            "Event loop",
+            ["asyncio", "uvloop"],
+            default="uvloop",
+        )
         if event_loop:
             config_toml["agent"]["event-loop"] = event_loop
         else:
             config_toml["agent"].pop("event-loop")
 
-        skip_manager_detection = ask_choice("Skip manager detection", ["true", "false", ""], "")
+        skip_manager_detection = ask_choice(
+            "Skip manager detection",
+            ["true", "false"],
+            default="false",
+        )
         if skip_manager_detection:
             config_toml["agent"]["skip-manager-detection"] = skip_manager_detection
         else:

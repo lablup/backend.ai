@@ -3,14 +3,7 @@ from typing import Optional
 
 from tomlkit.items import InlineTable, Table
 
-from ai.backend.cli.interaction import (
-    ask_host,
-    ask_int,
-    ask_path,
-    ask_port,
-    ask_string,
-    ask_choice,
-)
+from ai.backend.cli.interaction import ask_choice, ask_host, ask_int, ask_path, ask_port, ask_string
 
 
 def config_manager(config_toml: dict) -> dict:
@@ -63,7 +56,7 @@ def config_manager(config_toml: dict) -> dict:
         except ValueError:
             raise ValueError
 
-        ssl_enabled = ask_choice("Enable SSL", ["true", "false"], "false")
+        ssl_enabled = ask_choice("Enable SSL", ["true", "false"], default="false")
         config_toml["manager"]["ssl-enabled"] = ssl_enabled == "true"
 
         if ssl_enabled == "true":
@@ -95,11 +88,13 @@ def config_manager(config_toml: dict) -> dict:
             config_toml["manager"]["pid-file"] = pid_path
 
         hide_agent = ask_choice(
-            "Hide agent and container ID", ["true", "false"], config_toml["manager"]["hide-agents"]
+            "Hide agent and container ID",
+            ["true", "false"],
+            default=config_toml["manager"]["hide-agents"],
         )
         config_toml["manager"]["hide-agents"] = hide_agent == "true"
 
-        event_loop = ask_choice("Event loop", ["asyncio", "uvloop", ""], "")
+        event_loop = ask_choice("Event loop", ["asyncio", "uvloop"], default="uvloop")
         if event_loop:
             config_toml["manager"]["event-loop"] = event_loop
         else:

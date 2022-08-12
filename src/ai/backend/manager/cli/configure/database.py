@@ -1,7 +1,7 @@
 import psycopg2
 from tomlkit.items import InlineTable, Table
 
-from ai.backend.cli.interaction import ask_host, ask_port, ask_string, ask_choice
+from ai.backend.cli.interaction import ask_choice, ask_host, ask_port, ask_string
 
 
 def config_database(config_toml: dict) -> tuple[dict, str, str, str, str, int]:
@@ -13,7 +13,7 @@ def config_database(config_toml: dict) -> tuple[dict, str, str, str, str, int]:
             raise TypeError
         database_config: dict = dict(config_toml["db"])
 
-        database_type = ask_choice("Database type", ["postgresql"], "postgresql")
+        database_type = ask_choice("Database type", ["postgresql"], default="postgresql")
         config_toml["db"]["type"] = database_type
 
         while True:

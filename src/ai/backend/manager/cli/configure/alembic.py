@@ -11,16 +11,18 @@ def config_alembic(
     database_host: str,
     database_port: int,
 ) -> ConfigParser:
-    script_location = ask_string("Script location: ", config_parser["alembic"]["script_location"])
+    script_location = ask_string(
+        "Script location", default=config_parser["alembic"]["script_location"]
+    )
     config_parser["alembic"]["script_location"] = script_location
 
-    file_template = ask_string("File template: ", use_default=False)
+    file_template = ask_string("File template")
     if file_template:
         config_parser["alembic"]["file_template"] = file_template
     else:
         config_parser["alembic"].pop("file_template")
 
-    timezone = ask_string("Timezone: ", use_default=False)
+    timezone = ask_string("Timezone")
     if file_template:
         config_parser["alembic"]["timezone"] = timezone
     else:

@@ -1,6 +1,6 @@
 from tomlkit.items import Table
 
-from ai.backend.cli.interaction import ask_host, ask_int, ask_port, ask_choice
+from ai.backend.cli.interaction import ask_choice, ask_host, ask_int, ask_port
 
 
 def config_container(config_toml: dict) -> dict:
@@ -40,11 +40,17 @@ def config_container(config_toml: dict) -> dict:
         )
         config_toml["container"]["bind-host"] = container_bind_host
 
-        stats_type = ask_choice("Stats type", ["docker", "cgroup"], container_config["stats-type"])
+        stats_type = ask_choice(
+            "Stats type",
+            ["docker", "cgroup"],
+            default=container_config["stats-type"],
+        )
         config_toml["container"]["stats-type"] = stats_type
 
         sandbox_type = ask_choice(
-            "sandbox type", ["docker", "cgroup"], container_config["sandbox-type"]
+            "sandbox type",
+            ["docker", "cgroup"],
+            default=container_config["sandbox-type"],
         )
         config_toml["container"]["sandbox-type"] = sandbox_type
         return config_toml

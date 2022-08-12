@@ -14,7 +14,8 @@ def config_etcd(config_toml: dict) -> dict:
         etcd_config: dict = dict(config_toml["etcd"])
 
         etcd_namespace = ask_string(
-            "Etcd name space: ", etcd_config["namespace"] if etcd_config.get("namespace") else ""
+            "Etcd name space",
+            default=etcd_config["namespace"] if etcd_config.get("namespace") else "",
         )
         config_toml["etcd"]["namespace"] = etcd_namespace
 
@@ -41,8 +42,8 @@ def config_etcd(config_toml: dict) -> dict:
             except ValueError:
                 print("Invalid etcd address sample.")
 
-        etcd_user = ask_string("Etcd user name", use_default=False)
-        etcd_password = ask_string("Etcd password", use_default=False)
+        etcd_user = ask_string("Etcd user name")
+        etcd_password = ask_string("Etcd password")
         config_toml["etcd"]["addr"] = {"host": etcd_host, "port": etcd_port}
         config_toml["etcd"]["user"] = etcd_user
         config_toml["etcd"]["password"] = etcd_password
