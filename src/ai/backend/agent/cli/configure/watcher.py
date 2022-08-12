@@ -1,6 +1,6 @@
 from tomlkit.items import InlineTable, Table
 
-from ai.backend.cli.interaction import ask_host, ask_number, ask_path, ask_string_in_array
+from ai.backend.cli.interaction import ask_host, ask_int, ask_path, ask_choice
 
 
 def config_watcher(config_toml: dict) -> dict:
@@ -20,14 +20,19 @@ def config_watcher(config_toml: dict) -> dict:
             watcher_address: dict = dict(watcher_config["service-addr"])
             watcher_host = ask_host("Watcher host: ", watcher_address["host"])
             if type(watcher_address.get("port")) != str:
-                watcher_port = ask_number("watcher port: ", int(watcher_address["port"]), 1, 65535)
+                watcher_port = ask_int(
+                    "watcher port",
+                    default=int(watcher_address["port"]),
+                    min_value=1,
+                    max_value=65535,
+                )
             else:
                 raise TypeError
             config_toml["watcher"]["service-addr"] = {"host": watcher_host, "port": watcher_port}
         except ValueError:
             raise ValueError
 
-        ssl_enabled = ask_string_in_array("Enable SSL", ["true", "false"], "false")
+        ssl_enabled = ask_choice("Enable SSL", ["true", "false"], "false")
         config_toml["watcher"]["ssl-enabled"] = ssl_enabled == "true"
         if ssl_enabled == "true":
             ssl_cert = ask_path("SSL cert path")

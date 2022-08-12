@@ -1,9 +1,9 @@
 import asyncio
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-import aioredis
+import redis
 
-from ai.backend.cli.interaction import ask_host, ask_number, ask_string
+from ai.backend.cli.interaction import ask_host, ask_port, ask_string
 
 
 def config_redis(config_json: dict) -> dict:
@@ -18,25 +18,21 @@ def config_redis(config_json: dict) -> dict:
             redis_host = ask_host("Redis host: ", str(redis_host_str))
             if type(redis_port_str) != str:
                 raise TypeError
-            redis_port = ask_number("Redis port: ", int(redis_port_str), 1, 65535)
-            redis_password = ask_string("Redis password", use_default=False)
-            if redis_password:
-                redis_client = aioredis.Redis(
-                    host=redis_host, port=redis_port, password=redis_password
-                )
-            else:
-                redis_client = aioredis.Redis(host=redis_host, port=redis_port)
-
+            redis_port = ask_port("Redis port", default=int(redis_port_str))
+            redis_password = ask_string("Redis password", default=None)
+            redis_client = redis.Redis(
+                host=redis_host,
+                port=redis_port,
+                password=redis_password,
+            )
             try:
-                loop = asyncio.get_event_loop()
-                coroutine = redis_client.get("")
-                loop.run_until_complete(coroutine)
-                coroutine = redis_client.close()
-                loop.run_until_complete(coroutine)
+                redis_client.ping()
+                redis_client.close()
                 config_json["redis"]["addr"] = f"{redis_host}:{redis_port}"
-                config_json["redis"]["password"] = redis_password
+                if redis_password:
+                    config_json["redis"]["password"] = redis_password
                 break
-            except (aioredis.exceptions.ConnectionError, aioredis.exceptions.BusyLoadingError):
+            except (redis.exceptions.ConnectionError, redis.exceptions.BusyLoadingError):
                 print("Cannot connect to etcd. Please input etcd information again.")
 
         while True:

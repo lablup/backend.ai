@@ -1,6 +1,6 @@
 from configparser import ConfigParser
 
-from ai.backend.cli.interaction import ask_number, ask_string, ask_string_in_array
+from ai.backend.cli.interaction import ask_string
 
 
 def config_alembic(
@@ -25,37 +25,6 @@ def config_alembic(
         config_parser["alembic"]["timezone"] = timezone
     else:
         config_parser["alembic"].pop("timezone")
-
-    truncate_slug_length: int = ask_number(
-        "Max length of slug field(If you don't want to use, " "just leave default value): ",
-        0,
-        0,
-        40,
-    )
-    if truncate_slug_length > 0:
-        config_parser["alembic"]["truncate_slug_length"] = str(truncate_slug_length)
-    else:
-        config_parser["alembic"].pop("truncate_slug_length")
-
-    revision_environment = ask_string_in_array(
-        "Revision Environment",
-        ["true", "false", ""],
-        config_parser["alembic"]["revision_environment"],
-    )
-    if revision_environment:
-        config_parser["alembic"]["revision_environment"] = revision_environment
-    else:
-        config_parser["alembic"].pop("revision_environment")
-
-    sourceless = ask_string_in_array(
-        "Sourceless(set to 'true' to allow .pyc and .pyo files " "without a source .py)",
-        ["true", "false", ""],
-        "true",
-    )
-    if sourceless:
-        config_parser["alembic"]["sourceless"] = sourceless
-    else:
-        config_parser["alembic"].pop("sourceless")
 
     # modify database scheme
     if all(

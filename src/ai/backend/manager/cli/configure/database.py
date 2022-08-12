@@ -1,7 +1,7 @@
 import psycopg2
 from tomlkit.items import InlineTable, Table
 
-from ai.backend.cli.interaction import ask_host, ask_number, ask_string, ask_string_in_array
+from ai.backend.cli.interaction import ask_host, ask_port, ask_string, ask_choice
 
 
 def config_database(config_toml: dict) -> tuple[dict, str, str, str, str, int]:
@@ -13,7 +13,7 @@ def config_database(config_toml: dict) -> tuple[dict, str, str, str, str, int]:
             raise TypeError
         database_config: dict = dict(config_toml["db"])
 
-        database_type = ask_string_in_array("Database type", ["postgresql"], "postgresql")
+        database_type = ask_choice("Database type", ["postgresql"], "postgresql")
         config_toml["db"]["type"] = database_type
 
         while True:
@@ -25,14 +25,16 @@ def config_database(config_toml: dict) -> tuple[dict, str, str, str, str, int]:
                 database_address: dict = dict(database_config["addr"])
                 database_host = ask_host("Database host: ", str(database_address.get("host")))
                 if type(database_address.get("port")) != str:
-                    database_port = ask_number(
-                        "Database port: ", int(database_address["port"]), 1, 65535
-                    )
+                    database_port = ask_port("Database port", default=int(database_address["port"]))
                 else:
                     raise TypeError
-                database_name = ask_string("Database name", str(database_config.get("name")))
-                database_user = ask_string("Database user", str(database_config.get("user")))
-                database_password = ask_string("Database password", use_default=False)
+                database_name = ask_string(
+                    "Database name", default=str(database_config.get("name"))
+                )
+                database_user = ask_string(
+                    "Database user", default=str(database_config.get("user"))
+                )
+                database_password = ask_string("Database password")
                 if check_database_health(
                     database_host,
                     database_port,

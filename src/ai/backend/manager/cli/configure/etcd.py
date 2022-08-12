@@ -3,7 +3,7 @@ from typing import Optional
 import etcd3
 from tomlkit.items import InlineTable, Table
 
-from ai.backend.cli.interaction import ask_host, ask_number, ask_string
+from ai.backend.cli.interaction import ask_host, ask_port, ask_string
 
 
 def config_etcd(config_toml: dict) -> dict:
@@ -24,12 +24,12 @@ def config_etcd(config_toml: dict) -> dict:
                 etcd_address: dict = dict(etcd_config["addr"])
                 etcd_host = ask_host("Etcd host: ", etcd_address["host"])
                 if type(etcd_address.get("port")) != str:
-                    etcd_port = ask_number("Etcd port: ", int(etcd_address["port"]), 1, 65535)
+                    etcd_port = ask_port("Etcd port", default=int(etcd_address["port"]))
                 else:
                     raise TypeError
 
-                etcd_user = ask_string("Etcd user name", use_default=False)
-                etcd_password = ask_string("Etcd password", use_default=False)
+                etcd_user = ask_string("Etcd user name")
+                etcd_password = ask_string("Etcd password")
                 if check_etcd_health(etcd_host, etcd_port, etcd_user, etcd_password):
                     break
                 print("Cannot connect to etcd. Please input etcd information again.")

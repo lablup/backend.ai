@@ -1,7 +1,7 @@
 import etcd3
 from tomlkit.items import InlineTable, Table
 
-from ai.backend.cli.interaction import ask_host, ask_number, ask_string
+from ai.backend.cli.interaction import ask_host, ask_int, ask_string
 
 
 def config_etcd(config_toml: dict) -> dict:
@@ -27,7 +27,12 @@ def config_etcd(config_toml: dict) -> dict:
                 etcd_address: dict = dict(etcd_config["addr"])
                 etcd_host = ask_host("Etcd host: ", etcd_address["host"])
                 if type(etcd_address.get("port")) != str:
-                    etcd_port = ask_number("Etcd port: ", int(etcd_address["port"]), 1, 65535)
+                    etcd_port = ask_int(
+                        "Etcd port",
+                        default=int(etcd_address["port"]),
+                        min_value=1,
+                        max_value=65535,
+                    )
                 else:
                     raise TypeError
                 if check_etcd_health(etcd_host, etcd_port):

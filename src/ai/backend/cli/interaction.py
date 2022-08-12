@@ -1,10 +1,11 @@
 import ipaddress
+import functools
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Type, TypeVar, Union, cast
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
-Numeric = Union[int, float]
+T_Number = TypeVar("T_Number", bound=Union[int, float])
 
 
 def ask_host(prompt: str, default: str = "127.0.0.1", allow_hostname=False) -> str:
@@ -29,42 +30,84 @@ def ask_host(prompt: str, default: str = "127.0.0.1", allow_hostname=False) -> s
     return user_reply
 
 
-def convert_str_into_numeric(user_reply: str) -> Numeric:
-    if user_reply.isdigit():
-        return int(user_reply)
-    return float(user_reply)
+def ask_int(
+    prompt: str,
+    *,
+    default: Optional[int] = None,
+    min_value: Optional[int] = None,
+    max_value: Optional[int] = None,
+) -> int:
+    return ask_number_impl(prompt, int, default=default, min_value=min_value, max_value=max_value)
 
 
-def ask_number(prompt: str, default: Numeric, min_value: Numeric, max_value: Numeric) -> Numeric:
+ask_port = functools.partial(ask_int, min_value=1, max_value=65535)
+
+
+def ask_float(
+    prompt: str,
+    *,
+    default: Optional[float] = None,
+    min_value: Optional[float] = None,
+    max_value: Optional[float] = None,
+) -> float:
+    return ask_number_impl(prompt, float, default=default, min_value=min_value, max_value=max_value)
+
+
+def ask_number_impl(
+    prompt: str,
+    num_type: Type[T_Number],
+    *,
+    default=None,
+    min_value=None,
+    max_value=None,
+) -> T_Number:
+    if default is None:
+        prompt = f"{prompt}: "
+    else:
+        prompt = f"{prompt} (default: {default}): "
     while True:
-        user_reply = input(f"{prompt} (default: {default}): ")
-        try:
-            if user_reply == "":
+        user_reply = input(prompt)
+        if not user_reply:
+            if default is not None:
                 return default
-            if (
-                user_reply.isdigit()
-                and min_value <= convert_str_into_numeric(user_reply) <= max_value
-            ):
-                user_reply_numeric = convert_str_into_numeric(user_reply)
-                break
+            else:
+                print("You must input the value.")
+                continue
+        try:
+            value = cast(T_Number, num_type(user_reply))
         except ValueError:
-            print(f"Please input correct number between {min_value}~{max_value}.")
-    return user_reply_numeric
+            print(f"Could not parse the input as a number: {user_reply}")
+            continue
+        if min_value is not None and min_value > value:
+            print(f"The number must be equivalent to or greater than {min_value}.")
+            continue
+        if max_value is not None and max_value < value:
+            print(f"The number must be equivalent to or less than {max_value}.")
+            continue
+        return value
 
 
-def ask_string(prompt: str, default: str = "", use_default: bool = True) -> str:
+def ask_string(
+    prompt: str,
+    *,
+    default: Optional[str] = None,
+    allow_empty: bool = False,
+) -> str:
     while True:
-        if use_default:
+        if default is not None:
             user_reply = input(f'{prompt} (default: "{default}"): ')
-            if user_reply == "":
+            if not user_reply:
                 return default
             return user_reply
         else:
             user_reply = input(f"{prompt} (if you don't want, just leave empty): ")
+            if not user_reply and not allow_empty:
+                print("You must input the value.")
+                continue
             return user_reply
 
 
-def ask_string_in_array(prompt: str, choices: list, default: str) -> Optional[str]:
+def ask_choice(prompt: str, choices: list, default: str) -> Optional[str]:
     if default and default not in choices:
         print("Default value should be in choices args.")
         return None

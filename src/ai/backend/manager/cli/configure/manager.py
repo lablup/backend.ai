@@ -5,10 +5,11 @@ from tomlkit.items import InlineTable, Table
 
 from ai.backend.cli.interaction import (
     ask_host,
-    ask_number,
+    ask_int,
     ask_path,
+    ask_port,
     ask_string,
-    ask_string_in_array,
+    ask_choice,
 )
 
 
@@ -22,19 +23,22 @@ def config_manager(config_toml: dict) -> dict:
         manager_config: dict = dict(config_toml["manager"])
         cpu_count: Optional[int] = os.cpu_count()
         if cpu_count:
-            no_of_processors: int = ask_number(
-                "How many processors that manager uses: ", 1, 1, cpu_count
+            no_of_processors: int = ask_int(
+                "How many processors that manager uses",
+                default=1,
+                min_value=1,
+                max_value=cpu_count,
             )
             config_toml["manager"]["num-proc"] = no_of_processors
 
-        secret_token: str = ask_string("Secret token", use_default=False)
+        secret_token: str = ask_string("Secret token")
         if secret_token:
             config_toml["manager"]["secret"] = secret_token
         else:
             config_toml["manager"].pop("secret")
 
-        daemon_user: str = ask_string("User name used for the manager daemon", use_default=False)
-        daemon_group: str = ask_string("Group name used for the manager daemon", use_default=False)
+        daemon_user: str = ask_string("User name used for the manager daemon")
+        daemon_group: str = ask_string("Group name used for the manager daemon")
         if daemon_user:
             config_toml["manager"]["user"] = daemon_user
         else:
@@ -52,14 +56,14 @@ def config_manager(config_toml: dict) -> dict:
             manager_address: dict = dict(manager_config["service-addr"])
             manager_host = ask_host("Manager host: ", manager_address["host"])
             if type(manager_address.get("port")) != str:
-                manager_port = ask_number("Manager port: ", int(manager_address["port"]), 1, 65535)
+                manager_port = ask_port("Manager port", default=int(manager_address["port"]))
             else:
                 raise TypeError
             config_toml["manager"]["service-addr"] = {"host": manager_host, "port": manager_port}
         except ValueError:
             raise ValueError
 
-        ssl_enabled = ask_string_in_array("Enable SSL", ["true", "false"], "false")
+        ssl_enabled = ask_choice("Enable SSL", ["true", "false"], "false")
         config_toml["manager"]["ssl-enabled"] = ssl_enabled == "true"
 
         if ssl_enabled == "true":
@@ -78,24 +82,24 @@ def config_manager(config_toml: dict) -> dict:
             except ValueError:
                 print("Please input correct heartbeat timeout value as float.")
 
-        node_name = ask_string("Manager node name", use_default=False)
+        node_name = ask_string("Manager node name")
         if node_name:
             config_toml["manager"]["id"] = node_name
         else:
             config_toml["manager"].pop("id")
 
-        pid_path = ask_string("PID file path", use_default=False)
+        pid_path = ask_string("PID file path")
         if pid_path == "":
             config_toml["manager"].pop("pid-file")
         elif pid_path and os.path.exists(pid_path):
             config_toml["manager"]["pid-file"] = pid_path
 
-        hide_agent = ask_string_in_array(
+        hide_agent = ask_choice(
             "Hide agent and container ID", ["true", "false"], config_toml["manager"]["hide-agents"]
         )
         config_toml["manager"]["hide-agents"] = hide_agent == "true"
 
-        event_loop = ask_string_in_array("Event loop", ["asyncio", "uvloop", ""], "")
+        event_loop = ask_choice("Event loop", ["asyncio", "uvloop", ""], "")
         if event_loop:
             config_toml["manager"]["event-loop"] = event_loop
         else:
