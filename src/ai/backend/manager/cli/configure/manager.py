@@ -1,8 +1,15 @@
 import os
 from typing import Optional
 
-from ai.backend.cli.interaction import ask_string_in_array, ask_string, ask_number, ask_host, ask_path
-from tomlkit.items import Table, InlineTable
+from tomlkit.items import InlineTable, Table
+
+from ai.backend.cli.interaction import (
+    ask_host,
+    ask_number,
+    ask_path,
+    ask_string,
+    ask_string_in_array,
+)
 
 
 def config_manager(config_toml: dict) -> dict:
@@ -15,8 +22,9 @@ def config_manager(config_toml: dict) -> dict:
         manager_config: dict = dict(config_toml["manager"])
         cpu_count: Optional[int] = os.cpu_count()
         if cpu_count:
-            no_of_processors: int = ask_number("How many processors that manager uses: ", 1, 1,
-                                               cpu_count)
+            no_of_processors: int = ask_number(
+                "How many processors that manager uses: ", 1, 1, cpu_count
+            )
             config_toml["manager"]["num-proc"] = no_of_processors
 
         secret_token: str = ask_string("Secret token", use_default=False)
@@ -82,8 +90,9 @@ def config_manager(config_toml: dict) -> dict:
         elif pid_path and os.path.exists(pid_path):
             config_toml["manager"]["pid-file"] = pid_path
 
-        hide_agent = ask_string_in_array("Hide agent and container ID", ["true", "false"],
-                                         config_toml["manager"]["hide-agents"])
+        hide_agent = ask_string_in_array(
+            "Hide agent and container ID", ["true", "false"], config_toml["manager"]["hide-agents"]
+        )
         config_toml["manager"]["hide-agents"] = hide_agent == "true"
 
         event_loop = ask_string_in_array("Event loop", ["asyncio", "uvloop", ""], "")

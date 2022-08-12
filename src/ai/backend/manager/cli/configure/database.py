@@ -1,6 +1,7 @@
 import psycopg2
-from ai.backend.cli.interaction import ask_string_in_array, ask_host, ask_number, ask_string
-from tomlkit.items import Table, InlineTable
+from tomlkit.items import InlineTable, Table
+
+from ai.backend.cli.interaction import ask_host, ask_number, ask_string, ask_string_in_array
 
 
 def config_database(config_toml: dict) -> tuple[dict, str, str, str, str, int]:
@@ -24,8 +25,9 @@ def config_database(config_toml: dict) -> tuple[dict, str, str, str, str, int]:
                 database_address: dict = dict(database_config["addr"])
                 database_host = ask_host("Database host: ", str(database_address.get("host")))
                 if type(database_address.get("port")) != str:
-                    database_port = ask_number("Database port: ",
-                                               int(database_address["port"]), 1, 65535)
+                    database_port = ask_number(
+                        "Database port: ", int(database_address["port"]), 1, 65535
+                    )
                 else:
                     raise TypeError
                 database_name = ask_string("Database name", str(database_config.get("name")))
@@ -45,7 +47,14 @@ def config_database(config_toml: dict) -> tuple[dict, str, str, str, str, int]:
                     break
             except ValueError:
                 raise ValueError
-        return config_toml, database_user, database_password, database_name, database_host, database_port
+        return (
+            config_toml,
+            database_user,
+            database_password,
+            database_name,
+            database_host,
+            database_port,
+        )
     except ValueError:
         raise ValueError
 

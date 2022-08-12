@@ -1,8 +1,9 @@
 from typing import Optional
 
 import etcd3
-from ai.backend.cli.interaction import ask_string, ask_host, ask_number
-from tomlkit.items import Table, InlineTable
+from tomlkit.items import InlineTable, Table
+
+from ai.backend.cli.interaction import ask_host, ask_number, ask_string
 
 
 def config_etcd(config_toml: dict) -> dict:
@@ -46,8 +47,9 @@ def config_etcd(config_toml: dict) -> dict:
 def check_etcd_health(host: str, port: int, etcd_user: Optional[str], etcd_password: Optional[str]):
     try:
         if etcd_user:
-            etcd_client = etcd3.Etcd3Client(host=host, port=port,
-                                            user=etcd_user, password=etcd_password)
+            etcd_client = etcd3.Etcd3Client(
+                host=host, port=port, user=etcd_user, password=etcd_password
+            )
         else:
             etcd_client = etcd3.Etcd3Client(host=host, port=port)
 

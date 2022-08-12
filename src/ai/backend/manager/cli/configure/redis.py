@@ -2,6 +2,7 @@ import asyncio
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import aioredis
+
 from ai.backend.cli.interaction import ask_host, ask_number, ask_string
 
 
@@ -21,9 +22,8 @@ def config_redis(config_json: dict) -> dict:
             redis_password = ask_string("Redis password", use_default=False)
             if redis_password:
                 redis_client = aioredis.Redis(
-                    host=redis_host,
-                    port=redis_port,
-                    password=redis_password)
+                    host=redis_host, port=redis_port, password=redis_password
+                )
             else:
                 redis_client = aioredis.Redis(host=redis_host, port=redis_port)
 
@@ -46,7 +46,7 @@ def config_redis(config_json: dict) -> dict:
                 config_json["system"]["timezone"] = timezone
                 break
             except (ValueError, ZoneInfoNotFoundError):
-                print('Please input correct timezone.')
+                print("Please input correct timezone.")
         return config_json
     except ValueError:
         raise ValueError
