@@ -2,9 +2,10 @@ import sys
 
 import click
 
+from ai.backend.cli.main import main
+
 from ..compat import asyncio_run
 from ..session import AsyncSession
-from .main import main
 from .pretty import print_error
 
 

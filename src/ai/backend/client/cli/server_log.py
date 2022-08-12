@@ -3,8 +3,9 @@ from datetime import datetime
 
 import click
 
+from ai.backend.cli.main import main
+
 from ..session import Session
-from .main import main
 from .pretty import print_error
 
 

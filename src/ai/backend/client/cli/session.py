@@ -13,11 +13,12 @@ import click
 from humanize import naturalsize
 from tabulate import tabulate
 
+from ai.backend.cli.main import main
+
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
 from ..session import AsyncSession, Session
 from ..types import Undefined, undefined
-from .main import main
 from .params import CommaSeparatedListType
 from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg

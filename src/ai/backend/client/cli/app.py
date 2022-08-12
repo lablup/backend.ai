@@ -7,12 +7,13 @@ from typing import Dict, List, MutableMapping, Optional, Sequence, Union
 import aiohttp
 import click
 
+from ai.backend.cli.main import main
+
 from ..compat import asyncio_run, asyncio_run_forever
 from ..config import DEFAULT_CHUNK_SIZE
 from ..request import Request
 from ..session import AsyncSession
 from ..versioning import get_naming
-from .main import main
 from .pretty import print_error, print_fail, print_info, print_warn
 
 
