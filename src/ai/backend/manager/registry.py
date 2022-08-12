@@ -1289,6 +1289,12 @@ class AgentRegistry:
                     binding.kernel.cluster_hostname for binding in kernel_agent_bindings
                 ),
                 "BACKENDAI_ACCESS_KEY": scheduled_session.access_key,
+                "BACKENDAI_SERVICE_PORTS": ",".join(
+                    image_infos[binding.kernel.image_ref].labels.get("ai.backend.service-ports") for binding in kernel_agent_bindings
+                ),
+                "BACKENDAI_PREOPEN_PORTS": ",".join(
+                    str(port) for port in scheduled_session.preopen_ports
+                ) if scheduled_session.preopen_ports is not None else "",
             }
         )
 
