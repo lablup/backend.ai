@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import configparser
+import json
+import json.decoder
 import logging
 import subprocess
 import sys
@@ -11,6 +14,7 @@ from pathlib import Path
 import click
 import psycopg2
 import sqlalchemy as sa
+import tomlkit
 from more_itertools import chunked
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
@@ -23,6 +27,11 @@ from ai.backend.common.validators import TimeDuration
 from ai.backend.manager.models import kernels
 from ai.backend.manager.models.utils import connect_database
 
+from ..cli.configure.alembic import config_alembic
+from ..cli.configure.database import config_database
+from ..cli.configure.etcd import config_etcd
+from ..cli.configure.manager import config_manager
+from ..cli.configure.redis import config_redis
 from ..config import load as load_config
 from ..models.keypair import generate_keypair as _gen_keypair
 from .context import CLIContext, init_logger, redis_ctx
@@ -55,6 +64,56 @@ def main(ctx, config_path, debug):
         logger=init_logger(local_config),
         local_config=local_config,
     )
+
+
+@main.command()
+def configure() -> None:
+    """
+    Take necessary inputs from user and generate toml file.
+    """
+    # toml section
+    with open("config/template.toml", "r") as f:
+        config_toml: dict = dict(tomlkit.loads(f.read()))
+        # Interactive user input
+        config_toml = config_etcd(config_toml)
+        (
+            config_toml,
+            database_user,
+            database_password,
+            database_name,
+            database_host,
+            database_port,
+        ) = config_database(config_toml)
+        config_toml = config_manager(config_toml)
+    with open("manager.toml", "w") as f:
+        print("\nDump to manager.toml\n")
+        tomlkit.dump(config_toml, f)
+
+    # Dump alembic.ini
+    config_parser = configparser.ConfigParser()
+    config_parser.read("config/halfstack.alembic.template.ini")
+    config_parser = config_alembic(
+        config_parser, database_user, database_password, database_name, database_host, database_port
+    )
+    with open("alembic.ini", "w") as f:
+        print("\nDump to alembic.ini\n")
+        config_parser.write(f)
+
+    # Dump etcd config json
+    with open("config/sample.etcd.config.json") as f:
+        config_json: dict = json.load(f)
+    config_json = config_redis(config_json)
+    with open("dev.etcd.config.json", "w") as f:
+        print("\nDump to dev.etcd.config.json\n")
+        json.dump(config_json, f, indent=4)
+
+    print(
+        "Complete configure backend.ai manager. "
+        "If you want to control more value, edit following files.\n"
+    )
+    print("manager.toml : etcd, database, manager configuration, logging options and so on.")
+    print("alembic.ini : option about alembic")
+    print("dev.etcd.config.json : etcd options like timezone, host, port and so on.")
 
 
 @main.command(
