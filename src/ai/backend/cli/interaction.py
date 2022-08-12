@@ -66,7 +66,7 @@ def ask_number_impl(
 ) -> T_Number:
     prefill = "" if default is None else str(default)
     while True:
-        user_reply = rl_input(prompt, prefill=prefill)
+        user_reply = rl_input(f"{prompt}: ", prefill=prefill)
         if not user_reply:
             if default is not None:
                 return default
@@ -99,7 +99,7 @@ def ask_string(
     prefill = "" if default is None else default
     while True:
         if default is not None:
-            user_reply = rl_input("{prompt}: ", prefill=prefill)
+            user_reply = rl_input(f"{prompt}: ", prefill=prefill)
             if not user_reply:
                 return default
             return user_reply
