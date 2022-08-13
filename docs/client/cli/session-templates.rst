@@ -16,29 +16,30 @@ The following sample shows how a session template looks like:
 
 .. code-block:: yaml
 
-  ---
-  api_version: v1
-  kind: taskTemplate
-  metadata:
-    name: template1234
-    tag: example-tag
-  spec:
-    kernel:
-      environ:
-        MYCONFIG: XXX
-      git:
-        branch: '19.09'
-        commit: 10daee9e328876d75e6d0fa4998d4456711730db
-        repository: https://github.com/lablup/backend.ai-agent
-        destinationDir: /home/work/baiagent
-      image: python:3.6-ubuntu18.04
-    resources:
-      cpu: '2'
-      mem: 4g
-    mounts:
-      hostpath-test: /home/work/hostDesktop
-      test-vfolder:
-    sessionType: interactive
+  session_templates:
+    - template:
+        api_version: v1
+        kind: taskTemplate
+        metadata:
+          name: template1234
+          tag: example-tag
+        spec:
+          kernel:
+            environ:
+              MYCONFIG: XXX
+            git:
+              branch: '22.03'
+              commit: e59bd61a196a74eb158f9fbcbccd37e1c48dcb55
+              repository: https://github.com/lablup/backend.ai
+              destinationDir: /home/work/bai
+            image: cr.backend.ai/multiarch/python:3.9-ubuntu20.04
+          resources:
+            cpu: '2'
+            mem: 4g
+          mounts:
+            hostpath-test: /home/work/hostDesktop
+            test-vfloder:
+          sessionType: 'interactive'
 
 The ``backend.ai sesstpl`` command set provides the basic CRUD operations
 of user-specific session templates.
@@ -57,7 +58,7 @@ session:
 
 .. code-block:: console
 
-  $ backend.ai start-template <templateId>
+  $ backend.ai session create-from-template <templateId>
 
 with substituting ``<templateId>`` to your template ID.
 
@@ -76,27 +77,34 @@ Full syntax for task template
 
 .. code-block:: text
 
-  ---
-  api_version or apiVersion: str, required
-  kind: Enum['taskTemplate', 'task_template'], required
-  metadata: required
-    name: str, required
-    tag: str (optional)
-  spec:
-    type or sessionType: Enum['interactive', 'batch'] (optional), default=interactive
-    kernel:
-      image: str, required
-      environ: map[str, str] (optional)
-      run: (optional)
-        bootstrap: str (optional)
-        stratup or startup_command or startupCommand: str (optional)
-      git: (optional)
-        repository: str, required
-        commit: str (optional)
-        branch: str (optional)
-        credential: (optional)
-          username: str
-          password: str
-        destination_dir or destinationDir: str (optional)
-    mounts: map[str, str] (optional)
-    resources: map[str, str] (optional)
+  session_templates:
+    - template:
+        api_version or apiVersion: str, required
+        kind: Enum['taskTemplate', 'task_template'], required
+        metadata:
+          name: str, required
+          tag: str (optional)
+        spec:
+          type or session_type or sessionType: Enum['interactive', 'batch'] (optional), default=interactive
+          kernel:
+            image: str, required
+            architecture: str (optional), default=x86_64
+            environ: map[str, str] (optional)
+              MYCONFIG: XXX
+            run: (optional)
+              bootstrap: str (optional)
+              startup or startup_command or startupCommand: str (optional)
+            git: (optional)
+              repository: str, required
+              commit: str (optional)
+              branch: str (optional)
+              credential: (optional)
+                username: str
+                password: str
+              destination_dir or destinationDir: str (optional)
+          scaling_group: str (optional)
+          mounts: map[str, str] (optional)
+          resources: map[str, str] (optional)
+            cpu: '1'
+            mem: '320m'
+          agent_list or agentList: list[str] (optional)

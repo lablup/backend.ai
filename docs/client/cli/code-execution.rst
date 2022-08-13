@@ -25,10 +25,10 @@ concurrent sessions.
 .. code-block:: shell
 
   backend.ai run -c 'import os; print("Hello world, {}".format(os.environ["CASENO"]))' \
-      -r cpu=1 -r mem=256m \
+      -r cpu=1 -r mem=320m \
       -e 'CASENO=$X' \
       --env-range=X=case:1,2,3,4 \
-      lablup/python:3.6-ubuntu18.04
+      cr.backend.ai/multiarch/python:3.9-ubuntu20.04
 
 Both range options accept a special form of argument: "range expressions".
 The front part of range option value consists of the variable name used for

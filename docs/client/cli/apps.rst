@@ -40,7 +40,7 @@ that runs on web browsers.
 
 .. code-block:: shell
 
-   backend.ai start -t mysession ...
+   backend.ai start -t mysession python
    backend.ai app -b 9900 mysession ttyd
 
 Then open ``http://localhost:9900`` to access the shell in a fully
@@ -71,7 +71,7 @@ that proxies the SSH/SFTP traffic to the compute sessions:
 .. code-block:: console
 
   $ backend.ai start -t mysess ...
-  $ backend.ai download mysess id_container
+  $ backend.ai session download mysess id_container
   $ mv id_container ~/.ssh
   $ backend.ai app mysess sshd -b 9922
 
@@ -112,13 +112,22 @@ extra options every time.
 
 To use your own SSH private key across all your sessions without
 downloading the auto-generated one every time, create a vfolder named
-``.ssh`` and put the ``authorized_keys`` file that includes the public key.
-The keypair and ``.ssh`` directory permissions will be automatically
+``ssh`` and put the ``authorized_keys`` file that includes the public key.
+The keypair and ``ssh`` directory permissions will be automatically
 updated by Backend.AI when the session launches.
 
 .. code-block:: console
 
   $ ssh-keygen -t rsa -b 2048 -f id_container
   $ cat id_container.pub > authorized_keys
-  $ backend.ai vfolder create .ssh
-  $ backend.ai vfolder upload .ssh authorized_keys
+  $ backend.ai vfolder create ssh local:volume1
+  $ backend.ai vfolder upload ssh authorized_keys
+
+You can run ``backend.ai vfolder list-hosts`` to list available vfolder hosts.
+
+.. code-block:: console
+
+  $ backend.ai vfolder list-hosts
+
+  # Default vfolder host: local:volume1
+  # Usable hosts: local:volume1

@@ -65,6 +65,10 @@ To list files in the vfolder's specific path:
 
   $ backend.ai vfolder ls mydata1 .
 
+  # file name      size  modified              mode
+  # -----------  ------  --------------------  ----------
+  # README.md     10370  Aug 13 2022 18:00:54  -rw-r--r--
+
 To delete files in the vfolder:
 
 .. code-block:: console
@@ -73,7 +77,7 @@ To delete files in the vfolder:
 
 .. warning::
 
-   All file uploads and downloads overwrite existing files and all file
+   All file uploads overwrite existing files and all file
    operations are irreversible.
 
 
