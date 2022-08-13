@@ -24,7 +24,7 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:5 76b2fa814e3147169961821ecf1ba0fc
 msgid "About Pants"
-msgstr ""
+msgstr "Pants에 대하여"
 
 #: ../../dev/daily-workflows.rst:7 1cb433812f084526ae2b7e0007dbcdf0
 msgid ""
@@ -42,7 +42,7 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:16 18cb82b5bf524998a5a2ca252f333d2f
 msgid "Key concepts"
-msgstr ""
+msgstr "주요 개념"
 
 #: ../../dev/daily-workflows.rst:18 e328d30359444266859801613728ba9e
 msgid "The command pattern:"
@@ -147,7 +147,7 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:104 44db92ee701d4ca398290a62d9b79e69
 msgid "Here are various methods to run tests:"
-msgstr ""
+msgstr "테스트를 실행하는 다양한 방법들이 있습니다:"
 
 #: ../../dev/daily-workflows.rst:112 5ef6ab558af044ba81c99fbf2b1f7eb1
 msgid ""
@@ -162,7 +162,7 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:124 8cb51411d618418c88d083c477994aa1
 msgid "Running integration tests"
-msgstr ""
+msgstr "통합 테스트 실행"
 
 #: ../../dev/daily-workflows.rst:131 1f9b5f71d8144bcd98059cb7d13766c2
 msgid "Building wheel packages"
@@ -226,7 +226,7 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:194 746be7b7ee374fc78063c72eb9a46277
 msgid "Examples:"
-msgstr ""
+msgstr "예:"
 
 #: ../../dev/daily-workflows.rst:203 a867589a4bbe4a6f888e87566e818af9
 msgid "Working with plugins"
@@ -242,7 +242,7 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:213 5727f75c9e9f47c6b633080156257dc1
 msgid "Manual installation:"
-msgstr ""
+msgstr "수동 설치:"
 
 #: ../../dev/daily-workflows.rst:222 c685acb9c2da401e91fc2b5b59b0a34f
 msgid ""
@@ -253,7 +253,7 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:228 bd72f534ec674e21b3adc147c17534a2
 msgid "Writing test cases"
-msgstr ""
+msgstr "테스트 케이스 작성"
 
 #: ../../dev/daily-workflows.rst:230 d3bd3d5bf62f40f3942c73e3fa515667
 msgid ""
