@@ -31,7 +31,7 @@ Run this shell script before using ``backend.ai`` command.
    The console-server users should set ``BACKEND_ENDPOINT_TYPE`` to ``session``.
    For details, check out :doc:`the client configuration document <config>`.
 
-Windows (TODO: Verify on Windows machine)
+Windows
 -------
 
 We recommend using `the Anaconda Navigator <https://www.anaconda.com/download/>`_ to
@@ -50,11 +50,20 @@ Create a batch file ``my-backendai-env.bat`` like:
 .. code-block:: bat
 
   chcp 65001
+  
+  # prompt
   set PYTHONIOENCODING=UTF-8
   set BACKEND_ACCESS_KEY=...
   set BACKEND_SECRET_KEY=...
   set BACKEND_ENDPOINT=https://my-precious-cluster
   set BACKEND_ENDPOINT_TYPE=api
+  
+  # PowerShell
+  $Env:PYTHONIOENCODING = "UTF-8"
+  $Env:BACKEND_ACCESS_KEY = "..."
+  $Env:BACKEND_SECRET_KEY = "..."
+  $Env:BACKEND_ENDPOINT = "https://my-precious-cluster"
+  $Env:BACKEND_ENDPOINT_TYPE = "api"
 
 Run this batch file before using ``backend.ai`` command.
 
