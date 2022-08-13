@@ -32,7 +32,7 @@ Both commands offer options to set the status filter as follows.
 For other options, please consult the output of ``--help``.
 
 .. list-table::
-   :widths: 20 80
+   :widths: 25 75
    :header-rows: 1
 
    * - Option
@@ -61,7 +61,7 @@ For other options, please consult the output of ``--help``.
 Both commands offer options to specify which fields of sessions should be printed as follows.
 
 .. list-table::
-   :widths: 20 80
+   :widths: 25 75
    :header-rows: 1
 
    * - Option
