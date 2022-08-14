@@ -310,13 +310,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d5340d16943a0f67057329db59b564e938bb3736c6e50ae16ea84d5e5d9ba6d0",
-              "url": "https://files.pythonhosted.org/packages/22/59/ab3469c21ff2e16011c53dbe3b9b64325bf397625a60f7368347db9bc5e6/setuptools-63.3.0-py3-none-any.whl"
+              "hash": "dc2662692f47d99cb8ae15a784529adeed535bcd7c277fee0beccf961522baf6",
+              "url": "https://files.pythonhosted.org/packages/90/2e/109766d7f3cb854a083dd66bfc0bf2bf9e40f373829efedb4b5e0d104aa3/setuptools-63.4.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "273b6847ae61f7829c1affcdd9a32f67aa65233be508f4fbaab866c5faa4e408",
-              "url": "https://files.pythonhosted.org/packages/a8/d9/28490a9ef6592c3471bd1bcacaf5bd0dee2bb05c8a8bcf901e673b2f1732/setuptools-63.3.0.tar.gz"
+              "hash": "7c7854ee1429a240090297628dc9f75b35318d193537968e2dc14010ee2f5bca",
+              "url": "https://files.pythonhosted.org/packages/63/2e/e1f3e1b02d7ff0baa356413e93ad8a88706accd6b3538e18204a8a00c42d/setuptools-63.4.1.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -353,7 +353,9 @@
             "pytest>=6; extra == \"testing\"",
             "rst.linker>=1.9; extra == \"docs\"",
             "sphinx-favicon; extra == \"docs\"",
+            "sphinx-hoverxref<2; extra == \"docs\"",
             "sphinx-inline-tabs; extra == \"docs\"",
+            "sphinx-notfound-page==0.8.3; extra == \"docs\"",
             "sphinx-reredirects; extra == \"docs\"",
             "sphinx; extra == \"docs\"",
             "sphinxcontrib-towncrier; extra == \"docs\"",
@@ -365,7 +367,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "63.3"
+          "version": "63.4.1"
         },
         {
           "artifacts": [

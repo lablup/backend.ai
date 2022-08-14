@@ -28,24 +28,24 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "44e3ecd719bba1cb2ae65d1b54212cc9df4f5db15ac271f8856e5e6c2eebefed",
-              "url": "https://files.pythonhosted.org/packages/4f/24/5396113ca4621c0bcc924a2e9ceb7bf03e141ebbfcc89c724284f55225c7/flake8-5.0.1-py2.py3-none-any.whl"
+              "hash": "7a1cf6b73744f5806ab95e526f6f0d8c01c66d7bbe349562d22dfca20610b248",
+              "url": "https://files.pythonhosted.org/packages/cf/a0/b881b63a17a59d9d07f5c0cc91a29182c8e8a9aa2bde5b3b2b16519c02f4/flake8-5.0.4-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9c51d3d1426379fd444d3b79eabbeb887849368bd053039066439523d8486961",
-              "url": "https://files.pythonhosted.org/packages/dd/94/b407f9f904fa387522ed8ba7890bcd1af67b94e2988744159c263e516cf8/flake8-5.0.1.tar.gz"
+              "hash": "6fbe320aad8d6b95cec8b8e47bc933004678dc63095be98528b7bdd2a9f510db",
+              "url": "https://files.pythonhosted.org/packages/ad/00/9808c62b2d529cefc69ce4e4a1ea42c0f855effa55817b7327ec5b75e60a/flake8-5.0.4.tar.gz"
             }
           ],
           "project_name": "flake8",
           "requires_dists": [
-            "importlib-metadata<4.3; python_version < \"3.8\"",
+            "importlib-metadata<4.3,>=1.1.0; python_version < \"3.8\"",
             "mccabe<0.8.0,>=0.7.0",
             "pycodestyle<2.10.0,>=2.9.0",
             "pyflakes<2.6.0,>=2.5.0"
           ],
           "requires_python": ">=3.6.1",
-          "version": "5.0.1"
+          "version": "5.0.4"
         },
         {
           "artifacts": [
@@ -69,19 +69,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "289cdc0969d589d90752582bef6dff57c5fbc6949ee8b013ad6d6449a8ae9437",
-              "url": "https://files.pythonhosted.org/packages/a4/9e/2f9e7d5b13ad7c326f99d08d36757fc02fcd137cd5898b216a9faca38f9a/pycodestyle-2.9.0-py2.py3-none-any.whl"
+              "hash": "d1735fc58b418fd7c5f658d28d943854f8a849b01a5d0a1e6f3f3fdd0166804b",
+              "url": "https://files.pythonhosted.org/packages/67/e4/fc77f1039c34b3612c4867b69cbb2b8a4e569720b1f19b0637002ee03aff/pycodestyle-2.9.1-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "beaba44501f89d785be791c9462553f06958a221d166c64e1f107320f839acc2",
-              "url": "https://files.pythonhosted.org/packages/f7/98/95b7936a9439bea0e537a42feca1404e7926518fe054f85d28ad7e4bc6fa/pycodestyle-2.9.0.tar.gz"
+              "hash": "2c9607871d58c76354b697b42f5d57e1ada7d261c261efac224b664affdc5785",
+              "url": "https://files.pythonhosted.org/packages/b6/83/5bcaedba1f47200f0665ceb07bcb00e2be123192742ee0edfb66b600e5fd/pycodestyle-2.9.1.tar.gz"
             }
           ],
           "project_name": "pycodestyle",
           "requires_dists": [],
           "requires_python": ">=3.6",
-          "version": "2.9"
+          "version": "2.9.1"
         },
         {
           "artifacts": [
@@ -105,13 +105,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d5340d16943a0f67057329db59b564e938bb3736c6e50ae16ea84d5e5d9ba6d0",
-              "url": "https://files.pythonhosted.org/packages/22/59/ab3469c21ff2e16011c53dbe3b9b64325bf397625a60f7368347db9bc5e6/setuptools-63.3.0-py3-none-any.whl"
+              "hash": "dc2662692f47d99cb8ae15a784529adeed535bcd7c277fee0beccf961522baf6",
+              "url": "https://files.pythonhosted.org/packages/90/2e/109766d7f3cb854a083dd66bfc0bf2bf9e40f373829efedb4b5e0d104aa3/setuptools-63.4.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "273b6847ae61f7829c1affcdd9a32f67aa65233be508f4fbaab866c5faa4e408",
-              "url": "https://files.pythonhosted.org/packages/a8/d9/28490a9ef6592c3471bd1bcacaf5bd0dee2bb05c8a8bcf901e673b2f1732/setuptools-63.3.0.tar.gz"
+              "hash": "7c7854ee1429a240090297628dc9f75b35318d193537968e2dc14010ee2f5bca",
+              "url": "https://files.pythonhosted.org/packages/63/2e/e1f3e1b02d7ff0baa356413e93ad8a88706accd6b3538e18204a8a00c42d/setuptools-63.4.1.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -148,7 +148,9 @@
             "pytest>=6; extra == \"testing\"",
             "rst.linker>=1.9; extra == \"docs\"",
             "sphinx-favicon; extra == \"docs\"",
+            "sphinx-hoverxref<2; extra == \"docs\"",
             "sphinx-inline-tabs; extra == \"docs\"",
+            "sphinx-notfound-page==0.8.3; extra == \"docs\"",
             "sphinx-reredirects; extra == \"docs\"",
             "sphinx; extra == \"docs\"",
             "sphinxcontrib-towncrier; extra == \"docs\"",
@@ -160,7 +162,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "63.3"
+          "version": "63.4.1"
         }
       ],
       "platform_tag": null
