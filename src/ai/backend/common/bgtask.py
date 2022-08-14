@@ -201,7 +201,7 @@ class BackgroundTaskManager:
 
         async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline()
-            tracker_key = f"bgtask.{str(task_id)}"
+            tracker_key = f"bgtask.{task_id}"
             now = str(time.time())
             await pipe.hset(
                 tracker_key,
@@ -252,7 +252,7 @@ class BackgroundTaskManager:
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
-                tracker_key = f"bgtask.{str(task_id)}"
+                tracker_key = f"bgtask.{task_id}"
                 await pipe.hset(
                     tracker_key,
                     mapping={

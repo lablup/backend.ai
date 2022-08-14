@@ -69,7 +69,7 @@ from .config import (
 )
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
-from .types import AgentBackend, LifecycleEvent, VolumeInfo
+from .types import AgentBackend, CommitStatus, LifecycleEvent, VolumeInfo
 from .utils import get_subnet_ip
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.server"))
@@ -534,17 +534,17 @@ class AgentRPCServer(aobject):
         kernel_id,  # type: str
         path,  # type: str
     ):
-        is_validate: int = await self.agent.get_commit_status(
+        commit_status = await self.agent.get_commit_status(
             KernelId(UUID(kernel_id)),
             get_lock=True,
         )
-        if not is_validate:
+        if commit_status == CommitStatus.DUPLICATED:
             log.warning("Kernel (id={}) is already being committed", kernel_id)
             return {
                 "task": "-1",
                 "kernel": kernel_id,
                 "path": path,
-                "status": is_validate,
+                "status": commit_status,
             }
         log.info("rpc::commit(k:{})", kernel_id)
         bgtask_mgr = self.local_config["background_task_manager"]
@@ -555,7 +555,7 @@ class AgentRPCServer(aobject):
             "task": str(task_id),
             "kernel": kernel_id,
             "path": path,
-            "status": is_validate,
+            "status": commit_status,
         }
 
     @rpc_function

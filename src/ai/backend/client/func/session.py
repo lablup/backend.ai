@@ -577,7 +577,7 @@ class ComputeSession(BaseFunction):
     @api_function
     async def commit(self):
         """
-        Commit a running session to tar file.
+        Commit a running session to a tar file in the agent host.
         """
         params = {}
         if self.owner_access_key:

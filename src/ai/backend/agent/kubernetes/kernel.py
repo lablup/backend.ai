@@ -202,42 +202,14 @@ class KubernetesKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
-    async def check_commit_tag(self, commit_path, get_lock):
+    async def check_duplicate_commit(self, commit_path, get_lock):
         log.error("Committing in Kubernetes is not supported yet.")
+        raise NotImplementedError
 
     async def commit(self, image_commit_path, path):
+        # TODO: Implement container commit on Kubernetes kernel.
         log.error("Committing in Kubernetes is not supported yet.")
-        # assert self.runner is not None
-        # work_dir = Path(dst)
-        # core_api = kube_client.CoreV1Api()
-        # pods = await core_api.list_namespaced_pod(
-        #     "backend-ai",
-        #     label_selector=f"run=kernel-{self.kernel_id}",
-        # )
-        # pods = pods.to_dict()["items"] or []
-        # if not pods:
-        #     log.exception("No pods on the given kubernetes name space.")
-        #     return
-
-        # for pod in pods:
-        #     containers = pod["spec"]["containers"]
-        #     container = containers[0]
-        #     break
-
-        # async with watch.Watch().stream(
-        #     core_api.connect_get_namespaced_pod_exec,
-        #     self.kernel_id,
-        #     "backend-ai",
-        #     container=container["name"],
-        #     command=["docker", "export", f"--output={work_dir}", ],
-        #     stderr=True,
-        #     stdin=True,
-        #     stdout=True,
-        #     tty=False,
-        #     _preload_content=False,
-        # ) as stream:
-        #     async for event in stream:
-        #         log.debug("stream: {}", event)
+        raise NotImplementedError
 
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()

@@ -18,16 +18,15 @@ from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import KernelId
 from ai.backend.common.utils import current_loop
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
+from ..types import CommitStatus
 from ..utils import closing_async, get_arch_name
-
-# TODO: set the commit tags directory from toml or cfg
-COMMIT_DIR = Path("/tmp/backend.ai/commit/")
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -132,32 +131,28 @@ class DockerKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
-    async def check_commit_tag(self, commit_path: Path, get_lock: bool = False):
+    async def check_duplicate_commit(self, commit_path: Path, get_lock: bool = False):
         container_id: str = str(self.data["container_id"])
         tag_path = commit_path / "tags" / container_id
 
         tag_path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with open(tag_path, mode="x") as f:
-                if get_lock:
-                    f.write("")
-        except FileExistsError:
-            return int(False)
-        return int(True)
+            async with FileLock(path=tag_path, timeout=0):
+                pass
+        except TimeoutError:
+            return CommitStatus.DUPLICATED
+        return CommitStatus.AVAILABLE
 
     async def commit(self, image_commit_path: Path, path: str):
         assert self.runner is not None
 
         container_id: str = str(self.data["container_id"])
-
         filepath = image_commit_path / path
         filename = Path(filepath).name
-
         try:
             Path(filepath).parent.mkdir(exist_ok=True, parents=True)
         except ValueError:  # parent_path does not start with work_dir!
             raise AssertionError("malformed committed path.")
-
         loop = current_loop()
         async with closing_async(Docker()) as docker:
             async with docker._query(
@@ -174,7 +169,7 @@ class DockerKernel(AbstractKernel):
                         tar.addfile(tar_info, fileobj=BytesIO(data))
 
                 await loop.run_in_executor(None, _save_tar)
-        tag_path = COMMIT_DIR / "tags" / container_id
+        tag_path = image_commit_path / "tags" / container_id
         os.remove(tag_path)
         log.info("Container is being committed to {}", filepath)
 

@@ -13,6 +13,11 @@ class AgentBackend(enum.Enum):
     KUBERNETES = "kubernetes"
 
 
+class CommitStatus(enum.Enum):
+    AVAILABLE = 0
+    DUPLICATED = 1
+
+
 @attr.s(auto_attribs=True, slots=True)
 class VolumeInfo:
     name: str  # volume name
