@@ -1337,11 +1337,11 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
         "GET_COMMIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )
     try:
-        is_ongoing = await root_ctx.registry.get_commit_status(session_name, owner_access_key)
+        status_info = await root_ctx.registry.get_commit_status(session_name, owner_access_key)
     except BackendError:
         log.exception("GET_COMMIT_STATUS: exception")
         raise
-    resp = {"stats": is_ongoing}
+    resp = {"stats": status_info["status"], "kernel": status_info["kernel"]}
     return web.json_response(resp, status=200)
 
 
@@ -1379,15 +1379,6 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     except BackendError:
         log.exception("COMMIT_SESSION: exception")
         raise
-    if resp["status"] == 0:
-        return web.json_response(
-            {
-                **resp,
-                "title": "Duplicated session commit.",
-                "type": "session-commit-already-exists",
-            },
-            status=409,
-        )
     return web.json_response(resp, status=201)
 
 

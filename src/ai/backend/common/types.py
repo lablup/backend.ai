@@ -257,6 +257,11 @@ class ClusterMode(str, enum.Enum):
     MULTI_NODE = "multi-node"
 
 
+class CommitStatus(str, enum.Enum):
+    AVAILABLE = "available"
+    DUPLICATED = "duplicated"
+
+
 class MovingStatValue(TypedDict):
     min: str
     max: str

@@ -20,12 +20,11 @@ from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import CommitStatus, KernelId
 from ai.backend.common.utils import current_loop
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
-from ..types import CommitStatus
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -131,47 +130,48 @@ class DockerKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
-    async def check_duplicate_commit(self, commit_path: Path, get_lock: bool = False):
-        container_id: str = str(self.data["container_id"])
-        tag_path = commit_path / "tags" / container_id
+    def _get_lock_path(self, commit_path: Path):
+        return commit_path / "lock"
 
-        tag_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            async with FileLock(path=tag_path, timeout=0):
-                pass
-        except TimeoutError:
+    async def check_duplicate_commit(self, path: Path):
+        lock_path = self._get_lock_path(path)
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if lock_path.exists():
             return CommitStatus.DUPLICATED
         return CommitStatus.AVAILABLE
 
-    async def commit(self, image_commit_path: Path, path: str):
+    async def commit(self, path: Path):
         assert self.runner is not None
 
         container_id: str = str(self.data["container_id"])
-        filepath = image_commit_path / path
+        filepath = path / "commit.tar.gz"
         filename = Path(filepath).name
         try:
             Path(filepath).parent.mkdir(exist_ok=True, parents=True)
         except ValueError:  # parent_path does not start with work_dir!
             raise AssertionError("malformed committed path.")
         loop = current_loop()
-        async with closing_async(Docker()) as docker:
-            async with docker._query(
-                f"containers/{container_id}/export",
-                method="GET",
-            ) as response:
-
-                data: bytes = await response.read()
-
-                def _save_tar():
-                    tar_info = tarfile.TarInfo(filename)
-                    tar_info.size = len(data)
-                    with tarfile.open(name=filepath, mode="x:gz") as tar:
-                        tar.addfile(tar_info, fileobj=BytesIO(data))
-
-                await loop.run_in_executor(None, _save_tar)
-        tag_path = image_commit_path / "tags" / container_id
-        os.remove(tag_path)
-        log.info("Container is being committed to {}", filepath)
+        lock_path = self._get_lock_path(path)
+        try:
+            async with FileLock(path=lock_path, timeout=0.1):
+                docker = Docker()
+                async with docker._query(
+                    f"containers/{container_id}/export",
+                    method="GET",
+                ) as response:
+                    log.info("Container is being committed to {}", filepath)
+                    data: bytes = await response.read()
+                    def _save_tar():
+                        tar_info = tarfile.TarInfo(filename)
+                        tar_info.size = len(data)
+                        with tarfile.open(name=filepath, mode="x:gz") as tar:
+                            tar.addfile(tar_info, fileobj=BytesIO(data))
+                    await loop.run_in_executor(None, _save_tar)
+        except asyncio.exceptions.TimeoutError:
+            log.warning("Session is already being committed.")
+        else:
+            os.unlink(lock_path)
+            await docker.close()
 
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()

@@ -277,11 +277,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, commit_path, get_lock=False):
+    async def check_duplicate_commit(self, path):
         raise NotImplementedError
 
     @abstractmethod
-    async def commit(self, image_commit_path, path):
+    async def commit(self, path):
         raise NotImplementedError
 
     @abstractmethod

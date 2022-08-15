@@ -202,7 +202,7 @@ class KubernetesKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
-    async def check_duplicate_commit(self, commit_path, get_lock):
+    async def check_duplicate_commit(self, path):
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 

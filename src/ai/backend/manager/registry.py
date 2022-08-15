@@ -2989,7 +2989,7 @@ class AgentRegistry:
         self,
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
-    ) -> bool:
+    ) -> Mapping[str, str]:
         kernel = await self.get_session(session_name_or_id, access_key)
 
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
@@ -3013,10 +3013,6 @@ class AgentRegistry:
         """
 
         kernel = await self.get_session(session_name_or_id, access_key)
-        if filename is None:
-            now = datetime.now(tzutc())
-            filename = f"{now.isoformat()}.tar.gz"
-        assert filename is not None
 
         async with self.db.begin_readonly() as db_conn:
             query = (
@@ -3027,7 +3023,7 @@ class AgentRegistry:
             result = await db_conn.execute(query)
             user_email = result.scalar()
         # TODO: get path from toml or cfg
-        path = Path(str(user_email), str(kernel["session_id"]), filename)
+        path = Path(str(user_email), str(kernel["session_id"]))
 
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(

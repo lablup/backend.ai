@@ -69,7 +69,7 @@ from .config import (
 )
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
-from .types import AgentBackend, CommitStatus, LifecycleEvent, VolumeInfo
+from .types import AgentBackend, LifecycleEvent, VolumeInfo
 from .utils import get_subnet_ip
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.server"))
@@ -516,11 +516,14 @@ class AgentRPCServer(aobject):
     async def get_commit_status(
         self,
         kernel_id,  # type: str
+        path,  # type: str
     ):
         log.info("rpc::get_commit_status(k:{})", kernel_id)
+        image_commit_path: Path = self.local_config["agent"]["image-commit-path"]
+        commit_path = image_commit_path / path
         status: int = await self.agent.get_commit_status(
             KernelId(UUID(kernel_id)),
-            get_lock=False,
+            commit_path,
         )
         return {
             "kernel": kernel_id,
@@ -534,28 +537,19 @@ class AgentRPCServer(aobject):
         kernel_id,  # type: str
         path,  # type: str
     ):
-        commit_status = await self.agent.get_commit_status(
-            KernelId(UUID(kernel_id)),
-            get_lock=True,
-        )
-        if commit_status == CommitStatus.DUPLICATED:
-            log.warning("Kernel (id={}) is already being committed", kernel_id)
-            return {
-                "task": "-1",
-                "kernel": kernel_id,
-                "path": path,
-                "status": commit_status,
-            }
+        image_commit_path: Path = self.local_config["agent"]["image-commit-path"]
+        commit_path = image_commit_path / path
         log.info("rpc::commit(k:{})", kernel_id)
         bgtask_mgr = self.local_config["background_task_manager"]
         task_id = await bgtask_mgr.start(
-            self.agent.commit, kernel_id=KernelId(UUID(kernel_id)), path=path
+            self.agent.commit,
+            kernel_id=KernelId(UUID(kernel_id)),
+            path=commit_path,
         )
         return {
-            "task": str(task_id),
+            "bgtask_id": str(task_id),
             "kernel": kernel_id,
-            "path": path,
-            "status": commit_status,
+            "path": str(commit_path),
         }
 
     @rpc_function
