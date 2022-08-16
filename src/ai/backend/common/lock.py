@@ -80,7 +80,8 @@ class FileLock(AbstractDistributedLock):
     async def acquire(self) -> None:
         assert self._file is None
         assert not self._locked
-        self._path.touch(exist_ok=True)
+        if not self._path.exists():
+            self._path.touch()
         self._file = open(self._path, "rb")
         stop_func = stop_never if self._timeout <= 0 else stop_after_delay(self._timeout)
         try:

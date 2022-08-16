@@ -26,6 +26,7 @@ from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import quote_plus as urlquote
 
 import aiohttp
+import asyncpg
 import pytest
 import sqlalchemy as sa
 from aiohttp import web
@@ -33,6 +34,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
+from ai.backend.common.logging import LocalLogger
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.api.context import RootContext
@@ -107,8 +109,30 @@ def vfolder_host():
 
 
 @pytest.fixture(scope="session")
+def logging_config():
+    config = {
+        "drivers": ["console"],
+        "console": {"colored": None, "format": "verbose"},
+        "level": "DEBUG",
+        "pkg-ns": {
+            "": "INFO",
+            "ai.backend": "DEBUG",
+            "tests": "DEBUG",
+            "alembic": "INFO",
+            "aiotools": "INFO",
+            "aiohttp": "INFO",
+            "sqlalchemy": "WARNING",
+        },
+    }
+    logger = LocalLogger(config)
+    with logger:
+        yield config
+
+
+@pytest.fixture(scope="session")
 def local_config(
     test_id,
+    logging_config,
     etcd_container,  # noqa: F811
     redis_container,  # noqa: F811
     postgres_container,  # noqa: F811
@@ -155,10 +179,7 @@ def local_config(
                 "log-scheduler-ticks": False,
                 "periodic-sync-stats": False,
             },
-            "logging": {
-                "drivers": ["console"],
-                "console": {"colored": False, "format": "verbose"},
-            },
+            "logging": logging_config,
         }
     )
 
@@ -283,8 +304,16 @@ def database(request, local_config, test_db):
             connect_args=pgsql_connect_opts,
             isolation_level="AUTOCOMMIT",
         )
-        async with engine.connect() as conn:
-            await conn.execute(sa.text(f'CREATE DATABASE "{test_db}";'))
+        while True:
+            try:
+                async with engine.connect() as conn:
+                    await conn.execute(sa.text(f'CREATE DATABASE "{test_db}";'))
+            except (asyncpg.exceptions.CannotConnectNowError, ConnectionError):
+                # Workaround intermittent test failures in GitHub Actions
+                await asyncio.sleep(0.1)
+                continue
+            else:
+                break
         await engine.dispose()
 
     asyncio.run(init_db())
