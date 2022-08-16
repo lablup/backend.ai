@@ -55,6 +55,7 @@ from .exception import (
 )
 from .stats import ContainerMeasurement, NodeMeasurement, StatContext
 from .types import Container as SessionContainer
+from .types import MountInfo
 
 if TYPE_CHECKING:
     from io import TextIOWrapper
@@ -358,6 +359,18 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
     async def get_node_hwinfo(self) -> HardwareMetadata:
         raise NotImplementedError
+
+    @abstractmethod
+    async def get_docker_networks(
+        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[str]:
+        return []
+
+    @abstractmethod
+    async def generate_mounts(
+        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[MountInfo]:
+        return []
 
 
 class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
@@ -694,6 +707,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                     key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
                     reverse=True,
                 )
+                log.debug("sorted_dev_allocs: {}", sorted_dev_allocs)
                 for dev_id, current_alloc in sorted_dev_allocs:
                     diff = diffs[dev_id]
                     new_alloc[dev_id] += diff
