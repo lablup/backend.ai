@@ -364,12 +364,21 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[str]:
+        """
+        Returns reference string (e.g. Id, name, ...) of docker networks
+        to attach to container for accelerator to work properly.
+        """
         return []
 
     @abstractmethod
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> List[MountInfo]:
+        """
+        Populates additional files/directories under `source_path`
+        to mount to container and returns `MountInfo`.
+        Agent will then read this `MountInfo`s and mount files/directories.
+        """
         return []
 
 
