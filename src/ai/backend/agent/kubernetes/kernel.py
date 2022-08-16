@@ -206,7 +206,7 @@ class KubernetesKernel(AbstractKernel):
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 
-    async def commit(self, image_commit_path, path):
+    async def commit(self, path):
         # TODO: Implement container commit on Kubernetes kernel.
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError

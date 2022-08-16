@@ -549,7 +549,7 @@ class AgentRPCServer(aobject):
         return {
             "bgtask_id": str(task_id),
             "kernel": kernel_id,
-            "path": str(commit_path),
+            "path": path,
         }
 
     @rpc_function

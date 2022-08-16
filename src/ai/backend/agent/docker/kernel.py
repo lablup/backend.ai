@@ -12,6 +12,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
 
 import pkg_resources
+from datetime import datetime
+from dateutil.tz import tzutc
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
@@ -135,7 +137,6 @@ class DockerKernel(AbstractKernel):
 
     async def check_duplicate_commit(self, path: Path):
         lock_path = self._get_lock_path(path)
-        lock_path.parent.mkdir(parents=True, exist_ok=True)
         if lock_path.exists():
             return CommitStatus.DUPLICATED
         return CommitStatus.AVAILABLE
@@ -144,8 +145,9 @@ class DockerKernel(AbstractKernel):
         assert self.runner is not None
 
         container_id: str = str(self.data["container_id"])
-        filepath = path / "commit.tar.gz"
-        filename = Path(filepath).name
+        now = datetime.now(tzutc())
+        filename = f"{now}.tar.gz"
+        filepath = path / filename
         try:
             Path(filepath).parent.mkdir(exist_ok=True, parents=True)
         except ValueError:  # parent_path does not start with work_dir!
@@ -167,11 +169,10 @@ class DockerKernel(AbstractKernel):
                         with tarfile.open(name=filepath, mode="x:gz") as tar:
                             tar.addfile(tar_info, fileobj=BytesIO(data))
                     await loop.run_in_executor(None, _save_tar)
-        except asyncio.exceptions.TimeoutError:
-            log.warning("Session is already being committed.")
-        else:
             os.unlink(lock_path)
             await docker.close()
+        except asyncio.exceptions.TimeoutError:
+            log.warning("Session is already being committed.")
 
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()

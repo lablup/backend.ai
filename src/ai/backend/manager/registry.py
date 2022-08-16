@@ -3022,7 +3022,6 @@ class AgentRegistry:
             )
             result = await db_conn.execute(query)
             user_email = result.scalar()
-        # TODO: get path from toml or cfg
         path = Path(str(user_email), str(kernel["session_id"]))
 
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
@@ -3034,7 +3033,15 @@ class AgentRegistry:
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
                 resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), str(path))
-                return resp
+        
+        async with self.db.begin_readonly() as db_conn:
+            update_query = (
+                sa.update(kernels)
+                .values({"bgtask_id": resp["bgtask_id"]})
+                .where(kernels.c.id == kernel["id"])
+            )
+            await db_conn.execute(update_query)
+        return resp
 
 
 async def check_scaling_group(
