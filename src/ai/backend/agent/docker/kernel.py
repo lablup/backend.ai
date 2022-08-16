@@ -7,16 +7,16 @@ import shutil
 import subprocess
 import tarfile
 import textwrap
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
 
 import pkg_resources
-from datetime import datetime
-from dateutil.tz import tzutc
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
+from dateutil.tz import tzutc
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
@@ -145,7 +145,7 @@ class DockerKernel(AbstractKernel):
         assert self.runner is not None
 
         container_id: str = str(self.data["container_id"])
-        now = datetime.now(tzutc())
+        now = datetime.now(tzutc()).strftime("%Y-%m-%dT%H:%M:%S")
         filename = f"{now}.tar.gz"
         filepath = path / filename
         try:
@@ -164,11 +164,13 @@ class DockerKernel(AbstractKernel):
                 ) as response:
                     log.debug("Container commit data is being written on {}", filepath)
                     data: bytes = await response.read()
+
                     def _save_tar():
                         tar_info = tarfile.TarInfo(filename)
                         tar_info.size = len(data)
                         with tarfile.open(name=filepath, mode="x:gz") as tar:
                             tar.addfile(tar_info, fileobj=BytesIO(data))
+
                     await loop.run_in_executor(None, _save_tar)
             os.unlink(lock_path)
             await docker.close()

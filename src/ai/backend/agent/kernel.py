@@ -281,7 +281,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def commit(self, path, filename):
+    async def commit(self, path):
         raise NotImplementedError
 
     @abstractmethod

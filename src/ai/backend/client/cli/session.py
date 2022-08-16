@@ -969,7 +969,7 @@ def commit(session_id):
         try:
             kernel = session.ComputeSession(session_id)
             kernel.commit()
-            print_done("Session is being committed.")
+            print_info(f"Request to commit Session(name or id: {session_id})")
         except BackendAPIError as e:
             print_error(e)
             if e.status == 409:
