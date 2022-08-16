@@ -902,6 +902,7 @@ class ComputeSession(graphene.ObjectType):
             "created_user_email": None,  # TODO: implement
             "created_user_id": None,  # TODO: implement
             # status
+            "bgtask_id": row["bgtask_id"],
             "status": row["status"].name,
             "status_changed": row["status_changed"],
             "status_info": row["status_info"],
