@@ -221,18 +221,13 @@ def verify_vfolder_name(folder: str) -> bool:
     return True
 
 
-async def query_accessible_vfolders(
+async def _set_vfolder_query(
     conn: SAConnection,
     user_uuid: uuid.UUID,
-    *,
     user_role=None,
     domain_name=None,
     allowed_vfolder_types=None,
-    extra_vf_conds=None,
-    extra_vfperm_conds=None,
-    extra_vf_user_conds=None,
-    extra_vf_group_conds=None,
-) -> Sequence[Mapping[str, Any]]:
+) -> sa.select:
     from ai.backend.manager.models import association_groups_users as agus
     from ai.backend.manager.models import groups, users
 
@@ -254,57 +249,28 @@ async def query_accessible_vfolders(
         vfolders.c.creator,
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
-        # vfolders.c.permission,
-        # users.c.email,
     ]
 
-    async def _append_entries(_query, _is_owner=True):
-        if extra_vf_conds is not None:
-            _query = _query.where(extra_vf_conds)
-        if extra_vf_user_conds is not None:
-            _query = _query.where(extra_vf_user_conds)
-        result = await conn.execute(_query)
-        for row in result:
-            row_keys = row.keys()
-            _perm = (
-                row.vfolder_permissions_permission
-                if "vfolder_permissions_permission" in row_keys
-                else row.vfolders_permission
-            )
-            entries.append(
-                {
-                    "name": row.vfolders_name,
-                    "id": row.vfolders_id,
-                    "host": row.vfolders_host,
-                    "usage_mode": row.vfolders_usage_mode,
-                    "created_at": row.vfolders_created_at,
-                    "last_used": row.vfolders_last_used,
-                    "max_size": row.vfolders_max_size,
-                    "max_files": row.vfolders_max_files,
-                    "ownership_type": row.vfolders_ownership_type,
-                    "user": str(row.vfolders_user) if row.vfolders_user else None,
-                    "group": str(row.vfolders_group) if row.vfolders_group else None,
-                    "creator": row.vfolders_creator,
-                    "user_email": row.users_email if "users_email" in row_keys else None,
-                    "group_name": row.groups_name if "groups_name" in row_keys else None,
-                    "is_owner": _is_owner,
-                    "permission": _perm,
-                    "unmanaged_path": row.vfolders_unmanaged_path,
-                    "cloneable": row.vfolders_cloneable,
-                }
-            )
-
-    entries: List[dict] = []
-    # User vfolders.
+    owned_query = None
+    shared_query = None
+    group_query = None
     if "user" in allowed_vfolder_types:
-        # Scan my owned vfolders.
+        # user query
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = (
-            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
+        # Scan my owned vfolders.
+        owned_query = (
+            sa.select(
+                vfolders_selectors
+                + [
+                    users.c.email.label("users_email"),
+                    vfolders.c.permission.label("permission"),
+                    sa.case([(True, True)]).label("is_owner"),
+                    sa.case([(True, None)]).label("groups_name"),
+                ],
+            )
             .select_from(j)
             .where(vfolders.c.user == user_uuid)
         )
-        await _append_entries(query)
 
         # Scan vfolders shared with me.
         j = vfolders.join(
@@ -316,73 +282,232 @@ async def query_accessible_vfolders(
             vfolders.c.user == users.c.uuid,
             isouter=True,
         )
-        query = (
+        shared_query = (
             sa.select(
-                vfolders_selectors + [vfolder_permissions.c.permission, users.c.email],
-                use_labels=True,
+                vfolders_selectors
+                + [
+                    users.c.email.label("users_email"),
+                    vfolder_permissions.c.permission.label("permission"),
+                    sa.case(
+                        [
+                            (
+                                (vfolders.c.id == vfolder_permissions.c.vfolder)
+                                & (vfolders.c.user != user_uuid),
+                                False,
+                            )
+                        ]
+                    ).label("is_owner"),
+                    sa.case([(True, None)]).label("groups_name"),
+                ],
             )
             .select_from(j)
             .where(
-                (vfolder_permissions.c.user == user_uuid)
+                (vfolder_permissions.c.user == user_uuid != vfolders.c.user)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER),
             )
         )
-        await _append_entries(query, _is_owner=False)
 
     if "group" in allowed_vfolder_types:
         # Scan group vfolders.
         if user_role == UserRole.ADMIN or user_role == "admin":
-            query = (
+            group_query = (
                 sa.select([groups.c.id])
                 .select_from(groups)
                 .where(groups.c.domain_name == domain_name)
             )
-            result = await conn.execute(query)
+            result = await conn.execute(group_query)
             grps = result.fetchall()
             group_ids = [g.id for g in grps]
         else:
             j = sa.join(agus, users, agus.c.user_id == users.c.uuid)
-            query = sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_uuid)
-            result = await conn.execute(query)
+            group_query = (
+                sa.select([agus.c.group_id]).select_from(j).where(agus.c.user_id == user_uuid)
+            )
+            result = await conn.execute(group_query)
             grps = result.fetchall()
             group_ids = [g.group_id for g in grps]
         j = vfolders.join(groups, vfolders.c.group == groups.c.id)
-        query = sa.select(
-            vfolders_selectors + [vfolders.c.permission, groups.c.name], use_labels=True
+        group_query = sa.select(
+            vfolders_selectors
+            + [
+                sa.case([(True, None)]).label("users_email"),
+                vfolders.c.permission,
+                sa.case(
+                    [
+                        (
+                            (user_role == UserRole.ADMIN or user_role == "admin")
+                            or (user_role == UserRole.SUPERADMIN or user_role == "superadmin"),
+                            True,
+                        ),
+                    ],
+                    else_=False,
+                ).label("is_owner"),
+                groups.c.name.label("groups_name"),
+            ],
         ).select_from(j)
-        if user_role != UserRole.SUPERADMIN:
-            query = query.where(vfolders.c.group.in_(group_ids))
-        is_owner = (user_role == UserRole.ADMIN or user_role == "admin") or (
-            user_role == UserRole.SUPERADMIN or user_role == "superadmin"
-        )
-        await _append_entries(query, is_owner)
 
-        # Override permissions, if exists, for group vfolders.
-        j = sa.join(
-            vfolders,
-            vfolder_permissions,
-            vfolders.c.id == vfolder_permissions.c.vfolder,
-        )
-        query = (
-            sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
-            .select_from(j)
-            .where(
-                (vfolders.c.group.in_(group_ids)) & (vfolder_permissions.c.user == user_uuid),
+    if shared_query is None:
+        _is_shared_query = False
+    else:
+        result = await conn.execute(shared_query)
+        _is_shared_query = result.first() is not None
+    # Use vfolder_permissions table only if shared vfolders exist.
+    if _is_shared_query:
+        _user_conds = (vfolders.c.ownership_type == VFolderOwnershipType.USER) & (
+            (users.c.email == vfolders.c.creator)
+            & (
+                (vfolders.c.user == user_uuid)
+                | (
+                    (vfolder_permissions.c.user == user_uuid != vfolders.c.user)
+                    & (vfolders.c.id == vfolder_permissions.c.vfolder)
+                )
             )
         )
-        if extra_vf_conds is not None:
-            query = query.where(extra_vf_conds)
-        if extra_vf_user_conds is not None:
-            query = query.where(extra_vf_user_conds)
-        result = await conn.execute(query)
-        overriding_permissions: dict = {row.vfolder: row.permission for row in result}
-        for entry in entries:
-            if (
-                entry["id"] in overriding_permissions
-                and entry["ownership_type"] == VFolderOwnershipType.GROUP
-            ):
-                entry["permission"] = overriding_permissions[entry["id"]]
+        _perm = sa.case(
+            [
+                (
+                    (vfolder_permissions.c.user == user_uuid != vfolders.c.user)
+                    & (vfolders.c.id == vfolder_permissions.c.vfolder),
+                    vfolder_permissions.c.permission,
+                ),
+            ],
+            else_=vfolders.c.permission,
+        ).label("permission")
+        _is_owner = sa.case(
+            [
+                (
+                    (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+                    & (
+                        (vfolders.c.id == vfolder_permissions.c.vfolder)
+                        & (vfolders.c.user != user_uuid)
+                    ),
+                    False,
+                ),
+                (
+                    (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+                    & (
+                        (user_role == UserRole.MONITOR or user_role == "monitor")
+                        | (user_role == UserRole.USER or user_role == "user")
+                    ),
+                    False,
+                ),
+            ],
+            else_=True,
+        ).label("is_owner")
+    else:
+        _user_conds = (vfolders.c.ownership_type == VFolderOwnershipType.USER) & (
+            (users.c.email == vfolders.c.creator) & (vfolders.c.user == user_uuid)
+        )
+        _perm = vfolders.c.permission
+        _is_owner = sa.case(
+            [
+                (
+                    (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+                    & (
+                        (user_role == UserRole.MONITOR or user_role == "monitor")
+                        | (user_role == UserRole.USER or user_role == "user")
+                    ),
+                    False,
+                ),
+            ],
+            else_=True,
+        ).label("is_owner")
 
+    _group_conds = (
+        (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+        & (vfolders.c.group.in_(group_ids))
+        & (vfolders.c.group == groups.c.id)
+    )
+    _email = sa.case(
+        [
+            (vfolders.c.ownership_type == VFolderOwnershipType.USER, users.c.email),
+            (vfolders.c.ownership_type == VFolderOwnershipType.GROUP, None),
+        ],
+    ).label("users_email")
+    _group_name = sa.case(
+        [
+            (vfolders.c.ownership_type == VFolderOwnershipType.USER, None),
+            (vfolders.c.ownership_type == VFolderOwnershipType.GROUP, groups.c.name),
+        ],
+    ).label("groups_name")
+    result_query = sa.select(
+        vfolders_selectors
+        + [
+            _email,
+            _perm,
+            _is_owner,
+            _group_name,
+        ],
+    )
+
+    if len(allowed_vfolder_types) > 1:
+        result_query = result_query.select_from(sa.union(owned_query, shared_query, group_query))
+        result_query = result_query.where(_user_conds | _group_conds)
+    elif "user" in allowed_vfolder_types:
+        result_query = result_query.select_from(sa.union(owned_query, shared_query))
+        result_query = result_query.where(_user_conds)
+    elif "group" in allowed_vfolder_types:
+        result_query = result_query.select_from(group_query)
+        result_query = result_query.where(_group_conds)
+    result_query = result_query.distinct()
+    return result_query
+
+
+async def query_accessible_vfolders(
+    conn: SAConnection,
+    user_uuid: uuid.UUID,
+    *,
+    user_role=None,
+    domain_name=None,
+    allowed_vfolder_types=None,
+    extra_vf_conds=None,
+    extra_vfperm_conds=None,
+    extra_vf_user_conds=None,
+    extra_vf_group_conds=None,
+) -> Sequence[Mapping[str, Any]]:
+    if allowed_vfolder_types is None:
+        allowed_vfolder_types = ["user"]  # legacy default
+
+    async def _append_entries(_query):
+        if extra_vf_conds is not None:
+            _query = _query.where(extra_vf_conds)
+        if extra_vf_user_conds is not None:
+            _query = _query.where(extra_vf_user_conds)
+        result = await conn.execute(_query)
+        for row in result:
+            row_keys = row.keys()
+            entries.append(
+                {
+                    "name": row.name,
+                    "id": row.id,
+                    "host": row.host,
+                    "usage_mode": row.usage_mode,
+                    "created_at": row.created_at,
+                    "last_used": row.last_used,
+                    "max_size": row.max_size,
+                    "max_files": row.max_files,
+                    "ownership_type": row.ownership_type,
+                    "user": str(row.user) if row.user else None,
+                    "group": str(row.group) if row.group else None,
+                    "creator": row.creator,
+                    "user_email": row.users_email if "users_email" in row_keys else None,
+                    "group_name": row.groups_name if "groups_name" in row_keys else None,
+                    "is_owner": row.is_owner,
+                    "permission": row.permission,
+                    "unmanaged_path": row.unmanaged_path,
+                    "cloneable": row.cloneable,
+                }
+            )
+
+    entries: List[dict] = []
+    query = await _set_vfolder_query(
+        conn,
+        user_uuid,
+        user_role,
+        domain_name,
+        allowed_vfolder_types,
+    )
+    await _append_entries(query)
     return entries
 
 
