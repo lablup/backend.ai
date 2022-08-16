@@ -157,11 +157,12 @@ class DockerKernel(AbstractKernel):
         try:
             async with FileLock(path=lock_path, timeout=0.1):
                 docker = Docker()
+                log.info("Container is being committed to {}", filepath)
                 async with docker._query(
                     f"containers/{container_id}/export",
                     method="GET",
                 ) as response:
-                    log.info("Container is being committed to {}", filepath)
+                    log.debug("Container commit data is being written on {}", filepath)
                     data: bytes = await response.read()
                     def _save_tar():
                         tar_info = tarfile.TarInfo(filename)

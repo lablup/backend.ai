@@ -49,6 +49,7 @@ from ai.backend.common.events import EventProducer
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
+    CommitStatus,
     EtcdRedisConfig,
     HardwareMetadata,
     HostPortPair,
@@ -521,13 +522,13 @@ class AgentRPCServer(aobject):
         log.info("rpc::get_commit_status(k:{})", kernel_id)
         image_commit_path: Path = self.local_config["agent"]["image-commit-path"]
         commit_path = image_commit_path / path
-        status: int = await self.agent.get_commit_status(
+        status: CommitStatus = await self.agent.get_commit_status(
             KernelId(UUID(kernel_id)),
             commit_path,
         )
         return {
             "kernel": kernel_id,
-            "status": status,
+            "status": status.value,
         }
 
     @rpc_function

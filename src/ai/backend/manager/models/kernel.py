@@ -210,7 +210,6 @@ kernels = sa.Table(
     sa.Column("attached_devices", pgsql.JSONB(), nullable=True, default={}),
     sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={}),
     sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True),
-    sa.Column("bgtask_id", sa.String(length=64)),
     # Port mappings
     # If kernel_host is NULL, it is assumed to be same to the agent host or IP.
     sa.Column("kernel_host", sa.String(length=128), nullable=True),
@@ -858,6 +857,7 @@ class ComputeSession(graphene.ObjectType):
     starts_at = GQLDateTime()
     startup_command = graphene.String()
     result = graphene.String()
+    commit_status = graphene.String()
 
     # resources
     resource_opts = graphene.JSONString()
@@ -902,7 +902,6 @@ class ComputeSession(graphene.ObjectType):
             "created_user_email": None,  # TODO: implement
             "created_user_id": None,  # TODO: implement
             # status
-            "bgtask_id": row["bgtask_id"],
             "status": row["status"].name,
             "status_changed": row["status_changed"],
             "status_info": row["status_info"],
@@ -961,6 +960,11 @@ class ComputeSession(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeSession.by_dependency")
         return await loader.load(self.id)
+
+    async def resolve_commit_status(self, info: graphene.ResolveInfo) -> Optional[str]:
+        graph_ctx: GraphQueryContext = info.context
+        commit_status = await graph_ctx.registry.get_commit_status(self.id, self.access_key)
+        return commit_status["status"]
 
     _queryfilter_fieldspec = {
         "type": ("kernels_session_type", lambda s: SessionTypes[s]),
