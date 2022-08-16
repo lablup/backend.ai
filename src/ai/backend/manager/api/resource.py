@@ -322,6 +322,7 @@ async def get_container_stats_for_period(
                     kernels.c.status,
                     kernels.c.status_changed,
                     kernels.c.last_stat,
+                    kernels.c.status_history,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
                     groups.c.name,
