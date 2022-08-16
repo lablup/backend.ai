@@ -1,17 +1,18 @@
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import redis
+from tomlkit import TOMLDocument
 
 from ai.backend.cli.interaction import ask_host, ask_port, ask_string
 
 
-def config_redis(config_json: dict) -> dict:
+def config_redis(config_json: TOMLDocument) -> TOMLDocument:
     try:
         if config_json.get("redis") is None:
             raise KeyError
         elif type(config_json.get("redis")) != dict:
             raise TypeError
-        redis_config: dict = dict(config_json["redis"])
+        redis_config = config_json["redis"]
         while True:
             redis_host_str, redis_port_str = str(redis_config.get("addr")).split(":")
             redis_host = ask_host("Redis host: ", str(redis_host_str))

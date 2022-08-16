@@ -11,8 +11,9 @@ T_Number = TypeVar("T_Number", bound=Union[int, float])
 def rl_input(prompt: str, prefill: str = "") -> str:
     readline.set_startup_hook(lambda: readline.insert_text(prefill))
     try:
-        return input(prompt)
+        return input(prompt + "\033[1;97m")
     finally:
+        print("\033[0m", end="", flush=True)
         readline.set_startup_hook()
 
 
@@ -68,11 +69,12 @@ def ask_number_impl(
     while True:
         user_reply = rl_input(f"{prompt}: ", prefill=prefill)
         if not user_reply:
-            if default is not None:
-                return default
-            else:
+            if default is None:
                 print("You must input the value.")
+                prefill = user_reply
                 continue
+            else:
+                return default
         try:
             value = cast(T_Number, num_type(user_reply))
         except ValueError:
@@ -95,19 +97,23 @@ def ask_string(
     *,
     default: Optional[str] = None,
     allow_empty: bool = False,
-) -> str:
+) -> Optional[str]:
     prefill = "" if default is None else default
     while True:
-        if default is not None:
-            user_reply = rl_input(f"{prompt}: ", prefill=prefill)
+        if allow_empty:
+            user_reply = rl_input(f"{prompt} (may be left empty): ", prefill=prefill)
             if not user_reply:
-                return default
+                return None
             return user_reply
         else:
-            user_reply = rl_input(f"{prompt} (may be left empty): ", prefill=prefill)
-            if not user_reply and not allow_empty:
-                print("You must input the value.")
-                continue
+            user_reply = rl_input(f"{prompt}: ", prefill=prefill)
+            if not user_reply:
+                if default is None:
+                    print("You must input a value.")
+                    prefill = user_reply
+                    continue
+                else:
+                    return default
             return user_reply
 
 

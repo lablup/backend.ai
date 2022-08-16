@@ -61,6 +61,7 @@ resources(
         ":version",
     ],
     sources=[
-        "**/py.typed",
+        "py.typed",
+        "templates/configs/manager.toml",
     ],
 )

@@ -1,35 +1,45 @@
-from typing import Optional
+import asyncio
+from typing import Optional, cast
 
-import etcd3
+import async_timeout
+import grpc
+from etcetra.types import HostPortPair as EtcetraHostPortPair
 from tomlkit.items import InlineTable, Table
+from tomlkit.toml_document import TOMLDocument
 
 from ai.backend.cli.interaction import ask_host, ask_port, ask_string
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
 
-def config_etcd(config_toml: dict) -> dict:
-    # etcd section
+default_etcd_scope_prefix_map = {
+    ConfigScopes.GLOBAL: "",
+}
+
+
+def config_etcd(config_toml: TOMLDocument) -> TOMLDocument:
     try:
         if config_toml.get("etcd") is None:
             raise KeyError
         elif type(config_toml.get("etcd")) != Table:
             raise TypeError
-        etcd_config: dict = dict(config_toml["etcd"])
+        # The type-anno in tomlkit's Table.unwrap() method is wrong...
+        template = cast(dict, config_toml["etcd"].unwrap())
 
         while True:
             try:
-                if etcd_config.get("addr") is None:
+                if template.get("addr") is None:
                     raise KeyError
-                elif type(etcd_config.get("addr")) != InlineTable:
+                elif type(template.get("addr")) != InlineTable:
                     raise TypeError
-                etcd_address: dict = dict(etcd_config["addr"])
-                etcd_host = ask_host("Etcd host: ", etcd_address["host"])
-                if type(etcd_address.get("port")) != str:
-                    etcd_port = ask_port("Etcd port", default=int(etcd_address["port"]))
+                etcd_addr = template["addr"]
+                etcd_host = ask_host("etcd host", etcd_addr["host"])
+                if type(etcd_addr.get("port")) != str:
+                    etcd_port = ask_port("etcd port", default=int(etcd_addr["port"]))
                 else:
                     raise TypeError
 
-                etcd_user = ask_string("Etcd user name")
-                etcd_password = ask_string("Etcd password")
+                etcd_user = ask_string("etcd username", allow_empty=True)
+                etcd_password = ask_string("etcd password", allow_empty=True)
                 if check_etcd_health(etcd_host, etcd_port, etcd_user, etcd_password):
                     break
                 print("Cannot connect to etcd. Please input etcd information again.")
@@ -44,16 +54,46 @@ def config_etcd(config_toml: dict) -> dict:
         raise ValueError
 
 
-def check_etcd_health(host: str, port: int, etcd_user: Optional[str], etcd_password: Optional[str]):
-    try:
-        if etcd_user:
-            etcd_client = etcd3.Etcd3Client(
-                host=host, port=port, user=etcd_user, password=etcd_password
-            )
-        else:
-            etcd_client = etcd3.Etcd3Client(host=host, port=port)
+def check_etcd_health(
+    host: str,
+    port: int,
+    etcd_user: Optional[str],
+    etcd_password: Optional[str],
+) -> bool:
+    return asyncio.run(_check_etcd_health(host, port, etcd_user, etcd_password))
 
-        etcd_client.close()
-    except (etcd3.exceptions.ConnectionFailedError, etcd3.exceptions.ConnectionTimeoutError):
+
+async def _check_etcd_health(
+    host: str,
+    port: int,
+    etcd_user: Optional[str],
+    etcd_password: Optional[str],
+) -> bool:
+    if etcd_user:
+        etcd_client = AsyncEtcd(
+            EtcetraHostPortPair(host, port),
+            namespace="local",
+            scope_prefix_map=default_etcd_scope_prefix_map,
+            credentials={
+                "user": etcd_user,
+                "password": etcd_password,
+            },
+        )
+    else:
+        etcd_client = AsyncEtcd(
+            EtcetraHostPortPair(host, port),
+            namespace="local",
+            scope_prefix_map=default_etcd_scope_prefix_map,
+        )
+    try:
+        with async_timeout.timeout(5.0):
+            await etcd_client.put("ping", "hello")
+            value = await etcd_client.get("ping")
+        if value is not None and value == "hello":
+            return True
+    except (grpc.RpcError, IOError, asyncio.TimeoutError):
+        # FIXME: replace grpc error with etcetra error
+        print(f"Could not connect to the etcd at {host}:{port}!")
         return False
-    return True
+    print(f"Did not get the correct reply from the etcd at {host}:{port}!")
+    return False

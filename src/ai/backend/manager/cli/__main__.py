@@ -5,6 +5,7 @@ import configparser
 import json
 import json.decoder
 import logging
+import pkg_resources
 import subprocess
 import sys
 from datetime import datetime
@@ -54,7 +55,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
     help="Enable the debug mode and override the global log level to DEBUG.",
 )
 @click.pass_context
-def main(ctx, config_path, debug):
+def main(ctx, config_path, debug) -> None:
     """
     Manager Administration CLI
     """
@@ -71,44 +72,56 @@ def configure() -> None:
     """
     Take necessary inputs from user and generate toml file.
     """
-    # toml section
-    with open("config/template.toml", "r") as f:
-        config_toml: dict = dict(tomlkit.loads(f.read()))
-        # Interactive user input
-        config_toml = config_etcd(config_toml)
-        (
-            config_toml,
-            database_user,
-            database_password,
-            database_name,
-            database_host,
-            database_port,
-        ) = config_database(config_toml)
-        config_toml = config_manager(config_toml)
-    with open("manager.toml", "w") as f:
-        print("\nDump to manager.toml\n")
-        tomlkit.dump(config_toml, f)
+    # TODO: Check if configuration already exists and take the template
+    # from the existing configuration or the packaged sample template.
 
-    # Dump alembic.ini
+    # Generate manager.toml
+    template_path = pkg_resources.resource_filename(
+        "ai.backend.manager",
+        "templates/configs/manager.toml",
+    )
+    with open(template_path, "r") as f:
+        config_toml = tomlkit.loads(f.read())
+    config_toml = config_etcd(config_toml)
+    (
+        config_toml,
+        database_user,
+        database_password,
+        database_name,
+        database_host,
+        database_port,
+    ) = config_database(config_toml)
+    config_toml = config_manager(config_toml)
+    with open("manager.toml", "w") as f:
+        tomlkit.dump(config_toml, f)
+        # print(tomlkit.dumps(config_toml))  # for debugging
+        print(f"\nDumped to {Path.cwd()}/manager.toml\n")
+
+    # return  # for debugging
+
+    # Generate alembic.ini
+    alembic_template_path = pkg_resources.resource_filename(
+        "ai.backend.manager",
+        "templates/configs/alembic.ini",
+    )
     config_parser = configparser.ConfigParser()
-    config_parser.read("config/halfstack.alembic.template.ini")
+    config_parser.read(alembic_template_path)
     config_parser = config_alembic(
         config_parser, database_user, database_password, database_name, database_host, database_port
     )
     with open("alembic.ini", "w") as f:
-        print("\nDump to alembic.ini\n")
+        print("\nDumped to alembic.ini\n")
         config_parser.write(f)
 
-    # Dump etcd config json
     with open("config/sample.etcd.config.json") as f:
         config_json: dict = json.load(f)
     config_json = config_redis(config_json)
     with open("dev.etcd.config.json", "w") as f:
-        print("\nDump to dev.etcd.config.json\n")
+        print("\nDumped to dev.etcd.config.json\n")
         json.dump(config_json, f, indent=4)
 
     print(
-        "Complete configure backend.ai manager. "
+        "Completed configuration of Backend.AI Manager\n"
         "If you want to control more value, edit following files.\n"
     )
     print("manager.toml : etcd, database, manager configuration, logging options and so on.")
@@ -142,7 +155,7 @@ def configure() -> None:
 )
 @click.argument("psql_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_obj
-def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
+def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args) -> None:
     """
     Run the database shell.
 
@@ -200,7 +213,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
 
 @main.command()
 @click.pass_obj
-def generate_keypair(cli_ctx: CLIContext):
+def generate_keypair(cli_ctx: CLIContext) -> None:
     """
     Generate a random keypair and print it out to stdout.
     """
@@ -348,27 +361,27 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")
-def schema():
+def schema() -> None:
     """Command set for managing the database schema."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.etcd:cli")
-def etcd():
+def etcd() -> None:
     """Command set for putting/getting data to/from etcd."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.fixture:cli")
-def fixture():
+def fixture() -> None:
     """Command set for managing fixtures."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.gql:cli")
-def gql():
+def gql() -> None:
     """Command set for GraphQL schema."""
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.image:cli")
-def image():
+def image() -> None:
     """Command set for managing images."""
 
 

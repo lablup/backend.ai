@@ -61,5 +61,6 @@ resources(
     ],
     sources=[
         "py.typed",
+        "templates/configs/agent.toml",
     ],
 )
