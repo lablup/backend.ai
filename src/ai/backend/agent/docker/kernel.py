@@ -8,7 +8,6 @@ import subprocess
 import tarfile
 import textwrap
 from datetime import datetime
-from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple
 
@@ -20,7 +19,6 @@ from dateutil.tz import tzutc
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import CommitStatus, KernelId
@@ -156,7 +154,6 @@ class DockerKernel(AbstractKernel):
             Path(filepath).parent.mkdir(exist_ok=True, parents=True)
         except ValueError:  # parent_path does not start with work_dir!
             raise AssertionError("malformed committed path.")
-        loop = current_loop()
         lock_path = self._get_lock_path(path)
         try:
             async with FileLock(path=lock_path, timeout=0.1):
@@ -168,6 +165,7 @@ class DockerKernel(AbstractKernel):
                 async with docker._query(f"images/{image_id}/get") as tb_resp:
                     with tarfile.open(str(filepath), "w|gz") as tar:
                         async for chunk in tb_resp.content.iter_chunked(DEFAULT_CHUNK_SIZE):
+                            assert tar.fileobj is not None
                             tar.fileobj.write(chunk)
                         tar.add(str(filepath))
                 await docker.close()
