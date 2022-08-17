@@ -15,7 +15,6 @@ from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from datetime import datetime
 from decimal import Decimal
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
