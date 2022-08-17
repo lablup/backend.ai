@@ -171,6 +171,7 @@ class DockerKernel(AbstractKernel):
                             tar.fileobj.write(chunk)
                         tar.add(str(filepath))
                 await docker.close()
+            os.unlink(lock_path)
         except asyncio.exceptions.TimeoutError:
             log.warning("Session is already being committed.")
 
