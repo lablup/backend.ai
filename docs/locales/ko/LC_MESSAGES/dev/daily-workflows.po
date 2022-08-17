@@ -226,7 +226,7 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:194 746be7b7ee374fc78063c72eb9a46277
 msgid "Examples:"
-msgstr "예:"
+msgstr "예시:"
 
 #: ../../dev/daily-workflows.rst:203 a867589a4bbe4a6f888e87566e818af9
 msgid "Working with plugins"
