@@ -15,6 +15,7 @@ from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncGenerator,
     Callable,
@@ -57,7 +58,6 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import current_loop
 
 from . import __version__ as VERSION
-from .agent import AbstractAgent
 from .config import (
     agent_etcd_config_iv,
     agent_local_config_iv,
@@ -68,6 +68,9 @@ from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, LifecycleEvent, VolumeInfo
 from .utils import get_subnet_ip
+
+if TYPE_CHECKING:
+    from .agent import AbstractAgent
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.server"))
 
