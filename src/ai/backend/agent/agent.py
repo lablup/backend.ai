@@ -92,6 +92,7 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
     ContainerId,
+    DeviceId,
     DeviceName,
     HardwareMetadata,
     ImageRegistry,
@@ -121,7 +122,7 @@ from .resources import (
     Mount,
 )
 from .stats import StatContext, StatModes
-from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent
+from .types import Container, ContainerLifecycleEvent, ContainerStatus, LifecycleEvent, MountInfo
 from .utils import generate_local_instance_id, get_arch_name
 
 if TYPE_CHECKING:
@@ -223,7 +224,19 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         raise NotImplementedError
 
     @abstractmethod
-    async def apply_accelerator_allocation(self, computer, device_alloc) -> None:
+    async def apply_accelerator_allocation(
+        self,
+        computer: AbstractComputePlugin,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def generate_accelerator_mounts(
+        self,
+        computer: AbstractComputePlugin,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+    ) -> List[MountInfo]:
         raise NotImplementedError
 
     @abstractmethod
@@ -443,6 +456,12 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                 computer_set.instance,
                 device_alloc,
             )
+            accelerator_mounts = await self.generate_accelerator_mounts(
+                computer_set.instance,
+                device_alloc,
+            )
+            for mount_info in accelerator_mounts:
+                _mount(mount_info.mode, mount_info.src_path, mount_info.dst_path.as_posix())
             alloc_sum = Decimal(0)
             for dev_id, per_dev_alloc in device_alloc.items():
                 alloc_sum += sum(per_dev_alloc.values())
@@ -1433,6 +1452,9 @@ class AbstractAgent(
                         # TODO: support allocate_evenly()
                         resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
                             device_specific_slots, context_tag=dev_name
+                        )
+                        log.debug(
+                            "{} allocations: {}", dev_name, resource_spec.allocations[dev_name]
                         )
                     except ResourceError as e:
                         log.info(
