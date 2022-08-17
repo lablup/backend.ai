@@ -164,15 +164,21 @@ class DockerKernel(AbstractKernel):
                 image_id = response["Id"]
                 async with docker._query(f"images/{image_id}/get") as tb_resp:
                     with tarfile.open(str(filepath), "w|gz") as tar:
+                        tar_info = tarfile.TarInfo(filename)
+                        tar.addfile(tar_info)
+                        assert tar.fileobj is not None
                         async for chunk in tb_resp.content.iter_chunked(DEFAULT_CHUNK_SIZE):
-                            assert tar.fileobj is not None
                             tar.fileobj.write(chunk)
-                        tar.add(str(filepath))
-                await docker.images.delete(image_id)
-                await docker.close()
             os.unlink(lock_path)
         except asyncio.exceptions.TimeoutError:
             log.warning("Session is already being committed.")
+        finally:
+            try:
+                tar.close()
+                await docker.images.delete(image_id)
+                await docker.close()
+            except:
+                pass
 
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()

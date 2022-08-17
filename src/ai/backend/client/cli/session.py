@@ -970,11 +970,6 @@ def commit(session_id):
             kernel = session.ComputeSession(session_id)
             kernel.commit()
             print_info(f"Request to commit Session(name or id: {session_id})")
-        except BackendAPIError as e:
-            print_error(e)
-            if e.status == 409:
-                print_info(f"Session(name or id: {session_id}) is already being committed.")
-            sys.exit(1)
         except Exception as e:
             print_error(e)
             sys.exit(1)
