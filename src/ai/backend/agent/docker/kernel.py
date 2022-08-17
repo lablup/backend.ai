@@ -10,7 +10,7 @@ import textwrap
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple
 
 import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
@@ -20,6 +20,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import CommitStatus, KernelId
@@ -30,6 +31,9 @@ from ..resources import KernelResourceSpec
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
+DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 
 class DockerKernel(AbstractKernel):
@@ -156,24 +160,17 @@ class DockerKernel(AbstractKernel):
         lock_path = self._get_lock_path(path)
         try:
             async with FileLock(path=lock_path, timeout=0.1):
-                docker = Docker()
                 log.info("Container is being committed to {}", filepath)
-                async with docker._query(
-                    f"containers/{container_id}/export",
-                    method="GET",
-                ) as response:
-                    log.debug("Container commit data is being written on {}", filepath)
-                    data: bytes = await response.read()
-
-                    def _save_tar():
-                        tar_info = tarfile.TarInfo(filename)
-                        tar_info.size = len(data)
-                        with tarfile.open(name=filepath, mode="x:gz") as tar:
-                            tar.addfile(tar_info, fileobj=BytesIO(data))
-
-                    await loop.run_in_executor(None, _save_tar)
-            os.unlink(lock_path)
-            await docker.close()
+                docker = Docker()
+                container = docker.containers.container(container_id)
+                response: Mapping[str, Any] = await container.commit()
+                image_id = response["Id"]
+                async with docker._query(f"images/{image_id}/get") as tb_resp:
+                    with tarfile.open(str(filepath), "w|gz") as tar:
+                        async for chunk in tb_resp.content.iter_chunked(DEFAULT_CHUNK_SIZE):
+                            tar.fileobj.write(chunk)
+                        tar.add(str(filepath))
+                await docker.close()
         except asyncio.exceptions.TimeoutError:
             log.warning("Session is already being committed.")
 
