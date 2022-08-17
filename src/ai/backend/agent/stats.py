@@ -26,6 +26,7 @@ from typing import (
 
 import attr
 from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
@@ -439,7 +440,7 @@ class StatContext:
                         else:
                             self.kernel_metrics[kernel_id][metric_key].update(measure)
 
-        async def _pipe_builder(r: Redis):
+        async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
             for kernel_id in updated_kernel_ids:
                 metrics = self.kernel_metrics[kernel_id]
