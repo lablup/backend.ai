@@ -148,6 +148,7 @@ __all__ = ["AgentRegistry", "InstanceNotFound"]
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.registry"))
 
+SESSION_NAME_LEN_LIMIT = 10
 _read_only_txn_opts = {
     "postgresql_readonly": True,
 }
@@ -2985,10 +2986,10 @@ class AgentRegistry:
     ) -> None:
         await self.clean_session(session_id)
 
-    async def _get_commit_path(
+    async def _get_user_email(
         self,
         kernel,
-    ) -> Path:
+    ) -> str:
         async with self.db.begin_readonly() as db_conn:
             query = (
                 sa.select([users.c.email])
@@ -2996,8 +2997,9 @@ class AgentRegistry:
                 .where(users.c.uuid == kernel["user_uuid"])
             )
             result = await db_conn.execute(query)
-            user_email = result.scalar()
-        return Path(str(user_email), str(kernel["session_id"]))
+            user_email = str(result.scalar())
+            user_email = user_email.replace("@", "_")
+        return user_email
 
     async def get_commit_status(
         self,
@@ -3005,7 +3007,7 @@ class AgentRegistry:
         access_key: AccessKey,
     ) -> Mapping[str, str]:
         kernel = await self.get_session(session_name_or_id, access_key)
-        path = await self._get_commit_path(kernel)
+        email = await self._get_user_email(kernel)
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
                 kernel["agent"],
@@ -3014,7 +3016,7 @@ class AgentRegistry:
                 order_key=kernel["id"],
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                return await rpc.call.get_commit_status(str(kernel["id"]), str(path))
+                return await rpc.call.get_commit_status(str(kernel["id"]), email)
 
     async def commit_session(
         self,
@@ -3027,7 +3029,12 @@ class AgentRegistry:
         """
 
         kernel = await self.get_session(session_name_or_id, access_key)
-        path = await self._get_commit_path(kernel)
+        email = await self._get_user_email(kernel)
+        now = datetime.now(tzutc()).strftime("%Y-%m-%dT%H:%M:%S")
+        shortend_sname = kernel["session_name"][:SESSION_NAME_LEN_LIMIT]
+        registry, _, filtered = kernel["image"].partition("/")
+        img_path, _, image_name = filtered.partition("/")
+        filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
                 kernel["agent"],
@@ -3036,7 +3043,7 @@ class AgentRegistry:
                 order_key=kernel["id"],
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), str(path))
+                resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), email, filename)
         return resp
 
 

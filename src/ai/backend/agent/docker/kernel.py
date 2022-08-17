@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import tarfile
 import textwrap
-from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple
 
@@ -15,7 +14,6 @@ import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
-from dateutil.tz import tzutc
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
@@ -134,27 +132,21 @@ class DockerKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
-    def _get_lock_path(self, commit_path: Path):
-        return commit_path / "lock"
-
     async def check_duplicate_commit(self, path: Path):
-        lock_path = self._get_lock_path(path)
-        if lock_path.exists():
+        if path.exists():
             return CommitStatus.DUPLICATED
         return CommitStatus.AVAILABLE
 
-    async def commit(self, path: Path):
+    async def commit(self, path: Path, lock_path: Path, filename: str):
         assert self.runner is not None
 
         container_id: str = str(self.data["container_id"])
-        now = datetime.now(tzutc()).strftime("%Y-%m-%dT%H:%M:%S")
-        filename = f"{now}.tar.gz"
         filepath = path / filename
         try:
             Path(path).mkdir(exist_ok=True, parents=True)
+            Path(lock_path).parent.mkdir(exist_ok=True, parents=True)
         except ValueError:  # parent_path does not start with work_dir!
             raise AssertionError("malformed committed path.")
-        lock_path = self._get_lock_path(path)
         try:
             async with FileLock(path=lock_path, timeout=0.1):
                 log.info("Container is being committed to {}", filepath)
@@ -177,7 +169,7 @@ class DockerKernel(AbstractKernel):
                 tar.close()
                 await docker.images.delete(image_id)
                 await docker.close()
-            except:
+            except UnboundLocalError:
                 pass
 
     async def accept_file(self, filename: str, filedata: bytes):

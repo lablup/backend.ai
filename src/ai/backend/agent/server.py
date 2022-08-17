@@ -512,19 +512,25 @@ class AgentRPCServer(aobject):
         log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
         return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts)
 
+    def _get_commit_path(self, kernel_id: str, additional_path: str) -> Tuple[Path, Path]:
+        image_commit_path: Path = self.local_config["agent"]["image-commit-path"]
+        commit_path = image_commit_path / additional_path
+        lock_path = commit_path / "lock" / kernel_id
+        return commit_path, lock_path
+
     @rpc_function
     @collect_error
     async def get_commit_status(
         self,
         kernel_id,  # type: str
-        path,  # type: str
+        email,  # type: str
     ):
-        log.info("rpc::get_commit_status(k:{})", kernel_id)
-        image_commit_path: Path = self.local_config["agent"]["image-commit-path"]
-        commit_path = image_commit_path / path
+        # Only this function logs debug since web sends request at short intervals
+        log.debug("rpc::get_commit_status(k:{})", kernel_id)
+        _, lock_path = self._get_commit_path(kernel_id, email)
         status: CommitStatus = await self.agent.get_commit_status(
             KernelId(UUID(kernel_id)),
-            commit_path,
+            lock_path,
         )
         return {
             "kernel": kernel_id,
@@ -536,21 +542,23 @@ class AgentRPCServer(aobject):
     async def commit(
         self,
         kernel_id,  # type: str
-        path,  # type: str
+        email,  # type: str
+        filename,  # type: str
     ):
-        image_commit_path: Path = self.local_config["agent"]["image-commit-path"]
-        commit_path = image_commit_path / path
+        commit_path, lock_path = self._get_commit_path(kernel_id, email)
         log.info("rpc::commit(k:{})", kernel_id)
         bgtask_mgr = self.local_config["background_task_manager"]
         task_id = await bgtask_mgr.start(
             self.agent.commit,
             kernel_id=KernelId(UUID(kernel_id)),
             path=commit_path,
+            lock_path=lock_path,
+            filename=filename,
         )
         return {
             "bgtask_id": str(task_id),
             "kernel": kernel_id,
-            "path": path,
+            "path": str(commit_path / filename),
         }
 
     @rpc_function
