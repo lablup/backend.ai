@@ -12,10 +12,10 @@ This is the minimal code to execute a code snippet with this client SDK.
 .. code-block:: python3
 
   import sys
-  from ai.backend.client import Session
+  from ai.backend.client.session import Session
 
   with Session() as session:
-      kern = session.ComputeSession.get_or_create('python:3.6-ubuntu18.04')
+      kern = session.ComputeSession.get_or_create('cr.backend.ai/multiarch/python:3.9-ubuntu20.04')
       code = 'print("hello world")'
       mode = 'query'
       run_id = None
@@ -33,7 +33,7 @@ This is the minimal code to execute a code snippet with this client SDK.
           if result['status'] == 'finished':
               break
           else:
-              mode = 'continued'
+              mode = 'continue'
               code = ''
       kern.destroy()
 
@@ -53,10 +53,10 @@ You first need to upload the files after creating the session and construct a
 .. code-block:: python3
 
   import sys
-  from ai.backend.client import Session
+  from ai.backend.client.session import Session
 
   with Session() as session:
-      kern = session.ComputeSession.get_or_create('python:3.6-ubuntu18.04')
+      kern = session.ComputeSession.get_or_create('cr.backend.ai/multiarch/python:3.9-ubuntu20.04')
       kern.upload(['mycode.py', 'setup.py'])
       code = ''
       mode = 'batch'
@@ -80,7 +80,7 @@ You first need to upload the files after creating the session and construct a
           if result['status'] == 'finished':
               break
           else:
-              mode = 'continued'
+              mode = 'continue'
               code = ''
       kern.destroy()
 
@@ -103,7 +103,7 @@ change the if-block for ``result['status']`` as follows:
       else:
           code = input()
   else:
-      mode = 'continued'
+      mode = 'continue'
       code = ''
   ...
 
@@ -142,15 +142,15 @@ features such as ``stream_execute()`` which streams the execution results via we
 .. code-block:: python3
 
   import asyncio
+  import getpass
   import json
   import sys
   import aiohttp
-  from ai.backend.client import AsyncSession
+  from ai.backend.client.session import AsyncSession
 
   async def main():
       async with AsyncSession() as session:
-          kern = await session.ComputeSession.get_or_create('python:3.6-ubuntu18.04',
-                                                    client_token='mysession')
+          kern = await session.ComputeSession.get_or_create('cr.backend.ai/multiarch/python:3.9-ubuntu20.04')
           code = 'print("hello world")'
           mode = 'query'
           async with kern.stream_execute(code, mode=mode) as stream:
@@ -177,11 +177,11 @@ features such as ``stream_execute()`` which streams the execution results via we
                           code = input()
                       await stream.send_text(code)
                   else:
-                      mode = 'continued'
+                      mode = 'continue'
                       code = ''
           await kern.destroy()
 
-  loop = asyncio.get_event_loop()
+  loop = asyncio.new_event_loop()
   try:
       loop.run_until_complete(main())
   finally:

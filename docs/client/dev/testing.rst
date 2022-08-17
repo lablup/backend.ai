@@ -5,8 +5,8 @@ Unit Tests
 ----------
 
 Unit tests perform function-by-function tests to ensure their individual
-functionality.  This test suite runs without depending on the server-side
-and thus it is executed in Travis CI for every push.
+functionality. This test suite runs without depending on the server-side
+and thus it is executed in GitHub Actions for every push.
 
 How to run
 ~~~~~~~~~~
