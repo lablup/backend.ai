@@ -2985,13 +2985,27 @@ class AgentRegistry:
     ) -> None:
         await self.clean_session(session_id)
 
+    async def _get_commit_path(
+        self,
+        kernel,
+    ) -> Path:
+        async with self.db.begin_readonly() as db_conn:
+            query = (
+                sa.select([users.c.email])
+                .select_from(users)
+                .where(users.c.uuid == kernel["user_uuid"])
+            )
+            result = await db_conn.execute(query)
+            user_email = result.scalar()
+        return Path(str(user_email), str(kernel["session_id"]))
+
     async def get_commit_status(
         self,
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
     ) -> Mapping[str, str]:
         kernel = await self.get_session(session_name_or_id, access_key)
-
+        path = await self._get_commit_path(kernel)
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
                 kernel["agent"],
@@ -3000,7 +3014,7 @@ class AgentRegistry:
                 order_key=kernel["id"],
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                return await rpc.call.get_commit_status(str(kernel["id"]))
+                return await rpc.call.get_commit_status(str(kernel["id"]), str(path))
 
     async def commit_session(
         self,
@@ -3013,17 +3027,7 @@ class AgentRegistry:
         """
 
         kernel = await self.get_session(session_name_or_id, access_key)
-
-        async with self.db.begin_readonly() as db_conn:
-            query = (
-                sa.select([users.c.email])
-                .select_from(users)
-                .where(users.c.uuid == kernel["user_uuid"])
-            )
-            result = await db_conn.execute(query)
-            user_email = result.scalar()
-        path = Path(str(user_email), str(kernel["session_id"]))
-
+        path = await self._get_commit_path(kernel)
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
                 kernel["agent"],
