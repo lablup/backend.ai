@@ -440,17 +440,16 @@ class StatContext:
                             self.kernel_metrics[kernel_id][metric_key].update(measure)
 
         async def _pipe_builder(r: Redis):
-            async with r.pipeline() as pipe:
-                for kernel_id in updated_kernel_ids:
-                    metrics = self.kernel_metrics[kernel_id]
-                    serializable_metrics = {
-                        key: obj.to_serializable_dict() for key, obj in metrics.items()
-                    }
-                    if self.agent.local_config["debug"]["log-stats"]:
-                        log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
-                    serialized_metrics = msgpack.packb(serializable_metrics)
-
-                    await pipe.set(str(kernel_id), serialized_metrics)
-                    return pipe
+            pipe = r.pipeline(transaction=False)
+            for kernel_id in updated_kernel_ids:
+                metrics = self.kernel_metrics[kernel_id]
+                serializable_metrics = {
+                    key: obj.to_serializable_dict() for key, obj in metrics.items()
+                }
+                if self.agent.local_config["debug"]["log-stats"]:
+                    log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
+                serialized_metrics = msgpack.packb(serializable_metrics)
+                pipe.set(str(kernel_id), serialized_metrics)
+            return pipe
 
         await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)
