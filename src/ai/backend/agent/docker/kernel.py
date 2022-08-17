@@ -151,7 +151,7 @@ class DockerKernel(AbstractKernel):
         filename = f"{now}.tar.gz"
         filepath = path / filename
         try:
-            Path(filepath).parent.mkdir(exist_ok=True, parents=True)
+            Path(path).mkdir(exist_ok=True, parents=True)
         except ValueError:  # parent_path does not start with work_dir!
             raise AssertionError("malformed committed path.")
         lock_path = self._get_lock_path(path)
@@ -168,6 +168,7 @@ class DockerKernel(AbstractKernel):
                             assert tar.fileobj is not None
                             tar.fileobj.write(chunk)
                         tar.add(str(filepath))
+                await docker.images.delete(image_id)
                 await docker.close()
             os.unlink(lock_path)
         except asyncio.exceptions.TimeoutError:
