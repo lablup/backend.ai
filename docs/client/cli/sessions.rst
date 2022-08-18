@@ -154,7 +154,7 @@ try ``backend.ai events <sessionID>`` to receive the lifecycle events
 such as its scheduling and preparation steps.
 
 
-Running sessions with accelerators  # TODO
+Running sessions with accelerators
 ----------------------------------
 
 Use one or more ``-r`` options to specify resource requirements when
@@ -162,13 +162,18 @@ using ``backend.ai run`` and ``backend.ai start`` commands.
 
 For instance, the following command spawns a Python TensorFlow session
 using a half of virtual GPU device, 4 CPU cores, and 8 GiB of the main
-memory to execute ``./mygpucode.py`` file inside it.
+memory to execute ``./main.py`` file inside it.
+
+.. note::
+
+  Running GPUs in `Fractional` allocation mode using ``cuda.shares`` option
+  is only supported in **Enterprise** edition.
 
 .. code-block:: shell
 
   backend.ai run --rm \
-             -r cpu=4 -r mem=8g -r cuda.shares=2 \
-             python-tensorflow:1.12-py36 ./mygpucode.py
+             -r cpu=4 -r mem=8g -r cuda.device=1 \
+             cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3 ./main.py
 
 
 Terminating or cancelling sessions
