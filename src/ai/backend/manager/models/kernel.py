@@ -963,6 +963,8 @@ class ComputeSession(graphene.ObjectType):
 
     async def resolve_commit_status(self, info: graphene.ResolveInfo) -> Optional[str]:
         graph_ctx: GraphQueryContext = info.context
+        if self.status != "RUNNING":
+            return None
         commit_status = await graph_ctx.registry.get_commit_status(self.id, self.access_key)
         return commit_status["status"]
 
