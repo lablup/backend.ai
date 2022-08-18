@@ -16,6 +16,10 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.03.13 (2022-08-18)
+* A follow-up hotfix for [#664](https://github.com/lablup/backend.ai/issues/664)
+
+
 ## 22.03.12 (2022-08-18)
 
 ### Fixes
