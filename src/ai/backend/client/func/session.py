@@ -575,6 +575,23 @@ class ComputeSession(BaseFunction):
             pass
 
     @api_function
+    async def commit(self):
+        """
+        Commit a running session to a tar file in the agent host.
+        """
+        params = {}
+        if self.owner_access_key:
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "POST",
+            f"/{prefix}/{self.name}/commit",
+            params=params,
+        )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
     async def interrupt(self):
         """
         Tries to interrupt the current ongoing code execution.

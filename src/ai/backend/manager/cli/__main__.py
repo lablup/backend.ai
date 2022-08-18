@@ -16,6 +16,7 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from setproctitle import setproctitle
 
+from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
@@ -104,7 +105,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
                 "Please set the container name explicitly.",
                 err=True,
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         container_name = candidate_container_names.decode().splitlines()[0].strip()
     elif container_name == "-":
         # Use the host-provided psql command
