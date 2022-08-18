@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import logging
 import lzma
 import os
@@ -8,8 +9,9 @@ import subprocess
 import tarfile
 import textwrap
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple
+from typing import Any, BinaryIO, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple, cast
 
+import janus
 import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
@@ -19,7 +21,7 @@ from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import CommitStatus, KernelId
+from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
@@ -140,6 +142,7 @@ class DockerKernel(AbstractKernel):
     async def commit(self, path: Path, lock_path: Path, filename: str):
         assert self.runner is not None
 
+        loop = asyncio.get_running_loop()
         container_id: str = str(self.data["container_id"])
         filepath = path / filename
         try:
@@ -147,6 +150,14 @@ class DockerKernel(AbstractKernel):
             Path(lock_path).parent.mkdir(exist_ok=True, parents=True)
         except ValueError:  # parent_path does not start with work_dir!
             raise ValueError("malformed committed path.")
+
+        def _write_chunks(fileobj: BinaryIO, q: janus._SyncQueueProxy[bytes | Sentinel]) -> None:
+            while True:
+                chunk = q.get()
+                if chunk is Sentinel.TOKEN:
+                    return
+                fileobj.write(chunk)
+
         try:
             async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
                 log.info("Container is being committed to {}", filepath)
@@ -156,13 +167,30 @@ class DockerKernel(AbstractKernel):
                     response: Mapping[str, Any] = await container.commit()
                     image_id = response["Id"]
                     try:
+                        q: janus.Queue[bytes | Sentinel] = janus.Queue()
                         async with docker._query(f"images/{image_id}/get") as tb_resp:
                             with tarfile.open(os.fsencode(filepath), "w|gz") as tar:
-                                tar_info = tarfile.TarInfo(filename)
-                                tar.addfile(tar_info)
                                 assert tar.fileobj is not None
-                                async for chunk in tb_resp.content.iter_chunked(DEFAULT_CHUNK_SIZE):
-                                    tar.fileobj.write(chunk)
+                                write_task = loop.run_in_executor(
+                                    None,
+                                    functools.partial(
+                                        _write_chunks,
+                                        cast(BinaryIO, tar.fileobj),
+                                        q.sync_q,
+                                    ),
+                                )
+                                try:
+                                    await asyncio.sleep(0)  # let write_task get started
+                                    tar_info = tarfile.TarInfo(filename)
+                                    tar.addfile(tar_info)
+                                    assert tar.fileobj is not None
+                                    async for chunk in tb_resp.content.iter_chunked(
+                                        DEFAULT_CHUNK_SIZE
+                                    ):
+                                        await q.async_q.put(chunk)
+                                finally:
+                                    q.async_q.put_nowait(Sentinel.TOKEN)
+                                    await write_task
                     finally:
                         await docker.images.delete(image_id)
                 finally:
