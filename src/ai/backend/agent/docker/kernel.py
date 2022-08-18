@@ -157,6 +157,7 @@ class DockerKernel(AbstractKernel):
                 if chunk is Sentinel.TOKEN:
                     return
                 fileobj.write(chunk)
+                q.task_done()
 
         try:
             async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
@@ -167,7 +168,9 @@ class DockerKernel(AbstractKernel):
                     response: Mapping[str, Any] = await container.commit()
                     image_id = response["Id"]
                     try:
-                        q: janus.Queue[bytes | Sentinel] = janus.Queue()
+                        q: janus.Queue[bytes | Sentinel] = janus.Queue(
+                            maxsize=DEFAULT_INFLIGHT_CHUNKS
+                        )
                         async with docker._query(f"images/{image_id}/get") as tb_resp:
                             with tarfile.open(os.fsencode(filepath), "w|gz") as tar:
                                 assert tar.fileobj is not None
@@ -183,13 +186,12 @@ class DockerKernel(AbstractKernel):
                                     await asyncio.sleep(0)  # let write_task get started
                                     tar_info = tarfile.TarInfo(filename)
                                     tar.addfile(tar_info)
-                                    assert tar.fileobj is not None
                                     async for chunk in tb_resp.content.iter_chunked(
                                         DEFAULT_CHUNK_SIZE
                                     ):
                                         await q.async_q.put(chunk)
                                 finally:
-                                    q.async_q.put_nowait(Sentinel.TOKEN)
+                                    await q.async_q.put(Sentinel.TOKEN)
                                     await write_task
                     finally:
                         await docker.images.delete(image_id)
