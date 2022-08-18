@@ -16,6 +16,30 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.03.11 (2022-08-18)
+
+### Features
+* Accept the explicit "s" (seconds) unit suffix as well in `common.validators.TimeDuration` ([#570](https://github.com/lablup/backend.ai/issues/570))
+* Support wsproxy v2 when the coordinator's user-accessible URL is different from the manager-accessible URL (usually when the user is separated from the Backend.AI service by NAT) ([#582](https://github.com/lablup/backend.ai/issues/582))
+* Add `common.logging.LocalLogger` to improve logging outputs in test cases, which does not use the relay handler to send log records to another (parent) process but just the standard Python logging subsystem ([#630](https://github.com/lablup/backend.ai/issues/630))
+* Use the full terminal width when formatting CLI help texts for better readability ([#662](https://github.com/lablup/backend.ai/issues/662))
+
+### Fixes
+* Ignore if a scanned `BUILD` or `build` target is a directory when scanning them to discover plugin entrypoints ([#550](https://github.com/lablup/backend.ai/issues/550))
+* web: Force the keypair-based auth mode regardless to env-vars ([#564](https://github.com/lablup/backend.ai/issues/564))
+* Fixed a Regex/shell escaping issue when updating var-base-path by changing parsing. ([#567](https://github.com/lablup/backend.ai/issues/567))
+* install-dev: Add compatibility checks for `-f` option of the `docker compose` (v2) commands in the user home directory and system-wide directory ([#602](https://github.com/lablup/backend.ai/issues/602))
+* Pin `hiredis` version to 1.1.0 (the version auto-inferred from `redis-py` is 2.0) to avoid a potential memory corruption error, such as "free(): invalid pointer" upon termination ([#636](https://github.com/lablup/backend.ai/issues/636))
+* Improve null-checks when querying allowed vfolder hosts to prevent internal server errors when there are no allowed vfolder hosts ([#638](https://github.com/lablup/backend.ai/issues/638))
+* Fix a spurious insufficient privilege error when running `backend.ai run` command as a normal user due to a mishandling of the default value of `--assign-agent` CLI option ([#639](https://github.com/lablup/backend.ai/issues/639))
+* Fix `FileLock` not acquiring lock forever when lock file is created without write permission to manager processes' owner ([#642](https://github.com/lablup/backend.ai/issues/642))
+* Change `client.cli` to use `ai.backend.cli.main:main` as its root CommandGroup. ([#650](https://github.com/lablup/backend.ai/issues/650))
+
+### Miscellaneous
+* Upgrade Pants to 2.12.0 to 2.13.0rc0 to take advantage of the latest bug fixes and improvements ([#589](https://github.com/lablup/backend.ai/issues/589))
+* Revamp and refactor BUILD files to make Pants to handle fine-grained target selection better via per-directory BUILD files and utilize automatic internal-dependency inferences whenever possible, with unification of the source target names to `:src` (previously, `:lib` and `:service`) ([#627](https://github.com/lablup/backend.ai/issues/627))
+
+
 ## 22.03.10 (2022-07-18)
 
 ### Features
