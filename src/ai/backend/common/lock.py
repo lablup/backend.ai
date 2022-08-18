@@ -58,6 +58,7 @@ class FileLock(AbstractDistributedLock):
         *,
         timeout: Optional[float] = None,
         lifetime: Optional[float] = None,
+        remove_when_unlock: bool = False,
         debug: bool = False,
     ) -> None:
         super().__init__(lifetime=lifetime)
@@ -65,6 +66,7 @@ class FileLock(AbstractDistributedLock):
         self._path = path
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
+        self._remove_when_unlock = remove_when_unlock
         self._watchdog_task: Optional[asyncio.Task[Any]] = None
 
     @property
@@ -113,6 +115,8 @@ class FileLock(AbstractDistributedLock):
             if self._debug:
                 log.debug("file lock explicitly released: {}", self._path)
         self._file.close()
+        if self._remove_when_unlock:
+            self._path.unlink()
         self._file = None
 
     async def __aenter__(self) -> FileLock:
