@@ -2,6 +2,7 @@ python_sources(
     name="src",
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
+        "src/ai/backend/manager/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
         "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
         ":resources",
     ],
