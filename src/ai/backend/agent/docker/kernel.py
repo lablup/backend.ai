@@ -1,15 +1,15 @@
 import asyncio
 import functools
+import gzip
 import logging
 import lzma
 import os
 import re
 import shutil
 import subprocess
-import tarfile
 import textwrap
 from pathlib import Path, PurePosixPath
-from typing import Any, BinaryIO, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple
 
 import janus
 import pkg_resources
@@ -151,7 +151,10 @@ class DockerKernel(AbstractKernel):
         except ValueError:  # parent_path does not start with work_dir!
             raise ValueError("malformed committed path.")
 
-        def _write_chunks(fileobj: BinaryIO, q: janus._SyncQueueProxy[bytes | Sentinel]) -> None:
+        def _write_chunks(
+            fileobj: gzip.GzipFile,
+            q: janus._SyncQueueProxy[bytes | Sentinel],
+        ) -> None:
             while True:
                 chunk = q.get()
                 if chunk is Sentinel.TOKEN:
@@ -172,20 +175,17 @@ class DockerKernel(AbstractKernel):
                             maxsize=DEFAULT_INFLIGHT_CHUNKS
                         )
                         async with docker._query(f"images/{image_id}/get") as tb_resp:
-                            with tarfile.open(os.fsencode(filepath), "w|gz") as tar:
-                                assert tar.fileobj is not None
+                            with gzip.open(filepath, "wb") as fileobj:
                                 write_task = loop.run_in_executor(
                                     None,
                                     functools.partial(
                                         _write_chunks,
-                                        cast(BinaryIO, tar.fileobj),
+                                        fileobj,
                                         q.sync_q,
                                     ),
                                 )
                                 try:
                                     await asyncio.sleep(0)  # let write_task get started
-                                    tar_info = tarfile.TarInfo(filename)
-                                    tar.addfile(tar_info)
                                     async for chunk in tb_resp.content.iter_chunked(
                                         DEFAULT_CHUNK_SIZE
                                     ):
