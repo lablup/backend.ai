@@ -972,7 +972,7 @@ def commit(session_id):
             print_info(f"Request to commit Session(name or id: {session_id})")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 def _ssh_cmd(docs: str = None):
