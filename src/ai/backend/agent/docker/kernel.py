@@ -136,8 +136,8 @@ class DockerKernel(AbstractKernel):
 
     async def check_duplicate_commit(self, path: Path):
         if path.exists():
-            return CommitStatus.DUPLICATED
-        return CommitStatus.AVAILABLE
+            return CommitStatus.ONGOING
+        return CommitStatus.READY
 
     async def commit(self, path: Path, lock_path: Path, filename: str):
         assert self.runner is not None

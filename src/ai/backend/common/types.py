@@ -258,8 +258,8 @@ class ClusterMode(str, enum.Enum):
 
 
 class CommitStatus(str, enum.Enum):
-    AVAILABLE = "available"
-    DUPLICATED = "duplicated"
+    READY = "ready"
+    ONGOING = "ongoing"
 
 
 class MovingStatValue(TypedDict):
