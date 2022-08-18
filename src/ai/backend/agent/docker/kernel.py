@@ -146,31 +146,29 @@ class DockerKernel(AbstractKernel):
             Path(path).mkdir(exist_ok=True, parents=True)
             Path(lock_path).parent.mkdir(exist_ok=True, parents=True)
         except ValueError:  # parent_path does not start with work_dir!
-            raise AssertionError("malformed committed path.")
+            raise ValueError("malformed committed path.")
         try:
-            async with FileLock(path=lock_path, timeout=0.1):
+            async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
                 log.info("Container is being committed to {}", filepath)
                 docker = Docker()
                 container = docker.containers.container(container_id)
-                response: Mapping[str, Any] = await container.commit()
-                image_id = response["Id"]
-                async with docker._query(f"images/{image_id}/get") as tb_resp:
-                    with tarfile.open(str(filepath), "w|gz") as tar:
-                        tar_info = tarfile.TarInfo(filename)
-                        tar.addfile(tar_info)
-                        assert tar.fileobj is not None
-                        async for chunk in tb_resp.content.iter_chunked(DEFAULT_CHUNK_SIZE):
-                            tar.fileobj.write(chunk)
-            os.unlink(lock_path)
-        except asyncio.exceptions.TimeoutError:
+                try:
+                    response: Mapping[str, Any] = await container.commit()
+                    image_id = response["Id"]
+                    try:
+                        async with docker._query(f"images/{image_id}/get") as tb_resp:
+                            with tarfile.open(os.fsencode(filepath), "w|gz") as tar:
+                                tar_info = tarfile.TarInfo(filename)
+                                tar.addfile(tar_info)
+                                assert tar.fileobj is not None
+                                async for chunk in tb_resp.content.iter_chunked(DEFAULT_CHUNK_SIZE):
+                                    tar.fileobj.write(chunk)
+                    finally:
+                        await docker.images.delete(image_id)
+                finally:
+                    await docker.close()
+        except asyncio.TimeoutError:
             log.warning("Session is already being committed.")
-        finally:
-            try:
-                tar.close()
-                await docker.images.delete(image_id)
-                await docker.close()
-            except UnboundLocalError:
-                pass
 
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()
