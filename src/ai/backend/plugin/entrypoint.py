@@ -134,7 +134,7 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
             for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
                 entrypoints[entrypoint.name] = entrypoint
         # For cases when plugins use standard setup.cfg
-        for setup_cfg_path in _glob(plugins_path, "BUILD", _default_glob_excluded_patterns):
+        for setup_cfg_path in _glob(plugins_path, "setup.cfg", _default_glob_excluded_patterns):
             for entrypoint in extract_entrypoints_from_setup_cfg(group_name, setup_cfg_path):
                 if entrypoint.name not in entrypoints:
                     entrypoints[entrypoint.name] = entrypoint
