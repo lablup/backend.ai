@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.0b2 (2022-08-18)
+
+### Features
+* Reduce the initial startup latency of service daemons and CLI (`./backend.ai`) by more than 50% in the development setups using Pants ([#663](https://github.com/lablup/backend.ai/issues/663))
+
+### Fixes
+* Add missing lazy-imported cli modules in the package ([#664](https://github.com/lablup/backend.ai/issues/664))
+
+
 ## 22.09.0b1 (2022-08-18)
 
 ### Features
