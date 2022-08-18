@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.03.12 (2022-08-18)
+
+### Fixes
+* Add missing lazy-imported cli modules in the package ([#664](https://github.com/lablup/backend.ai/issues/664))
+
+
 ## 22.03.11 (2022-08-18)
 
 ### Features
