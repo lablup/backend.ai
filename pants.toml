@@ -97,6 +97,11 @@ lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 timeout_default = 300
 
+[coverage-py]
+version = "coverage[toml]>=6.4,<7.0"
+report = ["xml", "console"]
+lockfile = "tools/coverage-py.lock"
+
 [mypy]
 version = "mypy>=0.961"
 interpreter_constraints = ["CPython>=3.10,<4"]
