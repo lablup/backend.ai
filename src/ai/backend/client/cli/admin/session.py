@@ -85,7 +85,7 @@ def _list_cmd(name: str = "list", docs: str = None):
         "--all",
         is_flag=True,
         default=False,
-        help='Alias of "backend.ai ps --status=ALL" listing all sessions regardless of status.',
+        help='Alias of "backend.ai ps --status=ALL" listing all sessions regardless of status. Ignores --status option.',
     )
     def list(
         ctx: CLIContext,
