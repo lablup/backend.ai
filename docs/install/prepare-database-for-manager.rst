@@ -105,8 +105,7 @@ Then pour it to the database:
 
 .. code-block:: console
 
-   $ ./backend.ai mgr fixture populate \
-   >   fixture populate example_keypair.json
+   $ ./backend.ai mgr fixture populate example_keypair.json
 
 example execution result
 
