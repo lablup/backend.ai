@@ -34,56 +34,9 @@ Guide variables
        Development setup: Use an arbitrary empty directory where Docker containers can also mount as volumes — e.g., `Docker for Mac requires explicit configuration for mountable parent folders. <https://docs.docker.com/docker-for-mac/#file-sharing>`_
 
 
-Load initial etcd data
-----------------------
-
-
 .. image:: https://asciinema.org/a/8vM2cEHEHQzCMaOummV4ruDAm.png
    :target: https://asciinema.org/a/8vM2cEHEHQzCMaOummV4ruDAm
    :alt: asciicast
-
-
-.. code-block:: console
-
-   $ cd backend.ai-manager
-
-Copy ``sample-configs/image-metadata.yml`` and ``sample-configs/image-aliases.yml`` and edit according to your setup.
-
-.. code-block:: console
-
-   $ cp sample-configs/image-metadata.yml image-metadata.yml
-   $ cp sample-configs/image-aliases.yml image-aliases.yml
-
-By default you can pull the images listed in the sample via ``docker pull lablup/kernel-xxxx:tag``\ (e.g. ``docker pull lablup/kernel-python-tensorflow:latest`` for the latest tensorflow) as they are hosted on the public Docker registry.
-
-Load image registry metadata
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-(Instead of manually specifying environment variables, you may use ``scripts/run-with-halfstack.sh`` script in a development setup.)
-
-.. code-block:: console
-
-   $ BACKEND_NAMESPACE={NS} BACKEND_ETCD_ADDR={ETCDADDR} \
-   > python -m ai.backend.manager.cli etcd update-images \
-   >        -f image-metadata.yml
-
-Load image aliases
-^^^^^^^^^^^^^^^^^^
-
-.. code-block:: console
-
-   $ BACKEND_NAMESPACE={NS} BACKEND_ETCD_ADDR={ETCDADDR} \
-   > python -m ai.backend.manager.cli etcd update-aliases \
-   >        -f image-aliases.yml
-
-Set the default storage mount for virtual folders
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: console
-
-   $ BACKEND_NAMESPACE={NS} BACKEND_ETCD_ADDR={ETCDADDR} \
-   > python -m ai.backend.manager.cli etcd put \
-   >        volumes/_mount {STRGMOUNT}
 
 Database Setup
 --------------
@@ -122,7 +75,7 @@ You may use the following shell command:
 
 .. code-block:: console
 
-   $ python -m ai.backend.manager.cli schema oneshot head
+   $ ./backend.ai mgr schema oneshot
 
 example execution result
 
@@ -142,23 +95,21 @@ NOTE: All sub-commands under "schema" uses alembic.ini to establish database con
 Load initial fixtures
 ^^^^^^^^^^^^^^^^^^^^^
 
-Edit ``ai/backend/manager/models/fixtures.py`` so that you have a randomized admin keypair.
+The file ``fixtures/manager/example-keypairs.json`` , is example of admin keypair json file.
+If you want to change a randomized admin keypair, copy the ``fixtures/manager/example-keypairs.json`` to create and modify the ``example_keypair.json`` .
+so that you can edit & apply admin keypair using ``example_keypair.json`` file.
 
-:raw-html-m2r:`<span style="color:red">**(TODO: automate here!)**</span>`
+Database information is located on ``manager.toml`` file.
 
 Then pour it to the database:
 
 .. code-block:: console
 
-   $ python -m ai.backend.manager.cli \
-   >   --db-addr={DBHOST}:{DBPORT} \
-   >   --db-user={DBUSER} \
-   >   --db-password={DBPASS} 
-   >   --db-name=backend \
-   >   fixture populate example_keypair
+   $ ./backend.ai mgr fixture populate example_keypair.json
 
 example execution result
 
 .. code-block:: console
 
-   201x-xx-xx xx:xx:xx INFO ai.backend.manager.cli.fixture [MainProcess] populating fixture 'example_keypair'
+   202x-xx-xx xx:xx:xx INFO ai.backend.manager.cli.fixture [MainProcess] Populating fixture 'example_keypair' ...
+   202x-xx-xx xx:xx:xx INFO ai.backend.manager.cli.fixture [MainProcess] Done
