@@ -7,6 +7,7 @@ on:
     # ref) https://crontab.guru/
     # The time is based on UTC
     - cron: '0 15 * * 1-5'
+  workflow_dispatch:
 
 jobs:
   test-coverage:
