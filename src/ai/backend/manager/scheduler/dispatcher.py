@@ -542,7 +542,7 @@ class SchedulerDispatcher(aobject):
             agent_id = None
             async with self.db.begin() as agent_db_conn:
                 if sess_ctx.agent_id is not None:
-                    # Check the resource availaility of the manually designated agent
+                    # Check the resource availability of the manually designated agent
                     agent_id = sess_ctx.agent_id
                     query = (
                         sa.select([agents.c.available_slots])
@@ -703,7 +703,7 @@ class SchedulerDispatcher(aobject):
                 try:
                     agent_id: AgentId | None
                     if kernel.agent_id is not None:
-                        # Check the resource availaility of the manually designated agent
+                        # Check the resource availability of the manually designated agent
                         agent_id = kernel.agent_id
                         query = (
                             sa.select([agents.c.available_slots])
