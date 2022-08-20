@@ -11,7 +11,7 @@ on:
 
 jobs:
   test-coverage:
-    if: ${{ github.event_name == 'schedule' || (!contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == true) }}
+    if: ${{ contains(fromJson('["schedule", "workflow_dispatch"]'), github.event_name) || (!contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == true) }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
