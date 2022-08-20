@@ -99,6 +99,7 @@ timeout_default = 300
 
 [coverage-py]
 version = "coverage[toml]>=6.4,<7.0"
+interpreter_constraints = ["CPython>=3.10,<4"]
 report = ["xml", "console"]
 lockfile = "tools/coverage-py.lock"
 
