@@ -13,6 +13,7 @@ import traceback
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import closing
 from datetime import datetime, timedelta
+from itertools import chain
 from pathlib import Path
 from typing import (
     Any,
@@ -37,6 +38,7 @@ from aiohttp import web
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from setproctitle import setproctitle
+from sqlalchemy.types import DateTime
 
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
@@ -466,17 +468,23 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
     async def _fetch_kernels_with_status(
         db: ExtendedAsyncSAEngine,
         status: Optional[KernelStatus] = None,
-        timeout: Optional[timedelta] = None,
+        period: Optional[timedelta] = None,
     ) -> Tuple[Tuple[str, str, str], ...]:
         async with db.begin_readonly() as conn:
             query = sa.select(kernels)
             if status:
                 query = query.where(kernels.c.status == status)
-                if timeout is not None:
+                if period is not None:
                     query = query.where(
-                        (datetime.now(tz=tzutc()) - timeout).isoformat()
-                        > kernels.c.status_history[status.name].astext  # FIXME
+                        (
+                            datetime.now(tz=tzutc())
+                            - kernels.c.status_history[status.name].astext.cast(
+                                DateTime(timezone=True)
+                            )
+                        )
+                        > period
                     )
+                # query = query.order_by(kernels.c.status_history[status.name].desc())
             result = await conn.execute(query)
             return tuple(
                 (kernel.session_id, kernel.status, kernel.status_history.get(kernel.status.name))
@@ -486,36 +494,19 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
     async def _manage_hanging_sessions():
         while True:
             log.warning("_manage_hanging_sessions(): ...")
-            """
-            kernels = await _fetch_kernels_with_status(root_ctx.db)
-            for sess_id, status, changed_at in kernels:
-                log.warning(
-                    f"- (all) kernel: {sess_id} {status}({changed_at}) (time: {datetime.now(tz=tzutc()) - datetime.fromisoformat(changed_at)})"
-                )
-
-            terminated_kernels = await _fetch_kernels_with_status(root_ctx.db, status=KernelStatus.TERMINATED)
-            for sess_id, status, changed_at in terminated_kernels:
-                log.warning(f"- (terminated) kernel: {sess_id}")
-            """
-            timeout_kernels = await _fetch_kernels_with_status(
-                root_ctx.db, status=KernelStatus.TERMINATED, timeout=timedelta(seconds=30)
+            preparing_kernels = await _fetch_kernels_with_status(
+                root_ctx.db, status=KernelStatus.PREPARING, period=timedelta(minutes=30)
             )
-            log.info(
-                f"Timeout kernel (TERMINATED): {timeout_kernels[-1][0] if timeout_kernels else None}"
+            terminating_kernels = await _fetch_kernels_with_status(
+                root_ctx.db, status=KernelStatus.TERMINATING, period=timedelta(minutes=30)
             )
-            """
-            for sess_id, status, changed_at in kernels:
-                elapsed_time = datetime.now(tz=tzutc()) - datetime.fromisoformat(changed_at)
-                if elapsed_time > timedelta(seconds=30):
-                    log.warning(f"- (old) kernel: {sess_id} {status} ({elapsed_time})")
-                    # TODO: Terminate
-            """
-            """
-            preparing_kernels = await _fetch_kernels_with_status(root_ctx.db, status=KernelStatus.PREPARING)
-            terminating_kernels = await _fetch_kernels_with_status(root_ctx.db, status=KernelStatus.TERMINATING)
-            for session_id, status, changed_at in chain(preparing_kernels, terminating_kernels):
-                log.warning(f"- kernel({session_id}): {status}({changed_at})")
-            """
+            for kernel in chain(preparing_kernels, terminating_kernels):
+                log.warning(f"Hanging session: {kernel[0]} {kernel[1]}({kernel[2]})")
+            terminated_kernels = await _fetch_kernels_with_status(
+                root_ctx.db, status=KernelStatus.TERMINATED, period=timedelta(seconds=30)
+            )
+            for sess_id, status, timestamp in terminated_kernels:
+                log.warning(f"Terminated session: {sess_id} {status}({timestamp})")
             await asyncio.sleep(3.0)
 
     task = asyncio.create_task(_manage_hanging_sessions())
