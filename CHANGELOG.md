@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.0b4 (2022-08-22)
+
+### Features
+* Elaborate messaging of `InstanceNotAvailable` errors and log it inside the `status_data` column as the `scheduler.msg` JSON field ([#643](https://github.com/lablup/backend.ai/issues/643))
+
+### Fixes
+* Skip non-running sessions for commit status checks by returning null in the `commit_status` GraphQL query field because the agent(s) won't have any information about the non-running kernels ([#667](https://github.com/lablup/backend.ai/issues/667))
+
+
 ## 22.09.0b3 (2022-08-18)
 * A follow-up hotfix for [#664](https://github.com/lablup/backend.ai/issues/664)
 
