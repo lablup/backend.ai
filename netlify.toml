@@ -1,4 +1,0 @@
-[build]
-base = "docs/"
-publish = "_build/html"
-command = "make html"
