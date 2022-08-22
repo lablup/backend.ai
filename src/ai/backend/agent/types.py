@@ -58,6 +58,8 @@ class LifecycleEvent(int, enum.Enum):
     DESTROY = 0
     CLEAN = 1
     START = 2
+    PAUSE = 3
+    UNPAUSE = 4
 
 
 @attr.s(auto_attribs=True, slots=True)
