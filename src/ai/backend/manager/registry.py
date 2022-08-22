@@ -1518,7 +1518,11 @@ class AgentRegistry:
                                 "BACKENDAI_CLUSTER_ROLE": binding.kernel.cluster_role,
                                 "BACKENDAI_CLUSTER_IDX": str(binding.kernel.cluster_idx),
                                 "BACKENDAI_CLUSTER_HOST": str(binding.kernel.cluster_hostname),
-                                "BACKENDAI_SERVICE_PORTS": str(image_infos[binding.kernel.image_ref].labels.get("ai.backend.service-ports")),
+                                "BACKENDAI_SERVICE_PORTS": str(
+                                    image_infos[binding.kernel.image_ref].labels.get(
+                                        "ai.backend.service-ports"
+                                    )
+                                ),
                             },
                             "resource_slots": binding.kernel.requested_slots.to_json(),
                             "resource_opts": binding.kernel.resource_opts,
