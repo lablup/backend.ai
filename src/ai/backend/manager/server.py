@@ -38,7 +38,6 @@ from aiohttp import web
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from setproctitle import setproctitle
-from sqlalchemy.types import DateTime
 
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
@@ -479,7 +478,7 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
                         (
                             datetime.now(tz=tzutc())
                             - kernels.c.status_history[status.name].astext.cast(
-                                DateTime(timezone=True)
+                                sa.types.DateTime(timezone=True)
                             )
                         )
                         > period
@@ -500,8 +499,17 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
             terminating_kernels = await _fetch_kernels_with_status(
                 root_ctx.db, status=KernelStatus.TERMINATING, period=timedelta(minutes=30)
             )
-            for kernel in chain(preparing_kernels, terminating_kernels):
-                log.warning(f"Hanging session: {kernel[0]} {kernel[1]}({kernel[2]})")
+            for session_id, *_ in chain(preparing_kernels, terminating_kernels):
+                # TODO: AgentRegistry.destroy_session() (refer ai.backend.manager.registry)
+                await root_ctx.registry.destroy_session(
+                    functools.partial(
+                        root_ctx.registry.get_session_by_session_id,
+                        session_id,
+                    ),
+                    forced=True,
+                    reason="automatic-force-termination",
+                )
+
             terminated_kernels = await _fetch_kernels_with_status(
                 root_ctx.db, status=KernelStatus.TERMINATED, period=timedelta(seconds=30)
             )

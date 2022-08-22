@@ -236,7 +236,7 @@ kernels = sa.Table(
     sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True, index=True),
     sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),
     # status_info contains a kebab-cased string that expresses a summary of the last status change.
-    # Examples: "user-requested", "self-terminated", "predicate-checks-failed", "no-available-instances"
+    # Examples: "user-requested", "self-terminated", "force-terminated", "killed-by-event", "task-finished", "predicate-checks-failed", "no-available-instances"
     sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null()),
     # status_data contains a JSON object that contains detailed data for the last status change.
     # During scheduling (as PENDING + ("no-available-instances" | "predicate-checks-failed")):

@@ -1838,7 +1838,7 @@ class AgentRegistry:
         async with self.db.begin_readonly() as conn:
             session = await session_getter(db_connection=conn)
         if forced:
-            reason = "force-terminated"
+            reason = "force-terminated"  # FIXME
         hook_result = await self.hook_plugin_ctx.dispatch(
             "PRE_DESTROY_SESSION",
             (session["session_id"], session["session_name"], session["access_key"]),
