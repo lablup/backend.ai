@@ -1275,6 +1275,37 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 except FileNotFoundError:
                     pass
 
+    async def pause_kernel(
+        self,
+        kernel_id: KernelId,
+        container_id: Optional[ContainerId],
+    ) -> None:
+        if container_id is None:
+            return
+        try:
+            async with closing_async(Docker()) as docker:
+                container = docker.containers.container(container_id)
+                await container.pause()
+
+        except DockerError as e:
+            log.exception(e)
+            await self.error_monitor.capture_exception()
+
+    async def unpause_kernel(
+        self,
+        kernel_id: KernelId,
+        container_id: Optional[ContainerId],
+    ) -> None:
+        if container_id is None:
+            return
+        try:
+            async with closing_async(Docker()) as docker:
+                container = docker.containers.container(container_id)
+                await container.unpause()
+        except DockerError as e:
+            log.exception(e)
+            await self.error_monitor.capture_exception()
+
     async def create_overlay_network(self, network_name: str) -> None:
         if not self.heartbeat_extra_info["swarm_enabled"]:
             raise RuntimeError("This agent has not joined to a swarm cluster.")
