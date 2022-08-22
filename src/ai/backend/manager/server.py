@@ -12,7 +12,7 @@ import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import closing
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import (
     Any,
@@ -22,7 +22,9 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
+    Optional,
     Sequence,
+    Tuple,
     cast,
 )
 
@@ -30,7 +32,9 @@ import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
+import sqlalchemy as sa
 from aiohttp import web
+from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from setproctitle import setproctitle
 
@@ -60,6 +64,9 @@ from .config import load as load_config
 from .config import volume_config_iv
 from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
+from .models import kernels
+from .models.kernel import KernelStatus
+from .models.utils import ExtendedAsyncSAEngine
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset(
@@ -454,6 +461,76 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         await ectx.cleanup()
 
 
+@actxmgr
+async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    async def _fetch_kernels_with_status(
+        db: ExtendedAsyncSAEngine,
+        status: Optional[KernelStatus] = None,
+        timeout: Optional[timedelta] = None,
+    ) -> Tuple[Tuple[str, str, str], ...]:
+        async with db.begin_readonly() as conn:
+            query = sa.select(kernels)
+            if status:
+                query = query.where(kernels.c.status == status)
+                if timeout is not None:
+                    query = query.where(
+                        (datetime.now(tz=tzutc()) - timeout).isoformat()
+                        > kernels.c.status_history[status.name].astext  # FIXME
+                    )
+            result = await conn.execute(query)
+            return tuple(
+                (kernel.session_id, kernel.status, kernel.status_history.get(kernel.status.name))
+                for kernel in result.fetchall()
+            )
+
+    async def _manage_hanging_sessions():
+        while True:
+            log.warning("_manage_hanging_sessions(): ...")
+            """
+            kernels = await _fetch_kernels_with_status(root_ctx.db)
+            for sess_id, status, changed_at in kernels:
+                log.warning(
+                    f"- (all) kernel: {sess_id} {status}({changed_at}) (time: {datetime.now(tz=tzutc()) - datetime.fromisoformat(changed_at)})"
+                )
+
+            terminated_kernels = await _fetch_kernels_with_status(root_ctx.db, status=KernelStatus.TERMINATED)
+            for sess_id, status, changed_at in terminated_kernels:
+                log.warning(f"- (terminated) kernel: {sess_id}")
+            """
+            timeout_kernels = await _fetch_kernels_with_status(
+                root_ctx.db, status=KernelStatus.TERMINATED, timeout=timedelta(seconds=30)
+            )
+            log.info(
+                f"Timeout kernel (TERMINATED): {timeout_kernels[-1][0] if timeout_kernels else None}"
+            )
+            """
+            for sess_id, status, changed_at in kernels:
+                elapsed_time = datetime.now(tz=tzutc()) - datetime.fromisoformat(changed_at)
+                if elapsed_time > timedelta(seconds=30):
+                    log.warning(f"- (old) kernel: {sess_id} {status} ({elapsed_time})")
+                    # TODO: Terminate
+            """
+            """
+            preparing_kernels = await _fetch_kernels_with_status(root_ctx.db, status=KernelStatus.PREPARING)
+            terminating_kernels = await _fetch_kernels_with_status(root_ctx.db, status=KernelStatus.TERMINATING)
+            for session_id, status, changed_at in chain(preparing_kernels, terminating_kernels):
+                log.warning(f"- kernel({session_id}): {status}({changed_at})")
+            """
+            await asyncio.sleep(3.0)
+
+    task = asyncio.create_task(_manage_hanging_sessions())
+
+    yield
+
+    try:
+        if not task.cancelled():
+            task.cancel()
+        if not task.done():
+            await task
+    except asyncio.CancelledError:
+        pass
+
+
 class background_task_ctx:
     def __init__(self, root_ctx: RootContext) -> None:
         self.root_ctx = root_ctx
@@ -603,6 +680,7 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
+            hanging_session_managing_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
