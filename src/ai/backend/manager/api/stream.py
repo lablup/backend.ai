@@ -50,7 +50,7 @@ from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
-from ..models import kernels
+from ..models import SessionRow, kernels
 from .auth import auth_required
 from .exceptions import (
     AppNotFound,
@@ -302,14 +302,14 @@ async def stream_execute(defer, request: web.Request) -> web.StreamResponse:
     api_version = request["api_version"]
     log.info("STREAM_EXECUTE(ak:{0}, s:{1})", access_key, session_name)
     try:
-        compute_session = await asyncio.shield(
+        compute_session: SessionRow = await asyncio.shield(
             database_ptask_group.create_task(
                 registry.get_session(session_name, access_key),  # noqa
             ),
         )
     except SessionNotFound:
         raise
-    stream_key = compute_session["id"]
+    stream_key = compute_session.id
 
     await asyncio.shield(
         database_ptask_group.create_task(

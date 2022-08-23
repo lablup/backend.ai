@@ -5,7 +5,6 @@ import itertools
 import logging
 from contextvars import ContextVar
 from datetime import datetime, timedelta
-from decimal import Decimal
 from functools import partial
 from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Optional, Sequence, Tuple, Union
 
@@ -559,7 +558,9 @@ class SchedulerDispatcher(aobject):
                 agent_id = agent.id
             else:
                 # Let the scheduler check the resource availability and decide the target agent
-                cand_agent = scheduler.assign_agent_for_session(compatible_candidate_agents, sess_ctx)
+                cand_agent = scheduler.assign_agent_for_session(
+                    compatible_candidate_agents, sess_ctx
+                )
                 if cand_agent is None:
                     raise InstanceNotAvailable(
                         extra_msg=(
@@ -761,7 +762,9 @@ class SchedulerDispatcher(aobject):
                                 ),
                             )
                         # Let the scheduler check the resource availability and decide the target agent
-                        agent = scheduler.assign_agent_for_kernel(compatible_candidate_agents, kernel)
+                        agent = scheduler.assign_agent_for_kernel(
+                            compatible_candidate_agents, kernel
+                        )
                         if agent is None:
                             raise InstanceNotAvailable(
                                 extra_msg=(

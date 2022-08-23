@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Sequence, Union
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, Union
 from uuid import UUID
 
 import aiotools
@@ -691,7 +691,6 @@ class ComputeSession(graphene.ObjectType):
             "resource_opts": row.resource_opts,
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
-            "vfolder_mounts": row.vfolder_mounts,
             # statistics
             "num_queries": row.num_queries,
         }
