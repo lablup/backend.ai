@@ -133,7 +133,7 @@ class DellEMCClient:
 
     async def get_node_metadata(self) -> List[Dict[str, Mapping[str, Any]]]:
         lnns = await self.get_list_lnn()
-        node_metadata = {}
+        node_metadata = []
         for lnn in lnns:
             node_metadata[lnn] = {
                 "hardware": await self.get_node_hardware_info_by_lnn(lnn),
