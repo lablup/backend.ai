@@ -72,12 +72,12 @@ class DellEMCVolume(BaseVolume):
         return quota_id
 
     async def get_quota(self, vfid: UUID) -> BinarySize:
-        quota = await self.dellEMC_client.list_all_quota()
+        quota = await self.quota_manager.list_all_quota()
         return quota[0]["usage"]
 
-    async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
-        msg = await self.dellEMC_client.create_quota()
-        return msg
+    # async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
+    #     msg = await self.quota_manager.create_quota()
+    #     return msg
 
     async def get_drive_stats(self):
         resp = await self.dellEMC_client.get_drive_stats()

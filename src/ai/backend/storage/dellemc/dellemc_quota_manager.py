@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any, Mapping
 
 import aiohttp
@@ -87,9 +86,7 @@ class QuotaManager:
             "thresholds_on": thresholds_on,
             "enforced": enforced,
         }
-        dataobj = json.dumps(dataobj)
         headers = {"content-type": "application/json", "accept": "application/hal+json"}
-        print(dataobj)
         async with self._session.post(
             f"{self.endpoint}/platform/{self.api_version}/quota/quotas",
             auth=aiohttp.BasicAuth(self.user, self.password),
