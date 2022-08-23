@@ -4,7 +4,17 @@ import asyncio
 import logging
 import re
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence, TypedDict, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    Optional,
+    Sequence,
+    TypedDict,
+    Union,
+    overload,
+)
 
 import aiohttp
 import graphene
@@ -143,10 +153,28 @@ async def resolve_group_name_or_id(
     return await db_conn.scalar(query)
 
 
+@overload
 async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
-    values: Iterable[str | uuid.UUID],
+    values: Iterable[uuid.UUID],
+) -> Iterable[uuid.UUID]:
+    ...
+
+
+@overload
+async def resolve_groups(
+    db_conn: SAConnection,
+    domain_name: str,
+    values: Iterable[str],
+) -> Iterable[uuid.UUID]:
+    ...
+
+
+async def resolve_groups(
+    db_conn: SAConnection,
+    domain_name: str,
+    values: Iterable[uuid.UUID] | Iterable[str],
 ) -> Iterable[uuid.UUID]:
     names, ids = [], []
     for v in values:

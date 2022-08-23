@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, overload
 
 import attr
 import graphene
@@ -166,10 +166,50 @@ sgroups_for_keypairs = sa.Table(
 )
 
 
+@overload
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: uuid.UUID | str | Iterable[Union[uuid.UUID, str]],
+    group: uuid.UUID,
+    access_key: str,
+) -> Sequence[Row]:
+    ...
+
+
+@overload
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: Iterable[uuid.UUID],
+    access_key: str,
+) -> Sequence[Row]:
+    ...
+
+
+@overload
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: str,
+    access_key: str,
+) -> Sequence[Row]:
+    ...
+
+
+@overload
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: Iterable[str],
+    access_key: str,
+) -> Sequence[Row]:
+    ...
+
+
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
     access_key: str,
 ) -> Sequence[Row]:
     query = sa.select([sgroups_for_domains]).where(sgroups_for_domains.c.domain == domain_name)
