@@ -1,10 +1,11 @@
 import asyncio
 import enum
+from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 
 import attr
 
-from ai.backend.common.types import ContainerId, KernelId
+from ai.backend.common.types import ContainerId, KernelId, MountTypes
 
 
 class AgentBackend(enum.Enum):
@@ -18,6 +19,13 @@ class VolumeInfo:
     name: str  # volume name
     container_path: str  # in-container path as str
     mode: str  # 'rw', 'ro', 'rwm'
+
+
+@attr.s(auto_attribs=True, slots=True)
+class MountInfo:
+    mode: MountTypes
+    src_path: Path
+    dst_path: Path
 
 
 @attr.s(auto_attribs=True, slots=True)

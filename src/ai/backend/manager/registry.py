@@ -129,6 +129,7 @@ from .models import (
     query_allowed_sgroups,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
+    users,
 )
 from .models.kernel import get_all_kernels, match_session_ids
 from .models.session import aggregate_kernel_status, match_sessions, match_sessions_by_id
@@ -156,6 +157,7 @@ __all__ = ["AgentRegistry", "InstanceNotFound"]
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.registry"))
 
+SESSION_NAME_LEN_LIMIT = 10
 _read_only_txn_opts = {
     "postgresql_readonly": True,
 }
@@ -368,6 +370,7 @@ class AgentRegistry:
             "list_files": KernelExecutionFailed,
             "get_logs_from_agent": KernelExecutionFailed,
             "refresh_session": KernelExecutionFailed,
+            "commit_session": KernelExecutionFailed,
         }
         exc_class = op_exc[op]
         # NOTE: Error logging is done outside of this actxmanager.
@@ -1893,7 +1896,7 @@ class AgentRegistry:
         session_getter: SessionGetter,
         *,
         forced: bool = False,
-        reason: str = "user-requested",
+        reason: Optional[str] = None,
     ) -> Mapping[str, Any]:
         """
         Destroy session kernels. Do not destroy
@@ -1906,8 +1909,8 @@ class AgentRegistry:
         async with self.db.begin_readonly_session() as db_sess:
             session: SessionRow = await session_getter(db_session=db_sess)
         session_id = session.id
-        if forced:
-            reason = "force-terminated"
+        if not reason:
+            reason = "force-terminated" if forced else "user-requested"
         hook_result = await self.hook_plugin_ctx.dispatch(
             "PRE_DESTROY_SESSION",
             (session_id, session.name, session.access_key),
@@ -3036,6 +3039,66 @@ class AgentRegistry:
         reason: str,
     ) -> None:
         await self.clean_session(session_id)
+
+    async def _get_user_email(
+        self,
+        kernel,
+    ) -> str:
+        async with self.db.begin_readonly() as db_conn:
+            query = (
+                sa.select([users.c.email])
+                .select_from(users)
+                .where(users.c.uuid == kernel["user_uuid"])
+            )
+            result = await db_conn.execute(query)
+            user_email = str(result.scalar())
+            user_email = user_email.replace("@", "_")
+        return user_email
+
+    async def get_commit_status(
+        self,
+        session_name_or_id: Union[str, SessionId],
+        access_key: AccessKey,
+    ) -> Mapping[str, str]:
+        kernel = await self.get_session(session_name_or_id, access_key)
+        email = await self._get_user_email(kernel)
+        async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
+            async with RPCContext(
+                kernel["agent"],
+                kernel["agent_addr"],
+                invoke_timeout=None,
+                order_key=kernel["id"],
+                keepalive_timeout=self.rpc_keepalive_timeout,
+            ) as rpc:
+                return await rpc.call.get_commit_status(str(kernel["id"]), email)
+
+    async def commit_session(
+        self,
+        session_name_or_id: Union[str, SessionId],
+        access_key: AccessKey,
+        filename: str | None,
+    ) -> Mapping[str, Any]:
+        """
+        Commit a main kernel's container of the given session.
+        """
+
+        kernel = await self.get_session(session_name_or_id, access_key)
+        email = await self._get_user_email(kernel)
+        now = datetime.now(tzutc()).strftime("%Y-%m-%dT%H:%M:%S")
+        shortend_sname = kernel["session_name"][:SESSION_NAME_LEN_LIMIT]
+        registry, _, filtered = kernel["image"].partition("/")
+        img_path, _, image_name = filtered.partition("/")
+        filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
+        async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
+            async with RPCContext(
+                kernel["agent"],
+                kernel["agent_addr"],
+                invoke_timeout=None,
+                order_key=kernel["id"],
+                keepalive_timeout=self.rpc_keepalive_timeout,
+            ) as rpc:
+                resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), email, filename)
+        return resp
 
 
 async def check_scaling_group(

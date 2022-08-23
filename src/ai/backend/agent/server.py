@@ -15,6 +15,7 @@ from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncGenerator,
     Callable,
@@ -23,6 +24,7 @@ from typing import (
     Dict,
     Literal,
     Mapping,
+    Optional,
     Sequence,
     Set,
     Tuple,
@@ -43,10 +45,14 @@ from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
 
 from ai.backend.common import config, identity, msgpack, utils
+from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.events import EventProducer
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
+    CommitStatus,
+    EtcdRedisConfig,
     HardwareMetadata,
     HostPortPair,
     KernelCreationConfig,
@@ -57,7 +63,6 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import current_loop
 
 from . import __version__ as VERSION
-from .agent import AbstractAgent
 from .config import (
     agent_etcd_config_iv,
     agent_local_config_iv,
@@ -68,6 +73,9 @@ from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, LifecycleEvent, VolumeInfo
 from .utils import get_subnet_ip
+
+if TYPE_CHECKING:
+    from .agent import AbstractAgent
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.server"))
 
@@ -198,6 +206,7 @@ class AgentRPCServer(aobject):
 
         await self.read_agent_config()
         await self.read_agent_config_container()
+        await self.init_background_task_manager()
 
         self.stats_monitor = AgentStatsPluginContext(self.etcd, self.local_config)
         self.error_monitor = AgentErrorPluginContext(self.etcd, self.local_config)
@@ -282,6 +291,13 @@ class AgentRPCServer(aobject):
         for k, v in container_etcd_config.items():
             self.local_config["container"][k] = v
             log.info("etcd: container-config: {}={}".format(k, v))
+
+    async def init_background_task_manager(self):
+        event_producer = await EventProducer.new(
+            cast(EtcdRedisConfig, self.local_config["redis"]),
+            db=4,  # Identical to manager's REDIS_STREAM_DB
+        )
+        self.local_config["background_task_manager"] = BackgroundTaskManager(event_producer)
 
     async def __aenter__(self) -> None:
         await self.rpc_server.__aenter__()
@@ -390,7 +406,7 @@ class AgentRPCServer(aobject):
     async def destroy_kernel(
         self,
         kernel_id: str,
-        reason: str = None,
+        reason: Optional[str] = None,
         suppress_events: bool = False,
     ):
         loop = asyncio.get_running_loop()
@@ -499,6 +515,55 @@ class AgentRPCServer(aobject):
         # type: (...) -> Dict[str, Any]
         log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
         return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts)
+
+    def _get_commit_path(self, kernel_id: str, additional_path: str) -> Tuple[Path, Path]:
+        image_commit_path: Path = self.local_config["agent"]["image-commit-path"]
+        commit_path = image_commit_path / additional_path
+        lock_path = commit_path / "lock" / kernel_id
+        return commit_path, lock_path
+
+    @rpc_function
+    @collect_error
+    async def get_commit_status(
+        self,
+        kernel_id,  # type: str
+        email,  # type: str
+    ):
+        # Only this function logs debug since web sends request at short intervals
+        log.debug("rpc::get_commit_status(k:{})", kernel_id)
+        _, lock_path = self._get_commit_path(kernel_id, email)
+        status: CommitStatus = await self.agent.get_commit_status(
+            KernelId(UUID(kernel_id)),
+            lock_path,
+        )
+        return {
+            "kernel": kernel_id,
+            "status": status.value,
+        }
+
+    @rpc_function
+    @collect_error
+    async def commit(
+        self,
+        kernel_id,  # type: str
+        email,  # type: str
+        filename,  # type: str
+    ):
+        commit_path, lock_path = self._get_commit_path(kernel_id, email)
+        log.info("rpc::commit(k:{})", kernel_id)
+        bgtask_mgr = self.local_config["background_task_manager"]
+        task_id = await bgtask_mgr.start(
+            self.agent.commit,
+            kernel_id=KernelId(UUID(kernel_id)),
+            path=commit_path,
+            lock_path=lock_path,
+            filename=filename,
+        )
+        return {
+            "bgtask_id": str(task_id),
+            "kernel": kernel_id,
+            "path": str(commit_path / filename),
+        }
 
     @rpc_function
     @collect_error
@@ -803,6 +868,8 @@ def main(
             cfg["debug"]["coredump"]["core_path"] = Path(core_pattern).parent
 
         cfg["agent"]["pid-file"].write_text(str(os.getpid()))
+        image_commit_path = cfg["agent"]["image-commit-path"]
+        image_commit_path.mkdir(parents=True, exist_ok=True)
         ipc_base_path = cfg["agent"]["ipc-base-path"]
         log_sockpath = ipc_base_path / f"agent-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)

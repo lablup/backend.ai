@@ -37,6 +37,7 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
     ContainerId,
+    DeviceId,
     DeviceName,
     ImageRegistry,
     KernelCreationConfig,
@@ -53,7 +54,7 @@ from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationCont
 from ..exception import K8sError, UnsupportedResource
 from ..kernel import AbstractKernel, KernelFeatures
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
-from ..types import Container, ContainerStatus, Port
+from ..types import Container, ContainerStatus, MountInfo, Port
 from .kernel import KubernetesKernel
 from .kube_object import (
     ConfigMap,
@@ -391,6 +392,13 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         #     await computer.generate_docker_args(self.docker, device_alloc))
         # TODO: add support for accelerator allocation
         pass
+
+    async def generate_accelerator_mounts(
+        self,
+        computer: AbstractComputePlugin,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+    ) -> List[MountInfo]:
+        return []
 
     async def generate_deployment_object(
         self,

@@ -44,7 +44,7 @@ from ai.backend.agent.stats import (
     NodeMeasurement,
     StatContext,
 )
-from ai.backend.agent.types import Container
+from ai.backend.agent.types import Container, MountInfo
 from ai.backend.common.types import (
     BinarySize,
     DeviceId,
@@ -457,3 +457,13 @@ class CUDAPlugin(AbstractComputePlugin):
             f"{local_idx}:{global_id}" for local_idx, global_id in enumerate(active_device_ids)
         )
         return data
+
+    async def get_docker_networks(
+        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[str]:
+        return []
+
+    async def generate_mounts(
+        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[MountInfo]:
+        return []

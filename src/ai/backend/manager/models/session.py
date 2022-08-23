@@ -628,12 +628,13 @@ class ComputeSession(graphene.ObjectType):
     starts_at = GQLDateTime()
     startup_command = graphene.String()
     result = graphene.String()
+    commit_status = graphene.String()
 
     # resources
     resource_opts = graphene.JSONString()
     scaling_group = graphene.String()
     service_ports = graphene.JSONString()
-    vfolder_mounts = graphene.JSONString()
+    mounts = graphene.List(lambda: graphene.String)
     occupied_slots = graphene.JSONString()
 
     # statistics
@@ -734,6 +735,13 @@ class ComputeSession(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeSession.by_dependency")
         return await loader.load(self.id)
+
+    async def resolve_commit_status(self, info: graphene.ResolveInfo) -> Optional[str]:
+        graph_ctx: GraphQueryContext = info.context
+        if self.status != "RUNNING":
+            return None
+        commit_status = await graph_ctx.registry.get_commit_status(self.id, self.access_key)
+        return commit_status["status"]
 
     _queryfilter_fieldspec = {
         "type": ("kernels_session_type", lambda s: SessionTypes[s]),
