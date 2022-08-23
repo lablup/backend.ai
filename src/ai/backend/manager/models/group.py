@@ -181,7 +181,7 @@ async def resolve_groups(
         case [uuid.UUID(), *_]:
             query = _build_group_query((groups.c.id.in_(listed_val)), domain_name)
         case [str(), *_]:
-            query = _build_group_query((groups.c.id.in_(listed_val)), domain_name)
+            query = _build_group_query((groups.c.name.in_(listed_val)), domain_name)
         case []:
             return []
         case _:
