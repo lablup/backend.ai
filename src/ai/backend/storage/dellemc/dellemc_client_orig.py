@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, List, Mapping
+from typing import Any, Dict, List, Mapping
 
 import aiohttp
 
@@ -131,7 +131,7 @@ class DellEMCClient:
             "batteries": node["nvram"]["batteries"],
         }
 
-    async def get_node_metadata(self) -> Mapping[str, Any]:
+    async def get_node_metadata(self) -> List[Dict[str, Mapping[str, Any]]]:
         lnns = await self.get_list_lnn()
         node_metadata = {}
         for lnn in lnns:
