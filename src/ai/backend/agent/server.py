@@ -24,6 +24,7 @@ from typing import (
     Dict,
     Literal,
     Mapping,
+    Optional,
     Sequence,
     Set,
     Tuple,
@@ -405,7 +406,7 @@ class AgentRPCServer(aobject):
     async def destroy_kernel(
         self,
         kernel_id: str,
-        reason: str = None,
+        reason: Optional[str] = None,
         suppress_events: bool = False,
     ):
         loop = asyncio.get_running_loop()

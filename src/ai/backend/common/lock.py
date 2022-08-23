@@ -115,7 +115,7 @@ class FileLock(AbstractDistributedLock):
             if self._debug:
                 log.debug("file lock explicitly released: {}", self._path)
         self._file.close()
-        if self._remove_when_unlock:
+        if self._locked and self._remove_when_unlock:
             self._path.unlink()
         self._file = None
 
