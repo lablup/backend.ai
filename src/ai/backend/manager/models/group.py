@@ -176,25 +176,19 @@ async def resolve_groups(
     domain_name: str,
     values: Iterable[uuid.UUID] | Iterable[str],
 ) -> Iterable[uuid.UUID]:
-    names, ids = [], []
-    for v in values:
-        match v:
-            case uuid.UUID():
-                ids.append(v)
-            case str():
-                names.append(v)
-            case _:
-                raise TypeError("unexpected type for group_name_or_id")
+    listed_val = [*values]
+    match listed_val:
+        case [uuid.UUID(), *_]:
+            query = _build_group_query((groups.c.id.in_(listed_val)), domain_name)
+        case [str(), *_]:
+            query = _build_group_query((groups.c.id.in_(listed_val)), domain_name)
+        case []:
+            return []
+        case _:
+            raise TypeError("unexpected type for group_name_or_id")
 
-    return_val = []
-    if names:
-        name_query = _build_group_query((groups.c.id.in_(names)), domain_name)
-        rows = (await db_conn.execute(name_query)).fetchall()
-        return_val = [row["id"] for row in rows]
-    if ids:
-        id_query = _build_group_query((groups.c.id.in_(ids)), domain_name)
-        rows = (await db_conn.execute(id_query)).fetchall()
-        return_val = [*return_val, *[row["id"] for row in rows]]
+    rows = (await db_conn.execute(query)).fetchall()
+    return_val = [row["id"] for row in rows]
 
     return return_val
 
