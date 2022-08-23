@@ -44,6 +44,7 @@ from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.utils import env_info
 
 from . import __version__
+from .api import ManagerStatus
 from .api.context import RootContext
 from .api.exceptions import (
     BackendError,
@@ -53,20 +54,12 @@ from .api.exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
-from .api.manager import ManagerStatus
 from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHandler
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
 from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
-from .idle import init_idle_checkers
-from .models.storage import StorageSessionManager
-from .models.utils import connect_database
-from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
-from .plugin.webapp import WebappPluginContext
-from .registry import AgentRegistry
-from .scheduler.dispatcher import SchedulerDispatcher
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset(
@@ -259,6 +252,8 @@ async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
+    from .plugin.webapp import WebappPluginContext
+
     root_ctx: RootContext = root_app["_root.context"]
     plugin_ctx = WebappPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     await plugin_ctx.init()
@@ -327,6 +322,8 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .models.utils import connect_database
+
     async with connect_database(root_ctx.local_config) as db:
         root_ctx.db = db
         yield
@@ -358,6 +355,8 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .idle import init_idle_checkers
+
     root_ctx.idle_checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.shared_config,
@@ -372,6 +371,8 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .models.storage import StorageSessionManager
+
     raw_vol_config = await root_ctx.shared_config.etcd.get_prefix("volumes")
     config = volume_config_iv.check(raw_vol_config)
     root_ctx.storage_manager = StorageSessionManager(config)
@@ -397,6 +398,8 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .registry import AgentRegistry
+
     root_ctx.registry = AgentRegistry(
         root_ctx.shared_config,
         root_ctx.db,
@@ -415,6 +418,8 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .scheduler.dispatcher import SchedulerDispatcher
+
     sched_dispatcher = await SchedulerDispatcher.new(
         root_ctx.local_config,
         root_ctx.shared_config,
@@ -429,6 +434,8 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
+
     ectx = ManagerErrorPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     sctx = ManagerStatsPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     init_success = False

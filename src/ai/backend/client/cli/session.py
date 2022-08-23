@@ -18,6 +18,7 @@ from dateutil.tz import tzutc
 from humanize import naturalsize
 from tabulate import tabulate
 
+from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 
 from ..compat import asyncio_run
@@ -28,7 +29,6 @@ from ..output.types import FieldSpec
 from ..session import AsyncSession, Session
 from ..types import Undefined, undefined
 from . import events
-from .main import main
 from .params import CommaSeparatedListType
 from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
@@ -950,6 +950,26 @@ def rename(session_id, new_id):
             kernel = session.ComputeSession(session_id)
             kernel.rename(new_id)
             print_done(f"Session renamed to {new_id}.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@session.command()
+@click.argument("session_id", metavar="SESSID")
+def commit(session_id):
+    """
+    Commit a running session to tar file.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    """
+
+    with Session() as session:
+        try:
+            kernel = session.ComputeSession(session_id)
+            kernel.commit()
+            print_info(f"Request to commit Session(name or id: {session_id})")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
