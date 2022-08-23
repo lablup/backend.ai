@@ -30,7 +30,7 @@ class DellEMCClient:
     async def aclose(self) -> None:
         await self._session.close()
 
-    '''
+    """
     async def get_metadata(self) -> Mapping[str, Any]:
         async with self._session.get(
             f"{self.endpoint}/platform/12/cluster/config",
@@ -58,15 +58,13 @@ class DellEMCClient:
             "upgrade_type": str(data["upgrade_type"]),
         }
         return volume_cluster
-    '''
+    """
 
     async def get_metadata(self) -> Mapping[str, Any]:
         # TODO: request-timeout-error
         node_metadata = await self.get_node_metadata()
 
-        volume_cluster = {
-            "nodes": json.dumps(node_metadata)
-        }
+        volume_cluster = {"nodes": json.dumps(node_metadata)}
         return volume_cluster
 
     async def get_usage(self) -> Mapping[str, Any]:

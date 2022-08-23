@@ -132,7 +132,8 @@ class DellEMCVolume(BaseVolume):
         # "default-group"
         quota_id = self.quota_manager.create_quota(path, type)
         return quota_id
-    '''
+
+    """
     async def get_usage(
         self,
         vfid: UUID,
@@ -142,4 +143,4 @@ class DellEMCVolume(BaseVolume):
         total_size = 0
         total_count = 0
         raw_target_path = bytes(target_path)
-    '''
+    """

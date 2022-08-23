@@ -22,7 +22,6 @@ class QuotaManager:
         password: str,
         *,
         api_version: str = "12",
-
     ) -> None:
         self.endpoint = endpoint
         self.user = user

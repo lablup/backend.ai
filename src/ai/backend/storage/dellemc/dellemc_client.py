@@ -100,13 +100,15 @@ class DellEMCClient:
     async def get_cluster_metadata(self) -> List[Mapping[str, Any]]:
         try:
             cluster_metadata = []
-            cluster_metadata.append({
-                "config": await self.get_cluster_config(),
-                "interface": await self.get_cluster_interface(),
-            })
+            cluster_metadata.append(
+                {
+                    "config": await self.get_cluster_config(),
+                    "interface": await self.get_cluster_interface(),
+                }
+            )
             return cluster_metadata
         except Exception as e:
-            raise(e)
+            raise (e)
 
     async def get_cluster_config(self) -> Mapping[str, Any]:
         async with self._session.get(
@@ -138,13 +140,15 @@ class DellEMCClient:
             lnns = await self.get_list_lnn()
             node_metadata = []
             for lnn in lnns:
-                node_metadata.append({
-                    "hardware": await self.get_node_hardware_info_by_lnn(lnn),
-                    "status": await self.get_node_status_by_lnn(lnn),
-                })
+                node_metadata.append(
+                    {
+                        "hardware": await self.get_node_hardware_info_by_lnn(lnn),
+                        "status": await self.get_node_status_by_lnn(lnn),
+                    }
+                )
             return node_metadata
         except Exception as e:
-            raise(e)
+            raise (e)
 
     async def get_drive_stats(self) -> Mapping[int, any]:
         async with self._session.get(
@@ -187,7 +191,7 @@ class DellEMCClient:
         return data["system"][0]
 
 
-'''
+"""
     async def get_workload_stats(self) -> Mapping[int, any]:
         async with self._session.get(
             f"{self.endpoint}/platform/{self.api_version}/statistics/summary/workload",
@@ -197,4 +201,4 @@ class DellEMCClient:
         ) as resp:
             data = await resp.json()
         return data["workload"]
-'''
+"""
