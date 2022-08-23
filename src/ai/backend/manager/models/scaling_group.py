@@ -219,14 +219,15 @@ async def query_allowed_sgroups(
     if isinstance(group, Iterable):
         group_ids = await resolve_groups(db_conn, domain_name, group)
     else:
-        group_id = await resolve_group_name_or_id(db_conn, domain_name, group)
-        if group_id is None:
+        if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):
+            group_ids = [group_id]
+        else:
             group_ids = []
-    group_cond = sgroups_for_groups.c.group.in_(group_ids)
     from_group: Set[str]
     if not group_ids:
         from_group = set()  # empty
     else:
+        group_cond = sgroups_for_groups.c.group.in_(group_ids)
         query = sa.select([sgroups_for_groups]).where(group_cond)
         result = await db_conn.execute(query)
         from_group = {row["scaling_group"] for row in result}
