@@ -680,7 +680,7 @@ def _destroy_cmd(docs: str = None):
         """
         if len(session_names) == 0:
             print_warn('Specify at least one session ID. Check usage with "-h" option.')
-            sys.exit(ExitCode.INVALID_ARGUMENT)
+            sys.exit(ExitCode.INVALID_ARGUMENTS)
         print_wait("Terminating the session(s)...")
         with Session() as session:
             has_failure = False
@@ -731,7 +731,7 @@ def _restart_cmd(docs: str = None):
         """
         if len(session_refs) == 0:
             print_warn('Specify at least one session ID. Check usage with "-h" option.')
-            sys.exit(ExitCode.INVALID_ARGUMENT)
+            sys.exit(ExitCode.INVALID_ARGUMENTS)
         print_wait("Restarting the session(s)...")
         with Session() as session:
             has_failure = False
