@@ -496,26 +496,36 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
             preparing_kernels = await _fetch_kernels_with_status(
                 root_ctx.db, status=KernelStatus.PREPARING, period=timedelta(minutes=30)
             )
+            log.warning(f"\n{len(preparing_kernels)} PREPARING kernels found.")
             terminating_kernels = await _fetch_kernels_with_status(
                 root_ctx.db, status=KernelStatus.TERMINATING, period=timedelta(minutes=30)
             )
-            for session_id, *_ in chain(preparing_kernels, terminating_kernels):
-                # TODO: AgentRegistry.destroy_session() (refer ai.backend.manager.registry)
-                await root_ctx.registry.destroy_session(
-                    functools.partial(
-                        root_ctx.registry.get_session_by_session_id,
-                        session_id,
-                    ),
-                    forced=True,
-                    reason="automatic-force-termination",
-                )
-
-            terminated_kernels = await _fetch_kernels_with_status(
-                root_ctx.db, status=KernelStatus.TERMINATED, period=timedelta(seconds=30)
+            log.warning(f"\n{len(terminating_kernels)} TERMINATING kernels found.")
+            # FIXME: Running kernels are only for testing.
+            running_kernels = await _fetch_kernels_with_status(
+                root_ctx.db, status=KernelStatus.RUNNING, period=timedelta(seconds=30)
             )
-            for sess_id, status, timestamp in terminated_kernels:
-                log.warning(f"Terminated session: {sess_id} {status}({timestamp})")
-            await asyncio.sleep(3.0)
+            log.warning(f"\n{len(running_kernels)} RUNNING kernels found.")
+
+            _ = await asyncio.gather(
+                *[
+                    asyncio.create_task(
+                        root_ctx.registry.destroy_session(
+                            functools.partial(
+                                root_ctx.registry.get_session_by_session_id,
+                                session_id,
+                            ),
+                            forced=True,
+                            reason="automatic-force-termination",
+                        )
+                    )
+                    for session_id, *_ in chain(
+                        preparing_kernels, terminating_kernels, running_kernels
+                    )
+                ]
+            )
+
+            await asyncio.sleep(30.0)
 
     task = asyncio.create_task(_manage_hanging_sessions())
 
