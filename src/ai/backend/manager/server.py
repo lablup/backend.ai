@@ -12,8 +12,7 @@ import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import closing
-from datetime import datetime, timedelta
-from itertools import chain
+from datetime import datetime
 from pathlib import Path
 from typing import (
     Any,
@@ -23,9 +22,7 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
-    Optional,
     Sequence,
-    Tuple,
     cast,
 )
 
@@ -460,6 +457,9 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from contextlib import suppress
+    from datetime import timedelta
+    from itertools import chain
+    from typing import Optional, Tuple
 
     import sqlalchemy as sa
     from dateutil.tz import tzutc
@@ -489,21 +489,18 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
                     )
                 query = query.order_by(kernels.c.status_history[status.name].asc())
             result = await conn.execute(query)
-            return tuple(
-                (kernel.session_id, kernel.status, kernel.status_history.get(kernel.status.name))
-                for kernel in result.fetchall()
-            )
+            return tuple(kernel.session_id for kernel in result.fetchall())
 
     async def _terminate_hanging_sessions():
         while True:
             preparing_kernels = await _fetch_kernels_with_status_and_period(
                 root_ctx.db, status=KernelStatus.PREPARING, period=timedelta(minutes=30)
             )
-            log.debug(f"\n{len(preparing_kernels)} PREPARING kernels found.")
+            log.debug(f"{len(preparing_kernels)} PREPARING kernels found.")
             terminating_kernels = await _fetch_kernels_with_status_and_period(
                 root_ctx.db, status=KernelStatus.TERMINATING, period=timedelta(minutes=30)
             )
-            log.debug(f"\n{len(terminating_kernels)} TERMINATING kernels found.")
+            log.debug(f"{len(terminating_kernels)} TERMINATING kernels found.")
 
             _ = await asyncio.gather(
                 *[
@@ -517,7 +514,7 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
                             reason="automatic-force-termination",
                         )
                     )
-                    for session_id, *_ in chain(preparing_kernels, terminating_kernels)
+                    for session_id in chain(preparing_kernels, terminating_kernels)
                 ]
             )
 
@@ -527,9 +524,9 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
 
     yield
 
-    if not task.cancelled():
-        task.cancel()
     if not task.done():
+        if not task.cancelled():
+            task.cancel()
         with suppress(asyncio.CancelledError):
             await task
 
