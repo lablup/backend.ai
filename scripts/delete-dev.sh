@@ -29,11 +29,11 @@ usage() {
   echo "  $0 ${LWHITE}[OPTIONS]${NC}"
   echo ""
   echo "${LWHITE}OPTIONS${NC}"
-  echo "  ${LWHITE}-h, --help${NC}           Show this help and exit"
+  echo "  ${LWHITE}-h, --help${NC}         Show this help and exit"
   echo ""
-  echo "  ${LWHITE}--skip-containers${NC}    Skip removal of docker resources (default: false)"
+  echo "  ${LWHITE}--skip-containers${NC}  Skip removal of docker resources (default: false)"
   echo ""
-  echo "  ${LWHITE}--skip-source${NC}        Skip removal of the install path (default: false)"
+  echo "  ${LWHITE}--skip-venvs${NC}       Skip removal of temporary virtualenvs (default: false)"
 }
 
 has_python() {
@@ -113,4 +113,10 @@ else
   echo "Skipped removal of Docker containers."
 fi
 
+echo ""
+echo "(FYI) To reset Pants and its cache data, run:"
+echo "  $ killall pantsd"
+echo "  $ rm -r .tmp .pants.d .pants.env pants-local ~/.cache/pants"
+
+echo ""
 echo "Done."

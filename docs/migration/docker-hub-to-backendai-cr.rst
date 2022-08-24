@@ -32,7 +32,7 @@ This registry migration does not affect existing running sessions, though the Do
 
       $ sudo systemctl stop backendai-manager  # stop the manager daemon (may differ by setup)
       $ backend.ai mgr etcd put-json '' registry-config.json
-      $ backend.ai mgr etcd rescan-images cr.backend.ai
+      $ backend.ai mgr image rescan cr.backend.ai
       $ sudo systemctl start backendai-manager  # start the manager daemon (may differ by setup)
 
    * The agents will automatically pull the images since the image references are changed even when the new images are actually same to the existing ones.
@@ -44,7 +44,7 @@ This registry migration does not affect existing running sessions, though the Do
 
      For example, ``lablup/python:3.6-ubuntu18.04`` is now referred as ``cr.backend.ai/stable/python:3.6-ubuntu18.04``.
 
-   * If you have configured image aliases, you need to udpate them manually as well, using the ``backend.ai mgr etcd alias`` command.
+   * If you have configured image aliases, you need to udpate them manually as well, using the ``backend.ai mgr image alias`` command.
      This does not affect existing sessions running with old aliases.
 
 4. Update the allowed docker registries policy for each domain using the ``backend.ai mgr dbshell`` command. Remove "index.docker.io" from the existing values and replace "..." below with your own domain names and additional registries.

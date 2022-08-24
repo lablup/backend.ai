@@ -8,23 +8,21 @@ from ai.backend.client.session import api_session
 
 from .base import BaseFunction, api_function
 
-__all__ = (
-    'Storage',
-)
+__all__ = ("Storage",)
 
 _default_list_fields = (
-    storage_fields['id'],
-    storage_fields['backend'],
-    storage_fields['capabilities'],
+    storage_fields["id"],
+    storage_fields["backend"],
+    storage_fields["capabilities"],
 )
 
 _default_detail_fields = (
-    storage_fields['id'],
-    storage_fields['backend'],
-    storage_fields['path'],
-    storage_fields['fsprefix'],
-    storage_fields['capabilities'],
-    storage_fields['hardware_metadata'],
+    storage_fields["id"],
+    storage_fields["backend"],
+    storage_fields["path"],
+    storage_fields["fsprefix"],
+    storage_fields["capabilities"],
+    storage_fields["hardware_metadata"],
 )
 
 
@@ -44,7 +42,7 @@ class Storage(BaseFunction):
     @classmethod
     async def paginated_list(
         cls,
-        status: str = 'ALIVE',
+        status: str = "ALIVE",
         *,
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
@@ -57,10 +55,10 @@ class Storage(BaseFunction):
         You need an admin privilege for this operation.
         """
         return await generate_paginated_results(
-            'storage_volume_list',
+            "storage_volume_list",
             {
-                'filter': (filter, 'String'),
-                'order': (order, 'String'),
+                "filter": (filter, "String"),
+                "order": (order, "String"),
             },
             fields,
             page_offset=page_offset,
@@ -74,12 +72,14 @@ class Storage(BaseFunction):
         vfolder_host: str,
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> dict:
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($vfolder_host: String!) {
                 storage_volume(id: $vfolder_host) {$fields}
             }
-        """)
-        query = query.replace('$fields', ' '.join(f.field_ref for f in fields))
-        variables = {'vfolder_host': vfolder_host}
+        """
+        )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {"vfolder_host": vfolder_host}
         data = await api_session.get().Admin._query(query, variables)
-        return data['storage_volume']
+        return data["storage_volume"]

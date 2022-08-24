@@ -16,7 +16,7 @@ from . import vfolder as _vfolder
 from .base import metadata
 
 __all__ = (
-    'metadata',
+    "metadata",
     *_agent.__all__,
     *_domain.__all__,
     *_group.__all__,

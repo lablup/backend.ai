@@ -25,6 +25,7 @@ from typing import (
     Tuple,
     TypedDict,
     Union,
+    cast,
 )
 
 import zmq
@@ -47,39 +48,56 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 # (excluding control signals such as 'finished' and 'waiting-input'
 # since they are passed as separate status field.)
 ConsoleItemType = Literal[
-    'stdout', 'stderr', 'media', 'html', 'log', 'completion',
+    "stdout",
+    "stderr",
+    "media",
+    "html",
+    "log",
+    "completion",
 ]
-outgoing_msg_types: FrozenSet[ConsoleItemType] = frozenset([
-    'stdout', 'stderr', 'media', 'html', 'log', 'completion',
-])
-ResultType = Union[ConsoleItemType, Literal[
-    'continued',
-    'clean-finished',
-    'build-finished',
-    'finished',
-    'exec-timeout',
-    'waiting-input',
-]]
+outgoing_msg_types: FrozenSet[ConsoleItemType] = frozenset(
+    [
+        "stdout",
+        "stderr",
+        "media",
+        "html",
+        "log",
+        "completion",
+    ]
+)
+ResultType = Union[
+    ConsoleItemType,
+    Literal[
+        "continued",
+        "clean-finished",
+        "build-finished",
+        "finished",
+        "exec-timeout",
+        "waiting-input",
+    ],
+]
 
 
 class KernelFeatures(StringSetFlag):
-    UID_MATCH = 'uid-match'
-    USER_INPUT = 'user-input'
-    BATCH_MODE = 'batch'
-    QUERY_MODE = 'query'
-    TTY_MODE = 'tty'
+    UID_MATCH = "uid-match"
+    USER_INPUT = "user-input"
+    BATCH_MODE = "batch"
+    QUERY_MODE = "query"
+    TTY_MODE = "tty"
 
 
 class ClientFeatures(StringSetFlag):
-    INPUT = 'input'
-    CONTINUATION = 'continuation'
+    INPUT = "input"
+    CONTINUATION = "continuation"
 
 
 # TODO: use Python 3.7 contextvars for per-client feature selection
-default_client_features = frozenset({
-    ClientFeatures.INPUT.value,
-    ClientFeatures.CONTINUATION.value,
-})
+default_client_features = frozenset(
+    {
+        ClientFeatures.INPUT.value,
+        ClientFeatures.CONTINUATION.value,
+    }
+)
 default_api_version = 4
 
 
@@ -150,10 +168,14 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     _tasks: Set[asyncio.Task]
 
-    runner: 'AbstractCodeRunner'
+    runner: Optional[AbstractCodeRunner]
 
     def __init__(
-        self, kernel_id: KernelId, image: ImageRef, version: int, *,
+        self,
+        kernel_id: KernelId,
+        image: ImageRef,
+        version: int,
+        *,
         agent_config: Mapping[str, Any],
         resource_spec: KernelResourceSpec,
         service_ports: Any,  # TODO: type-annotation
@@ -173,20 +195,24 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self.stats_enabled = False
         self._tasks = set()
         self.environ = environ
+        self.runner = None
 
     async def init(self) -> None:
-        log.debug('kernel.init(k:{0}, api-ver:{1}, client-features:{2}): '
-                  'starting new runner',
-                  self.kernel_id, default_api_version, default_client_features)
+        log.debug(
+            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): " "starting new runner",
+            self.kernel_id,
+            default_api_version,
+            default_client_features,
+        )
         self.runner = await self.create_code_runner(
-            client_features=default_client_features,
-            api_version=default_api_version)
+            client_features=default_client_features, api_version=default_api_version
+        )
 
     def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
-        del props['agent_config']
-        del props['clean_event']
-        del props['_tasks']
+        del props["agent_config"]
+        del props["clean_event"]
+        del props["_tasks"]
         return props
 
     def __setstate__(self, props) -> None:
@@ -219,10 +245,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     @abstractmethod
     async def create_code_runner(
-        self, *,
+        self,
+        *,
         client_features: FrozenSet[str],
         api_version: int,
-    ) -> 'AbstractCodeRunner':
+    ) -> "AbstractCodeRunner":
         raise NotImplementedError
 
     @abstractmethod
@@ -250,6 +277,14 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    async def check_duplicate_commit(self, path):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def commit(self, path, lock_path, filename):
+        raise NotImplementedError
+
+    @abstractmethod
     async def get_service_apps(self):
         raise NotImplementedError
 
@@ -268,7 +303,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     async def execute(
         self,
         run_id: Optional[str],
-        mode: Literal['batch', 'query', 'input', 'continue'],
+        mode: Literal["batch", "query", "input", "continue"],
         text: str,
         *,
         opts: Mapping[str, Any],
@@ -277,17 +312,18 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     ) -> NextResult:
         myself = asyncio.current_task()
         assert myself is not None
+        assert self.runner is not None
         self._tasks.add(myself)
         try:
             await self.runner.attach_output_queue(run_id)
             try:
-                if mode == 'batch':
+                if mode == "batch":
                     await self.runner.feed_batch(opts)
-                elif mode == 'query':
+                elif mode == "query":
                     await self.runner.feed_code(text)
-                elif mode == 'input':
+                elif mode == "input":
                     await self.runner.feed_input(text)
-                elif mode == 'continue':
+                elif mode == "continue":
                     pass
             except zmq.ZMQError:
                 # cancel the operation by myself
@@ -345,10 +381,10 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.started_at = time.monotonic()
         self.finished_at = None
         if not math.isfinite(exec_timeout) or exec_timeout < 0:
-            raise ValueError('execution timeout must be a zero or finite positive number.')
+            raise ValueError("execution timeout must be a zero or finite positive number.")
         self.kernel_id = kernel_id
         self.exec_timeout = exec_timeout
-        self.max_record_size = 10 * (2 ** 20)  # 10 MBytes
+        self.max_record_size = 10 * (2**20)  # 10 MBytes
         self.client_features = client_features or frozenset()
         if _zctx is None:
             _zctx = zmq.asyncio.Context()
@@ -382,19 +418,19 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
 
     def __getstate__(self):
         props = self.__dict__.copy()
-        del props['zctx']
-        del props['input_sock']
-        del props['output_sock']
-        del props['completion_queue']
-        del props['service_queue']
-        del props['service_apps_info_queue']
-        del props['status_queue']
-        del props['output_queue']
-        del props['pending_queues']
-        del props['read_task']
-        del props['status_task']
-        del props['watchdog_task']
-        del props['_closed']
+        del props["zctx"]
+        del props["input_sock"]
+        del props["output_sock"]
+        del props["completion_queue"]
+        del props["service_queue"]
+        del props["service_apps_info_queue"]
+        del props["status_queue"]
+        del props["output_queue"]
+        del props["pending_queues"]
+        del props["read_task"]
+        del props["status_task"]
+        del props["watchdog_task"]
+        del props["_closed"]
         return props
 
     def __setstate__(self, props):
@@ -468,47 +504,53 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_batch(self, opts):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        clean_cmd = opts.get('clean', '')
+        clean_cmd = opts.get("clean", "")
         if clean_cmd is None:
-            clean_cmd = ''
-        await self.input_sock.send_multipart([
-            b'clean',
-            clean_cmd.encode('utf8'),
-        ])
-        build_cmd = opts.get('build', '')
+            clean_cmd = ""
+        await self.input_sock.send_multipart(
+            [
+                b"clean",
+                clean_cmd.encode("utf8"),
+            ]
+        )
+        build_cmd = opts.get("build", "")
         if build_cmd is None:
-            build_cmd = ''
-        await self.input_sock.send_multipart([
-            b'build',
-            build_cmd.encode('utf8'),
-        ])
-        exec_cmd = opts.get('exec', '')
+            build_cmd = ""
+        await self.input_sock.send_multipart(
+            [
+                b"build",
+                build_cmd.encode("utf8"),
+            ]
+        )
+        exec_cmd = opts.get("exec", "")
         if exec_cmd is None:
-            exec_cmd = ''
-        await self.input_sock.send_multipart([
-            b'exec',
-            exec_cmd.encode('utf8'),
-        ])
+            exec_cmd = ""
+        await self.input_sock.send_multipart(
+            [
+                b"exec",
+                exec_cmd.encode("utf8"),
+            ]
+        )
 
     async def feed_code(self, text: str):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b'code', text.encode('utf8')])
+        await self.input_sock.send_multipart([b"code", text.encode("utf8")])
 
     async def feed_input(self, text: str):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b'input', text.encode('utf8')])
+        await self.input_sock.send_multipart([b"input", text.encode("utf8")])
 
     async def feed_interrupt(self):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b'interrupt', b''])
+        await self.input_sock.send_multipart([b"interrupt", b""])
 
     async def feed_and_get_status(self):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart([b'status', b''])
+        await self.input_sock.send_multipart([b"status", b""])
         try:
             result = await self.status_queue.get()
             self.status_queue.task_done()
@@ -520,13 +562,15 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         if self.input_sock.closed:
             raise asyncio.CancelledError
         payload = {
-            'code': code_text,
+            "code": code_text,
         }
         payload.update(opts)
-        await self.input_sock.send_multipart([
-            b'complete',
-            json.dumps(payload).encode('utf8'),
-        ])
+        await self.input_sock.send_multipart(
+            [
+                b"complete",
+                json.dumps(payload).encode("utf8"),
+            ]
+        )
         try:
             result = await self.completion_queue.get()
             self.completion_queue.task_done()
@@ -537,54 +581,62 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_start_service(self, service_info):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart([
-            b'start-service',
-            json.dumps(service_info).encode('utf8'),
-        ])
+        await self.input_sock.send_multipart(
+            [
+                b"start-service",
+                json.dumps(service_info).encode("utf8"),
+            ]
+        )
         try:
             with timeout(10):
                 result = await self.service_queue.get()
             self.service_queue.task_done()
             return json.loads(result)
         except asyncio.CancelledError:
-            return {'status': 'failed', 'error': 'cancelled'}
+            return {"status": "failed", "error": "cancelled"}
         except asyncio.TimeoutError:
-            return {'status': 'failed', 'error': 'timeout'}
+            return {"status": "failed", "error": "timeout"}
 
     async def feed_shutdown_service(self, service_name: str):
         if self.input_sock.closed:
             raise asyncio.CancelledError
-        await self.input_sock.send_multipart([
-            b'shutdown-service',
-            json.dumps(service_name).encode('utf8'),
-        ])
+        await self.input_sock.send_multipart(
+            [
+                b"shutdown-service",
+                json.dumps(service_name).encode("utf8"),
+            ]
+        )
 
     async def feed_service_apps(self):
-        await self.input_sock.send_multipart([
-            b'get-apps',
-            ''.encode('utf8'),
-        ])
+        await self.input_sock.send_multipart(
+            [
+                b"get-apps",
+                "".encode("utf8"),
+            ]
+        )
         try:
             with timeout(10):
                 result = await self.service_apps_info_queue.get()
             self.service_apps_info_queue.task_done()
             return json.loads(result)
         except asyncio.CancelledError:
-            return {'status': 'failed', 'error': 'cancelled'}
+            return {"status": "failed", "error": "cancelled"}
         except asyncio.TimeoutError:
-            return {'status': 'failed', 'error': 'timeout'}
+            return {"status": "failed", "error": "timeout"}
 
     async def watchdog(self) -> None:
         try:
             await asyncio.sleep(self.exec_timeout)
             if self.output_queue is not None:
                 # TODO: what to do if None?
-                await self.output_queue.put(ResultRecord('exec-timeout', None))
+                await self.output_queue.put(ResultRecord("exec-timeout", None))
         except asyncio.CancelledError:
             pass
 
     @staticmethod
-    def aggregate_console(result: NextResult, records: Sequence[ResultRecord], api_ver: int) -> None:
+    def aggregate_console(
+        result: NextResult, records: Sequence[ResultRecord], api_ver: int
+    ) -> None:
 
         if api_ver == 1:
 
@@ -594,20 +646,20 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             html_items = []
 
             for rec in records:
-                if rec.msg_type == 'stdout':
-                    stdout_items.append(rec.data or '')
-                elif rec.msg_type == 'stderr':
-                    stderr_items.append(rec.data or '')
-                elif rec.msg_type == 'media' and rec.data is not None:
+                if rec.msg_type == "stdout":
+                    stdout_items.append(rec.data or "")
+                elif rec.msg_type == "stderr":
+                    stderr_items.append(rec.data or "")
+                elif rec.msg_type == "media" and rec.data is not None:
                     o = json.loads(rec.data)
-                    media_items.append((o['type'], o['data']))
-                elif rec.msg_type == 'html':
+                    media_items.append((o["type"], o["data"]))
+                elif rec.msg_type == "html":
                     html_items.append(rec.data)
 
-            result['stdout'] = ''.join(stdout_items)
-            result['stderr'] = ''.join(stderr_items)
-            result['media'] = media_items
-            result['html'] = html_items
+            result["stdout"] = "".join(stdout_items)
+            result["stderr"] = "".join(stderr_items)
+            result["media"] = media_items
+            result["html"] = html_items
 
         elif api_ver >= 2:
 
@@ -617,37 +669,37 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
 
             for rec in records:
 
-                if last_stdout.tell() and rec.msg_type != 'stdout':
-                    console_items.append(('stdout', last_stdout.getvalue()))
+                if last_stdout.tell() and rec.msg_type != "stdout":
+                    console_items.append(("stdout", last_stdout.getvalue()))
                     last_stdout.seek(0)
                     last_stdout.truncate(0)
-                if last_stderr.tell() and rec.msg_type != 'stderr':
-                    console_items.append(('stderr', last_stderr.getvalue()))
+                if last_stderr.tell() and rec.msg_type != "stderr":
+                    console_items.append(("stderr", last_stderr.getvalue()))
                     last_stderr.seek(0)
                     last_stderr.truncate(0)
 
-                if rec.msg_type == 'stdout':
-                    last_stdout.write(rec.data or '')
-                elif rec.msg_type == 'stderr':
-                    last_stderr.write(rec.data or '')
-                elif rec.msg_type == 'media' and rec.data is not None:
+                if rec.msg_type == "stdout":
+                    last_stdout.write(rec.data or "")
+                elif rec.msg_type == "stderr":
+                    last_stderr.write(rec.data or "")
+                elif rec.msg_type == "media" and rec.data is not None:
                     o = json.loads(rec.data)
-                    console_items.append(('media', (o['type'], o['data'])))
+                    console_items.append(("media", (o["type"], o["data"])))
                 elif rec.msg_type in outgoing_msg_types:
                     # FIXME: currently mypy cannot handle dynamic specialization of literals.
                     console_items.append((rec.msg_type, rec.data))  # type: ignore
 
             if last_stdout.tell():
-                console_items.append(('stdout', last_stdout.getvalue()))
+                console_items.append(("stdout", last_stdout.getvalue()))
             if last_stderr.tell():
-                console_items.append(('stderr', last_stderr.getvalue()))
+                console_items.append(("stderr", last_stderr.getvalue()))
 
-            result['console'] = console_items
+            result["console"] = console_items
             last_stdout.close()
             last_stderr.close()
 
         else:
-            raise AssertionError('Unrecognized API version')
+            raise AssertionError("Unrecognized API version")
 
     async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
         # Context: per API request
@@ -662,87 +714,86 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                     if rec.msg_type in outgoing_msg_types:
                         records.append(rec)
                     self.output_queue.task_done()
-                    if rec.msg_type == 'finished':
+                    if rec.msg_type == "finished":
                         data = json.loads(rec.data) if rec.data else {}
                         raise RunFinished(data)
-                    elif rec.msg_type == 'clean-finished':
+                    elif rec.msg_type == "clean-finished":
                         data = json.loads(rec.data) if rec.data else {}
                         raise CleanFinished(data)
-                    elif rec.msg_type == 'build-finished':
+                    elif rec.msg_type == "build-finished":
                         data = json.loads(rec.data) if rec.data else {}
                         raise BuildFinished(data)
-                    elif rec.msg_type == 'waiting-input':
+                    elif rec.msg_type == "waiting-input":
                         opts = json.loads(rec.data) if rec.data else {}
                         raise InputRequestPending(opts)
-                    elif rec.msg_type == 'exec-timeout':
+                    elif rec.msg_type == "exec-timeout":
                         raise ExecTimeout
         except asyncio.CancelledError:
             self.resume_output_queue()
             raise
         except asyncio.TimeoutError:
             result = {
-                'runId': self.current_run_id,
-                'status': 'continued',
-                'exitCode': None,
-                'options': None,
+                "runId": self.current_run_id,
+                "status": "continued",
+                "exitCode": None,
+                "options": None,
             }
             type(self).aggregate_console(result, records, api_ver)
             self.resume_output_queue()
             return result
         except CleanFinished as e:
             result = {
-                'runId': self.current_run_id,
-                'status': 'clean-finished',
-                'exitCode': e.data.get('exitCode'),
-                'options': None,
+                "runId": self.current_run_id,
+                "status": "clean-finished",
+                "exitCode": e.data.get("exitCode"),
+                "options": None,
             }
             type(self).aggregate_console(result, records, api_ver)
             self.resume_output_queue()
             return result
         except BuildFinished as e:
             result = {
-                'runId': self.current_run_id,
-                'status': 'build-finished',
-                'exitCode': e.data.get('exitCode'),
-                'options': None,
+                "runId": self.current_run_id,
+                "status": "build-finished",
+                "exitCode": e.data.get("exitCode"),
+                "options": None,
             }
             type(self).aggregate_console(result, records, api_ver)
             self.resume_output_queue()
             return result
         except RunFinished as e:
             result = {
-                'runId': self.current_run_id,
-                'status': 'finished',
-                'exitCode': e.data.get('exitCode'),
-                'options': None,
+                "runId": self.current_run_id,
+                "status": "finished",
+                "exitCode": e.data.get("exitCode"),
+                "options": None,
             }
             type(self).aggregate_console(result, records, api_ver)
             self.next_output_queue()
             return result
         except ExecTimeout:
             result = {
-                'runId': self.current_run_id,
-                'status': 'exec-timeout',
-                'exitCode': None,
-                'options': None,
+                "runId": self.current_run_id,
+                "status": "exec-timeout",
+                "exitCode": None,
+                "options": None,
             }
-            log.warning('Execution timeout detected on kernel '
-                        f'{self.kernel_id}')
+            log.warning("Execution timeout detected on kernel " f"{self.kernel_id}")
             type(self).aggregate_console(result, records, api_ver)
             self.next_output_queue()
             return result
         except InputRequestPending as e:
             result = {
-                'runId': self.current_run_id,
-                'status': 'waiting-input',
-                'exitCode': None,
-                'options': e.data,
+                "runId": self.current_run_id,
+                "status": "waiting-input",
+                "exitCode": None,
+                "options": e.data,
             }
             type(self).aggregate_console(result, records, api_ver)
             self.resume_output_queue()
             return result
         except Exception:
-            log.exception('unexpected error')
+            log.exception("unexpected error")
             raise
 
     async def attach_output_queue(self, run_id: Optional[str]) -> None:
@@ -804,41 +855,43 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         # We should use incremental decoder because some kernels may
         # send us incomplete UTF-8 byte sequences (e.g., Julia).
         decoders = (
-            codecs.getincrementaldecoder('utf8')(errors='replace'),
-            codecs.getincrementaldecoder('utf8')(errors='replace'),
+            codecs.getincrementaldecoder("utf8")(errors="replace"),
+            codecs.getincrementaldecoder("utf8")(errors="replace"),
         )
         while True:
             try:
                 msg_type, msg_data = await self.output_sock.recv_multipart()
                 try:
-                    if msg_type == b'status':
+                    if msg_type == b"status":
                         await self.status_queue.put(msg_data)
-                    elif msg_type == b'completion':
+                    elif msg_type == b"completion":
                         await self.completion_queue.put(msg_data)
-                    elif msg_type == b'service-result':
+                    elif msg_type == b"service-result":
                         await self.service_queue.put(msg_data)
-                    elif msg_type == b'apps-result':
+                    elif msg_type == b"apps-result":
                         await self.service_apps_info_queue.put(msg_data)
-                    elif msg_type == b'stdout':
+                    elif msg_type == b"stdout":
                         if self.output_queue is None:
                             continue
                         if len(msg_data) > self.max_record_size:
-                            msg_data = msg_data[:self.max_record_size]
+                            msg_data = msg_data[: self.max_record_size]
                         await self.output_queue.put(
                             ResultRecord(
-                                'stdout',
+                                "stdout",
                                 decoders[0].decode(msg_data),
-                            ))
-                    elif msg_type == b'stderr':
+                            )
+                        )
+                    elif msg_type == b"stderr":
                         if self.output_queue is None:
                             continue
                         if len(msg_data) > self.max_record_size:
-                            msg_data = msg_data[:self.max_record_size]
+                            msg_data = msg_data[: self.max_record_size]
                         await self.output_queue.put(
                             ResultRecord(
-                                'stderr',
+                                "stderr",
                                 decoders[1].decode(msg_data),
-                            ))
+                            )
+                        )
                     else:
                         # Normal outputs should go to the current
                         # output queue.
@@ -846,24 +899,25 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                             continue
                         await self.output_queue.put(
                             ResultRecord(
-                                msg_type.decode('ascii'),
-                                msg_data.decode('utf8'),
-                            ))
+                                cast(ResultType, msg_type.decode("ascii")),
+                                msg_data.decode("utf8"),
+                            )
+                        )
                 except asyncio.QueueFull:
                     pass
-                if msg_type == b'build-finished':
+                if msg_type == b"build-finished":
                     # finalize incremental decoder
-                    decoders[0].decode(b'', True)
-                    decoders[1].decode(b'', True)
-                elif msg_type == b'finished':
+                    decoders[0].decode(b"", True)
+                    decoders[1].decode(b"", True)
+                elif msg_type == b"finished":
                     # finalize incremental decoder
-                    decoders[0].decode(b'', True)
-                    decoders[1].decode(b'', True)
+                    decoders[0].decode(b"", True)
+                    decoders[1].decode(b"", True)
                     self.finished_at = time.monotonic()
             except (asyncio.CancelledError, GeneratorExit):
                 break
             except Exception:
-                log.exception('unexpected error')
+                log.exception("unexpected error")
                 break
 
 
@@ -876,22 +930,22 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
     prefix (e.g., "centos", "ubuntu") and a distro version composed of multiple integer components
     joined by single dots (e.g., "1.2.3", "18.04").
     """
-    rx_ver_suffix = re.compile(r'(\d+(\.\d+)*)$')
+    rx_ver_suffix = re.compile(r"(\d+(\.\d+)*)$")
     m = rx_ver_suffix.search(distro)
     if m is None:
         # Assume latest
         distro_prefix = distro
         distro_ver = None
     else:
-        distro_prefix = distro[:-len(m.group(1))]
+        distro_prefix = distro[: -len(m.group(1))]
         distro_ver = m.group(1)
 
     # Check if there are static-build krunners first.
-    if distro_prefix == 'alpine':
-        libc_flavor = 'musl'
+    if distro_prefix == "alpine":
+        libc_flavor = "musl"
     else:
-        libc_flavor = 'gnu'
-    distro_key = f'static-{libc_flavor}'
+        libc_flavor = "gnu"
+    distro_key = f"static-{libc_flavor}"
     if volume := data.get(distro_key):
         return distro_key, volume
 
@@ -905,13 +959,10 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> Tuple[str, Any]:
     def _extract_version(item: Tuple[str, Any]) -> Tuple[int, ...]:
         m = rx_ver_suffix.search(item[0])
         if m is not None:
-            return tuple(map(int, m.group(1).split('.')))
+            return tuple(map(int, m.group(1).split(".")))
         return (0,)
 
-    match_list = sorted(
-        match_list,
-        key=_extract_version,
-        reverse=True)
+    match_list = sorted(match_list, key=_extract_version, reverse=True)
     if match_list:
         if distro_ver is None:
             return match_list[0]

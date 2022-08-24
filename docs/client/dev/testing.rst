@@ -40,7 +40,7 @@ Prerequisite
 Please refer the README of the manager and agent repositories to set up them.
 To avoid an indefinite waiting time for pulling Docker images:
 
-* (manager) ``python -m ai.backend.manager.cli etcd rescan-images``
+* (manager) ``python -m ai.backend.manager.cli image rescan``
 
 * (agent) ``docker pull``
 

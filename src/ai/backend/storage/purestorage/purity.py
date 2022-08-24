@@ -95,13 +95,7 @@ class PurityClient:
         pagination_token = ""
         while True:
             async with self._session.get(
-                (
-                    self.endpoint
-                    / "api"
-                    / self.api_version
-                    / "file-systems"
-                    / "performance"
-                ),
+                (self.endpoint / "api" / self.api_version / "file-systems" / "performance"),
                 headers={"x-auth-token": self.auth_token.get()},
                 params={
                     "names": fs_name,
