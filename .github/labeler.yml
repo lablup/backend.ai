@@ -1,0 +1,2 @@
+require:db-migration:
+- any: ['src/ai/backend/manager/alembic/versions/*.py']

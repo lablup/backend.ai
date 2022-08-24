@@ -1825,7 +1825,7 @@ class AgentRegistry:
         session_getter: SessionGetter,
         *,
         forced: bool = False,
-        reason: str = "user-requested",
+        reason: Optional[str] = None,
     ) -> Mapping[str, Any]:
         """
         Destroy session kernels. Do not destroy
@@ -1837,8 +1837,8 @@ class AgentRegistry:
         """
         async with self.db.begin_readonly() as conn:
             session = await session_getter(db_connection=conn)
-        if forced:
-            reason = "force-terminated"  # FIXME
+        if not reason:
+            reason = "force-terminated" if forced else "user-requested"
         hook_result = await self.hook_plugin_ctx.dispatch(
             "PRE_DESTROY_SESSION",
             (session["session_id"], session["session_name"], session["access_key"]),
