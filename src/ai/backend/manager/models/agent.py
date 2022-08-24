@@ -405,6 +405,22 @@ class AgentSummary(graphene.ObjectType):
             occupied_slots=row["occupied_slots"].to_json(),
         )
 
+    _queryfilter_fieldspec = {
+        "id": ("id", None),
+        "status": ("status", lambda s: AgentStatus[s]),
+        "scaling_group": ("scaling_group", None),
+        "schedulable": ("schedulabe", None),
+    }
+
+    _queryorder_colmap = {
+        "id": "id",
+        "status": "status",
+        "scaling_group": "scaling_group",
+        "schedulable": "schedulable",
+        "available_slots": "available_slots",
+        "occupied_slots": "occupied_slots",
+    }
+
     @classmethod
     async def batch_load(
         cls,
