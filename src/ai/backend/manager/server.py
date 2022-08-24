@@ -491,12 +491,13 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
             result = await conn.execute(query)
             return tuple(kernel.session_id for kernel in result.fetchall())
 
-    async def _terminate_hanging_sessions():
+    async def _terminate_hanging_sessions(interval: float = 30.0):
         while True:
             preparing_kernels = await _fetch_kernels_with_status_and_period(
                 root_ctx.db, status=KernelStatus.PREPARING, period=timedelta(minutes=30)
             )
             log.debug(f"{len(preparing_kernels)} PREPARING kernels found.")
+
             terminating_kernels = await _fetch_kernels_with_status_and_period(
                 root_ctx.db, status=KernelStatus.TERMINATING, period=timedelta(minutes=30)
             )
@@ -518,7 +519,7 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
                 ]
             )
 
-            await asyncio.sleep(30.0)
+            await asyncio.sleep(interval)
 
     task = asyncio.create_task(_terminate_hanging_sessions())
 
