@@ -554,6 +554,7 @@ class Queries(graphene.ObjectType):
         agent_id: AgentId,
         *,
         access_key: AccessKey,
+        domain_name: str,
         scaling_group: str = None,
     ) -> AgentSummary:
         ctx: GraphQueryContext = info.context
@@ -562,6 +563,7 @@ class Queries(graphene.ObjectType):
             "Agent",
             raw_status=None,
             scaling_group=scaling_group,
+            domain_name=domain_name,
             access_key=access_key,
         )
         return await loader.load(agent_id)
@@ -575,6 +577,7 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         access_key: AccessKey,
+        domain_name: str,
         filter: str = None,
         order: str = None,
         scaling_group: str = None,
@@ -584,6 +587,7 @@ class Queries(graphene.ObjectType):
             info.context,
             access_key=access_key,
             scaling_group=scaling_group,
+            domain_name=domain_name,
             raw_status=status,
             filter=filter,
         )
@@ -593,6 +597,7 @@ class Queries(graphene.ObjectType):
             offset,
             access_key=access_key,
             scaling_group=scaling_group,
+            domain_name=domain_name,
             raw_status=status,
             filter=filter,
             order=order,

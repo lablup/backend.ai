@@ -331,46 +331,35 @@ class AgentList(graphene.ObjectType):
     items = graphene.List(Agent, required=True)
 
 
-async def _query_domain_groups_by_ak(
+async def _query_groups_by_ak(
     db_conn: SAConnection,
     access_key: str,
-) -> tuple[str, list[uuid.UUID]]:
-    j = sa.join(
-        keypairs,
-        users,
-        keypairs.c.user == users.c.uuid,
+) -> list[uuid.UUID]:
+    j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid,).join(
+        association_groups_users,
+        association_groups_users.c.user_id == users.c.uuid,
     )
     query = (
-        sa.select([keypairs, users.c.domain_name])
+        sa.select([association_groups_users.c.group_id])
         .select_from(j)
         .where(keypairs.c.access_key == access_key)
     )
     result = await db_conn.execute(query)
-    row = result.first()
-    domain_name = row["domain_name"]
-    user_id = row["user"]
-
-    query = (
-        sa.select([association_groups_users.c.group_id])
-        .select_from(association_groups_users)
-        .where(association_groups_users.c.user_id == user_id)
-    )
-    result = await db_conn.execute(query)
-    groud_ids = [row["group_id"] for row in result.fetchall()]
-    return domain_name, groud_ids
+    return [row.group_id for row in result.fetchall()]
 
 
 async def _append_sgroup_from_clause(
     graph_ctx: GraphQueryContext,
     query: sa.sql.Select,
     access_key: str,
-    scaling_group: str | None,
-):
+    domain_name: str,
+    scaling_group: str | None = None,
+) -> sa.sql.Select:
     if scaling_group is not None:
         query = query.where(agents.c.scaling_group == scaling_group)
     else:
         async with graph_ctx.db.begin_readonly() as conn:
-            domain_name, group_ids = await _query_domain_groups_by_ak(conn, access_key)
+            group_ids = await _query_groups_by_ak(conn, access_key)
             sgroups = await query_allowed_sgroups(conn, domain_name, group_ids, access_key)
         query = query.where(agents.c.scaling_group.in_([sgroup["name"] for sgroup in sgroups]))
     return query
@@ -427,6 +416,7 @@ class AgentSummary(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         agent_ids: Sequence[AgentId],
         *,
+        domain_name: str,
         raw_status: str = None,
         scaling_group: str = None,
         access_key: str,
@@ -441,7 +431,9 @@ class AgentSummary(graphene.ObjectType):
         )
         if raw_status is not None:
             query = query.where(agents.c.status == AgentStatus[raw_status])
-        query = await _append_sgroup_from_clause(graph_ctx, query, access_key, scaling_group)
+        query = await _append_sgroup_from_clause(
+            graph_ctx, query, access_key, domain_name, scaling_group
+        )
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_result(
                 graph_ctx,
@@ -457,13 +449,16 @@ class AgentSummary(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
+        domain_name: str,
         scaling_group: str = None,
         access_key: str,
         raw_status: str = None,
         filter: str = None,
     ) -> int:
         query = sa.select([sa.func.count()]).select_from(agents)
-        query = await _append_sgroup_from_clause(graph_ctx, query, access_key, scaling_group)
+        query = await _append_sgroup_from_clause(
+            graph_ctx, query, access_key, domain_name, scaling_group
+        )
 
         if raw_status is not None:
             query = query.where(agents.c.status == AgentStatus[raw_status])
@@ -481,6 +476,7 @@ class AgentSummary(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
+        domain_name: str,
         scaling_group: str = None,
         access_key: str,
         raw_status: str = None,
@@ -488,7 +484,9 @@ class AgentSummary(graphene.ObjectType):
         order: str = None,
     ) -> Sequence[Agent]:
         query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
-        query = await _append_sgroup_from_clause(graph_ctx, query, access_key, scaling_group)
+        query = await _append_sgroup_from_clause(
+            graph_ctx, query, access_key, domain_name, scaling_group
+        )
 
         if raw_status is not None:
             query = query.where(agents.c.status == AgentStatus[raw_status])
