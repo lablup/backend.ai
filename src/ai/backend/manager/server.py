@@ -531,7 +531,7 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
             case "m":
                 acceptable_period = timedelta(minutes=int(period[:-1]))
             case "s":
-                acceptable_period = timedelta(minutes=int(period[:-1]))
+                acceptable_period = timedelta(seconds=int(period[:-1]))
             case _:
                 log.error(
                     f'Skip "{status}:{period}" as it is an invalid argument. Supported postfixes: "h", "m", "s"'
