@@ -187,9 +187,8 @@ async def login_handler(request: web.Request) -> web.Response:
             ),
             content_type="application/problem+json",
         )
-    raw_creds = json.loads(request["payload"])
     try:
-        creds = json.loads(raw_creds)
+        creds = json.loads(request["payload"])
     except json.JSONDecodeError as e:
         log.error("Login: JSON decoding error: {}", e)
         creds = {}
