@@ -21,14 +21,12 @@ jobs:
         id: branch-name
         uses: tj-actions/branch-names@v5.5
       - name: Update working project
-        env:
-          REPOSITORY_URL: https://github.com/${{ github.repository }}.git
         run: |
           RESP_CODE=$(curl \
             -X PATCH \
             -H "Authorization: Token $RTD_AUTH_TOKEN" $RTD_PROJ_URL/$PROJ_SLUG/ \
             -H "Content-Type: application/json" \
-            -d '{"repository": {"url": "$REPOSITORY_URL", "type": "git"}}' \
+            -d '{"repository": {"url": "${{ github.server_url }}/${{ github.repository }}.git", "type": "git"}}' \
             -o /dev/null -w '%{http_code}\n' -s
           )
           if [ $RESP_CODE -ne 204 ]; then exit 1; fi
