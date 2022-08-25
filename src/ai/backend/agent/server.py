@@ -738,6 +738,8 @@ async def server_main(
 
     # Start aiomonitor.
     # Port is set by config (default=50002).
+    if local_config["debug"]["enabled"]:
+        loop.set_debug(True)
     monitor = aiomonitor.Monitor(
         loop,
         port=local_config["agent"]["aiomonitor-port"],

@@ -675,6 +675,8 @@ async def server_main(
 
     # Start aiomonitor.
     # Port is set by config (default=50001).
+    if root_ctx.local_config["debug"]["enabled"]:
+        loop.set_debug(True)
     m = aiomonitor.Monitor(
         loop,
         port=root_ctx.local_config["manager"]["aiomonitor-port"] + pidx,

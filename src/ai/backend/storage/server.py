@@ -50,6 +50,8 @@ async def server_main(
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
     local_config = _args[0]
+    if local_config["debug"]["enabled"]:
+        loop.set_debug(True)
 
     etcd_credentials = None
     if local_config["etcd"]["user"]:
