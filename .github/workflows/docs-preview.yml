@@ -1,0 +1,21 @@
+name: docs-preview
+
+on:
+  pull-request:
+    types: [labeled, unlabeled, opened, synchronize, reopened]
+
+jobs:
+  sphinx:
+    runs-on: ubuntu-latest
+    env:
+      RTD_AUTH_TOKEN: ${{ secrets.RTD_AUTH_TOKEN }}
+      RTD_PROJ_URL: https://readthedocs.org/api/v3/projects
+      PROJ_SLUG: sorna
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        with:
+          python-version: "3.10.5"
+      - name: Get current branch name
+        id: branch-name
+        uses: tj-actions/branch-names@v5.5
