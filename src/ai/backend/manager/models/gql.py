@@ -1091,18 +1091,29 @@ class Queries(graphene.ObjectType):
         return StorageVolumeList(items, total_count)
 
     @staticmethod
-    @privileged_query(UserRole.SUPERADMIN)
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_vfolder(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         id: str,
+        *,
+        domain_name: str = None,
+        group_id: uuid.UUID = None,
+        user_id: uuid.UUID = None,
     ) -> Optional[VirtualFolder]:
         graph_ctx: GraphQueryContext = info.context
-        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, 'VirtualFolder.by_id')
+        user_role = graph_ctx.user["role"]
+        loader = graph_ctx.dataloader_manager.get_loader(
+            graph_ctx,
+            "VirtualFolder.by_id",
+            user_uuid=user_id,
+            user_role=user_role,
+            domain_name=domain_name,
+        )
         return await loader.load(id)
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key='user_id')
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_vfolder_list(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
