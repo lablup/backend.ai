@@ -493,15 +493,15 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
 
     async def _terminate_hanging_sessions(interval: float = 30.0):
         while True:
-            preparing_kernels = await _fetch_kernels_with_status_and_period(
+            preparing_session_ids = await _fetch_kernels_with_status_and_period(
                 root_ctx.db, status=KernelStatus.PREPARING, period=timedelta(minutes=30)
             )
-            log.debug(f"{len(preparing_kernels)} PREPARING kernels found.")
+            log.debug(f"{len(preparing_session_ids)} PREPARING kernels found.")
 
-            terminating_kernels = await _fetch_kernels_with_status_and_period(
+            terminating_session_ids = await _fetch_kernels_with_status_and_period(
                 root_ctx.db, status=KernelStatus.TERMINATING, period=timedelta(minutes=30)
             )
-            log.debug(f"{len(terminating_kernels)} TERMINATING kernels found.")
+            log.debug(f"{len(terminating_session_ids)} TERMINATING kernels found.")
 
             _ = await asyncio.gather(
                 *[
@@ -512,10 +512,13 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
                                 session_id,
                             ),
                             forced=True,
-                            reason="automatic-force-termination",
+                            reason=reason,
                         )
                     )
-                    for session_id in chain(preparing_kernels, terminating_kernels)
+                    for session_id, reason in chain(
+                        map(lambda sid: (sid, "hang-preparing"), preparing_session_ids),
+                        map(lambda sid: (sid, "hang-terminating"), terminating_session_ids),
+                    )
                 ]
             )
 
