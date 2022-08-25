@@ -361,7 +361,8 @@ async def _append_sgroup_from_clause(
         async with graph_ctx.db.begin_readonly() as conn:
             group_ids = await _query_groups_by_ak(conn, access_key)
             sgroups = await query_allowed_sgroups(conn, domain_name, group_ids, access_key)
-        query = query.where(agents.c.scaling_group.in_([sgroup["name"] for sgroup in sgroups]))
+            names = [sgroup["name"] for sgroup in sgroups]
+        query = query.where(agents.c.scaling_group.in_(names))
     return query
 
 
@@ -450,8 +451,8 @@ class AgentSummary(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         *,
         domain_name: str,
-        scaling_group: str = None,
         access_key: str,
+        scaling_group: str | None = None,
         raw_status: str = None,
         filter: str = None,
     ) -> int:
@@ -477,8 +478,8 @@ class AgentSummary(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str,
-        scaling_group: str = None,
         access_key: str,
+        scaling_group: str | None = None,
         raw_status: str = None,
         filter: str = None,
         order: str = None,
