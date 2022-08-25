@@ -458,7 +458,6 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from contextlib import suppress
     from datetime import timedelta
-    from itertools import chain
     from typing import Optional, Tuple
 
     import sqlalchemy as sa
@@ -491,17 +490,14 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
             result = await conn.execute(query)
             return tuple(kernel.session_id for kernel in result.fetchall())
 
-    async def _terminate_hanging_sessions(interval: float = 30.0):
+    async def _terminate_hanging_sessions(
+        status: KernelStatus, period: timedelta, reason: str = "force-terminated-due-to-hanging"
+    ):
         while True:
-            preparing_session_ids = await _fetch_kernels_with_status_and_period(
-                root_ctx.db, status=KernelStatus.PREPARING, period=timedelta(minutes=30)
+            session_ids = await _fetch_kernels_with_status_and_period(
+                root_ctx.db, status=status, period=period
             )
-            log.debug(f"{len(preparing_session_ids)} PREPARING kernels found.")
-
-            terminating_session_ids = await _fetch_kernels_with_status_and_period(
-                root_ctx.db, status=KernelStatus.TERMINATING, period=timedelta(minutes=30)
-            )
-            log.debug(f"{len(terminating_session_ids)} TERMINATING kernels found.")
+            log.error(f"{len(session_ids)} {status} kernels found.")
 
             _ = await asyncio.gather(
                 *[
@@ -515,24 +511,47 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
                             reason=reason,
                         )
                     )
-                    for session_id, reason in chain(
-                        map(lambda sid: (sid, "hang-preparing"), preparing_session_ids),
-                        map(lambda sid: (sid, "hang-terminating"), terminating_session_ids),
-                    )
+                    for session_id in session_ids
                 ]
             )
 
-            await asyncio.sleep(interval)
+            await asyncio.sleep(period.seconds)
 
-    task = asyncio.create_task(_terminate_hanging_sessions())
+    managed_sessions = root_ctx.local_config["manager"]["enabled-session-managing-contexts"]
+    force_termination_tasks = []
+    for status, period in managed_sessions.items():
+        try:
+            kernel_status = KernelStatus[status]
+        except KeyError:
+            continue
+
+        match period[-1]:
+            case "h":
+                acceptable_period = timedelta(hours=int(period[:-1]))
+            case "m":
+                acceptable_period = timedelta(minutes=int(period[:-1]))
+            case "s":
+                acceptable_period = timedelta(minutes=int(period[:-1]))
+            case _:
+                log.error(
+                    f'Skip "{status}:{period}" as it is an invalid argument. Supported postfixes: "h", "m", "s"'
+                )
+                continue
+
+        force_termination_tasks.append(
+            asyncio.create_task(
+                _terminate_hanging_sessions(status=kernel_status, period=acceptable_period)
+            )
+        )
 
     yield
 
-    if not task.done():
-        if not task.cancelled():
-            task.cancel()
-        with suppress(asyncio.CancelledError):
-            await task
+    for task in force_termination_tasks:
+        if not task.done():
+            if not task.cancelled():
+                task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 class background_task_ctx:
@@ -684,9 +703,8 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
+            hanging_session_managing_ctx,
         ]
-        if local_config["manager"]["force-terminate-hanging-sessions"]:
-            cleanup_contexts.append(hanging_session_managing_ctx)
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
