@@ -331,35 +331,50 @@ class AgentList(graphene.ObjectType):
     items = graphene.List(Agent, required=True)
 
 
-async def _query_groups_by_ak(
+async def _query_domain_groups_by_ak(
     db_conn: SAConnection,
     access_key: str,
-) -> list[uuid.UUID]:
-    j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid,).join(
-        association_groups_users,
-        association_groups_users.c.user_id == users.c.uuid,
-    )
+    domain_name: str | None,
+) -> tuple[str, list[uuid.UUID]]:
+    kp_user_join = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+    if domain_name is None:
+        domain_query = (
+            sa.select([users.c.uuid, users.c.domain_name])
+            .select_from(kp_user_join)
+            .where(keypairs.c.access_key == access_key)
+        )
+        row = (await db_conn.execute(domain_query)).first()
+        user_domain = row.domain_name
+        user_id = row.uuid
+        group_join = association_groups_users
+        group_cond = association_groups_users.c.user_id == user_id
+    else:
+        user_domain = domain_name
+        group_join = kp_user_join.join(
+            association_groups_users,
+            association_groups_users.c.user_id == users.c.uuid,
+        )
+        group_cond = keypairs.c.access_key == access_key
     query = (
-        sa.select([association_groups_users.c.group_id])
-        .select_from(j)
-        .where(keypairs.c.access_key == access_key)
+        sa.select([association_groups_users.c.group_id]).select_from(group_join).where(group_cond)
     )
-    result = await db_conn.execute(query)
-    return [row.group_id for row in result.fetchall()]
+    rows = (await db_conn.execute(query)).fetchall()
+    group_ids = [row.group_id for row in rows]
+    return user_domain, group_ids
 
 
 async def _append_sgroup_from_clause(
     graph_ctx: GraphQueryContext,
     query: sa.sql.Select,
     access_key: str,
-    domain_name: str,
+    domain_name: str | None,
     scaling_group: str | None = None,
 ) -> sa.sql.Select:
     if scaling_group is not None:
         query = query.where(agents.c.scaling_group == scaling_group)
     else:
         async with graph_ctx.db.begin_readonly() as conn:
-            group_ids = await _query_groups_by_ak(conn, access_key)
+            domain_name, group_ids = await _query_domain_groups_by_ak(conn, access_key, domain_name)
             sgroups = await query_allowed_sgroups(conn, domain_name, group_ids, access_key)
             names = [sgroup["name"] for sgroup in sgroups]
         query = query.where(agents.c.scaling_group.in_(names))
@@ -417,7 +432,7 @@ class AgentSummary(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         agent_ids: Sequence[AgentId],
         *,
-        domain_name: str,
+        domain_name: str | None,
         raw_status: str = None,
         scaling_group: str = None,
         access_key: str,
@@ -450,8 +465,8 @@ class AgentSummary(graphene.ObjectType):
         cls,
         graph_ctx: GraphQueryContext,
         *,
-        domain_name: str,
         access_key: str,
+        domain_name: str | None = None,
         scaling_group: str | None = None,
         raw_status: str = None,
         filter: str = None,
@@ -477,8 +492,8 @@ class AgentSummary(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str,
         access_key: str,
+        domain_name: str | None = None,
         scaling_group: str | None = None,
         raw_status: str = None,
         filter: str = None,

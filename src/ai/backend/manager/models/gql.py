@@ -554,8 +554,8 @@ class Queries(graphene.ObjectType):
         agent_id: AgentId,
         *,
         access_key: AccessKey,
-        domain_name: str,
-        scaling_group: str = None,
+        domain_name: str | None = None,
+        scaling_group: str | None = None,
     ) -> AgentSummary:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(
@@ -577,11 +577,11 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         access_key: AccessKey,
-        domain_name: str,
-        filter: str = None,
-        order: str = None,
-        scaling_group: str = None,
-        status: str = None,
+        domain_name: str | None = None,
+        filter: str | None = None,
+        order: str | None = None,
+        scaling_group: str | None = None,
+        status: str | None = None,
     ) -> AgentSummaryList:
         total_count = await AgentSummary.load_count(
             info.context,
