@@ -394,6 +394,7 @@ class AgentSummary(graphene.ObjectType):
     schedulable = graphene.Boolean()
     available_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()
+    architecture = graphene.String()
 
     @classmethod
     def from_row(
@@ -408,6 +409,7 @@ class AgentSummary(graphene.ObjectType):
             schedulable=row["schedulable"],
             available_slots=row["available_slots"].to_json(),
             occupied_slots=row["occupied_slots"].to_json(),
+            architecture=row["architecture"]
         )
 
     _queryfilter_fieldspec = {
