@@ -7,7 +7,7 @@ from ai.backend.client.output.types import FieldSpec
 
 from ..request import Request
 from ..session import api_session
-from .base import BaseFunction, api_function
+from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("ScalingGroup",)
 
@@ -121,13 +121,11 @@ class ScalingGroup(BaseFunction):
         driver_opts: Mapping[str, str] = None,
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new scaling group with the given options.
         """
-        if fields is None:
-            fields = ("name",)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: CreateScalingGroupInput!) {
@@ -137,7 +135,10 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        resolved_fields = resolve_fields(
+            fields, scaling_group_fields, (scaling_group_fields["name"],)
+        )
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "input": {
@@ -163,13 +164,11 @@ class ScalingGroup(BaseFunction):
         driver_opts: Mapping[str, str] = None,
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Update existing scaling group.
         """
-        if fields is None:
-            fields = ("name",)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: ModifyScalingGroupInput!) {
@@ -179,7 +178,10 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        resolved_fields = resolve_fields(
+            fields, scaling_group_fields, (scaling_group_fields["name"],)
+        )
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "input": {
