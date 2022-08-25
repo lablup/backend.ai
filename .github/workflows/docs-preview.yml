@@ -6,6 +6,7 @@ on:
 
 jobs:
   sphinx:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'docs') }}
     runs-on: ubuntu-latest
     env:
       RTD_AUTH_TOKEN: ${{ secrets.RTD_AUTH_TOKEN }}
