@@ -1,0 +1,1 @@
+Make the Web-UI login work again by decoding the payload as JSON.
