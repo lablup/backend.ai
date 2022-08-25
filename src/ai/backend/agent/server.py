@@ -737,7 +737,7 @@ async def server_main(
     local_config["plugins"] = await etcd.get_prefix_dict("config/plugins/accelerator")
 
     # Start aiomonitor.
-    # Port is set by config (default=50002).
+    # Port is set by config (default=50200).
     if local_config["debug"]["enabled"]:
         loop.set_debug(True)
     monitor = aiomonitor.Monitor(
