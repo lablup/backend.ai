@@ -497,7 +497,7 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
             session_ids = await _fetch_kernels_with_status_and_period(
                 root_ctx.db, status=status, period=period
             )
-            log.error(f"{len(session_ids)} {status} kernels found.")
+            log.debug(f"{len(session_ids)} {status} kernels found.")
 
             _ = await asyncio.gather(
                 *[
