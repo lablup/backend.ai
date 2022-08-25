@@ -21,6 +21,7 @@ service-addr = { host = "0.0.0.0", port = 8081 }
 ssl-enabled = false
 #ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"   # env: BACKNED_SSL_CERT
 #ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
+force-terminate-hanging-sessions = true
 
 heartbeat-timeout = 10.0
 #id = ""

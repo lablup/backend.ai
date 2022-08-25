@@ -684,8 +684,9 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
-            hanging_session_managing_ctx,
         ]
+        if local_config["manager"]["force-terminate-hanging-sessions"]:
+            cleanup_contexts.append(hanging_session_managing_ctx)
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
