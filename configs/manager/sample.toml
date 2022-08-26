@@ -172,8 +172,8 @@ enabled = false
 # Enable or disable the asyncio debug mode.
 asyncio = false
 
-# Periodically sync container stat from Redis to the kernels.last_stat column.
-periodic-sync-stats = false
-
 # Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
 enhanced-aiomonitor-task-info = false
+
+# Periodically sync container stat from Redis to the kernels.last_stat column.
+periodic-sync-stats = false
