@@ -80,6 +80,8 @@ agent_local_config_iv = (
             t.Key("debug"): t.Dict(
                 {
                     t.Key("enabled", default=False): t.Bool,
+                    t.Key("asyncio", default=False): t.Bool,
+                    t.Key("enhanced-aiomonitor-task-info", default=False): t.Bool,
                     t.Key("skip-container-deletion", default=False): t.Bool,
                     t.Key("log-stats", default=False): t.Bool,
                     t.Key("log-kernel-config", default=False): t.Bool,

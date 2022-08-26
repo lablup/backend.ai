@@ -57,6 +57,9 @@ secret = "some-secret-shared-with-manager"
 # Enable the debug mode by overriding the global loglevel and "ai.backend" loglevel.
 enabled = false
 
+# Enable or disable the asyncio debug mode.
+asyncio = false
+
 
 [logging]
 # One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"

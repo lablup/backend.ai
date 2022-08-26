@@ -267,6 +267,8 @@ manager_local_config_iv = (
             t.Key("debug"): t.Dict(
                 {
                     t.Key("enabled", default=False): t.ToBool,
+                    t.Key("asyncio", default=False): t.Bool,
+                    t.Key("enhanced-aiomonitor-task-info", default=False): t.Bool,
                     t.Key("log-events", default=False): t.ToBool,
                     t.Key("log-scheduler-ticks", default=False): t.ToBool,
                     t.Key("periodic-sync-stats", default=False): t.ToBool,
