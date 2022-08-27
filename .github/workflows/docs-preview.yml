@@ -29,6 +29,7 @@ jobs:
             -H "Content-Type: application/json" \
             -o /dev/null -w '%{http_code}\n' -s
           )
+          echo $RESP_CODE
           if [ $RESP_CODE -ne 204 ]; then exit 1; fi
           echo "Successfully update $PROJ_SLUG"
       - name: Activate Branch
@@ -41,6 +42,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"active": true, "hidden": false}' -o /dev/null -w '%{http_code}\n' -s
           )
+          echo $RESP_CODE
           if [ $RESP_CODE -ne 204 ]; then exit 1; fi
           echo "Automatically activate $VER_SLUG version of $PROJ_SLUG"
       - name: Trigger a New Build
@@ -52,6 +54,7 @@ jobs:
             -H "Authorization: Token $RTD_AUTH_TOKEN" $RTD_PROJ_URL/$PROJ_SLUG/versions/$VER_SLUG/builds/ \
             -o /dev/null -w '%{http_code}\n' -s
           )
+          echo $RESP_CODE
           if [ $RESP_CODE -ne 202 ]; then exit 1; fi
           echo "Successfully trigger new $VER_SLUG build of $PROJ_SLUG"
       - name: Deactivate Branch
@@ -64,5 +67,6 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"active": false, "hidden": false}' -o /dev/null -w '%{http_code}\n' -s
           )
+          echo $RESP_CODE
           if [ $RESP_CODE -ne 204 ]; then exit 1; fi
           echo "Automatically deactivate $VER_SLUG version of $PROJ_SLUG"
