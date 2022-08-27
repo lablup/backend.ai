@@ -15,6 +15,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import sessionmaker
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -49,6 +50,7 @@ class ExtendedAsyncSAEngine(SAEngine):
         self._readonly_txn_count = 0
         self._generic_txn_count = 0
         self._txn_concurrency_threshold = kwargs.pop("txn_concurrency_threshold", 8)
+        self._sess_factory = sessionmaker(self, expire_on_commit=False, class_=SASession)
 
     @actxmgr
     async def begin(self) -> AsyncIterator[SAConnection]:
@@ -90,7 +92,8 @@ class ExtendedAsyncSAEngine(SAEngine):
     @actxmgr
     async def begin_session(self, expire_on_commit=False) -> AsyncIterator[SASession]:
         async with self.begin() as conn:
-            session = SASession(bind=conn, expire_on_commit=expire_on_commit)
+            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
+            session = self._sess_factory()
             try:
                 yield session
                 await session.commit()
@@ -103,7 +106,9 @@ class ExtendedAsyncSAEngine(SAEngine):
         self, deferrable: bool = False, expire_on_commit=False
     ) -> AsyncIterator[SASession]:
         async with self.begin_readonly(deferrable=deferrable) as conn:
-            yield SASession(bind=conn, expire_on_commit=expire_on_commit)
+            self._sess_factory.configure(bind=conn, expire_on_commit=expire_on_commit)
+            session = self._sess_factory()
+            yield session
 
     @actxmgr
     async def advisory_lock(self, lock_id: LockID) -> AsyncIterator[None]:
