@@ -35,13 +35,7 @@ from ai.backend.client.session import AsyncSession as APISession
 from . import __version__, user_agent
 from .config import config_iv
 from .logging import BraceStyleAdapter
-from .proxy import (
-    decrypt_payload,
-    extra_config_headers,
-    web_handler,
-    web_plugin_handler,
-    websocket_handler,
-)
+from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
 from .template import toml_scalar
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
@@ -193,16 +187,11 @@ async def login_handler(request: web.Request) -> web.Response:
             ),
             content_type="application/problem+json",
         )
-    request_headers = extra_config_headers.check(request.headers)
-    secure_context = request_headers.get("X-BackendAI-Encoded", None)
-    if secure_context:
-        raw_creds = await decrypt_payload(request)
-        if not raw_creds:
-            creds = {}
-        else:
-            creds = json.loads(raw_creds)
-    else:
-        creds = await request.json()
+    try:
+        creds = json.loads(request["payload"])
+    except json.JSONDecodeError as e:
+        log.error("Login: JSON decoding error: {}", e)
+        creds = {}
     if "username" not in creds or not creds["username"]:
         return web.HTTPBadRequest(
             text=json.dumps(
@@ -466,7 +455,7 @@ async def server_main(
     args: Tuple[Any, ...],
 ) -> AsyncIterator[None]:
     config = args[0]
-    app = web.Application()
+    app = web.Application(middlewares=[decrypt_payload])
     app["config"] = config
     j2env = jinja2.Environment(
         extensions=[
