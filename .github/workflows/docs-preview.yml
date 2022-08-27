@@ -27,7 +27,6 @@ jobs:
             -X PATCH \
             -H "Authorization: Token $RTD_AUTH_TOKEN" $RTD_PROJ_URL/$PROJ_SLUG/ \
             -H "Content-Type: application/json" \
-            -d '{"repository": {"url": "${{ github.server_url }}/${{ github.repository }}.git", "type": "git"}}' \
             -o /dev/null -w '%{http_code}\n' -s
           )
           if [ $RESP_CODE -ne 204 ]; then exit 1; fi
