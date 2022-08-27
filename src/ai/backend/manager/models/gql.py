@@ -96,7 +96,12 @@ from .user import (
     UserRole,
     UserStatus,
 )
-from .vfolder import VirtualFolder, VirtualFolderList
+from .vfolder import (
+    VirtualFolder,
+    VirtualFolderList,
+    VirtualFolderPermission,
+    VirtualFolderPermissionList,
+)
 
 
 @attr.s(auto_attribs=True, slots=True)
@@ -392,6 +397,15 @@ class Queries(graphene.ObjectType):
         domain_name=graphene.String(),
         group_id=graphene.UUID(),
         access_key=graphene.String(),  # must be empty for user requests
+    )
+
+    # super-admin only
+    vfolder_permission_list = graphene.Field(
+        VirtualFolderPermissionList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
     )
 
     vfolders = graphene.List(  # legacy non-paginated list
@@ -1104,6 +1118,33 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return VirtualFolderList(items, total_count)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_vfolder_permission_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderPermissionList:
+        total_count = await VirtualFolderPermission.load_count(
+            info.context,
+            user_id=user_id,
+            filter=filter,
+        )
+        items = await VirtualFolderPermission.load_slice(
+            info.context,
+            limit,
+            offset,
+            user_id=user_id,
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderPermissionList(items, total_count)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")

@@ -44,6 +44,7 @@ enable_resolves = true
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.10.5"]
 lockfile_generator = "pex"
+tailor_pex_binary_targets = false
 
 [python-repos]
 indexes.add = ["https://dist.backend.ai/pypi/simple/"]
@@ -95,6 +96,12 @@ args = ["-v", "-m", "'not integration'"]
 lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 timeout_default = 300
+
+[coverage-py]
+version = "coverage[toml]>=6.4,<7.0"
+interpreter_constraints = ["CPython>=3.10,<4"]
+report = ["xml", "console"]
+lockfile = "tools/coverage-py.lock"
 
 [mypy]
 version = "mypy>=0.961"

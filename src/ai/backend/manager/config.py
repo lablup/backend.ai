@@ -194,8 +194,8 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import HostPortPair, SlotName, SlotTypes, current_resource_slots
 
 from ..manager.defs import INTRINSIC_SLOTS
+from .api import ManagerStatus
 from .api.exceptions import ServerMisconfiguredError
-from .api.manager import ManagerStatus
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 

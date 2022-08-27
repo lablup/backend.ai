@@ -1,6 +1,5 @@
 python_sources(
-    name="lib",
-    sources=["**/*.py"],
+    name="src",
     dependencies=[
         ":resources",
         "//:reqs#pytest",
@@ -11,7 +10,7 @@ python_sources(
 pex_binary(
     name="cli",
     dependencies=[
-        ":lib",
+        ":src",
     ],
     entry_point="ai.backend.test.cli.__main__:main",
 )
@@ -19,7 +18,7 @@ pex_binary(
 python_distribution(
     name="dist",
     dependencies=[
-        ":lib",
+        ":src",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(

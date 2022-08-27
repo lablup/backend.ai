@@ -20,13 +20,13 @@ sessions.
 
   backend.ai ps
 
-The ``ps`` command is an alias of the following ``admin sessions`` command.
+The ``ps`` command is an alias of the following ``admin session list`` command.
 If you have the administrator privilege, you can list sessions owned by
 other users by adding ``--access-key`` option here.
 
 .. code-block:: shell
 
-  backend.ai admin sessions
+  backend.ai admin session list
 
 Both commands offer options to set the status filter as follows.
 For other options, please consult the output of ``--help``.
