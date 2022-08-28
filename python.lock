@@ -21,7 +21,7 @@
 //     "aiohttp_session[aioredis]~=2.11",
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.1",
-//     "aiomonitor-ng~=0.5.0",
+//     "aiomonitor-ng~=0.5.1",
 //     "aioredis[hiredis]~=2.0.1",
 //     "aiosqlite~=0.17.0",
 //     "aiotools~=1.5.9",
@@ -366,13 +366,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "61cd98c73b1a8c25fcd0f7a85cc8da9b8eb65909646d03adf86fdf162787471a",
-              "url": "https://files.pythonhosted.org/packages/78/b9/53a09ad32c29f99f4a2e7c962d54a68960ee23daf680864a386df83a19bc/aiomonitor_ng-0.5.0-py3-none-any.whl"
+              "hash": "6a13cd037c5d7e1a00eae828e3b002937cc0c5da3d35b366a9ffbff609ed0344",
+              "url": "https://files.pythonhosted.org/packages/b1/ac/dc372280795c821ee2a7a9e8aea04ef7afc92cc168d5ac1824390b0834eb/aiomonitor_ng-0.5.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3f5a65b02b2c00c2e366fbdcb5aebfb3dd7dcacc4ce4a75c3f3a27750af8157e",
-              "url": "https://files.pythonhosted.org/packages/97/fe/154adcf6e2876ae4310fcea1d613fd574244c02a394e06bdf33254e4dbe8/aiomonitor-ng-0.5.0.tar.gz"
+              "hash": "89adce2e4df86d1632c72e6b1840539dd44fef632c7feb72bc6386d88dc272e4",
+              "url": "https://files.pythonhosted.org/packages/2d/e0/ccfa40c9ed1d2fee32a3f944c0b6708d0bcd3fbc33e42276a5e0955c4a61/aiomonitor-ng-0.5.1.tar.gz"
             }
           ],
           "project_name": "aiomonitor-ng",
@@ -381,7 +381,7 @@
             "terminaltables"
           ],
           "requires_python": null,
-          "version": "0.5"
+          "version": "0.5.1"
         },
         {
           "artifacts": [
@@ -3575,19 +3575,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a34c4e7aafa4b2fb9090d3a7f3ad0ac969089c7b4a05c21dff593a0c37405916",
-              "url": "https://files.pythonhosted.org/packages/82/0b/cec9e5170a53a0a5da8c7b9db5e2f3336a778d1f37f9ce728421757e4fed/types_redis-4.3.17-py3-none-any.whl"
+              "hash": "ba4dffd5f804af849ddd5399164abd04fbf87fa5295680d89ccec010c66bb110",
+              "url": "https://files.pythonhosted.org/packages/03/ee/0346392cae3abab44835a1829f5c7e8c653a139e40ffb5b1f3038a7530b7/types_redis-4.3.18-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "03b023c08acf344f4f0821cc1c7e4dbecb7b17bc5483927c3e73d80f7fe1768e",
-              "url": "https://files.pythonhosted.org/packages/b6/30/080bfd95a4a1605c8aa4a3ae50b2ba6d1d428e90ba152059a347c5acc14d/types-redis-4.3.17.tar.gz"
+              "hash": "2260532c157d4f64f6e266de67b0aaa1979cfb969e409a16445ec6976c4a1de6",
+              "url": "https://files.pythonhosted.org/packages/2d/a1/3ee68099750b1fa6b3b6396ab9dddab15100c4e96680e8153a12613b5262/types-redis-4.3.18.tar.gz"
             }
           ],
           "project_name": "types-redis",
           "requires_dists": [],
           "requires_python": null,
-          "version": "4.3.17"
+          "version": "4.3.18"
         },
         {
           "artifacts": [
@@ -3982,7 +3982,7 @@
     "aiohttp_session[aioredis]~=2.11",
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.1",
-    "aiomonitor-ng~=0.5.0",
+    "aiomonitor-ng~=0.5.1",
     "aioredis[hiredis]~=2.0.1",
     "aiosqlite~=0.17.0",
     "aiotools~=1.5.9",
