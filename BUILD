@@ -5,6 +5,7 @@ python_requirements(
         "aiodataloader-ng": ["aiodataloader"],
         "attrs": ["attr", "attrs"],
         "aiohttp-session": ["aiohttp_session"],
+        "aioraft-ng": ["aioraft"],
         "pycryptodome": ["Crypto"],
         "python-dateutil": ["dateutil"],
         "python-json-logger": ["pythonjsonlogger"],
