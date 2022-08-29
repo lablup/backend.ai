@@ -737,11 +737,13 @@ async def server_main(
     local_config["plugins"] = await etcd.get_prefix_dict("config/plugins/accelerator")
 
     # Start aiomonitor.
-    # Port is set by config (default=50002).
+    # Port is set by config (default=50200).
+    loop.set_debug(local_config["debug"]["asyncio"])
     monitor = aiomonitor.Monitor(
         loop,
         port=local_config["agent"]["aiomonitor-port"],
         console_enabled=False,
+        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
     monitor.prompt = "monitor (agent) >>> "
     monitor.start()
