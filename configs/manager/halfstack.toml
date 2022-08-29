@@ -29,6 +29,8 @@ disabled-plugins = []
 
 hide-agents = true
 
+raft-configuration = ["127.0.0.1:50051", "127.0.0.1:50052", "127.0.0.1:50053", "127.0.0.1:50054", "127.0.0.1:50055"]
+
 
 [docker-registry]
 ssl-verify = false

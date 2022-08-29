@@ -17,11 +17,13 @@ from pathlib import Path
 from typing import (
     Any,
     AsyncIterator,
+    Coroutine,
     Final,
     Iterable,
     List,
     Mapping,
     MutableMapping,
+    Optional,
     Sequence,
     cast,
 )
@@ -31,13 +33,18 @@ import aiomonitor
 import aiotools
 import click
 from aiohttp import web
+from aioraft import Raft
+from aioraft.client import GrpcRaftClient
+from aioraft.server import GrpcRaftServer
+from aioraft.types import RaftState
 from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.distributed import GlobalTimer
+from ai.backend.common.events import EventDispatcher, EventProducer, LeaderElectedEvent
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -58,7 +65,14 @@ from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHand
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
-from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
+from .defs import (
+    REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
+    REDIS_STAT_DB,
+    REDIS_STREAM_DB,
+    REDIS_STREAM_LOCK,
+    LockID,
+)
 from .exceptions import InvalidArgument
 from .types import DistributedLockFactory
 
@@ -279,6 +293,72 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         tz = root_ctx.shared_config["system"]["timezone"]
         log.info("Configured timezone: {}", tz.tzname(datetime.now()))
     yield
+
+
+@actxmgr
+async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    configuration = root_ctx.local_config["manager"]["raft-configuration"]
+
+    _cleanup_coroutines: List[Coroutine] = []
+
+    loop = asyncio.get_running_loop()
+    global_timer: Optional[GlobalTimer] = None
+    global_timer_join_task: Optional[asyncio.Task] = None
+    global_timer_leave_task: Optional[asyncio.Task] = None
+
+    async def _on_state_changed(next_state: RaftState):
+        nonlocal global_timer
+        nonlocal global_timer_join_task
+        nonlocal global_timer_leave_task
+
+        match next_state:
+            case RaftState.LEADER:
+                log.debug(f"[pid={os.getpid()}]/pidx={root_ctx.pidx}] LEADER")
+                global_timer = GlobalTimer(
+                    root_ctx.distributed_lock_factory(
+                        lock_id=LockID.LOCKID_LEADER_ELECTION_TIMER, lifetime_hint=10.0
+                    ),
+                    event_producer=root_ctx.event_producer,
+                    event_factory=lambda: LeaderElectedEvent(),
+                    interval=10.0,
+                )
+                global_timer_join_task = loop.create_task(global_timer.join())
+            case RaftState.CANDIDATE:
+                pass
+            case RaftState.FOLLOWER:
+                log.debug(f"[pid={os.getpid()}]/pidx={root_ctx.pidx}] FOLLOWER")
+                if timer := global_timer:
+                    global_timer_leave_task = loop.create_task(timer.leave())
+                global_timer = None
+
+    raft_id = configuration[root_ctx.pidx]
+    grpc_port = int(raft_id.split(":")[-1])
+    filtered_configuration = tuple(conf for conf in configuration if conf != raft_id)
+
+    server = GrpcRaftServer()
+    client = GrpcRaftClient()
+    raft = await Raft.new(
+        raft_id,
+        server=server,
+        client=client,
+        configuration=filtered_configuration,
+        on_state_changed=_on_state_changed,
+    )
+
+    _ = (
+        loop.create_task(
+            GrpcRaftServer.run(
+                server,
+                cleanup_coroutines=_cleanup_coroutines,
+                port=grpc_port,
+            ),
+        ),
+        loop.create_task(raft.main()),
+    )
+
+    yield
+
+    await asyncio.gather(*_cleanup_coroutines)
 
 
 @actxmgr
@@ -603,6 +683,7 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
+            leader_election_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
