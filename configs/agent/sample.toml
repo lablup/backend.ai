@@ -53,6 +53,9 @@ scaling-group = "default"
 # when the agent starts up. [default: false]
 # skip-manager-detection = false
 
+# The port number for aiomonitor.
+# aiomonitor-port = 50200
+
 # This directory is used to store the last registry file.
 # var-base-path = "/var/lib/backend.ai"
 
@@ -227,6 +230,12 @@ enabled = false
 # This is useful for debugging errors that make containers to terminate immediately after kernel
 # launches, due to bugs in initialization steps such as jail.
 skip-container-deletion = false
+
+# Enable or disable the asyncio debug mode.
+asyncio = false
+
+# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
+enhanced-aiomonitor-task-info = false
 
 # Include debug-level logs for internal events.
 log-events = false

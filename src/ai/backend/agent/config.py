@@ -40,7 +40,7 @@ agent_local_config_iv = (
                     ),
                     t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
                     t.Key("skip-manager-detection", default=False): t.ToBool,
-                    t.Key("aiomonitor-port", default=50102): t.Int[1:65535],
+                    t.Key("aiomonitor-port", default=50200): t.Int[1:65535],
                 }
             ).allow_extra("*"),
             t.Key("container"): t.Dict(
@@ -74,6 +74,8 @@ agent_local_config_iv = (
             t.Key("debug"): t.Dict(
                 {
                     t.Key("enabled", default=False): t.Bool,
+                    t.Key("asyncio", default=False): t.Bool,
+                    t.Key("enhanced-aiomonitor-task-info", default=False): t.Bool,
                     t.Key("skip-container-deletion", default=False): t.Bool,
                     t.Key("log-stats", default=False): t.Bool,
                     t.Key("log-kernel-config", default=False): t.Bool,

@@ -645,11 +645,13 @@ async def server_main(
     root_ctx: RootContext = root_app["_root.context"]
 
     # Start aiomonitor.
-    # Port is set by config (default=50001).
+    # Port is set by config (default=50100 + pidx).
+    loop.set_debug(root_ctx.local_config["debug"]["asyncio"])
     m = aiomonitor.Monitor(
         loop,
         port=root_ctx.local_config["manager"]["aiomonitor-port"] + pidx,
         console_enabled=False,
+        hook_task_factory=root_ctx.local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
     m.prompt = f"monitor (manager[{pidx}@{os.getpid()}]) >>> "
     m.start()
