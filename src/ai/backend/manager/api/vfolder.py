@@ -1812,7 +1812,7 @@ async def delete(request: web.Request) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["shared_user_id", "sharedUserId"], default=None): t.String | t.Null,
+            tx.AliasedKey(["shared_user_uuid", "sharedUserUuid"], default=None): t.String | t.Null,
         }
     ),
 )
