@@ -473,8 +473,9 @@ class VFolder(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def leave(self):
+    async def leave(self, shared_user_uuid=None):
         rqst = Request("POST", "/folders/{}/leave".format(self.name))
+        rqst.set_json({"shared_user_uuid": shared_user_uuid})
         async with rqst.fetch() as resp:
             return await resp.json()
 

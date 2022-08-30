@@ -625,7 +625,15 @@ def unshare(name, emails):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def leave(name):
+@click.option(
+    "-s",
+    "--shared-user-uuid",
+    metavar="SHARED_USER_UUID",
+    type=str,
+    default=None,
+    help="The ID of the person who wants to leave (the person who shared the vfolder).",
+)
+def leave(name, shared_user_uuid):
     """Leave the shared virutal folder.
 
     NAME: Name of a virtual folder
@@ -639,7 +647,7 @@ def leave(name):
             if vfolder_info["is_owner"]:
                 print("You cannot leave a virtual folder you own. Consider using delete instead.")
                 return
-            session.VFolder(name).leave()
+            session.VFolder(name).leave(shared_user_uuid)
             print('Left the shared virtual folder "{}".'.format(name))
 
         except Exception as e:
