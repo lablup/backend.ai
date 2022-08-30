@@ -79,6 +79,7 @@ keypairs = sa.Table(
     # SSH Keypairs.
     sa.Column("ssh_public_key", sa.String(length=750), nullable=True),
     sa.Column("ssh_private_key", sa.String(length=2000), nullable=True),
+    sa.Column("allowed_client_ip", sa.String(length=256), nullable=True),
     ForeignKeyIDColumn("user", "users.uuid", nullable=False),
     sa.Column(
         "resource_policy",
