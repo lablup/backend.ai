@@ -126,7 +126,7 @@ groups = sa.Table(
 )
 
 
-def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.BinaryExpression:
+def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
     query = (
         sa.select([groups.c.id])
         .select_from(groups)
