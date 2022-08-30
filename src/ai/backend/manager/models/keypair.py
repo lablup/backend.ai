@@ -151,6 +151,7 @@ class KeyPair(graphene.ObjectType):
     rate_limit = graphene.Int()
     num_queries = graphene.Int()
     user = graphene.UUID()
+    allowed_client_ip = graphene.String()
 
     ssh_public_key = graphene.String()
 
@@ -196,6 +197,7 @@ class KeyPair(graphene.ObjectType):
             last_used=row["last_used"],
             rate_limit=row["rate_limit"],
             user=row["user"],
+            allowed_client_ip=row["allowed_client_ip"],
             ssh_public_key=row["ssh_public_key"],
             concurrency_limit=0,  # deprecated
         )
@@ -277,6 +279,7 @@ class KeyPair(graphene.ObjectType):
         "rate_limit": ("keypairs_rate_limit", None),
         "num_queries": ("keypairs_num_queries", None),
         "ssh_public_key": ("keypairs_ssh_public_key", None),
+        "allowed_client_ip": ("allowed_client_ip", None),
     }
 
     _queryorder_colmap = {
@@ -522,6 +525,7 @@ class ModifyKeyPair(graphene.Mutation):
         set_if_set(props, data, "is_admin")
         set_if_set(props, data, "resource_policy")
         set_if_set(props, data, "rate_limit")
+        set_if_set(props, data, "allowed_client_ip")
         update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
         return await simple_db_mutate(cls, ctx, update_query)
 
