@@ -468,7 +468,6 @@ class ModifyUserInput(graphene.InputObjectType):
     domain_name = graphene.String(required=False)
     role = graphene.String(required=False)
     group_ids = graphene.List(lambda: graphene.String, required=False)
-    allowed_client_ip = graphene.String(required=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):

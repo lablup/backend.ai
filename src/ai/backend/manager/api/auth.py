@@ -392,6 +392,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         return await handler(request)
     if not check_date(request):
         raise InvalidAuthParameters("Date/time sync error")
+
     # PRE_AUTH_MIDDLEWARE allows authentication via 3rd-party request headers/cookies.
     # Any responsible hook must return a valid keypair.
     hook_result = await root_ctx.hook_plugin_ctx.dispatch(
@@ -501,7 +502,8 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
 
         def validate_ip(keypair: Mapping[str, Any]):
             raw_ip = keypair.get("allowed_client_ip", None)
-            if raw_ip is None:
+            if not raw_ip or raw_ip is None:
+                # raw_ip is None or "" - empty string
                 return
             _ip = request.headers.get("X-BackendAI-IP")
             assert isinstance(raw_ip, str)

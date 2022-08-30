@@ -37,7 +37,7 @@ from .base import (
 )
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
-from .user import ModifyUserInput, UserRole
+from .user import UserRole
 
 __all__: Sequence[str] = (
     "keypairs",
@@ -449,6 +449,7 @@ class ModifyKeyPairInput(graphene.InputObjectType):
     resource_policy = graphene.String(required=False)
     concurrency_limit = graphene.Int(required=False)  # deprecated and ignored
     rate_limit = graphene.Int(required=False)
+    allowed_client_ip = graphene.String(required=False)
 
 
 class CreateKeyPair(graphene.Mutation):
@@ -517,7 +518,7 @@ class ModifyKeyPair(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
-        props: ModifyUserInput,
+        props: ModifyKeyPairInput,
     ) -> ModifyKeyPair:
         ctx: GraphQueryContext = info.context
         data: Dict[str, Any] = {}
