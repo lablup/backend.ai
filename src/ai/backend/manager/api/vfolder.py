@@ -1824,8 +1824,6 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     """
     if row["ownership_type"] == VFolderOwnershipType.GROUP:
         raise InvalidAPIParameters("Cannot leave a group vfolder.")
-    if row["is_owner"]:
-        raise InvalidAPIParameters("Cannot leave a vfolder owned by the requesting user.")
 
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -1841,6 +1839,8 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             raise InsufficientPrivilege("Insufficient permission.")
         user_uuid = shared_user_uuid
     else:
+        if row["is_owner"]:
+            raise InvalidAPIParameters("Cannot leave a vfolder owned by the requesting user.")
         user_uuid = rqst_user_uuid
 
     log.info(
