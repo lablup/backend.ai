@@ -45,6 +45,9 @@ config_iv = t.Dict(
                 t.Key("allow_signup_without_confirmation", default=False): t.ToBool,
                 t.Key("webui_debug", default=False): t.ToBool,
                 t.Key("mask_user_info", default=False): t.ToBool,
+                t.Key("single_sign_on_vendors", default=None): t.Null
+                | tx.StringList(empty_str_as_empty_list=True),
+                t.Key("enable_container_commit", default=False): t.ToBool,
             }
         ).allow_extra("*"),
         t.Key("resources"): t.Dict(

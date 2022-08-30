@@ -1,0 +1,1 @@
+Make the Web-UI login work again by fixing missing decrypted payloads as JSON (a regression of #626)
