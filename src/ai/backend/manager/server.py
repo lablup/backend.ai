@@ -11,7 +11,7 @@ import ssl
 import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
-from contextlib import closing, suppress
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 from typing import (
@@ -23,7 +23,6 @@ from typing import (
     List,
     Mapping,
     MutableMapping,
-    Optional,
     Sequence,
     cast,
 )
@@ -45,10 +44,10 @@ from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.events import (
     EventDispatcher,
-    EventHandler,
     EventProducer,
-    NewLeaderEvent,
-    RerouteRequestEvent,
+    GlobalTimerCreatedEvent,
+    GlobalTimerJoinEvent,
+    GlobalTimerLeaveEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
@@ -306,60 +305,44 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     loop = asyncio.get_running_loop()
 
-    reroute_handler: Optional[EventHandler] = None
-    random_event_produce_task: Optional[asyncio.Task] = None
+    global_timer_ids: List[str] = []
+    has_leadership: bool = False
 
-    async def _on_leader_elected(context: None, source: str, event: NewLeaderEvent):
-        if event.leader == raft_id:
-            # TODO: Achieved a leadership: Run GlobalTimers
-            log.debug(f"{_log_prefix} NewLeaderEvent(LEADER)")
-        else:
-            # TODO: Stop GlobalTimers
-            log.debug(f"{_log_prefix} NewLeaderEvent(FOLLOWER)")
+    async def _on_global_timer_created(context: None, source: str, event: GlobalTimerCreatedEvent):
+        if os.getpid() == event.process_id:
+            global_timer_ids.append(event.timer_id)
+            if has_leadership:
+                await root_ctx.event_producer.produce_event(
+                    GlobalTimerJoinEvent(process_id=os.getpid(), timer_id=event.timer_id)
+                )
 
-    leader_elected_event_subscriber = root_ctx.event_dispatcher.subscribe(
-        NewLeaderEvent, None, _on_leader_elected
+    global_timer_created_handler = root_ctx.event_dispatcher.subscribe(
+        GlobalTimerCreatedEvent, None, _on_global_timer_created
     )
 
     async def _on_state_changed(next_state: RaftState):
-        nonlocal reroute_handler
-        nonlocal random_event_produce_task  # TODO: Remove before merge
-
+        nonlocal has_leadership
         match next_state:
             case RaftState.LEADER:
                 log.debug(f"{_log_prefix} LEADER")
+                has_leadership = True
                 # TODO: Run GlobalTimer objects
-                await root_ctx.event_producer.produce_event(NewLeaderEvent(leader=raft_id))
-
-                async def _event_callback(context: None, source: str, event: RerouteRequestEvent):
-                    log.debug(f"{_log_prefix} consume(): {event}")
-
-                if reroute_handler is None:
-                    reroute_handler = root_ctx.event_dispatcher.consume(
-                        RerouteRequestEvent, None, _event_callback
+                for timer_id in global_timer_ids:
+                    await root_ctx.event_producer.produce_event(
+                        GlobalTimerJoinEvent(process_id=os.getpid(), timer_id=timer_id)
                     )
 
             case RaftState.CANDIDATE:
                 log.debug(f"{_log_prefix} CANDIDATE")
+                has_leadership = False
 
             case RaftState.FOLLOWER:
                 log.debug(f"{_log_prefix} FOLLOWER")
-                if handler := reroute_handler:
-                    root_ctx.event_dispatcher.unconsume(handler)
-
-                async def _random_event_produce_coroutine():
-                    while True:
-                        await asyncio.sleep(1)
-                        event = RerouteRequestEvent()
-                        await root_ctx.event_producer.produce_event(event)
-                        log.debug(f"{_log_prefix} produce(): {event}")
-
-                if task := random_event_produce_task:
-                    if not task.done() and not task.cancelled():
-                        task.cancel()
-                        with suppress(asyncio.CancelledError):
-                            await task
-                random_event_produce_task = loop.create_task(_random_event_produce_coroutine())
+                has_leadership = False
+                for timer_id in global_timer_ids:
+                    await root_ctx.event_producer.produce_event(
+                        GlobalTimerLeaveEvent(process_id=os.getpid(), timer_id=timer_id)
+                    )
 
     server = GrpcRaftServer()
     client = GrpcRaftClient()
@@ -386,7 +369,7 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     await asyncio.gather(*_cleanup_coroutines)
 
-    root_ctx.event_dispatcher.unsubscribe(leader_elected_event_subscriber)
+    root_ctx.event_dispatcher.unsubscribe(global_timer_created_handler)
 
 
 @actxmgr
@@ -470,7 +453,6 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
         root_ctx.event_producer,
-        root_ctx.distributed_lock_factory,
     )
     await root_ctx.idle_checker_host.start()
     yield

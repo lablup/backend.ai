@@ -19,7 +19,7 @@ from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, LogSeverity, RedisConnectionInfo
 
-from ..defs import REDIS_LIVE_DB, LockID
+from ..defs import REDIS_LIVE_DB
 from ..models import UserRole
 from ..models import association_groups_users as agus
 from ..models import error_logs, groups
@@ -256,19 +256,19 @@ async def init(app: web.Application) -> None:
         db=REDIS_LIVE_DB,
     )
     app_ctx.log_cleanup_timer = GlobalTimer(
-        root_ctx.distributed_lock_factory(LockID.LOCKID_LOG_CLEANUP_TIMER, 20.0),
         root_ctx.event_producer,
+        root_ctx.event_dispatcher,
         lambda: DoLogCleanupEvent(),
         20.0,
         initial_delay=17.0,
     )
-    await app_ctx.log_cleanup_timer.join()
+    # await app_ctx.log_cleanup_timer.join()
 
 
 async def shutdown(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["logs.context"]
-    await app_ctx.log_cleanup_timer.leave()
+    # await app_ctx.log_cleanup_timer.leave()
     root_ctx.event_dispatcher.unconsume(app_ctx.log_cleanup_timer_evh)
     await app_ctx.log_cleanup_timer_redis.close()
 

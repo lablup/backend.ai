@@ -155,26 +155,26 @@ class SchedulerDispatcher(aobject):
         evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
         evd.consume(DoPrepareEvent, None, self.prepare)
         self.schedule_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_SCHEDULE_TIMER, 10.0),
             self.event_producer,
+            self.event_dispatcher,
             lambda: DoScheduleEvent(),
             interval=10.0,
         )
         self.prepare_timer = GlobalTimer(
-            self.lock_factory(LockID.LOCKID_PREPARE_TIMER, 10.0),
             self.event_producer,
+            self.event_dispatcher,
             lambda: DoPrepareEvent(),
             interval=10.0,
             initial_delay=5.0,
         )
-        await self.schedule_timer.join()
-        await self.prepare_timer.join()
+        # await self.schedule_timer.join()
+        # await self.prepare_timer.join()
         log.info("Session scheduler started")
 
     async def close(self) -> None:
-        async with aiotools.TaskGroup() as tg:
-            tg.create_task(self.prepare_timer.leave())
-            tg.create_task(self.schedule_timer.leave())
+        # async with aiotools.TaskGroup() as tg:
+        #     tg.create_task(self.prepare_timer.leave())
+        #     tg.create_task(self.schedule_timer.leave())
         log.info("Session scheduler stopped")
 
     async def schedule(

@@ -47,10 +47,9 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, RedisConnectionInfo, SessionTypes
 from ai.backend.common.utils import nmget
 
-from .defs import DEFAULT_ROLE, REDIS_LIVE_DB, REDIS_STAT_DB, LockID
+from .defs import DEFAULT_ROLE, REDIS_LIVE_DB, REDIS_STAT_DB
 from .models import kernels, keypair_resource_policies, keypairs
 from .models.kernel import LIVE_STATUS
-from .types import DistributedLockFactory
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -83,7 +82,6 @@ class IdleCheckerHost:
         shared_config: SharedConfig,
         event_dispatcher: EventDispatcher,
         event_producer: EventProducer,
-        lock_factory: DistributedLockFactory,
     ) -> None:
         self._checkers: list[BaseIdleChecker] = []
         self._frozen = False
@@ -91,7 +89,6 @@ class IdleCheckerHost:
         self._shared_config = shared_config
         self._event_dispatcher = event_dispatcher
         self._event_producer = event_producer
-        self._lock_factory = lock_factory
         self._redis_live = redis_helper.get_redis_object(
             self._shared_config.data["redis"],
             db=REDIS_LIVE_DB,
@@ -116,8 +113,8 @@ class IdleCheckerHost:
             )
             await checker.populate_config(raw_config or {})
         self.timer = GlobalTimer(
-            self._lock_factory(LockID.LOCKID_IDLE_CHECK_TIMER, self.check_interval),
             self._event_producer,
+            self._event_dispatcher,
             lambda: DoIdleCheckEvent(),
             self.check_interval,
         )
@@ -126,12 +123,12 @@ class IdleCheckerHost:
             None,
             self._do_idle_check,
         )
-        await self.timer.join()
+        # await self.timer.join()
 
     async def shutdown(self) -> None:
         for checker in self._checkers:
             await checker.aclose()
-        await self.timer.leave()
+        # await self.timer.leave()
         self._event_dispatcher.unconsume(self._evh_idle_check)
         await self._redis_stat.close()
         await self._redis_live.close()
@@ -624,14 +621,16 @@ async def init_idle_checkers(
     shared_config: SharedConfig,
     event_dispatcher: EventDispatcher,
     event_producer: EventProducer,
-    lock_factory: DistributedLockFactory,
 ) -> IdleCheckerHost:
     """
     Create an instance of session idleness checker
     from the given configuration and using the given event dispatcher.
     """
     checker_host = IdleCheckerHost(
-        db, shared_config, event_dispatcher, event_producer, lock_factory
+        db,
+        shared_config,
+        event_dispatcher,
+        event_producer,
     )
     checker_init_args = (event_dispatcher, checker_host._redis_live, checker_host._redis_stat)
     log.info("Initializing idle checker: session_lifetime")

@@ -105,17 +105,32 @@ class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
 
 
 @attr.s(slots=True, frozen=True)
-class NewLeaderEvent(AbstractEvent):
-    name = "new_leader_event"
+class GlobalTimerEventArgs:
 
-    leader: str = attr.ib()
+    process_id: int = attr.ib()
+    timer_id: str = attr.ib()
 
     def serialize(self) -> tuple:
-        return (self.leader,)
+        return (
+            self.process_id,
+            self.timer_id,
+        )
 
     @classmethod
     def deserialize(cls, value: tuple):
-        return cls(value[0])
+        return cls(value[0], value[1])
+
+
+class GlobalTimerCreatedEvent(GlobalTimerEventArgs, AbstractEvent):
+    name = "global_timer_created_event"
+
+
+class GlobalTimerJoinEvent(GlobalTimerEventArgs, AbstractEvent):
+    name = "global_timer_join_event"
+
+
+class GlobalTimerLeaveEvent(GlobalTimerEventArgs, AbstractEvent):
+    name = "global_timer_leave_event"
 
 
 class RerouteRequestEvent(EmptyEventArgs, AbstractEvent):
