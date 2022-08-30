@@ -40,8 +40,11 @@ agent_local_config_iv = (
                     ),
                     t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
                     t.Key("skip-manager-detection", default=False): t.ToBool,
-                    t.Key("aiomonitor-port", default=50002): t.Int[1:65535],
+                    t.Key("aiomonitor-port", default=50200): t.Int[1:65535],
                     t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
+                    t.Key("image-commit-path", default="./tmp/backend.ai/commit"): tx.Path(
+                        type="dir", auto_create=True
+                    ),
                     t.Key("abuse-report-path", default=None): t.Null
                     | tx.Path(type="dir", allow_nonexisting=True),
                 }
@@ -77,6 +80,8 @@ agent_local_config_iv = (
             t.Key("debug"): t.Dict(
                 {
                     t.Key("enabled", default=False): t.Bool,
+                    t.Key("asyncio", default=False): t.Bool,
+                    t.Key("enhanced-aiomonitor-task-info", default=False): t.Bool,
                     t.Key("skip-container-deletion", default=False): t.Bool,
                     t.Key("log-stats", default=False): t.Bool,
                     t.Key("log-kernel-config", default=False): t.Bool,

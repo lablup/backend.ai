@@ -202,6 +202,15 @@ class KubernetesKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
+    async def check_duplicate_commit(self, path):
+        log.error("Committing in Kubernetes is not supported yet.")
+        raise NotImplementedError
+
+    async def commit(self, path, lock_path, filename):
+        # TODO: Implement container commit on Kubernetes kernel.
+        log.error("Committing in Kubernetes is not supported yet.")
+        raise NotImplementedError
+
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()
         work_dir = self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"

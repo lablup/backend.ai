@@ -4,7 +4,17 @@ import asyncio
 import logging
 import re
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, TypedDict, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    Optional,
+    Sequence,
+    TypedDict,
+    Union,
+    overload,
+)
 
 import aiohttp
 import graphene
@@ -116,31 +126,71 @@ groups = sa.Table(
 )
 
 
+def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
+    query = (
+        sa.select([groups.c.id])
+        .select_from(groups)
+        .where(
+            cond & (groups.c.domain_name == domain_name),
+        )
+    )
+    return query
+
+
 async def resolve_group_name_or_id(
     db_conn: SAConnection,
     domain_name: str,
     value: Union[str, uuid.UUID],
 ) -> Optional[uuid.UUID]:
-    if isinstance(value, str):
-        query = (
-            sa.select([groups.c.id])
-            .select_from(groups)
-            .where(
-                (groups.c.name == value) & (groups.c.domain_name == domain_name),
-            )
-        )
-        return await db_conn.scalar(query)
-    elif isinstance(value, uuid.UUID):
-        query = (
-            sa.select([groups.c.id])
-            .select_from(groups)
-            .where(
-                (groups.c.id == value) & (groups.c.domain_name == domain_name),
-            )
-        )
-        return await db_conn.scalar(query)
-    else:
-        raise TypeError("unexpected type for group_name_or_id")
+    match value:
+        case uuid.UUID():
+            cond = groups.c.id == value
+        case str():
+            cond = groups.c.name == value
+        case _:
+            raise TypeError("unexpected type for group_name_or_id")
+    query = _build_group_query(cond, domain_name)
+    return await db_conn.scalar(query)
+
+
+@overload
+async def resolve_groups(
+    db_conn: SAConnection,
+    domain_name: str,
+    values: Iterable[uuid.UUID],
+) -> Iterable[uuid.UUID]:
+    ...
+
+
+@overload
+async def resolve_groups(
+    db_conn: SAConnection,
+    domain_name: str,
+    values: Iterable[str],
+) -> Iterable[uuid.UUID]:
+    ...
+
+
+async def resolve_groups(
+    db_conn: SAConnection,
+    domain_name: str,
+    values: Iterable[uuid.UUID] | Iterable[str],
+) -> Iterable[uuid.UUID]:
+    listed_val = [*values]
+    match listed_val:
+        case [uuid.UUID(), *_]:
+            query = _build_group_query((groups.c.id.in_(listed_val)), domain_name)
+        case [str(), *_]:
+            query = _build_group_query((groups.c.name.in_(listed_val)), domain_name)
+        case []:
+            return []
+        case _:
+            raise TypeError("unexpected type for group_name_or_id")
+
+    rows = (await db_conn.execute(query)).fetchall()
+    return_val = [row["id"] for row in rows]
+
+    return return_val
 
 
 class Group(graphene.ObjectType):
