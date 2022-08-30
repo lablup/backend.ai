@@ -104,8 +104,22 @@ class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
 
 
-class LeaderElectedEvent(EmptyEventArgs, AbstractEvent):
-    name = "leader_elected_event"
+@attr.s(slots=True, frozen=True)
+class NewLeaderEvent(AbstractEvent):
+    name = "new_leader_event"
+
+    leader: str = attr.ib()
+
+    def serialize(self) -> tuple:
+        return (self.leader,)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(value[0])
+
+
+class RerouteRequestEvent(EmptyEventArgs, AbstractEvent):
+    name = "reroute_request_event"
 
 
 @attr.s(slots=True, frozen=True)

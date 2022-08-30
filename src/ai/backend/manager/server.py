@@ -11,7 +11,7 @@ import ssl
 import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
-from contextlib import closing
+from contextlib import closing, suppress
 from datetime import datetime
 from pathlib import Path
 from typing import (
@@ -43,8 +43,13 @@ from setproctitle import setproctitle
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.distributed import GlobalTimer
-from ai.backend.common.events import EventDispatcher, EventProducer, LeaderElectedEvent
+from ai.backend.common.events import (
+    EventDispatcher,
+    EventHandler,
+    EventProducer,
+    NewLeaderEvent,
+    RerouteRequestEvent,
+)
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -65,14 +70,7 @@ from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHand
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
-from .defs import (
-    REDIS_IMAGE_DB,
-    REDIS_LIVE_DB,
-    REDIS_STAT_DB,
-    REDIS_STREAM_DB,
-    REDIS_STREAM_LOCK,
-    LockID,
-)
+from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
 from .types import DistributedLockFactory
 
@@ -298,42 +296,70 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     configuration = root_ctx.local_config["manager"]["raft-configuration"]
+    raft_id = configuration[root_ctx.pidx]
+    grpc_port = int(raft_id.split(":")[-1])
+    filtered_configuration = tuple(conf for conf in configuration if conf != raft_id)
+
+    _log_prefix = f"[pid={os.getpid()}/pidx={root_ctx.pidx}]"
 
     _cleanup_coroutines: List[Coroutine] = []
 
     loop = asyncio.get_running_loop()
-    global_timer: Optional[GlobalTimer] = None
-    global_timer_join_task: Optional[asyncio.Task] = None
-    global_timer_leave_task: Optional[asyncio.Task] = None
+
+    reroute_handler: Optional[EventHandler] = None
+    random_event_produce_task: Optional[asyncio.Task] = None
+
+    async def _on_leader_elected(context: None, source: str, event: NewLeaderEvent):
+        if event.leader == raft_id:
+            # TODO: Achieved a leadership: Run GlobalTimers
+            log.debug(f"{_log_prefix} NewLeaderEvent(LEADER)")
+        else:
+            # TODO: Stop GlobalTimers
+            log.debug(f"{_log_prefix} NewLeaderEvent(FOLLOWER)")
+
+    leader_elected_event_subscriber = root_ctx.event_dispatcher.subscribe(
+        NewLeaderEvent, None, _on_leader_elected
+    )
 
     async def _on_state_changed(next_state: RaftState):
-        nonlocal global_timer
-        nonlocal global_timer_join_task
-        nonlocal global_timer_leave_task
+        nonlocal reroute_handler
+        nonlocal random_event_produce_task  # TODO: Remove before merge
 
         match next_state:
             case RaftState.LEADER:
-                log.debug(f"[pid={os.getpid()}]/pidx={root_ctx.pidx}] LEADER")
-                global_timer = GlobalTimer(
-                    root_ctx.distributed_lock_factory(
-                        lock_id=LockID.LOCKID_LEADER_ELECTION_TIMER, lifetime_hint=10.0
-                    ),
-                    event_producer=root_ctx.event_producer,
-                    event_factory=lambda: LeaderElectedEvent(),
-                    interval=10.0,
-                )
-                global_timer_join_task = loop.create_task(global_timer.join())
-            case RaftState.CANDIDATE:
-                pass
-            case RaftState.FOLLOWER:
-                log.debug(f"[pid={os.getpid()}]/pidx={root_ctx.pidx}] FOLLOWER")
-                if timer := global_timer:
-                    global_timer_leave_task = loop.create_task(timer.leave())
-                global_timer = None
+                log.debug(f"{_log_prefix} LEADER")
+                # TODO: Run GlobalTimer objects
+                await root_ctx.event_producer.produce_event(NewLeaderEvent(leader=raft_id))
 
-    raft_id = configuration[root_ctx.pidx]
-    grpc_port = int(raft_id.split(":")[-1])
-    filtered_configuration = tuple(conf for conf in configuration if conf != raft_id)
+                async def _event_callback(context: None, source: str, event: RerouteRequestEvent):
+                    log.debug(f"{_log_prefix} consume(): {event}")
+
+                if reroute_handler is None:
+                    reroute_handler = root_ctx.event_dispatcher.consume(
+                        RerouteRequestEvent, None, _event_callback
+                    )
+
+            case RaftState.CANDIDATE:
+                log.debug(f"{_log_prefix} CANDIDATE")
+
+            case RaftState.FOLLOWER:
+                log.debug(f"{_log_prefix} FOLLOWER")
+                if handler := reroute_handler:
+                    root_ctx.event_dispatcher.unconsume(handler)
+
+                async def _random_event_produce_coroutine():
+                    while True:
+                        await asyncio.sleep(1)
+                        event = RerouteRequestEvent()
+                        await root_ctx.event_producer.produce_event(event)
+                        log.debug(f"{_log_prefix} produce(): {event}")
+
+                if task := random_event_produce_task:
+                    if not task.done() and not task.cancelled():
+                        task.cancel()
+                        with suppress(asyncio.CancelledError):
+                            await task
+                random_event_produce_task = loop.create_task(_random_event_produce_coroutine())
 
     server = GrpcRaftServer()
     client = GrpcRaftClient()
@@ -359,6 +385,8 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     yield
 
     await asyncio.gather(*_cleanup_coroutines)
+
+    root_ctx.event_dispatcher.unsubscribe(leader_elected_event_subscriber)
 
 
 @actxmgr
