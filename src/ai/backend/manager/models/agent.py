@@ -409,7 +409,7 @@ class AgentSummary(graphene.ObjectType):
             schedulable=row["schedulable"],
             available_slots=row["available_slots"].to_json(),
             occupied_slots=row["occupied_slots"].to_json(),
-            architecture=row["architecture"]
+            architecture=row["architecture"],
         )
 
     _queryfilter_fieldspec = {
