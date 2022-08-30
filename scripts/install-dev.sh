@@ -275,6 +275,7 @@ install_brew() {
 	    fi
     esac
 }
+
 install_script_deps() {
   case $DISTRO in
   Debian)
@@ -561,11 +562,6 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
     echo "validating Docker Desktop mount permissions..."
     docker pull alpine:3.8 > /dev/null
     docker run --rm -v "$HOME/.pyenv:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
-
-  if [ "$DISTRO" = "Darwin" ]; then
-    echo "validating Docker Desktop mount permissions..."
-    docker pull alpine:3.8 > /dev/null
-    docker run --rm -v "$HOME/.pyenv:/root/vol" alpine:3.8 ls /root/vol > /dev/null 2>&1
     if [ $? -ne 0 ]; then
       # backend.ai-krunner-DISTRO pkgs are installed in pyenv's virtualenv,
       # so ~/.pyenv must be mountable.
@@ -596,11 +592,7 @@ check_snappy() {
   fi
   rm -f $pkgfile
 }
-
-setup_environment() {
-
-  # Install pyenv
-  read -r -d '' pyenv_init_script <<"EOS"
+read -r -d '' pyenv_init_script <<"EOS"
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init --path)"
@@ -608,6 +600,8 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOS
 
+setup_environment() {
+  # Install pyenv
   if ! type "pyenv" >/dev/null 2>&1; then
     # TODO: ask if install pyenv
     show_info "Installing pyenv..."
@@ -761,6 +755,12 @@ configure_backendai() {
   # configure tester
   echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-admin-api.sh" > ./env-tester-admin.sh
   echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user-api.sh" > ./env-tester-user.sh
+
+  if [ "${CODESPACES}" = "true" ]; then
+    $docker_sudo docker stop $($docker_sudo docker ps -q)
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" down
+    $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d
+  fi
 
   # initialize the DB schema
   show_info "Setting up databases..."
