@@ -16,6 +16,16 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.03.14 (2022-08-30)
+
+### Features
+* Elaborate messaging of `InstanceNotAvailable` errors and log it inside the `status_data` column as the `scheduler.msg` JSON field ([#643](https://github.com/lablup/backend.ai/issues/643))
+* Enable the asyncio debug mode when our debug mode is enabled (e.g., `--debug`) and replace `aiomonitor` with `aiomonitor-ng` ([#688](https://github.com/lablup/backend.ai/issues/688))
+
+### Fixes
+* Accept both string field names and `FieldSpec` instances in the Client SDK's functional API wrappers ([#613](https://github.com/lablup/backend.ai/issues/613))
+
+
 ## 22.03.13 (2022-08-18)
 * A follow-up hotfix for [#664](https://github.com/lablup/backend.ai/issues/664)
 
