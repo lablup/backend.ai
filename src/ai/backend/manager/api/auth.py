@@ -500,8 +500,8 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             "is_admin": row["keypairs_is_admin"],
         }
 
-        def validate_ip(keypair: Mapping[str, Any]):
-            raw_ip = keypair.get("allowed_client_ip", None)
+        def validate_ip(user: Mapping[str, Any]):
+            raw_ip = user.get("allowed_client_ip", None)
             if not raw_ip or raw_ip is None:
                 # raw_ip is None or "" - empty string
                 return
@@ -511,7 +511,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             if _ip not in allowed_client_ips:
                 raise AuthorizationFailed("Not allowed IP address")
 
-        validate_ip(auth_result["keypair"])
+        validate_ip(auth_result["user"])
         auth_result["keypair"]["resource_policy"] = {
             col.name: row[f"keypair_resource_policies_{col.name}"]
             for col in keypair_resource_policies.c
