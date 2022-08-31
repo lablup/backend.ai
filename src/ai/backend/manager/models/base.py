@@ -305,6 +305,8 @@ class IPColumn(TypeDecorator):
     cache_ok = True
 
     def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
         try:
             str_val = str(value)
         except ValueError:
@@ -318,7 +320,7 @@ class IPColumn(TypeDecorator):
             octets = _ip.split(".")
             cidr = octets.index("*") * 8
             return ip_network(f"{filtered}/{cidr}")
-        return value
+        return ip_network(value)
 
 
 class CurrencyTypes(enum.Enum):
