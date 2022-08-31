@@ -382,23 +382,17 @@ class StatContext:
         """
         async with self._lock:
             kernel_id_map: Dict[ContainerId, KernelId] = {}
-            stale_kernel_ids = []
             for kid, info in self.agent.kernel_registry.items():
                 try:
                     cid = info["container_id"]
                 except KeyError:
-                    stale_kernel_ids.append(kid)
                     log.warning("collect_container_stat(): no container for kernel {}", kid)
                 else:
                     kernel_id_map[ContainerId(cid)] = kid
-            if stale_kernel_ids:
-                for kid in stale_kernel_ids:
-                    self.agent.kernel_registry.pop(kid, None)
             unused_kernel_ids = set(self.kernel_metrics.keys()) - set(kernel_id_map.values())
             for unused_kernel_id in unused_kernel_ids:
                 log.debug("removing kernel_metric for {}", unused_kernel_id)
                 self.kernel_metrics.pop(unused_kernel_id, None)
-
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
             # instead of cancelling them.

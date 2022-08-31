@@ -777,12 +777,19 @@ class AbstractAgent(
         try:
             updated_kernel_ids = []
             container_ids = []
+            stale_kernel_ids = []
             async with self.registry_lock:
                 for kernel_id, kernel_obj in [*self.kernel_registry.items()]:
                     if not kernel_obj.stats_enabled:
                         continue
                     updated_kernel_ids.append(kernel_id)
                     container_ids.append(kernel_obj["container_id"])
+                for kid, info in self.kernel_registry.items():
+                    if not info:
+                        stale_kernel_ids.append(kid)
+                if stale_kernel_ids:
+                    for kid in stale_kernel_ids:
+                        self.kernel_registry.pop(kid, None)
                 await self.stat_ctx.collect_container_stat(container_ids)
             # Let the manager store the statistics in the persistent database.
             if updated_kernel_ids:
