@@ -107,12 +107,12 @@ class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
 @attr.s(slots=True, frozen=True)
 class GlobalTimerEventArgs:
 
-    process_id: int = attr.ib()
+    node_id: str = attr.ib()
     timer_id: str = attr.ib()
 
     def serialize(self) -> tuple:
         return (
-            self.process_id,
+            self.node_id,
             self.timer_id,
         )
 
@@ -123,6 +123,10 @@ class GlobalTimerEventArgs:
 
 class GlobalTimerCreatedEvent(GlobalTimerEventArgs, AbstractEvent):
     name = "global_timer_created_event"
+
+
+class GlobalTimerDeletedEvent(GlobalTimerEventArgs, AbstractEvent):
+    name = "global_timer_deleted_event"
 
 
 class GlobalTimerJoinEvent(GlobalTimerEventArgs, AbstractEvent):

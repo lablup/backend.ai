@@ -86,6 +86,7 @@ class LeaderGlobalTimer:
 
     def __init__(
         self,
+        node_id: str,
         event_producer: EventProducer,
         event_dispatcher: EventDispatcher,
         event_factory: Callable[[], AbstractEvent],
@@ -114,7 +115,7 @@ class LeaderGlobalTimer:
         loop = asyncio.get_running_loop()
         loop.create_task(
             event_producer.produce_event(
-                GlobalTimerCreatedEvent(process_id=os.getpid(), timer_id=self._id)
+                GlobalTimerCreatedEvent(node_id=node_id, timer_id=self._id)
             )
         )
 
@@ -128,7 +129,9 @@ class LeaderGlobalTimer:
             if self._stopped:
                 return
             while True:
-                log.warning(f"[GlobalTimer:{os.getpid()}] generate_tick()")
+                log.warning(
+                    f"[GlobalTimer:{os.getpid()}:{self._id[:4]}] generate_tick(interval={self.interval})"
+                )
                 try:
                     if self._stopped:
                         return

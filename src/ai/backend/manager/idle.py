@@ -78,6 +78,7 @@ class IdleCheckerHost:
 
     def __init__(
         self,
+        node_id: str,
         db: SAEngine,
         shared_config: SharedConfig,
         event_dispatcher: EventDispatcher,
@@ -85,6 +86,7 @@ class IdleCheckerHost:
     ) -> None:
         self._checkers: list[BaseIdleChecker] = []
         self._frozen = False
+        self._node_id = node_id
         self._db = db
         self._shared_config = shared_config
         self._event_dispatcher = event_dispatcher
@@ -113,6 +115,7 @@ class IdleCheckerHost:
             )
             await checker.populate_config(raw_config or {})
         self.timer = LeaderGlobalTimer(
+            self._node_id,
             self._event_producer,
             self._event_dispatcher,
             lambda: DoIdleCheckEvent(),
@@ -617,6 +620,7 @@ checker_registry: Mapping[str, Type[BaseIdleChecker]] = {
 
 
 async def init_idle_checkers(
+    node_id: str,
     db: SAEngine,
     shared_config: SharedConfig,
     event_dispatcher: EventDispatcher,
@@ -627,6 +631,7 @@ async def init_idle_checkers(
     from the given configuration and using the given event dispatcher.
     """
     checker_host = IdleCheckerHost(
+        node_id,
         db,
         shared_config,
         event_dispatcher,

@@ -111,7 +111,8 @@ StartTaskArgs = Tuple[
 
 class SchedulerDispatcher(aobject):
 
-    config: LocalConfig
+    node_id: str
+    local_config: LocalConfig
     shared_config: SharedConfig
     registry: AgentRegistry
     db: SAEngine
@@ -123,6 +124,7 @@ class SchedulerDispatcher(aobject):
 
     def __init__(
         self,
+        node_id: str,
         local_config: LocalConfig,
         shared_config: SharedConfig,
         event_dispatcher: EventDispatcher,
@@ -130,6 +132,7 @@ class SchedulerDispatcher(aobject):
         lock_factory: DistributedLockFactory,
         registry: AgentRegistry,
     ) -> None:
+        self.node_id = node_id
         self.local_config = local_config
         self.shared_config = shared_config
         self.event_dispatcher = event_dispatcher
@@ -155,12 +158,14 @@ class SchedulerDispatcher(aobject):
         evd.consume(DoScheduleEvent, None, self.schedule, coalescing_opts)
         evd.consume(DoPrepareEvent, None, self.prepare)
         self.schedule_timer = LeaderGlobalTimer(
+            self.node_id,
             self.event_producer,
             self.event_dispatcher,
             lambda: DoScheduleEvent(),
             interval=10.0,
         )
         self.prepare_timer = LeaderGlobalTimer(
+            self.node_id,
             self.event_producer,
             self.event_dispatcher,
             lambda: DoPrepareEvent(),

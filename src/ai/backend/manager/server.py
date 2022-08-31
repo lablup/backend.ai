@@ -299,21 +299,22 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     grpc_port = int(raft_id.split(":")[-1])
     filtered_configuration = tuple(conf for conf in configuration if conf != raft_id)
 
+    root_ctx.cluster_node_id = f"{raft_id}:{os.getpid()}"
+
     _log_prefix = f"[pid={os.getpid()}/pidx={root_ctx.pidx}]"
 
-    _cleanup_coroutines: List[Coroutine] = []
-
     loop = asyncio.get_running_loop()
+    _cleanup_coroutines: List[Coroutine] = []
 
     global_timer_ids: List[str] = []
     has_leadership: bool = False
 
     async def _on_global_timer_created(context: None, source: str, event: GlobalTimerCreatedEvent):
-        if os.getpid() == event.process_id:
+        if root_ctx.cluster_node_id == event.node_id:
             global_timer_ids.append(event.timer_id)
             if has_leadership:
                 await root_ctx.event_producer.produce_event(
-                    GlobalTimerJoinEvent(process_id=os.getpid(), timer_id=event.timer_id)
+                    GlobalTimerJoinEvent(node_id=root_ctx.cluster_node_id, timer_id=event.timer_id)
                 )
 
     global_timer_created_handler = root_ctx.event_dispatcher.subscribe(
@@ -326,10 +327,9 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             case RaftState.LEADER:
                 log.debug(f"{_log_prefix} LEADER")
                 has_leadership = True
-                # TODO: Run GlobalTimer objects
                 for timer_id in global_timer_ids:
                     await root_ctx.event_producer.produce_event(
-                        GlobalTimerJoinEvent(process_id=os.getpid(), timer_id=timer_id)
+                        GlobalTimerJoinEvent(node_id=root_ctx.cluster_node_id, timer_id=timer_id)
                     )
 
             case RaftState.CANDIDATE:
@@ -341,7 +341,7 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 has_leadership = False
                 for timer_id in global_timer_ids:
                     await root_ctx.event_producer.produce_event(
-                        GlobalTimerLeaveEvent(process_id=os.getpid(), timer_id=timer_id)
+                        GlobalTimerLeaveEvent(node_id=root_ctx.cluster_node_id, timer_id=timer_id)
                     )
 
     server = GrpcRaftServer()
@@ -449,6 +449,7 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .idle import init_idle_checkers
 
     root_ctx.idle_checker_host = await init_idle_checkers(
+        root_ctx.cluster_node_id,
         root_ctx.db,
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
@@ -511,6 +512,7 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .scheduler.dispatcher import SchedulerDispatcher
 
     sched_dispatcher = await SchedulerDispatcher.new(
+        root_ctx.cluster_node_id,
         root_ctx.local_config,
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
@@ -686,6 +688,7 @@ def build_root_app(
             database_ctx,
             distributed_lock_ctx,
             event_dispatcher_ctx,
+            leader_election_ctx,
             idle_checker_ctx,
             storage_manager_ctx,
             hook_plugin_ctx,
@@ -693,7 +696,6 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
-            leader_election_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
