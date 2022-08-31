@@ -34,6 +34,11 @@ session-expire = "1d"
 # user = 1000
 # group = 1000
 
+# The starting port number for aiomonitor.
+# Since the storage-proxy is composed of multiple processes, each process will be exposed
+# via the port number of this base port number + pidx.
+# aiomonitor-port = 50300
+
 
 [api.client]
 # Client-facing API
@@ -56,6 +61,12 @@ secret = "some-secret-shared-with-manager"
 [debug]
 # Enable the debug mode by overriding the global loglevel and "ai.backend" loglevel.
 enabled = false
+
+# Enable or disable the asyncio debug mode.
+asyncio = false
+
+# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
+enhanced-aiomonitor-task-info = false
 
 
 [logging]

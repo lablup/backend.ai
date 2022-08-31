@@ -21,7 +21,7 @@
 //     "aiohttp_session[aioredis]~=2.11",
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.1",
-//     "aiomonitor~=0.4.5",
+//     "aiomonitor-ng~=0.5.1",
 //     "aioraft-ng==0.1.1",
 //     "aioredis[hiredis]~=2.0.1",
 //     "aiosqlite~=0.17.0",
@@ -372,22 +372,22 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5c7ac38b2ee59cbad87162ef5c45d72c7b57b94c8a93e7f462184bf10f9ebccd",
-              "url": "https://files.pythonhosted.org/packages/94/6d/95eb718f545c6d09aa19fa08b28b616203a77a68755b09c6f6b1202773b2/aiomonitor-0.4.5-py3-none-any.whl"
+              "hash": "6a13cd037c5d7e1a00eae828e3b002937cc0c5da3d35b366a9ffbff609ed0344",
+              "url": "https://files.pythonhosted.org/packages/b1/ac/dc372280795c821ee2a7a9e8aea04ef7afc92cc168d5ac1824390b0834eb/aiomonitor_ng-0.5.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6232c1ab14bf06cd7217845801c27340032f74e283bdaf32d01cdd3b7c673d0e",
-              "url": "https://files.pythonhosted.org/packages/98/76/b62e9fbe267287527fb6f4b6774394d4f00650195774173bb0055a99ab3d/aiomonitor-0.4.5.tar.gz"
+              "hash": "89adce2e4df86d1632c72e6b1840539dd44fef632c7feb72bc6386d88dc272e4",
+              "url": "https://files.pythonhosted.org/packages/2d/e0/ccfa40c9ed1d2fee32a3f944c0b6708d0bcd3fbc33e42276a5e0955c4a61/aiomonitor-ng-0.5.1.tar.gz"
             }
           ],
-          "project_name": "aiomonitor",
+          "project_name": "aiomonitor-ng",
           "requires_dists": [
             "aioconsole",
             "terminaltables"
           ],
           "requires_python": null,
-          "version": "0.4.5"
+          "version": "0.5.1"
         },
         {
           "artifacts": [
@@ -4017,7 +4017,7 @@
     "aiohttp_session[aioredis]~=2.11",
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.1",
-    "aiomonitor~=0.4.5",
+    "aiomonitor-ng~=0.5.1",
     "aioraft-ng==0.1.1",
     "aioredis[hiredis]~=2.0.1",
     "aiosqlite~=0.17.0",
