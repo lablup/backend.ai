@@ -391,16 +391,17 @@ async def create(request: web.Request, params: Any) -> web.Response:
         assert result.rowcount == 1
         data_before: Dict[str, Any] = {}
         auditlog_data = {
-                            'user_id': str(request['user']['uuid']),
-                            'email': request['user']['email'],
-                            'access_key': request['keypair']['access_key'],
-                            'data': {
-                                'before': data_before,
-                                'after': insert_values,
-                            },
-                            'action': 'CREATE',
-                            'target': params['name'],
-                        }
+            'user_id': str(request['user']['uuid']),
+            'email': request['user']['email'],
+            'access_key': request['keypair']['access_key'],
+            'data': {
+                'before': data_before,
+                'after': insert_values,
+            },
+            'action': 'CREATE',
+            'target_type': 'vfolder',
+            'target': params['id'],
+        }
         try:
             insert_auditlog_query = (
                 sa.insert(audit_logs)
@@ -531,20 +532,21 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         query = (sa.delete(vfolders).where(vfolders.c.id == folder_id))
         await conn.execute(query)
         auditlog_data = {
-                        'email': request['user']['email'],
-                        'user_id': str(request['user']['uuid']),
-                        'access_key': request['keypair']['access_key'],
-                        'data': {
-                            'data_before': prev_data,
-                            'data_after': {},
-                        },
-                        'action': 'DELETE',
-                        'target': prev_data['name'],
-                    }
+            'email': request['user']['email'],
+            'user_id': str(request['user']['uuid']),
+            'access_key': request['keypair']['access_key'],
+            'data': {
+                'data_before': prev_data,
+                'data_after': {},
+            },
+            'action': 'DELETE',
+            'target_type': 'vfolder',
+            'target': prev_data['id'],
+        }
         try:
             insert_auditlog_query = (
-                    sa.insert(audit_logs)
-                    .values(auditlog_data)
+                sa.insert(audit_logs)
+                .values(auditlog_data)
             )
             await conn.execute(insert_auditlog_query)
         except sa.exc.DataError:
@@ -764,7 +766,8 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app['_root.context']
     proxy_name, volume_name = root_ctx.storage_manager.split_host(params['folder_host'])
     quota = int(params['input']['size_bytes'])
-    log.info('VFOLDER.UPDATE_QUOTA (volume_name:{}, quota:{}, vf:{})', volume_name, quota, params['id'])
+    log.info('VFOLDER.UPDATE_QUOTA (volume_name:{}, quota:{}, vf:{})',
+             volume_name, quota, params['id'])
 
     # Permission check for the requested vfolder.
     user_role = request['user']['role']
@@ -1686,7 +1689,8 @@ async def delete(request: web.Request) -> web.Response:
         #         break
         # FIXME: For now, multiple entries on delete vfolder will raise an error. Will be fixed in 22.06
         if len(entries) > 1:
-            log.error('VFOLDER.DELETE(folder name:{}, hosts:{}', folder_name, [entry['host'] for entry in entries])
+            log.error('VFOLDER.DELETE(folder name:{}, hosts:{}',
+                      folder_name, [entry['host'] for entry in entries])
             raise TooManyVFoldersFound(
                 extra_msg="Multiple folders with the same name.",
                 extra_data=None,
@@ -1719,20 +1723,20 @@ async def delete(request: web.Request) -> web.Response:
         query = (sa.delete(vfolders).where(vfolders.c.id == folder_id))
         await conn.execute(query)
         auditlog_data = {
-                        'email': request['user']['email'],
-                        'user_id': str(request['user']['uuid']),
-                        'access_key': request['keypair']['access_key'],
-                        'data': {
-                            'data_before': prev_data,
-                            'data_after': {},
-                        },
-                        'action': 'DELETE',
-                        'target': folder_name,
-                    }
+            'email': request['user']['email'],
+            'user_id': str(request['user']['uuid']),
+            'access_key': request['keypair']['access_key'],
+            'data': {
+                'data_before': prev_data,
+                'data_after': {},
+            },
+            'action': 'DELETE',
+            'target': prev_data['id'],
+        }
         try:
             insert_auditlog_query = (
-                    sa.insert(audit_logs)
-                    .values(auditlog_data)
+                sa.insert(audit_logs)
+                .values(auditlog_data)
             )
             await conn.execute(insert_auditlog_query)
         except sa.exc.DataError:
@@ -2446,46 +2450,46 @@ def create_app(default_cors_options):
     add_route = app.router.add_route
     root_resource = cors.add(app.router.add_resource(r''))
     cors.add(root_resource.add_route('POST', create))
-    cors.add(root_resource.add_route('GET',  list_folders))
-    cors.add(root_resource.add_route('DELETE',  delete_by_id))
+    cors.add(root_resource.add_route('GET', list_folders))
+    cors.add(root_resource.add_route('DELETE', delete_by_id))
     vfolder_resource = cors.add(app.router.add_resource(r'/{name}'))
-    cors.add(vfolder_resource.add_route('GET',    get_info))
+    cors.add(vfolder_resource.add_route('GET', get_info))
     cors.add(vfolder_resource.add_route('DELETE', delete))
-    cors.add(add_route('GET',    r'/_/hosts', list_hosts))
-    cors.add(add_route('GET',    r'/_/all-hosts', list_all_hosts))
-    cors.add(add_route('GET',    r'/_/allowed-types', list_allowed_types))
-    cors.add(add_route('GET',    r'/_/all_hosts', list_all_hosts))          # legacy underbar
-    cors.add(add_route('GET',    r'/_/allowed_types', list_allowed_types))  # legacy underbar
-    cors.add(add_route('GET',    r'/_/perf-metric', get_volume_perf_metric))
-    cors.add(add_route('POST',   r'/{name}/rename', rename_vfolder))
-    cors.add(add_route('POST',   r'/{name}/update-options', update_vfolder_options))
-    cors.add(add_route('POST',   r'/{name}/mkdir', mkdir))
-    cors.add(add_route('POST',   r'/{name}/request-upload', create_upload_session))
-    cors.add(add_route('POST',   r'/{name}/request-download', create_download_session))
-    cors.add(add_route('POST',   r'/{name}/move-file', move_file))
-    cors.add(add_route('POST',   r'/{name}/rename-file', rename_file))
+    cors.add(add_route('GET', r'/_/hosts', list_hosts))
+    cors.add(add_route('GET', r'/_/all-hosts', list_all_hosts))
+    cors.add(add_route('GET', r'/_/allowed-types', list_allowed_types))
+    cors.add(add_route('GET', r'/_/all_hosts', list_all_hosts))          # legacy underbar
+    cors.add(add_route('GET', r'/_/allowed_types', list_allowed_types))  # legacy underbar
+    cors.add(add_route('GET', r'/_/perf-metric', get_volume_perf_metric))
+    cors.add(add_route('POST', r'/{name}/rename', rename_vfolder))
+    cors.add(add_route('POST', r'/{name}/update-options', update_vfolder_options))
+    cors.add(add_route('POST', r'/{name}/mkdir', mkdir))
+    cors.add(add_route('POST', r'/{name}/request-upload', create_upload_session))
+    cors.add(add_route('POST', r'/{name}/request-download', create_download_session))
+    cors.add(add_route('POST', r'/{name}/move-file', move_file))
+    cors.add(add_route('POST', r'/{name}/rename-file', rename_file))
     cors.add(add_route('DELETE', r'/{name}/delete-files', delete_files))
-    cors.add(add_route('POST',   r'/{name}/rename_file', rename_file))    # legacy underbar
+    cors.add(add_route('POST', r'/{name}/rename_file', rename_file))    # legacy underbar
     cors.add(add_route('DELETE', r'/{name}/delete_files', delete_files))  # legacy underbar
-    cors.add(add_route('GET',    r'/{name}/files', list_files))
-    cors.add(add_route('POST',   r'/{name}/invite', invite))
-    cors.add(add_route('POST',   r'/{name}/leave', leave))
-    cors.add(add_route('POST',   r'/{name}/share', share))
+    cors.add(add_route('GET', r'/{name}/files', list_files))
+    cors.add(add_route('POST', r'/{name}/invite', invite))
+    cors.add(add_route('POST', r'/{name}/leave', leave))
+    cors.add(add_route('POST', r'/{name}/share', share))
     cors.add(add_route('DELETE', r'/{name}/unshare', unshare))
-    cors.add(add_route('POST',   r'/{name}/clone', clone))
-    cors.add(add_route('GET',    r'/invitations/list-sent', list_sent_invitations))
-    cors.add(add_route('GET',    r'/invitations/list_sent', list_sent_invitations))  # legacy underbar
-    cors.add(add_route('POST',   r'/invitations/update/{inv_id}', update_invitation))
-    cors.add(add_route('GET',    r'/invitations/list', invitations))
-    cors.add(add_route('POST',   r'/invitations/accept', accept_invitation))
+    cors.add(add_route('POST', r'/{name}/clone', clone))
+    cors.add(add_route('GET', r'/invitations/list-sent', list_sent_invitations))
+    cors.add(add_route('GET', r'/invitations/list_sent', list_sent_invitations))  # legacy underbar
+    cors.add(add_route('POST', r'/invitations/update/{inv_id}', update_invitation))
+    cors.add(add_route('GET', r'/invitations/list', invitations))
+    cors.add(add_route('POST', r'/invitations/accept', accept_invitation))
     cors.add(add_route('DELETE', r'/invitations/delete', delete_invitation))
-    cors.add(add_route('GET',    r'/_/shared', list_shared_vfolders))
-    cors.add(add_route('POST',   r'/_/shared', update_shared_vfolder))
-    cors.add(add_route('GET',    r'/_/fstab', get_fstab_contents))
-    cors.add(add_route('GET',    r'/_/mounts', list_mounts))
-    cors.add(add_route('POST',   r'/_/mounts', mount_host))
+    cors.add(add_route('GET', r'/_/shared', list_shared_vfolders))
+    cors.add(add_route('POST', r'/_/shared', update_shared_vfolder))
+    cors.add(add_route('GET', r'/_/fstab', get_fstab_contents))
+    cors.add(add_route('GET', r'/_/mounts', list_mounts))
+    cors.add(add_route('POST', r'/_/mounts', mount_host))
     cors.add(add_route('DELETE', r'/_/mounts', umount_host))
-    cors.add(add_route('GET',    r'/_/quota', get_quota))
-    cors.add(add_route('POST',   r'/_/quota', update_quota))
-    cors.add(add_route('GET',    r'/_/usage', get_usage))
+    cors.add(add_route('GET', r'/_/quota', get_quota))
+    cors.add(add_route('POST', r'/_/quota', update_quota))
+    cors.add(add_route('GET', r'/_/usage', get_usage))
     return app, []

@@ -37,9 +37,11 @@ audit_logs = sa.Table(
     sa.Column('action', sa.Enum('CREATE', 'CHANGE', 'DELETE',
               name='auditlogs_action', create_type=False), index=True),
     sa.Column('data', pgsql.JSONB()),
+    sa.Column('target_type', sa.Enum('user', 'keypairs', 'vfolder',
+              name='auditlogs_targettype', create_type=False), index=True),
     sa.Column('target', sa.String(length=64), index=True),
     sa.Column('created_at', sa.DateTime(timezone=True),
-                server_default=sa.func.now(), index=True),
+              server_default=sa.func.now(), index=True),
 )
 
 
@@ -52,6 +54,7 @@ class AuditLog(graphene.ObjectType):
     email = graphene.String()
     action = graphene.String()
     data = graphene.JSONString()
+    target_type = graphene.String()
     target = graphene.String()
     created_at = GQLDateTime()
 
@@ -68,6 +71,7 @@ class AuditLog(graphene.ObjectType):
             email=row['email'],
             action=row['action'],
             data=row['data'],
+            target_type=row['target_type'],
             target=row['target'],
             created_at=row['created_at'],
 
@@ -78,6 +82,7 @@ class AuditLog(graphene.ObjectType):
         "email": ("email", None),
         "access_key": ("access_key", None),
         "action": ("action", None),
+        "target_type": ("target_type", None),
         "target": ("target", None),
         "created_at": ("created_at", dtparse),
     }
@@ -87,6 +92,7 @@ class AuditLog(graphene.ObjectType):
         "access_key": "access_key",
         "email": "email",
         "action": "action",
+        "target_type": "target_type",
         "target": "target",
         "created_at": "created_at",
     }
@@ -169,6 +175,7 @@ class AuditLogInput(graphene.InputObjectType):
     data_before = graphene.JSONString(required=True)
     data_after = graphene.JSONString(required=True)
     action = graphene.String(required=True)
+    target_type = graphene.String(required=True)
     target = graphene.String(required=True)
 
 
@@ -197,7 +204,8 @@ class CreateAuditLog(graphene.Mutation):
                 value = props['data_after'][key]
                 if props['data_before'][key] != value and value is not None:
                     if key == 'password':
-                        prepare_data_after.update({key: 'new_password_set'})  # don't show new password
+                        # don't show new password
+                        prepare_data_after.update({key: 'new_password_set'})
                     else:
                         prepare_data_after.update({key: value})
             for key in prepare_data_after.keys():
@@ -210,6 +218,7 @@ class CreateAuditLog(graphene.Mutation):
             'access_key': props['access_key'],
             'email': props['user_email'],
             'action': props['action'],
+            'target_type': props['target_type'],
             'target': str(props['target']),
             'data': {
                 'before':

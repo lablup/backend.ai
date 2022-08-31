@@ -42,6 +42,7 @@ def list(ctx: CLIContext, user_id, filter_, order, offset, limit) -> None:
         auditlog_fields['access_key'],
         auditlog_fields['email'],
         auditlog_fields['action'],
+        auditlog_fields['target_type'],
         auditlog_fields['target'],
         auditlog_fields['data'],
         auditlog_fields['created_at'],
@@ -50,13 +51,13 @@ def list(ctx: CLIContext, user_id, filter_, order, offset, limit) -> None:
     try:
         with Session() as session:
             fetch_func = lambda pg_offset, pg_size: session.AuditLog.paginated_list(
-                    user_id,
-                    fields=fields,
-                    page_offset=pg_offset,
-                    page_size=pg_size,
-                    filter=filter_,
-                    order=order,
-                   )
+                user_id,
+                fields=fields,
+                page_offset=pg_offset,
+                page_size=pg_size,
+                filter=filter_,
+                order=order,
+            )
             ctx.output.print_paginated_list(
                 fetch_func,
                 initial_page_offset=offset,

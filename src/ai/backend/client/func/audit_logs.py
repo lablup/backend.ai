@@ -18,13 +18,14 @@ __all__ = (
 
 
 _default_list_fields = [
-        auditlog_fields['user_id'],
-        auditlog_fields['access_key'],
-        auditlog_fields['email'],
-        auditlog_fields['action'],
-        auditlog_fields['data'],
-        auditlog_fields['target'],
-        auditlog_fields['created_at'],
+    auditlog_fields['user_id'],
+    auditlog_fields['access_key'],
+    auditlog_fields['email'],
+    auditlog_fields['action'],
+    auditlog_fields['data'],
+    auditlog_fields['target_type'],
+    auditlog_fields['target'],
+    auditlog_fields['created_at'],
 ]
 
 
@@ -81,6 +82,7 @@ class AuditLog(BaseFunction):
         user_email: str = None,
         data_before: Dict[str, str] = None,
         data_after: Dict[str, str] = None,
+        target_type: str = None,
         target: str = None,
         action: str = None,
     ) -> dict:
@@ -103,6 +105,7 @@ class AuditLog(BaseFunction):
                 'user_email': user_email,
                 'data_before': data_before,
                 'data_after': data_after,
+                'target_type': target_type,
                 'target': target,
                 'action': action,
             },

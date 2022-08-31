@@ -134,15 +134,15 @@ def generate_keypair(cli_ctx: CLIContext):
                     'When VACUUM FULL is being processed, the database is locked.'
                     '[default: False]')
 @click.option('-e', '--entry', type=click.Choice(['kernels', 'audit_logs'], case_sensitive=False),
-                default='kernels',
-                help='Which table to run the operation on. Options available are kernels and audit_logs. '
-                'If not set or set to kernels, it will run the operation on kernels table. '
-                'If set to audit_logs, it will run on audit_logs table. '
-                '[default: kernels]')
+              default='kernels',
+              help='Which table to run the operation on. Options available are kernels and audit_logs. '
+              'If not set or set to kernels, it will run the operation on kernels table. '
+              'If set to audit_logs, it will run on audit_logs table. '
+              '[default: kernels]')
 @click.option('--target', type=str, default=None,
-                help='For audit_logs you can chose which audit target object to run the operation on. '
-                'To run on a desired target between user, keypairs or vfolder use respectively user.uuid, keypairs.access_key, or vfolders.name. '
-                'If not set, it will run on all targets. ')
+              help='For audit_logs you can chose which audit target object to run the operation on. '
+              'To run on a desired target between user, keypairs or vfolder use respectively user.uuid, keypairs.access_key, or vfolders.id. '
+              'If not set, it will run on all targets. ')
 @click.pass_obj
 def clear_history(cli_ctx: CLIContext, retention, vacuum_full, entry, target) -> None:
     """

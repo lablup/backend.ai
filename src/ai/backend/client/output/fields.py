@@ -264,6 +264,7 @@ auditlog_fields = FieldSet([
     FieldSpec('email'),
     FieldSpec('action'),
     FieldSpec('data'),
+    FieldSpec('target_type'),
     FieldSpec('target'),
     FieldSpec('created_at'),
 ])

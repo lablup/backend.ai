@@ -83,8 +83,10 @@ keypairs = sa.Table(
               sa.ForeignKey('keypair_resource_policies.name'),
               nullable=False),
     # dotfiles column, \x90 means empty list in msgpack
-    sa.Column('dotfiles', sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b'\x90'),
-    sa.Column('bootstrap_script', sa.String(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=''),
+    sa.Column('dotfiles', sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE),
+              nullable=False, default=b'\x90'),
+    sa.Column('bootstrap_script', sa.String(
+        length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=''),
 )
 
 
@@ -471,14 +473,15 @@ class CreateKeyPair(graphene.Mutation):
         try:
             # audit log on target: user
             auditlog_data = graph_ctx.schema.get_type('AuditLogInput').create_container({
-                            'user_email': graph_ctx.user['email'],
-                            'user_id': graph_ctx.user['uuid'],
-                            'access_key': graph_ctx.access_key,
-                            'data_before': data_before,
-                            'data_after': data_after,
-                            'action': 'CREATE',
-                            'target': data['access_key'],
-                        })
+                'user_email': graph_ctx.user['email'],
+                'user_id': graph_ctx.user['uuid'],
+                'access_key': graph_ctx.access_key,
+                'data_before': data_before,
+                'data_after': data_after,
+                'action': 'CREATE',
+                'target_type': 'keypairs',
+                'target': data['access_key'],
+            })
             await CreateAuditLog.mutate(info, auditlog_data)
         except Exception as e:
             log.error(str(e))
@@ -531,12 +534,12 @@ class ModifyKeyPair(graphene.Mutation):
 
         async def _pre_func(conn: SAConnection) -> None:
             prev_data = await conn.execute(
-                        sa.select([keypairs.c.is_active,
-                                   keypairs.c.is_admin,
-                                   keypairs.c.resource_policy,
-                                   keypairs.c.rate_limit])
-                        .select_from(keypairs)
-                        .where(keypairs.c.access_key == access_key),
+                sa.select([keypairs.c.is_active,
+                           keypairs.c.is_admin,
+                           keypairs.c.resource_policy,
+                           keypairs.c.rate_limit])
+                .select_from(keypairs)
+                .where(keypairs.c.access_key == access_key),
             )
             from .audit_logs import CreateAuditLog
             data_before = dict(prev_data.first())
@@ -549,14 +552,15 @@ class ModifyKeyPair(graphene.Mutation):
 
             try:
                 auditlog_data = ctx.schema.get_type('AuditLogInput').create_container({
-                                'user_email': ctx.user['email'],
-                                'user_id': ctx.user['uuid'],
-                                'access_key': ctx.access_key,
-                                'data_before': data_before,
-                                'data_after': data_after,
-                                'action': 'CHANGE',
-                                'target': access_key,
-                            })
+                    'user_email': ctx.user['email'],
+                    'user_id': ctx.user['uuid'],
+                    'access_key': ctx.access_key,
+                    'data_before': data_before,
+                    'data_after': data_after,
+                    'action': 'CHANGE',
+                    'target_type': 'keypairs',
+                    'target': access_key,
+                })
                 await CreateAuditLog.mutate(info, auditlog_data)
             except Exception as e:
                 log.error(str(e))
@@ -594,10 +598,10 @@ class DeleteKeyPair(graphene.Mutation):
         async def _pre_func(conn: SAConnection) -> None:
             from .audit_logs import CreateAuditLog
             get_key_info = await conn.execute(
-                            sa.select([keypairs])
-                            .select_from(keypairs)
-                            .where(keypairs.c.access_key == access_key),
-                        )
+                sa.select([keypairs])
+                .select_from(keypairs)
+                .where(keypairs.c.access_key == access_key),
+            )
             key_info = dict(get_key_info.first())
             data_before = {'user_id': key_info['user_id'],
                            'access_key': key_info['access_key'],
@@ -609,14 +613,15 @@ class DeleteKeyPair(graphene.Mutation):
             data_after: Dict[str, Any] = {}
             try:
                 auditlog_data = ctx.schema.get_type('AuditLogInput').create_container({
-                                'user_email': ctx.user['email'],
-                                'user_id': ctx.user['uuid'],
-                                'access_key': ctx.access_key,
-                                'data_before': data_before,
-                                'data_after': data_after,
-                                'action': 'DELETE',
-                                'target': access_key,
-                            })
+                    'user_email': ctx.user['email'],
+                    'user_id': ctx.user['uuid'],
+                    'access_key': ctx.access_key,
+                    'data_before': data_before,
+                    'data_after': data_after,
+                    'action': 'DELETE',
+                    'target_type': 'keypairs',
+                    'target': access_key,
+                })
                 await CreateAuditLog.mutate(info, auditlog_data)
             except Exception as e:
                 log.error(str(e))
