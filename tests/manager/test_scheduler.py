@@ -1053,6 +1053,7 @@ async def test_manually_assign_agent_available(
     sess_ctx = example_pending_sessions[0]
 
     dispatcher = SchedulerDispatcher(
+        node_id=str(uuid4()),
         local_config=mock_local_config,
         shared_config=mock_shared_config,
         event_dispatcher=mock_event_dispatcher,

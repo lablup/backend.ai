@@ -299,6 +299,8 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     grpc_port = int(raft_id.split(":")[-1])
     filtered_configuration = tuple(conf for conf in configuration if conf != raft_id)
 
+    has_leadership: bool = False
+    root_ctx.has_leadership = lambda: has_leadership
     root_ctx.cluster_node_id = f"{raft_id}:{os.getpid()}"
 
     _log_prefix = f"[pid={os.getpid()}/pidx={root_ctx.pidx}]"
@@ -307,7 +309,6 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     _cleanup_coroutines: List[Coroutine] = []
 
     global_timer_ids: List[str] = []
-    has_leadership: bool = False
 
     async def _on_global_timer_created(context: None, source: str, event: GlobalTimerCreatedEvent):
         if root_ctx.cluster_node_id == event.node_id:

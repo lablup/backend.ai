@@ -92,7 +92,6 @@ class LeaderGlobalTimer:
         event_factory: Callable[[], AbstractEvent],
         interval: float = 10.0,
         initial_delay: float = 0.0,
-        # TODO: Initial leadership(?)
     ) -> None:
         self._id = str(uuid.uuid4())
         self._event_producer = event_producer
@@ -173,26 +172,3 @@ class LeaderGlobalTimer:
     ):
         if event.timer_id == self._id:
             await self.leave()
-
-
-"""
-class GlobalTimerManager:
-
-    global_timers: Final[List[GlobalTimer]] = []
-
-    @staticmethod
-    def create_timer(
-        event_producer: EventProducer,
-        event_factory: Callable[[], AbstractEvent],
-        interval: float = 10.0,
-        initial_delay: float = 0.0,
-    ) -> GlobalTimer:
-        global_timer = GlobalTimer(
-            event_producer=event_producer,
-            event_factory=event_factory,
-            interval=interval,
-            initial_delay=initial_delay,
-        )
-        GlobalTimerManager.global_timers.append(global_timer)
-        return global_timer
-"""

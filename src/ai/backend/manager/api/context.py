@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import attr
 
@@ -53,3 +53,4 @@ class RootContext(BaseContext):
     background_task_manager: BackgroundTaskManager
 
     cluster_node_id: str
+    has_leadership: Callable[[], bool]
