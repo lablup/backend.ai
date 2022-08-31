@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from passlib.hash import bcrypt
+from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -26,6 +27,7 @@ from ..api.exceptions import VFolderOperationFailed
 from .base import (
     EnumValueType,
     IDColumn,
+    IPColumn,
     Item,
     PaginatedList,
     batch_multiresult,
@@ -123,7 +125,7 @@ users = sa.Table(
     sa.Column("integration_id", sa.String(length=512)),
     sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), index=True),
     sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
-    sa.Column("allowed_client_ip", sa.String(length=256), nullable=True),
+    sa.Column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True),
 )
 
 
@@ -179,7 +181,7 @@ class User(graphene.ObjectType):
     modified_at = GQLDateTime()
     domain_name = graphene.String()
     role = graphene.String()
-    allowed_client_ip = graphene.String()
+    allowed_client_ip = graphene.List(lambda: graphene.String)
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -472,7 +474,7 @@ class ModifyUserInput(graphene.InputObjectType):
     domain_name = graphene.String(required=False)
     role = graphene.String(required=False)
     group_ids = graphene.List(lambda: graphene.String, required=False)
-    allowed_client_ip = graphene.String(required=False)
+    allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):

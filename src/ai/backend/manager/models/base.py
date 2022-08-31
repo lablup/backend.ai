@@ -7,6 +7,7 @@ import functools
 import logging
 import sys
 import uuid
+from ipaddress import ip_network
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -37,7 +38,7 @@ from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql.language import ast
-from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
+from sqlalchemy.dialects.postgresql import CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -293,6 +294,31 @@ class URLColumn(TypeDecorator):
             return None
         if value is not None:
             return yarl.URL(value)
+
+
+class IPColumn(TypeDecorator):
+    """
+    A column type to convert IP string values back and forth to CIDR.
+    """
+
+    impl = CIDR
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        try:
+            str_val = str(value)
+        except ValueError:
+            return value
+
+        if "*" in str_val:
+            _ip, _, given_cidr = str_val.partition("/")
+            filtered = _ip.replace("*", "0")
+            if given_cidr:
+                return ip_network(f"{filtered}/{given_cidr}")
+            octets = _ip.split(".")
+            cidr = octets.index("*") * 8
+            return ip_network(f"{filtered}/{cidr}")
+        return value
 
 
 class CurrencyTypes(enum.Enum):

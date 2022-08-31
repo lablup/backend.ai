@@ -16,6 +16,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
+    Generic,
     List,
     Literal,
     Mapping,
@@ -333,6 +334,50 @@ class HostPortPair(namedtuple("HostPortPair", "host port")):
         if isinstance(self.host, ipaddress.IPv6Address):
             return f"[{self.host}]:{self.port}"
         return f"{self.host}:{self.port}"
+
+
+_Address = TypeVar("_Address", bound=Union[ipaddress.IPv4Network, ipaddress.IPv6Network])
+
+
+class CIDR(Generic[_Address]):
+    def __init__(self, address) -> None:
+        self._address: _Address = cast(_Address, ipaddress.ip_network(address))
+
+    @property
+    def orig_address(self) -> _Address:
+        return self._address
+
+    def __str__(self) -> str:
+        return str(self._address)
+
+    def __eq__(self, other: object) -> bool:
+        """
+        Compare two IP address converting into lists.
+        CIDR or `*` wild-card are used to slice the list.
+
+        e.g)
+        192.10.0.0/24 -> ["192", "10", "0"]
+        192.10.0.10/32 -> ["192", "10", "0", "10]
+        """
+
+        if other is self:
+            return True
+        assert isinstance(other, CIDR), "Only can compare CIDR objects."
+
+        def ip_to_list(val: str) -> list[str]:
+            _ip, _, cidr = val.partition("/")
+            octets = _ip.split(".")
+            if "*" in octets:
+                if cidr:
+                    raise ValueError("Not allowed value")
+                return octets[: octets.index("*")]
+            return octets if not cidr else octets[: int(cidr) // 8]
+
+        ip1, ip2 = ip_to_list(str(self)), ip_to_list(str(other))
+        for octet1, octet2 in zip(ip1, ip2):
+            if octet1 != octet2:
+                return False
+        return True
 
 
 class BinarySize(int):
