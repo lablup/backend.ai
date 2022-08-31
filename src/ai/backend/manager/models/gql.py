@@ -233,7 +233,6 @@ class Queries(graphene.ObjectType):
     auditlog = graphene.List(
         AuditLog,
         user_id=graphene.ID(),
-
     )
 
     agent_summary = graphene.Field(
@@ -892,7 +891,7 @@ class Queries(graphene.ObjectType):
         return await loader.load(user_uuid)
 
     @staticmethod
-    @scoped_query(autofill_user=True, user_key='email')
+    @scoped_query(autofill_user=True, user_key="email")
     async def resolve_user_from_email(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
@@ -903,7 +902,8 @@ class Queries(graphene.ObjectType):
         print("into resolve")
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(
-            ctx, 'User.by_email',
+            ctx,
+            "User.by_email",
         )
 
         return await loader.load(email)

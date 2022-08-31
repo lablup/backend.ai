@@ -412,22 +412,19 @@ async def create(request: web.Request, params: Any) -> web.Response:
         assert result.rowcount == 1
         data_before: Dict[str, Any] = {}
         auditlog_data = {
-            'user_id': str(request['user']['uuid']),
-            'email': request['user']['email'],
-            'access_key': request['keypair']['access_key'],
-            'data': {
-                'before': data_before,
-                'after': insert_values,
+            "user_id": str(request["user"]["uuid"]),
+            "email": request["user"]["email"],
+            "access_key": request["keypair"]["access_key"],
+            "data": {
+                "before": data_before,
+                "after": insert_values,
             },
-            'action': 'CREATE',
-            'target_type': 'vfolder',
-            'target': params['id'],
+            "action": "CREATE",
+            "target_type": "vfolder",
+            "target": params["id"],
         }
         try:
-            insert_auditlog_query = (
-                sa.insert(audit_logs)
-                .values(auditlog_data)
-            )
+            insert_auditlog_query = sa.insert(audit_logs).values(auditlog_data)
             await conn.execute(insert_auditlog_query)
         except sa.exc.DataError:
             raise InvalidAPIParameters
@@ -543,67 +540,56 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == params["id"])
         )
         folder_host = await conn.scalar(query)
-        folder_id = uuid.UUID(params['id'])
-        query = (
-            sa.select(vfolders)
-            .select_from(vfolders)
-            .where(vfolders.c.id == params['id'])
-        )
+        folder_id = uuid.UUID(params["id"])
+        query = sa.select(vfolders).select_from(vfolders).where(vfolders.c.id == params["id"])
         vfolder_info = await conn.execute(query)
         prev_data = dict(vfolder_info.first())
-        prev_data['id'] = str(prev_data['id'])
-        prev_data['user'] = str(prev_data['user'])
-        prev_data['permission'] = str(prev_data['permission'][1])
-        prev_data['usage_mode'] = prev_data['usage_mode'][1]
-        query = (sa.delete(vfolders).where(vfolders.c.id == folder_id))
+        prev_data["id"] = str(prev_data["id"])
+        prev_data["user"] = str(prev_data["user"])
+        prev_data["permission"] = str(prev_data["permission"][1])
+        prev_data["usage_mode"] = prev_data["usage_mode"][1]
+        query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
         await conn.execute(query)
         auditlog_data = {
-            'email': request['user']['email'],
-            'user_id': str(request['user']['uuid']),
-            'access_key': request['keypair']['access_key'],
-            'data': {
-                'data_before': prev_data,
-                'data_after': {},
+            "email": request["user"]["email"],
+            "user_id": str(request["user"]["uuid"]),
+            "access_key": request["keypair"]["access_key"],
+            "data": {
+                "data_before": prev_data,
+                "data_after": {},
             },
-            'action': 'DELETE',
-            'target_type': 'vfolder',
-            'target': prev_data['id'],
+            "action": "DELETE",
+            "target_type": "vfolder",
+            "target": prev_data["id"],
         }
         try:
-            insert_auditlog_query = (
-                sa.insert(audit_logs)
-                .values(auditlog_data)
-            )
+            insert_auditlog_query = sa.insert(audit_logs).values(auditlog_data)
             await conn.execute(insert_auditlog_query)
         except sa.exc.DataError:
             raise InvalidAPIParameters
-        query = (sa.delete(vfolders).where(vfolders.c.id == folder_id))
+        query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
         await conn.execute(query)
         auditlog_data = {
-            'email': request['user']['email'],
-            'user_id': str(request['user']['uuid']),
-            'access_key': request['keypair']['access_key'],
-            'data': {
-                'data_before': prev_data,
-                'data_after': {},
+            "email": request["user"]["email"],
+            "user_id": str(request["user"]["uuid"]),
+            "access_key": request["keypair"]["access_key"],
+            "data": {
+                "data_before": prev_data,
+                "data_after": {},
             },
-            'action': 'DELETE',
-            'target_type': 'vfolder',
-            'target': prev_data['id'],
+            "action": "DELETE",
+            "target_type": "vfolder",
+            "target": prev_data["id"],
         }
         try:
-            insert_auditlog_query = (
-                sa.insert(audit_logs)
-                .values(auditlog_data)
-            )
+            insert_auditlog_query = sa.insert(audit_logs).values(auditlog_data)
             await conn.execute(insert_auditlog_query)
         except sa.exc.DataError:
             raise InvalidAPIParameters
-        query = (sa.delete(vfolders).where(vfolders.c.id == folder_id))
-=======
+
         folder_id = uuid.UUID(params["id"])
         query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
->>>>>>> 14373e7b9ffd70bcc2e8ccbeb6855636a6bb2bca
+
         await conn.execute(query)
     # fs-level deletion may fail or take longer time
     # but let's complete the db transaction to reflect that it's deleted.
@@ -1864,44 +1850,32 @@ async def delete(request: web.Request) -> web.Response:
         # query_accesible_vfolders returns list
         entry = entries[0]
         # Folder owner OR user who have DELETE permission can delete folder.
-        if (
-            not entry['is_owner']
-            and entry['permission'] != VFolderPermission.RW_DELETE
-        ):
-            raise InvalidAPIParameters(
-                'Cannot delete the vfolder '
-                'that is not owned by myself.')
-        folder_host = entry['host']
-        folder_id = entry['id']
-        query = (
-            sa.select(vfolders)
-            .select_from(vfolders)
-            .where(vfolders.c.id == entry['id'])
-        )
+        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
+            raise InvalidAPIParameters("Cannot delete the vfolder " "that is not owned by myself.")
+        folder_host = entry["host"]
+        folder_id = entry["id"]
+        query = sa.select(vfolders).select_from(vfolders).where(vfolders.c.id == entry["id"])
         result = await conn.execute(query)
         prev_data = dict(result.first())
-        prev_data['id'] = str(prev_data['id'])
-        prev_data['user'] = str(prev_data['user'])
-        prev_data['permission'] = str(prev_data['permission'][1])
-        prev_data['usage_mode'] = prev_data['usage_mode'][1]
-        query = (sa.delete(vfolders).where(vfolders.c.id == folder_id))
+        prev_data["id"] = str(prev_data["id"])
+        prev_data["user"] = str(prev_data["user"])
+        prev_data["permission"] = str(prev_data["permission"][1])
+        prev_data["usage_mode"] = prev_data["usage_mode"][1]
+        query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
         await conn.execute(query)
         auditlog_data = {
-            'email': request['user']['email'],
-            'user_id': str(request['user']['uuid']),
-            'access_key': request['keypair']['access_key'],
-            'data': {
-                'data_before': prev_data,
-                'data_after': {},
+            "email": request["user"]["email"],
+            "user_id": str(request["user"]["uuid"]),
+            "access_key": request["keypair"]["access_key"],
+            "data": {
+                "data_before": prev_data,
+                "data_after": {},
             },
-            'action': 'DELETE',
-            'target': prev_data['id'],
+            "action": "DELETE",
+            "target": prev_data["id"],
         }
         try:
-            insert_auditlog_query = (
-                sa.insert(audit_logs)
-                .values(auditlog_data)
-            )
+            insert_auditlog_query = sa.insert(audit_logs).values(auditlog_data)
             await conn.execute(insert_auditlog_query)
         except sa.exc.DataError:
             raise InvalidAPIParameters

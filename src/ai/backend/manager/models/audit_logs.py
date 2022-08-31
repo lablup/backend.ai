@@ -21,33 +21,38 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
 log = BraceStyleAdapter(logging.getLogger(__name__))
 __all__: Sequence[str] = (
-    'audit_logs',
-    'AuditLog', 'AuditLogList', 'AuditLogInput',
-    'CreateAuditLog',
-
-
+    "audit_logs",
+    "AuditLog",
+    "AuditLogList",
+    "AuditLogInput",
+    "CreateAuditLog",
 )
 
 audit_logs = sa.Table(
-    'audit_logs', metadata,
-
-    sa.Column('user_id', sa.String(length=256), index=True),
-    sa.Column('access_key', sa.String(length=20), index=True),
-    sa.Column('email', sa.String(length=64), index=True),
-    sa.Column('action', sa.Enum('CREATE', 'CHANGE', 'DELETE',
-              name='auditlogs_action', create_type=False), index=True),
-    sa.Column('data', pgsql.JSONB()),
-    sa.Column('target_type', sa.Enum('user', 'keypairs', 'vfolder',
-              name='auditlogs_targettype', create_type=False), index=True),
-    sa.Column('target', sa.String(length=64), index=True),
-    sa.Column('created_at', sa.DateTime(timezone=True),
-              server_default=sa.func.now(), index=True),
+    "audit_logs",
+    metadata,
+    sa.Column("user_id", sa.String(length=256), index=True),
+    sa.Column("access_key", sa.String(length=20), index=True),
+    sa.Column("email", sa.String(length=64), index=True),
+    sa.Column(
+        "action",
+        sa.Enum("CREATE", "CHANGE", "DELETE", name="auditlogs_action", create_type=False),
+        index=True,
+    ),
+    sa.Column("data", pgsql.JSONB()),
+    sa.Column(
+        "target_type",
+        sa.Enum("user", "keypairs", "vfolder", name="auditlogs_targettype", create_type=False),
+        index=True,
+    ),
+    sa.Column("target", sa.String(length=64), index=True),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
 )
 
 
 class AuditLog(graphene.ObjectType):
     class Meta:
-        interfaces = (Item, )
+        interfaces = (Item,)
 
     user_id = graphene.String()
     access_key = graphene.String()
@@ -59,22 +64,22 @@ class AuditLog(graphene.ObjectType):
     created_at = GQLDateTime()
 
     @classmethod
-    def from_row(cls,
-                 ctx: GraphQueryContext,
-                 row: Row,
-                 ) -> Optional[AuditLog]:
+    def from_row(
+        cls,
+        ctx: GraphQueryContext,
+        row: Row,
+    ) -> Optional[AuditLog]:
         if row is None:
             return None
         return cls(
-            user_id=row['user_id'],
-            access_key=row['access_key'],
-            email=row['email'],
-            action=row['action'],
-            data=row['data'],
-            target_type=row['target_type'],
-            target=row['target'],
-            created_at=row['created_at'],
-
+            user_id=row["user_id"],
+            access_key=row["access_key"],
+            email=row["email"],
+            action=row["action"],
+            data=row["data"],
+            target_type=row["target_type"],
+            target=row["target"],
+            created_at=row["created_at"],
         )
 
     _queryfilter_fieldspec = {
@@ -132,7 +137,8 @@ class AuditLog(graphene.ObjectType):
             )
         async with ctx.db.begin_readonly() as conn:
             b = [
-                obj async for row in (await conn.stream(query))
+                obj
+                async for row in (await conn.stream(query))
                 if (obj := cls.from_row(ctx, row)) is not None
             ]
             return b
@@ -151,7 +157,6 @@ class AuditLog(graphene.ObjectType):
             .where(
                 (audit_logs.c.user_id == user_id) | (audit_logs.c.email == user_id),
             )
-
         )
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
@@ -163,7 +168,7 @@ class AuditLog(graphene.ObjectType):
 
 class AuditLogList(graphene.ObjectType):
     class Meta:
-        interfaces = (PaginatedList, )
+        interfaces = (PaginatedList,)
 
     items = graphene.List(AuditLog, required=True)
 
@@ -189,7 +194,7 @@ class CreateAuditLog(graphene.Mutation):
     msg = graphene.String()
     audit_logs = graphene.Field(lambda: AuditLog, required=False)
 
-    @ classmethod
+    @classmethod
     async def mutate(
         cls,
         # root,
@@ -197,41 +202,38 @@ class CreateAuditLog(graphene.Mutation):
         props: AuditLogInput,
     ) -> CreateAuditLog:
         graph_ctx: GraphQueryContext = info.context
-        if props['action'] == 'CHANGE':
+        if props["action"] == "CHANGE":
             prepare_data_before = {}
             prepare_data_after = {}
-            for key in props['data_after'].keys():  # check update command options to only show changes
-                value = props['data_after'][key]
-                if props['data_before'][key] != value and value is not None:
-                    if key == 'password':
+            for key in props[
+                "data_after"
+            ].keys():  # check update command options to only show changes
+                value = props["data_after"][key]
+                if props["data_before"][key] != value and value is not None:
+                    if key == "password":
                         # don't show new password
-                        prepare_data_after.update({key: 'new_password_set'})
+                        prepare_data_after.update({key: "new_password_set"})
                     else:
                         prepare_data_after.update({key: value})
             for key in prepare_data_after.keys():
-                prepare_data_before.update({key: props['data_before'][key]})
+                prepare_data_before.update({key: props["data_before"][key]})
         else:
-            prepare_data_before = props['data_before']
-            prepare_data_after = props['data_after']
+            prepare_data_before = props["data_before"]
+            prepare_data_after = props["data_after"]
         data_set = {
-            'user_id': str(props['user_id']),
-            'access_key': props['access_key'],
-            'email': props['user_email'],
-            'action': props['action'],
-            'target_type': props['target_type'],
-            'target': str(props['target']),
-            'data': {
-                'before':
-                    prepare_data_before,
-                'after':
-                    prepare_data_after,
+            "user_id": str(props["user_id"]),
+            "access_key": props["access_key"],
+            "email": props["user_email"],
+            "action": props["action"],
+            "target_type": props["target_type"],
+            "target": str(props["target"]),
+            "data": {
+                "before": prepare_data_before,
+                "after": prepare_data_after,
             },
         }
         if prepare_data_after or prepare_data_before:
-            insert_query = (
-                sa.insert(audit_logs)
-                .values(data_set)
-            )
+            insert_query = sa.insert(audit_logs).values(data_set)
         else:
             log.warning("No data to write in Audit log")
             insert_query = ()

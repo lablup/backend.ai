@@ -58,9 +58,6 @@ python_executable = "dist/export/python/virtualenvs/python-default/3.10.5/bin/py
 [tool.black]
 line-length = 100
 
-[tool.black]
-line-length = 100
-
 [tool.isort]
 profile = "black"
 line_length = 100

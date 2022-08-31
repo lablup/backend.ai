@@ -46,13 +46,12 @@ _default_detail_fields = (
 )
 
 _user_info_fields = (
-
-    user_fields['username'],
-    user_fields['full_name'],
-    user_fields['domain_name'],
-    user_fields['role'],
-    user_fields['status'],
-    user_fields['description'],
+    user_fields["username"],
+    user_fields["full_name"],
+    user_fields["domain_name"],
+    user_fields["role"],
+    user_fields["status"],
+    user_fields["description"],
 )
 
 
@@ -264,23 +263,27 @@ class User(BaseFunction):
         :param fields: Additional per-user query fields to fetch.
         """
         if email is None:
-            query = textwrap.dedent("""\
+            query = textwrap.dedent(
+                """\
                 query {
                     user {$fields}
                 }
-            """)
+            """
+            )
         else:
-            query = textwrap.dedent("""\
+            query = textwrap.dedent(
+                """\
                 query($email: String!) {
                     user_from_email(email: $email) {$fields}
                 }
-            """)
-        query = query.replace('$fields', ' '.join(f.field_ref for f in fields))
+            """
+            )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         print("query{0}", query)
-        variables = {'email': email}
+        variables = {"email": email}
         data = await api_session.get().Admin._query(query, variables if email is not None else None)
-        print("data from func", data['user_from_email'])
-        return data['user_from_email']
+        print("data from func", data["user_from_email"])
+        return data["user_from_email"]
 
     @api_function
     @classmethod

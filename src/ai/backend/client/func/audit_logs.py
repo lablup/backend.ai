@@ -11,21 +11,18 @@ from ai.backend.client.session import api_session
 
 from .base import BaseFunction, api_function
 
-__all__ = (
-    'AuditLog',
-
-)
+__all__ = ("AuditLog",)
 
 
 _default_list_fields = [
-    auditlog_fields['user_id'],
-    auditlog_fields['access_key'],
-    auditlog_fields['email'],
-    auditlog_fields['action'],
-    auditlog_fields['data'],
-    auditlog_fields['target_type'],
-    auditlog_fields['target'],
-    auditlog_fields['created_at'],
+    auditlog_fields["user_id"],
+    auditlog_fields["access_key"],
+    auditlog_fields["email"],
+    auditlog_fields["action"],
+    auditlog_fields["data"],
+    auditlog_fields["target_type"],
+    auditlog_fields["target"],
+    auditlog_fields["created_at"],
 ]
 
 
@@ -33,11 +30,12 @@ class AuditLog(BaseFunction):
     """
     Provides management of audit logs.
     """
+
     @api_function
     @classmethod
     async def list(cls, list_all=False):
-        rqst = Request('GET', '/audit_logs')
-        rqst.set_json({'all': list_all})
+        rqst = Request("GET", "/audit_logs")
+        rqst.set_json({"all": list_all})
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -60,13 +58,13 @@ class AuditLog(BaseFunction):
 
         """
         variables = {
-            'user_id': (user_id, 'String'),  # list by user_id
-            'filter': (filter, 'String'),
-            'order': (order, 'String'),
+            "user_id": (user_id, "String"),  # list by user_id
+            "filter": (filter, "String"),
+            "order": (order, "String"),
         }
 
         return await generate_paginated_results(
-            'auditlog_list',
+            "auditlog_list",
             variables,
             fields,
             page_offset=page_offset,
@@ -90,28 +88,28 @@ class AuditLog(BaseFunction):
         Creates a new audit log entry.
         """
 
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($input: AuditLogInput!) {
                 create_audit_logs(props: $input) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
 
         variables = {
-            'input': {
-                'user_id': user_id,
-                'access_key': access_key,
-                'user_email': user_email,
-                'data_before': data_before,
-                'data_after': data_after,
-                'target_type': target_type,
-                'target': target,
-                'action': action,
+            "input": {
+                "user_id": user_id,
+                "access_key": access_key,
+                "user_email": user_email,
+                "data_before": data_before,
+                "data_after": data_after,
+                "target_type": target_type,
+                "target": target,
+                "action": action,
             },
-
-
         }
 
         data = await api_session.get().Admin._query(query, variables)
-        return data['create_audit_logs']
+        return data["create_audit_logs"]

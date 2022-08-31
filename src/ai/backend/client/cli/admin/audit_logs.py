@@ -22,31 +22,25 @@ def audit_logs() -> None:
 @audit_logs.command()
 # @click.pass_obj
 @pass_ctx_obj
-@click.option('-u', '--user-id', type=str, default=None,
-              help='User ID to audit.')
-@click.option('--filter', 'filter_', default=None,
-              help='Set the query filter expression.')
-@click.option('--order', default=None,
-              help='Set the query ordering expression.')
-@click.option('--offset', default=0,
-              help='The index of the current page start for pagination.')
-@click.option('--limit', default=None,
-              help='The page size for pagination.')
+@click.option("-u", "--user-id", type=str, default=None, help="User ID to audit.")
+@click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
+@click.option("--order", default=None, help="Set the query ordering expression.")
+@click.option("--offset", default=0, help="The index of the current page start for pagination.")
+@click.option("--limit", default=None, help="The page size for pagination.")
 def list(ctx: CLIContext, user_id, filter_, order, offset, limit) -> None:
     """
     List audit logs.
     (admin privilege required)
     """
     fields = [
-        auditlog_fields['user_id'],
-        auditlog_fields['access_key'],
-        auditlog_fields['email'],
-        auditlog_fields['action'],
-        auditlog_fields['target_type'],
-        auditlog_fields['target'],
-        auditlog_fields['data'],
-        auditlog_fields['created_at'],
-
+        auditlog_fields["user_id"],
+        auditlog_fields["access_key"],
+        auditlog_fields["email"],
+        auditlog_fields["action"],
+        auditlog_fields["target_type"],
+        auditlog_fields["target"],
+        auditlog_fields["data"],
+        auditlog_fields["created_at"],
     ]
     try:
         with Session() as session:

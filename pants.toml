@@ -72,10 +72,6 @@ version = "black~=22.6"
 interpreter_constraints = ["CPython>=3.10,<4"]
 lockfile = "tools/black.lock"
 
-[black]
-version = "black~=22.6"
-interpreter_constraints = ["CPython>=3.10,<4"]
-lockfile = "tools/black.lock"
 
 [flake8]
 version = "flake8>=4.0.1"

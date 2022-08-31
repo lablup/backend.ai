@@ -241,18 +241,35 @@ class BaseSession(metaclass=abc.ABCMeta):
     """
 
     __slots__ = (
-        '_config', '_closed', '_context_token', '_proxy_mode',
-        'aiohttp_session', 'api_version',
-        'System', 'Manager', 'Admin',
-        'Agent', 'AgentWatcher', 'ScalingGroup', 'Storage',
-        'Image', 'ComputeSession', 'SessionTemplate',
-        'Domain', 'Group', 'Auth', 'User', 'KeyPair',
-        'BackgroundTask',
-        'EtcdConfig',
-        'Resource', 'KeypairResourcePolicy',
-        'VFolder', 'Dotfile',
-        'ServerLog',
-        'AuditLog',
+        "_config",
+        "_closed",
+        "_context_token",
+        "_proxy_mode",
+        "aiohttp_session",
+        "api_version",
+        "System",
+        "Manager",
+        "Admin",
+        "Agent",
+        "AgentWatcher",
+        "ScalingGroup",
+        "Storage",
+        "Image",
+        "ComputeSession",
+        "SessionTemplate",
+        "Domain",
+        "Group",
+        "Auth",
+        "User",
+        "KeyPair",
+        "BackgroundTask",
+        "EtcdConfig",
+        "Resource",
+        "KeypairResourcePolicy",
+        "VFolder",
+        "Dotfile",
+        "ServerLog",
+        "AuditLog",
     )
 
     aiohttp_session: aiohttp.ClientSession
@@ -263,7 +280,8 @@ class BaseSession(metaclass=abc.ABCMeta):
     _proxy_mode: bool
 
     def __init__(
-        self, *,
+        self,
+        *,
         config: APIConfig = None,
         proxy_mode: bool = False,
     ) -> None:

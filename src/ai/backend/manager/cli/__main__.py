@@ -152,24 +152,42 @@ def generate_keypair(cli_ctx: CLIContext):
 
 
 @main.command()
-@click.option('-r', '--retention', type=str, default='1yr',
-              help='The retention limit. e.g., 20d, 1mo, 6mo, 1yr')
-@click.option('-v', '--vacuum-full', type=bool, default=False,
-              help='Reclaim storage occupied by dead tuples.'
-                    'If not set or set False, it will run VACUUM without FULL.'
-                    'If set True, it will run VACUUM FULL.'
-                    'When VACUUM FULL is being processed, the database is locked.'
-                    '[default: False]')
-@click.option('-e', '--entry', type=click.Choice(['kernels', 'audit_logs'], case_sensitive=False),
-              default='kernels',
-              help='Which table to run the operation on. Options available are kernels and audit_logs. '
-              'If not set or set to kernels, it will run the operation on kernels table. '
-              'If set to audit_logs, it will run on audit_logs table. '
-              '[default: kernels]')
-@click.option('--target', type=str, default=None,
-              help='For audit_logs you can chose which audit target object to run the operation on. '
-              'To run on a desired target between user, keypairs or vfolder use respectively user.uuid, keypairs.access_key, or vfolders.id. '
-              'If not set, it will run on all targets. ')
+@click.option(
+    "-r",
+    "--retention",
+    type=str,
+    default="1yr",
+    help="The retention limit. e.g., 20d, 1mo, 6mo, 1yr",
+)
+@click.option(
+    "-v",
+    "--vacuum-full",
+    type=bool,
+    default=False,
+    help="Reclaim storage occupied by dead tuples."
+    "If not set or set False, it will run VACUUM without FULL."
+    "If set True, it will run VACUUM FULL."
+    "When VACUUM FULL is being processed, the database is locked."
+    "[default: False]",
+)
+@click.option(
+    "-e",
+    "--entry",
+    type=click.Choice(["kernels", "audit_logs"], case_sensitive=False),
+    default="kernels",
+    help="Which table to run the operation on. Options available are kernels and audit_logs. "
+    "If not set or set to kernels, it will run the operation on kernels table. "
+    "If set to audit_logs, it will run on audit_logs table. "
+    "[default: kernels]",
+)
+@click.option(
+    "--target",
+    type=str,
+    default=None,
+    help="For audit_logs you can chose which audit target object to run the operation on. "
+    "To run on a desired target between user, keypairs or vfolder use respectively user.uuid, keypairs.access_key, or vfolders.id. "
+    "If not set, it will run on all targets. ",
+)
 @click.pass_obj
 def clear_history(cli_ctx: CLIContext, retention, vacuum_full, entry, target) -> None:
     """
@@ -261,51 +279,65 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full, entry, target) ->
                 vacuum_sql = "VACUUM FULL"
             else:
                 vacuum_sql = "VACUUM"
-            if entry == 'audit_logs':
+            if entry == "audit_logs":
                 if target is not None:
-                    curs.execute(f"""
+                    curs.execute(
+                        f"""
                     SELECT COUNT(*) FROM {entry} WHERE created_at < '{expiration_date}'
                     AND target = '{target}';
-                    """)
+                    """
+                    )
                 else:
-                    curs.execute(f"""
+                    curs.execute(
+                        f"""
                     SELECT COUNT(*) FROM {entry} WHERE created_at < '{expiration_date}';
-                    """)
+                    """
+                    )
             else:
-                curs.execute(f"""
+                curs.execute(
+                    f"""
                 SELECT COUNT(*) FROM kernels WHERE terminated_at < '{expiration_date}';
-                """)
+                """
+                )
             deleted_count = curs.fetchone()[0]
 
             conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-            log.info('Deleting old records...')
-            if entry == 'audit_logs':
+            log.info("Deleting old records...")
+            if entry == "audit_logs":
                 if target is not None:
-                    curs.execute(f"""
+                    curs.execute(
+                        f"""
                     DELETE FROM {entry} WHERE created_at < '{expiration_date}'
                     AND target = '{target}';
-                    """)
+                    """
+                    )
                     log.info(
-                        f'Perfoming {vacuum_sql} operation on {entry} where target object is {target}...')
+                        f"Perfoming {vacuum_sql} operation on {entry} where target object is {target}..."
+                    )
                 else:
-                    curs.execute(f"""
+                    curs.execute(
+                        f"""
                     DELETE FROM {entry} WHERE created_at < '{expiration_date}';
-                    """)
-                    log.info(
-                        f'Perfoming {vacuum_sql} operation on {entry}...')
+                    """
+                    )
+                    log.info(f"Perfoming {vacuum_sql} operation on {entry}...")
             else:
-                curs.execute(f"""
+                curs.execute(
+                    f"""
                 DELETE FROM kernels WHERE terminated_at < '{expiration_date}';
-                """)
-            log.info(f'Perfoming {vacuum_sql} operation...')
+                """
+                )
+            log.info(f"Perfoming {vacuum_sql} operation...")
             curs.execute(vacuum_sql)
             conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
 
-            curs.execute(f"""
+            curs.execute(
+                f"""
             SELECT COUNT(*) FROM {entry};
-            """)
+            """
+            )
             table_size = curs.fetchone()[0]
-            log.info(f'{entry} table size: {table_size}')
+            log.info(f"{entry} table size: {table_size}")
 
         log.info("Cleaned up {:,} database records older than {:}.", deleted_count, expiration_date)
 
