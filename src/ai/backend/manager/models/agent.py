@@ -439,6 +439,9 @@ class AgentSummary(graphene.ObjectType):
         scaling_group: str = None,
         access_key: str,
     ) -> Sequence[Agent | None]:
+        if graph_ctx.local_config["manager"]["hide-agents"]:
+            return []
+
         query = (
             sa.select([agents])
             .select_from(agents)
@@ -473,6 +476,9 @@ class AgentSummary(graphene.ObjectType):
         raw_status: str = None,
         filter: str = None,
     ) -> int:
+        if graph_ctx.local_config["manager"]["hide-agents"]:
+            return 0
+
         query = sa.select([sa.func.count()]).select_from(agents)
         query = await _append_sgroup_from_clause(
             graph_ctx, query, access_key, domain_name, scaling_group
@@ -501,6 +507,9 @@ class AgentSummary(graphene.ObjectType):
         filter: str = None,
         order: str = None,
     ) -> Sequence[Agent]:
+        if graph_ctx.local_config["manager"]["hide-agents"]:
+            return []
+
         query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
         query = await _append_sgroup_from_clause(
             graph_ctx, query, access_key, domain_name, scaling_group
