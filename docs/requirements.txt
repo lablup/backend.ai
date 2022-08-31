@@ -3,6 +3,7 @@ sphinxcontrib-trio>=1.1.0
 sphinx-autodoc-typehints~=1.11.1
 sphinx-intl>=2.0
 sphinx-rtd-theme~=1.0
+sphinxcontrib-mermaid~=0.7.1
 pygments~=2.12
 # replace the following line with native support of Sphinx in Pants
 -r ../requirements.txt

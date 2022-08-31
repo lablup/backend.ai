@@ -1,10 +1,9 @@
 import asyncio
-from collections import namedtuple
 import operator
+from collections import namedtuple
 
 import aiohttp
 import aiojobs
-
 
 DOCKER_HUB_URL = 'https://hub.docker.com/v2/repositories/lablup/?page_size=100'
 AUTH_TOKEN_URL = (

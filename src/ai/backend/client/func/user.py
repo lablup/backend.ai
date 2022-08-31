@@ -12,37 +12,37 @@ from ai.backend.client.pagination import generate_paginated_results
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
 
-from .base import BaseFunction, api_function
+from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = (
-    'User',
-    'UserStatus',
-    'UserRole',
+    "User",
+    "UserStatus",
+    "UserRole",
 )
 
 
 _default_list_fields = (
-    user_fields['uuid'],
-    user_fields['role'],
-    user_fields['username'],
-    user_fields['email'],
-    user_fields['is_active'],
-    user_fields['created_at'],
-    user_fields['domain_name'],
-    user_fields['groups'],
+    user_fields["uuid"],
+    user_fields["role"],
+    user_fields["username"],
+    user_fields["email"],
+    user_fields["is_active"],
+    user_fields["created_at"],
+    user_fields["domain_name"],
+    user_fields["groups"],
 )
 
 _default_detail_fields = (
-    user_fields['uuid'],
-    user_fields['username'],
-    user_fields['email'],
-    user_fields['need_password_change'],
-    user_fields['status'],
-    user_fields['status_info'],
-    user_fields['created_at'],
-    user_fields['domain_name'],
-    user_fields['role'],
-    user_fields['groups'],
+    user_fields["uuid"],
+    user_fields["username"],
+    user_fields["email"],
+    user_fields["need_password_change"],
+    user_fields["status"],
+    user_fields["status_info"],
+    user_fields["created_at"],
+    user_fields["domain_name"],
+    user_fields["role"],
+    user_fields["groups"],
 )
 
 _user_info_fields = (
@@ -60,20 +60,22 @@ class UserRole(str, enum.Enum):
     """
     The role (privilege level) of users.
     """
-    SUPERADMIN = 'superadmin'
-    ADMIN = 'admin'
-    USER = 'user'
-    MONITOR = 'monitor'
+
+    SUPERADMIN = "superadmin"
+    ADMIN = "admin"
+    USER = "user"
+    MONITOR = "monitor"
 
 
 class UserStatus(enum.Enum):
     """
     The detailed status of users to represent the signup process and account lifecycles.
     """
-    ACTIVE = 'active'
-    INACTIVE = 'inactive'
-    DELETED = 'deleted'
-    BEFORE_VERIFICATION = 'before-verification'
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    DELETED = "deleted"
+    BEFORE_VERIFICATION = "before-verification"
 
 
 class User(BaseFunction):
@@ -83,8 +85,9 @@ class User(BaseFunction):
 
     @api_function
     @classmethod
-    async def authorize(cls, username: str, password: str, *,
-                        token_type: AuthTokenTypes = AuthTokenTypes.KEYPAIR) -> AuthToken:
+    async def authorize(
+        cls, username: str, password: str, *, token_type: AuthTokenTypes = AuthTokenTypes.KEYPAIR
+    ) -> AuthToken:
         """
         Authorize the given credentials and get the API authentication token.
         This function can be invoked anonymously; i.e., it does not require
@@ -93,18 +96,20 @@ class User(BaseFunction):
         Its functionality will be expanded in the future to support multiple types
         of authentication methods.
         """
-        rqst = Request('POST', '/auth/authorize')
-        rqst.set_json({
-            'type': token_type.value,
-            'domain': api_session.get().config.domain,
-            'username': username,
-            'password': password,
-        })
+        rqst = Request("POST", "/auth/authorize")
+        rqst.set_json(
+            {
+                "type": token_type.value,
+                "domain": api_session.get().config.domain,
+                "username": username,
+                "password": password,
+            }
+        )
         async with rqst.fetch() as resp:
             data = await resp.json()
             return AuthToken(
                 type=token_type,
-                content=data['data'],
+                content=data["data"],
             )
 
     @api_function
@@ -123,18 +128,20 @@ class User(BaseFunction):
         :param group: Fetch users in a specific group.
         :param fields: Additional per-user query fields to fetch.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($status: String, $group: UUID) {
                 users(status: $status, group_id: $group) {$fields}
             }
-        """)
-        query = query.replace('$fields', ' '.join(f.field_ref for f in fields))
+        """
+        )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {
-            'status': status,
-            'group': group,
+            "status": status,
+            "group": group,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data['users']
+        return data["users"]
 
     @api_function
     @classmethod
@@ -158,12 +165,12 @@ class User(BaseFunction):
         :param fields: Additional per-user query fields to fetch.
         """
         return await generate_paginated_results(
-            'user_list',
+            "user_list",
             {
-                'status': (status, 'String'),
-                'group_id': (group, 'UUID'),
-                'filter': (filter, 'String'),
-                'order': (order, 'String'),
+                "status": (status, "String"),
+                "group_id": (group, "UUID"),
+                "filter": (filter, "String"),
+                "order": (order, "String"),
             },
             fields,
             page_offset=page_offset,
@@ -185,21 +192,25 @@ class User(BaseFunction):
         :param fields: Additional per-user query fields to fetch.
         """
         if email is None:
-            query = textwrap.dedent("""\
+            query = textwrap.dedent(
+                """\
                 query {
                     user {$fields}
                 }
-            """)
+            """
+            )
         else:
-            query = textwrap.dedent("""\
+            query = textwrap.dedent(
+                """\
                 query($email: String) {
                     user(email: $email) {$fields}
                 }
-            """)
-        query = query.replace('$fields', ' '.join(f.field_ref for f in fields))
-        variables = {'email': email}
+            """
+            )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {"email": email}
         data = await api_session.get().Admin._query(query, variables if email is not None else None)
-        return data['user']
+        return data["user"]
 
     @api_function
     @classmethod
@@ -216,21 +227,27 @@ class User(BaseFunction):
         :param fields: Additional per-user query fields to fetch.
         """
         if user_uuid is None:
-            query = textwrap.dedent("""\
+            query = textwrap.dedent(
+                """\
                 query {
                     user {$fields}
                 }
-            """)
+            """
+            )
         else:
-            query = textwrap.dedent("""\
+            query = textwrap.dedent(
+                """\
                 query($user_id: ID) {
                     user_from_uuid(user_id: $user_id) {$fields}
                 }
-            """)
-        query = query.replace('$fields', ' '.join(f.field_ref for f in fields))
-        variables = {'user_id': str(user_uuid)}
-        data = await api_session.get().Admin._query(query, variables if user_uuid is not None else None)
-        return data['user_from_uuid']
+            """
+            )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {"user_id": str(user_uuid)}
+        data = await api_session.get().Admin._query(
+            query, variables if user_uuid is not None else None
+        )
+        return data["user_from_uuid"]
 
     @api_function
     @classmethod
@@ -277,47 +294,55 @@ class User(BaseFunction):
         role: UserRole | str = UserRole.USER,
         status: UserStatus | str = UserStatus.ACTIVE,
         need_password_change: bool = False,
-        description: str = '',
+        description: str = "",
         group_ids: Iterable[str] = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new user with the given options.
         You need an admin privilege for this operation.
         """
-        if fields is None:
-            fields = ('domain_name', 'email', 'username', 'uuid')
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($email: String!, $input: UserInput!) {
                 create_user(email: $email, props: $input) {
                     ok msg user {$fields}
                 }
             }
-        """)
-        query = query.replace('$fields', ' '.join(fields))
+        """
+        )
+        default_fields = (
+            user_fields["domain_name"],
+            user_fields["email"],
+            user_fields["username"],
+            user_fields["uuid"],
+        )
+        resolved_fields = resolve_fields(fields, user_fields, default_fields)
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
-            'email': email,
-            'input': {
-                'password': password,
-                'username': username,
-                'full_name': full_name,
-                'role': role.value if isinstance(role, UserRole) else role,
-                'status': status.value if isinstance(status, UserStatus) else status,
-                'need_password_change': need_password_change,
-                'description': description,
-                'domain_name': domain_name,
-                'group_ids': group_ids,
+            "email": email,
+            "input": {
+                "password": password,
+                "username": username,
+                "full_name": full_name,
+                "role": role.value if isinstance(role, UserRole) else role,
+                "status": status.value if isinstance(status, UserStatus) else status,
+                "need_password_change": need_password_change,
+                "description": description,
+                "domain_name": domain_name,
+                "group_ids": group_ids,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data['create_user']
+        return data["create_user"]
 
     @api_function
     @classmethod
     async def update(
         cls,
         email: str,
-        password: str = None, username: str = None,
+        password: str = None,
+        username: str = None,
         full_name: str = None,
         domain_name: str = None,
         role: UserRole | str = UserRole.USER,
@@ -325,35 +350,37 @@ class User(BaseFunction):
         need_password_change: bool = None,
         description: str = None,
         group_ids: Iterable[str] = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Update existing user.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($email: String!, $input: ModifyUserInput!) {
                 modify_user(email: $email, props: $input) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
         variables = {
-            'email': email,
-            'input': {
-                'password': password,
-                'username': username,
-                'full_name': full_name,
-                'domain_name': domain_name,
-                'role': role.value if isinstance(role, UserRole) else role,
-                'status': status.value if isinstance(status, UserStatus) else status,
-                'need_password_change': need_password_change,
-                'description': description,
-                'group_ids': group_ids,
+            "email": email,
+            "input": {
+                "password": password,
+                "username": username,
+                "full_name": full_name,
+                "domain_name": domain_name,
+                "role": role.value if isinstance(role, UserRole) else role,
+                "status": status.value if isinstance(status, UserStatus) else status,
+                "need_password_change": need_password_change,
+                "description": description,
+                "group_ids": group_ids,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data['modify_user']
+        return data["modify_user"]
 
     @api_function
     @classmethod
@@ -361,16 +388,18 @@ class User(BaseFunction):
         """
         Inactivates an existing user.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($email: String!) {
                 delete_user(email: $email) {
                     ok msg
                 }
             }
-        """)
-        variables = {'email': email}
+        """
+        )
+        variables = {"email": email}
         data = await api_session.get().Admin._query(query, variables)
-        return data['delete_user']
+        return data["delete_user"]
 
     @api_function
     @classmethod
@@ -382,18 +411,20 @@ class User(BaseFunction):
         Shared virtual folder's ownership will be transferred to the requested admin.
         To delete shared folders as well, set ``purge_shared_vfolders`` to ``True``.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($email: String!, $input: PurgeUserInput!) {
                 purge_user(email: $email, props: $input) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
         variables = {
-            'email': email,
-            'input': {
-                'purge_shared_vfolders': purge_shared_vfolders,
+            "email": email,
+            "input": {
+                "purge_shared_vfolders": purge_shared_vfolders,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data['purge_user']
+        return data["purge_user"]

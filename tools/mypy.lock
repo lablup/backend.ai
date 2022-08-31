@@ -9,7 +9,7 @@
 //     "CPython<4,>=3.10"
 //   ],
 //   "generated_with_requirements": [
-//     "mypy>=0.950"
+//     "mypy>=0.961"
 //   ]
 // }
 // --- END PANTS LOCKFILE METADATA ---
@@ -44,11 +44,6 @@
               "algorithm": "sha256",
               "hash": "40b0f21484238269ae6a57200c807d80debc6459d444c0489a102d7c6a75fa56",
               "url": "https://files.pythonhosted.org/packages/5e/66/00f7f751140fe6953603fb0cd56dee0314842cfe358884ca3025589ca81c/mypy-0.971.tar.gz"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "25c5750ba5609a0c7550b73a33deb314ecfb559c350bb050b655505e8aed4103",
-              "url": "https://files.pythonhosted.org/packages/9e/01/a81de921bc3efde879f6eab5ff4d4bb33b037581f78eccfa28a47105d0b3/mypy-0.971-cp310-cp310-win_amd64.whl"
             },
             {
               "algorithm": "sha256",
@@ -135,16 +130,20 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.94",
+  "pex_version": "2.1.99",
   "prefer_older_binary": false,
   "requirements": [
-    "mypy>=0.950"
+    "mypy>=0.961"
   ],
   "requires_python": [
     "<4,>=3.10"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
+  "target_systems": [
+    "linux",
+    "mac"
+  ],
   "transitive": true,
   "use_pep517": null
 }

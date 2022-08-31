@@ -5,11 +5,7 @@ from typing import Any, Callable, Mapping, Optional, Sequence
 
 from tabulate import tabulate
 
-from ai.backend.client.cli.pagination import (
-    echo_via_pager,
-    get_preferred_page_size,
-    tabulate_items,
-)
+from ai.backend.client.cli.pagination import echo_via_pager, get_preferred_page_size, tabulate_items
 from ai.backend.client.cli.pretty import print_error, print_fail
 
 from .types import BaseOutputHandler, FieldSpec, PaginatedResult
@@ -20,7 +16,6 @@ class NoItems(Exception):
 
 
 class ConsoleOutputHandler(BaseOutputHandler):
-
     def print_item(
         self,
         item: Mapping[str, Any] | None,
@@ -30,16 +25,18 @@ class ConsoleOutputHandler(BaseOutputHandler):
             print_fail("No matching entry found.")
             return
         field_map = {f.field_name: f for f in fields}
-        print(tabulate(
-            [
-                (
-                    field_map[k].humanized_name,
-                    field_map[k].formatter.format_console(v, field_map[k]),
-                )
-                for k, v in item.items()
-            ],
-            headers=('Field', 'Value'),
-        ))
+        print(
+            tabulate(
+                [
+                    (
+                        field_map[k].humanized_name,
+                        field_map[k].formatter.format_console(v, field_map[k]),
+                    )
+                    for k, v in item.items()
+                ],
+                headers=("Field", "Value"),
+            )
+        )
 
     def print_items(
         self,
@@ -50,16 +47,18 @@ class ConsoleOutputHandler(BaseOutputHandler):
         for idx, item in enumerate(items):
             if idx > 0:
                 print("-" * 20)
-            print(tabulate(
-                [
-                    (
-                        field_map[k].humanized_name,
-                        field_map[k].formatter.format_console(v, field_map[k]),
-                    )
-                    for k, v in item.items()
-                ],
-                headers=('Field', 'Value'),
-            ))
+            print(
+                tabulate(
+                    [
+                        (
+                            field_map[k].humanized_name,
+                            field_map[k].formatter.format_console(v, field_map[k]),
+                        )
+                        for k, v in item.items()
+                    ],
+                    headers=("Field", "Value"),
+                )
+            )
 
     def print_list(
         self,
@@ -81,10 +80,10 @@ class ConsoleOutputHandler(BaseOutputHandler):
                     if is_scalar:
                         yield from map(
                             lambda v: {fields[0].field_name: v},
-                            items[current_offset:current_offset + page_size],
+                            items[current_offset : current_offset + page_size],
                         )
                     else:
-                        yield from items[current_offset:current_offset + page_size]
+                        yield from items[current_offset : current_offset + page_size]
                     current_offset += page_size
                     if current_offset >= len(items):
                         break
@@ -162,36 +161,42 @@ class ConsoleOutputHandler(BaseOutputHandler):
         extra_info: Mapping = {},
     ) -> None:
         t = [
-            ['ok', item['ok']],
-            ['msg', item['msg']],
+            ["ok", item["ok"]],
+            ["msg", item["msg"]],
             *[(k, v) for k, v in extra_info.items()],
         ]
         if action_name is not None:
-            t += [['Action', action_name]]
+            t += [["Action", action_name]]
         if item_name is not None:
             t += [(k, v) for k, v in item[item_name].items()]
-        print(tabulate(
-            t, headers=('Field', 'Value'),
-        ))
+        print(
+            tabulate(
+                t,
+                headers=("Field", "Value"),
+            )
+        )
 
     def print_mutation_error(
         self,
         error: Optional[Exception] = None,
-        msg: str = 'Failed',
+        msg: str = "Failed",
         item_name: Optional[str] = None,
         action_name: Optional[str] = None,
         extra_info: Mapping = {},
     ) -> None:
         t = [
-            ['Message', msg],
+            ["Message", msg],
         ]
         if item_name is not None:
-            t += [['Item', item_name]]
+            t += [["Item", item_name]]
         if action_name is not None:
-            t += [['Action', action_name]]
-        print(tabulate(
-            t, headers=('Field', 'Value'),
-        ))
+            t += [["Action", action_name]]
+        print(
+            tabulate(
+                t,
+                headers=("Field", "Value"),
+            )
+        )
         if error is not None:
             print_error(error)
 

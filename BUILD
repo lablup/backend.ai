@@ -3,6 +3,7 @@ python_requirements(
     source="requirements.txt",
     module_mapping={
         "aiodataloader-ng": ["aiodataloader"],
+        "aiomonitor-ng": ["aiomonitor"],
         "attrs": ["attr", "attrs"],
         "aiohttp-session": ["aiohttp_session"],
         "pycryptodome": ["Crypto"],
@@ -22,6 +23,7 @@ python_requirements(
         "types-Jinja2": ["Jinja2"],
         "types-PyYAML": ["yaml"],
         "types-python-dateutil": ["dateutil"],
+        "types-redis": ["redis"],
         "types-six": ["six"],
         "types-tabulate": ["tabulate"],
     },

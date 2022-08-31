@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence, Set, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, overload
 
 import attr
 import graphene
@@ -25,7 +25,7 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .group import resolve_group_name_or_id
+from .group import resolve_group_name_or_id, resolve_groups
 from .user import UserRole
 
 if TYPE_CHECKING:
@@ -33,22 +33,22 @@ if TYPE_CHECKING:
 
 __all__: Sequence[str] = (
     # table defs
-    'scaling_groups',
-    'sgroups_for_domains',
-    'sgroups_for_groups',
-    'sgroups_for_keypairs',
+    "scaling_groups",
+    "sgroups_for_domains",
+    "sgroups_for_groups",
+    "sgroups_for_keypairs",
     # functions
-    'query_allowed_sgroups',
-    'ScalingGroup',
-    'CreateScalingGroup',
-    'ModifyScalingGroup',
-    'DeleteScalingGroup',
-    'AssociateScalingGroupWithDomain',
-    'AssociateScalingGroupWithUserGroup',
-    'AssociateScalingGroupWithKeyPair',
-    'DisassociateScalingGroupWithDomain',
-    'DisassociateScalingGroupWithUserGroup',
-    'DisassociateScalingGroupWithKeyPair',
+    "query_allowed_sgroups",
+    "ScalingGroup",
+    "CreateScalingGroup",
+    "ModifyScalingGroup",
+    "DeleteScalingGroup",
+    "AssociateScalingGroupWithDomain",
+    "AssociateScalingGroupWithUserGroup",
+    "AssociateScalingGroupWithKeyPair",
+    "DisassociateScalingGroupWithDomain",
+    "DisassociateScalingGroupWithUserGroup",
+    "DisassociateScalingGroupWithKeyPair",
 )
 
 
@@ -62,9 +62,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
 
     def to_json(self) -> dict[str, Any]:
         return {
-            "allowed_session_types": [
-                item.value for item in self.allowed_session_types
-            ],
+            "allowed_session_types": [item.value for item in self.allowed_session_types],
             "pending_timeout": self.pending_timeout.total_seconds(),
             "config": self.config,
         }
@@ -75,30 +73,34 @@ class ScalingGroupOpts(JSONSerializableMixin):
 
     @classmethod
     def as_trafaret(cls) -> t.Trafaret:
-        return t.Dict({
-            t.Key('allowed_session_types', default=['interactive', 'batch']):
-                t.List(tx.Enum(SessionTypes), min_length=1),
-            t.Key('pending_timeout', default=0):
-                tx.TimeDuration(allow_negative=False),
-            # Each scheduler impl refers an additional "config" key.
-            t.Key("config", default={}): t.Mapping(t.String, t.Any),
-        }).allow_extra('*')
+        return t.Dict(
+            {
+                t.Key("allowed_session_types", default=["interactive", "batch"]): t.List(
+                    tx.Enum(SessionTypes), min_length=1
+                ),
+                t.Key("pending_timeout", default=0): tx.TimeDuration(allow_negative=False),
+                # Each scheduler impl refers an additional "config" key.
+                t.Key("config", default={}): t.Mapping(t.String, t.Any),
+            }
+        ).allow_extra("*")
 
 
 scaling_groups = sa.Table(
-    'scaling_groups', metadata,
-    sa.Column('name', sa.String(length=64), primary_key=True),
-    sa.Column('description', sa.String(length=512)),
-    sa.Column('is_active', sa.Boolean, index=True, default=True),
-    sa.Column('created_at', sa.DateTime(timezone=True),
-              server_default=sa.func.now()),
-    sa.Column('wsproxy_addr', sa.String(length=1024), nullable=True),
-    sa.Column('driver', sa.String(length=64), nullable=False),
-    sa.Column('driver_opts', pgsql.JSONB(), nullable=False, default={}),
-    sa.Column('scheduler', sa.String(length=64), nullable=False),
+    "scaling_groups",
+    metadata,
+    sa.Column("name", sa.String(length=64), primary_key=True),
+    sa.Column("description", sa.String(length=512)),
+    sa.Column("is_active", sa.Boolean, index=True, default=True),
+    sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    sa.Column("wsproxy_addr", sa.String(length=1024), nullable=True),
+    sa.Column("driver", sa.String(length=64), nullable=False),
+    sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={}),
+    sa.Column("scheduler", sa.String(length=64), nullable=False),
     sa.Column(
-        'scheduler_opts', StructuredJSONObjectColumn(ScalingGroupOpts),
-        nullable=False, default={},
+        "scheduler_opts",
+        StructuredJSONObjectColumn(ScalingGroupOpts),
+        nullable=False,
+        default={},
     ),
 )
 
@@ -108,91 +110,137 @@ scaling_groups = sa.Table(
 
 
 sgroups_for_domains = sa.Table(
-    'sgroups_for_domains', metadata,
-    sa.Column('scaling_group',
-              sa.ForeignKey('scaling_groups.name',
-                            onupdate='CASCADE',
-                            ondelete='CASCADE'),
-              index=True, nullable=False),
-    sa.Column('domain',
-              sa.ForeignKey('domains.name',
-                            onupdate='CASCADE',
-                            ondelete='CASCADE'),
-              index=True, nullable=False),
-    sa.UniqueConstraint('scaling_group', 'domain', name='uq_sgroup_domain'),
+    "sgroups_for_domains",
+    metadata,
+    sa.Column(
+        "scaling_group",
+        sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    ),
+    sa.Column(
+        "domain",
+        sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    ),
+    sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
 )
 
 
 sgroups_for_groups = sa.Table(
-    'sgroups_for_groups', metadata,
-    sa.Column('scaling_group',
-              sa.ForeignKey('scaling_groups.name',
-                            onupdate='CASCADE',
-                            ondelete='CASCADE'),
-              index=True, nullable=False),
-    sa.Column('group',
-              sa.ForeignKey('groups.id',
-                            onupdate='CASCADE',
-                            ondelete='CASCADE'),
-              index=True, nullable=False),
-    sa.UniqueConstraint('scaling_group', 'group', name='uq_sgroup_ugroup'),
+    "sgroups_for_groups",
+    metadata,
+    sa.Column(
+        "scaling_group",
+        sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    ),
+    sa.Column(
+        "group",
+        sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    ),
+    sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
 )
 
 
 sgroups_for_keypairs = sa.Table(
-    'sgroups_for_keypairs', metadata,
-    sa.Column('scaling_group',
-              sa.ForeignKey('scaling_groups.name',
-                            onupdate='CASCADE',
-                            ondelete='CASCADE'),
-              index=True, nullable=False),
-    sa.Column('access_key',
-              sa.ForeignKey('keypairs.access_key',
-                            onupdate='CASCADE',
-                            ondelete='CASCADE'),
-              index=True, nullable=False),
-    sa.UniqueConstraint('scaling_group', 'access_key', name='uq_sgroup_akey'),
+    "sgroups_for_keypairs",
+    metadata,
+    sa.Column(
+        "scaling_group",
+        sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    ),
+    sa.Column(
+        "access_key",
+        sa.ForeignKey("keypairs.access_key", onupdate="CASCADE", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    ),
+    sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
 )
+
+
+@overload
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: uuid.UUID,
+    access_key: str,
+) -> Sequence[Row]:
+    ...
+
+
+@overload
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: Iterable[uuid.UUID],
+    access_key: str,
+) -> Sequence[Row]:
+    ...
+
+
+@overload
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: str,
+    access_key: str,
+) -> Sequence[Row]:
+    ...
+
+
+@overload
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: Iterable[str],
+    access_key: str,
+) -> Sequence[Row]:
+    ...
 
 
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: Union[uuid.UUID, str],
+    group: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
     access_key: str,
 ) -> Sequence[Row]:
-    query = (
-        sa.select([sgroups_for_domains])
-        .where(sgroups_for_domains.c.domain == domain_name)
-    )
+    query = sa.select([sgroups_for_domains]).where(sgroups_for_domains.c.domain == domain_name)
     result = await db_conn.execute(query)
-    from_domain = {row['scaling_group'] for row in result}
+    from_domain = {row["scaling_group"] for row in result}
 
-    group_id = await resolve_group_name_or_id(db_conn, domain_name, group)
+    if isinstance(group, Iterable):
+        group_ids = await resolve_groups(db_conn, domain_name, group)
+    else:
+        if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):
+            group_ids = [group_id]
+        else:
+            group_ids = []
     from_group: Set[str]
-    if group_id is None:
+    if not group_ids:
         from_group = set()  # empty
     else:
-        query = (
-            sa.select([sgroups_for_groups])
-            .where(
-                (sgroups_for_groups.c.group == group_id),
-            )
-        )
+        group_cond = sgroups_for_groups.c.group.in_(group_ids)
+        query = sa.select([sgroups_for_groups]).where(group_cond)
         result = await db_conn.execute(query)
-        from_group = {row['scaling_group'] for row in result}
+        from_group = {row["scaling_group"] for row in result}
 
-    query = (sa.select([sgroups_for_keypairs])
-               .where(sgroups_for_keypairs.c.access_key == access_key))
+    query = sa.select([sgroups_for_keypairs]).where(sgroups_for_keypairs.c.access_key == access_key)
     result = await db_conn.execute(query)
-    from_keypair = {row['scaling_group'] for row in result}
+    from_keypair = {row["scaling_group"] for row in result}
 
     sgroups = from_domain | from_group | from_keypair
     query = (
         sa.select([scaling_groups])
         .where(
-            (scaling_groups.c.name.in_(sgroups)) &
-            (scaling_groups.c.is_active),
+            (scaling_groups.c.name.in_(sgroups)) & (scaling_groups.c.is_active),
         )
         .order_by(scaling_groups.c.name)
     )
@@ -220,15 +268,15 @@ class ScalingGroup(graphene.ObjectType):
         if row is None:
             return None
         return cls(
-            name=row['name'],
-            description=row['description'],
-            is_active=row['is_active'],
-            created_at=row['created_at'],
-            wsproxy_addr=row['wsproxy_addr'],
-            driver=row['driver'],
-            driver_opts=row['driver_opts'],
-            scheduler=row['scheduler'],
-            scheduler_opts=row['scheduler_opts'].to_json(),
+            name=row["name"],
+            description=row["description"],
+            is_active=row["is_active"],
+            created_at=row["created_at"],
+            wsproxy_addr=row["wsproxy_addr"],
+            driver=row["driver"],
+            driver_opts=row["driver_opts"],
+            scheduler=row["scheduler"],
+            scheduler_opts=row["scheduler_opts"].to_json(),
         )
 
     @classmethod
@@ -243,7 +291,8 @@ class ScalingGroup(graphene.ObjectType):
             query = query.where(scaling_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
             return [
-                obj async for row in (await conn.stream(query))
+                obj
+                async for row in (await conn.stream(query))
                 if (obj := cls.from_row(ctx, row)) is not None
             ]
 
@@ -256,18 +305,19 @@ class ScalingGroup(graphene.ObjectType):
         is_active: bool = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
-            scaling_groups, sgroups_for_domains,
-            scaling_groups.c.name == sgroups_for_domains.c.scaling_group)
+            scaling_groups,
+            sgroups_for_domains,
+            scaling_groups.c.name == sgroups_for_domains.c.scaling_group,
+        )
         query = (
-            sa.select([scaling_groups])
-            .select_from(j)
-            .where(sgroups_for_domains.c.domain == domain)
+            sa.select([scaling_groups]).select_from(j).where(sgroups_for_domains.c.domain == domain)
         )
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
             return [
-                obj async for row in (await conn.stream(query))
+                obj
+                async for row in (await conn.stream(query))
                 if (obj := cls.from_row(ctx, row)) is not None
             ]
 
@@ -280,19 +330,19 @@ class ScalingGroup(graphene.ObjectType):
         is_active: bool = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
-            scaling_groups, sgroups_for_groups,
+            scaling_groups,
+            sgroups_for_groups,
             scaling_groups.c.name == sgroups_for_groups.c.scaling_group,
         )
         query = (
-            sa.select([scaling_groups])
-            .select_from(j)
-            .where(sgroups_for_groups.c.group == group)
+            sa.select([scaling_groups]).select_from(j).where(sgroups_for_groups.c.group == group)
         )
         if is_active is not None:
             query = query.where(scaling_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
             return [
-                obj async for row in (await conn.stream(query))
+                obj
+                async for row in (await conn.stream(query))
                 if (obj := cls.from_row(ctx, row)) is not None
             ]
 
@@ -305,7 +355,8 @@ class ScalingGroup(graphene.ObjectType):
         is_active: bool = None,
     ) -> Sequence[ScalingGroup]:
         j = sa.join(
-            scaling_groups, sgroups_for_keypairs,
+            scaling_groups,
+            sgroups_for_keypairs,
             scaling_groups.c.name == sgroups_for_keypairs.c.scaling_group,
         )
         query = (
@@ -317,7 +368,8 @@ class ScalingGroup(graphene.ObjectType):
             query = query.where(scaling_groups.c.is_active == is_active)
         async with ctx.db.begin_readonly() as conn:
             return [
-                obj async for row in (await conn.stream(query))
+                obj
+                async for row in (await conn.stream(query))
                 if (obj := cls.from_row(ctx, row)) is not None
             ]
 
@@ -328,7 +380,8 @@ class ScalingGroup(graphene.ObjectType):
         group_ids: Sequence[uuid.UUID],
     ) -> Sequence[Sequence[ScalingGroup | None]]:
         j = sa.join(
-            scaling_groups, sgroups_for_groups,
+            scaling_groups,
+            sgroups_for_groups,
             scaling_groups.c.name == sgroups_for_groups.c.scaling_group,
         )
         query = (
@@ -338,8 +391,12 @@ class ScalingGroup(graphene.ObjectType):
         )
         async with ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
-                ctx, conn, query, cls,
-                group_ids, lambda row: row['group'],
+                ctx,
+                conn,
+                query,
+                cls,
+                group_ids,
+                lambda row: row["group"],
             )
 
     @classmethod
@@ -355,13 +412,17 @@ class ScalingGroup(graphene.ObjectType):
         )
         async with ctx.db.begin_readonly() as conn:
             return await batch_result(
-                ctx, conn, query, cls,
-                names, lambda row: row['name'],
+                ctx,
+                conn,
+                query,
+                cls,
+                names,
+                lambda row: row["name"],
             )
 
 
 class CreateScalingGroupInput(graphene.InputObjectType):
-    description = graphene.String(required=False, default='')
+    description = graphene.String(required=False, default="")
     is_active = graphene.Boolean(required=False, default=True)
     wsproxy_addr = graphene.String(required=False)
     driver = graphene.String(required=True)
@@ -401,20 +462,21 @@ class CreateScalingGroup(graphene.Mutation):
         props: CreateScalingGroupInput,
     ) -> CreateScalingGroup:
         data = {
-            'name': name,
-            'description': props.description,
-            'is_active': bool(props.is_active),
-            'wsproxy_addr': props.wsproxy_addr,
-            'driver': props.driver,
-            'driver_opts': props.driver_opts,
-            'scheduler': props.scheduler,
-            'scheduler_opts': ScalingGroupOpts.from_json(props.scheduler_opts),
+            "name": name,
+            "description": props.description,
+            "is_active": bool(props.is_active),
+            "wsproxy_addr": props.wsproxy_addr,
+            "driver": props.driver,
+            "driver_opts": props.driver_opts,
+            "scheduler": props.scheduler,
+            "scheduler_opts": ScalingGroupOpts.from_json(props.scheduler_opts),
         }
-        insert_query = (
-            sa.insert(scaling_groups).values(data)
-        )
+        insert_query = sa.insert(scaling_groups).values(data)
         return await simple_db_mutate_returning_item(
-            cls, info.context, insert_query, item_cls=ScalingGroup,
+            cls,
+            info.context,
+            insert_query,
+            item_cls=ScalingGroup,
         )
 
 
@@ -438,18 +500,16 @@ class ModifyScalingGroup(graphene.Mutation):
         props: ModifyScalingGroupInput,
     ) -> ModifyScalingGroup:
         data: Dict[str, Any] = {}
-        set_if_set(props, data, 'description')
-        set_if_set(props, data, 'is_active')
-        set_if_set(props, data, 'driver')
-        set_if_set(props, data, 'wsproxy_addr')
-        set_if_set(props, data, 'driver_opts')
-        set_if_set(props, data, 'scheduler')
-        set_if_set(props, data, 'scheduler_opts', clean_func=lambda v: ScalingGroupOpts.from_json(v))
-        update_query = (
-            sa.update(scaling_groups)
-            .values(data)
-            .where(scaling_groups.c.name == name)
+        set_if_set(props, data, "description")
+        set_if_set(props, data, "is_active")
+        set_if_set(props, data, "driver")
+        set_if_set(props, data, "wsproxy_addr")
+        set_if_set(props, data, "driver_opts")
+        set_if_set(props, data, "scheduler")
+        set_if_set(
+            props, data, "scheduler_opts", clean_func=lambda v: ScalingGroupOpts.from_json(v)
         )
+        update_query = sa.update(scaling_groups).values(data).where(scaling_groups.c.name == name)
         return await simple_db_mutate(cls, info.context, update_query)
 
 
@@ -470,10 +530,7 @@ class DeleteScalingGroup(graphene.Mutation):
         info: graphene.ResolveInfo,
         name: str,
     ) -> DeleteScalingGroup:
-        delete_query = (
-            sa.delete(scaling_groups)
-            .where(scaling_groups.c.name == name)
-        )
+        delete_query = sa.delete(scaling_groups).where(scaling_groups.c.name == name)
         return await simple_db_mutate(cls, info.context, delete_query)
 
 
@@ -496,12 +553,11 @@ class AssociateScalingGroupWithDomain(graphene.Mutation):
         scaling_group: str,
         domain: str,
     ) -> AssociateScalingGroupWithDomain:
-        insert_query = (
-            sa.insert(sgroups_for_domains)
-            .values({
-                'scaling_group': scaling_group,
-                'domain': domain,
-            })
+        insert_query = sa.insert(sgroups_for_domains).values(
+            {
+                "scaling_group": scaling_group,
+                "domain": domain,
+            }
         )
         return await simple_db_mutate(cls, info.context, insert_query)
 
@@ -525,12 +581,9 @@ class DisassociateScalingGroupWithDomain(graphene.Mutation):
         scaling_group: str,
         domain: str,
     ) -> DisassociateScalingGroupWithDomain:
-        delete_query = (
-            sa.delete(sgroups_for_domains)
-            .where(
-                (sgroups_for_domains.c.scaling_group == scaling_group) &
-                (sgroups_for_domains.c.domain == domain),
-            )
+        delete_query = sa.delete(sgroups_for_domains).where(
+            (sgroups_for_domains.c.scaling_group == scaling_group)
+            & (sgroups_for_domains.c.domain == domain),
         )
         return await simple_db_mutate(cls, info.context, delete_query)
 
@@ -552,10 +605,7 @@ class DisassociateAllScalingGroupsWithDomain(graphene.Mutation):
         info: graphene.ResolveInfo,
         domain: str,
     ) -> DisassociateAllScalingGroupsWithDomain:
-        delete_query = (
-            sa.delete(sgroups_for_domains)
-            .where(sgroups_for_domains.c.domain == domain)
-        )
+        delete_query = sa.delete(sgroups_for_domains).where(sgroups_for_domains.c.domain == domain)
         return await simple_db_mutate(cls, info.context, delete_query)
 
 
@@ -578,12 +628,11 @@ class AssociateScalingGroupWithUserGroup(graphene.Mutation):
         scaling_group: str,
         user_group: uuid.UUID,
     ) -> AssociateScalingGroupWithUserGroup:
-        insert_query = (
-            sa.insert(sgroups_for_groups)
-            .values({
-                'scaling_group': scaling_group,
-                'group': user_group,
-            })
+        insert_query = sa.insert(sgroups_for_groups).values(
+            {
+                "scaling_group": scaling_group,
+                "group": user_group,
+            }
         )
         return await simple_db_mutate(cls, info.context, insert_query)
 
@@ -607,12 +656,9 @@ class DisassociateScalingGroupWithUserGroup(graphene.Mutation):
         scaling_group: str,
         user_group: uuid.UUID,
     ) -> DisassociateScalingGroupWithUserGroup:
-        delete_query = (
-            sa.delete(sgroups_for_groups)
-            .where(
-                (sgroups_for_groups.c.scaling_group == scaling_group) &
-                (sgroups_for_groups.c.group == user_group),
-            )
+        delete_query = sa.delete(sgroups_for_groups).where(
+            (sgroups_for_groups.c.scaling_group == scaling_group)
+            & (sgroups_for_groups.c.group == user_group),
         )
         return await simple_db_mutate(cls, info.context, delete_query)
 
@@ -634,10 +680,7 @@ class DisassociateAllScalingGroupsWithGroup(graphene.Mutation):
         info: graphene.ResolveInfo,
         user_group: uuid.UUID,
     ) -> DisassociateAllScalingGroupsWithGroup:
-        delete_query = (
-            sa.delete(sgroups_for_groups)
-            .where(sgroups_for_groups.c.group == user_group)
-        )
+        delete_query = sa.delete(sgroups_for_groups).where(sgroups_for_groups.c.group == user_group)
         return await simple_db_mutate(cls, info.context, delete_query)
 
 
@@ -660,12 +703,11 @@ class AssociateScalingGroupWithKeyPair(graphene.Mutation):
         scaling_group: str,
         access_key: str,
     ) -> AssociateScalingGroupWithKeyPair:
-        insert_query = (
-            sa.insert(sgroups_for_keypairs)
-            .values({
-                'scaling_group': scaling_group,
-                'access_key': access_key,
-            })
+        insert_query = sa.insert(sgroups_for_keypairs).values(
+            {
+                "scaling_group": scaling_group,
+                "access_key": access_key,
+            }
         )
         return await simple_db_mutate(cls, info.context, insert_query)
 
@@ -689,11 +731,8 @@ class DisassociateScalingGroupWithKeyPair(graphene.Mutation):
         scaling_group: str,
         access_key: str,
     ) -> DisassociateScalingGroupWithKeyPair:
-        delete_query = (
-            sa.delete(sgroups_for_keypairs)
-            .where(
-                (sgroups_for_keypairs.c.scaling_group == scaling_group) &
-                (sgroups_for_keypairs.c.access_key == access_key),
-            )
+        delete_query = sa.delete(sgroups_for_keypairs).where(
+            (sgroups_for_keypairs.c.scaling_group == scaling_group)
+            & (sgroups_for_keypairs.c.access_key == access_key),
         )
         return await simple_db_mutate(cls, info.context, delete_query)

@@ -13,18 +13,18 @@ from . import AbstractPlugin, BasePluginContext
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 __all__ = (
-    'HookHandler',
-    'HookPlugin',
-    'HookPluginContext',
-    'Reject',
-    'HookResults',
-    'HookResult',
-    'HookReturnTiming',
-    'PASSED',
-    'REJECTED',
-    'ERROR',
-    'ALL_COMPLETED',
-    'FIRST_COMPLETED',
+    "HookHandler",
+    "HookPlugin",
+    "HookPluginContext",
+    "Reject",
+    "HookResults",
+    "HookResult",
+    "HookReturnTiming",
+    "PASSED",
+    "REJECTED",
+    "ERROR",
+    "ALL_COMPLETED",
+    "FIRST_COMPLETED",
 )
 
 
@@ -94,10 +94,12 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
     A manager for hook plugins with convenient handler invocation.
     """
 
-    plugin_group = 'backendai_hook_v20'
+    plugin_group = "backendai_hook_v20"
 
     def _get_handlers(
-        self, event_name: str, order: Sequence[str] = None,
+        self,
+        event_name: str,
+        order: Sequence[str] = None,
     ) -> Sequence[Tuple[str, HookHandler]]:
         handlers = []
         for plugin_name, plugin_instance in self.plugins.items():
@@ -114,7 +116,10 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         return handlers
 
     async def dispatch(
-        self, event_name: str, args: Tuple[Any, ...], *,
+        self,
+        event_name: str,
+        args: Tuple[Any, ...],
+        *,
         return_when: HookReturnTiming = ALL_COMPLETED,
         success_if_no_hook: bool = True,
         order: Sequence[str] = None,
@@ -155,7 +160,7 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
             return HookResult(
                 status=REJECTED,
                 src_plugin=executed_plugin_names,  # empty
-                result=results,                    # empty
+                result=results,  # empty
             )
         return HookResult(
             status=PASSED,
@@ -164,7 +169,9 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
         )
 
     async def notify(
-        self, event_name: str, args: Tuple[Any, ...],
+        self,
+        event_name: str,
+        args: Tuple[Any, ...],
     ) -> None:
         """
         Invoke the handlers that matches with the given ``event_name``.
@@ -174,6 +181,9 @@ class HookPluginContext(BasePluginContext[HookPlugin]):
             try:
                 await hook_handler(*args)
             except Exception:
-                log.exception('HookPluginContext.notify({}): skipping error in hook handler from {}',
-                              event_name, plugin_name)
+                log.exception(
+                    "HookPluginContext.notify({}): skipping error in hook handler from {}",
+                    event_name,
+                    plugin_name,
+                )
                 continue

@@ -23,19 +23,24 @@ from .logging import BraceStyleAdapter
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 HTTP_HEADERS_TO_FORWARD = [
-    'Accept-Language',
+    "Accept-Language",
+    "Authorization",
 ]
 
-extra_config_headers = t.Dict({
-    t.Key('X-BackendAI-Version', default=None): t.Null | t.String,
-    t.Key('X-BackendAI-Encoded', default=None): t.Null | t.ToBool,
-}).allow_extra('*')
+extra_config_headers = t.Dict(
+    {
+        t.Key("X-BackendAI-Version", default=None): t.Null | t.String,
+        t.Key("X-BackendAI-Encoded", default=None): t.Null | t.ToBool,
+    }
+).allow_extra("*")
 
 
 class WebSocketProxy:
     __slots__ = (
-        'up_conn', 'down_conn',
-        'upstream_buffer', 'upstream_buffer_task',
+        "up_conn",
+        "down_conn",
+        "upstream_buffer",
+        "upstream_buffer_task",
     )
 
     up_conn: aiohttp.ClientWebSocketResponse
@@ -43,8 +48,9 @@ class WebSocketProxy:
     upstream_buffer: asyncio.Queue[Tuple[Union[str, bytes], aiohttp.WSMsgType]]
     upstream_buffer_task: Optional[asyncio.Task]
 
-    def __init__(self, up_conn: aiohttp.ClientWebSocketResponse,
-                 down_conn: web.WebSocketResponse) -> None:
+    def __init__(
+        self, up_conn: aiohttp.ClientWebSocketResponse, down_conn: web.WebSocketResponse
+    ) -> None:
         self.up_conn = up_conn
         self.down_conn = down_conn
         self.upstream_buffer = asyncio.Queue()
@@ -60,8 +66,10 @@ class WebSocketProxy:
                 if msg.type in (aiohttp.WSMsgType.TEXT, aiohttp.WSMsgType.BINARY):
                     await self.send(msg.data, msg.type)
                 elif msg.type == aiohttp.WSMsgType.ERROR:
-                    log.error("WebSocketProxy: connection closed with exception {}",
-                              self.up_conn.exception())
+                    log.error(
+                        "WebSocketProxy: connection closed with exception {}",
+                        self.up_conn.exception(),
+                    )
                     break
                 elif msg.type == aiohttp.WSMsgType.CLOSE:
                     break
@@ -74,8 +82,7 @@ class WebSocketProxy:
 
     async def downstream(self) -> None:
         try:
-            self.upstream_buffer_task = \
-                    asyncio.create_task(self.consume_upstream_buffer())
+            self.upstream_buffer_task = asyncio.create_task(self.consume_upstream_buffer())
             async for msg in self.up_conn:
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     await self.down_conn.send_str(msg.data)
@@ -89,7 +96,7 @@ class WebSocketProxy:
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            log.error('WebSocketProxy: unexpected error: {}', e)
+            log.error("WebSocketProxy: unexpected error: {}", e)
         finally:
             await self.close_upstream()
 
@@ -120,64 +127,90 @@ class WebSocketProxy:
             await self.up_conn.close()
 
 
-async def decrypt_payload(request):
-    config = request.app['config']
-    scheme = config['service'].get('force-endpoint-protocol')
-    if not request.content:
-        return request
-    if scheme is None:
-        scheme = request.scheme
-    api_endpoint = f'{scheme}://{request.host}'
-    payload = await request.text()
-    iv, real_payload = payload.split(':')  # Extract initial vector and actual payload
-    key = (base64.b64encode(api_endpoint.encode('ascii')).decode() + iv + iv)[0:32]
-    crypt = AES.new(bytes(key, encoding='utf8'), AES.MODE_CBC, bytes(iv, encoding='utf8'))
-    b64p = base64.b64decode(real_payload)
-    dec = unpad(crypt.decrypt(bytes(b64p)), 16)
-    result = dec.decode("UTF-8")
-    return result
+@web.middleware
+async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
+    request_headers = extra_config_headers.check(request.headers)
+    secure_context = request_headers.get("X-BackendAI-Encoded", None)
+    if secure_context:
+        if not request.content:
+            request["payload"] = ""
+            return await handler(request)
+        config = request.app["config"]
+        scheme = config["service"]["force_endpoint_protocol"]
+        if scheme is None:
+            scheme = request.scheme
+        api_endpoint = f"{scheme}://{request.host}"
+        payload = await request.text()
+        initial_vector, real_payload = payload.split(":")
+        key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + initial_vector * 2)[0:32]
+        crypt = AES.new(
+            bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(initial_vector, encoding="utf8")
+        )
+        b64p = base64.b64decode(real_payload)
+        dec = unpad(crypt.decrypt(bytes(b64p)), 16)
+        result = dec.decode("UTF-8")
+        if not result:
+            request["payload"] = ""
+        else:
+            request["payload"] = result
+    else:
+        request["payload"] = ""
+    return await handler(request)
 
 
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
-    path = request.match_info.get('path', '')
+    path = request.match_info.get("path", "")
+    first_path = request.path.lstrip("/").partition("/")[
+        0
+    ]  # extract the first path  # extract the first path
     if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
         api_session = await asyncio.shield(get_api_session(request))
+
+    if first_path == "pipeline":
+        pipeline_endpoint = request.app["config"]["pipeline"]["endpoint"]
+        api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))
     try:
         async with api_session:
             # We perform request signing by ourselves using the HTTP session data,
             # but need to keep the client's version header so that
             # the final clients may perform its own API versioning support.
             request_headers = extra_config_headers.check(request.headers)
-            request_api_version = request_headers.get('X-BackendAI-Version', None)
-            secure_context = request_headers.get('X-BackendAI-Encoded', None)
+            request_api_version = request_headers.get("X-BackendAI-Version", None)
+            secure_context = request_headers.get("X-BackendAI-Encoded", None)
+            decrypted_payload_length = 0
             if secure_context:
-                payload = await decrypt_payload(request)
-                payload_length = len(payload)
+                payload = request["payload"]
+                decrypted_payload_length = len(payload)
             else:
                 payload = request.content
             # Send X-Forwarded-For header for token authentication with the client IP.
-            client_ip = request.headers.get('X-Forwarded-For')
+            client_ip = request.headers.get("X-Forwarded-For")
             if not client_ip:
                 client_ip = request.remote
-            _headers = {'X-Forwarded-For': client_ip}
+            _headers = {"X-Forwarded-For": client_ip}
             api_session.aiohttp_session.headers.update(_headers)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             # We treat all requests and responses as streaming universally
             # to be a transparent proxy.
             api_rqst = Request(
-                request.method, path, payload,
+                request.method,
+                path,
+                payload,
                 params=request.query,
-                override_api_version=request_api_version)
-            if 'Content-Type' in request.headers:
-                api_rqst.content_type = request.content_type                        # set for signing
-                api_rqst.headers['Content-Type'] = request.headers['Content-Type']  # preserve raw value
-            if 'Content-Length' in request.headers and not secure_context:
-                api_rqst.headers['Content-Length'] = request.headers['Content-Length']
-            if 'Content-Length' in request.headers and secure_context:
-                api_rqst.headers['Content-Length'] = str(payload_length)
+                override_api_version=request_api_version,
+            )
+            if "Content-Type" in request.headers:
+                api_rqst.content_type = request.content_type  # set for signing
+                api_rqst.headers["Content-Type"] = request.headers[
+                    "Content-Type"
+                ]  # preserve raw value
+            if "Content-Length" in request.headers and not secure_context:
+                api_rqst.headers["Content-Length"] = request.headers["Content-Length"]
+            if "Content-Length" in request.headers and secure_context:
+                api_rqst.headers["Content-Length"] = str(decrypted_payload_length)
             for hdr in HTTP_HEADERS_TO_FORWARD:
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
@@ -199,21 +232,34 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
     except asyncio.CancelledError:
         raise
     except BackendAPIError as e:
-        return web.Response(body=json.dumps(e.data),
-                            content_type="application/problem+json",
-                            status=e.status, reason=e.reason)
+        return web.Response(
+            body=json.dumps(e.data),
+            content_type="application/problem+json",
+            status=e.status,
+            reason=e.reason,
+        )
     except BackendClientError:
-        log.exception('web_handler: BackendClientError')
-        return web.HTTPBadGateway(text=json.dumps({
-            'type': 'https://api.backend.ai/probs/bad-gateway',
-            'title': "The proxy target server is inaccessible.",
-        }), content_type='application/problem+json')
+        log.exception("web_handler: BackendClientError")
+        return web.HTTPBadGateway(
+            text=json.dumps(
+                {
+                    "type": "https://api.backend.ai/probs/bad-gateway",
+                    "title": "The proxy target server is inaccessible.",
+                }
+            ),
+            content_type="application/problem+json",
+        )
     except Exception:
-        log.exception('web_handler: unexpected error')
-        return web.HTTPInternalServerError(text=json.dumps({
-            'type': 'https://api.backend.ai/probs/internal-server-error',
-            'title': "Something has gone wrong.",
-        }), content_type='application/problem+json')
+        log.exception("web_handler: unexpected error")
+        return web.HTTPInternalServerError(
+            text=json.dumps(
+                {
+                    "type": "https://api.backend.ai/probs/internal-server-error",
+                    "title": "Something has gone wrong.",
+                }
+            ),
+            content_type="application/problem+json",
+        )
     finally:
         await api_session.close()
 
@@ -224,7 +270,7 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
     content-type and content-length headers before sending up-requests.
     It also configures the domain in the json body for "auth/signup" requests.
     """
-    path = request.match_info['path']
+    path = request.match_info["path"]
     if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
@@ -232,24 +278,27 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
     try:
         async with api_session:
             content = request.content
-            if path == 'auth/signup':
+            if path == "auth/signup":
                 body = await request.json()
-                body['domain'] = request.app['config']['api']['domain']
-                content = json.dumps(body).encode('utf8')
-            request_api_version = request.headers.get('X-BackendAI-Version', None)
+                body["domain"] = request.app["config"]["api"]["domain"]
+                content = json.dumps(body).encode("utf8")
+            request_api_version = request.headers.get("X-BackendAI-Version", None)
             # Send X-Forwarded-For header for token authentication with the client IP.
-            client_ip = request.headers.get('X-Forwarded-For')
+            client_ip = request.headers.get("X-Forwarded-For")
             if not client_ip:
                 client_ip = request.remote
-            _headers = {'X-Forwarded-For': client_ip}
+            _headers = {"X-Forwarded-For": client_ip}
             api_session.aiohttp_session.headers.update(_headers)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             api_rqst = Request(
-                request.method, path, content,
+                request.method,
+                path,
+                content,
                 params=request.query,
                 content_type=request.content_type,
-                override_api_version=request_api_version)
+                override_api_version=request_api_version,
+            )
             for hdr in HTTP_HEADERS_TO_FORWARD:
                 if request.headers.get(hdr) is not None:
                     api_rqst.headers[hdr] = request.headers[hdr]
@@ -269,41 +318,54 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
     except asyncio.CancelledError:
         raise
     except BackendAPIError as e:
-        return web.Response(body=json.dumps(e.data),
-                            content_type='application/problem+json',
-                            status=e.status, reason=e.reason)
+        return web.Response(
+            body=json.dumps(e.data),
+            content_type="application/problem+json",
+            status=e.status,
+            reason=e.reason,
+        )
     except BackendClientError:
-        log.exception('web_plugin_handler: BackendClientError')
-        return web.HTTPBadGateway(text=json.dumps({
-            'type': 'https://api.backend.ai/probs/bad-gateway',
-            'title': "The proxy target server is inaccessible.",
-        }), content_type='application/problem+json')
+        log.exception("web_plugin_handler: BackendClientError")
+        return web.HTTPBadGateway(
+            text=json.dumps(
+                {
+                    "type": "https://api.backend.ai/probs/bad-gateway",
+                    "title": "The proxy target server is inaccessible.",
+                }
+            ),
+            content_type="application/problem+json",
+        )
     except Exception:
-        log.exception('web_plugin_handler: unexpected error')
-        return web.HTTPInternalServerError(text=json.dumps({
-            'type': 'https://api.backend.ai/probs/internal-server-error',
-            'title': "Something has gone wrong.",
-        }), content_type='application/problem+json')
+        log.exception("web_plugin_handler: unexpected error")
+        return web.HTTPInternalServerError(
+            text=json.dumps(
+                {
+                    "type": "https://api.backend.ai/probs/internal-server-error",
+                    "title": "Something has gone wrong.",
+                }
+            ),
+            content_type="application/problem+json",
+        )
 
 
 async def websocket_handler(request, *, is_anonymous=False) -> web.StreamResponse:
-    path = request.match_info['path']
+    path = request.match_info["path"]
     session = await get_session(request)
-    app = request.query.get('app')
+    app = request.query.get("app")
 
     # Choose a specific Manager endpoint for persistent web app connection.
     api_endpoint = None
     should_save_session = False
-    _endpoints = request.app['config']['api']['endpoint'].split(',')
-    _endpoints = [e.strip() for e in _endpoints]
-    if session.get('api_endpoints', {}).get(app):
-        if session['api_endpoints'][app] in _endpoints:
-            api_endpoint = session['api_endpoints'][app]
+    configured_endpoints = request.app["config"]["api"]["endpoint"]
+    if session.get("api_endpoints", {}).get(app):
+        stringified_endpoints = [str(e) for e in configured_endpoints]
+        if session["api_endpoints"][app] in stringified_endpoints:
+            api_endpoint = session["api_endpoints"][app]
     if api_endpoint is None:
-        api_endpoint = random.choice(_endpoints)
-        if 'api_endpoints' not in session:
-            session['api_endpoints'] = {}
-        session['api_endpoints'][app] = api_endpoint
+        api_endpoint = random.choice(configured_endpoints)
+        if "api_endpoints" not in session:
+            session["api_endpoints"] = {}
+        session["api_endpoints"][app] = str(api_endpoint)
         should_save_session = True
 
     if is_anonymous:
@@ -312,13 +374,15 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
         api_session = await asyncio.shield(get_api_session(request, api_endpoint))
     try:
         async with api_session:
-            request_api_version = request.headers.get('X-BackendAI-Version', None)
-            params = request.query if request.query else None
+            request_api_version = request.headers.get("X-BackendAI-Version", None)
             api_rqst = Request(
-                request.method, path, request.content,
-                params=params,
+                request.method,
+                path,
+                request.content,
+                params=request.query,
                 content_type=request.content_type,
-                override_api_version=request_api_version)
+                override_api_version=request_api_version,
+            )
             async with api_rqst.connect_websocket() as up_conn:
                 down_conn = web.WebSocketResponse()
                 await down_conn.prepare(request)
@@ -331,18 +395,31 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     except asyncio.CancelledError:
         raise
     except BackendAPIError as e:
-        return web.Response(body=json.dumps(e.data),
-                            content_type='application/problem+json',
-                            status=e.status, reason=e.reason)
+        return web.Response(
+            body=json.dumps(e.data),
+            content_type="application/problem+json",
+            status=e.status,
+            reason=e.reason,
+        )
     except BackendClientError:
-        log.exception('websocket_handler: BackendClientError')
-        return web.HTTPBadGateway(text=json.dumps({
-            'type': 'https://api.backend.ai/probs/bad-gateway',
-            'title': "The proxy target server is inaccessible.",
-        }), content_type='application/problem+json')
+        log.exception("websocket_handler: BackendClientError")
+        return web.HTTPBadGateway(
+            text=json.dumps(
+                {
+                    "type": "https://api.backend.ai/probs/bad-gateway",
+                    "title": "The proxy target server is inaccessible.",
+                }
+            ),
+            content_type="application/problem+json",
+        )
     except Exception:
-        log.exception('websocket_handler: unexpected error')
-        return web.HTTPInternalServerError(text=json.dumps({
-            'type': 'https://api.backend.ai/probs/internal-server-error',
-            'title': "Something has gone wrong.",
-        }), content_type='application/problem+json')
+        log.exception("websocket_handler: unexpected error")
+        return web.HTTPInternalServerError(
+            text=json.dumps(
+                {
+                    "type": "https://api.backend.ai/probs/internal-server-error",
+                    "title": "Something has gone wrong.",
+                }
+            ),
+            content_type="application/problem+json",
+        )

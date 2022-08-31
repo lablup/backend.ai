@@ -6,21 +6,19 @@ import click
 
 
 class CommaSeparatedChoice(click.Choice):
-
     def convert(
         self,
         value: str,
         param: Optional[click.Parameter],
         ctx: Optional[click.Context],
     ) -> Optional[list[str]]:
-        pieces = value.split(',')
+        pieces = value.split(",")
         return [super(click.Choice, self).convert(piece, param, ctx) for piece in pieces]
 
 
 class CustomUsageArgsCommand(click.Command):
-
     def __init__(self, *args, **kwargs) -> None:
-        self._usage_args = kwargs.pop('usage_args')
+        self._usage_args = kwargs.pop("usage_args")
         super().__init__(*args, **kwargs)
 
     def format_usage(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
