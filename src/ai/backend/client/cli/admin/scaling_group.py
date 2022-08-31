@@ -2,6 +2,7 @@ import sys
 
 import click
 
+from ai.backend.cli.types import ExitCode
 from ai.backend.client.func.scaling_group import _default_detail_fields, _default_list_fields
 from ai.backend.client.output.fields import scaling_group_fields
 from ai.backend.client.session import Session
@@ -29,7 +30,7 @@ def get_available(ctx: CLIContext, group: str) -> None:
             ctx.output.print_list(items, [scaling_group_fields["name"]])
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @scaling_group.command()
@@ -46,7 +47,7 @@ def info(ctx: CLIContext, name: str) -> None:
             ctx.output.print_item(item, _default_detail_fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @scaling_group.command()
@@ -62,7 +63,7 @@ def list(ctx: CLIContext) -> None:
             ctx.output.print_list(items, _default_list_fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @scaling_group.command()
@@ -106,14 +107,14 @@ def add(
                 item_name="scaling_group",
                 action_name="add",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="scaling_group",
                 action_name="add",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             item_name="scaling_group",
@@ -161,14 +162,14 @@ def update(
                 item_name="scaling_group",
                 action_name="update",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="scaling_group",
                 action_name="update",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -195,14 +196,14 @@ def delete(ctx: CLIContext, name):
                 item_name="scaling_group",
                 action_name="deletion",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="scaling_group",
                 action_name="deletion",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -232,14 +233,14 @@ def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
                 item_name="scaling_group",
                 action_name="scaling_group_association",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="scaling_group",
                 action_name="scaling_group_association",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -271,14 +272,14 @@ def dissociate_scaling_group(ctx: CLIContext, scaling_group, domain):
                 item_name="scaling_group",
                 action_name="scaling_group_dissociation",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="scaling_group",
                 action_name="scaling_group_dissociation",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             item_name="scaling_group",

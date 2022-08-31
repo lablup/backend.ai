@@ -6,7 +6,7 @@ aiohttp_cors~=0.7
 aiohttp_sse>=2.0
 aiohttp_session[aioredis]~=2.11
 aiodns>=3.0
-aiomonitor~=0.4.5
+aiomonitor-ng~=0.5.1
 aioredis[hiredis]~=2.0.1
 aiosqlite~=0.17.0
 aiotools~=1.5.9
@@ -24,6 +24,7 @@ colorama>=0.4.4
 cryptography>=2.8
 etcetra~=0.1.8
 faker~=13.12.0
+hiredis~=1.1.0
 humanize>=3.1.0
 inquirer~=2.9.2
 graphene~=2.1.9
@@ -40,9 +41,8 @@ pexpect~=4.8
 psutil~=5.9.1
 psycopg2-binary>=2.8.4
 pycryptodome>=3.14.1
-pytest~=7.1
-pytest-dependency>=0.5.1
 python-dateutil>=2.8
+python-dotenv~=0.20.0
 python-snappy~=0.6.0
 python-json-logger>=2.0.1
 pyzmq~=23.2.0
@@ -65,6 +65,10 @@ typing_extensions~=4.3
 uvloop>=0.16
 yarl>=1.7
 zipstream-new~=1.1.8
+
+# required by ai.backend.test (integration test suite)
+pytest>=7.1.2
+pytest-dependency>=0.5.1
 
 # type stubs
 types-aiofiles
