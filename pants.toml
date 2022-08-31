@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.13.0rc0"
+pants_version = "2.12.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
@@ -18,8 +18,7 @@ pants_ignore = [
     "plugins",
     "docs",  # TODO: docs build config
 ]
-use_deprecated_directory_cli_args_semantics = false  # for 2.13 or later
-use_deprecated_pex_binary_run_semantics = false
+# use_deprecated_directory_cli_args_semantics = false  # for 2.13 or later
 
 [anonymous-telemetry]
 enabled = false
@@ -44,7 +43,6 @@ enable_resolves = true
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.10.5"]
 lockfile_generator = "pex"
-tailor_pex_binary_targets = false
 
 [python-repos]
 indexes.add = ["https://dist.backend.ai/pypi/simple/"]
@@ -56,14 +54,15 @@ python-kernel = "python-kernel.lock"
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
 
-# [pex-cli]
-# version = "v2.1.99"
-# known_versions = [
-#     "v2.1.99|macos_arm64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-#     "v2.1.99|macos_x86_64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-#     "v2.1.99|linux_arm64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-#     "v2.1.99|linux_x86_64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
-# ]
+# Temporarily reverted due to pantsbuild/pants#15990
+[pex-cli]
+version = "v2.1.99"
+known_versions = [
+    "v2.1.99|macos_arm64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
+    "v2.1.99|macos_x86_64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
+    "v2.1.99|linux_arm64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
+    "v2.1.99|linux_x86_64|7e00a1d81a43fb913085182b2eba2f3b61822dd99fe1ddd0931aa824959a759f|3811337",
+]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.1.99/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 
@@ -96,12 +95,6 @@ args = ["-v", "-m", "'not integration'"]
 lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 timeout_default = 300
-
-[coverage-py]
-version = "coverage[toml]>=6.4,<7.0"
-interpreter_constraints = ["CPython>=3.10,<4"]
-report = ["xml", "console"]
-lockfile = "tools/coverage-py.lock"
 
 [mypy]
 version = "mypy>=0.961"

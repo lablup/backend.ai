@@ -1,10 +1,9 @@
 python_sources(
-    name="src",
+    name="service",
+    sources=["**/*.py"],
     dependencies=[
-        "src/ai/backend/cli:src",  # not auto-inferred
-        "src/ai/backend/manager/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
-        "src/ai/backend/manager/api:src",  # not auto-inferred (due to lazy-loading aiohttp app builder)
-        "src/ai/backend/manager/models/alembic:migrations",  # not auto-inferred
+        "src/ai/backend/cli:lib",
+        "src/ai/backend/common:lib",
         ":resources",
     ],
 )
@@ -12,7 +11,7 @@ python_sources(
 pex_binary(
     name="server",
     dependencies=[
-        ":src",
+        ":service",
     ],
     entry_point="server.py",
 )
@@ -20,15 +19,23 @@ pex_binary(
 pex_binary(
     name="cli",
     dependencies=[
-        ":src",
+        ":service",
     ],
     entry_point="cli/__main__.py",
+)
+
+pex_binary(
+    name="dump-gql-schema",
+    dependencies=[
+        ":service",
+    ],
+    entry_point="api/admin.py",
 )
 
 python_distribution(
     name="dist",
     dependencies=[
-        ":src",
+        ":service",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(

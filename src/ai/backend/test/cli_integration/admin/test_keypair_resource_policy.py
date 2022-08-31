@@ -4,7 +4,7 @@ from contextlib import closing
 from ...utils.cli import EOF, ClientRunnerFunc
 
 
-def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
+def test_add_keypair_resource_policy(run: ClientRunnerFunc):
     print("[ Add keypair resource policy ]")
 
     # Add keypair resource policy
@@ -29,7 +29,7 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
         "local:volume1",
         "--idle-timeout",
         "1200",
-        keypair_resource_policy,
+        "test_krp",
     ]
     with closing(run(add_arguments)) as p:
         p.expect(EOF)
@@ -44,7 +44,7 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
         krp_list = loaded.get("items")
         assert isinstance(krp_list, list), "Keypair resource policy list not printed properly"
 
-    test_krp = get_keypair_resource_policy_from_list(krp_list, keypair_resource_policy)
+    test_krp = get_keypair_resource_policy_from_list(krp_list, "test_krp")
 
     assert bool(test_krp), "Test keypair resource policy doesn't exist"
     assert (
@@ -70,7 +70,7 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
     ], "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
-def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
+def test_update_keypair_resource_policy(run: ClientRunnerFunc):
     print("[ Update keypair resource policy ]")
 
     # Update keypair resource policy
@@ -95,7 +95,7 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
         "local:volume2",
         "--idle-timeout",
         "1800",
-        keypair_resource_policy,
+        "test_krp",
     ]
     with closing(run(add_arguments)) as p:
         p.expect(EOF)
@@ -110,7 +110,7 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
         krp_list = loaded.get("items")
         assert isinstance(krp_list, list), "Keypair resource policy list not printed properly"
 
-    test_krp = get_keypair_resource_policy_from_list(krp_list, keypair_resource_policy)
+    test_krp = get_keypair_resource_policy_from_list(krp_list, "test_krp")
 
     assert bool(test_krp), "Test keypair resource policy doesn't exist"
     assert (
@@ -136,14 +136,12 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
     ], "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
-def test_delete_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
+def test_delete_keypair_resource_policy(run: ClientRunnerFunc):
     print("[ Delete keypair resource policy ]")
 
     # Delete keypair resource policy
     with closing(
-        run(
-            ["--output=json", "admin", "keypair-resource-policy", "delete", keypair_resource_policy]
-        )
+        run(["--output=json", "admin", "keypair-resource-policy", "delete", "test_krp"])
     ) as p:
         p.sendline("y")
         p.expect(EOF)

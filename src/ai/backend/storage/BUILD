@@ -1,6 +1,8 @@
 python_sources(
-    name="src",
+    name="service",
+    sources=["**/*.py"],
     dependencies=[
+        "src/ai/backend/common:lib",
         ":resources",
     ],
 )
@@ -8,7 +10,7 @@ python_sources(
 pex_binary(
     name="server",
     dependencies=[
-        ":src",
+        ":service",
     ],
     entry_point="server.py",
 )
@@ -16,7 +18,7 @@ pex_binary(
 python_distribution(
     name="dist",
     dependencies=[
-        ":src",
+        ":service",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(

@@ -4,7 +4,6 @@ import sys
 
 import click
 
-from ai.backend.cli.types import ExitCode
 from ai.backend.client.output.fields import storage_fields
 from ai.backend.client.session import Session
 
@@ -46,7 +45,7 @@ def info(ctx: CLIContext, vfolder_host: str) -> None:
             ctx.output.print_item(item, fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
 
 
 @storage.command()
@@ -81,4 +80,4 @@ def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
             )
     except Exception as e:
         ctx.output.print_error(e)
-        sys.exit(ExitCode.FAILURE)
+        sys.exit(1)

@@ -1,15 +1,12 @@
 import functools
 import inspect
-from typing import Iterable
 
-from ..output.types import FieldSet, FieldSpec
 from ..session import AsyncSession, api_session
 
 __all__ = (
     "APIFunctionMeta",
     "BaseFunction",
     "api_function",
-    "resolve_fields",
 )
 
 
@@ -42,38 +39,6 @@ def api_function(meth):
     """
     setattr(meth, "_backend_api", True)
     return meth
-
-
-def resolve_fields(
-    fields: Iterable[FieldSpec | str] | None,
-    base_field_set: FieldSet,
-    default_fields: Iterable[FieldSpec],
-) -> tuple[str, ...]:
-    if fields is None:
-        fields = default_fields
-    return tuple(
-        f.field_ref if isinstance(f, FieldSpec) else base_field_set[f].field_ref for f in fields
-    )
-
-
-def field_resolver(
-    base_field_set: FieldSet,
-    default_fields: Iterable[FieldSpec],
-):
-    def decorator(meth):
-        def wrapper(*args, **kwargs):
-            if fields := kwargs.get("fields", default_fields):
-                resolved_fields = tuple(
-                    f.field_ref if isinstance(f, FieldSpec) else base_field_set[f].field_ref
-                    for f in fields
-                )
-                kwargs["fields"] = resolved_fields
-            result = meth(*args, **kwargs)
-            return result
-
-        return wrapper
-
-    return decorator
 
 
 class APIFunctionMeta(type):

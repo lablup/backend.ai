@@ -1,5 +1,6 @@
 python_sources(
-    name="src",
+    name="lib",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
     ],
@@ -8,7 +9,7 @@ python_sources(
 python_distribution(
     name="dist",
     dependencies=[
-        ":src",
+        ":lib",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(

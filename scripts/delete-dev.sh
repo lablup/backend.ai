@@ -116,7 +116,7 @@ fi
 echo ""
 echo "(FYI) To reset Pants and its cache data, run:"
 echo "  $ killall pantsd"
-echo "  $ rm -r .tmp .pants.d .pants.env pants-local ~/.cache/pants"
+echo "  $ rm -r .tmp .pants.d ~/.cache/pants"
 
 echo ""
 echo "Done."

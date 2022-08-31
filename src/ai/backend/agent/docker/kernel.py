@@ -1,6 +1,4 @@
 import asyncio
-import functools
-import gzip
 import logging
 import lzma
 import os
@@ -9,9 +7,8 @@ import shutil
 import subprocess
 import textwrap
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
 
-import janus
 import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
@@ -19,9 +16,8 @@ from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import CommitStatus, KernelId, Sentinel
+from ai.backend.common.types import KernelId
 from ai.backend.common.utils import current_loop
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
@@ -29,9 +25,6 @@ from ..resources import KernelResourceSpec
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
-DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 
 class DockerKernel(AbstractKernel):
@@ -133,72 +126,6 @@ class DockerKernel(AbstractKernel):
         assert self.runner is not None
         result = await self.runner.feed_service_apps()
         return result
-
-    async def check_duplicate_commit(self, path: Path):
-        if path.exists():
-            return CommitStatus.ONGOING
-        return CommitStatus.READY
-
-    async def commit(self, path: Path, lock_path: Path, filename: str):
-        assert self.runner is not None
-
-        loop = asyncio.get_running_loop()
-        container_id: str = str(self.data["container_id"])
-        filepath = path / filename
-        try:
-            Path(path).mkdir(exist_ok=True, parents=True)
-            Path(lock_path).parent.mkdir(exist_ok=True, parents=True)
-        except ValueError:  # parent_path does not start with work_dir!
-            raise ValueError("malformed committed path.")
-
-        def _write_chunks(
-            fileobj: gzip.GzipFile,
-            q: janus._SyncQueueProxy[bytes | Sentinel],
-        ) -> None:
-            while True:
-                chunk = q.get()
-                if chunk is Sentinel.TOKEN:
-                    return
-                fileobj.write(chunk)
-                q.task_done()
-
-        try:
-            async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
-                log.info("Container is being committed to {}", filepath)
-                docker = Docker()
-                container = docker.containers.container(container_id)
-                try:
-                    response: Mapping[str, Any] = await container.commit()
-                    image_id = response["Id"]
-                    try:
-                        q: janus.Queue[bytes | Sentinel] = janus.Queue(
-                            maxsize=DEFAULT_INFLIGHT_CHUNKS
-                        )
-                        async with docker._query(f"images/{image_id}/get") as tb_resp:
-                            with gzip.open(filepath, "wb") as fileobj:
-                                write_task = loop.run_in_executor(
-                                    None,
-                                    functools.partial(
-                                        _write_chunks,
-                                        fileobj,
-                                        q.sync_q,
-                                    ),
-                                )
-                                try:
-                                    await asyncio.sleep(0)  # let write_task get started
-                                    async for chunk in tb_resp.content.iter_chunked(
-                                        DEFAULT_CHUNK_SIZE
-                                    ):
-                                        await q.async_q.put(chunk)
-                                finally:
-                                    await q.async_q.put(Sentinel.TOKEN)
-                                    await write_task
-                    finally:
-                        await docker.images.delete(image_id)
-                finally:
-                    await docker.close()
-        except asyncio.TimeoutError:
-            log.warning("Session is already being committed.")
 
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()

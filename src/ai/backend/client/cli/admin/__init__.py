@@ -1,4 +1,4 @@
-from ai.backend.cli.main import main
+from ..main import main
 
 
 @main.group()

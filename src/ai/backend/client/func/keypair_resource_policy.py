@@ -4,7 +4,7 @@ from ai.backend.client.output.fields import keypair_resource_policy_fields
 from ai.backend.client.output.types import FieldSpec
 
 from ..session import api_session
-from .base import BaseFunction, api_function, resolve_fields
+from .base import BaseFunction, api_function
 
 __all__ = "KeypairResourcePolicy"
 
@@ -48,19 +48,20 @@ class KeypairResourcePolicy(BaseFunction):
         name: str,
         default_for_unspecified: int,
         total_resource_slots: int,
-        max_session_lifetime: int,
         max_concurrent_sessions: int,
         max_containers_per_session: int,
         max_vfolder_count: int,
         max_vfolder_size: int,
         idle_timeout: int,
         allowed_vfolder_hosts: Sequence[str],
-        fields: Iterable[FieldSpec | str] = None,
+        fields: Iterable[str] = None,
     ) -> dict:
         """
         Creates a new keypair resource policy with the given options.
         You need an admin privilege for this operation.
         """
+        if fields is None:
+            fields = ("name",)
         q = (
             "mutation($name: String!, $input: CreateKeyPairResourcePolicyInput!) {"
             + "  create_keypair_resource_policy(name: $name, props: $input) {"
@@ -68,16 +69,12 @@ class KeypairResourcePolicy(BaseFunction):
             "  }"
             "}"
         )
-        resolved_fields = resolve_fields(
-            fields, keypair_resource_policy_fields, (keypair_resource_policy_fields["name"],)
-        )
-        q = q.replace("$fields", " ".join(resolved_fields))
+        q = q.replace("$fields", " ".join(fields))
         variables = {
             "name": name,
             "input": {
                 "default_for_unspecified": default_for_unspecified,
                 "total_resource_slots": total_resource_slots,
-                "max_session_lifetime": max_session_lifetime,
                 "max_concurrent_sessions": max_concurrent_sessions,
                 "max_containers_per_session": max_containers_per_session,
                 "max_vfolder_count": max_vfolder_count,
@@ -96,7 +93,6 @@ class KeypairResourcePolicy(BaseFunction):
         name: str,
         default_for_unspecified: int,
         total_resource_slots: int,
-        max_session_lifetime: int,
         max_concurrent_sessions: int,
         max_containers_per_session: int,
         max_vfolder_count: int,
@@ -120,7 +116,6 @@ class KeypairResourcePolicy(BaseFunction):
             "input": {
                 "default_for_unspecified": default_for_unspecified,
                 "total_resource_slots": total_resource_slots,
-                "max_session_lifetime": max_session_lifetime,
                 "max_concurrent_sessions": max_concurrent_sessions,
                 "max_containers_per_session": max_containers_per_session,
                 "max_vfolder_count": max_vfolder_count,

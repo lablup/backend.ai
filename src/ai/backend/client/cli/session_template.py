@@ -3,10 +3,8 @@ import sys
 import click
 from tabulate import tabulate
 
-from ai.backend.cli.main import main
-from ai.backend.cli.types import ExitCode
-
 from ..session import Session
+from .main import main
 from .pretty import print_error, print_info, print_warn
 
 
@@ -69,7 +67,7 @@ def create(template_path, domain, group, owner_access_key):
             print_info(f"Task template {template.template_id} created and ready")
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
 
 
 @session_template.command()
@@ -100,7 +98,7 @@ def get(template_id, template_format, owner_access_key):
             print(body)
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
 
 
 @session_template.command()
@@ -134,7 +132,7 @@ def list(list_all):
             print(tabulate(rows, hdrs))
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
 
 
 @session_template.command()
@@ -173,7 +171,7 @@ def update(template_id, template_path, owner_access_key):
             print_info(f"Task template {template.template_id} updated")
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
 
 
 @session_template.command()
@@ -210,4 +208,4 @@ def delete(template_id, force, owner_access_key):
             print_info(f"Task template {template.template_id} deleted")
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)

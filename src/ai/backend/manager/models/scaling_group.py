@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, overload
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence, Set, Union
 
 import attr
 import graphene
@@ -25,7 +25,7 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .group import resolve_group_name_or_id, resolve_groups
+from .group import resolve_group_name_or_id
 from .user import UserRole
 
 if TYPE_CHECKING:
@@ -166,69 +166,24 @@ sgroups_for_keypairs = sa.Table(
 )
 
 
-@overload
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: uuid.UUID,
-    access_key: str,
-) -> Sequence[Row]:
-    ...
-
-
-@overload
-async def query_allowed_sgroups(
-    db_conn: SAConnection,
-    domain_name: str,
-    group: Iterable[uuid.UUID],
-    access_key: str,
-) -> Sequence[Row]:
-    ...
-
-
-@overload
-async def query_allowed_sgroups(
-    db_conn: SAConnection,
-    domain_name: str,
-    group: str,
-    access_key: str,
-) -> Sequence[Row]:
-    ...
-
-
-@overload
-async def query_allowed_sgroups(
-    db_conn: SAConnection,
-    domain_name: str,
-    group: Iterable[str],
-    access_key: str,
-) -> Sequence[Row]:
-    ...
-
-
-async def query_allowed_sgroups(
-    db_conn: SAConnection,
-    domain_name: str,
-    group: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
+    group: Union[uuid.UUID, str],
     access_key: str,
 ) -> Sequence[Row]:
     query = sa.select([sgroups_for_domains]).where(sgroups_for_domains.c.domain == domain_name)
     result = await db_conn.execute(query)
     from_domain = {row["scaling_group"] for row in result}
 
-    if isinstance(group, Iterable):
-        group_ids = await resolve_groups(db_conn, domain_name, group)
-    else:
-        if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):
-            group_ids = [group_id]
-        else:
-            group_ids = []
+    group_id = await resolve_group_name_or_id(db_conn, domain_name, group)
     from_group: Set[str]
-    if not group_ids:
+    if group_id is None:
         from_group = set()  # empty
     else:
-        group_cond = sgroups_for_groups.c.group.in_(group_ids)
-        query = sa.select([sgroups_for_groups]).where(group_cond)
+        query = sa.select([sgroups_for_groups]).where(
+            (sgroups_for_groups.c.group == group_id),
+        )
         result = await db_conn.execute(query)
         from_group = {row["scaling_group"] for row in result}
 

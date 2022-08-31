@@ -1,14 +1,16 @@
 python_sources(
-    name="src",
+    name="lib",
     dependencies=[
+        "src/ai/backend/plugin:lib",
         ":resources",
     ],
+    sources=["**/*.py"],
 )
 
 python_distribution(
     name="dist",
     dependencies=[
-        ":src",
+        ":lib",
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
@@ -28,7 +30,7 @@ python_distribution(
 pex_binary(
     name="cli",
     dependencies=[
-        ":src",
+        ":lib",
     ],
     entry_point="ai.backend.cli.__main__:main",
 )

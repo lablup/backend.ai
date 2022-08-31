@@ -4,7 +4,6 @@ import sys
 import click
 from tqdm import tqdm
 
-from ai.backend.cli.types import ExitCode
 from ai.backend.client.func.image import _default_list_fields_admin
 from ai.backend.client.session import Session
 
@@ -38,7 +37,7 @@ def list(ctx: CLIContext, operation: bool) -> None:
             ctx.output.print_list(items, _default_list_fields_admin)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
 
 
 @image.command()
@@ -60,10 +59,10 @@ def rescan(registry: str) -> None:
                 result = await session.Image.rescan_images(registry)
             except Exception as e:
                 print_error(e)
-                sys.exit(ExitCode.FAILURE)
+                sys.exit(1)
             if not result["ok"]:
                 print_fail(f"Failed to begin registry scanning: {result['msg']}")
-                sys.exit(ExitCode.FAILURE)
+                sys.exit(1)
             print_done("Started updating the image metadata from the configured registries.")
             bgtask_id = result["task_id"]
             bgtask = session.BackgroundTask(bgtask_id)
@@ -103,7 +102,7 @@ def alias(alias, target, arch):
             result = session.Image.alias_image(alias, target, arch)
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if result["ok"]:
             print_done(f"An alias has created: {alias} -> {target}")
         else:
@@ -119,7 +118,7 @@ def dealias(alias):
             result = session.Image.dealias_image(alias)
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if result["ok"]:
             print_done(f"The alias has been removed: {alias}")
         else:

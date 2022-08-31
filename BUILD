@@ -3,7 +3,6 @@ python_requirements(
     source="requirements.txt",
     module_mapping={
         "aiodataloader-ng": ["aiodataloader"],
-        "aiomonitor-ng": ["aiomonitor"],
         "attrs": ["attr", "attrs"],
         "aiohttp-session": ["aiohttp_session"],
         "pycryptodome": ["Crypto"],

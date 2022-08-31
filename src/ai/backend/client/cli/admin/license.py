@@ -3,8 +3,6 @@ import sys
 
 from tabulate import tabulate
 
-from ai.backend.cli.types import ExitCode
-
 from ...request import Request
 from ...session import AsyncSession
 from ..pretty import print_done, print_error, print_warn
@@ -39,4 +37,4 @@ def show():
         asyncio.run(_show_license())
     except Exception as e:
         print_error(e)
-        sys.exit(ExitCode.FAILURE)
+        sys.exit(1)

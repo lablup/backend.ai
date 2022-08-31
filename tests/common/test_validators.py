@@ -191,21 +191,7 @@ def test_binary_size_commutative_with_null():
 
 
 def test_delimiter_list():
-    iv = tx.DelimiterSeperatedList(t.String(allow_blank=True), delimiter=":")
-    assert iv.check("") == [""]
-    assert iv.check(":") == ["", ""]
-    iv = tx.DelimiterSeperatedList(
-        t.String(allow_blank=True),
-        delimiter=":",
-        empty_str_as_empty_list=True,
-    )
-    assert iv.check("") == []
-    assert iv.check(":") == ["", ""]
     iv = tx.DelimiterSeperatedList(t.String, delimiter=":")
-    with pytest.raises(t.DataError):
-        iv.check("")
-    with pytest.raises(t.DataError):
-        iv.check(":")
     assert iv.check("aaa:bbb:ccc") == ["aaa", "bbb", "ccc"]
     assert iv.check("xxx") == ["xxx"]
     iv = tx.DelimiterSeperatedList(tx.HostPortPair, delimiter=",")
@@ -216,24 +202,13 @@ def test_delimiter_list():
 
 
 def test_string_list():
-    iv = tx.StringList(delimiter=":", allow_blank=True)
+    iv = tx.StringList(delimiter=":")
     assert iv.check("aaa:bbb:ccc") == ["aaa", "bbb", "ccc"]
     assert iv.check(":bbb") == ["", "bbb"]
     assert iv.check("aaa:") == ["aaa", ""]
     assert iv.check("xxx") == ["xxx"]
     assert iv.check("") == [""]
     assert iv.check(123) == ["123"]
-    iv = tx.StringList(delimiter=":", allow_blank=False)
-    with pytest.raises(t.DataError):
-        iv.check("")
-    with pytest.raises(t.DataError):
-        iv.check(":bbb")
-    iv = tx.StringList(delimiter=":", allow_blank=True, min_length=2)
-    with pytest.raises(t.DataError):
-        iv.check("")
-    with pytest.raises(t.DataError):
-        iv.check("a")
-    assert iv.check("a:b") == ["a", "b"]
 
 
 def test_enum():

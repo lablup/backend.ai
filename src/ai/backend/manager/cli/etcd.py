@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, AsyncIterator
 
 import click
 
-from ai.backend.cli.types import ExitCode
 from ai.backend.common.cli import EnumChoice, MinMaxRange
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -195,7 +194,7 @@ def get(cli_ctx: CLIContext, key, prefix, scope) -> None:
                 else:
                     val = await etcd.get(key, scope=scope)
                     if val is None:
-                        sys.exit(ExitCode.FAILURE)
+                        sys.exit(1)
                     print(val)
             except Exception:
                 log.exception("An error occurred.")

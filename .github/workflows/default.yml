@@ -4,7 +4,6 @@ on: [push, pull_request]
 
 jobs:
   lint:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -30,7 +29,7 @@ jobs:
         mkdir .tmp
         ./pants --no-verify-config version
     - name: Check BUILD files
-      run: ./pants tailor --check update-build-files --check '::'
+      run: ./pants tailor --check update-build-files --check # '::' # to add in 2.13+
     - name: Lint
       run: |
         if [ "$GITHUB_EVENT_NAME" == "pull_request" -a -n "$GITHUB_HEAD_REF" ]; then
@@ -54,7 +53,6 @@ jobs:
 
 
   typecheck:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -101,7 +99,6 @@ jobs:
       if: always()  # We want the log even on failures.
 
   test:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3

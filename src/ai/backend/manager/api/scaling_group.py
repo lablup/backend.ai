@@ -31,12 +31,13 @@ class WSProxyVersionQueryParams:
 
 
 @aiotools.lru_cache(expire_after=30)  # expire after 30 seconds
-async def query_wsproxy_status(
+async def query_wsproxy_version(
     wsproxy_addr: str,
-) -> dict[str, Any]:
+) -> str:
     async with aiohttp.ClientSession() as session:
         async with session.get(wsproxy_addr + "/status") as resp:
-            return await resp.json()
+            version_json = await resp.json()
+            return version_json["api_version"]
 
 
 @auth_required
@@ -90,8 +91,7 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
                 if not wsproxy_addr:
                     wsproxy_version = "v1"
                 else:
-                    wsproxy_status = await query_wsproxy_status(wsproxy_addr)
-                    wsproxy_version = wsproxy_status["api_version"]
+                    wsproxy_version = await query_wsproxy_version(wsproxy_addr)
                 return web.json_response(
                     {
                         "wsproxy_version": wsproxy_version,

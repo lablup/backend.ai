@@ -36,7 +36,6 @@ local_config_iv = (
                     t.Key("group", default=None): tx.GroupID(
                         default_gid=_file_perm.st_gid,
                     ),
-                    t.Key("aiomonitor-port", default=50300): t.Int[1:65535],
                 },
             ),
             t.Key("logging"): logging_config_iv,
@@ -72,8 +71,6 @@ local_config_iv = (
             t.Key("debug"): t.Dict(
                 {
                     t.Key("enabled", default=False): t.ToBool,
-                    t.Key("asyncio", default=False): t.Bool,
-                    t.Key("enhanced-aiomonitor-task-info", default=False): t.Bool,
                 },
             ).allow_extra("*"),
         },

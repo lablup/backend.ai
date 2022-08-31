@@ -6,12 +6,10 @@ import os
 import pwd
 import ssl
 import sys
-from contextlib import closing
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import Any, AsyncIterator, Sequence
 
-import aiomonitor
 import aiotools
 import click
 from aiohttp import web
@@ -52,91 +50,81 @@ async def server_main(
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
     local_config = _args[0]
-    loop.set_debug(local_config["debug"]["asyncio"])
-    m = aiomonitor.Monitor(
-        loop,
-        port=local_config["storage-proxy"]["aiomonitor-port"] + pidx,
-        console_enabled=False,
-        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
-    )
-    m.prompt = f"monitor (storage-proxy[{pidx}@{os.getpid()}]) >>> "
-    m.start()
 
-    with closing(m):
-        etcd_credentials = None
-        if local_config["etcd"]["user"]:
-            etcd_credentials = {
-                "user": local_config["etcd"]["user"],
-                "password": local_config["etcd"]["password"],
-            }
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-            ConfigScopes.NODE: f"nodes/storage/{local_config['storage-proxy']['node-id']}",
+    etcd_credentials = None
+    if local_config["etcd"]["user"]:
+        etcd_credentials = {
+            "user": local_config["etcd"]["user"],
+            "password": local_config["etcd"]["password"],
         }
-        etcd = AsyncEtcd(
-            local_config["etcd"]["addr"],
-            local_config["etcd"]["namespace"],
-            scope_prefix_map,
-            credentials=etcd_credentials,
-        )
-        ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd)
-        client_api_app = await init_client_app(ctx)
-        manager_api_app = await init_manager_app(ctx)
+    scope_prefix_map = {
+        ConfigScopes.GLOBAL: "",
+        ConfigScopes.NODE: f"nodes/storage/{local_config['storage-proxy']['node-id']}",
+    }
+    etcd = AsyncEtcd(
+        local_config["etcd"]["addr"],
+        local_config["etcd"]["namespace"],
+        scope_prefix_map,
+        credentials=etcd_credentials,
+    )
+    ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd)
+    client_api_app = await init_client_app(ctx)
+    manager_api_app = await init_manager_app(ctx)
 
-        client_ssl_ctx = None
-        manager_ssl_ctx = None
-        if local_config["api"]["client"]["ssl-enabled"]:
-            client_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            client_ssl_ctx.load_cert_chain(
-                str(local_config["api"]["client"]["ssl-cert"]),
-                str(local_config["api"]["client"]["ssl-privkey"]),
-            )
-        if local_config["api"]["manager"]["ssl-enabled"]:
-            manager_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            manager_ssl_ctx.load_cert_chain(
-                str(local_config["api"]["manager"]["ssl-cert"]),
-                str(local_config["api"]["manager"]["ssl-privkey"]),
-            )
-        client_api_runner = web.AppRunner(client_api_app)
-        manager_api_runner = web.AppRunner(manager_api_app)
-        await client_api_runner.setup()
-        await manager_api_runner.setup()
-        client_service_addr = local_config["api"]["client"]["service-addr"]
-        manager_service_addr = local_config["api"]["manager"]["service-addr"]
-        client_api_site = web.TCPSite(
-            client_api_runner,
-            str(client_service_addr.host),
-            client_service_addr.port,
-            backlog=1024,
-            reuse_port=True,
-            ssl_context=client_ssl_ctx,
+    client_ssl_ctx = None
+    manager_ssl_ctx = None
+    if local_config["api"]["client"]["ssl-enabled"]:
+        client_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        client_ssl_ctx.load_cert_chain(
+            str(local_config["api"]["client"]["ssl-cert"]),
+            str(local_config["api"]["client"]["ssl-privkey"]),
         )
-        manager_api_site = web.TCPSite(
-            manager_api_runner,
-            str(manager_service_addr.host),
-            manager_service_addr.port,
-            backlog=1024,
-            reuse_port=True,
-            ssl_context=manager_ssl_ctx,
+    if local_config["api"]["manager"]["ssl-enabled"]:
+        manager_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        manager_ssl_ctx.load_cert_chain(
+            str(local_config["api"]["manager"]["ssl-cert"]),
+            str(local_config["api"]["manager"]["ssl-privkey"]),
         )
-        await client_api_site.start()
-        await manager_api_site.start()
-        if os.geteuid() == 0:
-            uid = local_config["storage-proxy"]["user"]
-            gid = local_config["storage-proxy"]["group"]
-            os.setgroups(
-                [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
-            )
-            os.setgid(gid)
-            os.setuid(uid)
-            log.info("Changed process uid:gid to {}:{}", uid, gid)
-        log.info("Started service.")
-        try:
-            yield
-        finally:
-            log.info("Shutting down...")
-            await manager_api_runner.cleanup()
-            await client_api_runner.cleanup()
+    client_api_runner = web.AppRunner(client_api_app)
+    manager_api_runner = web.AppRunner(manager_api_app)
+    await client_api_runner.setup()
+    await manager_api_runner.setup()
+    client_service_addr = local_config["api"]["client"]["service-addr"]
+    manager_service_addr = local_config["api"]["manager"]["service-addr"]
+    client_api_site = web.TCPSite(
+        client_api_runner,
+        str(client_service_addr.host),
+        client_service_addr.port,
+        backlog=1024,
+        reuse_port=True,
+        ssl_context=client_ssl_ctx,
+    )
+    manager_api_site = web.TCPSite(
+        manager_api_runner,
+        str(manager_service_addr.host),
+        manager_service_addr.port,
+        backlog=1024,
+        reuse_port=True,
+        ssl_context=manager_ssl_ctx,
+    )
+    await client_api_site.start()
+    await manager_api_site.start()
+    if os.geteuid() == 0:
+        uid = local_config["storage-proxy"]["user"]
+        gid = local_config["storage-proxy"]["group"]
+        os.setgroups(
+            [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
+        )
+        os.setgid(gid)
+        os.setuid(uid)
+        log.info("Changed process uid:gid to {}:{}", uid, gid)
+    log.info("Started service.")
+    try:
+        yield
+    finally:
+        log.info("Shutting down...")
+        await manager_api_runner.cleanup()
+        await client_api_runner.cleanup()
 
 
 @click.group(invoke_without_command=True)

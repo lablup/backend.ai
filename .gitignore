@@ -81,9 +81,9 @@ ENV/
 *.swp
 *.swo
 .vscode/
-/.vimrc
-/.nvimrc
-/.exrc
+.vimrc
+.nvimrc
+.exrc
 .vim/
 
 # Pants

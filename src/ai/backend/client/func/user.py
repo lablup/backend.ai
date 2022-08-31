@@ -12,7 +12,7 @@ from ai.backend.client.pagination import generate_paginated_results
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
 
-from .base import BaseFunction, api_function, resolve_fields
+from .base import BaseFunction, api_function
 
 __all__ = (
     "User",
@@ -253,12 +253,14 @@ class User(BaseFunction):
         need_password_change: bool = False,
         description: str = "",
         group_ids: Iterable[str] = None,
-        fields: Iterable[FieldSpec | str] = None,
+        fields: Iterable[str] = None,
     ) -> dict:
         """
         Creates a new user with the given options.
         You need an admin privilege for this operation.
         """
+        if fields is None:
+            fields = ("domain_name", "email", "username", "uuid")
         query = textwrap.dedent(
             """\
             mutation($email: String!, $input: UserInput!) {
@@ -268,14 +270,7 @@ class User(BaseFunction):
             }
         """
         )
-        default_fields = (
-            user_fields["domain_name"],
-            user_fields["email"],
-            user_fields["username"],
-            user_fields["uuid"],
-        )
-        resolved_fields = resolve_fields(fields, user_fields, default_fields)
-        query = query.replace("$fields", " ".join(resolved_fields))
+        query = query.replace("$fields", " ".join(fields))
         variables = {
             "email": email,
             "input": {
@@ -307,7 +302,7 @@ class User(BaseFunction):
         need_password_change: bool = None,
         description: str = None,
         group_ids: Iterable[str] = None,
-        fields: Iterable[FieldSpec | str] = None,
+        fields: Iterable[str] = None,
     ) -> dict:
         """
         Update existing user.

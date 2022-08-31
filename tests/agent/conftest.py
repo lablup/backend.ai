@@ -10,7 +10,6 @@ import pytest
 
 from ai.backend.common import config
 from ai.backend.common import validators as tx
-from ai.backend.common.logging import LocalLogger
 from ai.backend.common.types import EtcdRedisConfig, HostPortPair
 from ai.backend.testutils.bootstrap import etcd_container, redis_container  # noqa: F401
 from ai.backend.testutils.pants import get_parallel_slot
@@ -22,28 +21,7 @@ def test_id():
 
 
 @pytest.fixture(scope="session")
-def logging_config():
-    config = {
-        "drivers": ["console"],
-        "console": {"colored": None, "format": "verbose"},
-        "level": "DEBUG",
-        "pkg-ns": {
-            "": "INFO",
-            "ai.backend": "DEBUG",
-            "tests": "DEBUG",
-            "alembic": "INFO",
-            "aiotools": "INFO",
-            "aiohttp": "INFO",
-            "sqlalchemy": "WARNING",
-        },
-    }
-    logger = LocalLogger(config)
-    with logger:
-        yield config
-
-
-@pytest.fixture(scope="session")
-def local_config(test_id, logging_config, etcd_container, redis_container):  # noqa: F811
+def local_config(test_id, etcd_container, redis_container):  # noqa: F811
     ipc_base_path = Path.cwd() / f".tmp/{test_id}/agent-ipc"
     ipc_base_path.mkdir(parents=True, exist_ok=True)
     var_base_path = Path.cwd() / f".tmp/{test_id}/agent-var"
@@ -75,7 +53,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             "reserved-mem": tx.BinarySize().check("256M"),
             "reserved-disk": tx.BinarySize().check("1G"),
         },
-        "logging": logging_config,
+        "logging": {},
         "debug": defaultdict(lambda: False),
         "etcd": {
             "addr": etcd_addr,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from pants.engine.addresses import Addresses, UnparsedAddressInputs
+from pants.engine.addresses import Address, Addresses, UnparsedAddressInputs
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, SubsystemRule, collect_rules, rule
 from pants.engine.target import (
@@ -13,7 +13,6 @@ from pants.engine.target import (
     InjectedDependencies,
     Target,
     WrappedTarget,
-    WrappedTargetRequest,
 )
 from pants.engine.unions import UnionRule
 from pants.option.option_types import EnumOption
@@ -66,13 +65,7 @@ async def inject_platform_specific_dependencies(
         request.dependencies_field.address,
         subsystem.platform.value,
     )
-    wrapped_target = await Get(
-        WrappedTarget,
-        WrappedTargetRequest(
-            request.dependencies_field.address,
-            description_of_origin="inject_platform_specific_dependencies",
-        ),
-    )
+    wrapped_target = await Get(WrappedTarget, Address, request.dependencies_field.address)
     platforms = wrapped_target.target.get(PlatformDependencyMapField).value
     platform_resources_unparsed_address = platforms and platforms.get(subsystem.platform.value)
     if not platform_resources_unparsed_address:
@@ -82,7 +75,6 @@ async def inject_platform_specific_dependencies(
         UnparsedAddressInputs(
             (platform_resources_unparsed_address,),
             owning_address=request.dependencies_field.address,
-            description_of_origin="inject_platform_specific_dependencies",
         ),
     )
     return InjectedDependencies(Addresses(parsed_addresses))

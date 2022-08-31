@@ -16,13 +16,15 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from setproctitle import setproctitle
 
-from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.validators import TimeDuration
+from ai.backend.manager.models import kernels
+from ai.backend.manager.models.utils import connect_database
 
 from ..config import load as load_config
+from ..models.keypair import generate_keypair as _gen_keypair
 from .context import CLIContext, init_logger, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
@@ -105,7 +107,7 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
                 "Please set the container name explicitly.",
                 err=True,
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         container_name = candidate_container_names.decode().splitlines()[0].strip()
     elif container_name == "-":
         # Use the host-provided psql command
@@ -143,8 +145,6 @@ def generate_keypair(cli_ctx: CLIContext):
     """
     Generate a random keypair and print it out to stdout.
     """
-    from ..models.keypair import generate_keypair as _gen_keypair
-
     log.info("generating keypair...")
     ak, sk = _gen_keypair()
     print(f"Access Key: {ak} ({len(ak)} bytes)")
@@ -176,9 +176,6 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     Delete old records from the kernels table and
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
     """
-    from ai.backend.manager.models import kernels
-    from ai.backend.manager.models.utils import connect_database
-
     local_config = cli_ctx.local_config
     with cli_ctx.logger:
         today = datetime.now()

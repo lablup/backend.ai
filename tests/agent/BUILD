@@ -1,7 +1,11 @@
 python_test_utils(
-    dependencies=[
-        "src/ai/backend/agent:src",  # indirectly referred by mocking in test_local_instance_id fixture
-    ],
+    name="test_utils",
 )
 
-python_tests(name="tests")
+python_tests(
+    name="tests",
+    dependencies=[
+        "src/ai/backend/agent:service",
+        "src/ai/backend/testutils:lib",
+    ],
+)

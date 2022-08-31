@@ -3,7 +3,6 @@ import sys
 import click
 
 from ai.backend.cli.interaction import ask_yn
-from ai.backend.cli.types import ExitCode
 from ai.backend.client.func.domain import _default_detail_fields, _default_list_fields
 from ai.backend.client.session import Session
 
@@ -36,7 +35,7 @@ def info(ctx: CLIContext, name: str) -> None:
             ctx.output.print_item(item, _default_detail_fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
 
 
 @domain.command()
@@ -52,7 +51,7 @@ def list(ctx: CLIContext) -> None:
             ctx.output.print_list(items, _default_list_fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
 
 
 @domain.command()
@@ -97,14 +96,14 @@ def add(
                 item_name="domain",
                 action_name="add",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="domain",
                 action_name="add",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             item_name="domain",
@@ -156,14 +155,14 @@ def update(
                 item_name="domain",
                 action_name="update",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="domain",
                 action_name="update",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -190,14 +189,14 @@ def delete(ctx: CLIContext, name):
                 item_name="domain",
                 action_name="deletion",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="domain",
                 action_name="deletion",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -219,7 +218,7 @@ def purge(ctx: CLIContext, name):
         try:
             if not ask_yn():
                 print_info("Cancelled")
-                sys.exit(ExitCode.FAILURE)
+                sys.exit(1)
             data = session.Domain.purge(name)
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -227,14 +226,14 @@ def purge(ctx: CLIContext, name):
                 item_name="domain",
                 action_name="purge",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="domain",
                 action_name="purge",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             extra_info={

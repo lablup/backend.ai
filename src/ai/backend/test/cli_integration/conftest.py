@@ -128,9 +128,3 @@ def new_keypair_options() -> Tuple[KeypairOption, ...]:
             is_active=False, is_admin=False, rate_limit=100000, resource_policy="default"
         ),
     )
-
-
-@pytest.fixture(scope="module")
-def keypair_resource_policy() -> str:
-    fake = Faker()
-    return fake.unique.word()

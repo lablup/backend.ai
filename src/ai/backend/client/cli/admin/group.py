@@ -4,7 +4,6 @@ import uuid
 import click
 
 from ai.backend.cli.interaction import ask_yn
-from ai.backend.cli.types import ExitCode
 from ai.backend.client.func.group import _default_detail_fields, _default_list_fields
 from ai.backend.client.session import Session
 
@@ -50,7 +49,7 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
                 ctx.output.print_item(item, _default_detail_fields)
             except Exception as e:
                 ctx.output.print_error(e)
-                sys.exit(ExitCode.FAILURE)
+                sys.exit(1)
         else:
             # interpret as UUID
             try:
@@ -58,7 +57,7 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
                 ctx.output.print_item(item, _default_detail_fields)
             except Exception as e:
                 ctx.output.print_error(e)
-                sys.exit(ExitCode.FAILURE)
+                sys.exit(1)
 
 
 @group.command()
@@ -77,7 +76,7 @@ def list(ctx: CLIContext, domain_name) -> None:
             ctx.output.print_list(items, _default_list_fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
 
 
 @group.command()
@@ -122,14 +121,14 @@ def add(
                 item_name="group",
                 action_name="add",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="group",
                 action_name="add",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             item_name="group",
@@ -170,14 +169,14 @@ def update(
                 item_name="group",
                 action_name="update",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="group",
                 action_name="update",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -204,14 +203,14 @@ def delete(ctx: CLIContext, gid):
                 item_name="group",
                 action_name="deletion",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="group",
                 action_name="deletion",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -233,7 +232,7 @@ def purge(ctx: CLIContext, gid):
         try:
             if not ask_yn():
                 print_info("Cancelled")
-                sys.exit(ExitCode.FAILURE)
+                sys.exit(1)
             data = session.Group.purge(gid)
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -241,14 +240,14 @@ def purge(ctx: CLIContext, gid):
                 item_name="group",
                 action_name="purge",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="group",
                 action_name="purge",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -278,14 +277,14 @@ def add_users(ctx: CLIContext, gid, user_uuids):
                 item_name="group",
                 action_name="add_users",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="group",
                 action_name="add_users",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             extra_info={
@@ -315,14 +314,14 @@ def remove_users(ctx: CLIContext, gid, user_uuids):
                 item_name="group",
                 action_name="users_remove",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if not data["ok"]:
             ctx.output.print_mutation_error(
                 msg=data["msg"],
                 item_name="group",
                 action_name="users_remove",
             )
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         ctx.output.print_mutation_result(
             data,
             extra_info={

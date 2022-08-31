@@ -1,7 +1,7 @@
 python_sources(
-    name="src",
+    name="lib",
     sources=[
-        "**/*.py",  # per-lang sources are not auto-inferred
+        "**/*.py",
     ],
     dependencies=[
         ":resources",
@@ -16,7 +16,7 @@ pex_binary(
 python_distribution(
     name="dist",
     dependencies=[
-        ":src",
+        ":lib",
     ],
     provides=python_artifact(
         name="backend.ai-kernel",

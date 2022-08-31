@@ -1,5 +1,5 @@
+import copy
 import json
-from typing import Optional
 
 from aiohttp import web
 from aiohttp_session import get_session
@@ -12,12 +12,12 @@ from . import user_agent
 
 async def get_api_session(
     request: web.Request,
-    override_api_endpoint: Optional[str] = None,
+    api_endpoint: str = None,
 ) -> APISession:
     config = request.app["config"]
-    api_endpoint = config["api"]["endpoint"][0]
-    if override_api_endpoint is not None:
-        api_endpoint = override_api_endpoint
+    if api_endpoint is not None:
+        config = copy.deepcopy(config)
+        config["api"]["endpoint"] = api_endpoint
     session = await get_session(request)
     if not session.get("authenticated", False):
         raise web.HTTPUnauthorized(
@@ -51,33 +51,31 @@ async def get_api_session(
             content_type="application/problem+json",
         )
     ak, sk = token["access_key"], token["secret_key"]
-    api_config = APIConfig(
+    config = APIConfig(
         domain=config["api"]["domain"],
-        endpoint=api_endpoint,
-        endpoint_type="api",
+        endpoint=config["api"]["endpoint"],
         access_key=ak,
         secret_key=sk,
         user_agent=user_agent,
-        skip_sslcert_validation=not config["api"]["ssl_verify"],
+        skip_sslcert_validation=not config["api"].get("ssl-verify", True),
     )
-    return APISession(config=api_config, proxy_mode=True)
+    return APISession(config=config, proxy_mode=True)
 
 
 async def get_anonymous_session(
     request: web.Request,
-    override_api_endpoint: Optional[str] = None,
+    api_endpoint: str = None,
 ) -> APISession:
     config = request.app["config"]
-    api_endpoint = config["api"]["endpoint"][0]
-    if override_api_endpoint is not None:
-        api_endpoint = override_api_endpoint
-    api_config = APIConfig(
+    if api_endpoint is not None:
+        config = copy.deepcopy(config)
+        config["api"]["endpoint"] = api_endpoint
+    config = APIConfig(
         domain=config["api"]["domain"],
-        endpoint=api_endpoint,
-        endpoint_type="api",
+        endpoint=config["api"]["endpoint"],
         access_key="",
         secret_key="",
         user_agent=user_agent,
-        skip_sslcert_validation=not config["api"]["ssl_verify"],
+        skip_sslcert_validation=not config["api"].get("ssl-verify", True),
     )
-    return APISession(config=api_config, proxy_mode=True)
+    return APISession(config=config, proxy_mode=True)

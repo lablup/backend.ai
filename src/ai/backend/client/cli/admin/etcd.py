@@ -3,8 +3,6 @@ import sys
 
 import click
 
-from ai.backend.cli.types import ExitCode
-
 from ...session import Session
 from ..pretty import print_error, print_fail, print_pretty
 from . import admin
@@ -34,7 +32,7 @@ def get(key, prefix):
             data = session.EtcdConfig.get(key, prefix)
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         data = json.dumps(data, indent=2) if data else "null"
         print_pretty(data)
 
@@ -59,7 +57,7 @@ def set(key, value):
             data = session.EtcdConfig.set(key, value)
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if data.get("result", False) != "ok":
             print_fail("Unable to set key/value.")
         else:
@@ -86,7 +84,7 @@ def delete(key, prefix):
             data = session.EtcdConfig.delete(key, prefix)
         except Exception as e:
             print_error(e)
-            sys.exit(ExitCode.FAILURE)
+            sys.exit(1)
         if data.get("result", False) != "ok":
             print_fail("Unable to delete key/value.")
         else:

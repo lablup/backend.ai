@@ -1,11 +1,10 @@
 import ast
-import collections
 import configparser
 import itertools
 import logging
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
-from typing import Iterable, Iterator, Optional
+from typing import Iterator, Optional
 
 log = logging.getLogger(__name__)
 
@@ -64,34 +63,6 @@ def scan_entrypoint_from_package_metadata(group_name: str) -> Iterator[EntryPoin
     yield from entry_points().select(group=group_name)
 
 
-_default_glob_excluded_patterns = [
-    "ai/backend/webui",
-    "ai/backend/web/static",
-    "ai/backend/runner",
-    "ai/backend/kernel",
-]
-
-
-def _glob(base_path: Path, filename: str, excluded_patterns: Iterable[str]) -> Iterator[Path]:
-    q: collections.deque[Path] = collections.deque()
-    q.append(base_path)
-    while q:
-        search_path = q.pop()
-        assert search_path.is_dir()
-        for item in search_path.iterdir():
-            if item.is_dir():
-                if search_path.name == "__pycache__":
-                    continue
-                if search_path.name.startswith("."):
-                    continue
-                if any(search_path.match(pattern) for pattern in excluded_patterns):
-                    continue
-                q.append(item)
-            else:
-                if item.name == filename:
-                    yield item
-
-
 def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     entrypoints = {}
     # Scan self-exported entrypoints when executed via pex.
@@ -99,7 +70,7 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     log.debug(
         "scan_entrypoint_from_buildscript(%r): Namespace path: %s", group_name, ai_backend_ns_path
     )
-    for buildscript_path in _glob(ai_backend_ns_path, "BUILD", _default_glob_excluded_patterns):
+    for buildscript_path in ai_backend_ns_path.glob("**/BUILD"):
         for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
             entrypoints[entrypoint.name] = entrypoint
     # Override with the entrypoints found in the current source directories,
@@ -110,7 +81,7 @@ def scan_entrypoint_from_buildscript(group_name: str) -> Iterator[EntryPoint]:
     else:
         src_path = build_root / "src"
         log.debug("scan_entrypoint_from_buildscript(%r): current src: %s", group_name, src_path)
-        for buildscript_path in _glob(src_path, "BUILD", _default_glob_excluded_patterns):
+        for buildscript_path in src_path.glob("**/BUILD"):
             for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
                 entrypoints[entrypoint.name] = entrypoint
     yield from entrypoints.values()
@@ -130,11 +101,11 @@ def scan_entrypoint_from_plugin_checkouts(group_name: str) -> Iterator[EntryPoin
             plugins_path,
         )
         # For cases when plugins use Pants
-        for buildscript_path in _glob(plugins_path, "BUILD", _default_glob_excluded_patterns):
+        for buildscript_path in plugins_path.glob("**/BUILD"):
             for entrypoint in extract_entrypoints_from_buildscript(group_name, buildscript_path):
                 entrypoints[entrypoint.name] = entrypoint
         # For cases when plugins use standard setup.cfg
-        for setup_cfg_path in _glob(plugins_path, "setup.cfg", _default_glob_excluded_patterns):
+        for setup_cfg_path in plugins_path.glob("**/setup.cfg"):
             for entrypoint in extract_entrypoints_from_setup_cfg(group_name, setup_cfg_path):
                 if entrypoint.name not in entrypoints:
                     entrypoints[entrypoint.name] = entrypoint

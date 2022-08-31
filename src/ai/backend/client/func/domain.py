@@ -5,7 +5,7 @@ from ai.backend.client.output.fields import domain_fields
 from ai.backend.client.output.types import FieldSpec
 
 from ..session import api_session
-from .base import BaseFunction, api_function, resolve_fields
+from .base import BaseFunction, api_function
 
 __all__ = ("Domain",)
 
@@ -102,12 +102,14 @@ class Domain(BaseFunction):
         allowed_vfolder_hosts: Iterable[str] = None,
         allowed_docker_registries: Iterable[str] = None,
         integration_id: str = None,
-        fields: Iterable[FieldSpec | str] = None,
+        fields: Iterable[str] = None,
     ) -> dict:
         """
         Creates a new domain with the given options.
         You need an admin privilege for this operation.
         """
+        if fields is None:
+            fields = ("name",)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: DomainInput!) {
@@ -117,8 +119,7 @@ class Domain(BaseFunction):
             }
         """
         )
-        resolved_fields = resolve_fields(fields, domain_fields, (domain_fields["name"],))
-        query = query.replace("$fields", " ".join(resolved_fields))
+        query = query.replace("$fields", " ".join(fields))
         variables = {
             "name": name,
             "input": {
@@ -145,7 +146,7 @@ class Domain(BaseFunction):
         allowed_vfolder_hosts: Iterable[str] = None,
         allowed_docker_registries: Iterable[str] = None,
         integration_id: str = None,
-        fields: Iterable[FieldSpec | str] = None,
+        fields: Iterable[str] = None,
     ) -> dict:
         """
         Update existing domain.

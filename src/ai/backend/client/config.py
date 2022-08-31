@@ -18,7 +18,6 @@ from typing import (
 )
 
 import appdirs
-from dotenv import load_dotenv
 from yarl import URL
 
 __all__ = [
@@ -83,7 +82,6 @@ def get_env(
 
     :returns: The value processed by the *clean* function.
     """
-    load_dotenv(override=True)
     key = key.upper()
     raw = os.environ.get("BACKEND_" + key)
     if raw is None:

@@ -92,14 +92,6 @@ hide-agents = false
 # uses an importer image from a private registry.
 importer-image = "lablup/importer:manylinux2010"
 
-# The maximum size of websocket messages in bytes.
-# max-wsmsg-size = 16777216  # 16 MiB
-
-# The starting port number for aiomonitor.
-# Since the manager is composed of multiple processes, each process will be exposed
-# via the port number of this base port number + pidx.
-# aiomonitor-port = 50100
-
 
 [docker-registry]
 # Enable or disable SSL certificate verification when accessing Docker registries.
@@ -168,12 +160,4 @@ ssl-verify = true
 
 [debug]
 enabled = false
-
-# Enable or disable the asyncio debug mode.
-asyncio = false
-
-# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
-enhanced-aiomonitor-task-info = false
-
-# Periodically sync container stat from Redis to the kernels.last_stat column.
-periodic-sync-stats = false
+periodic-sync-stats = false  # periodically sync container stat from Redis to the kernels.last_stat column.
