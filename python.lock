@@ -39,7 +39,7 @@
 //     "colorama>=0.4.4",
 //     "coloredlogs~=15.0",
 //     "cryptography>=2.8",
-//     "etcetra~=0.1.8",
+//     "etcetra~=0.1.10",
 //     "faker~=13.12.0",
 //     "graphene~=2.1.9",
 //     "hiredis~=1.1.0",
@@ -107,14 +107,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9b719b270e7cf6f2454eeaf16c20a025b73f0d4d352d157baa77ce9ad1df427d",
-              "url": "https://files.pythonhosted.org/packages/ee/9c/f8bc72c09eae047197d820b1618314323c780005b9a854b99bed75407d43/aioconsole-0.5.0.tar.gz"
+              "hash": "a0288be63d47ec5fd153f284477a1c9327c8f8e6b193d7cf0b2a8d1576a31589",
+              "url": "https://files.pythonhosted.org/packages/4a/88/4d00e98d144c7c1517d9fa069501369d6204841ccd6f7478d5a692f309d4/aioconsole-0.5.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "c8ddd9fd21db71ea51fb9b0d20d21d11c409c92988edf07c935d705fa60e026b",
+              "url": "https://files.pythonhosted.org/packages/71/74/cd64dbc518f71486b235f0e1538ea4b7cbf4375a8bdc6f96c9c9595291ab/aioconsole-0.5.1.tar.gz"
             }
           ],
           "project_name": "aioconsole",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "0.5"
+          "version": "0.5.1"
         },
         {
           "artifacts": [
@@ -1191,13 +1196,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7aab9d225b8ba65fdd55cb2a65ad81f6d0a3c149cf25ff0e8a8228412d40c6bc",
-              "url": "https://files.pythonhosted.org/packages/17/c8/437d34940a7c710a4048cf6f6f073bf2926e64014fb5ca9f727fbea6fda9/etcetra-0.1.8-py3-none-any.whl"
+              "hash": "b92e459c5c59113c1dc126b97db2fa055f280996961b2d6b75a73a99569f9275",
+              "url": "https://files.pythonhosted.org/packages/a3/b0/4ac345fb6ff5da962ba6fb0b71ec33eaefb9cd6f00c7a1df96ebe777c301/etcetra-0.1.10-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8efb7783b5ef08c513477544fb821b79e49b5305f0a24fee43ba94d1f467d467",
-              "url": "https://files.pythonhosted.org/packages/25/f0/f3d01eac06001041a9a3efd6722f9046ac5e0ee57666e6c44931dfddcbca/etcetra-0.1.8.tar.gz"
+              "hash": "654929e07cb620680ce3377cc3fb5f05070939a5429654c0fb0d87033234a899",
+              "url": "https://files.pythonhosted.org/packages/85/c1/9693ee6ed3f722a12e7efc84bd2139754419f4d1b1d29cd3e81601a69be8/etcetra-0.1.10.tar.gz"
             }
           ],
           "project_name": "etcetra",
@@ -1218,8 +1223,8 @@
             "types-setuptools; extra == \"typecheck\"",
             "wheel>=0.36.2; extra == \"build\""
           ],
-          "requires_python": ">=3.9",
-          "version": "0.1.8"
+          "requires_python": ">=3.10",
+          "version": "0.1.10"
         },
         {
           "artifacts": [
@@ -1843,13 +1848,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "df3921c3081b013c8a2d5ff03c18375651684921ae83fd12e64800b7da923257",
-              "url": "https://files.pythonhosted.org/packages/f1/01/62590c494bd3602e49b3536a5f9456f98e9a55178738bd2cb4811f0ebcdf/Mako-1.2.1-py3-none-any.whl"
+              "hash": "8efcb8004681b5f71d09c983ad5a9e6f5c40601a6ec469148753292abc0da534",
+              "url": "https://files.pythonhosted.org/packages/90/12/eb62db8bc346bc41a7ec8fbccd525e91d2747f9acfa6fbfd978948640a85/Mako-1.2.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f054a5ff4743492f1aa9ecc47172cb33b42b9d993cffcc146c9de17e717b0307",
-              "url": "https://files.pythonhosted.org/packages/ad/dd/34201dae727bb183ca14fd8417e61f936fa068d6f503991f09ee3cac6697/Mako-1.2.1.tar.gz"
+              "hash": "3724869b363ba630a272a5f89f68c070352137b8fd1757650017b7e06fda163f",
+              "url": "https://files.pythonhosted.org/packages/6d/f2/8ad2ec3d531c97c4071572a4104e00095300e278a7449511bee197ca22c9/Mako-1.2.2.tar.gz"
             }
           ],
           "project_name": "mako",
@@ -1861,7 +1866,7 @@
             "pytest; extra == \"testing\""
           ],
           "requires_python": ">=3.7",
-          "version": "1.2.1"
+          "version": "1.2.2"
         },
         {
           "artifacts": [
@@ -3447,19 +3452,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ced29372faf9fe95a5b617c844b3c10db3b288c85f8fabdd8b58f4cdb0101bcd",
-              "url": "https://files.pythonhosted.org/packages/2d/a9/dbe69d34a02f8dc006bf75387ed4206ec2f37e5d7dddbad79b2d7e194d1e/types_aiofiles-0.8.10-py3-none-any.whl"
+              "hash": "be6715fffd1c7f84c9316000ba8bbc66a884246dbd2902c163ebc2d67315206b",
+              "url": "https://files.pythonhosted.org/packages/66/a9/1a7e7e57e4e036139db67e2c7fc28c558edc69ed928ca6905ae2c4f0b3e5/types_aiofiles-0.8.11-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d006ed6894c1da9ed148325b80f3b13c45332474ec31335e6342493cf134e6d4",
-              "url": "https://files.pythonhosted.org/packages/e4/9a/7906a7d7667a953d1241552dc003eccff23980215fad8610c8f60753765e/types-aiofiles-0.8.10.tar.gz"
+              "hash": "1f93aa68e47de1379f45eef9acd34faa0f9341628921cd6aede666e6e559a5a8",
+              "url": "https://files.pythonhosted.org/packages/31/c2/c7bab6add84d9eb7738e653e5f23ea5080c070b18164bcc43ab2eaadee70/types-aiofiles-0.8.11.tar.gz"
             }
           ],
           "project_name": "types-aiofiles",
           "requires_dists": [],
           "requires_python": null,
-          "version": "0.8.10"
+          "version": "0.8.11"
         },
         {
           "artifacts": [
@@ -3575,19 +3580,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ba4dffd5f804af849ddd5399164abd04fbf87fa5295680d89ccec010c66bb110",
-              "url": "https://files.pythonhosted.org/packages/03/ee/0346392cae3abab44835a1829f5c7e8c653a139e40ffb5b1f3038a7530b7/types_redis-4.3.18-py3-none-any.whl"
+              "hash": "c74262197487a65e3f02db37d3f0e0f3bb2d5d370f7e6ba390814e865a45e56e",
+              "url": "https://files.pythonhosted.org/packages/28/0e/53a2c7747de518ae168c2b59e3eb6f916813e36ae916923c3290179e82e6/types_redis-4.3.19-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2260532c157d4f64f6e266de67b0aaa1979cfb969e409a16445ec6976c4a1de6",
-              "url": "https://files.pythonhosted.org/packages/2d/a1/3ee68099750b1fa6b3b6396ab9dddab15100c4e96680e8153a12613b5262/types-redis-4.3.18.tar.gz"
+              "hash": "c881ffb94bd47dca21ed503328544a56bb315851575eebb27fb371bff735844a",
+              "url": "https://files.pythonhosted.org/packages/56/15/745fef11530bb9c3c378343e7ca9e983198356987e98bf827cb6cb88fb5a/types-redis-4.3.19.tar.gz"
             }
           ],
           "project_name": "types-redis",
           "requires_dists": [],
           "requires_python": null,
-          "version": "4.3.18"
+          "version": "4.3.19"
         },
         {
           "artifacts": [
@@ -4000,7 +4005,7 @@
     "colorama>=0.4.4",
     "coloredlogs~=15.0",
     "cryptography>=2.8",
-    "etcetra~=0.1.8",
+    "etcetra~=0.1.10",
     "faker~=13.12.0",
     "graphene~=2.1.9",
     "hiredis~=1.1.0",
