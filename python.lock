@@ -22,7 +22,7 @@
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.1",
 //     "aiomonitor-ng~=0.5.1",
-//     "aioraft-ng==0.1.1",
+//     "aioraft-ng==0.1.2",
 //     "aioredis[hiredis]~=2.0.1",
 //     "aiosqlite~=0.17.0",
 //     "aiotools~=1.5.9",
@@ -393,13 +393,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7f9567eccd08370403979c84a1759c6f1ecbaf84df92a84edff3ed8589276af8",
-              "url": "https://files.pythonhosted.org/packages/98/c8/1a3f609cbc66e6814a288538be81faa98de486887f97dbd6f9cec7c357bb/aioraft_ng-0.1.1-py3-none-any.whl"
+              "hash": "5c36dc62107009f895eae1cc98b208c9eaf0f50ce0ca3550c5e384404c4295f9",
+              "url": "https://files.pythonhosted.org/packages/01/56/ce37314401091087c912e345ed39627867e431b92d0b961cc4ce968dc89e/aioraft_ng-0.1.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "da352a53a497de24f1b4914086bbf5cfe6cd69ce877bde15de84a7094e0dc2f3",
-              "url": "https://files.pythonhosted.org/packages/6b/73/bec82324b8f0108e55b745c729ffaaba8c55e28dff792ab74f7b0c3e07ad/aioraft-ng-0.1.1.tar.gz"
+              "hash": "d7cd0ae234e456bfd8f60962781bd7b817847365463d5f39050d3e00cc061f95",
+              "url": "https://files.pythonhosted.org/packages/09/38/8d455a7d30f025f4bb3ef1166ba38440141f7d9e3781c965fccdc811444a/aioraft-ng-0.1.2.tar.gz"
             }
           ],
           "project_name": "aioraft-ng",
@@ -416,7 +416,7 @@
             "types-protobuf; extra == \"dev\""
           ],
           "requires_python": ">=3.10",
-          "version": "0.1.1"
+          "version": "0.1.2"
         },
         {
           "artifacts": [
@@ -1226,13 +1226,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7aab9d225b8ba65fdd55cb2a65ad81f6d0a3c149cf25ff0e8a8228412d40c6bc",
-              "url": "https://files.pythonhosted.org/packages/17/c8/437d34940a7c710a4048cf6f6f073bf2926e64014fb5ca9f727fbea6fda9/etcetra-0.1.8-py3-none-any.whl"
+              "hash": "b92e459c5c59113c1dc126b97db2fa055f280996961b2d6b75a73a99569f9275",
+              "url": "https://files.pythonhosted.org/packages/a3/b0/4ac345fb6ff5da962ba6fb0b71ec33eaefb9cd6f00c7a1df96ebe777c301/etcetra-0.1.10-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8efb7783b5ef08c513477544fb821b79e49b5305f0a24fee43ba94d1f467d467",
-              "url": "https://files.pythonhosted.org/packages/25/f0/f3d01eac06001041a9a3efd6722f9046ac5e0ee57666e6c44931dfddcbca/etcetra-0.1.8.tar.gz"
+              "hash": "654929e07cb620680ce3377cc3fb5f05070939a5429654c0fb0d87033234a899",
+              "url": "https://files.pythonhosted.org/packages/85/c1/9693ee6ed3f722a12e7efc84bd2139754419f4d1b1d29cd3e81601a69be8/etcetra-0.1.10.tar.gz"
             }
           ],
           "project_name": "etcetra",
@@ -1253,8 +1253,8 @@
             "types-setuptools; extra == \"typecheck\"",
             "wheel>=0.36.2; extra == \"build\""
           ],
-          "requires_python": ">=3.9",
-          "version": "0.1.8"
+          "requires_python": ">=3.10",
+          "version": "0.1.10"
         },
         {
           "artifacts": [
@@ -1632,8 +1632,8 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5b4bdda35b40105b4ee3c87c72393496bec5e7f333befdcdd623511bf2684307",
-              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_12_0_arm64.whl"
+              "hash": "951e212c2e5e7328246f241d17d94e5eaef81c639a7d48164f451694ff99b157",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_10_15_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -1652,8 +1652,8 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "951e212c2e5e7328246f241d17d94e5eaef81c639a7d48164f451694ff99b157",
-              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_10_15_x86_64.whl"
+              "hash": "5b4bdda35b40105b4ee3c87c72393496bec5e7f333befdcdd623511bf2684307",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_12_0_arm64.whl"
             }
           ],
           "project_name": "hiredis",
@@ -4018,7 +4018,7 @@
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.1",
     "aiomonitor-ng~=0.5.1",
-    "aioraft-ng==0.1.1",
+    "aioraft-ng==0.1.2",
     "aioredis[hiredis]~=2.0.1",
     "aiosqlite~=0.17.0",
     "aiotools~=1.5.9",
