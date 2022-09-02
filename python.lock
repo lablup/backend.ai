@@ -56,7 +56,7 @@
 //     "passlib[bcrypt]>=1.7.4",
 //     "pexpect~=4.8",
 //     "psutil~=5.9.1",
-//     "psycopg2-binary>=2.8.4",
+//     "psycopg[binary]~=3.1",
 //     "pycryptodome>=3.14.1",
 //     "pytest-dependency>=0.5.1",
 //     "pytest>=7.1.2",
@@ -2294,59 +2294,95 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c3ae8e75eb7160851e59adc77b3a19a976e50622e44fd4fd47b8b18208189d42",
-              "url": "https://files.pythonhosted.org/packages/cd/7f/05c6036e6482b7cddf3a12904344655defd7fc16b008d7f17f28d25d2f2a/psycopg2_binary-2.9.3-cp310-cp310-musllinux_1_1_x86_64.whl"
+              "hash": "46a13ea46d16523c0f4fbf98a573881ba483ca94a920940629e29a688925121a",
+              "url": "https://files.pythonhosted.org/packages/ab/96/ea927e4deb032604818d9379c5d4bc87f7e6e76ca4d7d47537dc43ceeee6/psycopg-3.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a9e1f75f96ea388fbcef36c70640c4efbe4650658f3d6a2967b4cc70e907352e",
-              "url": "https://files.pythonhosted.org/packages/23/db/2383e85ceff06a2279001c027bb75406baf53d94a75c7648cb5d3b2a23d1/psycopg2_binary-2.9.3-cp310-cp310-musllinux_1_1_ppc64le.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "6e82d38390a03da28c7985b394ec3f56873174e2c88130e6966cb1c946508e65",
-              "url": "https://files.pythonhosted.org/packages/2b/20/2f1fc936f8ee4828b348aba3efacab2731995b21da0a955a25a398c0b57b/psycopg2_binary-2.9.3-cp310-cp310-manylinux_2_17_i686.manylinux2014_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "090f3348c0ab2cceb6dfbe6bf721ef61262ddf518cd6cc6ecc7d334996d64efa",
-              "url": "https://files.pythonhosted.org/packages/46/9f/536f052c80e71d37edcb8902bef319c1f8d6e7f4ba49d4a999b6cea87589/psycopg2_binary-2.9.3-cp310-cp310-musllinux_1_1_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "3a79d622f5206d695d7824cbf609a4f5b88ea6d6dab5f7c147fc6d333a8787e4",
-              "url": "https://files.pythonhosted.org/packages/62/cf/9e510ea668a22be01e3ba25deff03b9fa9a34598e6eabc714e67e868e0fb/psycopg2_binary-2.9.3-cp310-cp310-musllinux_1_1_aarch64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "083a55275f09a62b8ca4902dd11f4b33075b743cf0d360419e2051a8a5d5ff76",
-              "url": "https://files.pythonhosted.org/packages/7f/07/71dd915057d7ce28bc0167d3dff17166a821913085556df3fedf7968897d/psycopg2_binary-2.9.3-cp310-cp310-manylinux_2_24_aarch64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "539b28661b71da7c0e428692438efbcd048ca21ea81af618d845e06ebfd29478",
-              "url": "https://files.pythonhosted.org/packages/83/8f/748aa34614899181c5e420850281c18efec93f260a013d568020b38320e3/psycopg2_binary-2.9.3-cp310-cp310-macosx_10_14_x86_64.macosx_10_9_intel.macosx_10_9_x86_64.macosx_10_10_intel.macosx_10_10_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "0a29729145aaaf1ad8bafe663131890e2111f13416b60e460dae0a96af5905c9",
-              "url": "https://files.pythonhosted.org/packages/97/87/a73b2f93009bf66fc9b5a9aa1b8bdf94e462657bcb0a99c259d88683d217/psycopg2_binary-2.9.3-cp310-cp310-manylinux_2_24_ppc64le.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "57804fc02ca3ce0dbfbef35c4b3a4a774da66d66ea20f4bda601294ad2ea6092",
-              "url": "https://files.pythonhosted.org/packages/ac/84/d01b8a9aebeae783b84f8ee09d07ee861da2f8e260772ef7f3878549bf17/psycopg2_binary-2.9.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "761df5313dc15da1502b21453642d7599d26be88bff659382f8f9747c7ebea4e",
-              "url": "https://files.pythonhosted.org/packages/d7/1c/8d042630c5ff3c3e6d93c992bd7ecf516d577803b96781c6caa649bbf6e5/psycopg2-binary-2.9.3.tar.gz"
+              "hash": "1dfbbf221de14eab4bf01c6a5f15496f737d6b6e0db698f9e6081a692c598dc1",
+              "url": "https://files.pythonhosted.org/packages/73/f1/d1288fa8d1a2dce9492ddaffd7d992e58bd846a3df33d939ed0e1119aa34/psycopg-3.1.tar.gz"
             }
           ],
-          "project_name": "psycopg2-binary",
+          "project_name": "psycopg",
+          "requires_dists": [
+            "Sphinx>=5.0; extra == \"docs\"",
+            "backports.zoneinfo>=0.2.0; python_version < \"3.9\"",
+            "black>=22.3.0; extra == \"dev\"",
+            "dnspython>=2.1; extra == \"dev\"",
+            "flake8>=4.0; extra == \"dev\"",
+            "furo==2022.6.21; extra == \"docs\"",
+            "mypy>=0.940; extra == \"dev\"",
+            "mypy>=0.940; extra == \"test\"",
+            "pproxy>=2.7; extra == \"test\"",
+            "psycopg-binary==3.1; extra == \"binary\"",
+            "psycopg-c==3.1; extra == \"c\"",
+            "psycopg-pool; extra == \"pool\"",
+            "pytest-asyncio>=0.17; extra == \"test\"",
+            "pytest-cov>=3.0; extra == \"test\"",
+            "pytest-randomly>=3.10; extra == \"test\"",
+            "pytest>=6.2.5; extra == \"test\"",
+            "sphinx-autobuild>=2021.3.14; extra == \"docs\"",
+            "sphinx-autodoc-typehints>=1.12; extra == \"docs\"",
+            "types-setuptools>=57.4; extra == \"dev\"",
+            "typing-extensions>=4.1; python_version < \"3.11\"",
+            "tzdata; sys_platform == \"win32\"",
+            "wheel>=0.37; extra == \"dev\""
+          ],
+          "requires_python": ">=3.7",
+          "version": "3.1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "d1698049362959edb85ab401e6afb0487f0184583dfd4ce2a5311a4d38c19c6f",
+              "url": "https://files.pythonhosted.org/packages/6c/eb/52470ec9e5638deb47309e713befb4f14cdc905dcc3e6f24df85837f1a0e/psycopg_binary-3.1-cp310-cp310-musllinux_1_1_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d44412e55d1e9610143204562b235307e4e2b281999b3fbc1ea1201ac6003629",
+              "url": "https://files.pythonhosted.org/packages/27/26/df9adbcc20c95c295d77b75e9fae56ee21b0a8316f6b6a31e7e093e7ce57/psycopg_binary-3.1-cp310-cp310-musllinux_1_1_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d358d79788e0f74d911fc463da04e62820186bc18bca9e21510fa6bc1eb24e02",
+              "url": "https://files.pythonhosted.org/packages/49/81/877fdc9e162be9aff9fa65a46cfea275b7dd583f43242e39a5cc6ef049da/psycopg_binary-3.1-cp310-cp310-macosx_10_9_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "cb4c6f61da3ce8e43dee0629abe6a7889ae11b73c0c300ab1e1fc00c37e9d464",
+              "url": "https://files.pythonhosted.org/packages/4d/55/d2befb3a36e73cf5094fac05f05707ecceba25a3f1d54f75d4a2a0ec4a1f/psycopg_binary-3.1-cp310-cp310-musllinux_1_1_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "3b69321773efd0ebaacb89385eaba20aae449a3b7970579ca79919b369cbf305",
+              "url": "https://files.pythonhosted.org/packages/54/a0/50ba286bbcae351bafd9e917ac42c187f4ee168d52ac3d088c33ac8f49b4/psycopg_binary-3.1-cp310-cp310-musllinux_1_1_ppc64le.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "741404deaddf1e1bbc263d6ea47b1c3a101e5bd1aecdce17e8780040bfa21625",
+              "url": "https://files.pythonhosted.org/packages/61/47/46b28f1debd582f24b47f23465bc4eac140e8e8b4d44e13ccd325f4c3c9e/psycopg_binary-3.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "b9ad2c26e220f096629e0ba617af0e174b9b057f4545339be8858033ec487a8c",
+              "url": "https://files.pythonhosted.org/packages/6d/c8/14f25b6d5edb2f45afa53f036a3485f190545d16e8895c69688d88cf389f/psycopg_binary-3.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "629a8a586f217b2d0b133297b632a89d3c8f8fdad0b9913a86f885cc04c4c14f",
+              "url": "https://files.pythonhosted.org/packages/99/16/c998af7acb17f4f0ec902167565d7a205b4d2970728fbc84a623ecfdb4be/psycopg_binary-3.1-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "9dc691b6f85c0179e2ba6f367681bd0424befad9cf9d3d3a4bfae0e5f3bf695b",
+              "url": "https://files.pythonhosted.org/packages/f4/f9/109fc6df6adb257ce1c05cdaeefcb72af7e33168ff3591661d6a404b539d/psycopg_binary-3.1-cp310-cp310-manylinux_2_17_i686.manylinux2014_i686.whl"
+            }
+          ],
+          "project_name": "psycopg-binary",
           "requires_dists": [],
-          "requires_python": ">=3.6",
-          "version": "2.9.3"
+          "requires_python": ">=3.7",
+          "version": "3.1"
         },
         {
           "artifacts": [
@@ -4022,7 +4058,7 @@
     "passlib[bcrypt]>=1.7.4",
     "pexpect~=4.8",
     "psutil~=5.9.1",
-    "psycopg2-binary>=2.8.4",
+    "psycopg[binary]~=3.1",
     "pycryptodome>=3.14.1",
     "pytest-dependency>=0.5.1",
     "pytest>=7.1.2",
