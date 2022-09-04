@@ -47,6 +47,7 @@ __all__: Sequence[str] = (
     "VFolderInvitationState",
     "VFolderPermission",
     "VFolderPermissionValidator",
+    "VFolderOperationStatus",
     "query_accessible_vfolders",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
@@ -108,6 +109,18 @@ class VFolderInvitationState(str, enum.Enum):
     REJECTED = "rejected"  # rejected by invitee
 
 
+class VFolderOperationStatus(str, enum.Enum):
+    """
+    Introduce virtual folder status for storage-proxy operations.
+    """
+
+    READY = "ready"
+    PREPARED = "prepared"
+    CLONING = "cloning"
+    DELETING = "deleting"
+    MOUNTED = "mounted"
+
+
 vfolders = sa.Table(
     "vfolders",
     metadata,
@@ -141,6 +154,12 @@ vfolders = sa.Table(
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
     sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
+    sa.Column(
+        "status",
+        EnumValueType(VFolderOperationStatus),
+        default=VFolderOperationStatus.READY,
+        nullable=False,
+    ),
     sa.CheckConstraint(
         "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
         "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
