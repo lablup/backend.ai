@@ -137,10 +137,6 @@ class GlobalTimerLeaveEvent(GlobalTimerEventArgs, AbstractEvent):
     name = "global_timer_leave_event"
 
 
-class RerouteRequestEvent(EmptyEventArgs, AbstractEvent):
-    name = "reroute_request_event"
-
-
 @attr.s(slots=True, frozen=True)
 class DoTerminateSessionEvent(AbstractEvent):
     name = "do_terminate_session"
@@ -547,6 +543,24 @@ class BgtaskCancelledEvent(BgtaskDoneEventArgs, AbstractEvent):
 
 class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
     name = "bgtask_failed"
+
+
+@attr.s(auto_attribs=True, slots=True)
+class SessionCreateTaskEventArgs:
+    task_id: uuid.UUID = attr.ib()
+
+    def serialize(self) -> tuple:
+        return (str(self.task_id),)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            uuid.UUID(value[0]),
+        )
+
+
+class SessionCreateTaskEvent(SessionCreateTaskEventArgs, AbstractEvent):
+    name = "session_create_task"
 
 
 class RedisConnectorFunc(Protocol):

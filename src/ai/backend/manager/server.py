@@ -48,6 +48,7 @@ from ai.backend.common.events import (
     GlobalTimerCreatedEvent,
     GlobalTimerJoinEvent,
     GlobalTimerLeaveEvent,
+    SessionCreateTaskEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
@@ -69,7 +70,14 @@ from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHand
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
-from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
+from .defs import (
+    REDIS_IMAGE_DB,
+    REDIS_LIVE_DB,
+    REDIS_STAT_DB,
+    REDIS_STREAM_DB,
+    REDIS_STREAM_LEADER_TASK,
+    REDIS_STREAM_LOCK,
+)
 from .exceptions import InvalidArgument
 from .types import DistributedLockFactory
 
@@ -300,15 +308,38 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     filtered_configuration = tuple(conf for conf in configuration if conf != raft_id)
 
     has_leadership: bool = False
-    root_ctx.has_leadership = lambda: has_leadership
+
     root_ctx.cluster_node_id = f"{raft_id}:{os.getpid()}"
+
+    root_ctx.leader_task_producer = await EventProducer.new(
+        root_ctx.shared_config.data["redis"],
+        db=REDIS_STREAM_LEADER_TASK,
+    )
+    root_ctx.leader_task_dispatcher = await EventDispatcher.new(
+        root_ctx.shared_config.data["redis"],
+        db=REDIS_STREAM_LEADER_TASK,
+        log_events=root_ctx.local_config["debug"]["log-events"],
+        node_id=root_ctx.local_config["manager"]["id"],
+    )
+
+    async def _on_leader_task(context: None, source: str, event: SessionCreateTaskEvent):
+        log.warning(
+            f"[on_leader_task:{os.getpid()}:{root_ctx.pidx}:{has_leadership}] event({source}): {event.task_id}"
+        )
+        if not has_leadership:
+            await root_ctx.leader_task_producer.produce_event(event)
+            log.warning(f"[] redirect_event(): {event.task_id}")
+
+    leader_task_handler = root_ctx.leader_task_dispatcher.consume(
+        SessionCreateTaskEvent, None, _on_leader_task
+    )
 
     _log_prefix = f"[pid={os.getpid()}/pidx={root_ctx.pidx}]"
 
     loop = asyncio.get_running_loop()
     _cleanup_coroutines: List[Coroutine] = []
 
-    global_timer_ids: List[str] = []
+    global_timer_ids: Final[List[str]] = []
 
     async def _on_global_timer_created(context: None, source: str, event: GlobalTimerCreatedEvent):
         if root_ctx.cluster_node_id == event.node_id:
@@ -371,6 +402,10 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await asyncio.gather(*_cleanup_coroutines)
 
     root_ctx.event_dispatcher.unsubscribe(global_timer_created_handler)
+    root_ctx.leader_task_dispatcher.unsubscribe(leader_task_handler)
+
+    await root_ctx.leader_task_producer.close()
+    await root_ctx.leader_task_dispatcher.close()
 
 
 @actxmgr
