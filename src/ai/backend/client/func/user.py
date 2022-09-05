@@ -306,6 +306,7 @@ class User(BaseFunction):
         status: UserStatus | str = UserStatus.ACTIVE,
         need_password_change: bool = None,
         description: str = None,
+        allowed_ip: str = None,
         group_ids: Iterable[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -333,6 +334,7 @@ class User(BaseFunction):
                 "status": status.value if isinstance(status, UserStatus) else status,
                 "need_password_change": need_password_change,
                 "description": description,
+                "allowed_client_ip": allowed_ip,
                 "group_ids": group_ids,
             },
         }

@@ -42,6 +42,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["created_at"],
         user_fields["domain_name"],
         user_fields["groups"],
+        user_fields["allowed_client_ip"],
     ]
     with Session() as session:
         try:
@@ -83,6 +84,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         user_fields["created_at"],
         user_fields["domain_name"],
         user_fields["groups"],
+        user_fields["allowed_client_ip"],
     ]
     try:
         with Session() as session:
@@ -212,6 +214,12 @@ def add(
     help="Flag indicate that user needs to change password. "
     "Useful when admin manually create password.",
 )
+@click.option(
+    "--allowed-ip",
+    type=str,
+    default="",
+    help="Allowed client IP. IPv4 and IPv6 are allowed. CIDR type is recommended.",
+)
 @click.option("--description", type=str, default="", help="Description of the user.")
 def update(
     ctx: CLIContext,
@@ -223,6 +231,7 @@ def update(
     role,
     status,
     need_password_change,
+    allowed_ip,
     description,
 ):
     """
@@ -241,6 +250,7 @@ def update(
                 role=role,
                 status=status,
                 need_password_change=need_password_change,
+                allowed_ip=allowed_ip,
                 description=description,
             )
         except Exception as e:
