@@ -316,11 +316,11 @@ class IPColumn(TypeDecorator):
             _ip, _, given_cidr = str_val.partition("/")
             filtered = _ip.replace("*", "0")
             if given_cidr:
-                return ip_network(f"{filtered}/{given_cidr}")
+                return ip_network(f"{filtered}/{given_cidr}", strict=False)
             octets = _ip.split(".")
             cidr = octets.index("*") * 8
-            return ip_network(f"{filtered}/{cidr}")
-        return ip_network(value)
+            return ip_network(f"{filtered}/{cidr}", strict=False)
+        return ip_network(value, strict=False)
 
 
 class CurrencyTypes(enum.Enum):

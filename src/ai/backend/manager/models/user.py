@@ -474,7 +474,7 @@ class ModifyUserInput(graphene.InputObjectType):
     domain_name = graphene.String(required=False)
     role = graphene.String(required=False)
     group_ids = graphene.List(lambda: graphene.String, required=False)
-    allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
+    allowed_client_ip = graphene.String(required=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -619,11 +619,7 @@ class ModifyUser(graphene.Mutation):
             nonlocal user_update_data, prev_domain_name, prev_role
             result = await conn.execute(
                 sa.select(
-                    [
-                        users.c.domain_name,
-                        users.c.role,
-                        users.c.status,
-                    ]
+                    [users.c.domain_name, users.c.role, users.c.status, users.c.allowed_client_ip]
                 )
                 .select_from(users)
                 .where(users.c.email == email),
@@ -636,6 +632,14 @@ class ModifyUser(graphene.Mutation):
                 user_update_data[
                     "status_info"
                 ] = "admin-requested"  # user mutation is only for admin
+            if "allowed_client_ip" in data:
+                if row.allowed_client_ip is None:
+                    user_update_data["allowed_client_ip"] = [data["allowed_client_ip"]]
+                else:
+                    user_update_data["allowed_client_ip"] = [
+                        data["allowed_client_ip"],
+                        *row.allowed_client_ip,
+                    ]
 
         update_query = lambda: (  # uses lambda because user_update_data is modified in _pre_func()
             sa.update(users).values(user_update_data).where(users.c.email == email)
