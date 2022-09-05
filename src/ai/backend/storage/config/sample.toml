@@ -50,6 +50,13 @@ service_port = 8080
 # For more configuration file info see https://filebrowser.org/installation
 settings_path = "./filebrowser_dir/"
 
+# The location of storage proxy vfolder directory 
+# For example, /Users/lablup/Documents/workspace/bai-dev/vfroot/local
+mount_path = "/Users/lablup/Documents/workspace/bai-dev/vfroot/local"
+
+# The SQLite db path and name
+db_path = './filebrowser_dir/containers.db'
+
 # The maxium number of CPU cores available to each filebrowser container
 max_cpu = 1
 
@@ -58,9 +65,6 @@ max_mem = "1g"
 
 # The maximum limit of the number of filebrowser containers
 max_containers = 32
-
-# The SQLite db path and name
-db_path = './filebrowser_dir/containers.db'
 
 # The group to be used by the filebrowser container
 user_id = 1001
