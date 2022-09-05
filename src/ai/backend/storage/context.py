@@ -31,6 +31,7 @@ class Context:
     pid: int
     etcd: AsyncEtcd
     local_config: Mapping[str, Any]
+    container_id: Any
 
     def __init__(
         self,

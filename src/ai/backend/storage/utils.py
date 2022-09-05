@@ -1,10 +1,13 @@
 import enum
 import json
 import logging
+import random
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from datetime import timezone as tz
-from typing import Any, Optional, Union
+from pathlib import Path
+from socket import AF_INET, SOCK_STREAM, socket
+from typing import Any, List, Optional, Union
 
 import trafaret as t
 from aiohttp import web
@@ -127,3 +130,24 @@ async def log_manager_api_entry(
         "ManagerAPI::{}()",
         name.upper(),
     )
+
+
+def mangle_path(mount_path: str, vfid: str) -> Path:
+    prefix1 = vfid[0:2]
+    prefix2 = vfid[2:4]
+    rest = vfid[4:]
+    return Path(mount_path, prefix1, prefix2, rest)
+
+
+def is_port_in_use(port: int) -> bool:
+    with socket(AF_INET, SOCK_STREAM) as s:
+        return s.connect_ex(("localhost", port)) == 0
+
+
+def get_available_port(port_range: List[int]) -> int:
+    port_range = list(range(int(port_range[0]), int(port_range[1]) + 1))
+    while True:
+        sample_port = random.sample(port_range, 1)[0]
+        if not is_port_in_use(int(sample_port)):
+            break
+    return sample_port

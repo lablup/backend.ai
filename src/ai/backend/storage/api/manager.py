@@ -22,6 +22,7 @@ from ai.backend.storage.exception import ExecutionError
 from ..abc import AbstractVolume
 from ..context import Context
 from ..exception import InvalidSubpathError, VFolderNotFoundError
+from ..filebrowser import filebrowser
 from ..types import VFolderCreationOptions
 from ..utils import check_params, log_manager_api_entry
 
@@ -622,12 +623,56 @@ async def delete_files(request: web.Request) -> web.Response:
         )
 
 
+async def create_or_update_filebrowser(request: web.Request) -> web.Response:
+    ctx: Context = request.app["ctx"]
+    params = await request.json()
+    host: str
+    port: int
+    container_id: str
+    host, port, container_id = await filebrowser.create_or_update(
+        ctx,
+        params["host"],
+        params["vfolders"],
+    )
+    return web.json_response(
+        {
+            "addr": f"http://{host}:{port}",  # TODO: SSL?
+            "container_id": f"{container_id}",
+            "status": "ok",
+        },
+    )
+
+
+async def destroy_filebrowser(request: web.Request) -> web.Response:
+    async with check_params(
+        request,
+        t.Dict(
+            {
+                t.Key("auth_token"): t.String,
+                t.Key("container_id"): t.String,
+            },
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "destroy_filebrowser", params)
+        ctx: Context = request.app["ctx"]
+        try:
+            await filebrowser.destroy_container(ctx, params["container_id"])
+            return web.json_response(
+                {
+                    "status": "ok",
+                },
+            )
+        except Exception:
+            raise Exception
+
+
 async def init_manager_app(ctx: Context) -> web.Application:
     app = web.Application(
         middlewares=[
             token_auth_middleware,
         ],
     )
+
     app["ctx"] = ctx
     app.router.add_route("GET", "/", get_status)
     app.router.add_route("GET", "/volumes", get_volumes)
@@ -651,4 +696,10 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
+    app.router.add_route(
+        "POST",
+        "/storage/filebrowser/create",
+        create_or_update_filebrowser,
+    )
+    app.router.add_route("DELETE", "/storage/filebrowser/destroy", destroy_filebrowser)
     return app
