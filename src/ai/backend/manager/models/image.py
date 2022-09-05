@@ -750,6 +750,7 @@ class ForgetImage(graphene.Mutation):
                 ],
             )
             await session.delete(image_row)
+            await session.commit()
         return ForgetImage(ok=True, msg="")
 
 
@@ -784,6 +785,7 @@ class AliasImage(graphene.Mutation):
                     raise ImageNotFound
                 else:
                     image_row.aliases.append(ImageAliasRow(alias=alias, image_id=image_row.id))
+                await session.commit()
         except ValueError as e:
             return AliasImage(ok=False, msg=str(e))
         return AliasImage(ok=True, msg="")
@@ -815,6 +817,7 @@ class DealiasImage(graphene.Mutation):
                 if existing_alias is None:
                     raise DealiasImage(ok=False, msg=str("No such alias"))
                 await session.delete(existing_alias)
+                await session.commit()
         except ValueError as e:
             return DealiasImage(ok=False, msg=str(e))
         return DealiasImage(ok=True, msg="")
@@ -848,6 +851,7 @@ class ClearImages(graphene.Mutation):
                     sa.delete(ImageAliasRow).where(ImageAliasRow.image_id.in_(image_ids))
                 )
                 await session.execute(sa.delete(ImageRow).where(ImageRow.registry == registry))
+                await session.commit()
         except ValueError as e:
             return ClearImages(ok=False, msg=str(e))
         return ClearImages(ok=True, msg="")
@@ -927,6 +931,7 @@ class ModifyImage(graphene.Mutation):
                     return ModifyImage(ok=False, msg="Image not found")
                 for k, v in data.items():
                     setattr(row, k, v)
+                await session.commit()
         except ValueError as e:
             return ModifyImage(ok=False, msg=str(e))
         return ModifyImage(ok=True, msg="")

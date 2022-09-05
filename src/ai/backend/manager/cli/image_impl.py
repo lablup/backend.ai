@@ -93,6 +93,7 @@ async def forget_image(cli_ctx, canonical_or_alias, architecture):
                     ],
                 )
                 await session.delete(image_row)
+                await session.commit()
             except UnknownImageReference:
                 log.exception("Image not found.")
             except Exception:
@@ -117,6 +118,7 @@ async def set_image_resource_limit(
                     ],
                 )
                 await image_row.set_resource_limit(slot_type, range_value)
+                await session.commit()
             except UnknownImageReference:
                 log.exception("Image not found.")
             except Exception:
@@ -143,6 +145,7 @@ async def alias(cli_ctx, alias, target, architecture):
                     ],
                 )
                 await ImageAliasRow.create(session, alias, image_row)
+                await session.commit()
             except UnknownImageReference:
                 log.exception("Image not found.")
             except Exception:
@@ -159,3 +162,4 @@ async def dealias(cli_ctx, alias):
                 log.exception("Alias not found.")
                 return
             await session.delete(alias_row)
+            await session.commit()

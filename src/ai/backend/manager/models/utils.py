@@ -93,7 +93,6 @@ class ExtendedAsyncSAEngine(SAEngine):
             session = SASession(bind=conn)
             try:
                 yield session
-                await session.commit()
             except Exception as e:
                 await session.rollback()
                 raise e
