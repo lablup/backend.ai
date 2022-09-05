@@ -45,7 +45,9 @@ def parse_host_port(container_id, container_port):
         capture_output=True,
     )
     container_info = json.loads(proc.stdout)
-    return container_info[0]["NetworkSettings"]["Ports"][f"{container_port}/tcp"][0]["HostPort"]
+    return int(
+        container_info[0]["NetworkSettings"]["Ports"][f"{container_port}/tcp"][0]["HostPort"]
+    )
 
 
 @pytest.fixture(scope="session")
