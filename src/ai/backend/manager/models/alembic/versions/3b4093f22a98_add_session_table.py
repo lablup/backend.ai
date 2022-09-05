@@ -121,6 +121,7 @@ def upgrade():
             nullable=False,
         ),
         sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
         sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),
         sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null()),
         sa.Column("callback_url", sa.types.UnicodeText, nullable=True, default=sa.null()),
@@ -311,6 +312,7 @@ def upgrade():
                 "starts_at": row["starts_at"],
                 "status": row["status"],
                 "status_changed": row["status_changed"],
+                "status_history": row["status_history"],
                 "status_info": row["status_info"],
                 "status_data": row["status_data"],
                 "callback_url": row["callback_url"],
@@ -403,7 +405,7 @@ def upgrade():
     query = (
         sa.update(kernels)
         .where(kernels.c.id == sa.bindparam("kernel_id"))
-        .values({kernels.c.image_id: sa.bindparam("b_image_id")})
+        .values(image_id=sa.bindparam("b_image_id"))
     )
     params = []
     for kern in kernel_rows:
@@ -416,7 +418,8 @@ def upgrade():
             )
         except KeyError:
             continue
-    connection.execute(query, params)
+    if params:
+        connection.execute(query, params)
 
     op.create_foreign_key(
         op.f("fk_kernels_image_id_images"), "kernels", "images", ["image_id"], ["id"]
@@ -483,7 +486,8 @@ def downgrade():
             )
         except KeyError:
             continue
-    connection.execute(query, params)
+    if params:
+        connection.execute(query, params)
     op.drop_column("kernels", "image_id")
     op.drop_column("kernels", "requested_slots")
 
