@@ -18,6 +18,12 @@ if [ $USER_ID -eq 0 ]; then
   export LD_LIBRARY_PATH="/opt/backend.ai/lib:$LD_LIBRARY_PATH"
   export HOME="/home/work"
 
+  echo "Generate random alpha-numeric password"
+  if [ ! -f "$HOME/.password" ]; then
+    export ALPHA_NUMERIC_VAL=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    echo "$ALPHA_NUMERIC_VAL" > "$HOME/.password"
+  fi
+
   # Invoke image-specific bootstrap hook.
   if [ -x "/opt/container/bootstrap.sh" ]; then
     echo 'Executing image bootstrap... '
@@ -67,6 +73,12 @@ else
   fi
   export LD_LIBRARY_PATH="/opt/backend.ai/lib:$LD_LIBRARY_PATH"
   export HOME="/home/$USER_NAME"
+
+  echo "Generate random alpha-numeric password"
+  if [ ! -f "$HOME/.password" ]; then
+    export ALPHA_NUMERIC_VAL=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    echo "$ALPHA_NUMERIC_VAL" > "$HOME/.password"
+  fi
 
   # Invoke image-specific bootstrap hook.
   if [ -x "/opt/container/bootstrap.sh" ]; then
