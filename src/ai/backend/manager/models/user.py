@@ -458,6 +458,7 @@ class UserInput(graphene.InputObjectType):
     domain_name = graphene.String(required=True, default="default")
     role = graphene.String(required=False, default=UserRole.USER)
     group_ids = graphene.List(lambda: graphene.String, required=False)
+    allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
 
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
@@ -474,7 +475,7 @@ class ModifyUserInput(graphene.InputObjectType):
     domain_name = graphene.String(required=False)
     role = graphene.String(required=False)
     group_ids = graphene.List(lambda: graphene.String, required=False)
-    allowed_client_ip = graphene.String(required=False)
+    allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -519,6 +520,8 @@ class CreateUser(graphene.Mutation):
             "domain_name": props.domain_name,
             "role": UserRole(props.role),
         }
+        if props.allowed_client_ip:
+            user_data["allowed_client_ip"] = props.allowed_client_ip
         user_insert_query = sa.insert(users).values(user_data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Row:
