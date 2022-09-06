@@ -676,6 +676,7 @@ class VirtualFolder(graphene.ObjectType):
     cur_size = BigInt()
     # num_attached = graphene.Int()
     cloneable = graphene.Boolean()
+    status = graphene.String()
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[VirtualFolder]:
@@ -700,6 +701,7 @@ class VirtualFolder(graphene.ObjectType):
             last_used=row["last_used"],
             # num_attached=row['num_attached'],
             cloneable=row["cloneable"],
+            status=row["status"],
         )
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
@@ -728,6 +730,7 @@ class VirtualFolder(graphene.ObjectType):
         "created_at": ("vfolders_created_at", dtparse),
         "last_used": ("vfolders_last_used", dtparse),
         "cloneable": ("vfolders_cloneable", None),
+        "status": ("vfolders_status", lambda s: VFolderOperationStatus[s]),
     }
 
     _queryorder_colmap = {
@@ -746,6 +749,7 @@ class VirtualFolder(graphene.ObjectType):
         "created_at": "vfolders_created_at",
         "last_used": "vfolders_last_used",
         "cloneable": "vfolders_cloneable",
+        "status": "vfolders_status",
     }
 
     @classmethod
