@@ -11,6 +11,7 @@ from abc import ABCMeta, abstractmethod
 from collections import UserDict, namedtuple
 from contextvars import ContextVar
 from decimal import Decimal
+from ipaddress import ip_network
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -57,6 +58,7 @@ __all__ = (
     "SlotName",
     "IntrinsicSlotNames",
     "ResourceSlot",
+    "ReadableCIDR",
     "HardwareMetadata",
     "MountPermission",
     "MountPermissionLiteral",
@@ -339,12 +341,33 @@ class HostPortPair(namedtuple("HostPortPair", "host port")):
 _Address = TypeVar("_Address", bound=Union[ipaddress.IPv4Network, ipaddress.IPv6Network])
 
 
-class CIDR(Generic[_Address]):
-    def __init__(self, address) -> None:
-        self._address: _Address = cast(_Address, ipaddress.ip_network(address))
+class ReadableCIDR(Generic[_Address]):
+    """
+    Convert wild-card based IP address into CIDR.
+
+    e.g)
+    192.10.*.* -> 192.10.0.0/16
+    """
+
+    def __init__(self, address: str | None) -> None:
+        self._address: _Address | None = (
+            cast(_Address, self._convert_to_cidr(address)) if address is not None else None
+        )
+
+    def _convert_to_cidr(self, value: str) -> ipaddress.IPv4Network | ipaddress.IPv6Network:
+        str_val = str(value)
+        if "*" in str_val:
+            _ip, _, given_cidr = str_val.partition("/")
+            filtered = _ip.replace("*", "0")
+            if given_cidr:
+                return ip_network(f"{filtered}/{given_cidr}", strict=False)
+            octets = _ip.split(".")
+            cidr = octets.index("*") * 8
+            return ip_network(f"{filtered}/{cidr}", strict=False)
+        return ip_network(str_val, strict=False)
 
     @property
-    def orig_address(self) -> _Address:
+    def address(self) -> _Address | None:
         return self._address
 
     def __str__(self) -> str:
@@ -353,24 +376,25 @@ class CIDR(Generic[_Address]):
     def __eq__(self, other: object) -> bool:
         """
         Compare two IP address converting into lists.
-        CIDR or `*` wild-card are used to slice the list.
 
         e.g)
         192.10.0.0/24 -> ["192", "10", "0"]
         192.10.0.10/32 -> ["192", "10", "0", "10]
+        Both addresses above consider as the same.
         """
 
         if other is self:
             return True
-        assert isinstance(other, CIDR), "Only can compare CIDR objects."
+        assert isinstance(other, ReadableCIDR), "Only can compare ReadableCIDR objects."
+
+        if self.address is None or other.address is None:
+            # if self.address is None and other.address is None:
+            #     return True
+            return False
 
         def ip_to_list(val: str) -> list[str]:
             _ip, _, cidr = val.partition("/")
             octets = _ip.split(".")
-            if "*" in octets:
-                if cidr:
-                    raise ValueError("Not allowed value")
-                return octets[: octets.index("*")]
             return octets if not cidr else octets[: int(cidr) // 8]
 
         ip1, ip2 = ip_to_list(str(self)), ip_to_list(str(other))

@@ -20,7 +20,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
-from ai.backend.common.types import CIDR
+from ai.backend.common.types import ReadableCIDR
 
 from ..models import keypair_resource_policies, keypairs, users
 from ..models.group import association_groups_users, groups
@@ -509,10 +509,10 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             raw_client_addr = request.headers.get("X-BackendAI-IP")
             if raw_client_addr is None:
                 raise AuthorizationFailed("Not allowed IP address")
-            client_addr: CIDR = CIDR(raw_client_addr)
+            client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr)
             assert isinstance(raw_ip, list)
-            allowed_client_ip: list[CIDR]
-            allowed_client_ip = [CIDR(_ip) for _ip in raw_ip]
+            allowed_client_ip: list[ReadableCIDR]
+            allowed_client_ip = [ReadableCIDR(_ip) for _ip in raw_ip]
             if client_addr not in allowed_client_ip:
                 raise AuthorizationFailed("Not allowed IP address")
 

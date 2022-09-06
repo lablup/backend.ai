@@ -7,7 +7,6 @@ import functools
 import logging
 import sys
 import uuid
-from ipaddress import ip_network
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -51,6 +50,7 @@ from ai.backend.common.types import (
     BinarySize,
     JSONSerializableMixin,
     KernelId,
+    ReadableCIDR,
     ResourceSlot,
     SessionId,
 )
@@ -307,20 +307,12 @@ class IPColumn(TypeDecorator):
     def process_bind_param(self, value, dialect):
         if value is None:
             return value
-        try:
-            str_val = str(value)
-        except ValueError:
-            return value
+        return ReadableCIDR(value).address
 
-        if "*" in str_val:
-            _ip, _, given_cidr = str_val.partition("/")
-            filtered = _ip.replace("*", "0")
-            if given_cidr:
-                return ip_network(f"{filtered}/{given_cidr}", strict=False)
-            octets = _ip.split(".")
-            cidr = octets.index("*") * 8
-            return ip_network(f"{filtered}/{cidr}", strict=False)
-        return ip_network(value, strict=False)
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return ReadableCIDR(value)
 
 
 class CurrencyTypes(enum.Enum):
