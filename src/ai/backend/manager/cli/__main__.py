@@ -265,7 +265,6 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             """
             )
             deleted_count = result.rowcount
-            log.info("  Deleted {} records in total.", deleted_count)
 
             if vacuum_full:
                 vacuum_sql = "VACUUM FULL"
