@@ -1602,8 +1602,8 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5b4bdda35b40105b4ee3c87c72393496bec5e7f333befdcdd623511bf2684307",
-              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_12_0_arm64.whl"
+              "hash": "951e212c2e5e7328246f241d17d94e5eaef81c639a7d48164f451694ff99b157",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_10_15_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -1622,8 +1622,8 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "951e212c2e5e7328246f241d17d94e5eaef81c639a7d48164f451694ff99b157",
-              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_10_15_x86_64.whl"
+              "hash": "5b4bdda35b40105b4ee3c87c72393496bec5e7f333befdcdd623511bf2684307",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_12_0_arm64.whl"
             }
           ],
           "project_name": "hiredis",
@@ -2260,23 +2260,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "29a442e25fab1f4d05e2655bb1b8ab6887981838d22effa2396d584b740194de",
-              "url": "https://files.pythonhosted.org/packages/6d/c6/6a4e46802e8690d50ba6a56c7f79ac283e703fcfa0fdae8e41909c8cef1f/psutil-5.9.1-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "e3ac2c0375ef498e74b9b4ec56df3c88be43fe56cac465627572dbfb21c4be34",
+              "url": "https://files.pythonhosted.org/packages/4c/85/7a112fb6a8c598a6f5d079228bbc03ae84c472397be79c075e7514b6ed36/psutil-5.9.2-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "abd9246e4cdd5b554a2ddd97c157e292ac11ef3e7af25ac56b08b455c829dca8",
-              "url": "https://files.pythonhosted.org/packages/14/06/39d7e963a6a8bbf26519de208593cdb0ddfe22918b8989f4b2363d4ab49f/psutil-5.9.1-cp310-cp310-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+              "hash": "614337922702e9be37a39954d67fdb9e855981624d8011a9927b8f2d3c9625d9",
+              "url": "https://files.pythonhosted.org/packages/04/5d/d52473097582db5d3094bc34acf9874de726327a3166426e22ed0806de6a/psutil-5.9.2-cp310-cp310-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c7be9d7f5b0d206f0bbc3794b8e16fb7dbc53ec9e40bbe8787c6f2d38efcf6c9",
-              "url": "https://files.pythonhosted.org/packages/d1/16/6239e76ab5d990dc7866bc22a80585f73421588d63b42884d607f5f815e2/psutil-5.9.1-cp310-cp310-macosx_10_9_x86_64.whl"
+              "hash": "39ec06dc6c934fb53df10c1672e299145ce609ff0611b569e75a88f313634969",
+              "url": "https://files.pythonhosted.org/packages/47/2b/bd12c4f2d1bd3024fe7c5d8388f8a5627cc02fbe11d62bd451aff356415d/psutil-5.9.2-cp310-cp310-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "57f1819b5d9e95cdfb0c881a8a5b7d542ed0b7c522d575706a80bedc848c8954",
-              "url": "https://files.pythonhosted.org/packages/d6/de/0999ea2562b96d7165812606b18f7169307b60cd378bc29cf3673322c7e9/psutil-5.9.1.tar.gz"
+              "hash": "feb861a10b6c3bb00701063b37e4afc754f8217f0f09c42280586bd6ac712b5c",
+              "url": "https://files.pythonhosted.org/packages/8f/57/828ac1f70badc691a716e77bfae258ef5db76bb7830109bf4bcf882de020/psutil-5.9.2.tar.gz"
             }
           ],
           "project_name": "psutil",
@@ -2288,19 +2288,19 @@
             "wmi; sys_platform == \"win32\" and extra == \"test\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7",
-          "version": "5.9.1"
+          "version": "5.9.2"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "46a13ea46d16523c0f4fbf98a573881ba483ca94a920940629e29a688925121a",
-              "url": "https://files.pythonhosted.org/packages/ab/96/ea927e4deb032604818d9379c5d4bc87f7e6e76ca4d7d47537dc43ceeee6/psycopg-3.1-py3-none-any.whl"
+              "hash": "ff590faff820e928934699228743b1483a561ded064b5dbf1333358c3a9e9e50",
+              "url": "https://files.pythonhosted.org/packages/2a/05/eb5a7f6dbea0fdd6d462696fb06c109ba13aaef0d04d1fcfb6dfc99a026f/psycopg-3.1.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1dfbbf221de14eab4bf01c6a5f15496f737d6b6e0db698f9e6081a692c598dc1",
-              "url": "https://files.pythonhosted.org/packages/73/f1/d1288fa8d1a2dce9492ddaffd7d992e58bd846a3df33d939ed0e1119aa34/psycopg-3.1.tar.gz"
+              "hash": "3ee0af9cf944d9579441c15702835a949788b5a57894823f0a916c2598c96f40",
+              "url": "https://files.pythonhosted.org/packages/3e/9b/2af032b1befdfdb8c9af1cf9e88cf1b3ad54b03d0135af3f60e421e6befc/psycopg-3.1.1.tar.gz"
             }
           ],
           "project_name": "psycopg",
@@ -2314,8 +2314,8 @@
             "mypy>=0.940; extra == \"dev\"",
             "mypy>=0.940; extra == \"test\"",
             "pproxy>=2.7; extra == \"test\"",
-            "psycopg-binary==3.1; extra == \"binary\"",
-            "psycopg-c==3.1; extra == \"c\"",
+            "psycopg-binary==3.1.1; extra == \"binary\"",
+            "psycopg-c==3.1.1; extra == \"c\"",
             "psycopg-pool; extra == \"pool\"",
             "pytest-asyncio>=0.17; extra == \"test\"",
             "pytest-cov>=3.0; extra == \"test\"",
@@ -2329,60 +2329,65 @@
             "wheel>=0.37; extra == \"dev\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.1"
+          "version": "3.1.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d1698049362959edb85ab401e6afb0487f0184583dfd4ce2a5311a4d38c19c6f",
-              "url": "https://files.pythonhosted.org/packages/6c/eb/52470ec9e5638deb47309e713befb4f14cdc905dcc3e6f24df85837f1a0e/psycopg_binary-3.1-cp310-cp310-musllinux_1_1_x86_64.whl"
+              "hash": "fef6d425df15e8bc47832183db8c2d065761285fb2a819a5c2ecc110e49cb18f",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/psycopg-binary/psycopg_binary-3.1.1-cp310-cp310-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d44412e55d1e9610143204562b235307e4e2b281999b3fbc1ea1201ac6003629",
-              "url": "https://files.pythonhosted.org/packages/27/26/df9adbcc20c95c295d77b75e9fae56ee21b0a8316f6b6a31e7e093e7ce57/psycopg_binary-3.1-cp310-cp310-musllinux_1_1_aarch64.whl"
+              "hash": "866da22ea7784e11b90a7cd8a60fa97dbc3b95e0602b83a8f4e93b3ee503aacf",
+              "url": "https://files.pythonhosted.org/packages/0f/09/5098e2b9d87a606932215ad333af9fc16d5e37fdd44743895fc6e2546ffd/psycopg_binary-3.1.1-cp310-cp310-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d358d79788e0f74d911fc463da04e62820186bc18bca9e21510fa6bc1eb24e02",
-              "url": "https://files.pythonhosted.org/packages/49/81/877fdc9e162be9aff9fa65a46cfea275b7dd583f43242e39a5cc6ef049da/psycopg_binary-3.1-cp310-cp310-macosx_10_9_x86_64.whl"
+              "hash": "ef58ff949c051fbdacf90875ebffd6a4904ea97f17ce2d24f3d9f1ebe5675c5b",
+              "url": "https://files.pythonhosted.org/packages/57/04/dbdbf39d57a529fc76156faccab8cf70dc96358efc7e0e8dd532fc2957c7/psycopg_binary-3.1.1-cp310-cp310-musllinux_1_1_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "cb4c6f61da3ce8e43dee0629abe6a7889ae11b73c0c300ab1e1fc00c37e9d464",
-              "url": "https://files.pythonhosted.org/packages/4d/55/d2befb3a36e73cf5094fac05f05707ecceba25a3f1d54f75d4a2a0ec4a1f/psycopg_binary-3.1-cp310-cp310-musllinux_1_1_i686.whl"
+              "hash": "25dd804d9e6cdc3a117dc0ddd31a0c24510e28ceeb2e22d72414401a3e058cc8",
+              "url": "https://files.pythonhosted.org/packages/77/4a/3bf602538f1bfe68ace2b5ef270f5955b4c6c9cff8e0219452c1641de499/psycopg_binary-3.1.1-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3b69321773efd0ebaacb89385eaba20aae449a3b7970579ca79919b369cbf305",
-              "url": "https://files.pythonhosted.org/packages/54/a0/50ba286bbcae351bafd9e917ac42c187f4ee168d52ac3d088c33ac8f49b4/psycopg_binary-3.1-cp310-cp310-musllinux_1_1_ppc64le.whl"
+              "hash": "5c34f58b78b2537fe6caccdf45cb4c64bfbfad19ed52eb021f9dcaf7e2e4a439",
+              "url": "https://files.pythonhosted.org/packages/a7/ee/afb2dcb697f41cb6fe4f61bdfdb72e57e7039be0b785a1e4766b1b76d570/psycopg_binary-3.1.1-cp310-cp310-manylinux_2_17_i686.manylinux2014_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "741404deaddf1e1bbc263d6ea47b1c3a101e5bd1aecdce17e8780040bfa21625",
-              "url": "https://files.pythonhosted.org/packages/61/47/46b28f1debd582f24b47f23465bc4eac140e8e8b4d44e13ccd325f4c3c9e/psycopg_binary-3.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "ecde1e900eb1c06973bb0eaed968f4969c0296352da4114c33ee67489571ef54",
+              "url": "https://files.pythonhosted.org/packages/c5/1d/4033f0fb0e02197d1977cfc47764829cb6d81f6692e8d977cb158911eb81/psycopg_binary-3.1.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b9ad2c26e220f096629e0ba617af0e174b9b057f4545339be8858033ec487a8c",
-              "url": "https://files.pythonhosted.org/packages/6d/c8/14f25b6d5edb2f45afa53f036a3485f190545d16e8895c69688d88cf389f/psycopg_binary-3.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "af2d351ea9f9e6f7285739ec1a27c7763dc860302f8338acc5d99a37083d2bad",
+              "url": "https://files.pythonhosted.org/packages/cc/1a/e5e2fea530e867595627ece3c6189fa35e1342bb16cdf6b1073f6390de6d/psycopg_binary-3.1.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "629a8a586f217b2d0b133297b632a89d3c8f8fdad0b9913a86f885cc04c4c14f",
-              "url": "https://files.pythonhosted.org/packages/99/16/c998af7acb17f4f0ec902167565d7a205b4d2970728fbc84a623ecfdb4be/psycopg_binary-3.1-cp310-cp310-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl"
+              "hash": "6a04b886b7301ae7884e12fce76f632d13acb623499035eb41a920d9cdb7679d",
+              "url": "https://files.pythonhosted.org/packages/e6/9b/346962fe35d3b5d3dc544791e62d03a8a28972fa9b1bab8afe4356cd5a5f/psycopg_binary-3.1.1-cp310-cp310-musllinux_1_1_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9dc691b6f85c0179e2ba6f367681bd0424befad9cf9d3d3a4bfae0e5f3bf695b",
-              "url": "https://files.pythonhosted.org/packages/f4/f9/109fc6df6adb257ce1c05cdaeefcb72af7e33168ff3591661d6a404b539d/psycopg_binary-3.1-cp310-cp310-manylinux_2_17_i686.manylinux2014_i686.whl"
+              "hash": "dc68e6234557dcdd61724c1b629c555494e0462c84be8c6e9d217c9f8b369a27",
+              "url": "https://files.pythonhosted.org/packages/ed/92/0fb8f3ed762fb8f3c5b4f45e5a9fb1bf134f7647d5d921956400d5eaa2b9/psycopg_binary-3.1.1-cp310-cp310-musllinux_1_1_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "a54e70d1023cdcee9be415b55eeec98c8ef0ee2f43146fc11d8bc726dbb82ad4",
+              "url": "https://files.pythonhosted.org/packages/f7/f2/ae4ab31ecbe2fb5edea4ffad70ebe2d88dabc9f49fab11aec99c2a3808ed/psycopg_binary-3.1.1-cp310-cp310-musllinux_1_1_ppc64le.whl"
             }
           ],
           "project_name": "psycopg-binary",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "3.1"
+          "version": "3.1.1"
         },
         {
           "artifacts": [
@@ -2653,19 +2658,18 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "13d0e3ccfc2b6e26be000cb6568c832ba67ba32e719443bfe725814d3c42433c",
-              "url": "https://files.pythonhosted.org/packages/fb/d0/bae533985f2338c5d02184b4a7083b819f6b3fc101da792e0d96e6e5299d/pytest-7.1.2-py3-none-any.whl"
+              "hash": "1377bda3466d70b55e3f5cecfa55bb7cfcf219c7964629b967c37cf0bda818b7",
+              "url": "https://files.pythonhosted.org/packages/e3/b9/3541bbcb412a9fd56593005ff32183825634ef795a1c01ceb6dee86e7259/pytest-7.1.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a06a0425453864a270bc45e71f783330a7428defb4230fb5e6a731fde06ecd45",
-              "url": "https://files.pythonhosted.org/packages/4e/1f/34657c6ac56f3c58df650ba41f8ffb2620281ead8e11bcdc7db63cf72a78/pytest-7.1.2.tar.gz"
+              "hash": "4f365fec2dff9c1162f834d9f18af1ba13062db0c708bf7b946f8a5c76180c39",
+              "url": "https://files.pythonhosted.org/packages/a4/a7/8c63a4966935b0d0b039fd67ebf2e1ae00f1af02ceb912d838814d772a9a/pytest-7.1.3.tar.gz"
             }
           ],
           "project_name": "pytest",
           "requires_dists": [
             "argcomplete; extra == \"testing\"",
-            "atomicwrites>=1.0; sys_platform == \"win32\"",
             "attrs>=19.2.0",
             "colorama; sys_platform == \"win32\"",
             "hypothesis>=3.56; extra == \"testing\"",
@@ -2682,7 +2686,7 @@
             "xmlschema; extra == \"testing\""
           ],
           "requires_python": ">=3.7",
-          "version": "7.1.2"
+          "version": "7.1.3"
         },
         {
           "artifacts": [
@@ -3416,13 +3420,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "74a2cdefe14d11442cedf3ba4e21a3b84ff9a2dbdc6cfae2c34addb2a14a5ea6",
-              "url": "https://files.pythonhosted.org/packages/8a/c4/d15f1e627fff25443ded77ea70a7b5532d6371498f9285d44d62587e209c/tqdm-4.64.0-py2.py3-none-any.whl"
+              "hash": "6fee160d6ffcd1b1c68c65f14c829c22832bc401726335ce92c52d395944a6a1",
+              "url": "https://files.pythonhosted.org/packages/47/bb/849011636c4da2e44f1253cd927cfb20ada4374d8b3a4e425416e84900cc/tqdm-4.64.1-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "40be55d30e200777a307a7585aee69e4eabb46b4ec6a4b4a5f2d9f11e7d5408d",
-              "url": "https://files.pythonhosted.org/packages/98/2a/838de32e09bd511cf69fe4ae13ffc748ac143449bfc24bb3fd172d53a84f/tqdm-4.64.0.tar.gz"
+              "hash": "5f4f682a004951c1b450bc753c710e9280c5746ce6ffedee253ddbcbf54cf1e4",
+              "url": "https://files.pythonhosted.org/packages/c1/c2/d8a40e5363fb01806870e444fc1d066282743292ff32a9da54af51ce36a2/tqdm-4.64.1.tar.gz"
             }
           ],
           "project_name": "tqdm",
@@ -3437,7 +3441,7 @@
             "wheel; extra == \"dev\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7",
-          "version": "4.64"
+          "version": "4.64.1"
         },
         {
           "artifacts": [
@@ -3616,19 +3620,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c74262197487a65e3f02db37d3f0e0f3bb2d5d370f7e6ba390814e865a45e56e",
-              "url": "https://files.pythonhosted.org/packages/28/0e/53a2c7747de518ae168c2b59e3eb6f916813e36ae916923c3290179e82e6/types_redis-4.3.19-py3-none-any.whl"
+              "hash": "b22e0f5a18b98b6a197dd403daed52a22cb76f50e3cbd7ddc539196af52ec23e",
+              "url": "https://files.pythonhosted.org/packages/aa/54/f0224d2310a95031e32760be52961507ef15c73682aac5a8f6f5ad3f8d0f/types_redis-4.3.20-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c881ffb94bd47dca21ed503328544a56bb315851575eebb27fb371bff735844a",
-              "url": "https://files.pythonhosted.org/packages/56/15/745fef11530bb9c3c378343e7ca9e983198356987e98bf827cb6cb88fb5a/types-redis-4.3.19.tar.gz"
+              "hash": "74ed02945470ddea2dd21447c185dabb3169e5a5328d26b25cf3547d949b8e04",
+              "url": "https://files.pythonhosted.org/packages/b3/42/cea94d0019128bc9fdd2da0363c88ecc177230ecc9bd678bf11d7ed266df/types-redis-4.3.20.tar.gz"
             }
           ],
           "project_name": "types-redis",
           "requires_dists": [],
           "requires_python": null,
-          "version": "4.3.19"
+          "version": "4.3.20"
         },
         {
           "artifacts": [
@@ -3809,13 +3813,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "33ad3cf0aef4270b95d10a5a66b670a66be1f5ccf10ce390b3644f9eddfdca9d",
-              "url": "https://files.pythonhosted.org/packages/bb/9b/a6e780d1980121f4d6e256dfffd11194656e5256adc7f9f2968bbdb4e57c/websocket_client-1.4.0-py3-none-any.whl"
+              "hash": "398909eb7e261f44b8f4bd474785b6ec5f5b499d4953342fe9755e01ef624090",
+              "url": "https://files.pythonhosted.org/packages/83/b8/95c2512818d6ddb9b97f4163e915b2afe2db42b620270aa59c5ee0b47245/websocket_client-1.4.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "79d730c9776f4f112f33b10b78c8d209f23b5806d9a783e296b3813fc5add2f1",
-              "url": "https://files.pythonhosted.org/packages/71/aa/69c635c6d209a3e67cfcaa0cf6d2de71cf7575347f63d5976c8792b8be2e/websocket-client-1.4.0.tar.gz"
+              "hash": "f9611eb65c8241a67fb373bef040b3cf8ad377a9f6546a12b620b6511e8ea9ef",
+              "url": "https://files.pythonhosted.org/packages/99/11/01fe7ebcb7545a1990c53c11f31230afe1388b0b34256e3fd20e49482245/websocket-client-1.4.1.tar.gz"
             }
           ],
           "project_name": "websocket-client",
@@ -3827,7 +3831,7 @@
             "wsaccel; extra == \"optional\""
           ],
           "requires_python": ">=3.7",
-          "version": "1.4"
+          "version": "1.4.1"
         },
         {
           "artifacts": [
