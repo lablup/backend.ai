@@ -308,7 +308,7 @@ class User(BaseFunction):
         status: UserStatus | str = UserStatus.ACTIVE,
         need_password_change: bool = None,
         description: str = None,
-        allowed_ip: str = None,
+        allowed_ip: Iterable[str] = None,
         group_ids: Iterable[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:

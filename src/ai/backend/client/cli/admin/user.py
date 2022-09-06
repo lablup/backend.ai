@@ -228,9 +228,10 @@ def add(
 )
 @click.option(
     "--allowed-ip",
-    type=str,
-    default="",
-    help="Allowed client IP. IPv4 and IPv6 are allowed. CIDR type is recommended.",
+    type=list_expr,
+    default=None,
+    help="Allowed client IP. IPv4 and IPv6 are allowed. CIDR type is recommended. "
+    '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)',
 )
 @click.option("--description", type=str, default="", help="Description of the user.")
 def update(
