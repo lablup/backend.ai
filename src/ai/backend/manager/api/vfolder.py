@@ -38,6 +38,7 @@ from ..models import (
     KernelStatus,
     UserRole,
     VFolderInvitationState,
+    VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
     VFolderPermissionValidator,
@@ -69,6 +70,7 @@ from .exceptions import (
     VFolderAlreadyExists,
     VFolderCreationFailed,
     VFolderNotFound,
+    VFolderStatusCheckFailed,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
@@ -80,6 +82,60 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 VFolderRow = Mapping[str, Any]
+
+
+def vfolder_status_check(allowed_status: VFolderOperationStatus):
+    """
+    Checks if the target vfolder status is READY.
+    The decorated handler should prevent user access
+    while storage-proxy operations such as vfolder clone, deletion is handling.
+    """
+
+    def _wrapper(handler: Callable[..., Awaitable[web.Response]]):
+        @functools.wraps(handler)
+        async def _wrapped(request: web.Request, *args, **kwargs) -> web.Response:
+            root_ctx: RootContext = request.app["_root.context"]
+            domain_name = request["user"]["domain_name"]
+            user_role = request["user"]["role"]
+            user_uuid = request["user"]["uuid"]
+            allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+            folder_name = request.match_info["name"]
+            vf_name_conds = vfolders.c.name == folder_name
+            if allowed_status == VFolderOperationStatus.READY:
+                vf_status_conds = vfolders.c.status.in_(
+                    [
+                        VFolderOperationStatus.READY,
+                        VFolderOperationStatus.PREPARED,
+                        VFolderOperationStatus.MOUNTED,
+                        VFolderOperationStatus.CLONING,
+                        VFolderOperationStatus.DELETING,
+                    ]
+                )
+            elif allowed_status == VFolderOperationStatus.PREPARED:
+                vf_status_conds = vfolders.c.status.in_(
+                    [
+                        VFolderOperationStatus.READY,
+                        VFolderOperationStatus.PREPARED,
+                    ]
+                )
+            else:
+                vf_status_conds = vfolders.c.status == VFolderOperationStatus.READY
+            async with root_ctx.db.begin_readonly() as conn:
+                entries = await query_accessible_vfolders(
+                    conn,
+                    user_uuid,
+                    user_role=user_role,
+                    domain_name=domain_name,
+                    allowed_vfolder_types=allowed_vfolder_types,
+                    extra_vf_conds=(vf_name_conds & vf_status_conds),
+                )
+                if len(entries) == 0:
+                    raise VFolderStatusCheckFailed()
+            return await handler(request, *args, **kwargs)
+
+        return _wrapped
+
+    return _wrapper
 
 
 def vfolder_permission_required(perm: VFolderPermission):

@@ -273,6 +273,7 @@ async def query_accessible_vfolders(
         vfolders.c.creator,
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
+        vfolders.c.status,
         # vfolders.c.permission,
         # users.c.email,
     ]
@@ -310,6 +311,7 @@ async def query_accessible_vfolders(
                     "permission": _perm,
                     "unmanaged_path": row.vfolders_unmanaged_path,
                     "cloneable": row.vfolders_cloneable,
+                    "status": row.vfolders_status,
                 }
             )
 

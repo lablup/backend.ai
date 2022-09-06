@@ -268,6 +268,11 @@ class VFolderOperationFailed(BackendError, web.HTTPBadRequest):
     error_title = "Virtual folder operation has failed."
 
 
+class VFolderStatusCheckFailed(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-status-check-failed"
+    error_title = "Virtual folder status check has failed."
+
+
 class DotfileCreationFailed(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Dotfile creation has failed."
