@@ -257,36 +257,32 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             password=local_config["db"]["password"],
         )
         with conn.cursor() as curs:
-            if vacuum_full:
-                vacuum_sql = "VACUUM FULL"
-            else:
-                vacuum_sql = "VACUUM"
-
-            curs.execute(
-                f"""
-            SELECT COUNT(*) FROM kernels WHERE terminated_at < '{expiration_date}';
-            """
-            )
-            deleted_count = curs.fetchone()[0]
-
-            conn.set_isolation_level(psycopg.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+            conn.autocommit = True
             log.info("Deleting old records...")
-            curs.execute(
+            result = curs.execute(
                 f"""
             DELETE FROM kernels WHERE terminated_at < '{expiration_date}';
             """
             )
+            deleted_count = result.rowcount
+            log.info("  Deleted {} records in total.", deleted_count)
+
+            if vacuum_full:
+                vacuum_sql = "VACUUM FULL"
+            else:
+                vacuum_sql = "VACUUM"
             log.info(f"Perfoming {vacuum_sql} operation...")
             curs.execute(vacuum_sql)
-            conn.set_isolation_level(psycopg.extensions.ISOLATION_LEVEL_READ_COMMITTED)
+            conn.isolation_level = psycopg.IsolationLevel.READ_COMMITTED
 
             curs.execute(
                 """
             SELECT COUNT(*) FROM kernels;
             """
             )
-            table_size = curs.fetchone()[0]
-            log.info(f"kernels table size: {table_size}")
+            if ret := curs.fetchone():
+                table_size = ret[0]
+                log.info(f"The number of rows of the `kernels` tables after cleanup: {table_size}")
 
         log.info("Cleaned up {:,} database records older than {:}.", deleted_count, expiration_date)
 
