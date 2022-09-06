@@ -177,7 +177,7 @@ def add(
                 role=role,
                 status=status,
                 need_password_change=need_password_change,
-                allowed_ip=allowed_ip,
+                allowed_client_ip=allowed_ip,
                 description=description,
             )
         except Exception as e:
@@ -263,7 +263,7 @@ def update(
                 role=role,
                 status=status,
                 need_password_change=need_password_change,
-                allowed_ip=allowed_ip,
+                allowed_client_ip=allowed_ip,
                 description=description,
             )
         except Exception as e:
