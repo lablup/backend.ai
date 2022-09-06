@@ -22,7 +22,7 @@ if [ $USER_ID -eq 0 ]; then
   if [ ! -f "$HOME/.password" ]; then
     export ALPHA_NUMERIC_VAL=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     echo "$ALPHA_NUMERIC_VAL" > "$HOME/.password"
-    chmod 0400 "$HOME/.password"
+    chmod 644 "$HOME/.password"
   fi
 
   # Invoke image-specific bootstrap hook.
@@ -79,7 +79,7 @@ else
   if [ ! -f "$HOME/.password" ]; then
     export ALPHA_NUMERIC_VAL=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     echo "$ALPHA_NUMERIC_VAL" > "$HOME/.password"
-    chmod 0400 "$HOME/.password"
+    chmod 644 "$HOME/.password"
   fi
 
   # Invoke image-specific bootstrap hook.
