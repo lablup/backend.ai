@@ -883,11 +883,14 @@ class KubernetesAgent(
                     kernel_id = await get_kernel_id_from_deployment(pod)
                     if kernel_id is None:
                         return
+                    kid = KernelId(uuid.UUID(kernel_id))
+                    if kid not in self.kernel_registry:
+                        return
                     # Is it okay to assume that only one container resides per pod?
                     if pod["status"]["containerStatuses"][0]["stats"].keys()[0] in status_filter:
                         result.append(
                             (
-                                KernelId(uuid.UUID(kernel_id)),
+                                kid,
                                 await container_from_pod(pod),
                             ),
                         )
