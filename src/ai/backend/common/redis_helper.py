@@ -393,7 +393,7 @@ async def read_stream_by_group(
     *,
     autoclaim_idle_timeout: int = 1_000,  # in msec
     block_timeout: int = 10_000,  # in msec
-) -> AsyncIterator[Tuple[bytes, bytes]]:
+) -> AsyncIterator[Tuple[bytes, Dict[bytes, Any]]]:
     """
     A high-level wrapper for the XREADGROUP command
     combined with XAUTOCLAIM and XGROUP_CREATE.

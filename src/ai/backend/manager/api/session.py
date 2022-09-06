@@ -71,7 +71,6 @@ from ai.backend.common.events import (
     KernelTerminatedEvent,
     KernelTerminatingEvent,
     SessionCancelledEvent,
-    SessionCreateTaskEvent,
     SessionEnqueuedEvent,
     SessionFailureEvent,
     SessionPreparingEvent,
@@ -449,11 +448,11 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["session.context"]
 
-    # TODO: If leader?
-    task_id = uuid.uuid4()
-    event = SessionCreateTaskEvent(task_id=task_id)
-    await root_ctx.leader_task_producer.produce_event(event)
-    log.warning(f"[manager.session] produce_event(): {event}")
+    job_id = uuid.uuid4()
+    await redis_helper.execute(
+        root_ctx.redis_leader_task,
+        lambda r: r.xadd("leader-task", {"idx": 0, "job": "session-create", "job_id": str(job_id)}),
+    )
 
     resp: MutableMapping[str, Any] = {}
     current_task = asyncio.current_task()
@@ -894,7 +893,6 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
     loads=_json_loads,
 )
 async def create_from_params(request: web.Request, params: dict[str, Any]) -> web.Response:
-    log.warning(f"[manager.session] create_from_params(request={request})")
     if params["session_name"] in ["from-template"]:
         raise InvalidAPIParameters(
             f'Requested session ID {params["session_name"]} is reserved word'
@@ -1856,6 +1854,15 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         session_name,
         params["forced"],
     )
+
+    job_id = uuid.uuid4()
+    await redis_helper.execute(
+        root_ctx.redis_leader_task,
+        lambda r: r.xadd(
+            "leader-task", {"idx": 0, "job": "session-destroy", "job_id": str(job_id)}
+        ),
+    )
+
     last_stat = await root_ctx.registry.destroy_session(
         functools.partial(
             root_ctx.registry.get_session,

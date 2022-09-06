@@ -54,5 +54,4 @@ class RootContext(BaseContext):
 
     cluster_node_id: str
 
-    leader_task_dispatcher: EventDispatcher
-    leader_task_producer: EventProducer
+    redis_leader_task: RedisConnectionInfo

@@ -545,24 +545,6 @@ class BgtaskFailedEvent(BgtaskDoneEventArgs, AbstractEvent):
     name = "bgtask_failed"
 
 
-@attr.s(auto_attribs=True, slots=True)
-class SessionCreateTaskEventArgs:
-    task_id: uuid.UUID = attr.ib()
-
-    def serialize(self) -> tuple:
-        return (str(self.task_id),)
-
-    @classmethod
-    def deserialize(cls, value: tuple):
-        return cls(
-            uuid.UUID(value[0]),
-        )
-
-
-class SessionCreateTaskEvent(SessionCreateTaskEventArgs, AbstractEvent):
-    name = "session_create_task"
-
-
 class RedisConnectorFunc(Protocol):
     def __call__(
         self,

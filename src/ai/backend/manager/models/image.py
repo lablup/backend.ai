@@ -81,7 +81,7 @@ async def rescan_images(
     db: ExtendedAsyncSAEngine,
     registry: str = None,
     *,
-    reporter: ProgressReporter = None,
+    reporter: Optional[ProgressReporter] = None,
 ) -> None:
     # cannot import ai.backend.manager.config at start due to circular import
     from ai.backend.manager.config import container_registry_iv
@@ -717,6 +717,7 @@ class RescanImages(graphene.Mutation):
         async def _rescan_task(reporter: ProgressReporter) -> None:
             await rescan_images(ctx.etcd, ctx.db, registry, reporter=reporter)
 
+        # TODO
         task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
 
