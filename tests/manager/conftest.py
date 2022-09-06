@@ -291,7 +291,7 @@ def database(request, local_config, test_db):
     db_user = local_config["db"]["user"]
     db_pass = local_config["db"]["password"]
 
-    # Create database using low-level psycopg2 API.
+    # Create database using low-level core API.
     # Temporarily use "testing" dbname until we create our own db.
     if db_pass:
         db_url = f"postgresql+asyncpg://{urlquote(db_user)}:{urlquote(db_pass)}@{db_addr}/testing"

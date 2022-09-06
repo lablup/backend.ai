@@ -9,7 +9,7 @@ from functools import partial
 from pathlib import Path
 
 import click
-import psycopg2
+import psycopg
 import sqlalchemy as sa
 from more_itertools import chunked
 from redis.asyncio import Redis
@@ -249,7 +249,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
 
         asyncio.run(_clear_redis_history())
 
-        conn = psycopg2.connect(
+        conn = psycopg.connect(
             host=local_config["db"]["addr"][0],
             port=local_config["db"]["addr"][1],
             dbname=local_config["db"]["name"],
@@ -269,7 +269,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             )
             deleted_count = curs.fetchone()[0]
 
-            conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+            conn.set_isolation_level(psycopg.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
             log.info("Deleting old records...")
             curs.execute(
                 f"""
@@ -278,7 +278,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             )
             log.info(f"Perfoming {vacuum_sql} operation...")
             curs.execute(vacuum_sql)
-            conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
+            conn.set_isolation_level(psycopg.extensions.ISOLATION_LEVEL_READ_COMMITTED)
 
             curs.execute(
                 """
