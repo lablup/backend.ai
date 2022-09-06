@@ -437,6 +437,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "group": group_uuid,
             "unmanaged_path": "",
             "cloneable": params["cloneable"],
+            "status": VFolderOperationStatus.READY,
         }
         resp = {
             "id": folder_id.hex,
@@ -450,6 +451,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "user": user_uuid,
             "group": group_uuid,
             "cloneable": params["cloneable"],
+            "status": VFolderOperationStatus.READY,
         }
         if unmanaged_path:
             insert_values.update(
@@ -1841,6 +1843,13 @@ async def delete(request: web.Request) -> web.Response:
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder " "that is not owned by myself.")
+        query = (
+            sa.update(vfolders)
+            .values(status=VFolderOperationStatus.DELETING)
+            .where(vfolders.c.name == folder_name)
+        )
+        await conn.execute(query)
+
         folder_host = entry["host"]
         folder_id = entry["id"]
         query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
@@ -1858,6 +1867,14 @@ async def delete(request: web.Request) -> web.Response:
         },
     ):
         pass
+
+    async with root_ctx.db.begin() as conn:
+        query = (
+            sa.update(vfolders)
+            .values(status=VFolderOperationStatus.READY)
+            .where(vfolders.c.name == folder_name)
+        )
+        await conn.execute(query)
     return web.Response(status=204)
 
 
@@ -2002,6 +2019,13 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         #       vfolder.  After done, we need to make another transaction to clear the unusable state.
         folder_id = uuid.uuid4()
 
+        query = (
+            sa.update(vfolders)
+            .values(status=VFolderOperationStatus.CLONING)
+            .where(vfolders.c.name == row["name"])
+        )
+        await conn.execute(query)
+
         # Create the destination vfolder.
         # (assuming that this operation finishes quickly!)
         # TODO: copy vfolder options
@@ -2058,6 +2082,14 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             pass
 
     task_id = await root_ctx.background_task_manager.start(_clone_bgtask)
+
+    async with root_ctx.db.begin() as conn:
+        query = (
+            sa.update(vfolders)
+            .values(status=VFolderOperationStatus.READY)
+            .where(vfolders.c.name == row["name"])
+        )
+        await conn.execute(query)
 
     # Return the information about the destination vfolder.
     resp = {
