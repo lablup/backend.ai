@@ -252,6 +252,7 @@ class User(BaseFunction):
         status: UserStatus | str = UserStatus.ACTIVE,
         need_password_change: bool = False,
         description: str = "",
+        allowed_ip: Iterable[str] = None,
         group_ids: Iterable[str] = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -288,6 +289,7 @@ class User(BaseFunction):
                 "description": description,
                 "domain_name": domain_name,
                 "group_ids": group_ids,
+                "allowed_client_ip": allowed_ip,
             },
         }
         data = await api_session.get().Admin._query(query, variables)

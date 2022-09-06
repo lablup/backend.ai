@@ -519,9 +519,8 @@ class CreateUser(graphene.Mutation):
             "status_info": "admin-requested",  # user mutation is only for admin
             "domain_name": props.domain_name,
             "role": UserRole(props.role),
+            "allowed_client_ip": props.allowed_client_ip,
         }
-        if props.allowed_client_ip:
-            user_data["allowed_client_ip"] = props.allowed_client_ip
         user_insert_query = sa.insert(users).values(user_data)
 
         async def _post_func(conn: SAConnection, result: Result) -> Row:
