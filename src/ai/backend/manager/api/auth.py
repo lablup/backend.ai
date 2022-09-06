@@ -502,17 +502,15 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         }
 
         def validate_ip(user: Mapping[str, Any]):
-            raw_ip = user.get("allowed_client_ip", None)
-            if not raw_ip or raw_ip is None:
+            allowed_client_ip = user.get("allowed_client_ip", None)
+            if not allowed_client_ip or allowed_client_ip is None:
                 # raw_ip is None or [] - empty list
                 return
+            assert isinstance(allowed_client_ip, list)
             raw_client_addr = request.headers.get("X-BackendAI-IP")
             if raw_client_addr is None:
                 raise AuthorizationFailed("Not allowed IP address")
             client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr)
-            assert isinstance(raw_ip, list)
-            allowed_client_ip: list[ReadableCIDR]
-            allowed_client_ip = [ReadableCIDR(_ip) for _ip in raw_ip]
             if client_addr not in allowed_client_ip:
                 raise AuthorizationFailed("Not allowed IP address")
 
