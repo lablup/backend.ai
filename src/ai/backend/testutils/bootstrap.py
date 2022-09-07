@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
+import socket
 import subprocess
 import time
+from contextlib import closing
 from typing import Iterator
 
 import pytest
@@ -11,6 +13,19 @@ import pytest
 from ai.backend.common.types import HostPortPair
 
 log = logging.getLogger(__name__)
+
+
+class PortNotAvailableError(Exception):
+    pass
+
+
+def get_idle_port(min_port_no: int, max_tries=10) -> int:
+    for port in range(min_port_no, min_port_no + max_tries):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            if sock.connect_ex(("0.0.0.0", port)) == 0:
+                return port
+    else:
+        raise PortNotAvailableError
 
 
 def wait_health_check(container_id):
@@ -53,14 +68,15 @@ def parse_host_port(container_id, container_port):
 @pytest.fixture(scope="session")
 def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
-    log.info("spawning etcd container")
+    etcd_allocated_port = get_idle_port(12379)
+    log.info("spawning etcd container on port {}", etcd_allocated_port)
     proc = subprocess.run(
         [
             "docker",
             "run",
             "-d",
             "-p",
-            "0.0.0.0::2379",
+            f"0.0.0.0:{etcd_allocated_port}:2379",
             "-p",
             ":4001",
             "--health-cmd",
@@ -80,8 +96,6 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     )
     container_id = proc.stdout.decode().strip()
     wait_health_check(container_id)
-    etcd_allocated_port = parse_host_port(container_id, "2379")
-    log.info("spawned etcd container on port %d", etcd_allocated_port)
     yield container_id, HostPortPair("127.0.0.1", etcd_allocated_port)
     subprocess.run(
         [
@@ -98,7 +112,8 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
 @pytest.fixture(scope="session")
 def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
-    log.info("spawning redis container")
+    redis_allocated_port = get_idle_port(16379)
+    log.info("spawning redis container on port {}", redis_allocated_port)
     proc = subprocess.run(
         [
             "docker",
@@ -107,7 +122,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
             "--health-cmd",
             "redis-cli ping | grep PONG",
             "-p",
-            "0.0.0.0::6379",
+            f"0.0.0.0:{redis_allocated_port}:6379",
             "--health-interval",
             "1s",
             "--health-start-period",
@@ -118,8 +133,6 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     )
     container_id = proc.stdout.decode().strip()
     wait_health_check(container_id)
-    redis_allocated_port = parse_host_port(container_id, "6379")
-    log.info("spawned redis container on port %d", redis_allocated_port)
     yield container_id, HostPortPair("127.0.0.1", redis_allocated_port)
     subprocess.run(
         [
@@ -136,14 +149,15 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
 @pytest.fixture(scope="session")
 def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
-    log.info("spawning postgres container")
+    postgres_allocated_port = get_idle_port(15432)
+    log.info("spawning postgres container on port {}", postgres_allocated_port)
     proc = subprocess.run(
         [
             "docker",
             "run",
             "-d",
             "-p",
-            "0.0.0.0::5432",
+            f"0.0.0.0:{postgres_allocated_port}:5432",
             "-e",
             "POSTGRES_PASSWORD=develove",
             "-e",
@@ -160,8 +174,6 @@ def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
     )
     container_id = proc.stdout.decode().strip()
     wait_health_check(container_id)
-    postgres_allocated_port = parse_host_port(container_id, "5432")
-    log.info("spawned postgres container on port %d", postgres_allocated_port)
     yield container_id, HostPortPair("127.0.0.1", postgres_allocated_port)
     subprocess.run(
         [
