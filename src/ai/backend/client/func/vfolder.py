@@ -5,6 +5,14 @@ from typing import Mapping, Optional, Sequence, Union
 import aiohttp
 import janus
 from aiotusclient import client
+from tenacity import (
+    AsyncRetrying,
+    RetryError,
+    TryAgain,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 from tqdm import tqdm
 from yarl import URL
 
@@ -222,9 +230,24 @@ class VFolder(BaseFunction):
                             writer_fut = loop.run_in_executor(
                                 None, _write_file, file_path, q.sync_q
                             )
+                            max_attempts = 30
                             await asyncio.sleep(0)
                             while True:
-                                chunk = await raw_resp.content.read(chunk_size)
+                                try:
+                                    async for attempt in AsyncRetrying(
+                                        wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
+                                        stop=stop_after_attempt(max_attempts),
+                                        retry=retry_if_exception_type(TryAgain),
+                                    ):
+                                        with attempt:
+                                            try:
+                                                chunk = await raw_resp.content.read(chunk_size)
+                                            except asyncio.TimeoutError:
+                                                raise TryAgain
+                                except RetryError:
+                                    raise RuntimeError(
+                                        f"File download failed after {max_attempts} retries"
+                                    )
                                 pbar.update(len(chunk))
                                 if not chunk:
                                     break
