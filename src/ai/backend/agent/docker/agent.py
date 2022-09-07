@@ -434,6 +434,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         },
                     }
                 )
+        else:
+            if 'alternate_bridge' in self.local_config['container']:
+                self.container_configs.append(
+                    {
+                        'HostConfig': {
+                            'NetworkMode': self.local_config['container']['alternate_bridge'],
+                        },
+                    }
+                )
 
     async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
