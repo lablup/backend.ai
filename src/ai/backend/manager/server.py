@@ -4,6 +4,7 @@ import asyncio
 import functools
 import grp
 import importlib
+import json
 import logging
 import os
 import pwd
@@ -325,10 +326,27 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 )
             ) as agen:
                 async for msg_id, msg_data in agen:
-                    log.debug(
-                        f"[redis:{root_ctx.pidx}:{reigns}] read_stream_by_group(): id={msg_id.decode()} job_id={msg_data[b'job_id'].decode()}"
+                    log.info(
+                        f"[redis:{root_ctx.pidx}:{reigns}] read_stream_by_group(): id={msg_id.decode()} task_id={msg_data[b'task_id'].decode()}"
                     )
-                    if not reigns:
+                    if reigns:
+                        rqst = json.loads(msg_data[b"request"].decode())
+                        print(
+                            f"[redis:{root_ctx.pidx}:{reigns}] read_stream_by_group(): request={rqst}"
+                        )
+                        """
+                        try:
+                            import importlib
+                            function_name = msg_data[b"function"].decode()
+                            module_name, func_name = function_name.split(".")
+                            module = importlib.import_module(f"ai.backend.manager.api.{module_name}")
+                            func = getattr(module, func_name)
+                            log.info(f"[redis:{root_ctx.pidx}:{reigns}] func={func}")
+                            # TODO
+                        except Exception as e:
+                            log.error(f"[redis:subscribe] {e}")
+                        """
+                    else:
                         await redis_helper.execute(
                             root_ctx.redis_leader_task, lambda r: r.xadd("leader-task", msg_data)
                         )

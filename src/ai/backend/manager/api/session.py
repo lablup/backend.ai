@@ -448,12 +448,6 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["session.context"]
 
-    job_id = uuid.uuid4()
-    await redis_helper.execute(
-        root_ctx.redis_leader_task,
-        lambda r: r.xadd("leader-task", {"idx": 0, "job": "session-create", "job_id": str(job_id)}),
-    )
-
     resp: MutableMapping[str, Any] = {}
     current_task = asyncio.current_task()
     assert current_task is not None
@@ -718,7 +712,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     ),
     loads=_json_loads,
 )
-async def create_from_template(request: web.Request, params: dict[str, Any]) -> web.Response:
+async def create_from_template(request: web.Request, params: Dict[str, Any]) -> web.Response:
     # TODO: we need to refactor session_template model to load the template configs
     #       by one batch. Currently, we need to set every template configs one by one.
     root_ctx: RootContext = request.app["_root.context"]
@@ -855,6 +849,21 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         bootstrap += "\n"
         bootstrap += cmd_builder
         params["bootstrap_script"] = base64.b64encode(bootstrap.encode()).decode()
+
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+
+    task_id = str(uuid.uuid4())
+    await redis_helper.execute(
+        root_ctx.redis_leader_task,
+        lambda r: r.xadd(
+            "leader-task", {"function": "session._create_from_template", "task_id": task_id}
+        ),
+    )
+
+    return web.json_response({"task_id": task_id}, status=201)
+    """
+
     return await _create(request, params)
 
 
@@ -892,7 +901,7 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
     ),
     loads=_json_loads,
 )
-async def create_from_params(request: web.Request, params: dict[str, Any]) -> web.Response:
+async def create_from_params(request: web.Request, params: Dict[str, Any]) -> web.Response:
     if params["session_name"] in ["from-template"]:
         raise InvalidAPIParameters(
             f'Requested session ID {params["session_name"]} is reserved word'
@@ -935,6 +944,38 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
                         "For non-cluster sessions and single-node cluster sessions, "
                         "you may specify only one manually assigned agent.",
                     )
+
+    root_ctx: RootContext = request.app["_root.context"]
+    # TypeError: can't pickle multidict._multidict.CIMultiDictProxy objects
+    # https://github.com/aio-libs/multidict/issues/340
+
+    request_dict = {
+        "user": {
+            "domain_name": request["user"]["domain_name"],
+        },
+        "is_admin": request["is_admin"],
+        "is_superadmin": request["is_superadmin"],
+        "keypair": {
+            "access_key": request["keypair"]["access_key"],
+        },
+    }
+    # TODO
+    # "root_ctx": request.app["_root.context"],
+    # "app_ctx": request.app["session.context"],
+
+    task_id = str(uuid.uuid4())
+    await redis_helper.execute(
+        root_ctx.redis_leader_task,
+        lambda r: r.xadd(
+            "leader-task",
+            {
+                "function": "session._create",
+                "task_id": task_id,
+                "request": json.dumps(request_dict),
+            },
+        ),
+    )
+
     return await _create(request, params)
 
 
@@ -1834,7 +1875,7 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
         }
     )
 )
-async def destroy(request: web.Request, params: Any) -> web.Response:
+async def destroy(request: web.Request, params: Dict[str, Any]) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
@@ -1854,15 +1895,6 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
         session_name,
         params["forced"],
     )
-
-    job_id = uuid.uuid4()
-    await redis_helper.execute(
-        root_ctx.redis_leader_task,
-        lambda r: r.xadd(
-            "leader-task", {"idx": 0, "job": "session-destroy", "job_id": str(job_id)}
-        ),
-    )
-
     last_stat = await root_ctx.registry.destroy_session(
         functools.partial(
             root_ctx.registry.get_session,
@@ -1875,6 +1907,21 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
     resp = {
         "stats": last_stat,
     }
+
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+
+    task_id = str(uuid.uuid4())
+    await redis_helper.execute(
+        root_ctx.redis_leader_task,
+        lambda r: r.xadd(
+            "leader-task", {"function": "session._destroy", "task_id": task_id}
+        ),
+    )
+
+    return web.json_response({"task_id": task_id}, status=201)
+    """
+
     return web.json_response(resp, status=200)
 
 
