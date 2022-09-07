@@ -675,7 +675,7 @@ class ModifyUser(graphene.Mutation):
                     kp_updates = []
                     for row in rows:
                         kp_data = {
-                            "user": row.user,
+                            "b_user": row.user,
                             "is_admin": keypairs.c.is_admin,
                             "is_active": keypairs.c.is_active,
                         }
@@ -689,17 +689,18 @@ class ModifyUser(graphene.Mutation):
                         if changed:
                             kp_updates.append(kp_data)
                         cnt += 1
-                    await conn.execute(
-                        sa.update(keypairs)
-                        .values(
-                            {
-                                "is_admin": bindparam("is_admin"),
-                                "is_active": bindparam("is_active"),
-                            }
+                    if kp_updates:
+                        await conn.execute(
+                            sa.update(keypairs)
+                            .values(
+                                {
+                                    "is_admin": bindparam("is_admin"),
+                                    "is_active": bindparam("is_active"),
+                                }
+                            )
+                            .where(keypairs.c.user == bindparam("b_user")),
+                            kp_updates,
                         )
-                        .where(keypairs.c.user == bindparam("user")),
-                        kp_updates,
-                    )
 
             # If domain is changed and no group is associated, clear previous domain's group.
             if prev_domain_name != updated_user.domain_name and not props.group_ids:
