@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import urllib.parse
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Final, Mapping, MutableMapping, cast
 
@@ -104,11 +105,17 @@ async def download(request: web.Request) -> web.StreamResponse:
                 else:
                     raise InvalidAPIParameters("The file is not a regular file.")
             if request.method == "HEAD":
+                last_mdt = datetime.fromtimestamp(os.stat(file_path).st_mtime)
                 return web.Response(
                     status=200,
                     headers={
                         hdrs.ACCEPT_RANGES: "bytes",
                         hdrs.CONTENT_LENGTH: str(file_path.stat().st_size),
+                        hdrs.LAST_MODIFIED: (
+                            f'{last_mdt.strftime("%a")}, {last_mdt.day} '
+                            f'{last_mdt.strftime("%b")} {last_mdt.year} '
+                            f"{last_mdt.hour}:{last_mdt.minute}:{last_mdt.second} GMT"
+                        ),
                     },
                 )
     ascii_filename = (
