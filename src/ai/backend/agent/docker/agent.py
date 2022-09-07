@@ -435,11 +435,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     }
                 )
         else:
-            if 'alternate_bridge' in self.local_config['container']:
+            if "alternate_bridge" in self.local_config["container"]:
                 self.container_configs.append(
                     {
-                        'HostConfig': {
-                            'NetworkMode': self.local_config['container']['alternate_bridge'],
+                        "HostConfig": {
+                            "NetworkMode": self.local_config["container"]["alternate_bridge"],
                         },
                     }
                 )
