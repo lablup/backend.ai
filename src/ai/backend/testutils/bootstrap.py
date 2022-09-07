@@ -20,12 +20,15 @@ class PortNotAvailableError(Exception):
 
 
 def get_idle_port(min_port_no: int, max_tries=10) -> int:
-    for port in range(min_port_no, min_port_no + max_tries):
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-            if sock.connect_ex(("0.0.0.0", port)) == 0:
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+        for port in range(min_port_no, min_port_no + max_tries):
+            try:
+                sock.bind(("", port))
                 return port
-    else:
-        raise PortNotAvailableError
+            except OSError:
+                pass
+        else:
+            raise PortNotAvailableError
 
 
 def wait_health_check(container_id):
