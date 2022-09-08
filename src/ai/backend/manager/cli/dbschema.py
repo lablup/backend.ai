@@ -10,7 +10,7 @@ from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy.engine import Connection
+from sqlalchemy.engine import Connection, Engine
 
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -87,9 +87,9 @@ def oneshot(cli_ctx: CLIContext, alembic_config) -> None:
         context = MigrationContext.configure(connection)
         return context.get_current_revision()
 
-    def _create_all_sync(connection: Connection) -> None:
+    def _create_all_sync(connection: Connection, engine: Engine) -> None:
         alembic_cfg.attributes["connection"] = connection
-        metadata.create_all(checkfirst=False)
+        metadata.create_all(engine, checkfirst=False)
         log.info("Stamping alembic version to head...")
         command.stamp(alembic_cfg, "head")
 
@@ -109,7 +109,7 @@ def oneshot(cli_ctx: CLIContext, alembic_config) -> None:
             log.info("Detected a fresh new database.")
             log.info("Creating tables...")
             async with engine.begin() as connection:
-                await connection.run_sync(_create_all_sync)
+                await connection.run_sync(_create_all_sync, engine=engine.sync_engine)
         else:
             # If alembic version info is already available, perform incremental upgrade.
             log.info("Detected an existing database.")
