@@ -5,7 +5,6 @@ import logging
 from typing import TYPE_CHECKING
 
 import click
-import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
@@ -101,7 +100,7 @@ def oneshot(cli_ctx: CLIContext, alembic_config) -> None:
         invoked_programmatically.set(True)
         engine = create_async_engine(sa_url)
         async with engine.begin() as connection:
-            await connection.execute(sa.text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'))
+            await connection.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
             current_rev = await connection.run_sync(_get_current_rev_sync)
         if current_rev is None:
             # For a fresh clean database, create all from scratch.
