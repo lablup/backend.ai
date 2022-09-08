@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING
 
@@ -9,10 +10,13 @@ from alembic import command
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
+from sqlalchemy.engine import Connection
 
 from ai.backend.common.logging import BraceStyleAdapter
 
+from ..models.alembic import invoked_programmatically
 from ..models.base import metadata
+from ..models.utils import create_async_engine
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -36,19 +40,28 @@ def cli(args) -> None:
 @click.pass_obj
 def show(cli_ctx: CLIContext, alembic_config) -> None:
     """Show the current schema information."""
-    with cli_ctx.logger:
-        alembic_cfg = Config(alembic_config)
-        sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
-        engine = sa.create_engine(sa_url)
-        with engine.begin() as connection:
-            context = MigrationContext.configure(connection)
-            current_rev = context.get_current_revision()
 
+    def _get_current_rev_sync(connection: Connection) -> str | None:
+        context = MigrationContext.configure(connection)
+        return context.get_current_revision()
+
+    async def _show(sa_url: str) -> None:
+        invoked_programmatically.set(True)
+        engine = create_async_engine(sa_url)
+        async with engine.begin() as connection:
+            current_rev = await connection.run_sync(_get_current_rev_sync)
         script = ScriptDirectory.from_config(alembic_cfg)
         heads = script.get_heads()
         head_rev = heads[0] if len(heads) > 0 else None
         print(f"Current database revision: {current_rev}")
         print(f"The head revision of available migrations: {head_rev}")
+
+    with cli_ctx.logger:
+        alembic_cfg = Config(alembic_config)
+        sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
+        assert sa_url is not None
+        sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
+        asyncio.run(_show(sa_url))
 
 
 @cli.command()
@@ -69,36 +82,49 @@ def oneshot(cli_ctx: CLIContext, alembic_config) -> None:
     Reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html
                #building-an-up-to-date-database-from-scratch
     """
-    with cli_ctx.logger:
-        alembic_cfg = Config(alembic_config)
-        sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
 
-        engine = sa.create_engine(sa_url)
-        engine.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
+    def _get_current_rev_sync(connection: Connection) -> str | None:
+        context = MigrationContext.configure(connection)
+        return context.get_current_revision()
 
-        with engine.begin() as connection:
-            context = MigrationContext.configure(connection)
-            current_rev = context.get_current_revision()
+    def _create_all_sync(connection: Connection) -> None:
+        alembic_cfg.attributes["connection"] = connection
+        metadata.create_all(checkfirst=False)
+        log.info("Stamping alembic version to head...")
+        command.stamp(alembic_cfg, "head")
 
+    def _upgrade_sync(connection: Connection) -> None:
+        alembic_cfg.attributes["connection"] = connection
+        command.upgrade(alembic_cfg, "head")
+
+    async def _oneshot(sa_url: str) -> None:
+        invoked_programmatically.set(True)
+        engine = create_async_engine(sa_url)
+        async with engine.begin() as connection:
+            await connection.execute(sa.text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'))
+            current_rev = await connection.run_sync(_get_current_rev_sync)
         if current_rev is None:
             # For a fresh clean database, create all from scratch.
             # (it will raise error if tables already exist.)
             log.info("Detected a fresh new database.")
             log.info("Creating tables...")
-            with engine.begin() as connection:
-                alembic_cfg.attributes["connection"] = connection
-                metadata.create_all(engine, checkfirst=False)
-                log.info("Stamping alembic version to head...")
-                command.stamp(alembic_cfg, "head")
+            async with engine.begin() as connection:
+                await connection.run_sync(_create_all_sync)
         else:
             # If alembic version info is already available, perform incremental upgrade.
             log.info("Detected an existing database.")
             log.info("Performing schema upgrade to head...")
-            with engine.begin() as connection:
-                alembic_cfg.attributes["connection"] = connection
-                command.upgrade(alembic_cfg, "head")
+            async with engine.begin() as connection:
+                await connection.run_sync(_upgrade_sync)
 
         log.info(
             "If you don't need old migrations, delete them and set "
             '"down_revision" value in the earliest migration to "None".'
         )
+
+    with cli_ctx.logger:
+        alembic_cfg = Config(alembic_config)
+        sa_url = alembic_cfg.get_main_option("sqlalchemy.url")
+        assert sa_url is not None
+        sa_url = sa_url.replace("postgresql://", "postgresql+asyncpg://")
+        asyncio.run(_oneshot(sa_url))
