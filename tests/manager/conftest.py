@@ -372,7 +372,7 @@ def database(request, local_config, test_db):
         logger=init_logger(local_config, nested=True),
         local_config=local_config,
     )
-    sqlalchemy_url = f"postgresql://{db_user}:{db_pass}@{db_addr}/{test_db}"
+    sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf8") as alembic_cfg:
         alembic_cfg_data = alembic_config_template.format(
             sqlalchemy_url=sqlalchemy_url,
