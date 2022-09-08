@@ -15,6 +15,7 @@ from redis.asyncio.sentinel import SentinelConnectionPool
 from tenacity import (
     AsyncRetrying,
     RetryError,
+    Retrying,
     retry_if_exception_type,
     stop_after_delay,
     stop_never,
@@ -79,6 +80,34 @@ class FileLock(AbstractDistributedLock):
             self.release()
             log.debug("file lock implicitly released: {}", self._path)
 
+    def _try_lock(self) -> None:
+        fcntl.flock(self._file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self._locked = True
+        if self._lifetime is not None:
+            self._watchdog_task = asyncio.create_task(
+                self._watchdog_timer(ttl=self._lifetime),
+            )
+        if self._debug:
+            log.debug("file lock acquired: {}", self._path)
+
+    def sync_acquire(self) -> None:
+        assert self._file is None
+        assert not self._locked
+        if not self._path.exists():
+            self._path.touch()
+        self._file = open(self._path, "rb")
+        stop_func = stop_never if self._timeout <= 0 else stop_after_delay(self._timeout)
+        try:
+            for attempt in Retrying(
+                retry=retry_if_exception_type(BlockingIOError),
+                wait=wait_exponential(multiplier=0.02, min=0.02, max=1.0) + wait_random(0, 0.05),
+                stop=stop_func,
+            ):
+                with attempt:
+                    self._try_lock()
+        except RetryError:
+            raise asyncio.TimeoutError(f"failed to lock file: {self._path}")
+
     async def acquire(self) -> None:
         assert self._file is None
         assert not self._locked
@@ -93,14 +122,7 @@ class FileLock(AbstractDistributedLock):
                 stop=stop_func,
             ):
                 with attempt:
-                    fcntl.flock(self._file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                    self._locked = True
-                    if self._lifetime is not None:
-                        self._watchdog_task = asyncio.create_task(
-                            self._watchdog_timer(ttl=self._lifetime),
-                        )
-                    if self._debug:
-                        log.debug("file lock acquired: {}", self._path)
+                    self._try_lock()
         except RetryError:
             raise asyncio.TimeoutError(f"failed to lock file: {self._path}")
 
@@ -124,6 +146,14 @@ class FileLock(AbstractDistributedLock):
         return self
 
     async def __aexit__(self, *exc_info) -> bool | None:
+        self.release()
+        return None
+
+    def __enter__(self) -> FileLock:
+        self.sync_acquire()
+        return self
+
+    def __exit__(self, *exc_info) -> bool | None:
         self.release()
         return None
 

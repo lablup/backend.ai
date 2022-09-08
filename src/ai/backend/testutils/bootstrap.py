@@ -6,10 +6,12 @@ import socket
 import subprocess
 import time
 from contextlib import closing
+from pathlib import Path
 from typing import Iterator
 
 import pytest
 
+from ai.backend.common.lock import FileLock
 from ai.backend.common.types import HostPortPair
 
 log = logging.getLogger(__name__)
@@ -20,15 +22,18 @@ class PortNotAvailableError(Exception):
 
 
 def get_idle_port(min_port_no: int, max_tries=10) -> int:
-    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
-        for port in range(min_port_no, min_port_no + max_tries):
-            try:
-                sock.bind(("", port))
-                return port
-            except OSError:
-                pass
-        else:
-            raise PortNotAvailableError
+    lock_path = Path("/tmp") / "bai-test" / "port.lock"
+    lock_path.parent.mkdir(exist_ok=True, parents=True)
+    with FileLock(lock_path):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            for port in range(min_port_no, min_port_no + max_tries):
+                try:
+                    sock.bind(("", port))
+                    return port
+                except OSError:
+                    pass
+            else:
+                raise PortNotAvailableError
 
 
 def wait_health_check(container_id):
