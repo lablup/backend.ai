@@ -69,8 +69,9 @@ from .exceptions import (
     TooManyVFoldersFound,
     VFolderAlreadyExists,
     VFolderCreationFailed,
+    VFolderFilterStatusFailed,
+    VFolderFilterStatusNotAvailable,
     VFolderNotFound,
-    VFolderStatusCheckFailed,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .resource import get_watcher_info
@@ -84,7 +85,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 VFolderRow = Mapping[str, Any]
 
 
-def vfolder_status_check(allowed_status: VFolderOperationStatus):
+def vfolder_filter_by_status_required(perm: VFolderOperationStatus):
     """
     Checks if the target vfolder status is READY.
     The decorated handler should prevent user access
@@ -101,25 +102,28 @@ def vfolder_status_check(allowed_status: VFolderOperationStatus):
             allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
             folder_name = request.match_info["name"]
             vf_name_conds = vfolders.c.name == folder_name
-            if allowed_status == VFolderOperationStatus.READY:
+            if perm == VFolderOperationStatus.READY:
+                # if READY is requested, all status is accepted.
                 vf_status_conds = vfolders.c.status.in_(
                     [
                         VFolderOperationStatus.READY,
-                        VFolderOperationStatus.PREPARED,
-                        VFolderOperationStatus.MOUNTED,
+                        VFolderOperationStatus.PERFORMING,
                         VFolderOperationStatus.CLONING,
                         VFolderOperationStatus.DELETING,
+                        VFolderOperationStatus.DELETED,
+                        VFolderOperationStatus.MOUNTED,
                     ]
                 )
-            elif allowed_status == VFolderOperationStatus.PREPARED:
-                vf_status_conds = vfolders.c.status.in_(
-                    [
-                        VFolderOperationStatus.READY,
-                        VFolderOperationStatus.PREPARED,
-                    ]
-                )
-            else:
+            elif perm in [
+                VFolderOperationStatus.PERFORMING,
+                VFolderOperationStatus.CLONING,
+                VFolderOperationStatus.DELETING,
+            ]:
+                # if PERFORMING, CLONING, DELETING is requested, only READY is accepted.
                 vf_status_conds = vfolders.c.status == VFolderOperationStatus.READY
+            else:
+                # Otherwise, raise VFolderFilterStatusNotAvailable()
+                raise VFolderFilterStatusNotAvailable()
             async with root_ctx.db.begin_readonly() as conn:
                 entries = await query_accessible_vfolders(
                     conn,
@@ -130,7 +134,7 @@ def vfolder_status_check(allowed_status: VFolderOperationStatus):
                     extra_vf_conds=(vf_name_conds & vf_status_conds),
                 )
                 if len(entries) == 0:
-                    raise VFolderStatusCheckFailed()
+                    raise VFolderFilterStatusFailed()
             return await handler(request, *args, **kwargs)
 
         return _wrapped
@@ -563,7 +567,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
 
 @superadmin_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_status_check(VFolderOperationStatus.DELETING)
+@vfolder_filter_by_status_required(VFolderOperationStatus.DELETING)
 @check_api_params(
     t.Dict(
         {
@@ -803,7 +807,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_status_check(VFolderOperationStatus.PREPARED)
+@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
 @check_api_params(
     t.Dict(
         {
@@ -902,7 +906,7 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_status_check(VFolderOperationStatus.PREPARED)
+@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
 @vfolder_permission_required(VFolderPermission.OWNER_PERM)
 @check_api_params(
     t.Dict(
@@ -950,7 +954,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_status_check(VFolderOperationStatus.PREPARED)
+@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
 @vfolder_permission_required(VFolderPermission.OWNER_PERM)
 @check_api_params(
     t.Dict(
@@ -1017,7 +1021,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_status_check(VFolderOperationStatus.PREPARED)
+@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
 @vfolder_permission_required(VFolderPermission.READ_ONLY)
 @check_api_params(
     t.Dict(
@@ -1058,7 +1062,7 @@ async def create_download_session(
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_status_check(VFolderOperationStatus.PREPARED)
+@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict(
@@ -1097,7 +1101,7 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_status_check(VFolderOperationStatus.PREPARED)
+@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict(
@@ -1137,7 +1141,7 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_status_check(VFolderOperationStatus.PREPARED)
+@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict(
@@ -1176,7 +1180,7 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_status_check(VFolderOperationStatus.PREPARED)
+@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict(
@@ -1805,7 +1809,7 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_status_check(VFolderOperationStatus.DELETING)
+@vfolder_filter_by_status_required(VFolderOperationStatus.DELETING)
 async def delete(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -1924,7 +1928,7 @@ async def leave(request: web.Request, row: VFolderRow) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @vfolder_permission_required(VFolderPermission.READ_ONLY)
-@vfolder_status_check(VFolderOperationStatus.CLONING)
+@vfolder_filter_by_status_required(VFolderOperationStatus.CLONING)
 @check_api_params(
     t.Dict(
         {
