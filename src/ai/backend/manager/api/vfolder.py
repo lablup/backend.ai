@@ -585,6 +585,12 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         )
         folder_host = await conn.scalar(query)
         folder_id = uuid.UUID(params["id"])
+        query = (
+            sa.update(vfolders)
+            .values(status=VFolderOperationStatus.DELETING)
+            .where(vfolders.c.id == folder_id)
+        )
+        await conn.execute(query)
         query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
         await conn.execute(query)
     # fs-level deletion may fail or take longer time
@@ -599,6 +605,13 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         },
     ):
         pass
+    async with root_ctx.db.begin() as conn:
+        query = (
+            sa.update(vfolders)
+            .values(status=VFolderOperationStatus.DELETED)
+            .where(vfolders.c.id == folder_id)
+        )
+        await conn.execute(query)
     return web.Response(status=204)
 
 
@@ -1885,7 +1898,7 @@ async def delete(request: web.Request) -> web.Response:
     async with root_ctx.db.begin() as conn:
         query = (
             sa.update(vfolders)
-            .values(status=VFolderOperationStatus.READY)
+            .values(status=VFolderOperationStatus.DELETED)
             .where(vfolders.c.name == folder_name)
         )
         await conn.execute(query)
