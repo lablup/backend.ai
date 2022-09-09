@@ -38,10 +38,14 @@ jobs:
           key: lfs-${{ hashFiles('.lfs-assets-id') }}
     - name: Git LFS Pull
       run: git lfs pull
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
-        python-version: "3.10.7"
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
     - name: Bootstrap Pants
       run: |
