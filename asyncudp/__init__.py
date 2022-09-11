@@ -20,6 +20,9 @@ class _SocketProtocol:
     def datagram_received(self, data, addr):
         self._packets.put_nowait((data, addr))
 
+    def error_received(self, exc):
+        pass
+
     async def recvfrom(self):
         return await self._packets.get()
 
