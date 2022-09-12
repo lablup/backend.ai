@@ -528,7 +528,7 @@ def run(
             "You can run only either source files or command-line " "code snippet.", file=sys.stderr
         )
         sys.exit(ExitCode.INVALID_ARGUMENT)
-    if not files and not code:
+    if not files and not code and not exec and not mount:
         print(
             "You should provide the command-line code snippet using "
             '"-c" option if run without files.',
@@ -786,24 +786,24 @@ def run(
                     print_fail("[{0}] Uploading source files failed!".format(idx))
                     print("{0}: {1}\n{2}".format(ret.status, ret.reason, ret.text()), file=stderr)
                     raise RuntimeError("Uploading source files has failed!")
-                if not is_multi:
-                    vprint_done("[{0}] Uploading done.".format(idx))
-                opts = {
-                    "clean": clean_cmd,
-                    "build": build_cmd,
-                    "exec": exec_cmd,
-                }
-                if not terminal:
-                    await exec_loop(
-                        stdout,
-                        stderr,
-                        compute_session,
-                        "batch",
-                        "",
-                        opts=opts,
-                        vprint_done=indexed_vprint_done,
-                        is_multi=is_multi,
-                    )
+            if not is_multi:
+                vprint_done("[{0}] Uploading done.".format(idx))
+            opts = {
+                "clean": clean_cmd,
+                "build": build_cmd,
+                "exec": exec_cmd,
+            }
+            if not terminal:
+                await exec_loop(
+                    stdout,
+                    stderr,
+                    compute_session,
+                    "batch",
+                    "",
+                    opts=opts,
+                    vprint_done=indexed_vprint_done,
+                    is_multi=is_multi,
+                )
             if terminal:
                 await exec_terminal(compute_session)
                 return
