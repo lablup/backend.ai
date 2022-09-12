@@ -12,7 +12,7 @@
 //     "Jinja2~=3.1.2",
 //     "PyJWT~=2.0",
 //     "PyYAML~=6.0",
-//     "SQLAlchemy[postgresql_asyncpg]~=1.4.39",
+//     "SQLAlchemy[postgresql_asyncpg]~=1.4.40",
 //     "aiodataloader-ng~=0.2.1",
 //     "aiodns>=3.0",
 //     "aiodocker~=0.21.0",
@@ -56,7 +56,6 @@
 //     "passlib[bcrypt]>=1.7.4",
 //     "pexpect~=4.8",
 //     "psutil~=5.9.1",
-//     "psycopg2-binary>=2.8.4",
 //     "pycryptodome>=3.14.1",
 //     "pytest-dependency>=0.5.1",
 //     "pytest>=7.1.2",
@@ -1084,53 +1083,58 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "190f82f3e87033821828f60787cfa42bff98404483577b591429ed99bed39d59",
-              "url": "https://files.pythonhosted.org/packages/6b/c0/4cfdc2fa58f86ccb5dcd017c9aa2125a5132e9b52868ccc5d46d0542d29c/cryptography-37.0.4-cp36-abi3-musllinux_1_1_x86_64.whl"
+              "hash": "89ed49784ba88c221756ff4d4755dbc03b3c8d2c5103f6d6b4f83a0fb1e85294",
+              "url": "https://files.pythonhosted.org/packages/da/81/330bf2ac32feb234096bfdebaae53888e95de8af01b88b6f477156569401/cryptography-38.0.1-cp36-abi3-musllinux_1_1_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f2dcb0b3b63afb6df7fd94ec6fbddac81b5492513f7b0436210d390c14d46ee8",
-              "url": "https://files.pythonhosted.org/packages/20/8b/66600f5851ec7893ace9b74445d7eaf3499571b347e339d18c76c876b0f9/cryptography-37.0.4-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "ca9f6784ea96b55ff41708b92c3f6aeaebde4c560308e5fbbd3173fbc466e94e",
+              "url": "https://files.pythonhosted.org/packages/1c/e5/1deb15c5c38bf0826c85e480cc05402553427663db9ae45e63ee3b06ba4d/cryptography-38.0.1-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3d41b965b3380f10e4611dbae366f6dc3cefc7c9ac4e8842a806b9672ae9add5",
-              "url": "https://files.pythonhosted.org/packages/55/68/17d21988cec2dec825ce7fb965cc44d5f64e9f48f414084510f5836c5cb3/cryptography-37.0.4-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.manylinux_2_24_aarch64.whl"
+              "hash": "3fc26e22840b77326a764ceb5f02ca2d342305fba08f002a8c1f139540cdfaad",
+              "url": "https://files.pythonhosted.org/packages/4b/25/c995d4269baceab3288c89f74cb08788a973f8f293758934387ebacdef08/cryptography-38.0.1-cp36-abi3-macosx_10_10_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b7f8dd0d4c1f21759695c05a5ec8536c12f31611541f8904083f3dc582604280",
-              "url": "https://files.pythonhosted.org/packages/86/82/5e81dbf8a94c011e5240595149626d92e78a110f01311face1ab08431566/cryptography-37.0.4-cp36-abi3-manylinux_2_24_x86_64.whl"
+              "hash": "1db3d807a14931fa317f96435695d9ec386be7b84b618cc61cfa5d08b0ae33d7",
+              "url": "https://files.pythonhosted.org/packages/6d/0c/5e67831007ba6cd7e52c4095f053cf45c357739b0a7c46a45ddd50049019/cryptography-38.0.1.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "63f9c17c0e2474ccbebc9302ce2f07b55b3b3fcb211ded18a42d5764f5c10a82",
-              "url": "https://files.pythonhosted.org/packages/89/d9/5fcd312d5cce0b4d7ee8b551a0ea99e4ea9db0fdbf6dd455a19042e3370b/cryptography-37.0.4.tar.gz"
+              "hash": "d4ef6cc305394ed669d4d9eebf10d3a101059bdcf2669c366ec1d14e4fb227bd",
+              "url": "https://files.pythonhosted.org/packages/97/ff/d93aa93fe9052b1ab235eead370165387ff5057f961dd2798175243d47e4/cryptography-38.0.1-cp36-abi3-manylinux_2_28_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a958c52505c8adf0d3822703078580d2c0456dd1d27fabfb6f76fe63d2971cd6",
-              "url": "https://files.pythonhosted.org/packages/c5/93/23f1cc4a39cee6ca0dc75550dc204e5af71e8bf3012d23feb1bd5b06edea/cryptography-37.0.4-cp36-abi3-macosx_10_10_x86_64.whl"
+              "hash": "16fa61e7481f4b77ef53991075de29fc5bacb582a1244046d2e8b4bb72ef66d0",
+              "url": "https://files.pythonhosted.org/packages/9b/4e/d7454551c3c7b327510e35d88db35c300484225ba47be861e28f0b520b33/cryptography-38.0.1-cp36-abi3-manylinux_2_24_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f721d1885ecae9078c3f6bbe8a88bc0786b6e749bf32ccec1ef2b18929a05046",
-              "url": "https://files.pythonhosted.org/packages/ca/44/2384260ffa2fa974894ec5f70896b328cd55a19dc367cf5c7ef32d5b3ba8/cryptography-37.0.4-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+              "hash": "194044c6b89a2f9f169df475cc167f6157eb9151cc69af8a2a163481d45cc407",
+              "url": "https://files.pythonhosted.org/packages/a3/bc/37f2744e2a3c77c964ac1cf7dd651d289020d3b476603c3c18e50d5f2371/cryptography-38.0.1-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "30788e070800fec9bbcf9faa71ea6d8068f5136f60029759fd8c3efec3c9dcb3",
-              "url": "https://files.pythonhosted.org/packages/d4/d7/fa8688ca6ba6dbe44a8ecab9b34cbba0a5ab42c5a3609371968ba3e7f44a/cryptography-37.0.4-cp36-abi3-musllinux_1_1_aarch64.whl"
+              "hash": "10d1f29d6292fc95acb597bacefd5b9e812099d75a6469004fd38ba5471a977f",
+              "url": "https://files.pythonhosted.org/packages/c2/f5/5ca3e00f8131b2d6d70cd5fc54079c7e5c3a2c28f863bd3980bf4d6b970f/cryptography-38.0.1-cp36-abi3-macosx_10_10_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "549153378611c0cca1042f20fd9c5030d37a72f634c9326e225c9f666d472884",
-              "url": "https://files.pythonhosted.org/packages/eb/f0/8bc2246a422eb5cd1fe7cfc2ed522e4e3e0fd6f1c828193c0860c7030ca6/cryptography-37.0.4-cp36-abi3-macosx_10_10_universal2.whl"
+              "hash": "0297ffc478bdd237f5ca3a7dc96fc0d315670bfa099c04dc3a4a2172008a405a",
+              "url": "https://files.pythonhosted.org/packages/c9/e7/9c7b7e8caef887a319e6492a30559c5136e305aae5885a8193c3a4e1dec6/cryptography-38.0.1-cp36-abi3-musllinux_1_1_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "80f49023dd13ba35f7c34072fa17f604d2f19bf0989f292cedf7ab5770b87a0b",
-              "url": "https://files.pythonhosted.org/packages/fd/5a/f47456f062b0c5bd828198992fca1f78bcc7aeadd216d9ce6c3348188b92/cryptography-37.0.4-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "3261725c0ef84e7592597606f6583385fed2a5ec3909f43bc475ade9729a41d6",
+              "url": "https://files.pythonhosted.org/packages/d2/42/2b5be637a08a0d83057bbce4c2cd904271a6b2fb46b6cd4abcb6f2df222c/cryptography-38.0.1-cp36-abi3-manylinux_2_28_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "3b72c360427889b40f36dc214630e688c2fe03e16c162ef0aa41da7ab1455153",
+              "url": "https://files.pythonhosted.org/packages/d4/94/a3e3c06b318453a5943e6dfc84102248d27629d5ba037b3056ae3dae98af/cryptography-38.0.1-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.manylinux_2_24_aarch64.whl"
             }
           ],
           "project_name": "cryptography",
@@ -1158,7 +1162,7 @@
             "twine>=1.12.0; extra == \"docstest\""
           ],
           "requires_python": ">=3.6",
-          "version": "37.0.4"
+          "version": "38.0.1"
         },
         {
           "artifacts": [
@@ -1602,8 +1606,8 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "5b4bdda35b40105b4ee3c87c72393496bec5e7f333befdcdd623511bf2684307",
-              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_12_0_arm64.whl"
+              "hash": "951e212c2e5e7328246f241d17d94e5eaef81c639a7d48164f451694ff99b157",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_10_15_x86_64.whl"
             },
             {
               "algorithm": "sha256",
@@ -1622,8 +1626,8 @@
             },
             {
               "algorithm": "sha256",
-              "hash": "951e212c2e5e7328246f241d17d94e5eaef81c639a7d48164f451694ff99b157",
-              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_10_15_x86_64.whl"
+              "hash": "5b4bdda35b40105b4ee3c87c72393496bec5e7f333befdcdd623511bf2684307",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/hiredis/hiredis-1.1.0-cp310-cp310-macosx_12_0_arm64.whl"
             }
           ],
           "project_name": "hiredis",
@@ -2260,23 +2264,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "29a442e25fab1f4d05e2655bb1b8ab6887981838d22effa2396d584b740194de",
-              "url": "https://files.pythonhosted.org/packages/6d/c6/6a4e46802e8690d50ba6a56c7f79ac283e703fcfa0fdae8e41909c8cef1f/psutil-5.9.1-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "e3ac2c0375ef498e74b9b4ec56df3c88be43fe56cac465627572dbfb21c4be34",
+              "url": "https://files.pythonhosted.org/packages/4c/85/7a112fb6a8c598a6f5d079228bbc03ae84c472397be79c075e7514b6ed36/psutil-5.9.2-cp310-cp310-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "abd9246e4cdd5b554a2ddd97c157e292ac11ef3e7af25ac56b08b455c829dca8",
-              "url": "https://files.pythonhosted.org/packages/14/06/39d7e963a6a8bbf26519de208593cdb0ddfe22918b8989f4b2363d4ab49f/psutil-5.9.1-cp310-cp310-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+              "hash": "614337922702e9be37a39954d67fdb9e855981624d8011a9927b8f2d3c9625d9",
+              "url": "https://files.pythonhosted.org/packages/04/5d/d52473097582db5d3094bc34acf9874de726327a3166426e22ed0806de6a/psutil-5.9.2-cp310-cp310-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c7be9d7f5b0d206f0bbc3794b8e16fb7dbc53ec9e40bbe8787c6f2d38efcf6c9",
-              "url": "https://files.pythonhosted.org/packages/d1/16/6239e76ab5d990dc7866bc22a80585f73421588d63b42884d607f5f815e2/psutil-5.9.1-cp310-cp310-macosx_10_9_x86_64.whl"
+              "hash": "39ec06dc6c934fb53df10c1672e299145ce609ff0611b569e75a88f313634969",
+              "url": "https://files.pythonhosted.org/packages/47/2b/bd12c4f2d1bd3024fe7c5d8388f8a5627cc02fbe11d62bd451aff356415d/psutil-5.9.2-cp310-cp310-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "57f1819b5d9e95cdfb0c881a8a5b7d542ed0b7c522d575706a80bedc848c8954",
-              "url": "https://files.pythonhosted.org/packages/d6/de/0999ea2562b96d7165812606b18f7169307b60cd378bc29cf3673322c7e9/psutil-5.9.1.tar.gz"
+              "hash": "feb861a10b6c3bb00701063b37e4afc754f8217f0f09c42280586bd6ac712b5c",
+              "url": "https://files.pythonhosted.org/packages/8f/57/828ac1f70badc691a716e77bfae258ef5db76bb7830109bf4bcf882de020/psutil-5.9.2.tar.gz"
             }
           ],
           "project_name": "psutil",
@@ -2288,65 +2292,7 @@
             "wmi; sys_platform == \"win32\" and extra == \"test\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7",
-          "version": "5.9.1"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "c3ae8e75eb7160851e59adc77b3a19a976e50622e44fd4fd47b8b18208189d42",
-              "url": "https://files.pythonhosted.org/packages/cd/7f/05c6036e6482b7cddf3a12904344655defd7fc16b008d7f17f28d25d2f2a/psycopg2_binary-2.9.3-cp310-cp310-musllinux_1_1_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "a9e1f75f96ea388fbcef36c70640c4efbe4650658f3d6a2967b4cc70e907352e",
-              "url": "https://files.pythonhosted.org/packages/23/db/2383e85ceff06a2279001c027bb75406baf53d94a75c7648cb5d3b2a23d1/psycopg2_binary-2.9.3-cp310-cp310-musllinux_1_1_ppc64le.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "6e82d38390a03da28c7985b394ec3f56873174e2c88130e6966cb1c946508e65",
-              "url": "https://files.pythonhosted.org/packages/2b/20/2f1fc936f8ee4828b348aba3efacab2731995b21da0a955a25a398c0b57b/psycopg2_binary-2.9.3-cp310-cp310-manylinux_2_17_i686.manylinux2014_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "090f3348c0ab2cceb6dfbe6bf721ef61262ddf518cd6cc6ecc7d334996d64efa",
-              "url": "https://files.pythonhosted.org/packages/46/9f/536f052c80e71d37edcb8902bef319c1f8d6e7f4ba49d4a999b6cea87589/psycopg2_binary-2.9.3-cp310-cp310-musllinux_1_1_i686.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "3a79d622f5206d695d7824cbf609a4f5b88ea6d6dab5f7c147fc6d333a8787e4",
-              "url": "https://files.pythonhosted.org/packages/62/cf/9e510ea668a22be01e3ba25deff03b9fa9a34598e6eabc714e67e868e0fb/psycopg2_binary-2.9.3-cp310-cp310-musllinux_1_1_aarch64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "083a55275f09a62b8ca4902dd11f4b33075b743cf0d360419e2051a8a5d5ff76",
-              "url": "https://files.pythonhosted.org/packages/7f/07/71dd915057d7ce28bc0167d3dff17166a821913085556df3fedf7968897d/psycopg2_binary-2.9.3-cp310-cp310-manylinux_2_24_aarch64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "539b28661b71da7c0e428692438efbcd048ca21ea81af618d845e06ebfd29478",
-              "url": "https://files.pythonhosted.org/packages/83/8f/748aa34614899181c5e420850281c18efec93f260a013d568020b38320e3/psycopg2_binary-2.9.3-cp310-cp310-macosx_10_14_x86_64.macosx_10_9_intel.macosx_10_9_x86_64.macosx_10_10_intel.macosx_10_10_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "0a29729145aaaf1ad8bafe663131890e2111f13416b60e460dae0a96af5905c9",
-              "url": "https://files.pythonhosted.org/packages/97/87/a73b2f93009bf66fc9b5a9aa1b8bdf94e462657bcb0a99c259d88683d217/psycopg2_binary-2.9.3-cp310-cp310-manylinux_2_24_ppc64le.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "57804fc02ca3ce0dbfbef35c4b3a4a774da66d66ea20f4bda601294ad2ea6092",
-              "url": "https://files.pythonhosted.org/packages/ac/84/d01b8a9aebeae783b84f8ee09d07ee861da2f8e260772ef7f3878549bf17/psycopg2_binary-2.9.3-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "761df5313dc15da1502b21453642d7599d26be88bff659382f8f9747c7ebea4e",
-              "url": "https://files.pythonhosted.org/packages/d7/1c/8d042630c5ff3c3e6d93c992bd7ecf516d577803b96781c6caa649bbf6e5/psycopg2-binary-2.9.3.tar.gz"
-            }
-          ],
-          "project_name": "psycopg2-binary",
-          "requires_dists": [],
-          "requires_python": ">=3.6",
-          "version": "2.9.3"
+          "version": "5.9.2"
         },
         {
           "artifacts": [
@@ -2617,19 +2563,18 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "13d0e3ccfc2b6e26be000cb6568c832ba67ba32e719443bfe725814d3c42433c",
-              "url": "https://files.pythonhosted.org/packages/fb/d0/bae533985f2338c5d02184b4a7083b819f6b3fc101da792e0d96e6e5299d/pytest-7.1.2-py3-none-any.whl"
+              "hash": "1377bda3466d70b55e3f5cecfa55bb7cfcf219c7964629b967c37cf0bda818b7",
+              "url": "https://files.pythonhosted.org/packages/e3/b9/3541bbcb412a9fd56593005ff32183825634ef795a1c01ceb6dee86e7259/pytest-7.1.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a06a0425453864a270bc45e71f783330a7428defb4230fb5e6a731fde06ecd45",
-              "url": "https://files.pythonhosted.org/packages/4e/1f/34657c6ac56f3c58df650ba41f8ffb2620281ead8e11bcdc7db63cf72a78/pytest-7.1.2.tar.gz"
+              "hash": "4f365fec2dff9c1162f834d9f18af1ba13062db0c708bf7b946f8a5c76180c39",
+              "url": "https://files.pythonhosted.org/packages/a4/a7/8c63a4966935b0d0b039fd67ebf2e1ae00f1af02ceb912d838814d772a9a/pytest-7.1.3.tar.gz"
             }
           ],
           "project_name": "pytest",
           "requires_dists": [
             "argcomplete; extra == \"testing\"",
-            "atomicwrites>=1.0; sys_platform == \"win32\"",
             "attrs>=19.2.0",
             "colorama; sys_platform == \"win32\"",
             "hypothesis>=3.56; extra == \"testing\"",
@@ -2646,7 +2591,7 @@
             "xmlschema; extra == \"testing\""
           ],
           "requires_python": ">=3.7",
-          "version": "7.1.2"
+          "version": "7.1.3"
         },
         {
           "artifacts": [
@@ -3189,28 +3134,28 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "23b693876ac7963b6bc7b1a5f3a2642f38d2624af834faad5933913928089d1b",
-              "url": "https://files.pythonhosted.org/packages/8e/35/dfc2d7c2b2064c6a51e8f704e139d583921bcf1e4ac0df57688349592ab1/SQLAlchemy-1.4.40-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "5102fb9ee2c258a2218281adcb3e1918b793c51d6c2b4666ce38c35101bb940e",
+              "url": "https://files.pythonhosted.org/packages/b6/df/51a99ba9b419e15aa39948756f79d6ef2df9ede3288799c1deb43b618799/SQLAlchemy-1.4.41-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "bb342c0e25cc8f78a0e7c692da3b984f072666b316fbbec2a0e371cb4dfef5f0",
-              "url": "https://files.pythonhosted.org/packages/2c/89/2ca9359bde80e25572e57ec4f2c0d6578ef83ccdc2448d0d91a3fb45e488/SQLAlchemy-1.4.40-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
+              "hash": "361f6b5e3f659e3c56ea3518cf85fbdae1b9e788ade0219a67eeaaea8a4e4d2a",
+              "url": "https://files.pythonhosted.org/packages/5b/05/0344b99768d345cd92785949a3dac38bfb7059b3b4dc6ae1e55ea842c772/SQLAlchemy-1.4.41-cp310-cp310-macosx_10_15_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "1ab08141d93de83559f6a7d9a962830f918623a885b3759ec2b9d1a531ff28fe",
-              "url": "https://files.pythonhosted.org/packages/44/6e/ee91fdeef035a250cb2ca3de022e08e84105a8fe88bb35744aa24aad203b/SQLAlchemy-1.4.40-cp310-cp310-macosx_10_15_x86_64.whl"
+              "hash": "0292f70d1797e3c54e862e6f30ae474014648bc9c723e14a2fda730adb0a9791",
+              "url": "https://files.pythonhosted.org/packages/67/a0/97da2cb07e013fd6c37fd896a86b374aa726e4161cafd57185e8418d59aa/SQLAlchemy-1.4.41.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "44a660506080cc975e1dfa5776fe5f6315ddc626a77b50bf0eee18b0389ea265",
-              "url": "https://files.pythonhosted.org/packages/4e/72/e36fa6563c45f8e1f2a5781f43f096500c1bca4963a34e72e8d3d8002d77/SQLAlchemy-1.4.40.tar.gz"
+              "hash": "0990932f7cca97fece8017414f57fdd80db506a045869d7ddf2dda1d7cf69ecc",
+              "url": "https://files.pythonhosted.org/packages/be/76/912622f9e0b87a9fc58d4d58e9ce459bbd9cd83021c51989afb1839d2162/SQLAlchemy-1.4.41-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "00dd998b43b282c71de46b061627b5edb9332510eb1edfc5017b9e4356ed44ea",
-              "url": "https://files.pythonhosted.org/packages/f6/d3/fef0edc60d3f235565a704f3585510bd895c8138b4ff413e46f0a059cb33/SQLAlchemy-1.4.40-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "cd767cf5d7252b1c88fcfb58426a32d7bd14a7e4942497e15b68ff5d822b41ad",
+              "url": "https://files.pythonhosted.org/packages/f0/97/c6a1bc6e80844c10ee1cb599fa5d8c919fc68b9d9ebed22217cadcfca4c8/SQLAlchemy-1.4.41-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl"
             }
           ],
           "project_name": "sqlalchemy",
@@ -3247,7 +3192,7 @@
             "typing-extensions!=3.10.0.1; extra == \"aiosqlite\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "1.4.40"
+          "version": "1.4.41"
         },
         {
           "artifacts": [
@@ -3380,13 +3325,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "74a2cdefe14d11442cedf3ba4e21a3b84ff9a2dbdc6cfae2c34addb2a14a5ea6",
-              "url": "https://files.pythonhosted.org/packages/8a/c4/d15f1e627fff25443ded77ea70a7b5532d6371498f9285d44d62587e209c/tqdm-4.64.0-py2.py3-none-any.whl"
+              "hash": "6fee160d6ffcd1b1c68c65f14c829c22832bc401726335ce92c52d395944a6a1",
+              "url": "https://files.pythonhosted.org/packages/47/bb/849011636c4da2e44f1253cd927cfb20ada4374d8b3a4e425416e84900cc/tqdm-4.64.1-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "40be55d30e200777a307a7585aee69e4eabb46b4ec6a4b4a5f2d9f11e7d5408d",
-              "url": "https://files.pythonhosted.org/packages/98/2a/838de32e09bd511cf69fe4ae13ffc748ac143449bfc24bb3fd172d53a84f/tqdm-4.64.0.tar.gz"
+              "hash": "5f4f682a004951c1b450bc753c710e9280c5746ce6ffedee253ddbcbf54cf1e4",
+              "url": "https://files.pythonhosted.org/packages/c1/c2/d8a40e5363fb01806870e444fc1d066282743292ff32a9da54af51ce36a2/tqdm-4.64.1.tar.gz"
             }
           ],
           "project_name": "tqdm",
@@ -3401,7 +3346,7 @@
             "wheel; extra == \"dev\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7",
-          "version": "4.64"
+          "version": "4.64.1"
         },
         {
           "artifacts": [
@@ -3580,19 +3525,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c74262197487a65e3f02db37d3f0e0f3bb2d5d370f7e6ba390814e865a45e56e",
-              "url": "https://files.pythonhosted.org/packages/28/0e/53a2c7747de518ae168c2b59e3eb6f916813e36ae916923c3290179e82e6/types_redis-4.3.19-py3-none-any.whl"
+              "hash": "b22e0f5a18b98b6a197dd403daed52a22cb76f50e3cbd7ddc539196af52ec23e",
+              "url": "https://files.pythonhosted.org/packages/aa/54/f0224d2310a95031e32760be52961507ef15c73682aac5a8f6f5ad3f8d0f/types_redis-4.3.20-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c881ffb94bd47dca21ed503328544a56bb315851575eebb27fb371bff735844a",
-              "url": "https://files.pythonhosted.org/packages/56/15/745fef11530bb9c3c378343e7ca9e983198356987e98bf827cb6cb88fb5a/types-redis-4.3.19.tar.gz"
+              "hash": "74ed02945470ddea2dd21447c185dabb3169e5a5328d26b25cf3547d949b8e04",
+              "url": "https://files.pythonhosted.org/packages/b3/42/cea94d0019128bc9fdd2da0363c88ecc177230ecc9bd678bf11d7ed266df/types-redis-4.3.20.tar.gz"
             }
           ],
           "project_name": "types-redis",
           "requires_dists": [],
           "requires_python": null,
-          "version": "4.3.19"
+          "version": "4.3.20"
         },
         {
           "artifacts": [
@@ -3773,13 +3718,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "33ad3cf0aef4270b95d10a5a66b670a66be1f5ccf10ce390b3644f9eddfdca9d",
-              "url": "https://files.pythonhosted.org/packages/bb/9b/a6e780d1980121f4d6e256dfffd11194656e5256adc7f9f2968bbdb4e57c/websocket_client-1.4.0-py3-none-any.whl"
+              "hash": "398909eb7e261f44b8f4bd474785b6ec5f5b499d4953342fe9755e01ef624090",
+              "url": "https://files.pythonhosted.org/packages/83/b8/95c2512818d6ddb9b97f4163e915b2afe2db42b620270aa59c5ee0b47245/websocket_client-1.4.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "79d730c9776f4f112f33b10b78c8d209f23b5806d9a783e296b3813fc5add2f1",
-              "url": "https://files.pythonhosted.org/packages/71/aa/69c635c6d209a3e67cfcaa0cf6d2de71cf7575347f63d5976c8792b8be2e/websocket-client-1.4.0.tar.gz"
+              "hash": "f9611eb65c8241a67fb373bef040b3cf8ad377a9f6546a12b620b6511e8ea9ef",
+              "url": "https://files.pythonhosted.org/packages/99/11/01fe7ebcb7545a1990c53c11f31230afe1388b0b34256e3fd20e49482245/websocket-client-1.4.1.tar.gz"
             }
           ],
           "project_name": "websocket-client",
@@ -3791,7 +3736,7 @@
             "wsaccel; extra == \"optional\""
           ],
           "requires_python": ">=3.7",
-          "version": "1.4"
+          "version": "1.4.1"
         },
         {
           "artifacts": [
@@ -3978,7 +3923,7 @@
     "Jinja2~=3.1.2",
     "PyJWT~=2.0",
     "PyYAML~=6.0",
-    "SQLAlchemy[postgresql_asyncpg]~=1.4.39",
+    "SQLAlchemy[postgresql_asyncpg]~=1.4.40",
     "aiodataloader-ng~=0.2.1",
     "aiodns>=3.0",
     "aiodocker~=0.21.0",
@@ -4022,7 +3967,6 @@
     "passlib[bcrypt]>=1.7.4",
     "pexpect~=4.8",
     "psutil~=5.9.1",
-    "psycopg2-binary>=2.8.4",
     "pycryptodome>=3.14.1",
     "pytest-dependency>=0.5.1",
     "pytest>=7.1.2",
