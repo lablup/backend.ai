@@ -16,17 +16,6 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 22.09.0b6 (2022-09-02)
-
-### Features
-* Update codespace bootstrap script to reflect updated `install-dev.sh` ([#516](https://github.com/lablup/backend.ai/issues/516))
-* Allow non-admin users to query agent information by implementing new gql schema. ([#645](https://github.com/lablup/backend.ai/issues/645))
-
-### Fixes
-* Fix accelerator specific files created under work directory (`/home/work`) instead of config directory (`/home/config`). ([#701](https://github.com/lablup/backend.ai/issues/701))
-* Update `etcetra` (to v0.1.10) to avoid potential accumulation of unreclaimed async tasks
-
-
 ## 22.09.0b5 (2022-08-30)
 
 ### Features

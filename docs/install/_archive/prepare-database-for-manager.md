@@ -84,7 +84,7 @@ You may use the following shell command:
 (ensure that special characters in your password are properly escaped)
 
 ```console
-$ sed -i'' -e 's!^sqlalchemy.url = .*$!sqlalchemy.url = postgresql+asyncpg://{DBUSER}:{DBPASS}@{DBHOST}:{DBPORT}/backend!' alembic.ini
+$ sed -i'' -e 's!^sqlalchemy.url = .*$!sqlalchemy.url = postgresql://{DBUSER}:{DBPASS}@{DBHOST}:{DBPORT}/backend!' alembic.ini
 ```
 
 ```console
@@ -117,7 +117,7 @@ Then pour it to the database:
 $ python -m ai.backend.manager.cli \
 >   --db-addr={DBHOST}:{DBPORT} \
 >   --db-user={DBUSER} \
->   --db-password={DBPASS}
+>   --db-password={DBPASS} 
 >   --db-name=backend \
 >   fixture populate example_keypair
 ```
