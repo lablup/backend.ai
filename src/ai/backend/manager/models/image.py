@@ -717,7 +717,6 @@ class RescanImages(graphene.Mutation):
         async def _rescan_task(reporter: ProgressReporter) -> None:
             await rescan_images(ctx.etcd, ctx.db, registry, reporter=reporter)
 
-        # TODO
         task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
 

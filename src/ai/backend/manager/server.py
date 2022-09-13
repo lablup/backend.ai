@@ -299,12 +299,8 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     grpc_port = int(raft_id.split(":")[-1])
     filtered_configuration = tuple(conf for conf in configuration if conf != raft_id)
 
-    reigns: bool = False
-
     root_ctx.node_id = f"{raft_id}:{os.getpid()}"
-
-    _log_prefix = f"[pid={os.getpid()}/pidx={root_ctx.pidx}]"
-
+    reigns: bool = False
     global_timer_ids: Final[List[str]] = []
 
     async def _on_global_timer_created(context: None, source: str, event: GlobalTimerCreatedEvent):
@@ -321,6 +317,7 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     async def _on_state_changed(next_state: RaftState):
         nonlocal reigns
+        _log_prefix = f"[pid={os.getpid()}/pidx={root_ctx.pidx}]"
         match next_state:
             case RaftState.LEADER:
                 log.debug(f"{_log_prefix} LEADER")

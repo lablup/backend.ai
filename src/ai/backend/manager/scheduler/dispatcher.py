@@ -172,14 +172,9 @@ class SchedulerDispatcher(aobject):
             interval=10.0,
             initial_delay=5.0,
         )
-        # await self.schedule_timer.join()
-        # await self.prepare_timer.join()
         log.info("Session scheduler started")
 
     async def close(self) -> None:
-        # async with aiotools.TaskGroup() as tg:
-        #     tg.create_task(self.prepare_timer.leave())
-        #     tg.create_task(self.schedule_timer.leave())
         log.info("Session scheduler stopped")
 
     async def schedule(

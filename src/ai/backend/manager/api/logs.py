@@ -263,13 +263,11 @@ async def init(app: web.Application) -> None:
         20.0,
         initial_delay=17.0,
     )
-    # await app_ctx.log_cleanup_timer.join()
 
 
 async def shutdown(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["logs.context"]
-    # await app_ctx.log_cleanup_timer.leave()
     root_ctx.event_dispatcher.unconsume(app_ctx.log_cleanup_timer_evh)
     await app_ctx.log_cleanup_timer_redis.close()
 

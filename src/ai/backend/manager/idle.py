@@ -126,12 +126,10 @@ class IdleCheckerHost:
             None,
             self._do_idle_check,
         )
-        # await self.timer.join()
 
     async def shutdown(self) -> None:
         for checker in self._checkers:
             await checker.aclose()
-        # await self.timer.leave()
         self._event_dispatcher.unconsume(self._evh_idle_check)
         await self._redis_stat.close()
         await self._redis_live.close()
