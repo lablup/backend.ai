@@ -16,6 +16,30 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.0b6 (2022-09-02)
+
+### Features
+* Update codespace bootstrap script to reflect updated `install-dev.sh` ([#516](https://github.com/lablup/backend.ai/issues/516))
+* Allow non-admin users to query agent information by implementing new gql schema. ([#645](https://github.com/lablup/backend.ai/issues/645))
+
+### Fixes
+* Fix accelerator specific files created under work directory (`/home/work`) instead of config directory (`/home/config`). ([#701](https://github.com/lablup/backend.ai/issues/701))
+* Update `etcetra` (to v0.1.10) to avoid potential accumulation of unreclaimed async tasks
+
+
+## 22.09.0b5 (2022-08-30)
+
+### Features
+* Refactor `decrypt_payload()` as a middleware so that applied to `web_handler()` and `login_handler()` ([#626](https://github.com/lablup/backend.ai/issues/626))
+* Preserve the given `reason` value even when a kernel is force-terminated with a fallback to `force-terminated` ([#681](https://github.com/lablup/backend.ai/issues/681))
+* Enable the asyncio debug mode when our debug mode is enabled (e.g., `--debug`) and replace `aiomonitor` with `aiomonitor-ng` ([#688](https://github.com/lablup/backend.ai/issues/688))
+
+### Fixes
+* Accept both string field names and `FieldSpec` instances in the Client SDK's functional API wrappers ([#613](https://github.com/lablup/backend.ai/issues/613))
+* Do not remove lock file when FileLock does not have lock. ([#676](https://github.com/lablup/backend.ai/issues/676))
+* Make the Web-UI login work again by fixing missing decrypted payloads as JSON (a regression of #626) ([#689](https://github.com/lablup/backend.ai/issues/689))
+
+
 ## 22.09.0b4 (2022-08-22)
 
 ### Features

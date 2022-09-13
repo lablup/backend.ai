@@ -116,7 +116,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 for opt in options:
                     if opt not in session_fields:
                         ctx.output.print_fail(f"There is no such format option: {opt}")
-                        sys.exit(ExitCode.INVALID_ARGUMENTS)
+                        sys.exit(ExitCode.INVALID_ARGUMENT)
                 fields = [session_fields[opt] for opt in options]
             else:
                 if session.api_version[0] >= 6:
