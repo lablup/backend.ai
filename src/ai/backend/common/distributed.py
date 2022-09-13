@@ -128,18 +128,15 @@ class LeaderGlobalTimer:
             if self._stopped:
                 return
             while True:
-                log.warning(
+                log.debug(
                     f"[GlobalTimer:{os.getpid()}:{self._id[:4]}] generate_tick(interval={self.interval})"
                 )
-                try:
-                    if self._stopped:
-                        return
-                    await self._event_producer.produce_event(self._event_factory())
-                    if self._stopped:
-                        return
-                    await asyncio.sleep(self.interval)
-                except asyncio.TimeoutError:  # timeout raised from etcd lock
-                    log.warn("timeout raised while trying to acquire lock. retrying...")
+                if self._stopped:
+                    return
+                await self._event_producer.produce_event(self._event_factory())
+                if self._stopped:
+                    return
+                await asyncio.sleep(self.interval)
         except asyncio.CancelledError:
             pass
 

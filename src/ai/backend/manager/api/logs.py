@@ -256,7 +256,7 @@ async def init(app: web.Application) -> None:
         db=REDIS_LIVE_DB,
     )
     app_ctx.log_cleanup_timer = LeaderGlobalTimer(
-        root_ctx.cluster_node_id,
+        root_ctx.node_id,
         root_ctx.event_producer,
         root_ctx.event_dispatcher,
         lambda: DoLogCleanupEvent(),

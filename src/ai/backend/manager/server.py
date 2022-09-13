@@ -4,7 +4,6 @@ import asyncio
 import functools
 import grp
 import importlib
-import json
 import logging
 import os
 import pwd
@@ -27,7 +26,6 @@ from typing import (
     Sequence,
     cast,
 )
-from uuid import uuid4
 
 import aiohttp_cors
 import aiomonitor
@@ -38,7 +36,6 @@ from aioraft import Raft
 from aioraft.client import GrpcRaftClient
 from aioraft.server import GrpcRaftServer
 from aioraft.types import RaftState
-from aiotools.context import aclosing
 from redis.asyncio import Redis
 from setproctitle import setproctitle
 
@@ -55,7 +52,6 @@ from ai.backend.common.events import (
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
-from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.common.utils import env_info
 
 from . import __version__
@@ -73,14 +69,7 @@ from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHand
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
-from .defs import (
-    REDIS_IMAGE_DB,
-    REDIS_LIVE_DB,
-    REDIS_STAT_DB,
-    REDIS_STREAM_DB,
-    REDIS_STREAM_LEADER_TASK,
-    REDIS_STREAM_LOCK,
-)
+from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
 from .types import DistributedLockFactory
 
@@ -312,59 +301,18 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     reigns: bool = False
 
-    root_ctx.cluster_node_id = f"{raft_id}:{os.getpid()}"
-
-    async def subscribe(r: RedisConnectionInfo):
-        try:
-            async with aclosing(
-                redis_helper.read_stream_by_group(
-                    r,
-                    stream_key="leader-task",
-                    group_name="raft",
-                    consumer_id=str(uuid4()),
-                    autoclaim_idle_timeout=500,
-                )
-            ) as agen:
-                async for msg_id, msg_data in agen:
-                    log.info(
-                        f"[redis:{root_ctx.pidx}:{reigns}] read_stream_by_group(): id={msg_id.decode()} task_id={msg_data[b'task_id'].decode()}"
-                    )
-                    if reigns:
-                        rqst = json.loads(msg_data[b"request"].decode())
-                        print(
-                            f"[redis:{root_ctx.pidx}:{reigns}] read_stream_by_group(): request={rqst}"
-                        )
-                        """
-                        try:
-                            import importlib
-                            function_name = msg_data[b"function"].decode()
-                            module_name, func_name = function_name.split(".")
-                            module = importlib.import_module(f"ai.backend.manager.api.{module_name}")
-                            func = getattr(module, func_name)
-                            log.info(f"[redis:{root_ctx.pidx}:{reigns}] func={func}")
-                            # TODO
-                        except Exception as e:
-                            log.error(f"[redis:subscribe] {e}")
-                        """
-                    else:
-                        await redis_helper.execute(
-                            root_ctx.redis_leader_task, lambda r: r.xadd("leader-task", msg_data)
-                        )
-        except asyncio.CancelledError:
-            pass
-
-    subscribe_task = asyncio.create_task(subscribe(root_ctx.redis_leader_task))
+    root_ctx.node_id = f"{raft_id}:{os.getpid()}"
 
     _log_prefix = f"[pid={os.getpid()}/pidx={root_ctx.pidx}]"
 
     global_timer_ids: Final[List[str]] = []
 
     async def _on_global_timer_created(context: None, source: str, event: GlobalTimerCreatedEvent):
-        if root_ctx.cluster_node_id == event.node_id:
+        if root_ctx.node_id == event.node_id:
             global_timer_ids.append(event.timer_id)
             if reigns:
                 await root_ctx.event_producer.produce_event(
-                    GlobalTimerJoinEvent(node_id=root_ctx.cluster_node_id, timer_id=event.timer_id)
+                    GlobalTimerJoinEvent(node_id=root_ctx.node_id, timer_id=event.timer_id)
                 )
 
     global_timer_created_handler = root_ctx.event_dispatcher.subscribe(
@@ -379,7 +327,7 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 reigns = True
                 for timer_id in global_timer_ids:
                     await root_ctx.event_producer.produce_event(
-                        GlobalTimerJoinEvent(node_id=root_ctx.cluster_node_id, timer_id=timer_id)
+                        GlobalTimerJoinEvent(node_id=root_ctx.node_id, timer_id=timer_id)
                     )
 
             case RaftState.CANDIDATE:
@@ -391,7 +339,7 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 reigns = False
                 for timer_id in global_timer_ids:
                     await root_ctx.event_producer.produce_event(
-                        GlobalTimerLeaveEvent(node_id=root_ctx.cluster_node_id, timer_id=timer_id)
+                        GlobalTimerLeaveEvent(node_id=root_ctx.node_id, timer_id=timer_id)
                     )
 
     server = GrpcRaftServer()
@@ -423,8 +371,6 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     root_ctx.event_dispatcher.unsubscribe(global_timer_created_handler)
 
-    subscribe_task.cancel()
-
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
@@ -448,17 +394,12 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_LOCK,
     )
-    root_ctx.redis_leader_task = redis_helper.get_redis_object(
-        root_ctx.shared_config.data["redis"],
-        db=REDIS_STREAM_LEADER_TASK,
-    )
     for redis_info in (
         root_ctx.redis_live,
         root_ctx.redis_stat,
         root_ctx.redis_image,
         root_ctx.redis_stream,
         root_ctx.redis_lock,
-        root_ctx.redis_leader_task,
     ):
         assert isinstance(redis_info.client, Redis)
         await redis_helper.ping_redis_connection(redis_info.client)
@@ -468,7 +409,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.redis_stat.close()
     await root_ctx.redis_live.close()
     await root_ctx.redis_lock.close()
-    await root_ctx.redis_leader_task.close()
 
 
 @actxmgr
@@ -509,7 +449,7 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .idle import init_idle_checkers
 
     root_ctx.idle_checker_host = await init_idle_checkers(
-        root_ctx.cluster_node_id,
+        root_ctx.node_id,
         root_ctx.db,
         root_ctx.shared_config,
         root_ctx.event_dispatcher,
@@ -572,7 +512,7 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .scheduler.dispatcher import SchedulerDispatcher
 
     sched_dispatcher = await SchedulerDispatcher.new(
-        root_ctx.cluster_node_id,
+        root_ctx.node_id,
         root_ctx.local_config,
         root_ctx.shared_config,
         root_ctx.event_dispatcher,

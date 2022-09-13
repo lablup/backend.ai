@@ -52,6 +52,5 @@ class RootContext(BaseContext):
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
 
-    cluster_node_id: str
-
+    node_id: str
     redis_leader_task: RedisConnectionInfo

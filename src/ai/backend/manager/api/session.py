@@ -849,21 +849,6 @@ async def create_from_template(request: web.Request, params: Dict[str, Any]) -> 
         bootstrap += "\n"
         bootstrap += cmd_builder
         params["bootstrap_script"] = base64.b64encode(bootstrap.encode()).decode()
-
-    """
-    root_ctx: RootContext = request.app["_root.context"]
-
-    task_id = str(uuid.uuid4())
-    await redis_helper.execute(
-        root_ctx.redis_leader_task,
-        lambda r: r.xadd(
-            "leader-task", {"function": "session._create_from_template", "task_id": task_id}
-        ),
-    )
-
-    return web.json_response({"task_id": task_id}, status=201)
-    """
-
     return await _create(request, params)
 
 
@@ -944,38 +929,6 @@ async def create_from_params(request: web.Request, params: Dict[str, Any]) -> we
                         "For non-cluster sessions and single-node cluster sessions, "
                         "you may specify only one manually assigned agent.",
                     )
-
-    root_ctx: RootContext = request.app["_root.context"]
-    # TypeError: can't pickle multidict._multidict.CIMultiDictProxy objects
-    # https://github.com/aio-libs/multidict/issues/340
-
-    request_dict = {
-        "user": {
-            "domain_name": request["user"]["domain_name"],
-        },
-        "is_admin": request["is_admin"],
-        "is_superadmin": request["is_superadmin"],
-        "keypair": {
-            "access_key": request["keypair"]["access_key"],
-        },
-    }
-    # TODO
-    # "root_ctx": request.app["_root.context"],
-    # "app_ctx": request.app["session.context"],
-
-    task_id = str(uuid.uuid4())
-    await redis_helper.execute(
-        root_ctx.redis_leader_task,
-        lambda r: r.xadd(
-            "leader-task",
-            {
-                "function": "session._create",
-                "task_id": task_id,
-                "request": json.dumps(request_dict),
-            },
-        ),
-    )
-
     return await _create(request, params)
 
 
@@ -1535,9 +1488,6 @@ async def handle_destroy_session(
     event: DoTerminateSessionEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
-    # log.error(
-    #     f"[manager.session] handle_destroy_session(has_leadership={root_ctx.has_leadership()})"
-    # )
     await root_ctx.registry.destroy_session(
         functools.partial(
             root_ctx.registry.get_session_by_session_id,
@@ -1907,21 +1857,6 @@ async def destroy(request: web.Request, params: Dict[str, Any]) -> web.Response:
     resp = {
         "stats": last_stat,
     }
-
-    """
-    root_ctx: RootContext = request.app["_root.context"]
-
-    task_id = str(uuid.uuid4())
-    await redis_helper.execute(
-        root_ctx.redis_leader_task,
-        lambda r: r.xadd(
-            "leader-task", {"function": "session._destroy", "task_id": task_id}
-        ),
-    )
-
-    return web.json_response({"task_id": task_id}, status=201)
-    """
-
     return web.json_response(resp, status=200)
 
 
