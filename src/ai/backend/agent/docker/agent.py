@@ -508,7 +508,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> List[MountInfo]:
-        src_path = self.work_dir / str(computer.key)
+        src_path = self.config_dir / str(computer.key)
         src_path.mkdir()
         return await computer.generate_mounts(src_path, device_alloc)
 
