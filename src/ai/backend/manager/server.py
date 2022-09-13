@@ -467,16 +467,16 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
     from .models.kernel import KernelStatus
     from .models.utils import ExtendedAsyncSAEngine
 
-    async def _fetch_kernels_with_status_and_period(
+    async def _fetch_kernels_with_status_and_hangtime(
         db: ExtendedAsyncSAEngine,
         status: Optional[KernelStatus] = None,
-        period: Optional[timedelta] = None,
+        hangtime: Optional[timedelta] = None,
     ) -> Tuple[Tuple[str, str, str], ...]:
         async with db.begin_readonly() as conn:
             query = sa.select(kernels)
             if status:
                 query = query.where(kernels.c.status == status)
-                if period is not None:
+                if hangtime is not None:
                     query = query.where(
                         (
                             datetime.now(tz=tzutc())
@@ -484,18 +484,18 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
                                 sa.types.DateTime(timezone=True)
                             )
                         )
-                        > period
+                        > hangtime
                     )
                 query = query.order_by(kernels.c.status_history[status.name].asc())
             result = await conn.execute(query)
             return tuple(kernel.session_id for kernel in result.fetchall())
 
     async def _terminate_hanging_sessions(
-        status: KernelStatus, period: timedelta, reason: str = "force-terminated-due-to-hanging"
+        status: KernelStatus, hangtime: timedelta, reason: str = "force-terminated-due-to-hanging"
     ):
         while True:
-            session_ids = await _fetch_kernels_with_status_and_period(
-                root_ctx.db, status=status, period=period
+            session_ids = await _fetch_kernels_with_status_and_hangtime(
+                root_ctx.db, status=status, hangtime=hangtime
             )
             log.debug(f"{len(session_ids)} {status} kernels found.")
 
@@ -515,32 +515,32 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
                 ]
             )
 
-            await asyncio.sleep(period.seconds)
+            await asyncio.sleep(hangtime.seconds)
 
-    managed_sessions = root_ctx.local_config["manager"]["enabled-session-managing-contexts"]
     force_termination_tasks = []
-    for status, period in managed_sessions.items():
+    managed_sessions = root_ctx.local_config["manager"]["enabled-session-managing-contexts"]
+    for status, hangtime_fmt in managed_sessions.items():
         try:
             kernel_status = KernelStatus[status]
         except KeyError:
             continue
 
-        match period[-1]:
+        match hangtime_fmt[-1]:
             case "h":
-                acceptable_period = timedelta(hours=int(period[:-1]))
+                hangtime = timedelta(hours=int(hangtime_fmt[:-1]))
             case "m":
-                acceptable_period = timedelta(minutes=int(period[:-1]))
+                hangtime = timedelta(minutes=int(hangtime_fmt[:-1]))
             case "s":
-                acceptable_period = timedelta(seconds=int(period[:-1]))
+                hangtime = timedelta(seconds=int(hangtime_fmt[:-1]))
             case _:
                 log.error(
-                    f'Skip "{status}:{period}" as it is an invalid argument. Supported postfixes: "h", "m", "s"'
+                    f'Skip "{status}:{hangtime_fmt}" as it is an invalid argument. Supported postfixes: "h", "m", "s"'
                 )
                 continue
 
         force_termination_tasks.append(
             asyncio.create_task(
-                _terminate_hanging_sessions(status=kernel_status, period=acceptable_period)
+                _terminate_hanging_sessions(status=kernel_status, hangtime=hangtime)
             )
         )
 
