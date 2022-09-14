@@ -111,7 +111,7 @@ class VFolderInvitationState(str, enum.Enum):
 
 class VFolderOperationStatus(str, enum.Enum):
     """
-    Introduce virtual folder status for storage-proxy operations.
+    Introduce virtual folder current status for storage-proxy operations.
     """
 
     READY = "ready"
@@ -121,7 +121,13 @@ class VFolderOperationStatus(str, enum.Enum):
     DELETED = "deleted"
     MOUNTED = "mounted"
 
+
 class VFolderAccessStatus(str, enum.Enum):
+    """
+    Introduce virtual folder desired status for storage-proxy operations.
+    Not added to db scheme  and determined only by current vfolder status.
+    """
+
     READABLE = "readable"
     WRITABLE = "writable"
 
