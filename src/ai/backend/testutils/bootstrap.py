@@ -2,16 +2,38 @@ from __future__ import annotations
 
 import json
 import logging
+import socket
 import subprocess
 import time
+from contextlib import closing
+from pathlib import Path
 from typing import Iterator
 
 import pytest
 
+from ai.backend.common.lock import FileLock
 from ai.backend.common.types import HostPortPair
-from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger(__name__)
+
+
+class PortNotAvailableError(Exception):
+    pass
+
+
+def get_idle_port(min_port_no: int, max_tries=10) -> int:
+    lock_path = Path("/tmp") / "bai-test" / "port.lock"
+    lock_path.parent.mkdir(exist_ok=True, parents=True)
+    with FileLock(lock_path):
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+            for port in range(min_port_no, min_port_no + max_tries):
+                try:
+                    sock.bind(("", port))
+                    return port
+                except OSError:
+                    pass
+            else:
+                raise PortNotAvailableError
 
 
 def wait_health_check(container_id):
@@ -36,11 +58,26 @@ def wait_health_check(container_id):
         return container_info
 
 
+def parse_host_port(container_id, container_port):
+    proc = subprocess.run(
+        [
+            "docker",
+            "inspect",
+            container_id,
+        ],
+        capture_output=True,
+    )
+    container_info = json.loads(proc.stdout)
+    return int(
+        container_info[0]["NetworkSettings"]["Ports"][f"{container_port}/tcp"][0]["HostPort"]
+    )
+
+
 @pytest.fixture(scope="session")
 def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
-    etcd_allocated_port = 12379 + get_parallel_slot() * 10
-    log.info("spawning etcd container on port %d", etcd_allocated_port)
+    etcd_allocated_port = get_idle_port(12379)
+    log.info("spawning etcd container on port {}", etcd_allocated_port)
     proc = subprocess.run(
         [
             "docker",
@@ -83,8 +120,8 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
 @pytest.fixture(scope="session")
 def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
-    redis_allocated_port = 36379 + get_parallel_slot() * 10
-    log.info("spawning redis container on port %d", redis_allocated_port)
+    redis_allocated_port = get_idle_port(16379)
+    log.info("spawning redis container on port {}", redis_allocated_port)
     proc = subprocess.run(
         [
             "docker",
@@ -120,8 +157,8 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
 @pytest.fixture(scope="session")
 def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
-    postgres_allocated_port = 15432 + get_parallel_slot() * 10
-    log.info("spawning postgres container on port %d", postgres_allocated_port)
+    postgres_allocated_port = get_idle_port(15432)
+    log.info("spawning postgres container on port {}", postgres_allocated_port)
     proc = subprocess.run(
         [
             "docker",
