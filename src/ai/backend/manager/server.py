@@ -295,11 +295,8 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @actxmgr
 async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     configuration = root_ctx.local_config["manager"]["raft-configuration"]
-    raft_id = configuration[root_ctx.pidx]
-    grpc_port = int(raft_id.split(":")[-1])
-    filtered_configuration = tuple(conf for conf in configuration if conf != raft_id)
-
-    root_ctx.node_id = f"{raft_id}:{os.getpid()}"
+    raft_addr = configuration.pop(root_ctx.pidx)
+    root_ctx.node_id = f"{raft_addr}:{os.getpid()}"
     reigns: bool = False
     global_timer_ids: Final[List[str]] = []
 
@@ -342,10 +339,10 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     server = GrpcRaftServer()
     client = GrpcRaftClient()
     raft = await Raft.new(
-        raft_id,
+        str(raft_addr),
         server=server,
         client=client,
-        configuration=filtered_configuration,
+        configuration=tuple(map(str, configuration)),
         on_state_changed=_on_state_changed,
     )
 
@@ -356,7 +353,7 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             GrpcRaftServer.run(
                 server,
                 cleanup_coroutines=_cleanup_coroutines,
-                port=grpc_port,
+                port=raft_addr.port,
             ),
         ),
         asyncio.create_task(raft.main()),

@@ -29,7 +29,13 @@ disabled-plugins = []
 
 hide-agents = true
 
-raft-configuration = ["127.0.0.1:50051", "127.0.0.1:50052", "127.0.0.1:50053", "127.0.0.1:50054", "127.0.0.1:50055"]
+raft-configuration = [
+    { host = "127.0.0.1", port = 50051 },
+    { host = "127.0.0.1", port = 50052 },
+    { host = "127.0.0.1", port = 50053 },
+    { host = "127.0.0.1", port = 50054 },
+    { host = "127.0.0.1", port = 50055 },
+]
 
 
 [docker-registry]

@@ -256,6 +256,9 @@ manager_local_config_iv = (
                     t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
                     t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
                     t.Key("aiomonitor-port", default=50100): t.Int[1:65535],
+                    t.Key("raft-configuration", default=[HostPortPair("127.0.0.1", 50051)]): t.List(
+                        tx.HostPortPair
+                    ),
                 }
             ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(
