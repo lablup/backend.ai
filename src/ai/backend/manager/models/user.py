@@ -687,7 +687,7 @@ class ModifyUser(graphene.Mutation):
                         if row.is_admin and row.is_active:
                             kp_data["is_active"] = False
                             kp_updates.append(kp_data)
-                    if kp_updates:
+                    if len(kp_updates) > 0:
                         await conn.execute(
                             sa.update(keypairs)
                             .values(
