@@ -131,7 +131,7 @@ async def setup_kwargs_plugin(
     # Override the interpreter compatibility range
     interpreter_constraints = InterpreterConstraints(python_setup.interpreter_constraints)
     python_requires = next(str(ic.specifier) for ic in interpreter_constraints)
-    if m := re.search(r"=(?P<major>\d+)\.(?P<minor>\d+)", python_requires):
+    if m := re.search(r"==(?P<major>\d+)\.(?P<minor>\d+)", python_requires):
         major = int(m.group("major"))
         minor = int(m.group("minor"))
         kwargs["python_requires"] = f">={major}.{minor},<{major}.{minor + 1}"
