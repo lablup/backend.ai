@@ -48,6 +48,7 @@ __all__: Sequence[str] = (
     "VFolderPermission",
     "VFolderPermissionValidator",
     "VFolderOperationStatus",
+    "VFolderAccessStatus",
     "query_accessible_vfolders",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",

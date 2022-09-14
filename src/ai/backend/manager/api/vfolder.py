@@ -37,6 +37,7 @@ from ..models import (
     AgentStatus,
     KernelStatus,
     UserRole,
+    VFolderAccessStatus,
     VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -85,7 +86,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 VFolderRow = Mapping[str, Any]
 
 
-def vfolder_filter_by_status_required(perm: VFolderOperationStatus):
+def vfolder_filter_by_status_required(perm: VFolderAccessStatus):
     """
     Checks if the target vfolder status is READY.
     The decorated handler should prevent user access
@@ -102,8 +103,8 @@ def vfolder_filter_by_status_required(perm: VFolderOperationStatus):
             allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
             folder_name = request.match_info["name"]
             vf_name_conds = vfolders.c.name == folder_name
-            if perm == VFolderOperationStatus.READY:
-                # if READY is requested, all status is accepted.
+            if perm == VFolderAccessStatus.READABLE:
+                # if READABLE access status is requested, all operation status is accepted.
                 vf_status_conds = vfolders.c.status.in_(
                     [
                         VFolderOperationStatus.READY,
@@ -114,12 +115,8 @@ def vfolder_filter_by_status_required(perm: VFolderOperationStatus):
                         VFolderOperationStatus.MOUNTED,
                     ]
                 )
-            elif perm in [
-                VFolderOperationStatus.PERFORMING,
-                VFolderOperationStatus.CLONING,
-                VFolderOperationStatus.DELETING,
-            ]:
-                # if PERFORMING, CLONING, DELETING is requested, only READY is accepted.
+            elif perm == VFolderAccessStatus.WRITABLE:
+                # if WRITABLE access status is requested, only READY operation status is accepted.
                 vf_status_conds = vfolders.c.status == VFolderOperationStatus.READY
             else:
                 # Otherwise, raise VFolderFilterStatusNotAvailable()
@@ -567,7 +564,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
 
 @superadmin_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_filter_by_status_required(VFolderOperationStatus.DELETING)
+@vfolder_filter_by_status_required(VFolderAccessStatus.WRITABLE)
 @check_api_params(
     t.Dict(
         {
@@ -820,7 +817,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
+@vfolder_filter_by_status_required(VFolderAccessStatus.WRITABLE)
 @check_api_params(
     t.Dict(
         {
@@ -919,7 +916,7 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
+@vfolder_filter_by_status_required(VFolderAccessStatus.WRITABLE)
 @vfolder_permission_required(VFolderPermission.OWNER_PERM)
 @check_api_params(
     t.Dict(
@@ -967,7 +964,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
+@vfolder_filter_by_status_required(VFolderAccessStatus.WRITABLE)
 @vfolder_permission_required(VFolderPermission.OWNER_PERM)
 @check_api_params(
     t.Dict(
@@ -1034,7 +1031,7 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
+@vfolder_filter_by_status_required(VFolderAccessStatus.WRITABLE)
 @vfolder_permission_required(VFolderPermission.READ_ONLY)
 @check_api_params(
     t.Dict(
@@ -1075,7 +1072,7 @@ async def create_download_session(
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
+@vfolder_filter_by_status_required(VFolderAccessStatus.WRITABLE)
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict(
@@ -1114,7 +1111,7 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
+@vfolder_filter_by_status_required(VFolderAccessStatus.WRITABLE)
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict(
@@ -1154,7 +1151,7 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
+@vfolder_filter_by_status_required(VFolderAccessStatus.WRITABLE)
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict(
@@ -1193,7 +1190,7 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderOperationStatus.PERFORMING)
+@vfolder_filter_by_status_required(VFolderAccessStatus.WRITABLE)
 @vfolder_permission_required(VFolderPermission.READ_WRITE)
 @check_api_params(
     t.Dict(
@@ -1822,7 +1819,7 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_filter_by_status_required(VFolderOperationStatus.DELETING)
+@vfolder_filter_by_status_required(VFolderAccessStatus.WRITABLE)
 async def delete(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -1941,7 +1938,7 @@ async def leave(request: web.Request, row: VFolderRow) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @vfolder_permission_required(VFolderPermission.READ_ONLY)
-@vfolder_filter_by_status_required(VFolderOperationStatus.CLONING)
+@vfolder_filter_by_status_required(VFolderAccessStatus.WRITABLE)
 @check_api_params(
     t.Dict(
         {
