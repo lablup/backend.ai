@@ -77,6 +77,7 @@ from ai.backend.common.events import (
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
+    KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
@@ -835,7 +836,9 @@ class AbstractAgent(
                         await self.rescan_resource_usage()
                         if not ev.suppress_events:
                             await self.produce_event(
-                                KernelTerminatedEvent(ev.kernel_id, "already-terminated"),
+                                KernelTerminatedEvent(
+                                    ev.kernel_id, KernelLifecycleEventReason.ALREADY_TERMINATED
+                                ),
                             )
                         if ev.done_future is not None:
                             ev.done_future.set_result(None)
@@ -1325,7 +1328,9 @@ class AbstractAgent(
                     )
                 except KeyError:
                     await self.produce_event(
-                        KernelTerminatedEvent(kernel_id, "self-terminated"),
+                        KernelTerminatedEvent(
+                            kernel_id, KernelLifecycleEventReason.SELF_TERMINATED
+                        ),
                     )
                     break
 

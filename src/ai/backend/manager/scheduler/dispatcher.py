@@ -24,6 +24,7 @@ from ai.backend.common.events import (
     DoScheduleEvent,
     EventDispatcher,
     EventProducer,
+    KernelLifecycleEventReason,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,
@@ -992,7 +993,7 @@ class SchedulerDispatcher(aobject):
                             {
                                 "status": KernelStatus.CANCELLED,
                                 "status_changed": now,
-                                "status_info": "failed-to-start",
+                                "status_info": KernelLifecycleEventReason.FAILED_TO_START,
                                 "status_data": status_data,
                                 "terminated_at": now,
                                 "status_history": sql_json_merge(

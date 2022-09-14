@@ -31,6 +31,7 @@ from kubernetes_asyncio import config as kube_config
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
@@ -948,8 +949,10 @@ class KubernetesAgent(
         core_api = kube_client.CoreV1Api()
         apps_api = kube_client.AppsV1Api()
 
-        async def force_cleanup(reason="self-terminated"):
-            await self.send_event("kernel_terminated", kernel_id, "self-terminated", None)
+        async def force_cleanup(reason=KernelLifecycleEventReason.SELF_TERMINATED):
+            await self.send_event(
+                "kernel_terminated", kernel_id, KernelLifecycleEventReason.SELF_TERMINATED, None
+            )
 
         try:
             kernel = self.kernel_registry[kernel_id]

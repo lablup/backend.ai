@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import enum
 import hashlib
 import logging
 import secrets
@@ -527,6 +528,15 @@ EventCallback = Union[
     Callable[[TContext, AgentId, TEvent], Coroutine[Any, Any, None]],
     Callable[[TContext, AgentId, TEvent], None],
 ]
+
+
+class KernelLifecycleEventReason(str, enum.Enum):
+    ALREADY_TERMINATED = "already-terminated"
+    FAILED_TO_START = "failed-to-start"
+    FORCE_TERMINATED = "force-terminated"
+    MISSING_AGENT_ALLOCATION = "missing-agent-allocation"
+    SELF_TERMINATED = "self-terminated"
+    USER_REQUESTED = "user-requested"
 
 
 @attr.s(auto_attribs=True, slots=True, frozen=True, eq=False, order=False)
