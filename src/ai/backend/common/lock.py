@@ -81,6 +81,7 @@ class FileLock(AbstractDistributedLock):
             log.debug("file lock implicitly released: {}", self._path)
 
     def _try_lock(self) -> None:
+        assert self._file is not None
         fcntl.flock(self._file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         self._locked = True
         if self._lifetime is not None:
