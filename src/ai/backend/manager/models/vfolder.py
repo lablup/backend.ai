@@ -121,6 +121,10 @@ class VFolderOperationStatus(str, enum.Enum):
     DELETED = "deleted"
     MOUNTED = "mounted"
 
+class VFolderAccessStatus(str, enum.Enum):
+    READABLE = "readable"
+    WRITABLE = "writable"
+
 
 vfolders = sa.Table(
     "vfolders",
