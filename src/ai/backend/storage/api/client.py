@@ -109,7 +109,8 @@ async def download(request: web.Request) -> web.StreamResponse:
                 mtime = os.stat(file_path).st_mtime
                 last_mdt = datetime.fromtimestamp(mtime)
                 resp_status = 200
-                if ifrange is not None and mtime > ifrange.timestamp():
+                if ifrange is not None and mtime <= ifrange.timestamp():
+                    # Return partial content.
                     resp_status = 206
                 return web.Response(
                     status=resp_status,
