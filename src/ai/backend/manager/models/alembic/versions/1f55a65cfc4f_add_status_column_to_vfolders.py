@@ -9,6 +9,9 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from ai.backend.manager.models.base import EnumValueType
+from ai.backend.manager.models.vfolder import VFolderOperationStatus
+
 # revision identifiers, used by Alembic.
 revision = "1f55a65cfc4f"
 down_revision = "35923972eddb"
@@ -17,7 +20,7 @@ depends_on = None
 
 
 vfolderstatus = postgresql.ENUM(
-    "READY", "PREPARED", "CLONING", "DELETING", "MOUNTED", name="vfolderstatus"
+    "READY", "PERFORMING", "CLONING", "DELETING", "DELETED", "MOUNTED", name="vfolderstatus"
 )
 
 
