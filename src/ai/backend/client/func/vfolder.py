@@ -168,6 +168,109 @@ class VFolder(BaseFunction):
             self.name = new_name
             return await resp.text()
 
+    def _write_file(self, file_path: Path, mode: str, q: janus._SyncQueueProxy[bytes]):
+        with open(file_path, mode) as f:
+            while True:
+                chunk = q.get()
+                if not chunk:
+                    return
+                f.write(chunk)
+                q.task_done()
+
+    async def _download_file(
+        self,
+        file_path: Path,
+        download_url: URL,
+        chunk_size: int,
+        max_retries: int,
+        show_progress: bool,
+    ) -> None:
+        if show_progress:
+            print(f"Downloading to {file_path} ...")
+
+        range_start = 0
+        if_range: str | None = None
+        file_unit = "bytes"
+        file_mode = "wb"
+        file_req_hdrs: Dict[str, str] = {}
+        try:
+            async for session_attempt in AsyncRetrying(
+                wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
+                stop=stop_after_attempt(max_retries),
+                retry=retry_if_exception_type(TryAgain),
+            ):
+                with session_attempt:
+                    try:
+                        if if_range is not None:
+                            file_req_hdrs[hdrs.IF_RANGE] = if_range
+                            file_req_hdrs[hdrs.RANGE] = f"{file_unit}={range_start}-"
+                        async with aiohttp.ClientSession(headers=file_req_hdrs) as client:
+                            async with client.get(download_url, ssl=False) as raw_resp:
+                                match raw_resp.status:
+                                    case 200:
+                                        # First attempt to download file or file has changed.
+                                        file_mode = "wb"
+                                        range_start = 0
+                                    case 206:
+                                        # File has not changed. Continue downloading from range_start.
+                                        file_mode = "ab"
+                                    case _:
+                                        # Retry.
+                                        raise ResponseFailed
+                                size = int(raw_resp.headers["Content-Length"])
+                                if_range = raw_resp.headers["Last-Modified"]
+                                q: janus.Queue[bytes] = janus.Queue(MAX_INFLIGHT_CHUNKS)
+                                try:
+                                    with tqdm(
+                                        total=(size - range_start),
+                                        unit=file_unit,
+                                        unit_scale=True,
+                                        unit_divisor=1024,
+                                        disable=not show_progress,
+                                    ) as pbar:
+                                        loop = current_loop()
+                                        writer_fut = loop.run_in_executor(
+                                            None, self._write_file, file_path, file_mode, q.sync_q
+                                        )
+                                        await asyncio.sleep(0)
+                                        max_attempts = 10
+                                        while True:
+                                            try:
+                                                async for attempt in AsyncRetrying(
+                                                    wait=wait_exponential(
+                                                        multiplier=0.02, min=0.02, max=5.0
+                                                    ),
+                                                    stop=stop_after_attempt(max_attempts),
+                                                    retry=retry_if_exception_type(TryAgain),
+                                                ):
+                                                    with attempt:
+                                                        try:
+                                                            chunk = await raw_resp.content.read(
+                                                                chunk_size
+                                                            )
+                                                        except asyncio.TimeoutError:
+                                                            raise TryAgain
+                                            except RetryError:
+                                                raise ResponseFailed
+                                            range_start += len(chunk)
+                                            pbar.update(len(chunk))
+                                            if not chunk:
+                                                break
+                                            await q.async_q.put(chunk)
+                                finally:
+                                    await q.async_q.put(b"")
+                                    await writer_fut
+                                    q.close()
+                                    await q.wait_closed()
+                    except (
+                        ResponseFailed,
+                        aiohttp.ClientPayloadError,
+                        aiohttp.ClientConnectorError,
+                    ):
+                        raise TryAgain
+        except RetryError:
+            raise RuntimeError(f"Downloading {file_path.name} failed after {max_retries} retries")
+
     @api_function
     async def download(
         self,
@@ -207,100 +310,9 @@ class VFolder(BaseFunction):
                         "token": download_info["token"],
                     }
                 )
-
-            def _write_file(file_path: Path, mode: str, q: janus._SyncQueueProxy[bytes]):
-                with open(file_path, mode) as f:
-                    while True:
-                        chunk = q.get()
-                        if not chunk:
-                            return
-                        f.write(chunk)
-                        q.task_done()
-
-            if show_progress:
-                print(f"Downloading to {file_path} ...")
-            range_start = 0
-            if_range: str | None = None
-            file_unit = "bytes"
-            file_mode = "wb"
-            file_req_hdrs: Dict[str, str] = {}
-            try:
-                async for session_attempt in AsyncRetrying(
-                    wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
-                    stop=stop_after_attempt(max_retries),
-                    retry=retry_if_exception_type(TryAgain),
-                ):
-                    with session_attempt:
-                        try:
-                            if if_range is not None:
-                                file_req_hdrs[hdrs.IF_RANGE] = if_range
-                                file_req_hdrs[hdrs.RANGE] = f"{file_unit}={range_start}-"
-                            async with aiohttp.ClientSession(headers=file_req_hdrs) as client:
-                                async with client.get(download_url, ssl=False) as raw_resp:
-                                    match raw_resp.status:
-                                        case 200:
-                                            # First attempt to download file or file has changed.
-                                            file_mode = "wb"
-                                            range_start = 0
-                                        case 206:
-                                            # File has not changed. Continue downloading from range_start.
-                                            file_mode = "ab"
-                                        case _:
-                                            # Retry.
-                                            raise ResponseFailed
-                                    size = int(raw_resp.headers["Content-Length"])
-                                    if_range = raw_resp.headers["Last-Modified"]
-                                    q: janus.Queue[bytes] = janus.Queue(MAX_INFLIGHT_CHUNKS)
-                                    try:
-                                        with tqdm(
-                                            total=(size - range_start),
-                                            unit=file_unit,
-                                            unit_scale=True,
-                                            unit_divisor=1024,
-                                            disable=not show_progress,
-                                        ) as pbar:
-                                            loop = current_loop()
-                                            writer_fut = loop.run_in_executor(
-                                                None, _write_file, file_path, file_mode, q.sync_q
-                                            )
-                                            await asyncio.sleep(0)
-                                            max_attempts = 10
-                                            while True:
-                                                try:
-                                                    async for attempt in AsyncRetrying(
-                                                        wait=wait_exponential(
-                                                            multiplier=0.02, min=0.02, max=5.0
-                                                        ),
-                                                        stop=stop_after_attempt(max_attempts),
-                                                        retry=retry_if_exception_type(TryAgain),
-                                                    ):
-                                                        with attempt:
-                                                            try:
-                                                                chunk = await raw_resp.content.read(
-                                                                    chunk_size
-                                                                )
-                                                            except asyncio.TimeoutError:
-                                                                raise TryAgain
-                                                except RetryError:
-                                                    raise ResponseFailed
-                                                range_start += len(chunk)
-                                                pbar.update(len(chunk))
-                                                if not chunk:
-                                                    break
-                                                await q.async_q.put(chunk)
-                                    finally:
-                                        await q.async_q.put(b"")
-                                        await writer_fut
-                                        q.close()
-                                        await q.wait_closed()
-                        except (
-                            ResponseFailed,
-                            aiohttp.ClientPayloadError,
-                            aiohttp.ClientConnectorError,
-                        ):
-                            raise TryAgain
-            except RetryError:
-                raise RuntimeError(f"File download failed after {max_retries} retries")
+            await self._download_file(
+                file_path, download_url, chunk_size, max_retries, show_progress
+            )
 
     @api_function
     async def upload(
