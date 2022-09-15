@@ -15,11 +15,11 @@ def get_tag():
     return revision
 
 def get_prev_tag():
-    rev = subprocess.run(['git', 'rev-list', '--tags', '--skip=0', '--max-count=1'], capture_output=True)
-    rev = rev.stdout.decode().strip()
+    p = subprocess.run(['git', 'rev-list', '--tags', '--skip=0', '--max-count=1'], capture_output=True)
+    rev = p.stdout.decode().strip()
 
-    tag = subprocess.run(['git', 'describe', '--abbrev=0', '--tags', f'{rev}'], capture_output=True)
-    tag = tag.stdout.decode().strip()
+    p = subprocess.run(['git', 'describe', '--abbrev=0', '--tags', f'{rev}'], capture_output=True)
+    tag = p.stdout.decode().strip()
     return tag
 
 def main():
