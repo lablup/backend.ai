@@ -235,11 +235,19 @@ class VFolder(BaseFunction):
                             if if_range is not None:
                                 file_req_hdrs[hdrs.IF_RANGE] = if_range
                                 file_req_hdrs[hdrs.RANGE] = f"{file_unit}={range_start}-"
-                                file_mode = "ab"
-                            async with aiohttp.ClientSession(
-                                headers=file_req_hdrs
-                            ) as client:
+                            async with aiohttp.ClientSession(headers=file_req_hdrs) as client:
                                 async with client.get(download_url, ssl=False) as raw_resp:
+                                    match raw_resp.status:
+                                        case 200:
+                                            # First attempt to download file or file has changed.
+                                            file_mode = "wb"
+                                            range_start = 0
+                                        case 206:
+                                            # File has not changed. Continue downloading from range_start.
+                                            file_mode = "ab"
+                                        case _:
+                                            # Retry.
+                                            raise ResponseFailed
                                     size = int(raw_resp.headers["Content-Length"])
                                     if_range = raw_resp.headers["Last-Modified"]
                                     q: janus.Queue[bytes] = janus.Queue(MAX_INFLIGHT_CHUNKS)
