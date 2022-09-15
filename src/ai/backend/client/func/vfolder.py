@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from typing import Mapping, Optional, Sequence, Union, cast
+from typing import Dict, Mapping, Optional, Sequence, Union
 
 import aiohttp
 import janus
@@ -177,6 +177,7 @@ class VFolder(BaseFunction):
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         show_progress: bool = False,
         address_map: Optional[Mapping[str, str]] = None,
+        max_retries: int = 20,
     ) -> None:
         base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
         for relpath in relative_paths:
@@ -222,12 +223,11 @@ class VFolder(BaseFunction):
             if_range: str | None = None
             file_unit = "bytes"
             file_mode = "wb"
-            file_req_hdrs = {}
-            session_max_attempts = 20
+            file_req_hdrs: Dict[str, str] = {}
             try:
                 async for session_attempt in AsyncRetrying(
                     wait=wait_exponential(multiplier=0.02, min=0.02, max=5.0),
-                    stop=stop_after_attempt(session_max_attempts),
+                    stop=stop_after_attempt(max_retries),
                     retry=retry_if_exception_type(TryAgain),
                 ):
                     with session_attempt:
@@ -237,7 +237,7 @@ class VFolder(BaseFunction):
                                 file_req_hdrs[hdrs.RANGE] = f"{file_unit}={range_start}-"
                                 file_mode = "ab"
                             async with aiohttp.ClientSession(
-                                headers=cast(Mapping[str, str], file_req_hdrs)
+                                headers=file_req_hdrs
                             ) as client:
                                 async with client.get(download_url, ssl=False) as raw_resp:
                                     size = int(raw_resp.headers["Content-Length"])
@@ -255,8 +255,8 @@ class VFolder(BaseFunction):
                                             writer_fut = loop.run_in_executor(
                                                 None, _write_file, file_path, file_mode, q.sync_q
                                             )
-                                            max_attempts = 10
                                             await asyncio.sleep(0)
+                                            max_attempts = 10
                                             while True:
                                                 try:
                                                     async for attempt in AsyncRetrying(
@@ -274,9 +274,7 @@ class VFolder(BaseFunction):
                                                             except asyncio.TimeoutError:
                                                                 raise TryAgain
                                                 except RetryError:
-                                                    raise ResponseFailed(
-                                                        f"File download failed after {max_attempts} retries"
-                                                    )
+                                                    raise ResponseFailed
                                                 range_start += len(chunk)
                                                 pbar.update(len(chunk))
                                                 if not chunk:
@@ -294,7 +292,7 @@ class VFolder(BaseFunction):
                         ):
                             raise TryAgain
             except RetryError:
-                raise RuntimeError("File download failed")
+                raise RuntimeError(f"File download failed after {max_retries} retries")
 
     @api_function
     async def upload(
