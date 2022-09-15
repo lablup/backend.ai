@@ -105,9 +105,14 @@ async def download(request: web.Request) -> web.StreamResponse:
                 else:
                     raise InvalidAPIParameters("The file is not a regular file.")
             if request.method == "HEAD":
-                last_mdt = datetime.fromtimestamp(os.stat(file_path).st_mtime)
+                ifrange: datetime | None = request.if_range
+                mtime = os.stat(file_path).st_mtime
+                last_mdt = datetime.fromtimestamp(mtime)
+                resp_status = 200
+                if ifrange is not None and mtime > ifrange.timestamp():
+                    resp_status = 206
                 return web.Response(
-                    status=200,
+                    status=resp_status,
                     headers={
                         hdrs.ACCEPT_RANGES: "bytes",
                         hdrs.CONTENT_LENGTH: str(file_path.stat().st_size),
