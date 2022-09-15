@@ -878,7 +878,7 @@ class KubernetesAgent(
             # Additional check to filter out real worker pods only?
 
             async def _fetch_container_info(pod: Any):
-                kernel_id: Union[str, None] = "(unknown)"
+                kernel_id: Union[KernelId, str, None] = "(unknown)"
                 try:
                     kernel_id = await get_kernel_id_from_deployment(pod)
                     if kernel_id is None or kernel_id not in self.kernel_registry:
