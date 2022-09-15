@@ -35,7 +35,7 @@ from ..api.exceptions import (
     ObjectNotFound,
     TooManyKernelsFound,
 )
-from .agent import Agent, AgentList, ModifyAgent
+from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
 from .group import CreateGroup, DeleteGroup, Group, ModifyGroup, PurgeGroup
@@ -96,7 +96,12 @@ from .user import (
     UserRole,
     UserStatus,
 )
-from .vfolder import VirtualFolder, VirtualFolderList
+from .vfolder import (
+    VirtualFolder,
+    VirtualFolderList,
+    VirtualFolderPermission,
+    VirtualFolderPermissionList,
+)
 
 
 @attr.s(auto_attribs=True, slots=True)
@@ -209,6 +214,22 @@ class Queries(graphene.ObjectType):
     # super-admin only
     agents = graphene.List(  # legacy non-paginated list
         Agent,
+        scaling_group=graphene.String(),
+        status=graphene.String(),
+    )
+
+    agent_summary = graphene.Field(
+        AgentSummary,
+        agent_id=graphene.String(required=True),
+    )
+
+    agent_summary_list = graphene.Field(
+        AgentSummaryList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+        # filters
         scaling_group=graphene.String(),
         status=graphene.String(),
     )
@@ -394,6 +415,15 @@ class Queries(graphene.ObjectType):
         access_key=graphene.String(),  # must be empty for user requests
     )
 
+    # super-admin only
+    vfolder_permission_list = graphene.Field(
+        VirtualFolderPermissionList,
+        limit=graphene.Int(required=True),
+        offset=graphene.Int(required=True),
+        filter=graphene.String(),
+        order=graphene.String(),
+    )
+
     vfolders = graphene.List(  # legacy non-paginated list
         VirtualFolder,
         domain_name=graphene.String(),
@@ -515,6 +545,71 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return AgentList(agent_list, total_count)
+
+    @staticmethod
+    @scoped_query(autofill_user=True, user_key="access_key")
+    async def resolve_agent_summary(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        agent_id: AgentId,
+        *,
+        access_key: AccessKey,
+        domain_name: str | None = None,
+        scaling_group: str | None = None,
+    ) -> AgentSummary:
+        ctx: GraphQueryContext = info.context
+        if ctx.local_config["manager"]["hide-agents"]:
+            raise ObjectNotFound(object_name="agent")
+
+        loader = ctx.dataloader_manager.get_loader(
+            ctx,
+            "Agent",
+            raw_status=None,
+            scaling_group=scaling_group,
+            domain_name=domain_name,
+            access_key=access_key,
+        )
+        return await loader.load(agent_id)
+
+    @staticmethod
+    @scoped_query(autofill_user=True, user_key="access_key")
+    async def resolve_agent_summary_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        access_key: AccessKey,
+        domain_name: str | None = None,
+        filter: str | None = None,
+        order: str | None = None,
+        scaling_group: str | None = None,
+        status: str | None = None,
+    ) -> AgentSummaryList:
+        ctx: GraphQueryContext = info.context
+        if ctx.local_config["manager"]["hide-agents"]:
+            raise ObjectNotFound(object_name="agent")
+
+        total_count = await AgentSummary.load_count(
+            ctx,
+            access_key=access_key,
+            scaling_group=scaling_group,
+            domain_name=domain_name,
+            raw_status=status,
+            filter=filter,
+        )
+        agent_list = await AgentSummary.load_slice(
+            ctx,
+            limit,
+            offset,
+            access_key=access_key,
+            scaling_group=scaling_group,
+            domain_name=domain_name,
+            raw_status=status,
+            filter=filter,
+            order=order,
+        )
+        return AgentSummaryList(agent_list, total_count)
 
     @staticmethod
     async def resolve_domain(
@@ -1104,6 +1199,33 @@ class Queries(graphene.ObjectType):
             order=order,
         )
         return VirtualFolderList(items, total_count)
+
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_vfolder_permission_list(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        limit: int,
+        offset: int,
+        *,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> VirtualFolderPermissionList:
+        total_count = await VirtualFolderPermission.load_count(
+            info.context,
+            user_id=user_id,
+            filter=filter,
+        )
+        items = await VirtualFolderPermission.load_slice(
+            info.context,
+            limit,
+            offset,
+            user_id=user_id,
+            filter=filter,
+            order=order,
+        )
+        return VirtualFolderPermissionList(items, total_count)
 
     @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")

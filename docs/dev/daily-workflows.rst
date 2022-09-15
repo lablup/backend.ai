@@ -57,14 +57,14 @@ Inspecting build configurations
 
   .. code-block:: console
 
-      $ ./pants dependencies --transitive src/ai/backend/common:lib
+      $ ./pants dependencies --transitive src/ai/backend/common:src
 
 * Display all dependees of a specific target (i.e., all targets affected when
   this target is changed)
 
   .. code-block:: console
 
-      $ ./pants dependees --transitive src/ai/backend/common:lib
+      $ ./pants dependees --transitive src/ai/backend/common:src
 
 .. note::
 
@@ -118,6 +118,10 @@ Here are various methods to run tests:
     $ ./pants test ::
     $ ./pants test tests/manager/test_scheduler.py::
     $ ./pants test tests/manager/test_scheduler.py:: -- -k test_scheduler_configs
+    $ ./pants test tests/common::            # Run common/**/test_*.py
+    $ ./pants test tests/common:tests        # Run common/test_*.py
+    $ ./pants test tests/common/redis::      # Run common/redis/**/test_*.py
+    $ ./pants test tests/common/redis:tests  # Run common/redis/test_*.py
 
 You may also try ``--changed-since`` option like ``lint`` and ``check``.
 
@@ -271,7 +275,7 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
      "coc.preferences.willSaveHandlerTimeout": 5000,
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.5/bin/python",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.7/bin/python",
      "python.formatting.provider": "black",
      "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
      "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
@@ -394,7 +398,7 @@ Writing documentation
 
   .. code-block:: console
 
-     $ pyenv virtualenv 3.10.4 venv-bai-docs
+     $ pyenv virtualenv 3.10.7 venv-bai-docs
 
 * Activate the virtualenv and run:
 
@@ -518,7 +522,7 @@ In this case, we recommend to do it as follows:
 
    .. code-block:: console
 
-      $ ./pants dependencies --transitive src/ai/backend/client:lib \
+      $ ./pants dependencies --transitive src/ai/backend/client:src \
       >   | grep src/ai/backend | grep -v ':version' | cut -d/ -f4 | uniq
       cli
       client

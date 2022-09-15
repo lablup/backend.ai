@@ -6,11 +6,11 @@ from tempfile import NamedTemporaryFile
 from typing import Dict, List
 from uuid import UUID
 
+from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize
 
 from ..exception import ExecutionError, VFolderCreationError
-from ..filelock import FileLock
 from ..types import VFolderCreationOptions, VFolderUsage
 from ..vfs import BaseVolume, run
 
