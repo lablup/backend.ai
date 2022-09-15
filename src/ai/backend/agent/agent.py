@@ -1905,13 +1905,11 @@ class AbstractAgent(
         except Exception:
             log.exception("unhandled exception while shutting down service app ${}", service)
 
-    async def commit(
-        self, reporter, kernel_id: KernelId, path: Path, lock_path: Path, filename: str
-    ):
-        return await self.kernel_registry[kernel_id].commit(path, lock_path, filename)
+    async def commit(self, reporter, kernel_id: KernelId, subdir: str, filename: str):
+        return await self.kernel_registry[kernel_id].commit(kernel_id, subdir, filename)
 
-    async def get_commit_status(self, kernel_id: KernelId, path: Path):
-        return await self.kernel_registry[kernel_id].check_duplicate_commit(path)
+    async def get_commit_status(self, kernel_id: KernelId, subdir: str):
+        return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)
 
     async def accept_file(self, kernel_id: KernelId, filename: str, filedata):
         return await self.kernel_registry[kernel_id].accept_file(filename, filedata)
