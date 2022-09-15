@@ -1089,11 +1089,12 @@ class PurgeUser(graphene.Mutation):
         ak_rows = await conn.execute(
             sa.select([keypairs.c.access_key]).where(keypairs.c.user == user_uuid),
         )
-        access_key = ak_rows.first().access_key
-        await redis_helper.execute(
-            redis_conn,
-            lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
-        )
+        if (row := ak_rows.first()) and (access_key := row.access_key):
+            # Log concurrency used only when there is at least one keypair.
+            await redis_helper.execute(
+                redis_conn,
+                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
+            )
         result = await conn.execute(
             sa.delete(keypairs).where(keypairs.c.user == user_uuid),
         )
