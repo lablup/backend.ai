@@ -851,7 +851,6 @@ class ClearImages(graphene.Mutation):
                     sa.delete(ImageAliasRow).where(ImageAliasRow.image_id.in_(image_ids))
                 )
                 await session.execute(sa.delete(ImageRow).where(ImageRow.registry == registry))
-                await session.commit()
         except ValueError as e:
             return ClearImages(ok=False, msg=str(e))
         return ClearImages(ok=True, msg="")
