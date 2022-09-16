@@ -418,27 +418,27 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 }
             )
-            # RDMA mounts
-            ib_root = Path("/dev/infiniband")
-            if ib_root.is_dir() and (ib_root / "uverbs0").exists():
-                self.container_configs.append(
-                    {
-                        "HostConfig": {
-                            "Devices": [
-                                {
-                                    "PathOnHost": "/dev/infiniband",
-                                    "PathInContainer": "/dev/infiniband",
-                                    "CgroupPermissions": "rwm",
-                                },
-                            ],
-                        },
-                    }
-                )
-        elif "alternate-bridge" in self.local_config["container"]:
+        elif self.local_config["container"].get("alternate-bridge") is not None:
             self.container_configs.append(
                 {
                     "HostConfig": {
                         "NetworkMode": self.local_config["container"]["alternate-bridge"],
+                    },
+                }
+            )
+        # RDMA mounts
+        ib_root = Path("/dev/infiniband")
+        if ib_root.is_dir() and (ib_root / "uverbs0").exists():
+            self.container_configs.append(
+                {
+                    "HostConfig": {
+                        "Devices": [
+                            {
+                                "PathOnHost": "/dev/infiniband",
+                                "PathInContainer": "/dev/infiniband",
+                                "CgroupPermissions": "rwm",
+                            },
+                        ],
                     },
                 }
             )
