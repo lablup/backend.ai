@@ -297,6 +297,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.domain import Domain
         from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
+        from .func.filebrowser import FileBrowser
         from .func.group import Group
         from .func.image import Image
         from .func.keypair import KeyPair
@@ -311,7 +312,6 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.system import System
         from .func.user import User
         from .func.vfolder import VFolder
-        from .func.filebrowser import FileBrowser
 
         self.System = System
         self.Admin = Admin
