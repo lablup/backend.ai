@@ -60,8 +60,8 @@ async def create_or_update(
     memory = int(BinarySize().check_and_return(memory))
     db_path = ctx.local_config["filebrowser"]["db_path"]
     p = Path(pkg_resources.resource_filename(__name__, ""))
-    storage_proxy_root_path_index = p.parts.index("storage-proxy")
-    settings_path = Path(*p.parts[0 : storage_proxy_root_path_index + 1]) / "config/filebrowser/"
+    storage_proxy_root_path_index = p.parts.index("storage")
+    settings_path = Path(*p.parts[0 : storage_proxy_root_path_index + 1]) / "filebrowser_dir/"
     _, requested_volume = host.split(":")
     volumes = ctx.local_config["volume"]
     for volume_name in volumes.keys():
@@ -206,9 +206,3 @@ async def get_network_stats(container_id: str) -> tuple[int, int]:
         int(stats[0]["networks"]["eth0"]["rx_bytes"]),
         int(stats[0]["networks"]["eth0"]["tx_bytes"]),
     )
-
-
-async def _check_active_connections() -> bool:
-    if len(await get_filebrowsers()) > 0:
-        return True
-    return False

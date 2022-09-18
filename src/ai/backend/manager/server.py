@@ -656,6 +656,7 @@ async def server_main(
         ".auth",
         ".ratelimit",
         ".vfolder",
+        ".filebrowser",
         ".admin",
         ".session",
         ".stream",

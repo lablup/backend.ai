@@ -1,1 +1,1 @@
-{"port": 8080, "baseURL": "", "address": "", "log": "stdout", "database": "/filebrowser_dir/filebrowser_8080.db", "root": "/data/"}
+{"port": 4404, "baseURL": "", "address": "", "log": "stdout", "database": "/filebrowser_dir/filebrowser_4404.db", "root": "/data/"}

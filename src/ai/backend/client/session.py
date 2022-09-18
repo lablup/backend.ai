@@ -267,6 +267,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Resource",
         "KeypairResourcePolicy",
         "VFolder",
+        "FileBrowser",
         "Dotfile",
         "ServerLog",
     )
@@ -310,6 +311,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.system import System
         from .func.user import User
         from .func.vfolder import VFolder
+        from .func.filebrowser import FileBrowser
 
         self.System = System
         self.Admin = Admin
@@ -331,6 +333,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.ScalingGroup = ScalingGroup
         self.SessionTemplate = SessionTemplate
         self.VFolder = VFolder
+        self.FileBrowser = FileBrowser
         self.Dotfile = Dotfile
         self.ServerLog = ServerLog
 

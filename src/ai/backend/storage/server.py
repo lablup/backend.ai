@@ -9,6 +9,7 @@ import sys
 from contextlib import closing
 from pathlib import Path
 from pprint import pformat, pprint
+from shutil import rmtree
 from typing import Any, AsyncIterator, Sequence
 
 import aiomonitor
@@ -156,8 +157,6 @@ async def server_main(
             if monitor_lock_path.exists() and file_lock.locked:
                 file_lock.release()
                 monitor_lock_path.unlink()
-            if ctx.local_config["filebrowser"]["db_path"].is_file():
-                ctx.local_config["filebrowser"]["db_path"].unlink()
 
 
 @click.group(invoke_without_command=True)
@@ -251,6 +250,11 @@ def main(cli_ctx, config_path, debug):
             if monitor_lock_path.exists() and file_lock.locked:
                 file_lock.release()
                 monitor_lock_path.unlink()
+            if local_config["filebrowser"]["db_path"].exists():
+                local_config["filebrowser"]["db_path"].unlink()
+            if (local_config["filebrowser"]["settings_path"] / "db/").exists():
+                rmtree((local_config["filebrowser"]["settings_path"] / "db/"))
+
     return 0
 
 
