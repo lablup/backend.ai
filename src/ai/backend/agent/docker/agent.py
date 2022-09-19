@@ -418,6 +418,14 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 }
             )
+        elif self.local_config["container"].get("alternative-bridge") is not None:
+            self.container_configs.append(
+                {
+                    "HostConfig": {
+                        "NetworkMode": self.local_config["container"]["alternative-bridge"],
+                    },
+                }
+            )
         # RDMA mounts
         ib_root = Path("/dev/infiniband")
         if ib_root.is_dir() and (ib_root / "uverbs0").exists():
