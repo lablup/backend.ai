@@ -67,7 +67,7 @@ agent_local_config_iv = (
                     t.Key("scratch-size", default="0"): tx.BinarySize,
                     t.Key("scratch-nfs-address", default=None): t.Null | t.String,
                     t.Key("scratch-nfs-options", default=None): t.Null | t.String,
-                    t.Key("alternate-bridge", default=None): t.Null | t.String,
+                    t.Key("alternative-bridge", default=None): t.Null | t.String,
                 }
             ).allow_extra("*"),
             t.Key("logging"): t.Any,  # checked in ai.backend.common.logging

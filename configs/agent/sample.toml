@@ -139,7 +139,7 @@ scratch-nfs-address = ""
 scratch-nfs-options = ""
 
 # Allow using an alternate Docker bridge network
-# alternate_bridge = ""
+# alternative-bridge = ""
 
 [watcher]
 # The address to accept the watcher API requests

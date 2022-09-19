@@ -418,11 +418,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 }
             )
-        elif self.local_config["container"].get("alternate-bridge") is not None:
+        elif self.local_config["container"].get("alternative-bridge") is not None:
             self.container_configs.append(
                 {
                     "HostConfig": {
-                        "NetworkMode": self.local_config["container"]["alternate-bridge"],
+                        "NetworkMode": self.local_config["container"]["alternative-bridge"],
                     },
                 }
             )
