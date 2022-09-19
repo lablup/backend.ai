@@ -507,12 +507,12 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
                 # raw_ip is None or [] - empty list
                 return
             assert isinstance(allowed_client_ip, list)
-            raw_client_addr = request.headers.get("X-BackendAI-IP")
+            raw_client_addr: str | None = request.headers.get("X-BackendAI-IP") or request.remote
             if raw_client_addr is None:
                 raise AuthorizationFailed("Not allowed IP address")
             client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr)
             if client_addr not in allowed_client_ip:
-                raise AuthorizationFailed("Not allowed IP address")
+                raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
 
         validate_ip(auth_result["user"])
         auth_result["keypair"]["resource_policy"] = {
