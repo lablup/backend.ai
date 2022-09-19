@@ -192,6 +192,7 @@ class APIConfig:
         "storage_proxy_address_map": {},
         "connection_timeout": "10.0",
         "read_timeout": "0",
+        "client_ip": "127.0.0.1",
     }
     """
     The default values for config parameterse settable via environment variables
@@ -221,6 +222,7 @@ class APIConfig:
         connection_timeout: float = None,
         read_timeout: float = None,
         announcement_handler: Callable[[str], None] = None,
+        client_ip: str = None,
     ) -> None:
         from . import get_user_agent
 
@@ -285,6 +287,11 @@ class APIConfig:
             else get_env("READ_TIMEOUT", self.DEFAULTS["read_timeout"], clean=float)
         )
         self._announcement_handler = announcement_handler
+        self._client_ip = (
+            client_ip
+            if client_ip is not None
+            else get_env("CLIENT_IP", self.DEFAULTS["client_ip"], clean=str)
+        )
 
     @property
     def is_anonymous(self) -> bool:
@@ -383,6 +390,11 @@ class APIConfig:
     def announcement_handler(self) -> Optional[Callable[[str], None]]:
         """The announcement handler to display server-set announcements."""
         return self._announcement_handler
+
+    @property
+    def client_ip(self) -> str:
+        """The client ip for authorization."""
+        return self._client_ip
 
 
 def get_config():
