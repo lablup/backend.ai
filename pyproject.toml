@@ -8,7 +8,10 @@ start_string = "<!-- towncrier release notes start -->\n"
 issue_format = "([#{issue}](https://github.com/lablup/backend.ai/issues/{issue}))"
 underlines = ["", "", ""]
 
+# NOTE: A single PR may have multiple news fragments with different types.
+
 [[tool.towncrier.type]]
+    # Put breaking changes that should be announced loudly.
     directory = "breaking"
     name = "Breaking Changes"
     showcontent = true
@@ -16,6 +19,13 @@ underlines = ["", "", ""]
 [[tool.towncrier.type]]
     directory = "feature"
     name = "Features"
+    showcontent = true
+
+[[tool.towncrier.type]]
+    # Describe general improvements, such as internal refactoring, optimization,
+    # performance improvements, and etc. that do not introduce new features.
+    directory = "enhance"
+    name = "Improvements"
     showcontent = true
 
 [[tool.towncrier.type]]
@@ -30,7 +40,15 @@ underlines = ["", "", ""]
 
 [[tool.towncrier.type]]
     directory = "doc"
-    name = "Documentation Changes"
+    name = "Documentation Updates"
+    showcontent = true
+
+[[tool.towncrier.type]]
+    # Describe notable changes of external/upstream dependencies
+    # that may require installers updates and extra concerns
+    # to upgrade existing setups.
+    directory = "deps"
+    name = "External Dependency Updates"
     showcontent = true
 
 [[tool.towncrier.type]]
@@ -53,7 +71,7 @@ ignore_missing_imports = true
 mypy_path = "stubs:src"
 namespace_packages = true
 explicit_package_bases = true
-python_executable = "dist/export/python/virtualenvs/python-default/3.10.5/bin/python"
+python_executable = "dist/export/python/virtualenvs/python-default/3.10.7/bin/python"
 
 [tool.black]
 line-length = 100
