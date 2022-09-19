@@ -169,7 +169,6 @@ class Request:
                 ("User-Agent", self.config.user_agent),
                 ("X-BackendAI-Domain", self.config.domain),
                 ("X-BackendAI-Version", self.api_version),
-                ("X-BackendAI-IP", self.config.client_ip),
             ]
         )
         self._content = b""
