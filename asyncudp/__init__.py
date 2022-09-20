@@ -9,6 +9,7 @@ class ClosedError(Exception):
 class _SocketProtocol:
 
     def __init__(self):
+        self._error = None
         self._packets = asyncio.Queue()
 
     def connection_made(self, transport):
@@ -21,10 +22,20 @@ class _SocketProtocol:
         self._packets.put_nowait((data, addr))
 
     def error_received(self, exc):
-        pass
+        self._error = exc
+        self._packets.put_nowait(None)
 
     async def recvfrom(self):
         return await self._packets.get()
+
+    def raise_if_error(self):
+        if self._error is None:
+            return
+
+        error = self._error
+        self._error = None
+
+        raise error
 
 
 class Socket:
@@ -49,23 +60,28 @@ class Socket:
         ``remote_addr`` given to the constructor if ``addr`` is
         ``None``.
 
+        Raises an error if a connection error has occurred.
+
         >>> sock.sendto(b'Hi!')
 
         """
 
         self._transport.sendto(data, addr)
+        self._protocol.raise_if_error()
 
     async def recvfrom(self):
         """Receive a UDP packet.
 
         Raises ClosedError on connection error, often by calling the
-        close() method from another task.
+        close() method from another task. May raise other errors as
+        well.
 
         >>> data, addr = sock.recvfrom()
 
         """
 
         packet = await self._protocol.recvfrom()
+        self._protocol.raise_if_error()
 
         if packet is None:
             raise ClosedError()
