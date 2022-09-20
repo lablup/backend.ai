@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import abc
 import asyncio
 import logging
 import os
@@ -17,12 +18,30 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-class GlobalTimer:
+class AbstractGlobalTimer(abc.ABC):
 
     """
     Executes the given async function only once in the given interval,
     uniquely among multiple manager instances across multiple nodes.
     """
+
+    def __init__(self, *args, **kwargs) -> None:
+        pass
+
+    @abc.abstractmethod
+    async def generate_tick(self) -> None:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def join(self) -> None:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def leave(self) -> None:
+        raise NotImplementedError
+
+
+class GlobalTimer(AbstractGlobalTimer):
 
     _event_producer: Final[EventProducer]
 
@@ -74,12 +93,7 @@ class GlobalTimer:
                 pass
 
 
-class LeaderGlobalTimer:
-
-    """
-    Executes the given async function only once in the given interval,
-    uniquely among multiple manager instances across multiple nodes.
-    """
+class LeaderGlobalTimer(AbstractGlobalTimer):
 
     _event_producer: Final[EventProducer]
     _tick_task: Optional[asyncio.Task]

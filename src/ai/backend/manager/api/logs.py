@@ -14,7 +14,7 @@ from aiohttp import web
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
-from ai.backend.common.distributed import LeaderGlobalTimer
+from ai.backend.common.distributed import AbstractGlobalTimer, LeaderGlobalTimer
 from ai.backend.common.events import AbstractEvent, EmptyEventArgs, EventHandler
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId, LogSeverity, RedisConnectionInfo
@@ -238,7 +238,7 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
 
 @attr.s(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    log_cleanup_timer: LeaderGlobalTimer
+    log_cleanup_timer: AbstractGlobalTimer
     log_cleanup_timer_redis: RedisConnectionInfo
     log_cleanup_timer_evh: EventHandler[web.Application, DoLogCleanupEvent]
 

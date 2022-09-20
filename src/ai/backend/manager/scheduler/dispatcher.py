@@ -16,7 +16,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.sql.expression import true
 
-from ai.backend.common.distributed import LeaderGlobalTimer
+from ai.backend.common.distributed import AbstractGlobalTimer, LeaderGlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
     CoalescingOptions,
@@ -119,8 +119,8 @@ class SchedulerDispatcher(aobject):
 
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
-    schedule_timer: LeaderGlobalTimer
-    prepare_timer: LeaderGlobalTimer
+    schedule_timer: AbstractGlobalTimer
+    prepare_timer: AbstractGlobalTimer
 
     def __init__(
         self,
