@@ -321,11 +321,6 @@ install_pybuild_deps() {
     brew install zlib xz
     brew install sqlite3 gdbm
     brew install tcl-tk
-    if [ "$(uname -p)" = "arm" ]; then
-      # On M1 Macs, psycopg2-binary tries to build itself and requires pg_config
-      # to access the postgresql include/library path information.
-      brew install postgresql
-    fi
     ;;
   esac
 }
@@ -737,6 +732,7 @@ configure_backendai() {
   sed_inplace "s/^path =/# path =/" ./storage-proxy.toml
   sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
   sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
+  sed_inplace "s/^weka_/# weka_/" ./storage-proxy.toml
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
