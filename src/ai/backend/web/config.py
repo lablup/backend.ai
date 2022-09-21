@@ -43,7 +43,6 @@ config_iv = t.Dict(
                 t.Key("allow_change_signin_mode", default=False): t.ToBool,
                 t.Key("allow_manual_image_name_for_session", default=False): t.ToBool,
                 t.Key("allow_signup_without_confirmation", default=False): t.ToBool,
-                t.Key("always_enqueue_compute_session", default=False): t.ToBool,
                 t.Key("webui_debug", default=False): t.ToBool,
                 t.Key("mask_user_info", default=False): t.ToBool,
                 t.Key("single_sign_on_vendors", default=None): t.Null

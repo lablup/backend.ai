@@ -418,30 +418,22 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 }
             )
-        elif self.local_config["container"].get("alternative-bridge") is not None:
-            self.container_configs.append(
-                {
-                    "HostConfig": {
-                        "NetworkMode": self.local_config["container"]["alternative-bridge"],
-                    },
-                }
-            )
-        # RDMA mounts
-        ib_root = Path("/dev/infiniband")
-        if ib_root.is_dir() and (ib_root / "uverbs0").exists():
-            self.container_configs.append(
-                {
-                    "HostConfig": {
-                        "Devices": [
-                            {
-                                "PathOnHost": "/dev/infiniband",
-                                "PathInContainer": "/dev/infiniband",
-                                "CgroupPermissions": "rwm",
-                            },
-                        ],
-                    },
-                }
-            )
+            # RDMA mounts
+            ib_root = Path("/dev/infiniband")
+            if ib_root.is_dir() and (ib_root / "uverbs0").exists():
+                self.container_configs.append(
+                    {
+                        "HostConfig": {
+                            "Devices": [
+                                {
+                                    "PathOnHost": "/dev/infiniband",
+                                    "PathInContainer": "/dev/infiniband",
+                                    "CgroupPermissions": "rwm",
+                                },
+                            ],
+                        },
+                    }
+                )
 
     async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
@@ -960,7 +952,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     kernel_id = "(unknown)"
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
-                        if kernel_id is None or kernel_id not in self.kernel_registry:
+                        if kernel_id is None:
                             return
                         if container["State"]["Status"] in status_filter:
                             await container.show()

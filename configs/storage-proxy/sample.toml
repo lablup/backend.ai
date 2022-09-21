@@ -153,14 +153,3 @@ netapp_xcp_container_name = "netapp-xcp" # only required when xcp activated by c
 netapp_xcp_hostname = "xcp-hostname"
 # default xcp catalog path goes to the directory named "catalog" of the first NetApp volume
 netapp_xcp_catalog_path = "path for xcp-catalog" # Hint: execute command cat /opt/NetApp/xFiles/xcp/xcp.ini and see nfs mount path
-
-[volume.weka]
-backend = "weka"
-path = "/vfroot/weka"
-
-[volume.weka.options]
-weka_endpoint = "https://wekaio.example.com"  # Endpoint to Weka.IO API
-weka_username = ""  # Weka.IO Username
-weka_password = ""  # Weka.IO Password
-weka_organization = ""  # Weka.IO Organization
-weka_fs_name = ""  # Target filesystem to use as vFolder, must match with the one mounted under `volume.weka.path`

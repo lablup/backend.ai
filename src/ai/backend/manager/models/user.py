@@ -636,6 +636,7 @@ class ModifyUser(graphene.Mutation):
         async def _post_func(conn: SAConnection, result: Result) -> Row:
             nonlocal prev_domain_name, prev_role
             updated_user = result.first()
+
             if "role" in data and data["role"] != prev_role:
                 from ai.backend.manager.models import keypairs
 
@@ -645,7 +646,6 @@ class ModifyUser(graphene.Mutation):
                             keypairs.c.user,
                             keypairs.c.is_active,
                             keypairs.c.is_admin,
-                            keypairs.c.access_key,
                         ]
                     )
                     .select_from(keypairs)
@@ -655,14 +655,13 @@ class ModifyUser(graphene.Mutation):
                 )
                 if data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN]:
                     # User's becomes admin. Set the keypair as active admin.
-                    # TODO: Should we update the role of all users related to keypair?
                     kp = result.first()
                     kp_data = dict()
                     if not kp.is_admin:
                         kp_data["is_admin"] = True
                     if not kp.is_active:
                         kp_data["is_active"] = True
-                    if kp_data:
+                    if len(kp_data.keys()) > 0:
                         await conn.execute(
                             sa.update(keypairs)
                             .values(kp_data)
@@ -671,34 +670,36 @@ class ModifyUser(graphene.Mutation):
                 else:
                     # User becomes non-admin. Make the keypair non-admin as well.
                     # If there are multiple admin keypairs, inactivate them.
-                    # TODO: Should elaborate keypair inactivation policy.
                     rows = result.fetchall()
+                    cnt = 0
                     kp_updates = []
-                    for idx, row in enumerate(rows):
+                    for row in rows:
                         kp_data = {
-                            "b_access_key": row.access_key,
-                            "is_admin": row.is_admin,
-                            "is_active": row.is_active,
+                            "user": row.user,
+                            "is_admin": keypairs.c.is_admin,
+                            "is_active": keypairs.c.is_active,
                         }
-                        if idx == 0:
+                        changed = False
+                        if cnt == 0:
                             kp_data["is_admin"] = False
-                            kp_updates.append(kp_data)
-                            continue
-                        if row.is_admin and row.is_active:
+                            changed = True
+                        elif row.is_admin and row.is_active:
                             kp_data["is_active"] = False
+                            changed = True
+                        if changed:
                             kp_updates.append(kp_data)
-                    if kp_updates:
-                        await conn.execute(
-                            sa.update(keypairs)
-                            .values(
-                                {
-                                    "is_admin": bindparam("is_admin"),
-                                    "is_active": bindparam("is_active"),
-                                }
-                            )
-                            .where(keypairs.c.access_key == bindparam("b_access_key")),
-                            kp_updates,
+                        cnt += 1
+                    await conn.execute(
+                        sa.update(keypairs)
+                        .values(
+                            {
+                                "is_admin": bindparam("is_admin"),
+                                "is_active": bindparam("is_active"),
+                            }
                         )
+                        .where(keypairs.c.user == bindparam("user")),
+                        kp_updates,
+                    )
 
             # If domain is changed and no group is associated, clear previous domain's group.
             if prev_domain_name != updated_user.domain_name and not props.group_ids:
@@ -1088,12 +1089,11 @@ class PurgeUser(graphene.Mutation):
         ak_rows = await conn.execute(
             sa.select([keypairs.c.access_key]).where(keypairs.c.user == user_uuid),
         )
-        if (row := ak_rows.first()) and (access_key := row.access_key):
-            # Log concurrency used only when there is at least one keypair.
-            await redis_helper.execute(
-                redis_conn,
-                lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
-            )
+        access_key = ak_rows.first().access_key
+        await redis_helper.execute(
+            redis_conn,
+            lambda r: r.delete(f"keypair.concurrency_used.{access_key}"),
+        )
         result = await conn.execute(
             sa.delete(keypairs).where(keypairs.c.user == user_uuid),
         )

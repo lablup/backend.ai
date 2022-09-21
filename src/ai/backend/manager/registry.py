@@ -3029,12 +3029,11 @@ class AgentRegistry:
 
         kernel = await self.get_session(session_name_or_id, access_key)
         email = await self._get_user_email(kernel)
-        now = datetime.now(tzutc()).strftime("%Y-%m-%dT%HH%MM%SS")
+        now = datetime.now(tzutc()).strftime("%Y-%m-%dT%H:%M:%S")
         shortend_sname = kernel["session_name"][:SESSION_NAME_LEN_LIMIT]
         registry, _, filtered = kernel["image"].partition("/")
         img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
-        filename = filename.replace(":", "-")
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
                 kernel["agent"],

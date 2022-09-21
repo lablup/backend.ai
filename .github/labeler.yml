@@ -51,5 +51,4 @@ installer:
 - any: [
     'scripts/install-dev.sh',
     'scripts/delete-dev.sh',
-    'tools/pants-plugins/**/*',
   ]
