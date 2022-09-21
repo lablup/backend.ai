@@ -139,6 +139,8 @@ scratch-nfs-address = ""
 # Only meaningful when scratch-type is "k8s-nfs".
 scratch-nfs-options = ""
 
+# Allow using an alternate Docker bridge network
+# alternative-bridge = ""
 
 [watcher]
 # The address to accept the watcher API requests
