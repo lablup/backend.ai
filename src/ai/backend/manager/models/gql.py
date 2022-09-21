@@ -558,9 +558,6 @@ class Queries(graphene.ObjectType):
         scaling_group: str | None = None,
     ) -> AgentSummary:
         ctx: GraphQueryContext = info.context
-        if ctx.local_config["manager"]["hide-agents"]:
-            raise ObjectNotFound(object_name="agent")
-
         loader = ctx.dataloader_manager.get_loader(
             ctx,
             "Agent",
@@ -586,12 +583,8 @@ class Queries(graphene.ObjectType):
         scaling_group: str | None = None,
         status: str | None = None,
     ) -> AgentSummaryList:
-        ctx: GraphQueryContext = info.context
-        if ctx.local_config["manager"]["hide-agents"]:
-            raise ObjectNotFound(object_name="agent")
-
         total_count = await AgentSummary.load_count(
-            ctx,
+            info.context,
             access_key=access_key,
             scaling_group=scaling_group,
             domain_name=domain_name,
@@ -599,7 +592,7 @@ class Queries(graphene.ObjectType):
             filter=filter,
         )
         agent_list = await AgentSummary.load_slice(
-            ctx,
+            info.context,
             limit,
             offset,
             access_key=access_key,

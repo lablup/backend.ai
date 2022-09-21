@@ -321,6 +321,11 @@ install_pybuild_deps() {
     brew install zlib xz
     brew install sqlite3 gdbm
     brew install tcl-tk
+    if [ "$(uname -p)" = "arm" ]; then
+      # On M1 Macs, psycopg2-binary tries to build itself and requires pg_config
+      # to access the postgresql include/library path information.
+      brew install postgresql
+    fi
     ;;
   esac
 }

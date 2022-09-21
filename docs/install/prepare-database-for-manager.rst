@@ -30,7 +30,7 @@ Guide variables
      - The database password (e.g., ``develove`` for development setup)
    * - ``{STRGMOUNT}``
      - The path to a directory that the manager and all agents share together (e.g., a network-shared storage mountpoint). Note that the path must be same across all the nodes that run the manager and agents.
-
+       
        Development setup: Use an arbitrary empty directory where Docker containers can also mount as volumes — e.g., `Docker for Mac requires explicit configuration for mountable parent folders. <https://docs.docker.com/docker-for-mac/#file-sharing>`_
 
 
@@ -118,7 +118,7 @@ You may use the following shell command:
 
 .. code-block:: console
 
-   $ sed -i'' -e 's!^sqlalchemy.url = .*$!sqlalchemy.url = postgresql+asyncpg://{DBUSER}:{DBPASS}@{DBHOST}:{DBPORT}/backend!' alembic.ini
+   $ sed -i'' -e 's!^sqlalchemy.url = .*$!sqlalchemy.url = postgresql://{DBUSER}:{DBPASS}@{DBHOST}:{DBPORT}/backend!' alembic.ini
 
 .. code-block:: console
 
@@ -153,7 +153,7 @@ Then pour it to the database:
    $ python -m ai.backend.manager.cli \
    >   --db-addr={DBHOST}:{DBPORT} \
    >   --db-user={DBUSER} \
-   >   --db-password={DBPASS}
+   >   --db-password={DBPASS} 
    >   --db-name=backend \
    >   fixture populate example_keypair
 
