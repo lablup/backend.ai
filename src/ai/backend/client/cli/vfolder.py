@@ -284,7 +284,13 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     "Each Yn address must at least include the IP address "
     "or the hostname and may include the protocol part and the port number to replace.",
 )
-def download(name, filenames, base_dir, chunk_size, override_storage_proxy):
+@click.option(
+    "--max-retries",
+    type=int,
+    default=20,
+    help="Maximum retry attempt when any failure occurs.",
+)
+def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_retries):
     """
     Download a file from the virtual folder to the current working directory.
     The files with the same names will be overwirtten.
@@ -302,6 +308,7 @@ def download(name, filenames, base_dir, chunk_size, override_storage_proxy):
                 show_progress=True,
                 address_map=override_storage_proxy
                 or APIConfig.DEFAULTS["storage_proxy_address_map"],
+                max_retries=max_retries,
             )
             print_done("Done.")
         except Exception as e:

@@ -134,15 +134,23 @@ class DockerKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
-    async def check_duplicate_commit(self, path: Path):
-        if path.exists():
+    def _get_commit_path(self, kernel_id: KernelId, subdir: str) -> Tuple[Path, Path]:
+        base_commit_path: Path = self.agent_config["agent"]["image-commit-path"]
+        commit_path = base_commit_path / subdir
+        lock_path = commit_path / "lock" / str(kernel_id)
+        return commit_path, lock_path
+
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str):
+        _, lock_path = self._get_commit_path(kernel_id, subdir)
+        if lock_path.exists():
             return CommitStatus.ONGOING
         return CommitStatus.READY
 
-    async def commit(self, path: Path, lock_path: Path, filename: str):
+    async def commit(self, kernel_id: KernelId, subdir: str, filename: str):
         assert self.runner is not None
 
         loop = asyncio.get_running_loop()
+        path, lock_path = self._get_commit_path(kernel_id, subdir)
         container_id: str = str(self.data["container_id"])
         filepath = path / filename
         try:
