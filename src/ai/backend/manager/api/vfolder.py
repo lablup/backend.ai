@@ -2123,17 +2123,15 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
                 "dst_vfid": str(folder_id),
             },
         ):
-            pass
+            async with root_ctx.db.begin() as conn:
+                query = (
+                    sa.update(vfolders)
+                    .values(status=VFolderOperationStatus.READY)
+                    .where(vfolders.c.name == row["name"])
+                )
+                await conn.execute(query)
 
     task_id = await root_ctx.background_task_manager.start(_clone_bgtask)
-
-    async with root_ctx.db.begin() as conn:
-        query = (
-            sa.update(vfolders)
-            .values(status=VFolderOperationStatus.READY)
-            .where(vfolders.c.name == row["name"])
-        )
-        await conn.execute(query)
 
     # Return the information about the destination vfolder.
     resp = {
