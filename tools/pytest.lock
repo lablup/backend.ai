@@ -6,7 +6,7 @@
 // {
 //   "version": 2,
 //   "valid_for_interpreter_constraints": [
-//     "CPython==3.10.7"
+//     "CPython==3.10.5"
 //   ],
 //   "generated_with_requirements": [
 //     "aioresponses>=0.7.3",
@@ -848,7 +848,7 @@
     "pytest>=7.1.2"
   ],
   "requires_python": [
-    "==3.10.7"
+    "==3.10.5"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",

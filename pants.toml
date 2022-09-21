@@ -43,7 +43,7 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export ::` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.10.7"]
+interpreter_constraints = ["CPython==3.10.5"]
 lockfile_generator = "pex"
 tailor_pex_binary_targets = false
 
