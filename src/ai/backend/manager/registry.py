@@ -3046,6 +3046,18 @@ class AgentRegistry:
                 resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), email, filename)
         return resp
 
+    async def get_local_config(
+        self,
+        agent_id: AgentId,
+        agent_addr: str,
+    ) -> Mapping[str, str]:
+        async with RPCContext(
+            agent_id,
+            agent_addr,
+            invoke_timeout=None,
+        ) as rpc:
+            return await rpc.call.get_local_config()
+
 
 async def check_scaling_group(
     conn: SAConnection,

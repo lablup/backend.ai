@@ -558,6 +558,28 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def get_local_config(self):
+        log.debug("rpc::get_local_config()")
+
+        def get_or_empty(val):
+            if val is None:
+                return ""
+            return str(val)
+
+        return {
+            "agent": {
+                "abuse-report-path": get_or_empty(
+                    self.local_config["agent"].get("abuse-report-path")
+                ),
+                "image-commit-path": get_or_empty(
+                    self.local_config["agent"].get("image-commit-path")
+                ),
+            },
+            "watcher": self.local_config["watcher"],
+        }
+
+    @rpc_function
+    @collect_error
     async def shutdown_service(
         self,
         kernel_id,  # type: str

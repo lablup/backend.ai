@@ -58,6 +58,7 @@ agent_fields = FieldSet(
         FieldSpec(
             "compute_containers", subfields=container_fields, formatter=ContainerListFormatter()
         ),
+        FieldSpec("local_config", formatter=nested_dict_formatter),
         # legacy fields
         FieldSpec("cpu_cur_pct", "CPU Usage (%)"),
         FieldSpec("mem_cur_bytes", "Used Memory (MiB)", formatter=mibytes_output_formatter),
