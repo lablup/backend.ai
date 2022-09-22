@@ -16,13 +16,13 @@ import tabulate as tabulate_mod
 from humanize import naturalsize
 from tabulate import tabulate
 
+from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 
 from ..compat import asyncio_run, current_loop
 from ..config import local_cache_path
 from ..exceptions import BackendError
 from ..session import AsyncSession
-from .main import main
 from .params import CommaSeparatedListType, RangeExprOptionType
 from .pretty import (
     format_info,
@@ -570,11 +570,9 @@ def run(
 
     if preopen is None:
         preopen = []  # noqa
-    if assign_agent is None:
-        assign_agent = []  # noqa
 
     preopen_ports = preopen
-    assigned_agent_list = assign_agent
+    assigned_agent_list = assign_agent  # should be None if not specified
     for env_vmap, build_vmap, exec_vmap in vmaps_product:
         interpolated_envs = tuple((k, vt.substitute(env_vmap)) for k, vt in env_templates.items())
         if build:

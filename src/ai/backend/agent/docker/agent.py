@@ -48,6 +48,7 @@ from ai.backend.common.types import (
     BinarySize,
     ClusterInfo,
     ContainerId,
+    DeviceId,
     DeviceName,
     ImageRegistry,
     KernelCreationConfig,
@@ -68,7 +69,7 @@ from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import AbstractComputePlugin, KernelResourceSpec, Mount, known_slot_types
 from ..server import get_extra_volumes
-from ..types import Container, ContainerStatus, LifecycleEvent, Port
+from ..types import Container, ContainerStatus, LifecycleEvent, MountInfo, Port
 from ..utils import (
     closing_async,
     container_pid_to_host_pid,
@@ -417,22 +418,30 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 }
             )
-            # RDMA mounts
-            ib_root = Path("/dev/infiniband")
-            if ib_root.is_dir() and (ib_root / "uverbs0").exists():
-                self.container_configs.append(
-                    {
-                        "HostConfig": {
-                            "Devices": [
-                                {
-                                    "PathOnHost": "/dev/infiniband",
-                                    "PathInContainer": "/dev/infiniband",
-                                    "CgroupPermissions": "rwm",
-                                },
-                            ],
-                        },
-                    }
-                )
+        elif self.local_config["container"].get("alternative-bridge") is not None:
+            self.container_configs.append(
+                {
+                    "HostConfig": {
+                        "NetworkMode": self.local_config["container"]["alternative-bridge"],
+                    },
+                }
+            )
+        # RDMA mounts
+        ib_root = Path("/dev/infiniband")
+        if ib_root.is_dir() and (ib_root / "uverbs0").exists():
+            self.container_configs.append(
+                {
+                    "HostConfig": {
+                        "Devices": [
+                            {
+                                "PathOnHost": "/dev/infiniband",
+                                "PathInContainer": "/dev/infiniband",
+                                "CgroupPermissions": "rwm",
+                            },
+                        ],
+                    },
+                }
+            )
 
     async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
@@ -483,12 +492,25 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         }
         self.container_configs.append(container_config)
 
-    async def apply_accelerator_allocation(self, computer, device_alloc) -> None:
+    async def apply_accelerator_allocation(
+        self,
+        computer: AbstractComputePlugin,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+    ) -> None:
         async with closing_async(Docker()) as docker:
             update_nested_dict(
                 self.computer_docker_args,
                 await computer.generate_docker_args(docker, device_alloc),
             )
+
+    async def generate_accelerator_mounts(
+        self,
+        computer: AbstractComputePlugin,
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
+    ) -> List[MountInfo]:
+        src_path = self.config_dir / str(computer.key)
+        src_path.mkdir()
+        return await computer.generate_mounts(src_path, device_alloc)
 
     async def spawn(
         self,
@@ -773,6 +795,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         self.computers[dev_name].alloc_map.free(device_alloc)
                 raise
 
+            additional_network_names: Set[str] = set()
+            for dev_name, device_alloc in resource_spec.allocations.items():
+                n = await self.computers[dev_name].instance.get_docker_networks(device_alloc)
+                additional_network_names |= set(n)
+
+            for name in additional_network_names:
+                network = await docker.networks.get(name)
+                await network.connect({"Container": container._id})
+
             ctnr_host_port_map: MutableMapping[int, int] = {}
             stdin_port = 0
             stdout_port = 0
@@ -929,7 +960,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     kernel_id = "(unknown)"
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
-                        if kernel_id is None:
+                        if kernel_id is None or kernel_id not in self.kernel_registry:
                             return
                         if container["State"]["Status"] in status_filter:
                             await container.show()
