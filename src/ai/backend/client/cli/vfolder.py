@@ -509,7 +509,7 @@ def invite(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).invite(perm, emails)
             invited_ids = result.get("invited_ids", [])
-            if len(invited_ids) > 0:
+            if invited_ids:
                 print("Invitation sent to:")
                 for invitee in invited_ids:
                     print("\t- " + invitee)
@@ -594,7 +594,7 @@ def share(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).share(perm, emails)
             shared_emails = result.get("shared_emails", [])
-            if len(shared_emails) > 0:
+            if shared_emails:
                 print("Shared with {} permission to:".format(perm))
                 for _email in shared_emails:
                     print("\t- " + _email)
@@ -619,7 +619,7 @@ def unshare(name, emails):
         try:
             result = session.VFolder(name).unshare(emails)
             unshared_emails = result.get("unshared_emails", [])
-            if len(unshared_emails) > 0:
+            if unshared_emails:
                 print("Unshared from:")
                 for _email in unshared_emails:
                     print("\t- " + _email)
@@ -772,61 +772,3 @@ def update_options(name, permission, set_cloneable):
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
-
-
-@vfolder.command
-@click.argument("vfolder_id", type=str)
-def shared_vfolder_info(vfolder_id):
-    """Show the vfolder permission information of the given virtual folder.
-
-    \b
-    VFOLDER_ID: ID of a virtual folder.
-    """
-    with Session() as session:
-        try:
-            resp = session.VFolder.shared_vfolder_info(vfolder_id)
-            result = resp.get("shared", [])
-            if len(result) > 0:
-                _result = result[0]
-                print(
-                    'Virtual folder "{0}" (ID: {1})'.format(
-                        _result["vfolder_name"], _result["vfolder_id"]
-                    )
-                )
-                print("- Owner: {0}".format(_result["owner"]))
-                print("- Permission: {0}".format(_result["perm"]))
-                print("- Folder Type: {0}".format(_result["type"]))
-                shared_to = _result.get("shared_to", [])
-                if len(shared_to) > 0:
-                    print("- Shared to:")
-                    for k, v in shared_to.items():
-                        print("\t- {0}: {1}\n".format(k, v))
-        except Exception as e:
-            print_error(e)
-            sys.exit(ExitCode.FAILURE)
-
-
-@vfolder.command()
-@click.argument("vfolder_id", type=str)
-@click.argument("user_id", type=str)
-@click.option(
-    "-p", "--permission", type=str, metavar="PERMISSION", help="Folder's innate permission."
-)
-def update_shared_vfolder(vfolder_id, user_id, permission):
-    """
-    Update permission for shared vfolders.
-    If permission is None, remove user's permission for the vfolder.
-
-    \b
-    VFOLDER_ID: ID of a virtual folder.
-    USER_ID: ID of user who shared the vfolder.
-    PERMISSION: Permission to update. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).
-    """
-    with Session() as session:
-        try:
-            resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, permission)
-            print("Updated.")
-        except Exception as e:
-            print_error(e)
-            sys.exit(ExitCode.FAILURE)
-        print(resp)
