@@ -559,8 +559,6 @@ class AgentRPCServer(aobject):
     @rpc_function
     @collect_error
     async def get_local_config(self):
-        log.debug("rpc::get_local_config()")
-
         def get_or_empty(val):
             if val is None:
                 return ""
