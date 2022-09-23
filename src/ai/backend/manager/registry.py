@@ -3066,11 +3066,11 @@ class AgentRegistry:
         if access_key is not None:
             kernel = await self.get_session(session_name_or_id, access_key)
         else:
-            query = sa.select([kernels.c.agent, kernels.c.agent_addr]).where(
+            query = sa.select([kernels.c.id, kernels.c.agent, kernels.c.agent_addr]).where(
                 kernels.c.id == session_name_or_id
             )
             async with self.db.begin_readonly() as conn:
-                kernel = await conn.scalar(query)
+                kernel = (await conn.execute(query)).first()
         async with RPCContext(
             kernel["agent"],
             kernel["agent_addr"],

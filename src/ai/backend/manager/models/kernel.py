@@ -865,6 +865,7 @@ class ComputeSession(graphene.ObjectType):
     startup_command = graphene.String()
     result = graphene.String()
     commit_status = graphene.String()
+    abusing_reports = graphene.List(lambda: graphene.JSONString)
 
     # resources
     resource_opts = graphene.JSONString()
@@ -974,6 +975,16 @@ class ComputeSession(graphene.ObjectType):
             return None
         commit_status = await graph_ctx.registry.get_commit_status(self.id, self.access_key)
         return commit_status["status"]
+
+    async def resolve_abusing_reports(
+        self, info: graphene.ResolveInfo
+    ) -> Iterable[Mapping[str, Any]]:
+        containers = self.containers
+        if containers is None:
+            containers = await self.resolve_containers(info)
+        if containers is None:
+            return []
+        return [(await con.resolve_abusing_report(info)) for con in containers]
 
     _queryfilter_fieldspec = {
         "type": ("kernels_session_type", lambda s: SessionTypes[s]),

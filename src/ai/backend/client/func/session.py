@@ -55,6 +55,7 @@ _default_list_fields = (
     session_fields["status_info"],
     session_fields["status_changed"],
     session_fields["result"],
+    session_fields["abusing_reports"],
 )
 
 
