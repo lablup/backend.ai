@@ -382,7 +382,11 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
         # raw_ip is None or [] - empty list
         return
     assert isinstance(allowed_client_ip, list)
-    raw_client_addr: str | None = request.headers.get("X-BackendAI-IP") or request.remote
+    raw_client_addr: str | None = (
+        request.headers.get("X-BackendAI-IP")
+        or request.headers.get("X-Forwarded-For")
+        or request.remote
+    )
     if raw_client_addr is None:
         raise AuthorizationFailed("Not allowed IP address")
     client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr)
