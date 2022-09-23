@@ -197,7 +197,7 @@ class Agent(graphene.ObjectType):
 
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.get_local_config(self.id, self.addr)
+        return await graph_ctx.registry.get_agent_local_config(self.id, self.addr)
 
     _queryfilter_fieldspec = {
         "id": ("id", None),

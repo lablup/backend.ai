@@ -3046,7 +3046,7 @@ class AgentRegistry:
                 resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), email, filename)
         return resp
 
-    async def get_local_config(
+    async def get_agent_local_config(
         self,
         agent_id: AgentId,
         agent_addr: str,
