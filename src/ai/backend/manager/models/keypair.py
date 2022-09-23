@@ -37,7 +37,7 @@ from .base import (
 )
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
-from .user import UserRole
+from .user import ModifyUserInput, UserRole
 
 __all__: Sequence[str] = (
     "keypairs",
@@ -513,7 +513,7 @@ class ModifyKeyPair(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         access_key: AccessKey,
-        props: ModifyKeyPairInput,
+        props: ModifyUserInput,
     ) -> ModifyKeyPair:
         ctx: GraphQueryContext = info.context
         data: Dict[str, Any] = {}

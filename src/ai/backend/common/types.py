@@ -349,22 +349,25 @@ class ReadableCIDR(Generic[_Address]):
     192.10.*.* -> 192.10.0.0/16
     """
 
+    _address: _Address | None
+
     def __init__(self, address: str | None) -> None:
-        self._address: _Address | None = (
+        self._address = (
             cast(_Address, self._convert_to_cidr(address)) if address is not None else None
         )
 
-    def _convert_to_cidr(self, value: str) -> ipaddress.IPv4Network | ipaddress.IPv6Network:
+    @staticmethod
+    def _convert_to_cidr(value: str) -> ipaddress.IPv4Network | ipaddress.IPv6Network:
         str_val = str(value)
         if "*" in str_val:
             _ip, _, given_cidr = str_val.partition("/")
             filtered = _ip.replace("*", "0")
             if given_cidr:
-                return ip_network(f"{filtered}/{given_cidr}", strict=False)
+                return ip_network(f"{filtered}/{given_cidr}")
             octets = _ip.split(".")
             cidr = octets.index("*") * 8
-            return ip_network(f"{filtered}/{cidr}", strict=False)
-        return ip_network(str_val, strict=False)
+            return ip_network(f"{filtered}/{cidr}")
+        return ip_network(str_val)
 
     @property
     def address(self) -> _Address | None:
@@ -374,34 +377,10 @@ class ReadableCIDR(Generic[_Address]):
         return str(self._address)
 
     def __eq__(self, other: object) -> bool:
-        """
-        Compare two IP address converting into lists.
-
-        e.g)
-        192.10.0.0/24 -> ["192", "10", "0"]
-        192.10.0.10/32 -> ["192", "10", "0", "10]
-        Both addresses above consider as the same.
-        """
-
         if other is self:
             return True
         assert isinstance(other, ReadableCIDR), "Only can compare ReadableCIDR objects."
-
-        if self.address is None or other.address is None:
-            # if self.address is None and other.address is None:
-            #     return True
-            return False
-
-        def ip_to_list(val: str) -> list[str]:
-            _ip, _, cidr = val.partition("/")
-            octets = _ip.split(".")
-            return octets if not cidr else octets[: int(cidr) // 8]
-
-        ip1, ip2 = ip_to_list(str(self)), ip_to_list(str(other))
-        for octet1, octet2 in zip(ip1, ip2):
-            if octet1 != octet2:
-                return False
-        return True
+        return self.address == other.address
 
 
 class BinarySize(int):

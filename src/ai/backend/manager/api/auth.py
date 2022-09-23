@@ -376,6 +376,20 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         raise InvalidAuthParameters(e.args[0])
 
 
+def validate_ip(request: web.Request, user: Mapping[str, Any]):
+    allowed_client_ip = user.get("allowed_client_ip", None)
+    if not allowed_client_ip or allowed_client_ip is None:
+        # raw_ip is None or [] - empty list
+        return
+    assert isinstance(allowed_client_ip, list)
+    raw_client_addr: str | None = request.headers.get("X-BackendAI-IP") or request.remote
+    if raw_client_addr is None:
+        raise AuthorizationFailed("Not allowed IP address")
+    client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr)
+    if client_addr not in allowed_client_ip:
+        raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
+
+
 @web.middleware
 async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     """
@@ -501,20 +515,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             "is_admin": row["keypairs_is_admin"],
         }
 
-        def validate_ip(user: Mapping[str, Any]):
-            allowed_client_ip = user.get("allowed_client_ip", None)
-            if not allowed_client_ip or allowed_client_ip is None:
-                # raw_ip is None or [] - empty list
-                return
-            assert isinstance(allowed_client_ip, list)
-            raw_client_addr: str | None = request.headers.get("X-BackendAI-IP") or request.remote
-            if raw_client_addr is None:
-                raise AuthorizationFailed("Not allowed IP address")
-            client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr)
-            if client_addr not in allowed_client_ip:
-                raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
-
-        validate_ip(auth_result["user"])
+        validate_ip(request, auth_result["user"])
         auth_result["keypair"]["resource_policy"] = {
             col.name: row[f"keypair_resource_policies_{col.name}"]
             for col in keypair_resource_policies.c
