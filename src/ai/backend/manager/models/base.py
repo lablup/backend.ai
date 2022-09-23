@@ -307,7 +307,11 @@ class IPColumn(TypeDecorator):
     def process_bind_param(self, value, dialect):
         if value is None:
             return value
-        return ReadableCIDR(value).address
+        try:
+            cidr = ReadableCIDR(value).address
+        except ValueError:
+            raise InvalidAPIParameters(f"{value} is invalid IP address value")
+        return cidr
 
     def process_result_value(self, value, dialect):
         if value is None:
