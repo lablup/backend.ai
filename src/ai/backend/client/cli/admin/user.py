@@ -211,7 +211,6 @@ def add(
     "-r",
     "--role",
     type=str,
-    default="user",
     help="Role of the user. One of (admin, user, monitor).",
 )
 @click.option(
