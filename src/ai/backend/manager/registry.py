@@ -3058,6 +3058,26 @@ class AgentRegistry:
         ) as rpc:
             return await rpc.call.get_local_config()
 
+    async def get_abusing_report(
+        self,
+        session_name_or_id: Union[str, SessionId],
+        access_key: AccessKey | None = None,
+    ) -> Optional[Mapping[str, str]]:
+        if access_key is not None:
+            kernel = await self.get_session(session_name_or_id, access_key)
+        else:
+            query = sa.select([kernels.c.agent, kernels.c.agent_addr]).where(
+                kernels.c.id == session_name_or_id
+            )
+            async with self.db.begin_readonly() as conn:
+                kernel = await conn.scalar(query)
+        async with RPCContext(
+            kernel["agent"],
+            kernel["agent_addr"],
+            invoke_timeout=None,
+        ) as rpc:
+            return await rpc.call.get_abusing_report(str(kernel["id"]))
+
 
 async def check_scaling_group(
     conn: SAConnection,

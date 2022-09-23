@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import importlib
+import json
 import logging
 import logging.config
 import os
@@ -575,6 +576,19 @@ class AgentRPCServer(aobject):
             },
             "watcher": self.local_config["watcher"],
         }
+
+    @rpc_function
+    @collect_error
+    async def get_abusing_report(
+        self,
+        kernel_id,  # type: str
+    ):
+        if (abuse_path := self.local_config["agent"].get("abuse-report-path")) is not None:
+            report_path = Path(abuse_path, f"report.{kernel_id}.json")
+            if report_path.is_file():
+                with open(report_path) as file:
+                    return json.load(file)
+        return
 
     @rpc_function
     @collect_error

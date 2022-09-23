@@ -1351,6 +1351,37 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
     t.Dict(
         {
             t.Key("login_session_token", default=None): t.Null | t.String,
+        }
+    ),
+    loads=_json_loads,
+)
+async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name: str = request.match_info["session_name"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    myself = asyncio.current_task()
+    assert myself is not None
+
+    log.info(
+        "GET_ABUSING_REPORT (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+    )
+    try:
+        report = await root_ctx.registry.get_abusing_report(session_name, owner_access_key)
+    except BackendError:
+        log.exception("GET_ABUSING_REPORT: exception")
+        raise
+    if report is None:
+        report = {}
+    return web.json_response(report, status=200)
+
+
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("login_session_token", default=None): t.Null | t.String,
             # if `dst` is None, it will be agent's default destination.
             tx.AliasedKey(["filename", "fname"], default=None): t.Null | t.String,
         }
@@ -2586,4 +2617,5 @@ def create_app(
     cors.add(app.router.add_route("POST", "/{session_name}/start-service", start_service))
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
     cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
+    cors.add(app.router.add_route("GET", "/{session_name}/abusing-report", get_abusing_report))
     return app, []

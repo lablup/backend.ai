@@ -205,6 +205,7 @@ session_fields = FieldSet(
             "dependencies { name id }",
             formatter=DependencyListFormatter(),
         ),
+        FieldSpec("abusing_report", formatter=nested_dict_formatter),
     ]
 )
 
