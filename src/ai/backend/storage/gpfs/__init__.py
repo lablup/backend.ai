@@ -36,18 +36,13 @@ class GPFSVolume(BaseVolume):
     ) -> None:
         super().__init__(local_config, mount_path, fsprefix=fsprefix, options=options)
         verify_ssl = self.config.get("verify_ssl", False)
-        match verify_ssl:
-            case False:
-                ssl_context = False
-            case True:
-                ssl_context = None
-            case _:
-                ssl_context = None
+
         self.api_client = GPFSAPIClient(
             self.config["gpfs_endpoint"],
             self.config["gpfs_username"],
             self.config["gpfs_password"],
-            ssl=ssl_context,
+            # follows ssl parameter on https://docs.aiohttp.org/en/v3.7.3/client_reference.html
+            ssl=False if not verify_ssl else None,
         )
         self.fs = self.config["gpfs_fs_name"]
 
