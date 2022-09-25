@@ -1,17 +1,13 @@
 import base64
 import contextlib
-import json
 import logging
-import time
 import urllib.parse
-from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from ssl import SSLContext
-from typing import Any, AsyncIterator, Dict, List, Mapping, MutableMapping, Optional
+from typing import Any, AsyncIterator, Dict, List, Mapping, Optional
 
 import aiohttp
-from aiohttp import ContentTypeError, web
+from aiohttp import web
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from ai.backend.common.logging import BraceStyleAdapter

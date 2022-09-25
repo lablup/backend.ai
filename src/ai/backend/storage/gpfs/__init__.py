@@ -12,11 +12,8 @@ from ai.backend.storage.vfs import BaseVolume
 
 from ..exception import VFolderCreationError
 from .exceptions import (
-    GPFSAPIError,
-    GPFSInitError,
     GPFSJobFailedError,
     GPFSNoMetricError,
-    GPFSNotFoundError,
 )
 from .gpfs_client import GPFSAPIClient
 
