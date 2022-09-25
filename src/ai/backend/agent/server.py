@@ -586,7 +586,7 @@ class AgentRPCServer(aobject):
         if (abuse_path := self.local_config["agent"].get("abuse-report-path")) is not None:
             report_path = Path(abuse_path, f"report.{kernel_id}.json")
             if report_path.is_file():
-                with open(report_path) as file:
+                with open(report_path, "r") as file:
                     return json.load(file)
         return
 
