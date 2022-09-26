@@ -50,7 +50,7 @@
             "status_info": "admin-requested",
             "domain_name": "default",
             "role": "superadmin",
-            "allowed_client_ip": "10.10.10.10"
+            "allowed_client_ip": ["10.10.10.10"]
         },
         {
             "uuid": "4f13d193-f646-425a-a340-270c4d2b9860",
@@ -64,7 +64,7 @@
             "status_info": "admin-requested",
             "domain_name": "default",
             "role": "admin",
-            "allowed_client_ip": "10.10.10.10"
+            "allowed_client_ip": ["10.10.10.10"]
         },
         {
             "uuid": "dfa9da54-4b28-432f-be29-c0d680c7a412",
@@ -78,7 +78,7 @@
             "status_info": "admin-requested",
             "domain_name": "default",
             "role": "user",
-            "allowed_client_ip": "10.10.10.10"
+            "allowed_client_ip": ["10.10.10.10"]
         },
         {
             "uuid": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
