@@ -523,8 +523,7 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             "is_admin": row["keypairs_is_admin"],
         }
 
-        # TODO: Impl X-Backend-IP header in webserver
-        # validate_ip(request, auth_result["user"])
+        validate_ip(request, auth_result["user"])
         auth_result["keypair"]["resource_policy"] = {
             col.name: row[f"keypair_resource_policies_{col.name}"]
             for col in keypair_resource_policies.c
