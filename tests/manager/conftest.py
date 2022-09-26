@@ -632,6 +632,7 @@ def get_headers(app, default_keypair):
         method,
         url,
         req_bytes,
+        allowed_ip="10.10.10.10",  # Same with fixture
         ctype="application/json",
         hash_type="sha256",
         api_version="v5.20191215",
@@ -645,6 +646,7 @@ def get_headers(app, default_keypair):
             "Content-Type": ctype,
             "Content-Length": str(len(req_bytes)),
             "X-BackendAI-Version": api_version,
+            "X-BackendAI-IP": allowed_ip,
         }
         if api_version >= "v4.20181215":
             req_bytes = b""
