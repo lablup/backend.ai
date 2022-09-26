@@ -45,6 +45,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
+from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     BinarySize,
@@ -309,7 +310,7 @@ class IPColumn(TypeDecorator):
             return value
         try:
             cidr = ReadableCIDR(value).address
-        except ValueError:
+        except InvalidIpAddressValue:
             raise InvalidAPIParameters(f"{value} is invalid IP address value")
         return cidr
 

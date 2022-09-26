@@ -18,6 +18,7 @@ from redis.asyncio.client import Pipeline as RedisPipeline
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
+from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
@@ -391,7 +392,7 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
         raise AuthorizationFailed("Not allowed IP address")
     try:
         client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr)
-    except ValueError:
+    except InvalidIpAddressValue:
         raise InvalidAuthParameters(f"{raw_client_addr} is invalid IP address value")
     if client_addr not in allowed_client_ip:
         raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
@@ -522,7 +523,8 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             "is_admin": row["keypairs_is_admin"],
         }
 
-        validate_ip(request, auth_result["user"])
+        # TODO: Impl X-Backend-IP header in webserver
+        # validate_ip(request, auth_result["user"])
         auth_result["keypair"]["resource_policy"] = {
             col.name: row[f"keypair_resource_policies_{col.name}"]
             for col in keypair_resource_policies.c

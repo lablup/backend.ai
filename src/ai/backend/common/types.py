@@ -39,6 +39,8 @@ import trafaret as t
 import typeguard
 from redis.asyncio import Redis
 
+from .exception import InvalidIpAddressValue
+
 __all__ = (
     "aobject",
     "JSONSerializableMixin",
@@ -352,22 +354,26 @@ class ReadableCIDR(Generic[_Address]):
     _address: _Address | None
 
     def __init__(self, address: str | None) -> None:
-        self._address = (
-            cast(_Address, self._convert_to_cidr(address)) if address is not None else None
-        )
+        self._address = self._convert_to_cidr(address) if address is not None else None
 
-    @staticmethod
-    def _convert_to_cidr(value: str) -> ipaddress.IPv4Network | ipaddress.IPv6Network:
+    def _convert_to_cidr(self, value: str) -> _Address:
         str_val = str(value)
         if "*" in str_val:
             _ip, _, given_cidr = str_val.partition("/")
             filtered = _ip.replace("*", "0")
             if given_cidr:
-                return ip_network(f"{filtered}/{given_cidr}")
+                return self._to_ip_network(f"{filtered}/{given_cidr}")
             octets = _ip.split(".")
             cidr = octets.index("*") * 8
-            return ip_network(f"{filtered}/{cidr}")
-        return ip_network(str_val)
+            return self._to_ip_network(f"{filtered}/{cidr}")
+        return self._to_ip_network(str_val)
+
+    @staticmethod
+    def _to_ip_network(val: str) -> _Address:
+        try:
+            return cast(_Address, ip_network(val))
+        except ValueError:
+            raise InvalidIpAddressValue
 
     @property
     def address(self) -> _Address | None:
