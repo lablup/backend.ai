@@ -664,10 +664,14 @@ class ComputeContainer(graphene.ObjectType):
         return await self.resolve_live_stat(info)
 
     async def resolve_abusing_report(
-        self, info: graphene.ResolveInfo
+        self,
+        info: graphene.ResolveInfo,
+        access_key: AccessKey | None,
     ) -> Optional[Mapping[str, Any]]:
         graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.get_abusing_report(self.id)
+        if access_key is None:
+            return None
+        return await graph_ctx.registry.get_abusing_report(self.id, access_key)
 
     _queryfilter_fieldspec = {
         "image": ("image", None),
@@ -978,13 +982,13 @@ class ComputeSession(graphene.ObjectType):
 
     async def resolve_abusing_reports(
         self, info: graphene.ResolveInfo
-    ) -> Iterable[Mapping[str, Any]]:
+    ) -> Iterable[Optional[Mapping[str, Any]]]:
         containers = self.containers
         if containers is None:
             containers = await self.resolve_containers(info)
         if containers is None:
             return []
-        return [(await con.resolve_abusing_report(info)) for con in containers]
+        return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
     _queryfilter_fieldspec = {
         "type": ("kernels_session_type", lambda s: SessionTypes[s]),
