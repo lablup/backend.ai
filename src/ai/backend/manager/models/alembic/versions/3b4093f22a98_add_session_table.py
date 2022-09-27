@@ -5,6 +5,9 @@ Revises: 35923972eddb
 Create Date: 2022-07-22 07:10:10.223182
 
 """
+from collections import defaultdict
+from uuid import uuid4
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
@@ -284,9 +287,16 @@ def upgrade():
     img_map = {img.name: img.id for img in imgs}
 
     all_kernel_sessions = {}
+    # kernel_id and session_id are the same if it is a single kernel session.
+    # update kernel's session_id of single kernel session.
+    single_kernel_ids = {}
     for row in kernel_rows:
         sess_id = row["session_id"]
         if sess_id not in all_kernel_sessions:
+            if sess_id == row["id"]:
+                # create session with new id if the kernel_id and session_id are the same.
+                sess_id = uuid4()
+                single_kernel_ids[row["id"]] = sess_id
             sess = {
                 "id": sess_id,
                 "creation_id": row["session_creation_id"],
@@ -360,8 +370,8 @@ def upgrade():
             #     sinfo = {**sinfo, row['id']: row['status_info']}
             #     sess['status_info'] = json.dumps(sinfo)
 
-    creates = tuple(all_kernel_sessions.values())
-    if creates:
+    if all_kernel_sessions:
+        creates = tuple(all_kernel_sessions.values())
         connection.execute(SessionRow.__table__.insert(), creates)
 
     # Session dependency table
@@ -391,6 +401,21 @@ def upgrade():
     )
 
     # Kernel table
+    sess_query = (
+        sa.update(kernels)
+        .where(kernels.c.id == sa.bindparam("kernel_id"))
+        .values(session_id=sa.bindparam("b_session_id"))
+    )
+    sess_update_params = []
+    for kern_id, sess_id in single_kernel_ids.items():
+        sess_update_params.append(
+            {
+                "kernel_id": kern_id,
+                "b_session_id": sess_id,
+            }
+        )
+    if sess_update_params:
+        connection.execute(sess_query, sess_update_params)
     op.create_foreign_key(
         op.f("fk_kernels_session_id_sessions"), "kernels", "sessions", ["session_id"], ["id"]
     )
@@ -402,15 +427,15 @@ def upgrade():
         sa.Column("image_id", GUID(), nullable=True),
         extend_existing=True,
     )
-    query = (
+    img_query = (
         sa.update(kernels)
         .where(kernels.c.id == sa.bindparam("kernel_id"))
         .values(image_id=sa.bindparam("b_image_id"))
     )
-    params = []
+    img_update_params = []
     for kern in kernel_rows:
         try:
-            params.append(
+            img_update_params.append(
                 {
                     "kernel_id": kern["id"],
                     "b_image_id": img_map[kern["image"]],
@@ -418,8 +443,8 @@ def upgrade():
             )
         except KeyError:
             continue
-    if params:
-        connection.execute(query, params)
+    if img_update_params:
+        connection.execute(img_query, img_update_params)
 
     op.create_foreign_key(
         op.f("fk_kernels_image_id_images"), "kernels", "images", ["image_id"], ["id"]
@@ -463,6 +488,7 @@ def downgrade():
         "kernels",
         metadata,
         KernelIDColumn(),
+        sa.Column("session_id", GUID, nullable=False),
         sa.Column("image_id", GUID(), nullable=True),
         sa.Column("image", sa.String(length=512), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
@@ -470,15 +496,22 @@ def downgrade():
     query = sa.select(kernels).select_from(kernels).order_by(kernels.c.created_at)
     kernel_rows = connection.execute(query).fetchall()
 
-    query = (
+    img_update_query = (
         sa.update(kernels)
         .where(kernels.c.id == sa.bindparam("kernel_id"))
         .values({kernels.c.image: sa.bindparam("image")})
     )
-    params = []
+    img_params = []
+    num_kernel_sess = defaultdict(int)
+    sess_kern_map = {}
     for kern in kernel_rows:
+        # restore kernel's session_id
+        sess_id = kern["session_id"]
+        num_kernel_sess[sess_id] += 1
+        if sess_id not in sess_kern_map:
+            sess_kern_map[sess_id] = kern["id"]
         try:
-            params.append(
+            img_params.append(
                 {
                     "kernel_id": kern["id"],
                     "image": img_map[kern["image_id"]],
@@ -486,8 +519,27 @@ def downgrade():
             )
         except KeyError:
             continue
-    if params:
-        connection.execute(query, params)
+    if img_params:
+        connection.execute(img_update_query, img_params)
+    kern_update_query = (
+        sa.update(kernels)
+        .where(kernels.c.id == sa.bindparam("kernel_id"))
+        .values({kernels.c.session_id: sa.bindparam("session_id")})
+    )
+    sess_update_params = []
+    for sess_id, num_kern in num_kernel_sess.items():
+        if num_kern == 1:
+            # it is single kernel session.
+            # session_id must be same with kernel_id.
+            kernel_id = sess_kern_map[sess_id]
+            sess_update_params.append(
+                {
+                    "kernel_id": kernel_id,
+                    "session_id": kernel_id,
+                }
+            )
+    if sess_update_params:
+        connection.execute(kern_update_query, sess_update_params)
     op.drop_column("kernels", "image_id")
     op.drop_column("kernels", "requested_slots")
 
