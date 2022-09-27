@@ -1360,9 +1360,6 @@ async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) ->
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
 
-    myself = asyncio.current_task()
-    assert myself is not None
-
     log.info(
         "GET_ABUSING_REPORT (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
     )

@@ -559,20 +559,10 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def get_local_config(self):
-        def get_or_empty(val):
-            if val is None:
-                return ""
-            return str(val)
-
+    async def get_local_config(self) -> Mapping[str, Any]:
         return {
             "agent": {
-                "abuse-report-path": get_or_empty(
-                    self.local_config["agent"].get("abuse-report-path")
-                ),
-                "image-commit-path": get_or_empty(
-                    self.local_config["agent"].get("image-commit-path")
-                ),
+                "abuse-report-path": str(self.local_config["agent"].get("abuse-report-path", "")),
             },
             "watcher": self.local_config["watcher"],
         }
@@ -582,13 +572,17 @@ class AgentRPCServer(aobject):
     async def get_abusing_report(
         self,
         kernel_id,  # type: str
-    ):
+    ) -> Mapping[str, str] | None:
         if (abuse_path := self.local_config["agent"].get("abuse-report-path")) is not None:
             report_path = Path(abuse_path, f"report.{kernel_id}.json")
             if report_path.is_file():
-                with open(report_path, "r") as file:
-                    return json.load(file)
-        return
+
+                def _read_file():
+                    with open(report_path, "r") as file:
+                        return json.load(file)
+
+                return await self.loop.run_in_executor(None, _read_file)
+        return None
 
     @rpc_function
     @collect_error
