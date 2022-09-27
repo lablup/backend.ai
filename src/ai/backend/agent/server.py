@@ -560,9 +560,11 @@ class AgentRPCServer(aobject):
     @rpc_function
     @collect_error
     async def get_local_config(self) -> Mapping[str, Any]:
+        agent_config: Mapping[str, Any] = self.local_config["agent"]
+        report_path: Path | None = agent_config.get("abuse-report-path")
         return {
             "agent": {
-                "abuse-report-path": str(self.local_config["agent"].get("abuse-report-path", "")),
+                "abuse-report-path": str(report_path) if report_path is not None else "",
             },
             "watcher": self.local_config["watcher"],
         }
