@@ -48,7 +48,7 @@ lockfile_generator = "pex"
 tailor_pex_binary_targets = false
 
 [python-repos]
-indexes.add = ["https://dist.backend.ai/pypi/simple/"]
+indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
 
 [python.resolves]
 python-default = "python.lock"
