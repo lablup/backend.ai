@@ -646,7 +646,7 @@ def get_headers(app, default_keypair):
             "Content-Type": ctype,
             "Content-Length": str(len(req_bytes)),
             "X-BackendAI-Version": api_version,
-            "X-BackendAI-IP": allowed_ip,
+            "X-Forwarded-For": allowed_ip,
         }
         if api_version >= "v4.20181215":
             req_bytes = b""

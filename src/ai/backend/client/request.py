@@ -5,7 +5,6 @@ import functools
 import io
 import json as modjson
 import logging
-import socket
 import sys
 from collections import OrderedDict, namedtuple
 from datetime import datetime
@@ -268,10 +267,6 @@ class Request:
                 pass
         else:
             raise ValueError("unsupported endpoint type")
-        bai_ip = self.session.aiohttp_session.headers.get("X-BackendAI-IP") or socket.gethostbyname(
-            socket.gethostname()
-        )
-        self.headers.update({"X-BackendAI-IP": bai_ip})
 
     def _pack_content(self) -> Union[RequestContent, aiohttp.FormData]:
         if self._attached_files is not None:
