@@ -65,6 +65,8 @@ __all__ = (
     "match_sessions_by_id",
     "get_session_by_id",
     "get_sgroup_managed_sessions",
+    "get_session",
+    "get_session_with_kernels",
     "SessionDependencyRow",
     "check_all_dependencies",
     "ComputeSession",
@@ -354,7 +356,7 @@ class SessionRow(Base):
 async def match_sessions(
     db_session: SASession,
     session_name_or_id: Union[str, UUID],
-    access_key: AccessKey,
+    access_key: AccessKey | None,
     *,
     allow_prefix: bool = False,
     allow_stale: bool = True,
@@ -373,6 +375,7 @@ async def match_sessions(
     except ValueError:
         pass
     else:
+        # Fetch id-based query first
         query_list = [aiotools.apartial(match_sessions_by_id, allow_prefix=False), *query_list]
         if allow_prefix:
             query_list.append(aiotools.apartial(match_sessions_by_id, allow_prefix=True))
@@ -506,6 +509,73 @@ async def get_sessions_by_name(
     )
     result = await db_session.execute(query)
     return result.scalars().all()
+
+
+async def get_session(
+    session_name_or_id: Union[str, UUID],
+    access_key: Union[str, AccessKey],
+    *,
+    allow_stale: bool = False,
+    for_update: bool = False,
+    db_session: SASession = None,
+) -> SessionRow:
+    """
+    Retrieve the session information by session's UUID,
+    or session's name paired with access_key.
+    This will return the information of the session and the sibling kernel(s).
+
+    :param session_name_or_id: session's id or session's name.
+    :param access_key: Access key used to create session.
+    :param allow_stale: If True, filter "inactive" sessions as well as "active" ones.
+                        If False, filter "active" sessions only.
+    :param for_update: Apply for_update during select query.
+    :param db_session: Database connection for reuse.
+    """
+    session_list = await match_sessions(
+        db_session,
+        session_name_or_id,
+        AccessKey(access_key),
+        allow_stale=allow_stale,
+        for_update=for_update,
+    )
+    try:
+        return session_list[0]
+    except IndexError:
+        raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
+
+
+async def get_session_with_kernels(
+    session_name_or_id: str | UUID,
+    access_key: AccessKey | None,
+    *,
+    allow_stale: bool = False,
+    for_update: bool = False,
+    only_main_kern: bool = False,
+    db_session: SASession = None,
+) -> SessionRow:
+    kernel_rel = SessionRow.kernels
+    if only_main_kern:
+        kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
+    kernel_loading_op = (
+        noload("*"),
+        selectinload(kernel_rel).options(
+            noload("*"),
+            selectinload(KernelRow.image_row).noload("*"),
+            selectinload(KernelRow.agent_row).noload("*"),
+        ),
+    )
+    session_list = await match_sessions(
+        db_session,
+        session_name_or_id,
+        access_key,
+        allow_stale=allow_stale,
+        for_update=for_update,
+        eager_loading_op=kernel_loading_op,
+    )
+    try:
+        return session_list[0]
+    except IndexError:
+        raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
 
 
 async def get_sgroup_managed_sessions(

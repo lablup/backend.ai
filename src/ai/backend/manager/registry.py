@@ -20,7 +20,6 @@ from typing import (
     Any,
     AsyncIterator,
     Callable,
-    Container,
     Dict,
     List,
     Mapping,
@@ -48,7 +47,6 @@ from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import noload, selectinload
-from sqlalchemy.sql.expression import true
 from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
@@ -132,7 +130,7 @@ from .models import (
     users,
 )
 from .models.kernel import get_all_kernels, match_session_ids
-from .models.session import aggregate_kernel_status, match_sessions, match_sessions_by_id
+from .models.session import aggregate_kernel_status, get_session_with_kernels
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -491,323 +489,25 @@ class AgentRegistry:
                 raise SessionNotFound
             return row
 
-    async def get_kernels(
-        self,
-        session_name_or_id: Union[str, uuid.UUID],
-        access_key: str,
-        *,
-        field=None,
-        allow_stale: bool = False,
-        for_update: bool = False,
-        db_connection: SAConnection = None,
-        cluster_role: str = None,
-    ) -> Sequence[sa.engine.Row]:
-        """
-        Retrieve the kernel information by kernel's ID, kernel's session UUID
-        (session_id), or kernel's name (session_id) paired with access_key.
-        If the session is composed of multiple containers, this will return
-        every container information, unless field and role is specified by the caller.
-
-        :param session_name_or_id: kernel's id, session_id (session name), or session_id.
-        :param access_key: Access key used to create kernels.
-        :param field: If given, it extracts only the raw value of the given field, without
-                      wrapping it as Kernel object.
-        :param allow_stale: If True, filter "inactive" kernels as well as "active" ones.
-                            If False, filter "active" kernels only.
-        :param for_update: Apply for_update during select query.
-        :param db_connection: Database connection for reuse.
-        :param cluster_role: Filter kernels by role. "main", "sub", or None (all).
-        """
-        cols = [
-            kernels.c.id,
-            kernels.c.session_id,
-            kernels.c.session_name,
-            kernels.c.session_type,
-            kernels.c.status,
-            kernels.c.cluster_mode,
-            kernels.c.cluster_role,
-            kernels.c.cluster_idx,
-            kernels.c.access_key,
-            kernels.c.agent_addr,
-            kernels.c.kernel_host,
-            kernels.c.image,
-            kernels.c.registry,
-            kernels.c.service_ports,
-        ]
-        if field == "*":
-            cols = [sa.text("*")]
-        elif isinstance(field, (tuple, list)):
-            cols.extend(field)
-        elif isinstance(field, (sa.Column, sa.sql.elements.ColumnClause)):
-            cols.append(field)
-        elif isinstance(field, str):
-            cols.append(sa.column(field))
-
-        cond_id = (
-            sa.sql.expression.cast(kernels.c.id, sa.String).like(f"{session_name_or_id}%")
-        ) & (kernels.c.access_key == access_key)
-        cond_name = (kernels.c.session_name.like(f"{session_name_or_id}%")) & (
-            kernels.c.access_key == access_key
-        )
-        cond_session_id = (
-            sa.sql.expression.cast(kernels.c.session_id, sa.String).like(f"{session_name_or_id}%")
-        ) & (kernels.c.access_key == access_key)
-        if cluster_role is not None:
-            cond_id = cond_id & (kernels.c.cluster_role == cluster_role)
-            cond_name = cond_name & (kernels.c.cluster_role == cluster_role)
-            cond_session_id = cond_session_id & (kernels.c.cluster_role == cluster_role)
-        if allow_stale:
-            cond_status = true()  # any status
-        else:
-            cond_status = ~(kernels.c.status.in_(DEAD_KERNEL_STATUSES))
-        query_by_id = (
-            sa.select(cols)
-            .select_from(kernels)
-            .where(cond_id & cond_status)
-            .order_by(sa.desc(kernels.c.created_at))
-            .limit(10)
-            .offset(0)
-        )
-        if for_update:
-            query_by_id = query_by_id.with_for_update()
-        query_by_name = (
-            sa.select(cols)
-            .select_from(kernels)
-            .where(cond_name & cond_status)
-            .order_by(sa.desc(kernels.c.created_at))
-        )
-        if for_update:
-            query_by_name = query_by_name.with_for_update()
-        query_by_session_id = (
-            sa.select(cols)
-            .select_from(kernels)
-            .where(cond_session_id & cond_status)
-            .order_by(sa.desc(kernels.c.created_at))
-            .limit(10)
-            .offset(0)
-        )
-        if for_update:
-            query_by_session_id = query_by_session_id.with_for_update()
-        if allow_stale:
-            query_by_name = query_by_name.limit(10).offset(0)
-        else:
-            # for backward-compatibility
-            query_by_name = query_by_name.limit(1).offset(0)
-
-        async with reenter_txn(self.db, db_connection) as conn:
-            for query in [
-                query_by_id,
-                query_by_session_id,
-                query_by_name,
-            ]:
-                result = await conn.execute(query)
-                if result.rowcount == 0:
-                    continue
-                return result.fetchall()
-        raise SessionNotFound
-
-    async def get_session_by_session_id(
-        self,
-        session_id: SessionId,
-        *,
-        db_session: SASession,
-        for_update: bool = False,
-    ) -> SessionRow:
-        cands = await match_sessions_by_id(db_session, session_id, for_update=for_update)
-        if not cands:
-            raise SessionNotFound
-        return cands[0]
-
-    async def get_session_by_kernel_id(
-        self,
-        kernel_id: KernelId,
-        *,
-        db_connection: SAConnection,
-        for_update: bool = False,
-    ) -> sa.engine.Row:
-        query = (
-            sa.select(
-                [sa.text("*")],
-            )
-            .select_from(kernels)
-            .where(
-                (
-                    kernels.c.session_id
-                    == (
-                        sa.select([kernels.c.session_id])
-                        .select_from(kernels)
-                        .where(kernels.c.id == kernel_id)
-                    )
-                )
-                & (kernels.c.cluster_role == DEFAULT_ROLE),
-            )
-        )
-        if for_update:
-            query = query.with_for_update()
-        result = await db_connection.execute(query)
-        row = result.first()
-        if row is None:
-            raise SessionNotFound
-        return row
-
     async def get_session(
         self,
-        session_name_or_id: Union[str, uuid.UUID],
-        access_key: Union[str, AccessKey],
+        session_name_or_id: str | uuid.UUID,
+        access_key: str | AccessKey | None = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
+        only_main_kern: bool = True,
         db_session: SASession = None,
     ) -> SessionRow:
-        """
-        Retrieve the session information by kernel's ID, kernel's session UUID
-        (session_id), or kernel's name (session_id) paired with access_key.
-        If the session is composed of multiple containers, this will return
-        the information of the main kernel.
-
-        :param session_name_or_id: kernel's id, session_id (session name), or session_id.
-        :param access_key: Access key used to create kernels.
-        :param allow_stale: If True, filter "inactive" kernels as well as "active" ones.
-                            If False, filter "active" kernels only.
-        :param for_update: Apply for_update during select query.
-        :param db_session: Database connection for reuse.
-        """
         async with reenter_txn_session(self.db, db_session, read_only=True) as db_sess:
-            session_list = await match_sessions(
-                db_sess,
+            return await get_session_with_kernels(
                 session_name_or_id,
-                AccessKey(access_key),
+                AccessKey(access_key) if access_key is not None else None,
                 allow_stale=allow_stale,
                 for_update=for_update,
+                only_main_kern=only_main_kern,
+                db_session=db_sess,
             )
-            try:
-                return session_list[0]
-            except IndexError:
-                raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
-
-    async def get_session_with_kernels(
-        self,
-        session_name_or_id: Union[str, uuid.UUID],
-        access_key: Union[str, AccessKey],
-        *,
-        allow_stale: bool = False,
-        for_update: bool = False,
-        only_main_kern: bool = False,
-        db_session: SASession = None,
-    ) -> SessionRow:
-
-        kernel_rel = SessionRow.kernels
-        if only_main_kern:
-            kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-        kernel_loading_op = (
-            noload("*"),
-            selectinload(kernel_rel).options(
-                noload("*"),
-                selectinload(KernelRow.image_row).noload("*"),
-                selectinload(KernelRow.agent_row).noload("*"),
-            ),
-        )
-        async with reenter_txn_session(self.db, db_session, read_only=True) as db_sess:
-            session_list = await match_sessions(
-                db_sess,
-                session_name_or_id,
-                AccessKey(access_key),
-                allow_stale=allow_stale,
-                for_update=for_update,
-                eager_loading_op=kernel_loading_op,
-            )
-            try:
-                return session_list[0]
-            except IndexError:
-                raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
-
-    async def get_session_kernels(
-        self,
-        session_id: str,
-        access_key: str,
-        *,
-        field=None,
-        allow_stale: bool = False,
-        for_update: bool = False,
-        db_connection: SAConnection = None,
-        cluster_role: str = None,
-    ) -> Sequence[sa.engine.Row]:
-        """
-        Retrieve the information of all kernels of a session by session UUID.
-        If the session is bundled with multiple containers,
-        this will return every information of them.
-
-        :param session_id: Session's UUID.
-        :param access_key: Access key used to create the session.
-        :param field: If given, it extracts only the raw value of the given field, without
-                      wrapping it as Kernel object.
-        :param allow_stale: If True, filter "inactive" kernels as well as "active" ones.
-                            If False, filter "active" kernels only.
-        :param for_update: Apply for_update during select query.
-        :param db_connection: Database connection for reuse.
-        :param cluster_role: Filter kernels by role. "main", "sub", or None (all).
-        """
-        return await self.get_kernels(
-            session_id,
-            access_key,
-            field=field,
-            for_update=for_update,
-            db_connection=db_connection,
-            cluster_role=cluster_role,
-        )
-
-    async def get_sessions(
-        self,
-        session_names: Container[str],
-        field=None,
-        allow_stale=False,
-        db_connection=None,
-    ):
-        """
-        Batched version of :meth:`get_session() <AgentRegistry.get_session>`.
-        The order of the returend array is same to the order of ``sess_ids``.
-        For non-existent or missing kernel IDs, it fills None in their
-        positions without raising SessionNotFound exception.
-        """
-
-        cols = [
-            kernels.c.id,
-            kernels.c.session_id,
-            kernels.c.agent_addr,
-            kernels.c.kernel_host,
-            kernels.c.access_key,
-            kernels.c.service_ports,
-        ]
-        if isinstance(field, (tuple, list)):
-            cols.extend(field)
-        elif isinstance(field, (sa.Column, sa.sql.elements.ColumnClause)):
-            cols.append(field)
-        elif isinstance(field, str):
-            cols.append(sa.column(field))
-        async with reenter_txn(self.db, db_connection, _read_only_txn_opts) as conn:
-            if allow_stale:
-                query = (
-                    sa.select(cols)
-                    .select_from(kernels)
-                    .where(
-                        (kernels.c.session_id.in_(session_names))
-                        & (kernels.c.cluster_role == DEFAULT_ROLE)
-                    )
-                )
-            else:
-                query = (
-                    sa.select(cols)
-                    .select_from(kernels.join(agents))
-                    .where(
-                        (kernels.c.session_id.in_(session_names))
-                        & (kernels.c.cluster_role == DEFAULT_ROLE)
-                        & (agents.c.status == AgentStatus.ALIVE)
-                        & (agents.c.id == kernels.c.agent)
-                    )
-                )
-            result = await conn.execute(query)
-            rows = result.fetchall()
-            return rows
 
     async def enqueue_session(
         self,
@@ -1156,18 +856,20 @@ class AgentRegistry:
 
                     matched_dependency_session_ids = []
                     for dependency_id in dependency_sessions:
-                        match_info = await match_sessions_by_id(
-                            db_sess,
-                            dependency_id,
-                            access_key,
-                        )
-                        if match_info:
-                            matched_dependency_session_ids.append(match_info[0].id)
-                        else:
+                        try:
+                            match_info = await self.get_session(
+                                dependency_id,
+                                access_key,
+                                db_session=db_sess,
+                            )
+                        except SessionNotFound:
                             raise InvalidAPIParameters(
                                 "Unknown session ID or name in the dependency list",
                                 extra_data={"session_ref": dependency_id},
                             )
+                        else:
+                            matched_dependency_session_ids.append(match_info.id)
+
                     dependency_rows = [
                         SessionDependencyRow(session_id=session_id, depends_on=depend_id)
                         for depend_id in matched_dependency_session_ids
@@ -2343,9 +2045,7 @@ class AgentRegistry:
         *,
         flush_timeout: float = None,
     ) -> Mapping[str, Any]:
-        sess = await self.get_session_with_kernels(
-            session_name_or_id, access_key, only_main_kern=True
-        )
+        sess = await self.get_session(session_name_or_id, access_key)
         async with self.handle_kernel_exception("execute", sess.id, access_key):
             # The agent aggregates at most 2 seconds of outputs
             # if the kernel runs for a long time.
@@ -2374,9 +2074,7 @@ class AgentRegistry:
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
     ) -> Mapping[str, Any]:
-        session = await self.get_session_with_kernels(
-            session_name_or_id, access_key, only_main_kern=True
-        )
+        session = await self.get_session(session_name_or_id, access_key)
         async with self.handle_kernel_exception("execute", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2394,9 +2092,7 @@ class AgentRegistry:
         text: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        session = await self.get_session_with_kernels(
-            session_name_or_id, access_key, only_main_kern=True
-        )
+        session = await self.get_session(session_name_or_id, access_key)
         async with self.handle_kernel_exception("execute", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2414,8 +2110,9 @@ class AgentRegistry:
         service: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        session = await self.get_session_with_kernels(
-            session_name_or_id, access_key, only_main_kern=True
+        session = await self.get_session(
+            session_name_or_id,
+            access_key,
         )
         async with self.handle_kernel_exception("execute", session.id, access_key):
             async with RPCContext(
@@ -2433,8 +2130,9 @@ class AgentRegistry:
         access_key: AccessKey,
         service: str,
     ) -> None:
-        session = await self.get_session_with_kernels(
-            session_name_or_id, access_key, only_main_kern=True
+        session = await self.get_session(
+            session_name_or_id,
+            access_key,
         )
         async with self.handle_kernel_exception("shutdown_service", session.id, access_key):
             async with RPCContext(
@@ -2453,9 +2151,7 @@ class AgentRegistry:
         filename: str,
         payload: bytes,
     ) -> Mapping[str, Any]:
-        session = await self.get_session_with_kernels(
-            session_name_or_id, access_key, only_main_kern=True
-        )
+        session = await self.get_session(session_name_or_id, access_key)
         async with self.handle_kernel_exception("upload_file", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,
@@ -2472,8 +2168,9 @@ class AgentRegistry:
         access_key: AccessKey,
         filepath: str,
     ) -> bytes:
-        session = await self.get_session_with_kernels(
-            session_name_or_id, access_key, only_main_kern=True
+        session = await self.get_session(
+            session_name_or_id,
+            access_key,
         )
         async with self.handle_kernel_exception("download_file", session.id, access_key):
             async with RPCContext(
@@ -2491,8 +2188,9 @@ class AgentRegistry:
         access_key: AccessKey,
         path: str,
     ) -> Mapping[str, Any]:
-        session = await self.get_session_with_kernels(
-            session_name_or_id, access_key, only_main_kern=True
+        session = await self.get_session(
+            session_name_or_id,
+            access_key,
         )
         async with self.handle_kernel_exception("list_files", session.id, access_key):
             async with RPCContext(
@@ -2509,9 +2207,7 @@ class AgentRegistry:
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
     ) -> str:
-        session = await self.get_session_with_kernels(
-            session_name_or_id, access_key, only_main_kern=True
-        )
+        session = await self.get_session(session_name_or_id, access_key, only_main_kern=True)
         async with self.handle_kernel_exception("get_logs_from_agent", session.id, access_key):
             async with RPCContext(
                 session.main_kernel.agent,
