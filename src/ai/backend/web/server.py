@@ -27,9 +27,9 @@ from setproctitle import setproctitle
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
-from ai.backend.common.session import get_session
-from ai.backend.common.session import setup as setup_session
-from ai.backend.common.session.redis_storage import RedisStorage
+from ai.backend.common.web.session import get_session
+from ai.backend.common.web.session import setup as setup_session
+from ai.backend.common.web.session.redis_storage import RedisStorage
 
 from . import __version__, user_agent
 from .config import config_iv
