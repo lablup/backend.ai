@@ -266,6 +266,7 @@ user_fields = FieldSet(
         FieldSpec("domain_name"),
         FieldSpec("role"),
         FieldSpec("groups { id name }", formatter=GroupListFormatter()),
+        FieldSpec("allowed_client_ip"),
     ]
 )
 

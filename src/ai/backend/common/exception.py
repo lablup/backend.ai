@@ -48,3 +48,9 @@ class AliasResolutionFailed(ValueError):
 
     def __str__(self) -> str:
         return f"Failed to resolve alias: {self.args[0]}"
+
+
+class InvalidIpAddressValue(ValueError):
+    """
+    Represents an invalid value for ip_address.
+    """

@@ -18,8 +18,10 @@ from redis.asyncio.client import Pipeline as RedisPipeline
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
+from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
+from ai.backend.common.types import ReadableCIDR
 
 from ..models import keypair_resource_policies, keypairs, users
 from ..models.group import association_groups_users, groups
@@ -375,6 +377,24 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         raise InvalidAuthParameters(e.args[0])
 
 
+def validate_ip(request: web.Request, user: Mapping[str, Any]):
+    allowed_client_ip = user.get("allowed_client_ip", None)
+    if not allowed_client_ip or allowed_client_ip is None:
+        # allowed_client_ip is None or [] - empty list
+        return
+    assert isinstance(allowed_client_ip, list)
+    raw_client_addr: str | None = request.headers.get("X-Forwarded-For") or request.remote
+    if raw_client_addr is None:
+        raise AuthorizationFailed("Not allowed IP address")
+    try:
+        client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr, is_network=False)
+    except InvalidIpAddressValue:
+        raise InvalidAuthParameters(f"{raw_client_addr} is invalid IP address value")
+    if any(client_addr.address in allowed_ip_cand.address for allowed_ip_cand in allowed_client_ip):
+        return
+    raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
+
+
 @web.middleware
 async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     """
@@ -499,6 +519,8 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
             },
             "is_admin": row["keypairs_is_admin"],
         }
+
+        validate_ip(request, auth_result["user"])
         auth_result["keypair"]["resource_policy"] = {
             col.name: row[f"keypair_resource_policies_{col.name}"]
             for col in keypair_resource_policies.c
