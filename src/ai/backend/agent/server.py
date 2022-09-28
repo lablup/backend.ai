@@ -767,6 +767,7 @@ async def server_main(
         hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
     monitor.prompt = "monitor (agent) >>> "
+    monitor.console_locals["local_config"] = local_config
     monitor.start()
 
     # Start RPC server.
@@ -777,6 +778,7 @@ async def server_main(
         skip_detect_manager=local_config["agent"]["skip-manager-detection"],
     )
     agent_instance = agent
+    monitor.console_locals["agent"] = agent
 
     # Run!
     try:

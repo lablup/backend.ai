@@ -21,7 +21,7 @@
 //     "aiohttp_session[aioredis]~=2.11",
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.1",
-//     "aiomonitor-ng~=0.5.1",
+//     "aiomonitor-ng~=0.6.0",
 //     "aioredis[hiredis]~=2.0.1",
 //     "aiosqlite~=0.17.0",
 //     "aiotools~=1.5.9",
@@ -370,22 +370,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6a13cd037c5d7e1a00eae828e3b002937cc0c5da3d35b366a9ffbff609ed0344",
-              "url": "https://files.pythonhosted.org/packages/b1/ac/dc372280795c821ee2a7a9e8aea04ef7afc92cc168d5ac1824390b0834eb/aiomonitor_ng-0.5.1-py3-none-any.whl"
+              "hash": "010871ae7f51a68fb315a112c3a3e8c617b321e12708405a99eef7c0fc0a4884",
+              "url": "https://files.pythonhosted.org/packages/65/16/024998efe68bba425fe1e5c937585da33cbc15a8e6599748ec937ced23d8/aiomonitor_ng-0.6.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "89adce2e4df86d1632c72e6b1840539dd44fef632c7feb72bc6386d88dc272e4",
-              "url": "https://files.pythonhosted.org/packages/2d/e0/ccfa40c9ed1d2fee32a3f944c0b6708d0bcd3fbc33e42276a5e0955c4a61/aiomonitor-ng-0.5.1.tar.gz"
+              "hash": "2c7abe539f4d26a4002fde61b7fbd9aa6d4c66e28b6b31f5a414c2593707e9fa",
+              "url": "https://files.pythonhosted.org/packages/d0/21/f2990624e3c92f421d6bf25c0f65d3e3c6bdb380de01cf1ae5efede6de76/aiomonitor-ng-0.6.0.tar.gz"
             }
           ],
           "project_name": "aiomonitor-ng",
           "requires_dists": [
             "aioconsole",
+            "prompt-toolkit>=3.0",
             "terminaltables"
           ],
           "requires_python": null,
-          "version": "0.5.1"
+          "version": "0.6"
         },
         {
           "artifacts": [
@@ -1334,13 +1335,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "53bdc0c2b4e25895575779caef4cfb3a6bdff1b7b32dc38a654d71aba35bb5f8",
-              "url": "https://files.pythonhosted.org/packages/be/65/3126b832ae3a8c7446820a9603b4b73e39ade43995922665f128f5aa53ab/google_auth-2.11.1-py2.py3-none-any.whl"
+              "hash": "98f601773978c969e1769f97265e732a81a8e598da3263895023958d456ee625",
+              "url": "https://files.pythonhosted.org/packages/04/48/dd016f1f9d9414381a466c2e03c9ec4534366774957b412234b219a13e15/google_auth-2.12.0-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "516e6623038b81430dd062a1a25ecd24f173d7c15cdf4e48a9e78bc87e97aeec",
-              "url": "https://files.pythonhosted.org/packages/78/30/5f73a9a960dc888f44577f76c34e8437e24b441eadbebabde3d213eccfe3/google-auth-2.11.1.tar.gz"
+              "hash": "f12d86502ce0f2c0174e2e70ecc8d36c69593817e67e1d9c5e34489120422e4b",
+              "url": "https://files.pythonhosted.org/packages/19/dd/48e06d7ce02ebf53a2d36fcada99c68d7f6b10f2058ec4f76f7e2e81d9e6/google-auth-2.12.0.tar.gz"
             }
           ],
           "project_name": "google-auth",
@@ -1359,7 +1360,7 @@
             "six>=1.9.0"
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "2.11.1"
+          "version": "2.12"
         },
         {
           "artifacts": [
@@ -2237,6 +2238,26 @@
           ],
           "requires_python": null,
           "version": "2.3"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "9696f386133df0fc8ca5af4895afe5d78f5fcfe5258111c2a79a1c3e41ffa96d",
+              "url": "https://files.pythonhosted.org/packages/26/ec/2ebddd1f0584fec4a6d4b5dc57627254070c3db310f00981bc5de03dd5ab/prompt_toolkit-3.0.31-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "9ada952c9d1787f52ff6d5f3484d0b4df8952787c087edf6a1f7c2cb1ea88148",
+              "url": "https://files.pythonhosted.org/packages/80/76/c94cf323ca362dd7baca8d8ddf3b5fe1576848bc0156522ad581c04f8446/prompt_toolkit-3.0.31.tar.gz"
+            }
+          ],
+          "project_name": "prompt-toolkit",
+          "requires_dists": [
+            "wcwidth"
+          ],
+          "requires_python": ">=3.6.2",
+          "version": "3.0.31"
         },
         {
           "artifacts": [
@@ -3933,7 +3954,7 @@
     "aiohttp_session[aioredis]~=2.11",
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.1",
-    "aiomonitor-ng~=0.5.1",
+    "aiomonitor-ng~=0.6.0",
     "aioredis[hiredis]~=2.0.1",
     "aiosqlite~=0.17.0",
     "aiotools~=1.5.9",
