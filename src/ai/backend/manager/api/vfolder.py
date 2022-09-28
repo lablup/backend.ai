@@ -603,13 +603,6 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         },
     ):
         pass
-    async with root_ctx.db.begin() as conn:
-        query = (
-            sa.update(vfolders)
-            .values(status=VFolderOperationStatus.DELETED)
-            .where(vfolders.c.id == folder_id)
-        )
-        await conn.execute(query)
     return web.Response(status=204)
 
 
@@ -1909,14 +1902,6 @@ async def delete(request: web.Request) -> web.Response:
         },
     ):
         pass
-
-    async with root_ctx.db.begin() as conn:
-        query = (
-            sa.update(vfolders)
-            .values(status=VFolderOperationStatus.DELETED)
-            .where(vfolders.c.name == folder_name)
-        )
-        await conn.execute(query)
     return web.Response(status=204)
 
 
