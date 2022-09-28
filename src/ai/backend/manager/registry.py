@@ -3046,6 +3046,31 @@ class AgentRegistry:
                 resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), email, filename)
         return resp
 
+    async def get_agent_local_config(
+        self,
+        agent_id: AgentId,
+        agent_addr: str,
+    ) -> Mapping[str, str]:
+        async with RPCContext(
+            agent_id,
+            agent_addr,
+            invoke_timeout=None,
+        ) as rpc:
+            return await rpc.call.get_local_config()
+
+    async def get_abusing_report(
+        self,
+        session_name_or_id: Union[str, SessionId],
+        access_key: AccessKey,
+    ) -> Optional[Mapping[str, str]]:
+        kernel = await self.get_session(session_name_or_id, access_key)
+        async with RPCContext(
+            kernel["agent"],
+            kernel["agent_addr"],
+            invoke_timeout=None,
+        ) as rpc:
+            return await rpc.call.get_abusing_report(str(kernel["id"]))
+
 
 async def check_scaling_group(
     conn: SAConnection,
