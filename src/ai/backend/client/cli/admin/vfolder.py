@@ -246,17 +246,37 @@ def shared_vfolder_info(vfolder_id):
 def update_shared_vf_permission(vfolder_id, user_id, permission):
     """
     Update permission for shared vfolders.
-    If permission is None, remove user's permission for the vfolder.
 
     \b
     VFOLDER_ID: ID of a virtual folder.
-    USER_ID: ID of user who shared the vfolder.
+    USER_ID: ID of user who have been granted access to shared vFolder.
     PERMISSION: Permission to update. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).
     """
     with Session() as session:
         try:
             resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, permission)
             print("Updated.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+        print(resp)
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=str)
+@click.argument("user_id", type=str)
+def remove_shared_vf_permission(vfolder_id, user_id):
+    """
+    Remove permission for shared vfolders.
+
+    \b
+    VFOLDER_ID: ID of a virtual folder.
+    USER_ID: ID of user who have been granted access to shared vFolder.
+    """
+    with Session() as session:
+        try:
+            resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, None)
+            print("Removed.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
