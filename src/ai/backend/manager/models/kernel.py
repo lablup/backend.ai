@@ -589,6 +589,7 @@ class ComputeContainer(graphene.ObjectType):
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
+    abusing_report = graphene.JSONString()
 
     # resources
     agent = graphene.String()
@@ -656,6 +657,16 @@ class ComputeContainer(graphene.ObjectType):
 
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
         return await self.resolve_live_stat(info)
+
+    async def resolve_abusing_report(
+        self,
+        info: graphene.ResolveInfo,
+        access_key: AccessKey | None,
+    ) -> Optional[Mapping[str, Any]]:
+        graph_ctx: GraphQueryContext = info.context
+        if access_key is None:
+            return None
+        return await graph_ctx.registry.get_abusing_report(self.id, access_key)
 
     _queryfilter_fieldspec = {
         "image": ("image", None),

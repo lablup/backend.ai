@@ -130,6 +130,7 @@ class Agent(graphene.ObjectType):
     version = graphene.String()
     compute_plugins = graphene.JSONString()
     hardware_metadata = graphene.JSONString()
+    local_config = graphene.JSONString()
 
     # Legacy fields
     mem_slots = graphene.Int()
@@ -218,6 +219,10 @@ class Agent(graphene.ObjectType):
     ) -> Mapping[str, HardwareMetadata]:
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.registry.gather_agent_hwinfo(self.id)
+
+    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+        graph_ctx: GraphQueryContext = info.context
+        return await graph_ctx.registry.get_agent_local_config(self.id, self.addr)
 
     _queryfilter_fieldspec = {
         "id": ("id", None),

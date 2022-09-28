@@ -11,11 +11,13 @@ from abc import ABCMeta, abstractmethod
 from collections import UserDict, namedtuple
 from contextvars import ContextVar
 from decimal import Decimal
+from ipaddress import ip_address, ip_network
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
+    Generic,
     List,
     Literal,
     Mapping,
@@ -37,6 +39,8 @@ import trafaret as t
 import typeguard
 from redis.asyncio import Redis
 
+from .exception import InvalidIpAddressValue
+
 __all__ = (
     "aobject",
     "JSONSerializableMixin",
@@ -56,6 +60,7 @@ __all__ = (
     "SlotName",
     "IntrinsicSlotNames",
     "ResourceSlot",
+    "ReadableCIDR",
     "HardwareMetadata",
     "MountPermission",
     "MountPermissionLiteral",
@@ -333,6 +338,58 @@ class HostPortPair(namedtuple("HostPortPair", "host port")):
         if isinstance(self.host, ipaddress.IPv6Address):
             return f"[{self.host}]:{self.port}"
         return f"{self.host}:{self.port}"
+
+
+_Address = TypeVar("_Address", bound=Union[ipaddress.IPv4Network, ipaddress.IPv6Network])
+
+
+class ReadableCIDR(Generic[_Address]):
+    """
+    Convert wild-card based IP address into CIDR.
+
+    e.g)
+    192.10.*.* -> 192.10.0.0/16
+    """
+
+    _address: _Address | None
+
+    def __init__(self, address: str | None, is_network: bool = True) -> None:
+        self._is_network = is_network
+        self._address = self._convert_to_cidr(address) if address is not None else None
+
+    def _convert_to_cidr(self, value: str) -> _Address:
+        str_val = str(value)
+        if not self._is_network:
+            return cast(_Address, ip_address(str_val))
+        if "*" in str_val:
+            _ip, _, given_cidr = str_val.partition("/")
+            filtered = _ip.replace("*", "0")
+            if given_cidr:
+                return self._to_ip_network(f"{filtered}/{given_cidr}")
+            octets = _ip.split(".")
+            cidr = octets.index("*") * 8
+            return self._to_ip_network(f"{filtered}/{cidr}")
+        return self._to_ip_network(str_val)
+
+    @staticmethod
+    def _to_ip_network(val: str) -> _Address:
+        try:
+            return cast(_Address, ip_network(val))
+        except ValueError:
+            raise InvalidIpAddressValue
+
+    @property
+    def address(self) -> _Address | None:
+        return self._address
+
+    def __str__(self) -> str:
+        return str(self._address)
+
+    def __eq__(self, other: object) -> bool:
+        if other is self:
+            return True
+        assert isinstance(other, ReadableCIDR), "Only can compare ReadableCIDR objects."
+        return self.address == other.address
 
 
 class BinarySize(int):

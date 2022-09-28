@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, overload
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, cast, overload
 
 import attr
 import graphene
@@ -243,13 +243,15 @@ async def query_allowed_sgroups(
     result = await db_conn.execute(query)
     from_domain = {row["scaling_group"] for row in result}
 
-    if isinstance(group, Iterable):
-        group_ids = await resolve_groups(db_conn, domain_name, group)
-    else:
-        if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):
-            group_ids = [group_id]
-        else:
-            group_ids = []
+    group_ids: Iterable[uuid.UUID] = []
+    match group:
+        case uuid.UUID() | str():
+            if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):
+                group_ids = [group_id]
+            else:
+                group_ids = []
+        case list() | tuple() | set():
+            group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable, group))
     from_group: Set[str]
     if not group_ids:
         from_group = set()  # empty

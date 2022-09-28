@@ -38,6 +38,7 @@ def info(ctx: CLIContext, agent_id: str) -> None:
         agent_fields["occupied_slots"],
         agent_fields["hardware_metadata"],
         agent_fields["live_stat"],
+        agent_fields["local_config"],
     ]
     with Session() as session:
         try:
