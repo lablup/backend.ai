@@ -54,8 +54,8 @@ jobs:
       shell: 'script -q -e -c "bash {0}"'
       run: |
         ./scripts/install-dev.sh
-        source env-tester.sh
-        backend.ai test run-cli
+        source env-tester-admin.sh
+        ./backend.ai test run-cli
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
