@@ -22,7 +22,7 @@
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.1",
 //     "aiomonitor-ng~=0.6.0",
-//     "aioraft-ng==0.1.3",
+//     "aioraft-ng==0.1.4",
 //     "aioredis[hiredis]~=2.0.1",
 //     "aiosqlite~=0.17.0",
 //     "aiotools~=1.5.9",
@@ -393,21 +393,21 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f380a91ae80f539e995510d4a3ccb55b07545c3f5bb6ebc862bc02d7b3d5190e",
-              "url": "https://files.pythonhosted.org/packages/03/a4/0d8cba356a9b643b6484375c1fde4bcc01e127817ea89f08677823928153/aioraft_ng-0.1.3-py3-none-any.whl"
+              "hash": "abf176fb3d779e8fb980db8d3d3dee080ac92143172002cddc8b45fc746ad9c9",
+              "url": "https://files.pythonhosted.org/packages/9f/27/708b57ece0966f4a27208a6c9f55b0ba8f1491fff2da7098fcf7161daefe/aioraft_ng-0.1.4-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "46882d5bad60d6b00c949d2668612109da6e07bdf78094e0ba5bbc7c8592970f",
-              "url": "https://files.pythonhosted.org/packages/86/3d/f9a66237356ec35e037f1e07b9167936dd33f172bddec95efb6d65313f28/aioraft-ng-0.1.3.tar.gz"
+              "hash": "baa89bae23b989acd062d67705a541e8e3ace8c25b8901fce7cb28e47fd998b8",
+              "url": "https://files.pythonhosted.org/packages/ef/89/1a00fb66e35bb8c47023cb895081201bee4ea56806548671e5ea917c1096/aioraft-ng-0.1.4.tar.gz"
             }
           ],
           "project_name": "aioraft-ng",
           "requires_dists": [
             "black; extra == \"dev\"",
             "flake8; extra == \"dev\"",
-            "grpcio-tools~=1.47.0; extra == \"dev\"",
-            "grpcio~=1.47.0",
+            "grpcio-tools==1.48.2; extra == \"dev\"",
+            "grpcio==1.48.2",
             "isort; extra == \"dev\"",
             "mypy; extra == \"dev\"",
             "pytest-asyncio~=0.19.0; extra == \"dev\"",
@@ -416,7 +416,7 @@
             "types-protobuf; extra == \"dev\""
           ],
           "requires_python": ">=3.10",
-          "version": "0.1.3"
+          "version": "0.1.4"
         },
         {
           "artifacts": [
@@ -3369,19 +3369,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "25d4e2e446c453be6360c67ddfb88838cfc42026322770ba13d1fbd403a93a5c",
-              "url": "https://files.pythonhosted.org/packages/18/31/2a87f292f752d39c6c207f9e44137e3e1d4250da880a9fbc0bbf630138e0/tomlkit-0.11.4-py3-none-any.whl"
+              "hash": "f2ef9da9cef846ee027947dc99a45d6b68a63b0ebc21944649505bf2e8bc5fe7",
+              "url": "https://files.pythonhosted.org/packages/df/b6/310fe14933403413f7352be0c8e75b7ed23db2170d769ed69e40f40130a3/tomlkit-0.11.5-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3235a9010fae54323e727c3ac06fb720752fe6635b3426e379daec60fbd44a83",
-              "url": "https://files.pythonhosted.org/packages/84/51/092a8b945edc3b93f2de091ab9596006673caac063e3fac14f0fa6c69b1c/tomlkit-0.11.4.tar.gz"
+              "hash": "571854ebbb5eac89abcb4a2e47d7ea27b89bf29e09c35395da6f03dd4ae23d1c",
+              "url": "https://files.pythonhosted.org/packages/0c/2b/7823f215c6aec294f5ab5ff2f529aca1d85e8bec2208ae7ea89ca1413620/tomlkit-0.11.5.tar.gz"
             }
           ],
           "project_name": "tomlkit",
           "requires_dists": [],
           "requires_python": "<4.0,>=3.6",
-          "version": "0.11.4"
+          "version": "0.11.5"
         },
         {
           "artifacts": [
@@ -3985,7 +3985,7 @@
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.1",
     "aiomonitor-ng~=0.6.0",
-    "aioraft-ng==0.1.3",
+    "aioraft-ng==0.1.4",
     "aioredis[hiredis]~=2.0.1",
     "aiosqlite~=0.17.0",
     "aiotools~=1.5.9",
