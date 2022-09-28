@@ -55,7 +55,9 @@ jobs:
       run: |
         ./scripts/install-dev.sh
         source env-tester-admin.sh
-        ./backend.ai test run-cli
+        ./backend.ai test run-cli admin
+        source env-tester-user.sh
+        ./backend.ai test run-cli user
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
