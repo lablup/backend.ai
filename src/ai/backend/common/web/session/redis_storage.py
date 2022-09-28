@@ -7,8 +7,8 @@ from aiohttp import web
 from . import AbstractStorage, Session
 
 try:
-    from redis import asyncio as aioredis
     from redis import VERSION
+    from redis import asyncio as aioredis
 except ImportError:  # pragma: no cover
     aioredis = None  # type: ignore[assignment]
 

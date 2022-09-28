@@ -2,17 +2,7 @@ import abc
 import json
 import sys
 import time
-from typing import (
-    Any,
-    Awaitable,
-    Callable,
-    Dict,
-    Iterator,
-    MutableMapping,
-    Optional,
-    Union,
-    cast,
-)
+from typing import Any, Awaitable, Callable, Dict, Iterator, MutableMapping, Optional, Union, cast
 
 from aiohttp import web
 
@@ -166,9 +156,7 @@ async def get_session(request: web.Request) -> Session:
 async def new_session(request: web.Request) -> Session:
     storage = request.get(STORAGE_KEY)
     if storage is None:
-        raise RuntimeError(
-            "Install aiohttp_session middleware " "in your aiohttp.web.Application"
-        )
+        raise RuntimeError("Install aiohttp_session middleware " "in your aiohttp.web.Application")
 
     session = await storage.new_session()
     if not isinstance(session, Session):
@@ -296,9 +284,7 @@ class AbstractStorage(metaclass=abc.ABCMeta):
             t = time.gmtime(time.time() + max_age)
             params["expires"] = time.strftime("%a, %d-%b-%Y %T GMT", t)
         if not cookie_data:
-            response.del_cookie(
-                self._cookie_name, domain=params["domain"], path=params["path"]
-            )
+            response.del_cookie(self._cookie_name, domain=params["domain"], path=params["path"])
         else:
             # Ignoring type for params until aiohttp#4238 is released
             response.set_cookie(self._cookie_name, cookie_data, **params)
