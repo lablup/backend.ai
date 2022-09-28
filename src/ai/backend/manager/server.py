@@ -350,10 +350,10 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     _ = (
         asyncio.create_task(
-            GrpcRaftServer.run(
-                server,
-                cleanup_coroutines=_cleanup_coroutines,
+            server.run(
+                host=raft_addr.host,
                 port=raft_addr.port,
+                cleanup_coroutines=_cleanup_coroutines,
             ),
         ),
         asyncio.create_task(raft.main()),
