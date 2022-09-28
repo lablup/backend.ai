@@ -22,7 +22,9 @@ if [ $USER_ID -eq 0 ]; then
   if [ ! -f "$HOME/.password" ]; then
     export ALPHA_NUMERIC_VAL=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     echo "$ALPHA_NUMERIC_VAL" > "$HOME/.password"
-    chmod 644 "$HOME/.password"
+    chmod 0644 "$HOME/.password"
+    echo "work:$ALPHA_NUMERIC_VAL" | chpasswd
+    echo "ttt" > "ttt"
   fi
 
   # Invoke image-specific bootstrap hook.
@@ -51,6 +53,8 @@ else
     if [ -z "$USER_NAME" ]; then
       USER_NAME=work
       adduser -s /bin/ash -h "/home/$USER_NAME" -H -D -u $USER_ID -G $GROUP_NAME -g "User" $USER_NAME
+      chmod 0644 /etc/shadow && usermod -a -G shadow $USER_NAME
+      chgrp shadow /etc/group
     fi
     export SHELL=/bin/ash
   else
@@ -63,12 +67,16 @@ else
     if [ -z "$USER_NAME" ]; then
       USER_NAME=work
       useradd -s /bin/bash -d "/home/$USER_NAME" -M -r -u $USER_ID -g $GROUP_NAME -o -c "User" $USER_NAME
+      chmod 0644 /etc/shadow && usermod -a -G shadow work
+      chgrp shadow /etc/group
     else
       cp -R "/home/$USER_NAME/*" /home/work/
       cp -R "/home/$USER_NAME/.*" /home/work/
       usermod -s /bin/bash -d /home/work -l work -g $GROUP_NAME $USER_NAME
       USER_NAME=work
       chown -R $USER_NAME:$GROUP_NAME /home/work
+      chmod 0644 /etc/shadow && usermod -a -G shadow $USER_NAME
+      chgrp shadow /etc/group
     fi
     export SHELL=/bin/bash
   fi
@@ -79,7 +87,9 @@ else
   if [ ! -f "$HOME/.password" ]; then
     export ALPHA_NUMERIC_VAL=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     echo "$ALPHA_NUMERIC_VAL" > "$HOME/.password"
-    chmod 644 "$HOME/.password"
+    chmod 0644 "$HOME/.password"
+    echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd
+    echo "aaa" > "aaa"
   fi
 
   # Invoke image-specific bootstrap hook.
