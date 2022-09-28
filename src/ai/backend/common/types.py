@@ -11,7 +11,7 @@ from abc import ABCMeta, abstractmethod
 from collections import UserDict, namedtuple
 from contextvars import ContextVar
 from decimal import Decimal
-from ipaddress import ip_network
+from ipaddress import ip_address, ip_network
 from pathlib import PurePosixPath
 from typing import (
     TYPE_CHECKING,
@@ -353,11 +353,14 @@ class ReadableCIDR(Generic[_Address]):
 
     _address: _Address | None
 
-    def __init__(self, address: str | None) -> None:
+    def __init__(self, address: str | None, is_network: bool = True) -> None:
+        self._is_network = is_network
         self._address = self._convert_to_cidr(address) if address is not None else None
 
     def _convert_to_cidr(self, value: str) -> _Address:
         str_val = str(value)
+        if not self._is_network:
+            return cast(_Address, ip_address(str_val))
         if "*" in str_val:
             _ip, _, given_cidr = str_val.partition("/")
             filtered = _ip.replace("*", "0")

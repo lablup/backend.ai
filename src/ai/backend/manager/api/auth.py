@@ -387,11 +387,12 @@ def validate_ip(request: web.Request, user: Mapping[str, Any]):
     if raw_client_addr is None:
         raise AuthorizationFailed("Not allowed IP address")
     try:
-        client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr)
+        client_addr: ReadableCIDR = ReadableCIDR(raw_client_addr, is_network=False)
     except InvalidIpAddressValue:
         raise InvalidAuthParameters(f"{raw_client_addr} is invalid IP address value")
-    if client_addr not in allowed_client_ip:
-        raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
+    if any(client_addr.address in allowed_ip_cand.address for allowed_ip_cand in allowed_client_ip):
+        return
+    raise AuthorizationFailed(f"'{client_addr}' is not allowed IP address")
 
 
 @web.middleware
