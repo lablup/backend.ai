@@ -22,7 +22,7 @@
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.1",
 //     "aiomonitor-ng~=0.6.0",
-//     "aioraft-ng==0.1.4",
+//     "aioraft-ng==0.1.5",
 //     "aioredis[hiredis]~=2.0.1",
 //     "aiosqlite~=0.17.0",
 //     "aiotools~=1.5.9",
@@ -393,13 +393,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "abf176fb3d779e8fb980db8d3d3dee080ac92143172002cddc8b45fc746ad9c9",
-              "url": "https://files.pythonhosted.org/packages/9f/27/708b57ece0966f4a27208a6c9f55b0ba8f1491fff2da7098fcf7161daefe/aioraft_ng-0.1.4-py3-none-any.whl"
+              "hash": "76c0f23102d195e730899b1cb0277ad9f3705afaa9bf7eaa9878345937da0416",
+              "url": "https://files.pythonhosted.org/packages/96/45/8685744cfa338a082baaa609fe3a24169d10b24468af9221bd1c6abd1411/aioraft_ng-0.1.5-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "baa89bae23b989acd062d67705a541e8e3ace8c25b8901fce7cb28e47fd998b8",
-              "url": "https://files.pythonhosted.org/packages/ef/89/1a00fb66e35bb8c47023cb895081201bee4ea56806548671e5ea917c1096/aioraft-ng-0.1.4.tar.gz"
+              "hash": "883006267bd07fcf867e46b0496ad820d7ed4ec002d0dd1123aa6d667036535d",
+              "url": "https://files.pythonhosted.org/packages/14/94/1d6de850b9e73642d439311a51e7b169c162a6204b87a2e9ddeb922c7fdc/aioraft-ng-0.1.5.tar.gz"
             }
           ],
           "project_name": "aioraft-ng",
@@ -410,13 +410,14 @@
             "grpcio==1.48.2",
             "isort; extra == \"dev\"",
             "mypy; extra == \"dev\"",
+            "protobuf==3.19.4",
             "pytest-asyncio~=0.19.0; extra == \"dev\"",
             "pytest~=7.1.2; extra == \"dev\"",
             "tomli~=2.0.1",
             "types-protobuf; extra == \"dev\""
           ],
           "requires_python": ">=3.10",
-          "version": "0.1.4"
+          "version": "0.1.5"
         },
         {
           "artifacts": [
@@ -3985,7 +3986,7 @@
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.1",
     "aiomonitor-ng~=0.6.0",
-    "aioraft-ng==0.1.4",
+    "aioraft-ng==0.1.5",
     "aioredis[hiredis]~=2.0.1",
     "aiosqlite~=0.17.0",
     "aiotools~=1.5.9",

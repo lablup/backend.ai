@@ -7,7 +7,7 @@ aiohttp_sse>=2.0
 aiohttp_session[aioredis]~=2.11
 aiodns>=3.0
 aiomonitor-ng~=0.6.0
-aioraft-ng==0.1.4
+aioraft-ng==0.1.5
 aioredis[hiredis]~=2.0.1
 aiosqlite~=0.17.0
 aiotools~=1.5.9
