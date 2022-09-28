@@ -42,6 +42,7 @@ agent_local_config_iv = (
                     t.Key("skip-manager-detection", default=False): t.ToBool,
                     t.Key("aiomonitor-port", default=50200): t.Int[1:65535],
                     t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
+                    t.Key("block-compute-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("image-commit-path", default="./tmp/backend.ai/commit"): tx.Path(
                         type="dir", auto_create=True
                     ),
@@ -67,6 +68,7 @@ agent_local_config_iv = (
                     t.Key("scratch-size", default="0"): tx.BinarySize,
                     t.Key("scratch-nfs-address", default=None): t.Null | t.String,
                     t.Key("scratch-nfs-options", default=None): t.Null | t.String,
+                    t.Key("alternative-bridge", default=None): t.Null | t.String,
                 }
             ).allow_extra("*"),
             t.Key("logging"): t.Any,  # checked in ai.backend.common.logging

@@ -61,6 +61,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             "rpc-listen-addr": HostPortPair("", 6001),
             "agent-sock-port": 6009,
             "allow-compute-plugins": set(),
+            "block-compute-plugins": set(),
         },
         "container": {
             "scratch-type": "hostdir",

@@ -55,6 +55,7 @@ _default_list_fields = (
     session_fields["status_info"],
     session_fields["status_changed"],
     session_fields["result"],
+    session_fields["abusing_reports"],
 )
 
 
@@ -959,6 +960,23 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with api_rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    async def get_abusing_report(self):
+        """
+        Retrieves abusing reports of session's sibling kernels.
+        """
+        params = {}
+        if self.owner_access_key:
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "GET",
+            f"/{prefix}/{self.name}/abusing-report",
+            params=params,
+        )
+        async with rqst.fetch() as resp:
             return await resp.json()
 
     # only supported in AsyncAPISession
