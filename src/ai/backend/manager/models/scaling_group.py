@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, cast, overload
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Sequence, Set, cast, overload
 
 import attr
 import graphene
@@ -223,7 +223,8 @@ async def query_allowed_sgroups(
             else:
                 group_ids = []
         case list() | tuple() | set():
-            group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable, group))
+            grps = await resolve_groups(db_conn, domain_name, cast(Iterable, group))
+            group_ids = cast(List, grps)
     from_group: Set[str]
     if not group_ids:
         from_group = set()  # empty
