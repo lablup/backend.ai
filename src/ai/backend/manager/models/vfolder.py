@@ -119,7 +119,6 @@ class VFolderOperationStatus(str, enum.Enum):
     PERFORMING = "performing"
     CLONING = "cloning"
     DELETING = "deleting"
-    DELETED = "deleted"
     MOUNTED = "mounted"
 
 

@@ -20,7 +20,7 @@ depends_on = None
 
 
 vfolderstatus = postgresql.ENUM(
-    "READY", "PERFORMING", "CLONING", "DELETING", "DELETED", "MOUNTED", name="vfolderstatus"
+    "READY", "PERFORMING", "CLONING", "DELETING", "MOUNTED", name="vfolderstatus"
 )
 
 

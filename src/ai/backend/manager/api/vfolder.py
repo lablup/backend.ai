@@ -111,7 +111,6 @@ def vfolder_filter_by_status_required(perm: VFolderAccessStatus):
                         VFolderOperationStatus.PERFORMING,
                         VFolderOperationStatus.CLONING,
                         VFolderOperationStatus.DELETING,
-                        VFolderOperationStatus.DELETED,
                         VFolderOperationStatus.MOUNTED,
                     ]
                 )
