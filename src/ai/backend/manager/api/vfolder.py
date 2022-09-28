@@ -61,6 +61,7 @@ from .exceptions import (
     BackendAgentError,
     GenericForbidden,
     GroupNotFound,
+    InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
@@ -1808,7 +1809,14 @@ async def delete(request: web.Request) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @vfolder_permission_required(VFolderPermission.READ_ONLY)
-async def leave(request: web.Request, row: VFolderRow) -> web.Response:
+@check_api_params(
+    t.Dict(
+        {
+            tx.AliasedKey(["shared_user_uuid", "sharedUserUuid"], default=None): t.String | t.Null,
+        }
+    ),
+)
+async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
     """
     Leave a shared vfolder.
 
@@ -1816,14 +1824,25 @@ async def leave(request: web.Request, row: VFolderRow) -> web.Response:
     """
     if row["ownership_type"] == VFolderOwnershipType.GROUP:
         raise InvalidAPIParameters("Cannot leave a group vfolder.")
-    if row["is_owner"]:
-        raise InvalidAPIParameters("Cannot leave a vfolder owned by the requesting user.")
 
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
-    user_uuid = request["user"]["uuid"]
+    user_role = request["user"]["role"]
+    rqst_user_uuid = request["user"]["uuid"]
+    shared_user_uuid = params["shared_user_uuid"]
     vfolder_id = row["id"]
-    perm = None
+    perm = row["permission"]
+
+    if shared_user_uuid:
+        # Allow only superadmin to leave the shared vfolder of others.
+        if (rqst_user_uuid != shared_user_uuid) and (user_role != UserRole.SUPERADMIN):
+            raise InsufficientPrivilege("Insufficient permission.")
+        user_uuid = shared_user_uuid
+    else:
+        if row["is_owner"]:
+            raise InvalidAPIParameters("Cannot leave a vfolder owned by the requesting user.")
+        user_uuid = rqst_user_uuid
+
     log.info(
         "VFOLDER.LEAVE(ak:{}, vfid:{}, uid:{}, perm:{})", access_key, vfolder_id, user_uuid, perm
     )

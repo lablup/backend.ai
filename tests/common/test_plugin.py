@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.plugin.hook import (
     ALL_COMPLETED,
@@ -124,6 +125,31 @@ async def test_plugin_context_init_cleanup(etcd, mocker):
     finally:
         await ctx.cleanup()
         ctx.plugins["dummy"].cleanup.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_plugin_context_config_allow_and_block_list(etcd, allow_and_block_list):
+    allowlist, blocklist = allow_and_block_list
+    ctx = BasePluginContext(
+        etcd,
+        {"local-key": "local-value"},
+    )
+    assert not ctx.plugins
+    await ctx.init(allowlist=allowlist, blocklist=blocklist)
+
+
+@pytest.mark.asyncio
+async def test_plugin_context_config_allow_and_block_list_has_union(
+    etcd, allow_and_block_list_has_union
+):
+    allowlist, blocklist = allow_and_block_list_has_union
+    ctx = BasePluginContext(
+        etcd,
+        {"local-key": "local-value"},
+    )
+    assert not ctx.plugins
+    with pytest.raises(ConfigurationError):
+        await ctx.init(allowlist=allowlist, blocklist=blocklist)
 
 
 @pytest.mark.asyncio
