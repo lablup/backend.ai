@@ -117,6 +117,7 @@ async def prepare_sshd_service(service_info):
         "-E",  # show logs in stderr
         "-F",  # run in foreground
         "-g",  # Disable password logins for root
+        "-w",  # Disallow root logins
         # '-W', str(256 * 1024),  # recv buffer size (256 KiB) -> built-in during compilation
         "-K",
         "15",  # keepalive interval
