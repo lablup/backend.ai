@@ -419,6 +419,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             "runner/DO_NOT_STORE_PERSISTENT_FILES_HERE.md"
         )
         entrypoint_sh_path = self.resolve_krunner_filepath("runner/entrypoint.sh")
+        code_server_path = self.resolve_krunner_filepath(
+            f"runner/code-server.{matched_libc_style}.{arch}.tar.gz"
+        )
 
         if matched_libc_style == "musl":
             terminfo_path = self.resolve_krunner_filepath("runner/terminfo.alpine3.8")
@@ -430,6 +433,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         if jail_path is not None:
             _mount(MountTypes.BIND, jail_path, "/opt/kernel/jail")
         _mount(MountTypes.BIND, hook_path, "/opt/kernel/libbaihook.so")
+        _mount(MountTypes.BIND, code_server_path, "/opt/kernel/coder-server.tar.gz")
         _mount(MountTypes.BIND, dropbear_path, "/opt/kernel/dropbear")
         _mount(MountTypes.BIND, dropbearconv_path, "/opt/kernel/dropbearconvert")
         _mount(MountTypes.BIND, dropbearkey_path, "/opt/kernel/dropbearkey")
