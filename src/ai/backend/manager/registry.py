@@ -3050,7 +3050,7 @@ class AgentRegistry:
         self,
         agent_id: AgentId,
         agent_addr: str,
-    ) -> Mapping[str, str]:
+    ) -> Mapping[str, Any]:
         async with RPCContext(
             agent_id,
             agent_addr,
@@ -3062,7 +3062,7 @@ class AgentRegistry:
         self,
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
-    ) -> Optional[Mapping[str, str]]:
+    ) -> Optional[Mapping[str, Any]]:
         kernel = await self.get_session(session_name_or_id, access_key)
         async with RPCContext(
             kernel["agent"],

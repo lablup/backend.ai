@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Mapping, MutableMapping, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -197,7 +197,25 @@ class Agent(graphene.ObjectType):
 
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.get_agent_local_config(self.id, self.addr)
+
+        def _convert_none_to_str(data: Mapping[str, Any]) -> Mapping[str, Any]:
+            converted: MutableMapping[str, Any] = {}
+            for k, v in data.items():
+                if v is None:
+                    converted[k] = ""
+                    continue
+                if isinstance(v, dict):
+                    converted[k] = _convert_none_to_str(v)
+                    continue
+                converted[k] = v
+            return converted
+
+        return (
+            _convert_none_to_str(return_val)
+            if (return_val := await graph_ctx.registry.get_agent_local_config(self.id, self.addr))
+            is not None
+            else None
+        )
 
     _queryfilter_fieldspec = {
         "id": ("id", None),

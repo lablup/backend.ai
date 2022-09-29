@@ -12,6 +12,7 @@ from typing import (
     Iterable,
     List,
     Mapping,
+    MutableMapping,
     Optional,
     Sequence,
     Type,
@@ -669,9 +670,27 @@ class ComputeContainer(graphene.ObjectType):
         access_key: AccessKey | None,
     ) -> Optional[Mapping[str, Any]]:
         graph_ctx: GraphQueryContext = info.context
+
+        def _convert_none_to_str(data: Mapping[str, Any]) -> Mapping[str, Any]:
+            converted: MutableMapping[str, Any] = {}
+            for k, v in data.items():
+                if v is None:
+                    converted[k] = ""
+                    continue
+                if isinstance(v, dict):
+                    converted[k] = _convert_none_to_str(v)
+                    continue
+                converted[k] = v
+            return converted
+
         if access_key is None:
             return None
-        return await graph_ctx.registry.get_abusing_report(self.id, access_key)
+        return (
+            _convert_none_to_str(return_val)
+            if (return_val := await graph_ctx.registry.get_abusing_report(self.id, access_key))
+            is not None
+            else None
+        )
 
     _queryfilter_fieldspec = {
         "image": ("image", None),
@@ -982,13 +1001,17 @@ class ComputeSession(graphene.ObjectType):
 
     async def resolve_abusing_reports(
         self, info: graphene.ResolveInfo
-    ) -> Iterable[Optional[Mapping[str, Any]]]:
+    ) -> Iterable[Mapping[str, Any]]:
         containers = self.containers
         if containers is None:
             containers = await self.resolve_containers(info)
         if containers is None:
             return []
-        return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
+        return [
+            result
+            for con in containers
+            if (result := await con.resolve_abusing_report(info, self.access_key)) is not None
+        ]
 
     _queryfilter_fieldspec = {
         "type": ("kernels_session_type", lambda s: SessionTypes[s]),

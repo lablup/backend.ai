@@ -564,7 +564,7 @@ class AgentRPCServer(aobject):
         report_path: Path | None = agent_config.get("abuse-report-path")
         return {
             "agent": {
-                "abuse-report-path": str(report_path) if report_path is not None else "",
+                "abuse-report-path": str(report_path) if report_path is not None else None,
             },
             "watcher": self.local_config["watcher"],
         }
