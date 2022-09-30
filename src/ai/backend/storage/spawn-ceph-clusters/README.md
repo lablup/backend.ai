@@ -54,6 +54,7 @@ sudo ceph-fuse -n client.admin --keyring=/etc/ceph/ceph.client.admin.keyring  -m
 ```
 
 # Setting Quotas setup
+<<<<<<< HEAD
 Login to admin machine: 
 ```
 vagrant ssh ceph-admin
@@ -63,12 +64,21 @@ ceph fs authorize test_fs client.foo / rwp
 Copy the key to the ceph-client at /etc/ceph/ceph.client.foo.keyring
 
 At the ceph-client: mount the ceps-fuse with created client account. 
+=======
+vagrant ssh ceps-admin
+ceph fs authorize test_fs client.foo / rwp
+
+Copy the key to the ceph-client at /etc/ceph/ceph.client.foo.keyring
+
+At the ceph-client: mount the ceps-fuse with created client account.
+>>>>>>> 38d605ea91c14b4574bd847ce122493610d371fc
 ```
 sudo ceph-fuse -n client.foo --keyring=/etc/ceph/ceph.client.foo.keyring  -m ceph-server-1 /mnt/vfroot/ceph-fuse/
 sudo mkdir /mnt/vfroot/ceph-fuse/test/
 sudo setfattr -n ceph.quota.max_bytes -v 100000000 /mnt/vfroot/ceph-fuse/test/
 getfattr -n ceph.quota.max_bytes /mnt/vfroot/ceph-fuse/test/
 ```
+<<<<<<< HEAD
 
 # Testing quotas using storage proxy
 After setting the volume in etcd and postrges tables the quotas can bet tested usng create vfolder command
@@ -80,3 +90,5 @@ After setting the volume in etcd and postrges tables the quotas can bet tested u
 Alternatively, if Ceph cluster is not setup you may still able to test the cephfs code intitialization and create vfolder with quota logic.
 By applying changes in storage_proxy.toml file by choosing the selected local volume and changend type from 'vfs' to 'cephfs'.
 And then by writting degug log statements in cephfs/__init__.py file intercepting the create vfolder flow and quotas. Also, testing the cephfs initialization for the volume.
+=======
+>>>>>>> 38d605ea91c14b4574bd847ce122493610d371fc

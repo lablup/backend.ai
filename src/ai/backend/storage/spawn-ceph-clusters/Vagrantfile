@@ -7,7 +7,6 @@ Vagrant.configure("2") do |config|
   config.ssh.insert_key = false
   config.hostmanager.enabled = true
 
-
   # Ceph admin machine to manage the cluster
   config.vm.define "ceph-admin" do |admin|
     admin.vm.hostname = "ceph-admin"

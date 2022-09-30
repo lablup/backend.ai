@@ -42,7 +42,6 @@ class CephFSVolume(BaseVolume):
 
     async def init(self) -> None:
         available = True
-
         try:
             await asyncio.create_subprocess_exec(
                 b"ceph",
@@ -54,7 +53,6 @@ class CephFSVolume(BaseVolume):
             available = False
 
         if not available:
-
             raise RuntimeError("Ceph is not installed. ")
 
     # ----- volume opeartions -----
