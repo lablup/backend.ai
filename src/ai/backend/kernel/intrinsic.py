@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import tarfile
 from collections.abc import Iterable
 from pathlib import Path
 from typing import List, Mapping, Tuple
@@ -148,26 +147,40 @@ async def prepare_ttyd_service(service_info):
     return cmdargs, {}
 
 
-async def init_code_server_service() -> None:
-    mounted_path = Path("/opt/kernel/coder-server.tar.gz")
+_CODE_SERVER_LIB_DIR = Path("/home/work/.local/lib")
 
-    os.chdir("/opt/kernel")
-    with tarfile.open(mounted_path, "r:gz") as code_server_tf:
-        code_server_tf.extractall()
-    try:
-        code_server_dir: Path = list(Path("/opt/kernel").glob("code-server-*"))[0]
-    except IndexError:
-        log.warning("Code server directory not found")
-    else:
-        os.rename(f"/opt/kernel/{code_server_dir}", "/opt/kernel/code-server")
-    os.chdir("/home/work")
+
+async def init_code_server_service() -> None:
+    code_server_tar_path = Path("/home/work/code-server.tar.gz")
+    proc = await asyncio.create_subprocess_exec(
+        *[
+            "tar",
+            "-C",
+            str(_CODE_SERVER_LIB_DIR),
+            "-xzf",
+            str(code_server_tar_path),
+        ],
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"code server unzip error: {stderr.decode('utf8')}")
+
+    # Rename the directory
+    # try:
+    #     code_server_dir: Path = list(_CODE_SERVER_LIB_DIR.glob("code-server-*"))[0]
+    # except IndexError:
+    #     log.warning("Code server directory not found")
+    # else:
+    #     code_server_dir.rename(str(_CODE_SERVER_LIB_DIR / "code-server"))
 
 
 async def prepare_code_server_service(service_info) -> Tuple[List[str], Mapping[str, str]]:
     extension_dir = Path("/home/work/.vscode-exts")
     extension_dir.mkdir(parents=True, exist_ok=True)
     return [
-        str(Path("/opt/kernel/code-server/bin/code-server")),
+        str(_CODE_SERVER_LIB_DIR / "code-server/bin/code-server"),
         "--auth",
         "none",
         "--bind-addr",
