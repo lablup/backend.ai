@@ -433,7 +433,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         if jail_path is not None:
             _mount(MountTypes.BIND, jail_path, "/opt/kernel/jail")
         _mount(MountTypes.BIND, hook_path, "/opt/kernel/libbaihook.so")
-        _mount(MountTypes.BIND, code_server_path, "/opt/kernel/coder-server.tar.gz")
+        if code_server_path.is_file():
+            _mount(MountTypes.BIND, code_server_path, "/opt/kernel/coder-server.tar.gz")
         _mount(MountTypes.BIND, dropbear_path, "/opt/kernel/dropbear")
         _mount(MountTypes.BIND, dropbearconv_path, "/opt/kernel/dropbearconvert")
         _mount(MountTypes.BIND, dropbearkey_path, "/opt/kernel/dropbearkey")

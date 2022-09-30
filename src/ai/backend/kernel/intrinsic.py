@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import tarfile
 from collections.abc import Iterable
 from pathlib import Path
 from typing import List, Mapping, Tuple
@@ -8,9 +9,6 @@ from typing import List, Mapping, Tuple
 from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger())
-
-_CODE_SERVER_LIB_PATH = Path("/usr/local/lib")
-_CODE_SERVER_BIN_PATH = Path("/usr/local/bin")
 
 
 async def init_sshd_service(child_env):
@@ -151,35 +149,25 @@ async def prepare_ttyd_service(service_info):
 
 
 async def init_code_server_service() -> None:
-    local_lib_path, local_bin_path = _CODE_SERVER_LIB_PATH, _CODE_SERVER_BIN_PATH
-    local_lib_path.mkdir(parents=True, exist_ok=True)
-    local_bin_path.mkdir(parents=True, exist_ok=True)
     mounted_path = Path("/opt/kernel/coder-server.tar.gz")
-    proc = await asyncio.create_subprocess_exec(
-        *[
-            "tar",
-            "-C",
-            str(local_lib_path),
-            str(mounted_path),
-            "-xz",
-        ],
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    _, stderr = await proc.communicate()
-    if proc.returncode != 0:
-        raise RuntimeError(f"code server init error: {stderr.decode('utf8')}")
 
-    os.symlink(
-        Path(local_lib_path, "coder-server/bin/code-server"), Path(local_bin_path, "code-server")
-    )
+    os.chdir("/opt/kernel")
+    with tarfile.open(mounted_path, "r:gz") as code_server_tf:
+        code_server_tf.extractall()
+    try:
+        code_server_dir: Path = list(Path("/opt/kernel").glob("code-server-*"))[0]
+    except IndexError:
+        log.warning("Code server directory not found")
+    else:
+        os.rename(f"/opt/kernel/{code_server_dir}", "/opt/kernel/code-server")
+    os.chdir("/home/work")
 
 
 async def prepare_code_server_service(service_info) -> Tuple[List[str], Mapping[str, str]]:
     extension_dir = Path("/home/work/.vscode-exts")
     extension_dir.mkdir(parents=True, exist_ok=True)
     return [
-        str(Path(_CODE_SERVER_BIN_PATH, "code-server")),
+        str(Path("/opt/kernel/code-server/bin/code-server")),
         "--auth",
         "none",
         "--bind-addr",
