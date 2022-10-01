@@ -19,7 +19,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     key_path = Path(f"~/.ssh/id_{random_id}").expanduser()
     try:
         subprocess.run(
-            ["backend.ai", "session", "download", session_ref, key_filename],
+            ["./backend.ai", "session", "download", session_ref, key_filename],
             shell=False,
             check=True,
             stdout=subprocess.PIPE,
@@ -34,7 +34,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     # proxy_proc is a background process
     proxy_proc = subprocess.Popen(
         [
-            "backend.ai",
+            "./backend.ai",
             "app",
             session_ref,
             "sshd",
