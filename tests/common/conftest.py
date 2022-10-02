@@ -147,3 +147,13 @@ def mock_time(mocker):
     _mock_async_sleep.get_total_delay = _get_total_delay
     _mock_async_sleep.get_call_count = _get_call_count
     yield _mock_async_sleep, _mock_time_monotonic
+
+
+@pytest.fixture
+def allow_and_block_list():
+    return {"cuda"}, {"cuda_mock"}
+
+
+@pytest.fixture
+def allow_and_block_list_has_union():
+    return {"cuda"}, {"cuda"}

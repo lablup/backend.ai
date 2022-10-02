@@ -43,12 +43,12 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export ::` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.10.5"]
+interpreter_constraints = ["CPython==3.10.7"]
 lockfile_generator = "pex"
 tailor_pex_binary_targets = false
 
 [python-repos]
-indexes.add = ["https://dist.backend.ai/pypi/simple/"]
+indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
 
 [python.resolves]
 python-default = "python.lock"

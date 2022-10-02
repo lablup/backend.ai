@@ -9,11 +9,7 @@ from functools import partial
 from pathlib import Path
 
 import click
-import psycopg2
-import sqlalchemy as sa
 from more_itertools import chunked
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 from setproctitle import setproctitle
 
 from ai.backend.cli.types import ExitCode
@@ -176,15 +172,17 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     Delete old records from the kernels table and
     invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
     """
+    import sqlalchemy as sa
+    from redis.asyncio import Redis
+    from redis.asyncio.client import Pipeline
+
     from ai.backend.manager.models import kernels
     from ai.backend.manager.models.utils import connect_database
 
-    local_config = cli_ctx.local_config
     with cli_ctx.logger:
         today = datetime.now()
         duration = TimeDuration()
-        expiration = today - duration.check_and_return(retention)
-        expiration_date = expiration.strftime("%Y-%m-%d %H:%M:%S")
+        expiration_date = today - duration.check_and_return(retention)
 
         async def _clear_redis_history():
             try:
@@ -194,7 +192,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
                             sa.select([kernels.c.id])
                             .select_from(kernels)
                             .where(
-                                (kernels.c.terminated_at < expiration),
+                                (kernels.c.terminated_at < expiration_date),
                             )
                         )
                         result = await conn.execute(query)
@@ -247,48 +245,34 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             except Exception:
                 log.exception("Unexpected error while cleaning up redis history")
 
+        async def _clear_terminated_sessions():
+            async with connect_database(cli_ctx.local_config, isolation_level="AUTOCOMMIT") as db:
+                async with db.begin() as conn:
+                    log.info("Deleting old records...")
+                    result = await conn.execute(
+                        sa.delete(kernels).where(kernels.c.terminated_at < expiration_date),
+                    )
+                    deleted_count = result.rowcount
+
+                    vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
+                    log.info(f"Perfoming {vacuum_sql} operation...")
+                    await conn.exec_driver_sql(vacuum_sql)
+
+                    curs = await conn.execute(sa.select([sa.func.count()]).select_from(kernels))
+                    if ret := curs.fetchone():
+                        table_size = ret[0]
+                        log.info(
+                            "The number of rows of the `kernels` tables after cleanup: {}",
+                            table_size,
+                        )
+            log.info(
+                "Cleaned up {:,} database records older than {}.",
+                deleted_count,
+                expiration_date,
+            )
+
         asyncio.run(_clear_redis_history())
-
-        conn = psycopg2.connect(
-            host=local_config["db"]["addr"][0],
-            port=local_config["db"]["addr"][1],
-            dbname=local_config["db"]["name"],
-            user=local_config["db"]["user"],
-            password=local_config["db"]["password"],
-        )
-        with conn.cursor() as curs:
-            if vacuum_full:
-                vacuum_sql = "VACUUM FULL"
-            else:
-                vacuum_sql = "VACUUM"
-
-            curs.execute(
-                f"""
-            SELECT COUNT(*) FROM kernels WHERE terminated_at < '{expiration_date}';
-            """
-            )
-            deleted_count = curs.fetchone()[0]
-
-            conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
-            log.info("Deleting old records...")
-            curs.execute(
-                f"""
-            DELETE FROM kernels WHERE terminated_at < '{expiration_date}';
-            """
-            )
-            log.info(f"Perfoming {vacuum_sql} operation...")
-            curs.execute(vacuum_sql)
-            conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
-
-            curs.execute(
-                """
-            SELECT COUNT(*) FROM kernels;
-            """
-            )
-            table_size = curs.fetchone()[0]
-            log.info(f"kernels table size: {table_size}")
-
-        log.info("Cleaned up {:,} database records older than {:}.", deleted_count, expiration_date)
+        asyncio.run(_clear_terminated_sessions())
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")
