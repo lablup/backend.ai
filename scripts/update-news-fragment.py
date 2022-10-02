@@ -36,6 +36,11 @@ def main():
         sys.exit(1)
 
     config = get_config()
+    towncrier_types = [t["directory"] for t in config["type"]]
+    if args.fragment not in towncrier_types:
+        print(f'Towncrier does not support {args.fragment} tag.\n Unable to create/update the news fragment.\n', file=sys.stderr)
+        sys.exit(1)
+
     fragment_dir = config.get("directory")
     try:
         files = os.listdir(fragment_dir)
@@ -49,7 +54,6 @@ def main():
         output_path.write_text(args.content)
         print(f'\n### {args.fragment.title()}\n * {args.content} ({basename})', file=sys.stderr)
         print(f'Successfully created the "{args.fragment.title()}" news fragment found by towncrier.\n', file=sys.stderr)
-
         sys.exit(0)
 
     for basename in files:
