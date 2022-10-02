@@ -62,11 +62,13 @@ class VFolderUsageMode(str, enum.Enum):
     GENERAL: normal virtual folder
     MODEL: virtual folder which provides shared models
     DATA: virtual folder which provides shared data
+    APP: virtual folder which provides mounted apps
     """
 
     GENERAL = "general"
     MODEL = "model"
     DATA = "data"
+    APP = "app"
 
 
 class VFolderOwnershipType(str, enum.Enum):
