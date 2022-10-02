@@ -6,10 +6,13 @@ on:
 
 jobs:
   towncrier:
+    if: |
+      toJson(github.event.pull_request.labels.*.name) != '[]'
+        && toJson(github.event.pull_request.labels.*.name) != ''
+        && !contains(github.event.pull_request.labels.*.name, 'skip:changelog')
     strategy:
       matrix:
-        labels: ${{ github.event.pull_request.labels.*.name }}
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') }}
+        label: ${{ github.event.pull_request.labels.*.name }}
     runs-on: ubuntu-latest
     env:
       BASE_BRANCH: ${{ github.base_ref }}
