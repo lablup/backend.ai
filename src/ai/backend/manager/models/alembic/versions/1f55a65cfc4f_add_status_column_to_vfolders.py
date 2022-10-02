@@ -1,4 +1,4 @@
-"""empty message
+"""add status column to vfolders
 
 Revision ID: 1f55a65cfc4f
 Revises: 35923972eddb
