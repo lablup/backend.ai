@@ -611,9 +611,13 @@ class AbstractAgent(
         self.timer_tasks.append(aiotools.create_timer(self.sync_container_lifecycles, 10.0))
 
         if abuse_report_path := self.local_config["agent"].get("abuse-report-path"):
-            log.info("Enabling auto-removal of kernels reported for abnormal activities")
+            log.info(
+                "Monitoring abnormal kernel activities reported by Watcher at {}", abuse_report_path
+            )
             abuse_report_path.mkdir(exist_ok=True, parents=True)
-            self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 10.0))
+            if self.local_config["agent"].get("force-terminate-abusing-containers"):
+                log.info("Enabling auto-removal of kernels with abnormal activities")
+                self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 10.0))
 
         loop = current_loop()
         self.last_registry_written_time = time.monotonic()
