@@ -43,7 +43,6 @@ jobs:
       env:
         CURRENT_BRANCH: ${{ steps.branch-name.outputs.current_branch }}
       working-directory: scripts/
-      # TODO: pass issue number linked to the pull request as a parameter
       run: |
         git fetch --no-tags origin +refs/heads/${CURRENT_BRANCH}:refs/remotes/origin/${CURRENT_BRANCH}
         git merge refs/remotes/origin/${CURRENT_BRANCH}

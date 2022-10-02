@@ -44,7 +44,6 @@ def main():
 
     files = [basename for basename in files if len(basename.split(".")) == 3]
     if not files:
-        # FIX: integer value to issue number linked to pull request
         basename = '.'.join([str(0), args.fragment, 'md'])
         output_path = Path(os.path.join(fragment_dir, basename))
         output_path.write_text(args.content)
