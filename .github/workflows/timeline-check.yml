@@ -6,8 +6,15 @@ on:
 
 jobs:
   towncrier:
+    strategy:
+      matrix:
+        labels: ${{ github.event.pull_request.labels.*.name }}
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') }}
     runs-on: ubuntu-latest
+    env:
+      BASE_BRANCH: ${{ github.base_ref }}
+      PR_TITLE: $ {{ github.event.pull_request.title }}
+      PR_LABEL: ${{ matrix.label }}
     steps:
     - name: Sparse-checkout
       uses: lablup/sparse-checkout@v1
@@ -16,6 +23,9 @@ jobs:
           changes
           scripts
           packages
+    - name: Get current branch name
+      id: branch-name
+      uses: tj-actions/branch-names@v5.5
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -29,5 +39,31 @@ jobs:
       run: |
         git fetch --no-tags origin +refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}
         python -m towncrier.check --compare-with=origin/${BASE_BRANCH}
+    - name: Update existing news fragment
       env:
-        BASE_BRANCH: ${{ github.base_ref }}
+        CURRENT_BRANCH: ${{ steps.branch-name.outputs.current_branch }}
+      working-directory: scripts/
+      # TODO: pass issue number linked to the pull request as a parameter
+      run: |
+        git fetch --no-tags origin +refs/heads/${CURRENT_BRANCH}:refs/remotes/origin/${CURRENT_BRANCH}
+        git merge refs/remotes/origin/${CURRENT_BRANCH}
+        python update-news-fragment.py --content "$PR_NAME" -f "$PR_LABEL"
+    - name: Get Changed Files
+      id: changed-files
+      uses: tj-actions/changed-files@v31
+      with:
+        files: |
+          changes/**
+    - name: Auto commit and push changes
+      id: auto-commit-push
+      if: ${{ steps.changed-files.outputs.changes_detected }}
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: update $PR_LABEL news fragment
+    - name: Debug change log
+      run: |
+        if ${{ steps.auto-commit-push.outputs.changes_detected }}; then
+          echo "update $PR_LABEL news fragment"
+        else
+          echo "no changes detected"
+        fi
