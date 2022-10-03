@@ -294,6 +294,10 @@ async def query_accessible_vfolders(
             _query = _query.where(extra_vf_conds)
         if extra_vf_user_conds is not None:
             _query = _query.where(extra_vf_user_conds)
+        if extra_vfperm_conds is not None:
+            _query = _query.where(extra_vfperm_conds)
+        if extra_vf_group_conds is not None:
+            _query = _query.where(extra_vf_group_conds)
         result = await conn.execute(_query)
         for row in result:
             row_keys = row.keys()
