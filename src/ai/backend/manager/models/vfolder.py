@@ -169,7 +169,6 @@ vfolders = sa.Table(
         "status",
         EnumValueType(VFolderOperationStatus),
         default=VFolderOperationStatus.READY,
-        server_default=VFolderOperationStatus.READY.value,
         nullable=False,
     ),
     sa.CheckConstraint(

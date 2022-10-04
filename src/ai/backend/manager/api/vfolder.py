@@ -92,6 +92,8 @@ def vfolder_filter_by_status_required(perm: VFolderAccessStatus):
     Checks if the target vfolder status is READY.
     The decorated handler should prevent user access
     while storage-proxy operations such as vfolder clone, deletion is handling.
+    This should be added "BEFORE" check_api_params decorator
+    to read vfolder reference properly.
     """
 
     def _wrapper(handler: Callable[..., Awaitable[web.Response]]):
@@ -102,8 +104,20 @@ def vfolder_filter_by_status_required(perm: VFolderAccessStatus):
             user_role = request["user"]["role"]
             user_uuid = request["user"]["uuid"]
             allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-            folder_name = request.match_info["name"]
-            vf_name_conds = vfolders.c.name == folder_name
+            if "id" in request.match_info:
+                folder_id = request.match_info["id"]
+                vf_name_conds = vfolders.c.id == folder_id
+            elif "name" in request.match_info:
+                folder_name = request.match_info["name"]
+                vf_name_conds = vfolders.c.name == folder_name
+            elif isinstance(args[1], dict) and "id" in args[1]:
+                folder_id = args[1]["id"]
+                vf_name_conds = vfolders.c.id == folder_id
+            elif isinstance(args[1], dict) and "name" in args[1]:
+                folder_name = args[1]["name"]
+                vf_name_conds = vfolders.c.name == folder_name
+            else:
+                raise VFolderFilterStatusFailed("either vFolder id nor name not supplied")
             if perm == VFolderAccessStatus.READABLE:
                 # if READABLE access status is requested, all operation status is accepted.
                 vf_status_conds = vfolders.c.status.in_(
@@ -473,7 +487,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.READABLE)
 @check_api_params(
     t.Dict(
         {
@@ -608,7 +621,6 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.READABLE)
 @check_api_params(
     t.Dict(
         {
@@ -661,7 +673,6 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
 
 @superadmin_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.READABLE)
 async def list_all_hosts(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -680,7 +691,6 @@ async def list_all_hosts(request: web.Request) -> web.Response:
 
 @superadmin_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.READABLE)
 @check_api_params(
     t.Dict(
         {
@@ -707,7 +717,6 @@ async def get_volume_perf_metric(request: web.Request, params: Any) -> web.Respo
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.READABLE)
 async def list_allowed_types(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -1289,7 +1298,6 @@ async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.READABLE)
 async def list_sent_invitations(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -1327,7 +1335,6 @@ async def list_sent_invitations(request: web.Request) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.UPDATABLE)
 @check_api_params(
     t.Dict(
         {
@@ -1477,7 +1484,6 @@ async def invite(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.READABLE)
 async def invitations(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -1515,7 +1521,6 @@ async def invitations(request: web.Request) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.UPDATABLE)
 @check_api_params(
     t.Dict(
         {
@@ -1604,7 +1609,6 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.UPDATABLE)
 @check_api_params(
     t.Dict(
         {
@@ -2155,7 +2159,6 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
 @auth_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.READABLE)
 @check_api_params(
     t.Dict(
         {
@@ -2214,7 +2217,6 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.UPDATABLE)
 @check_api_params(
     t.Dict(
         {
@@ -2263,7 +2265,6 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
 
 @superadmin_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.READABLE)
 @check_api_params(
     t.Dict(
         {
@@ -2330,7 +2331,6 @@ async def get_fstab_contents(request: web.Request, params: Any) -> web.Response:
 
 @superadmin_required
 @server_status_required(READ_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.READABLE)
 async def list_mounts(request: web.Request) -> web.Response:
     """
     List all mounted vfolder hosts in vfroot.
@@ -2433,7 +2433,6 @@ async def list_mounts(request: web.Request) -> web.Response:
 
 @superadmin_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.UPDATABLE)
 @check_api_params(
     t.Dict(
         {
@@ -2541,7 +2540,6 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
 
 @superadmin_required
 @server_status_required(ALL_ALLOWED)
-@vfolder_filter_by_status_required(VFolderAccessStatus.UPDATABLE)
 @check_api_params(
     t.Dict(
         {
