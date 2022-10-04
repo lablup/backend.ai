@@ -29,7 +29,6 @@ from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
 from ...types import Undefined, undefined
 from .. import events
-from ..main import main
 from ..params import CommaSeparatedListType
 from ..pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 from .args import click_start_option
