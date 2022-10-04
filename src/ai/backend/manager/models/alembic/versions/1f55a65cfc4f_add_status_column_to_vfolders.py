@@ -9,13 +9,15 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from ai.backend.manager.models.vfolder import VFolderOperationStatus
+
 # revision identifiers, used by Alembic.
 revision = "1f55a65cfc4f"
 down_revision = "35923972eddb"
 branch_labels = None
 depends_on = None
 
-vfolderstatus_choices = ["READY", "PERFORMING", "CLONING", "DELETING", "MOUNTED"]
+vfolderstatus_choices = [v.value for v in VFolderOperationStatus]
 vfolderstatus = postgresql.ENUM(*vfolderstatus_choices, name="vfolderstatus")
 
 
@@ -26,7 +28,8 @@ def upgrade():
         sa.Column(
             "status",
             sa.Enum(*vfolderstatus_choices, name="vfolderstatus"),
-            server_default="READY",
+            default="ready",
+            server_default="ready",
             nullable=False,
         ),
     )
