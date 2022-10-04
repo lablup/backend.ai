@@ -70,6 +70,15 @@ scaling-group = "default"
 # abuse-report-path = "/tmp/backend.ai/abuse-reports"
 # Automatically terminates abusing containers
 # force-terminate-abusing-containers = false
+#
+# By combining `abuse-report-path` and `force-terminate-abusing-containers` options,
+# the following scenarios can be supported:
+# | abuse-report-path | force-terminate-abusing-containers | Effect
+# |-------------------|------------------------------------|------------------------
+# | Not set           | false                              | No abuse detection
+# | Not set           | true                               | No abuse detection
+# | Set               | false                              | Abuse detection only
+# | Set               | true                               | Abuse detection & auto-termination
 
 [container]
 # The port range to expose public service ports.
