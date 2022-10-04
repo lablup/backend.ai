@@ -1,7 +1,7 @@
 import click
 
 
-def decorator_group(*decs):
+def decorator_group(*decs) -> click.Command:
     def d(f):
         for decorator in decs[::-1]:
             f = decorator(f)
@@ -10,7 +10,7 @@ def decorator_group(*decs):
     return d
 
 
-def click_start_option():
+def click_start_option() -> click.Option:
     return decorator_group(
         click.option(
             "-t",
