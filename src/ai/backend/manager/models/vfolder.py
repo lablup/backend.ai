@@ -47,6 +47,8 @@ __all__: Sequence[str] = (
     "VFolderInvitationState",
     "VFolderPermission",
     "VFolderPermissionValidator",
+    "VFolderOperationStatus",
+    "VFolderAccessStatus",
     "query_accessible_vfolders",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
@@ -108,6 +110,28 @@ class VFolderInvitationState(str, enum.Enum):
     REJECTED = "rejected"  # rejected by invitee
 
 
+class VFolderOperationStatus(str, enum.Enum):
+    """
+    Introduce virtual folder current status for storage-proxy operations.
+    """
+
+    READY = "ready"
+    PERFORMING = "performing"
+    CLONING = "cloning"
+    DELETING = "deleting"
+    MOUNTED = "mounted"
+
+
+class VFolderAccessStatus(str, enum.Enum):
+    """
+    Introduce virtual folder desired status for storage-proxy operations.
+    Not added to db scheme  and determined only by current vfolder status.
+    """
+
+    READABLE = "readable"
+    UPDATABLE = "updatable"
+
+
 vfolders = sa.Table(
     "vfolders",
     metadata,
@@ -141,6 +165,12 @@ vfolders = sa.Table(
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
     sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
+    sa.Column(
+        "status",
+        EnumValueType(VFolderOperationStatus),
+        default=VFolderOperationStatus.READY,
+        nullable=False,
+    ),
     sa.CheckConstraint(
         "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
         "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
@@ -254,6 +284,7 @@ async def query_accessible_vfolders(
         vfolders.c.creator,
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
+        vfolders.c.status,
         # vfolders.c.permission,
         # users.c.email,
     ]
@@ -291,6 +322,7 @@ async def query_accessible_vfolders(
                     "permission": _perm,
                     "unmanaged_path": row.vfolders_unmanaged_path,
                     "cloneable": row.vfolders_cloneable,
+                    "status": row.vfolders_status,
                 }
             )
 
@@ -657,6 +689,7 @@ class VirtualFolder(graphene.ObjectType):
     cur_size = BigInt()
     # num_attached = graphene.Int()
     cloneable = graphene.Boolean()
+    status = graphene.String()
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[VirtualFolder]:
@@ -681,6 +714,7 @@ class VirtualFolder(graphene.ObjectType):
             last_used=row["last_used"],
             # num_attached=row['num_attached'],
             cloneable=row["cloneable"],
+            status=row["status"],
         )
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
@@ -709,6 +743,7 @@ class VirtualFolder(graphene.ObjectType):
         "created_at": ("vfolders_created_at", dtparse),
         "last_used": ("vfolders_last_used", dtparse),
         "cloneable": ("vfolders_cloneable", None),
+        "status": ("vfolders_status", lambda s: VFolderOperationStatus[s]),
     }
 
     _queryorder_colmap = {
@@ -727,6 +762,7 @@ class VirtualFolder(graphene.ObjectType):
         "created_at": "vfolders_created_at",
         "last_used": "vfolders_last_used",
         "cloneable": "vfolders_cloneable",
+        "status": "vfolders_status",
     }
 
     @classmethod
@@ -841,3 +877,111 @@ class VirtualFolderList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(VirtualFolder, required=True)
+
+
+class VirtualFolderPermission(graphene.ObjectType):
+    class Meta:
+        interfaces = (Item,)
+
+    permission = graphene.String()
+    vfolder = graphene.UUID()
+    vfolder_name = graphene.String()
+    user = graphene.UUID()
+    user_email = graphene.String()
+
+    @classmethod
+    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[VirtualFolderPermission]:
+        if row is None:
+            return None
+        return cls(
+            permission=row["permission"],
+            vfolder=row["vfolder"],
+            vfolder_name=row["name"],
+            user=row["user"],
+            user_email=row["email"],
+        )
+
+    _queryfilter_fieldspec = {
+        "permission": ("vfolder_permissions_permission", lambda s: VFolderPermission[s]),
+        "vfolder": ("vfolder_permissions_vfolder", None),
+        "vfolder_name": ("vfolders_name", None),
+        "user": ("vfolder_permissions_user", None),
+        "user_email": ("users_email", None),
+    }
+
+    _queryorder_colmap = {
+        "permission": "vfolder_permissions_permission",
+        "vfolder": "vfolder_permissions_vfolder",
+        "vfolder_name": "vfolders_name",
+        "user": "vfolder_permissions_user",
+        "user_email": "users_email",
+    }
+
+    @classmethod
+    async def load_count(
+        cls,
+        graph_ctx: GraphQueryContext,
+        *,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+    ) -> int:
+        from .user import users
+
+        j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
+            users, users.c.uuid == vfolder_permissions.c.user
+        )
+        query = sa.select([sa.func.count()]).select_from(j)
+        if user_id is not None:
+            query = query.where(vfolders.c.user == user_id)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        async with graph_ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.scalar()
+
+    @classmethod
+    async def load_slice(
+        cls,
+        graph_ctx: GraphQueryContext,
+        limit: int,
+        offset: int,
+        *,
+        user_id: uuid.UUID = None,
+        filter: str = None,
+        order: str = None,
+    ) -> Sequence[VirtualFolderPermission]:
+        from .user import users
+
+        j = vfolder_permissions.join(vfolders, vfolders.c.id == vfolder_permissions.c.vfolder).join(
+            users, users.c.uuid == vfolder_permissions.c.user
+        )
+        query = (
+            sa.select([vfolder_permissions, vfolders.c.name, users.c.email])
+            .select_from(j)
+            .limit(limit)
+            .offset(offset)
+        )
+        if user_id is not None:
+            query = query.where(vfolders.c.user == user_id)
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        if order is not None:
+            qoparser = QueryOrderParser(cls._queryorder_colmap)
+            query = qoparser.append_ordering(query, order)
+        else:
+            query = query.order_by(vfolders.c.created_at.desc())
+        async with graph_ctx.db.begin_readonly() as conn:
+            return [
+                obj
+                async for r in (await conn.stream(query))
+                if (obj := cls.from_row(graph_ctx, r)) is not None
+            ]
+
+
+class VirtualFolderPermissionList(graphene.ObjectType):
+    class Meta:
+        interfaces = (PaginatedList,)
+
+    items = graphene.List(VirtualFolderPermission, required=True)

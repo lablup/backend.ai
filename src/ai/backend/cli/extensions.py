@@ -5,6 +5,8 @@ import sys
 import click
 from click.exceptions import Abort, ClickException
 
+from .types import ExitCode
+
 
 class InterruptAwareCommandMixin(click.BaseCommand):
     """
@@ -45,7 +47,7 @@ class InterruptAwareCommandMixin(click.BaseCommand):
             else:
                 print("Aborted!", end="", file=sys.stderr)
                 sys.stderr.flush()
-                sys.exit(1)
+                sys.exit(ExitCode.FAILURE)
         except ClickException as e:
             e.show()
             sys.exit(e.exit_code)

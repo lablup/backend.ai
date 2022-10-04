@@ -17,6 +17,7 @@ pants_ignore = [
     "scripts",
     "plugins",
     "docs",  # TODO: docs build config
+    "*.log"
 ]
 use_deprecated_directory_cli_args_semantics = false  # for 2.13 or later
 use_deprecated_pex_binary_run_semantics = false
@@ -42,12 +43,12 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export ::` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.10.5"]
+interpreter_constraints = ["CPython==3.10.7"]
 lockfile_generator = "pex"
 tailor_pex_binary_targets = false
 
 [python-repos]
-indexes.add = ["https://dist.backend.ai/pypi/simple/"]
+indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
 
 [python.resolves]
 python-default = "python.lock"
@@ -96,6 +97,12 @@ args = ["-v", "-m", "'not integration'"]
 lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 timeout_default = 300
+
+[coverage-py]
+version = "coverage[toml]>=6.4,<7.0"
+interpreter_constraints = ["CPython>=3.10,<4"]
+report = ["xml", "console"]
+lockfile = "tools/coverage-py.lock"
 
 [mypy]
 version = "mypy>=0.961"

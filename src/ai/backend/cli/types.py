@@ -13,4 +13,4 @@ class ExitCode(enum.Enum):
     OK = 0
     FAILURE = 1
     TIMEOUT = 2
-    INVALID_ARGUMENTS = 3
+    INVALID_ARGUMENT = 3

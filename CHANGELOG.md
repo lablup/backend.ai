@@ -16,6 +16,117 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.0 (2022-09-28)
+
+### Breaking Changes
+* All installations MUST replace "postgresql://" to "postgresql+asyncpg://" in `alembic.ini` ([#702](https://github.com/lablup/backend.ai/issues/702))
+
+### Features
+* Add `shared_user_uuid` paramater to allow superadmins to remove users from shared vfolders. ([#522](https://github.com/lablup/backend.ai/issues/522))
+* Allow reading compute plugin blocklists from agent local configuration. ([#624](https://github.com/lablup/backend.ai/issues/624))
+* Add `shared_user_uuid` parameter to vfolder's `leave` api to allow superadmins to remove users from shared vfolders. ([#692](https://github.com/lablup/backend.ai/issues/692))
+* Implement IP-based client restriction. ([#695](https://github.com/lablup/backend.ai/issues/695))
+* Show agent summary information to user only if `manager.hide-agents` config is set to `true`. ([#699](https://github.com/lablup/backend.ai/issues/699))
+* Add new `hide_agents` config for Webserver to control the visibility of agent information to normal users. ([#704](https://github.com/lablup/backend.ai/issues/704))
+* Agents skip containers owned by other agents in the same host during scanning containers. ([#712](https://github.com/lablup/backend.ai/issues/712))
+* Implement retry on vfolder-download when connection error or timeout error occurs. ([#714](https://github.com/lablup/backend.ai/issues/714))
+* Add agent configuration option to apply alternative docker network. ([#715](https://github.com/lablup/backend.ai/issues/715))
+* Add commit history link between releases in release notes(`CHANGELOG_RELEASE.md`). ([#721](https://github.com/lablup/backend.ai/issues/721))
+* Always mount infiniband device if it exists on agent host, without checking if kernel uses multi container or not. ([#731](https://github.com/lablup/backend.ai/issues/731))
+* Add webserver option to support session enqueue feature, introduced from lablup/backend.ai-webui#1162 ([#732](https://github.com/lablup/backend.ai/issues/732))
+* Introduce abusing container status and agent local_config API ([#737](https://github.com/lablup/backend.ai/issues/737))
+* Upgrade aiomonitor-ng to 0.6.0 for improved line-editing in telnet prompts and easier live-debugging with the `console` command via additional `console_locals` variable references ([#743](https://github.com/lablup/backend.ai/issues/743))
+
+### Fixes
+* Remove dependency to `psycopg2-binary` completely and make all database operations to run with `asyncpg` ([#702](https://github.com/lablup/backend.ai/issues/702))
+* Fix user update in client method and manager's mutation method ([#718](https://github.com/lablup/backend.ai/issues/718))
+* Let admins can purge a user account even if there is no related kaypair. ([#725](https://github.com/lablup/backend.ai/issues/725))
+* Allow installation of packaged wheels on compatible Python versions (e.g., any of 3.10.x) ([#727](https://github.com/lablup/backend.ai/issues/727))
+* Fix wrong type matching in scaling group query method ([#738](https://github.com/lablup/backend.ai/issues/738))
+
+### Miscellaneous
+* Refactor session commit functionality and change commit file name format. ([#674](https://github.com/lablup/backend.ai/issues/674))
+* Bump base Python version from 3.10.5 to 3.10.7 to reflect Python coroutine bugfix. ([#719](https://github.com/lablup/backend.ai/issues/719))
+
+
+## 22.09.0b6 (2022-09-02)
+
+### Features
+* Update codespace bootstrap script to reflect updated `install-dev.sh` ([#516](https://github.com/lablup/backend.ai/issues/516))
+* Allow non-admin users to query agent information by implementing new gql schema. ([#645](https://github.com/lablup/backend.ai/issues/645))
+
+### Fixes
+* Fix accelerator specific files created under work directory (`/home/work`) instead of config directory (`/home/config`). ([#701](https://github.com/lablup/backend.ai/issues/701))
+* Update `etcetra` (to v0.1.10) to avoid potential accumulation of unreclaimed async tasks
+
+
+## 22.09.0b5 (2022-08-30)
+
+### Features
+* Refactor `decrypt_payload()` as a middleware so that applied to `web_handler()` and `login_handler()` ([#626](https://github.com/lablup/backend.ai/issues/626))
+* Preserve the given `reason` value even when a kernel is force-terminated with a fallback to `force-terminated` ([#681](https://github.com/lablup/backend.ai/issues/681))
+* Enable the asyncio debug mode when our debug mode is enabled (e.g., `--debug`) and replace `aiomonitor` with `aiomonitor-ng` ([#688](https://github.com/lablup/backend.ai/issues/688))
+
+### Fixes
+* Accept both string field names and `FieldSpec` instances in the Client SDK's functional API wrappers ([#613](https://github.com/lablup/backend.ai/issues/613))
+* Do not remove lock file when FileLock does not have lock. ([#676](https://github.com/lablup/backend.ai/issues/676))
+* Make the Web-UI login work again by fixing missing decrypted payloads as JSON (a regression of #626) ([#689](https://github.com/lablup/backend.ai/issues/689))
+
+
+## 22.09.0b4 (2022-08-22)
+
+### Features
+* Elaborate messaging of `InstanceNotAvailable` errors and log it inside the `status_data` column as the `scheduler.msg` JSON field ([#643](https://github.com/lablup/backend.ai/issues/643))
+
+### Fixes
+* Skip non-running sessions for commit status checks by returning null in the `commit_status` GraphQL query field because the agent(s) won't have any information about the non-running kernels ([#667](https://github.com/lablup/backend.ai/issues/667))
+
+
+## 22.09.0b3 (2022-08-18)
+* A follow-up hotfix for [#664](https://github.com/lablup/backend.ai/issues/664)
+
+
+## 22.09.0b2 (2022-08-18)
+
+### Features
+* Reduce the initial startup latency of service daemons and CLI (`./backend.ai`) by more than 50% in the development setups using Pants ([#663](https://github.com/lablup/backend.ai/issues/663))
+
+### Fixes
+* Add missing lazy-imported cli modules in the package ([#664](https://github.com/lablup/backend.ai/issues/664))
+
+
+## 22.09.0b1 (2022-08-18)
+
+### Features
+* Add `owner` (replacing the `shared_by` field) and `type` fields ("project" or "user") to the `list_shared_vfolders` API to accurately distinguish the owner and the folder type ([#521](https://github.com/lablup/backend.ai/issues/521))
+* Add `keypair_resource.max_session_lifetime` option field to client following the latest schema. ([#543](https://github.com/lablup/backend.ai/issues/543))
+* client: Read `.env` files if present to configure the API session using `python-dotenv` ([#566](https://github.com/lablup/backend.ai/issues/566))
+* Accept the explicit "s" (seconds) unit suffix as well in `common.validators.TimeDuration` ([#570](https://github.com/lablup/backend.ai/issues/570))
+* Add a paginated query for the virtual folder permission list for superadmin. ([#571](https://github.com/lablup/backend.ai/issues/571))
+* Add manager REST APIs, agent RPC APIs and backend implementations to commit a running session container as a tar.gz file and check the status of long-running commit tasks (for the docker agent only) ([#601](https://github.com/lablup/backend.ai/issues/601))
+* Add `common.logging.LocalLogger` to improve logging outputs in test cases, which does not use the relay handler to send log records to another (parent) process but just the standard Python logging subsystem ([#630](https://github.com/lablup/backend.ai/issues/630))
+* Add a new API router (`/func/saml`) and a config `service.single_sign_on_vendors` to integrate SSO login, especially SAML 2.0 in this case. Also, the redirect responses (30X) are now transparently delivered to the downstream without raising `BackendAPIError`. ([#652](https://github.com/lablup/backend.ai/issues/652))
+* Add `status_history` to the query field of `get_container_stats_for_period` to know when the status of the session within a given period has changed. ([#653](https://github.com/lablup/backend.ai/issues/653))
+* Define interface `generate_mounts` and `get_docker_networks` on compute plugin ([#654](https://github.com/lablup/backend.ai/issues/654))
+* webserver: Include the feature flag `service.enable_container_commit` in `/config.toml` which allows users to commit their running session containers and save as images inside the configured path in the corresponding agent host ([#660](https://github.com/lablup/backend.ai/issues/660))
+* Use the full terminal width when formatting CLI help texts for better readability ([#662](https://github.com/lablup/backend.ai/issues/662))
+
+### Fixes
+* web: Force the keypair-based auth mode regardless to env-vars ([#564](https://github.com/lablup/backend.ai/issues/564))
+* Correct misspelled word in ImageNotFound exception message. ([#615](https://github.com/lablup/backend.ai/issues/615))
+* Pin `hiredis` version to 1.1.0 (the version auto-inferred from `redis-py` is 2.0) to avoid a potential memory corruption error, such as "free(): invalid pointer" upon termination ([#636](https://github.com/lablup/backend.ai/issues/636))
+* Improve null-checks when querying allowed vfolder hosts to prevent internal server errors when there are no allowed vfolder hosts ([#638](https://github.com/lablup/backend.ai/issues/638))
+* Fix a spurious insufficient privilege error when running `backend.ai run` command as a normal user due to a mishandling of the default value of `--assign-agent` CLI option ([#639](https://github.com/lablup/backend.ai/issues/639))
+* Fix `FileLock` not acquiring lock forever when lock file is created without write permission to manager processes' owner ([#642](https://github.com/lablup/backend.ai/issues/642))
+* Change `client.cli` to use `ai.backend.cli.main:main` as its root CommandGroup. ([#650](https://github.com/lablup/backend.ai/issues/650))
+* Fix kernel stats not being updated to database ([#661](https://github.com/lablup/backend.ai/issues/661))
+
+### Miscellaneous
+* Introduce `ExitCode` enum to give concrete semantics to numeric CLI exit codes ([#559](https://github.com/lablup/backend.ai/issues/559))
+* Upgrade Pants to 2.12.0 to 2.13.0rc0 to take advantage of the latest bug fixes and improvements ([#589](https://github.com/lablup/backend.ai/issues/589))
+* Revamp and refactor BUILD files to make Pants to handle fine-grained target selection better via per-directory BUILD files and utilize automatic internal-dependency inferences whenever possible, with unification of the source target names to `:src` (previously, `:lib` and `:service`) ([#627](https://github.com/lablup/backend.ai/issues/627))
+
+
 ## 22.06.0b4 (2022-07-28)
 
 ### Fixes

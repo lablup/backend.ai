@@ -11,10 +11,14 @@ connectionMode = "SESSION"
 {% toml_field "allowProjectResourceMonitor" config["service"]["allow_project_resource_monitor"] %}
 {% toml_field "allowManualImageNameForSession" config["service"]["allow_manual_image_name_for_session"] %}
 {% toml_field "allowSignupWithoutConfirmation" config["service"]["allow_signup_without_confirmation"] %}
+{% toml_field "alwaysEnqueueComputeSession" config["service"]["always_enqueue_compute_session"] %}
 {% toml_field "autoLogout" config["session"]["auto_logout"] %}
 {% toml_field "debug" config["service"]["webui_debug"] %}
 {% toml_field "debug" config["service"]["webui_debug"] %}
 {% toml_field "maskUserInfo" config["service"]["mask_user_info"] %}
+{% toml_strlist_field "singleSignOnVendors" config["service"]["single_sign_on_vendors"] %}
+{% toml_field "enableContainerCommit" config["service"]["enable_container_commit"] %}
+{% toml_field "hideAgents" config["service"]["hide_agents"] %}
 
 [resources]
 {% toml_field "openPortToPublic" config["resources"]["open_port_to_public"] %}

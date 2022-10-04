@@ -12,6 +12,7 @@ import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent.types import MountInfo
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     DeviceId,
@@ -304,6 +305,16 @@ class CPUPlugin(AbstractComputePlugin):
                     }
                 )
         return attached_devices
+
+    async def get_docker_networks(
+        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[str]:
+        return []
+
+    async def generate_mounts(
+        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[MountInfo]:
+        return []
 
 
 class MemoryDevice(AbstractComputeDevice):
@@ -613,3 +624,13 @@ class MemoryPlugin(AbstractComputePlugin):
                     }
                 )
         return attached_devices
+
+    async def get_docker_networks(
+        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[str]:
+        return []
+
+    async def generate_mounts(
+        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[MountInfo]:
+        return []

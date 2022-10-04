@@ -18,6 +18,7 @@ from dateutil.tz import tzutc
 from humanize import naturalsize
 from tabulate import tabulate
 
+from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 
 from ...compat import asyncio_run
@@ -712,6 +713,46 @@ def rename(session_id, new_id):
             kernel = session.ComputeSession(session_id)
             kernel.rename(new_id)
             print_done(f"Session renamed to {new_id}.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@session.command()
+@click.argument("session_id", metavar="SESSID")
+def commit(session_id):
+    """
+    Commit a running session to tar file.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    """
+
+    with Session() as session:
+        try:
+            kernel = session.ComputeSession(session_id)
+            kernel.commit()
+            print_info(f"Request to commit Session(name or id: {session_id})")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@session.command()
+@click.argument("session_id", metavar="SESSID")
+def abuse_history(session_id):
+    """
+    Get abusing reports of session's sibling kernels.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    """
+
+    with Session() as session:
+        try:
+            session = session.ComputeSession(session_id)
+            report = session.get_abusing_report()
+            print(dict(report))
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
