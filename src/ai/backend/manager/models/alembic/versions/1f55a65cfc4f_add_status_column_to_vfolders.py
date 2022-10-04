@@ -28,8 +28,9 @@ def upgrade():
         "vfolders",
         sa.Column(
             "status",
-            EnumValueType(VFolderOperationStatus, name="vfolderstatus"),
-            default=VFolderOperationStatus.READY,
+            sa.Enum(*vfolderstatus_choices, name="vfolderstatus"),
+            default="ready",
+            server_default="ready",
             nullable=False,
         ),
     )
