@@ -47,6 +47,8 @@ __all__: Sequence[str] = (
     "VFolderInvitationState",
     "VFolderPermission",
     "VFolderPermissionValidator",
+    "VFolderOperationStatus",
+    "VFolderAccessStatus",
     "query_accessible_vfolders",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
@@ -108,6 +110,28 @@ class VFolderInvitationState(str, enum.Enum):
     REJECTED = "rejected"  # rejected by invitee
 
 
+class VFolderOperationStatus(str, enum.Enum):
+    """
+    Introduce virtual folder current status for storage-proxy operations.
+    """
+
+    READY = "ready"
+    PERFORMING = "performing"
+    CLONING = "cloning"
+    DELETING = "deleting"
+    MOUNTED = "mounted"
+
+
+class VFolderAccessStatus(str, enum.Enum):
+    """
+    Introduce virtual folder desired status for storage-proxy operations.
+    Not added to db scheme  and determined only by current vfolder status.
+    """
+
+    READABLE = "readable"
+    UPDATABLE = "updatable"
+
+
 vfolders = sa.Table(
     "vfolders",
     metadata,
@@ -141,6 +165,13 @@ vfolders = sa.Table(
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
     sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
+    sa.Column(
+        "status",
+        EnumValueType(VFolderOperationStatus),
+        default=VFolderOperationStatus.READY,
+        server_default=VFolderOperationStatus.READY.value,
+        nullable=False,
+    ),
     sa.CheckConstraint(
         "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
         "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
@@ -254,6 +285,7 @@ async def query_accessible_vfolders(
         vfolders.c.creator,
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
+        vfolders.c.status,
         # vfolders.c.permission,
         # users.c.email,
     ]
@@ -291,6 +323,7 @@ async def query_accessible_vfolders(
                     "permission": _perm,
                     "unmanaged_path": row.vfolders_unmanaged_path,
                     "cloneable": row.vfolders_cloneable,
+                    "status": row.vfolders_status,
                 }
             )
 
@@ -657,6 +690,7 @@ class VirtualFolder(graphene.ObjectType):
     cur_size = BigInt()
     # num_attached = graphene.Int()
     cloneable = graphene.Boolean()
+    status = graphene.String()
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[VirtualFolder]:
@@ -681,6 +715,7 @@ class VirtualFolder(graphene.ObjectType):
             last_used=row["last_used"],
             # num_attached=row['num_attached'],
             cloneable=row["cloneable"],
+            status=row["status"],
         )
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
@@ -709,6 +744,7 @@ class VirtualFolder(graphene.ObjectType):
         "created_at": ("vfolders_created_at", dtparse),
         "last_used": ("vfolders_last_used", dtparse),
         "cloneable": ("vfolders_cloneable", None),
+        "status": ("vfolders_status", lambda s: VFolderOperationStatus[s]),
     }
 
     _queryorder_colmap = {
@@ -727,6 +763,7 @@ class VirtualFolder(graphene.ObjectType):
         "created_at": "vfolders_created_at",
         "last_used": "vfolders_last_used",
         "cloneable": "vfolders_cloneable",
+        "status": "vfolders_status",
     }
 
     @classmethod

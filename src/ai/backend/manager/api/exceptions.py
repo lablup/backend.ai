@@ -272,6 +272,16 @@ class VFolderOperationFailed(BackendError, web.HTTPBadRequest):
     error_title = "Virtual folder operation has failed."
 
 
+class VFolderFilterStatusFailed(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-filter-status-failed"
+    error_title = "Virtual folder status filtering has failed."
+
+
+class VFolderFilterStatusNotAvailable(BackendError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-filter-status-not-available"
+    error_title = "There is no available virtual folder to filter its status."
+
+
 class DotfileCreationFailed(BackendError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Dotfile creation has failed."
