@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -191,13 +191,13 @@ class Agent(graphene.ObjectType):
     async def resolve_hardware_metadata(
         self,
         info: graphene.ResolveInfo,
-    ) -> Mapping[str, HardwareMetadata] | None:
+    ) -> Optional[Mapping[str, HardwareMetadata]]:
         if self.status != AgentStatus.ALIVE:
             return None
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.registry.gather_agent_hwinfo(self.id)
 
-    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
+    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
         if self.status != AgentStatus.ALIVE:
             return None
         graph_ctx: GraphQueryContext = info.context
@@ -596,6 +596,7 @@ class ModifyAgent(graphene.Mutation):
         data: Dict[str, Any] = {}
         set_if_set(props, data, "schedulable")
         set_if_set(props, data, "scaling_group")
+        # TODO: Need to skip the following RPC call if the agent is not alive, or timeout.
         await graph_ctx.registry.update_scaling_group(id, data["scaling_group"])
 
         update_query = sa.update(agents).values(data).where(agents.c.id == id)
