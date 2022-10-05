@@ -1200,14 +1200,13 @@ class AbstractAgent(
                             LifecycleEvent.DESTROY,
                             body.get("reason", "anomaly-detected"),
                         )
+                        await self.loop.run_in_executor(None, _rm, reported_kernel)
                     else:
                         log.debug(
                             "abusing container detected, skipping auto-termination: {} ({})",
                             body["ID"],
                             body.get("reason"),
                         )
-
-                    await self.loop.run_in_executor(None, _rm, reported_kernel)
         finally:
             for kernel_id, ev in terminated_kernels.items():
                 await self.container_lifecycle_queue.put(ev)
