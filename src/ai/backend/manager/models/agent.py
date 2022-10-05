@@ -597,7 +597,8 @@ class ModifyAgent(graphene.Mutation):
         set_if_set(props, data, "schedulable")
         set_if_set(props, data, "scaling_group")
         # TODO: Need to skip the following RPC call if the agent is not alive, or timeout.
-        await graph_ctx.registry.update_scaling_group(id, data["scaling_group"])
+        if (scaling_group := data.get("scaling_group")) is not None:
+            await graph_ctx.registry.update_scaling_group(id, scaling_group)
 
         update_query = sa.update(agents).values(data).where(agents.c.id == id)
         return await simple_db_mutate(cls, graph_ctx, update_query)
