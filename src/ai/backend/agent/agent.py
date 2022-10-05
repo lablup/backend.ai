@@ -611,9 +611,11 @@ class AbstractAgent(
         self.timer_tasks.append(aiotools.create_timer(self.sync_container_lifecycles, 10.0))
 
         if abuse_report_path := self.local_config["agent"].get("abuse-report-path"):
-            log.info("Enabling auto-removal of kernels reported for abnormal activities")
+            log.info(
+                "Monitoring abnormal kernel activities reported by Watcher at {}", abuse_report_path
+            )
             abuse_report_path.mkdir(exist_ok=True, parents=True)
-            self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 10.0))
+            self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 30.0))
 
         loop = current_loop()
         self.last_registry_written_time = time.monotonic()
@@ -1173,6 +1175,9 @@ class AbstractAgent(
 
     async def _cleanup_reported_kernels(self, interval: float):
         dest_path: Path = self.local_config["agent"]["abuse-report-path"]
+        auto_terminate: bool = self.local_config["agent"].get(
+            "force-terminate-abusing-containers", False
+        )
 
         def _read(path: Path) -> str:
             with open(path, "r") as fr:
@@ -1187,15 +1192,21 @@ class AbstractAgent(
                 for reported_kernel in dest_path.glob("report.*.json"):
                     raw_body = await self.loop.run_in_executor(None, _read, reported_kernel)
                     body: MutableMapping[str, str] = json.loads(raw_body)
-                    log.debug("cleanup requested: {} ({})", body["ID"], body.get("reason"))
-                    terminated_kernels[body["ID"]] = ContainerLifecycleEvent(
-                        KernelId(UUID(body["ID"])),
-                        ContainerId(body["CID"]),
-                        LifecycleEvent.DESTROY,
-                        body.get("reason", "anomaly-detected"),
-                    )
-
-                    await self.loop.run_in_executor(None, _rm, reported_kernel)
+                    if auto_terminate:
+                        log.debug("cleanup requested: {} ({})", body["ID"], body.get("reason"))
+                        terminated_kernels[body["ID"]] = ContainerLifecycleEvent(
+                            KernelId(UUID(body["ID"])),
+                            ContainerId(body["CID"]),
+                            LifecycleEvent.DESTROY,
+                            body.get("reason", "anomaly-detected"),
+                        )
+                        await self.loop.run_in_executor(None, _rm, reported_kernel)
+                    else:
+                        log.debug(
+                            "abusing container detected, skipping auto-termination: {} ({})",
+                            body["ID"],
+                            body.get("reason"),
+                        )
         finally:
             for kernel_id, ev in terminated_kernels.items():
                 await self.container_lifecycle_queue.put(ev)
