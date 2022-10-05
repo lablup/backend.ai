@@ -18,11 +18,9 @@
 //     "aiodocker~=0.21.0",
 //     "aiofiles~=0.8.0",
 //     "aiohttp_cors~=0.7",
-//     "aiohttp_session[aioredis]~=2.11",
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.1",
 //     "aiomonitor-ng~=0.6.0",
-//     "aioredis[hiredis]~=2.0.1",
 //     "aiosqlite~=0.17.0",
 //     "aiotools~=1.5.9",
 //     "aiotusclient~=0.1.4",
@@ -324,32 +322,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d5451b72ba748d72ef01f55c3af45b63be2d40b2bdadf47407007e1270343384",
-              "url": "https://files.pythonhosted.org/packages/13/e3/affe80cf6d906f5a8ca7d084b780c340d90f7649c0683ed1e65dd88c5bdf/aiohttp_session-2.11.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "0fdf39600f6a05c4943ef6c7b099071ca9854413111a26761626244be5015dc4",
-              "url": "https://files.pythonhosted.org/packages/3b/a7/0b97b9a2e3a553a86a6703f86b0e9b1afb2b262849700e8f80015c0f643f/aiohttp-session-2.11.0.tar.gz"
-            }
-          ],
-          "project_name": "aiohttp-session",
-          "requires_dists": [
-            "aiohttp>=3.8",
-            "aiomcache>=0.5.2; extra == \"aiomcache\"",
-            "aioredis>=2.0.0; extra == \"aioredis\"",
-            "cryptography; extra == \"pycrypto\"",
-            "cryptography; extra == \"secure\"",
-            "pynacl; extra == \"pynacl\"",
-            "typing-extensions>=3.7.4; python_version < \"3.8\""
-          ],
-          "requires_python": ">=3.7",
-          "version": "2.11"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "b31cbf99142ca0c93cfc180e3f32fcdca0bcab35367e1380bc70dfaaf88cdc60",
               "url": "https://files.pythonhosted.org/packages/fe/0c/e1db340ac8d75af3e51236696077e399cc3dfe8ea25d2a524066bff196a9/aiohttp_sse-2.1.0-py3-none-any.whl"
             },
@@ -387,28 +359,6 @@
           ],
           "requires_python": null,
           "version": "0.6"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "9ac0d0b3b485d293b8ca1987e6de8658d7dafcca1cddfcd1d506cae8cdebfdd6",
-              "url": "https://files.pythonhosted.org/packages/9b/a9/0da089c3ae7a31cbcd2dcf0214f6f571e1295d292b6139e2bac68ec081d0/aioredis-2.0.1-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "eaa51aaf993f2d71f54b70527c440437ba65340588afeb786cd87c55c89cd98e",
-              "url": "https://files.pythonhosted.org/packages/2e/cf/9eb144a0b05809ffc5d29045c4b51039000ea275bc1268d0351c9e7dfc06/aioredis-2.0.1.tar.gz"
-            }
-          ],
-          "project_name": "aioredis",
-          "requires_dists": [
-            "async-timeout",
-            "hiredis>=1.0; implementation_name == \"cpython\" and extra == \"hiredis\"",
-            "typing-extensions"
-          ],
-          "requires_python": ">=3.6",
-          "version": "2.0.1"
         },
         {
           "artifacts": [
@@ -2958,13 +2908,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "2eb4e6894cde1e017976d2975ac210ef515d7548bc595ba20e195fb9628acdeb",
-              "url": "https://files.pythonhosted.org/packages/f6/39/4cb526e0d505464376e3c47a812df6e6638363ebe66e6a63618831fe47ad/rich-12.5.1-py3-none-any.whl"
+              "hash": "a4eb26484f2c82589bd9a17c73d32a010b1e29d89f1604cd9bf3a2097b81bb5e",
+              "url": "https://files.pythonhosted.org/packages/32/60/81ac2e7d1e3b861ab478a72e3b20fc91c4302acd2274822e493758941829/rich-12.6.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "63a5c5ce3673d3d5fbbf23cd87e11ab84b6b451436f1b7f19ec54b6bc36ed7ca",
-              "url": "https://files.pythonhosted.org/packages/bb/2d/c902484141330ded63c6c40d66a9725f8da5e818770f67241cf429eef825/rich-12.5.1.tar.gz"
+              "hash": "ba3a3775974105c221d31141f2c116f4fd65c5ceb0698657a11e9f295ec93fd0",
+              "url": "https://files.pythonhosted.org/packages/11/23/814edf09ec6470d52022b9e95c23c1bef77f0bc451761e1504ebd09606d3/rich-12.6.0.tar.gz"
             }
           ],
           "project_name": "rich",
@@ -2976,7 +2926,7 @@
             "typing-extensions<5.0,>=4.0.0; python_version < \"3.9\""
           ],
           "requires_python": "<4.0.0,>=3.6.3",
-          "version": "12.5.1"
+          "version": "12.6"
         },
         {
           "artifacts": [
@@ -3085,13 +3035,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c2d2709550f15aab6c9110196ea312f468f41cd546bceb24127a1be6fdcaeeb1",
-              "url": "https://files.pythonhosted.org/packages/d5/e6/e3a70a77dda22766b9ef4ff47ff8320720311e78d11d1401baffca3f6879/setuptools-65.4.0-py3-none-any.whl"
+              "hash": "1b6bdc6161661409c5f21508763dc63ab20a9ac2f8ba20029aaaa7fdb9118012",
+              "url": "https://files.pythonhosted.org/packages/bd/b4/f120561bc94a04bae5d71ea86fe2c7d97f57ab89635b4739ec4abceda92d/setuptools-65.4.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a8f6e213b4b0661f590ccf40de95d28a177cd747d098624ad3f69c40287297e9",
-              "url": "https://files.pythonhosted.org/packages/4c/61/86c94ae2cccb05749abfb1b2961125d40368c8f03ac59275550c45e634f1/setuptools-65.4.0.tar.gz"
+              "hash": "3050e338e5871e70c72983072fe34f6032ae1cdeeeb67338199c2f74e083a80e",
+              "url": "https://files.pythonhosted.org/packages/03/c9/7b050ea4cc4144d0328f15e0b43c839e759c6c639370a3b932ecf4c6358f/setuptools-65.4.1.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -3132,7 +3082,7 @@
             "sphinx-inline-tabs; extra == \"docs\"",
             "sphinx-notfound-page==0.8.3; extra == \"docs\"",
             "sphinx-reredirects; extra == \"docs\"",
-            "sphinx; extra == \"docs\"",
+            "sphinx>=3.5; extra == \"docs\"",
             "sphinxcontrib-towncrier; extra == \"docs\"",
             "tomli-w>=1.0.0; extra == \"testing\"",
             "tomli; extra == \"testing-integration\"",
@@ -3142,7 +3092,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "65.4"
+          "version": "65.4.1"
         },
         {
           "artifacts": [
@@ -3339,19 +3289,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "25d4e2e446c453be6360c67ddfb88838cfc42026322770ba13d1fbd403a93a5c",
-              "url": "https://files.pythonhosted.org/packages/18/31/2a87f292f752d39c6c207f9e44137e3e1d4250da880a9fbc0bbf630138e0/tomlkit-0.11.4-py3-none-any.whl"
+              "hash": "f2ef9da9cef846ee027947dc99a45d6b68a63b0ebc21944649505bf2e8bc5fe7",
+              "url": "https://files.pythonhosted.org/packages/df/b6/310fe14933403413f7352be0c8e75b7ed23db2170d769ed69e40f40130a3/tomlkit-0.11.5-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3235a9010fae54323e727c3ac06fb720752fe6635b3426e379daec60fbd44a83",
-              "url": "https://files.pythonhosted.org/packages/84/51/092a8b945edc3b93f2de091ab9596006673caac063e3fac14f0fa6c69b1c/tomlkit-0.11.4.tar.gz"
+              "hash": "571854ebbb5eac89abcb4a2e47d7ea27b89bf29e09c35395da6f03dd4ae23d1c",
+              "url": "https://files.pythonhosted.org/packages/0c/2b/7823f215c6aec294f5ab5ff2f529aca1d85e8bec2208ae7ea89ca1413620/tomlkit-0.11.5.tar.gz"
             }
           ],
           "project_name": "tomlkit",
           "requires_dists": [],
           "requires_python": "<4.0,>=3.6",
-          "version": "0.11.4"
+          "version": "0.11.5"
         },
         {
           "artifacts": [
@@ -3557,37 +3507,37 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "cca7e17e3efb5dfdc7c9841bd5963fdd717ab68c4d2d8c6f49a9175fe2f29ce4",
-              "url": "https://files.pythonhosted.org/packages/aa/31/2cf66792b66ffba95f5983197077eed84e7673568bd4f64bfa3dcbc9dd9a/types_redis-4.3.21-py3-none-any.whl"
+              "hash": "65b8c842f406932218f8ce636f75e5a03cb6b382d3922cb3e5f87e127e6d434d",
+              "url": "https://files.pythonhosted.org/packages/ed/b7/b540fb9a122c11f9adc242d93cf2f9a013d97b089f9ccefee94873867a85/types_redis-4.3.21.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "fd017a6733af193d14f1bb29b4ff79c0abc906e8654158d17aba457a6381afe2",
-              "url": "https://files.pythonhosted.org/packages/bf/ee/5d420f6b1973e4fd30058a48494951ad129b4ac34a7be05b4dcf536a3382/types-redis-4.3.21.tar.gz"
+              "hash": "493814829643fc04a14595eda6ccd69bdc0606477541ccda54238ce3f60bc993",
+              "url": "https://files.pythonhosted.org/packages/03/bf/d9618ef53a5b4fc13a34dfbf825158f88a0e59289fe9794b89e94136f1c5/types-redis-4.3.21.1.tar.gz"
             }
           ],
           "project_name": "types-redis",
           "requires_dists": [],
           "requires_python": null,
-          "version": "4.3.21"
+          "version": "4.3.21.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f69210049580939c70386252b776eb75ff4b6de488e7d766b9398669b7de68af",
-              "url": "https://files.pythonhosted.org/packages/b0/81/45b443a4a9e98f93ead4b21d71f5e7ab7c66d00eb7a33b91ba05635367f9/types_setuptools-65.3.0-py3-none-any.whl"
+              "hash": "ce178b3f7dbd6c0e67f8eee7ae29c1be280ade7e5188bdd9e620843de4060d85",
+              "url": "https://files.pythonhosted.org/packages/f9/a1/6c82034fd87ef0d2b363c7d6daa5bb8c9af907ac2775df3554195bed8482/types_setuptools-65.4.0.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c26779cbba3947823c260354adaab4e91ca8c18888aa2b740f503844b88f1813",
-              "url": "https://files.pythonhosted.org/packages/80/bd/5e02b6ad8595bbfe5a7967e016a8858ffae384413e51ec489e5997900d79/types-setuptools-65.3.0.tar.gz"
+              "hash": "d9021d6a70690b34e7bd2947e7ab10167c646fbf062508cb56581be2e2a1615e",
+              "url": "https://files.pythonhosted.org/packages/40/55/1e0c9c664303e5d301f113de11bfa639bf8d121451c7688a07c3711dbc16/types-setuptools-65.4.0.0.tar.gz"
             }
           ],
           "project_name": "types-setuptools",
           "requires_dists": [],
           "requires_python": null,
-          "version": "65.3"
+          "version": "65.4"
         },
         {
           "artifacts": [
@@ -3951,11 +3901,9 @@
     "aiodocker~=0.21.0",
     "aiofiles~=0.8.0",
     "aiohttp_cors~=0.7",
-    "aiohttp_session[aioredis]~=2.11",
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.1",
     "aiomonitor-ng~=0.6.0",
-    "aioredis[hiredis]~=2.0.1",
     "aiosqlite~=0.17.0",
     "aiotools~=1.5.9",
     "aiotusclient~=0.1.4",
