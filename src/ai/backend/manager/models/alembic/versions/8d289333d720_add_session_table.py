@@ -1,8 +1,8 @@
 """add_session_table
 
-Revision ID: 3b4093f22a98
-Revises: 35923972eddb
-Create Date: 2022-07-22 07:10:10.223182
+Revision ID: 8d289333d720
+Revises: 360af8f33d4e
+Create Date: 2022-10-05 14:40:29.012038
 
 """
 from collections import defaultdict
@@ -17,10 +17,11 @@ from sqlalchemy.orm.session import Session
 from ai.backend.manager.models.base import GUID, KernelIDColumn, convention
 
 # revision identifiers, used by Alembic.
-revision = "3b4093f22a98"
-down_revision = "35923972eddb"
+revision = "8d289333d720"
+down_revision = "360af8f33d4e"
 branch_labels = None
 depends_on = None
+
 
 KernelStatus = (
     "PENDING",
@@ -42,12 +43,7 @@ SessionStatus = (
     "PENDING",
     "SCHEDULED",
     "PREPARING",
-    "BUILDING",
-    "PULLING",
     "RUNNING",
-    "RESTARTING",
-    "RESIZING",
-    "SUSPENDED",
     "TERMINATING",
     "TERMINATED",
     "ERROR",
@@ -201,19 +197,7 @@ def upgrade():
         status = sa.Column(
             "status",
             pgsql.ENUM(
-                "PENDING",
-                "SCHEDULED",
-                "PREPARING",
-                "BUILDING",
-                "PULLING",
-                "RUNNING",
-                "RESTARTING",
-                "RESIZING",
-                "SUSPENDED",
-                "TERMINATING",
-                "TERMINATED",
-                "ERROR",
-                "CANCELLED",
+                *SessionStatus,
                 name="sessionstatus",
                 create_type=True,
             ),
@@ -586,19 +570,7 @@ def downgrade():
 
     # Drop ENUM types
     sess_statues = pgsql.ENUM(
-        "PENDING",
-        "SCHEDULED",
-        "PREPARING",
-        "BUILDING",
-        "PULLING",
-        "RUNNING",
-        "RESTARTING",
-        "RESIZING",
-        "SUSPENDED",
-        "TERMINATING",
-        "TERMINATED",
-        "ERROR",
-        "CANCELLED",
+        *SessionStatus,
         name="sessionstatus",
     )
     sess_results = pgsql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresults")

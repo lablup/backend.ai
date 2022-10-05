@@ -81,13 +81,7 @@ class SessionStatus(enum.Enum):
     SCHEDULED = 5
     PREPARING = 10
     # ---
-    BUILDING = 20
-    PULLING = 21
-    # ---
     RUNNING = 30
-    RESTARTING = 31
-    RESIZING = 32
-    SUSPENDED = 33
     # ---
     TERMINATING = 40
     TERMINATED = 41
@@ -129,12 +123,12 @@ KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
     KernelStatus.PENDING: SessionStatus.PENDING,
     KernelStatus.SCHEDULED: SessionStatus.SCHEDULED,
     KernelStatus.PREPARING: SessionStatus.PREPARING,
-    KernelStatus.BUILDING: SessionStatus.BUILDING,
-    KernelStatus.PULLING: SessionStatus.PULLING,
+    KernelStatus.BUILDING: SessionStatus.PREPARING,
+    KernelStatus.PULLING: SessionStatus.PREPARING,
     KernelStatus.RUNNING: SessionStatus.RUNNING,
-    KernelStatus.RESTARTING: SessionStatus.RESTARTING,
-    KernelStatus.RESIZING: SessionStatus.RESIZING,
-    KernelStatus.SUSPENDED: SessionStatus.SUSPENDED,
+    KernelStatus.RESTARTING: SessionStatus.RUNNING,
+    KernelStatus.RESIZING: SessionStatus.RUNNING,
+    KernelStatus.SUSPENDED: SessionStatus.RUNNING,
     KernelStatus.TERMINATING: SessionStatus.TERMINATING,
     KernelStatus.TERMINATED: SessionStatus.TERMINATED,
     KernelStatus.ERROR: SessionStatus.ERROR,
