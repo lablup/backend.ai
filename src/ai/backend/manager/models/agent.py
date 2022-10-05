@@ -191,11 +191,15 @@ class Agent(graphene.ObjectType):
     async def resolve_hardware_metadata(
         self,
         info: graphene.ResolveInfo,
-    ) -> Mapping[str, HardwareMetadata]:
+    ) -> Mapping[str, HardwareMetadata] | None:
+        if self.status != AgentStatus.ALIVE:
+            return None
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.registry.gather_agent_hwinfo(self.id)
 
-    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+    async def resolve_local_config(self, info: graphene.ResolveInfo) -> Mapping[str, Any] | None:
+        if self.status != AgentStatus.ALIVE:
+            return None
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.registry.get_agent_local_config(self.id, self.addr)
 
