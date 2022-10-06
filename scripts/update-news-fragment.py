@@ -18,7 +18,7 @@ def get_config():
 
 
 def get_repository_labels():
-    directory = os.path.abspath("./github/workflows")
+    directory = os.path.abspath("./.github/workflows")
     config_path = Path(os.path.join(directory, "label-matcher.json"))
     with open(config_path, encoding='utf-8') as json_f:
         labels = [x["name"] for x in json.loads(json_f.read())]
