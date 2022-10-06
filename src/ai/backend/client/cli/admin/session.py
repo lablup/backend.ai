@@ -186,7 +186,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                     "SCHEDULED",
                     "PREPARING",
                     "RUNNING",
-                    "RUNNING_DEGRADED" "RESTARTING",
+                    "RUNNING_DEGRADED",
                     "TERMINATING",
                     "ERROR",
                     "CANCELLED",
