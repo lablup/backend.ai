@@ -38,11 +38,13 @@ jobs:
         python -m pip install -U towncrier~=21.9
     - name: Create or Update news fragment
       env:
+        BASE_BRANCH: ${{ github.base_ref }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         CONTENT: ${{ steps.pr-fragment.outputs.content }}
         FRAGMENT: ${{ steps.pr-fragment.outputs.fragment }}
       working-directory: .
       run: |
+        git fetch --no-tags origin +refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}
         python scripts/update-news-fragment.py -n "$PR_NUMBER" --content "$CONTENT" -f "$FRAGMENT"
     - name: Get Changed Files
       id: changed-files
