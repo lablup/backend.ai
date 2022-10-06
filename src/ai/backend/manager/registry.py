@@ -46,7 +46,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import selectinload
 from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
@@ -2621,18 +2621,11 @@ class AgentRegistry:
     ) -> None:
         async def _check_and_mark() -> Tuple[bool, SessionId]:
             async with self.db.begin_session() as db_sess:
-                query = (
-                    sa.select(KernelRow)
-                    .where(KernelRow.id == kernel_id)
-                    .options(
-                        noload("*"),
-                        selectinload(KernelRow.session)
-                        .selectinload(SessionRow.kernels)
-                        .noload("*"),
-                    )
+                kernel_query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
+                session_id = (await db_sess.execute(kernel_query)).scalar()
+                session = await SessionRow.get_session_with_kernels(
+                    session_id, allow_stale=True, db_session=db_sess
                 )
-                result = await db_sess.execute(query)
-                session = result.scalars().first().session
                 sibling_kernels = session.kernels
                 sess_status = aggregate_kernel_status(sibling_kernels, KernelStatus.TERMINATED)
                 now = datetime.now(tzutc())
@@ -2651,14 +2644,14 @@ class AgentRegistry:
                         ),
                     }
                     query = (
-                        sa.update(SessionRow).values(**values).where(SessionRow.id == session.id)
+                        sa.update(SessionRow).values(**values).where(SessionRow.id == session_id)
                     )
                     await db_sess.execute(query)
                 all_terminated = session.status in (
                     SessionStatus.TERMINATED,
                     SessionStatus.CANCELLED,
                 )
-                return all_terminated, session.id
+                return all_terminated, session_id
 
         do_fire_event, session_id = await execute_with_retry(_check_and_mark)
         if session_id is None:
