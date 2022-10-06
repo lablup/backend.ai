@@ -100,7 +100,6 @@ from .api.exceptions import (
     RejectedByHook,
     ScalingGroupNotFound,
     SessionNotFound,
-    TooManySessionsMatched,
 )
 from .config import SharedConfig
 from .defs import DEFAULT_ROLE, INTRINSIC_SLOTS
@@ -121,16 +120,14 @@ from .models import (
     SessionRow,
     SessionStatus,
     agents,
+    aggregate_kernel_status,
     kernels,
     prepare_dotfiles,
     prepare_vfolder_mounts,
     query_allowed_sgroups,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
-    users,
 )
-from .models.kernel import get_all_kernels, match_session_ids
-from .models.session import aggregate_kernel_status, get_session_with_kernels
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -138,12 +135,11 @@ from .models.utils import (
     reenter_txn_session,
     sql_json_merge,
 )
-from .types import SessionGetter, UserScope
+from .types import UserScope
 
 if TYPE_CHECKING:
     from sqlalchemy.engine.row import Row
     from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
     from ai.backend.common.events import EventDispatcher, EventProducer
 
@@ -348,11 +344,10 @@ class AgentRegistry:
             )
 
     @actxmgr
-    async def handle_kernel_exception(
+    async def handle_session_exception(
         self,
         op: str,
         session_id: SessionId,
-        access_key: AccessKey,
         error_callback=None,
         cancellation_callback=None,
         set_error: bool = False,
@@ -378,7 +373,6 @@ class AgentRegistry:
             if set_error:
                 await self.set_session_status(
                     session_id,
-                    access_key,
                     SessionStatus.ERROR,
                     status_info=f"operation-timeout ({op})",
                 )
@@ -393,7 +387,6 @@ class AgentRegistry:
             if set_error:
                 await self.set_session_status(
                     session_id,
-                    access_key,
                     SessionStatus.ERROR,
                     status_info=f"agent-error ({e!r})",
                     status_data={
@@ -415,7 +408,6 @@ class AgentRegistry:
             if set_error:
                 await self.set_session_status(
                     session_id,
-                    access_key,
                     SessionStatus.ERROR,
                     status_info=f"other-error ({e!r})",
                     status_data={
@@ -488,26 +480,6 @@ class AgentRegistry:
             if row is None:
                 raise SessionNotFound
             return row
-
-    async def get_session(
-        self,
-        session_name_or_id: str | uuid.UUID,
-        access_key: str | AccessKey | None = None,
-        *,
-        allow_stale: bool = False,
-        for_update: bool = False,
-        only_main_kern: bool = True,
-        db_session: SASession = None,
-    ) -> SessionRow:
-        async with reenter_txn_session(self.db, db_session, read_only=True) as db_sess:
-            return await get_session_with_kernels(
-                session_name_or_id,
-                AccessKey(access_key) if access_key is not None else None,
-                allow_stale=allow_stale,
-                for_update=for_update,
-                only_main_kern=only_main_kern,
-                db_session=db_sess,
-            )
 
     async def enqueue_session(
         self,
@@ -857,7 +829,7 @@ class AgentRegistry:
                     matched_dependency_session_ids = []
                     for dependency_id in dependency_sessions:
                         try:
-                            match_info = await self.get_session(
+                            match_info = await SessionRow.get_session(
                                 dependency_id,
                                 access_key,
                                 db_session=db_sess,
@@ -1188,7 +1160,8 @@ class AgentRegistry:
                     result = await db_sess.execute(query)
                     session: SessionRow = result.scalars().first()
                     updated_sess_status = aggregate_kernel_status(
-                        [k.status for k in session.kernels]
+                        session.kernels,
+                        KernelStatus.RUNNING,
                     )
                     if updated_sess_status != session.status:
                         update_query = (
@@ -1595,7 +1568,7 @@ class AgentRegistry:
 
     async def destroy_session(
         self,
-        session_getter: SessionGetter,
+        session: SessionRow,
         *,
         forced: bool = False,
         reason: Optional[str] = None,
@@ -1608,8 +1581,6 @@ class AgentRegistry:
                        However, PULLING session still cannot be destroyed.
         :param reason: Reason to destroy a session if client wants to specify it manually.
         """
-        async with self.db.begin_readonly_session() as db_sess:
-            session: SessionRow = await session_getter(db_session=db_sess)
         session_id = session.id
         if not reason:
             reason = "force-terminated" if forced else "user-requested"
@@ -1621,10 +1592,9 @@ class AgentRegistry:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
-        async with self.handle_kernel_exception(
+        async with self.handle_session_exception(
             "destroy_session",
-            session_id,
-            session.access_key,
+            session,
             set_error=True,
         ):
 
@@ -1794,7 +1764,7 @@ class AgentRegistry:
                         destroyed_kernels.append(kernel)
 
                 async def _destroy_kernels_in_agent(
-                    session, destroyed_kernels: List[KernelRow]
+                    session: SessionRow, destroyed_kernels: List[KernelRow]
                 ) -> None:
                     nonlocal main_stat
                     async with RPCContext(
@@ -1917,60 +1887,42 @@ class AgentRegistry:
 
     async def restart_session(
         self,
-        session_creation_id: str,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        session: SessionRow,
     ) -> None:
-        log.warning("restart_session({})", session_name_or_id)
-        async with self.db.begin_readonly() as conn:
-            session_infos = await match_session_ids(
-                session_name_or_id,
-                access_key,
-                db_connection=conn,
-            )
-            if len(session_infos) > 1:
-                raise TooManySessionsMatched(extra_data={"matches": session_infos})
-            elif len(session_infos) == 0:
-                raise SessionNotFound()
-            session_id = session_infos[0]["session_id"]
-            kernel_list = [
-                row
-                for row in await get_all_kernels(
-                    [session_id],
-                    db_connection=conn,
-                )
-            ][0]
+        log.warning("restart_session({})", session.id)
 
-        async def _restart_kernel(kernel) -> None:
+        async def _restarting_session() -> None:
+            async with self.db.begin_session() as db_sess:
+                query = (
+                    sa.update(SessionRow)
+                    .values(
+                        status=SessionStatus.RESTARTING,
+                        status_history=sql_json_merge(
+                            SessionRow.status_history,
+                            (),
+                            {
+                                SessionStatus.RESTARTING.name: datetime.now(tzutc()).isoformat(),
+                            },
+                        ),
+                    )
+                    .where(SessionRow.id == session.id)
+                )
+                await db_sess.execute(query)
+
+        await execute_with_retry(_restarting_session)
+
+        kernel_list = session.kernels
+
+        async def _restart_kernel(kernel: KernelRow) -> None:
             loop = asyncio.get_running_loop()
             try:
                 kernel_creation_id = secrets.token_urlsafe(16)
                 start_future = loop.create_future()
-                self.kernel_creation_tracker[kernel["id"]] = start_future
+                self.kernel_creation_tracker[kernel.id] = start_future
                 try:
-                    async with self.db.begin() as conn:
-                        query = (
-                            kernels.update()
-                            .values(
-                                {
-                                    "status": KernelStatus.RESTARTING,
-                                    "status_history": sql_json_merge(
-                                        kernels.c.status_history,
-                                        (),
-                                        {
-                                            KernelStatus.RESTARTING.name: datetime.now(
-                                                tzutc()
-                                            ).isoformat(),
-                                        },
-                                    ),
-                                }
-                            )
-                            .where(kernels.c.id == kernel["id"])
-                        )
-                        await conn.execute(query)
                     async with RPCContext(
-                        kernel["agent"],  # the main-container's agent
-                        kernel["agent_addr"],
+                        kernel.agent,  # the main-container's agent
+                        kernel.agent_addr,
                         invoke_timeout=None,
                         order_key=None,
                         keepalive_timeout=self.rpc_keepalive_timeout,
@@ -1980,25 +1932,26 @@ class AgentRegistry:
                         }
                         kernel_info = await rpc.call.restart_kernel(
                             kernel_creation_id,
-                            str(kernel["session_id"]),
-                            str(kernel["id"]),
+                            str(kernel.session_id),
+                            str(kernel.id),
                             updated_config,
                         )
                     await start_future
-                    async with self.db.begin() as conn:
-                        query = (
-                            kernels.update()
-                            .values(
-                                {
-                                    "status": KernelStatus.RUNNING,
-                                    "container_id": kernel_info["container_id"],
-                                    "repl_in_port": kernel_info["repl_in_port"],
-                                    "repl_out_port": kernel_info["repl_out_port"],
-                                    "stdin_port": kernel_info["stdin_port"],
-                                    "stdout_port": kernel_info["stdout_port"],
-                                    "service_ports": kernel_info.get("service_ports", []),
-                                    "status_history": sql_json_merge(
-                                        kernels.c.status_history,
+
+                    async def _update_kernel() -> None:
+                        async with self.db.begin_session() as db_sess:
+                            query = (
+                                sa.update(KernelRow)
+                                .values(
+                                    status=KernelStatus.RUNNING,
+                                    container_id=kernel_info["container_id"],
+                                    repl_in_port=kernel_info["repl_in_port"],
+                                    repl_out_port=kernel_info["repl_out_port"],
+                                    stdin_port=kernel_info["stdin_port"],
+                                    stdout_port=kernel_info["stdout_port"],
+                                    service_ports=kernel_info.get("service_ports", []),
+                                    status_history=sql_json_merge(
+                                        KernelRow.status_history,
                                         (),
                                         {
                                             KernelStatus.RUNNING.name: datetime.now(
@@ -2006,37 +1959,56 @@ class AgentRegistry:
                                             ).isoformat(),
                                         },
                                     ),
-                                }
+                                )
+                                .where(KernelRow.id == kernel.id)
                             )
-                            .where(kernels.c.id == kernel["id"])
-                        )
-                        await conn.execute(query)
+                            await db_sess.execute(query)
+
+                    await execute_with_retry(_update_kernel)
                 finally:
-                    del self.kernel_creation_tracker[kernel["id"]]
+                    del self.kernel_creation_tracker[kernel.id]
             except Exception:
                 log.exception("unexpected-error in _restart_kerenl()")
 
         restart_coros = []
         for kernel in kernel_list:
             restart_coros.append(_restart_kernel(kernel))
-        async with self.handle_kernel_exception(
+        async with self.handle_session_exception(
             "restart_session",
-            session_id,
-            access_key,
+            session.id,
             set_error=True,
         ):
             await asyncio.gather(*restart_coros)
 
+        async def _update_session() -> None:
+            async with self.db.begin_session() as db_sess:
+                query = (
+                    sa.update(SessionRow)
+                    .values(
+                        status=SessionStatus.RUNNING,
+                        status_history=sql_json_merge(
+                            SessionRow.status_history,
+                            (),
+                            {
+                                SessionStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
+                            },
+                        ),
+                    )
+                    .where(SessionRow.id == session.id)
+                )
+                await db_sess.execute(query)
+
+        await execute_with_retry(_update_session)
+
         # NOTE: If the restarted session is a batch-type one, then the startup command
         #       will be executed again after restart.
         await self.event_producer.produce_event(
-            SessionStartedEvent(session_id, session_creation_id),
+            SessionStartedEvent(session.id, session.creation_id),
         )
 
     async def execute(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        session: SessionRow,
         api_version: Tuple[int, str],
         run_id: str,
         mode: str,
@@ -2045,22 +2017,21 @@ class AgentRegistry:
         *,
         flush_timeout: float = None,
     ) -> Mapping[str, Any]:
-        sess = await self.get_session(session_name_or_id, access_key)
-        async with self.handle_kernel_exception("execute", sess.id, access_key):
+        async with self.handle_session_exception("execute", session.id):
             # The agent aggregates at most 2 seconds of outputs
             # if the kernel runs for a long time.
             major_api_version = api_version[0]
             if major_api_version == 4:  # manager-agent protocol is same.
                 major_api_version = 3
             async with RPCContext(
-                sess.main_kernel.agent,
-                sess.main_kernel.agent_addr,
+                session.main_kernel.agent,
+                session.main_kernel.agent_addr,
                 invoke_timeout=30,
-                order_key=sess.main_kernel.id,
+                order_key=session.main_kernel.id,
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
                 return await rpc.call.execute(
-                    str(sess.main_kernel.id),
+                    str(session.main_kernel.id),
                     major_api_version,
                     run_id,
                     mode,
@@ -2071,11 +2042,9 @@ class AgentRegistry:
 
     async def interrupt_session(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        session: SessionRow,
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key)
-        async with self.handle_kernel_exception("execute", session.id, access_key):
+        async with self.handle_session_exception("execute", session.id):
             async with RPCContext(
                 session.main_kernel.agent,
                 session.main_kernel.agent_addr,
@@ -2087,13 +2056,11 @@ class AgentRegistry:
 
     async def get_completions(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        session: SessionRow,
         text: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key)
-        async with self.handle_kernel_exception("execute", session.id, access_key):
+        async with self.handle_session_exception("execute", session.id):
             async with RPCContext(
                 session.main_kernel.agent,
                 session.main_kernel.agent_addr,
@@ -2105,16 +2072,11 @@ class AgentRegistry:
 
     async def start_service(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        session: SessionRow,
         service: str,
         opts: Mapping[str, Any],
     ) -> Mapping[str, Any]:
-        session = await self.get_session(
-            session_name_or_id,
-            access_key,
-        )
-        async with self.handle_kernel_exception("execute", session.id, access_key):
+        async with self.handle_session_exception("execute", session.id):
             async with RPCContext(
                 session.main_kernel.agent,
                 session.main_kernel.agent_addr,
@@ -2126,15 +2088,10 @@ class AgentRegistry:
 
     async def shutdown_service(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        session: SessionRow,
         service: str,
     ) -> None:
-        session = await self.get_session(
-            session_name_or_id,
-            access_key,
-        )
-        async with self.handle_kernel_exception("shutdown_service", session.id, access_key):
+        async with self.handle_session_exception("shutdown_service", session.id):
             async with RPCContext(
                 session.main_kernel.agent,
                 session.main_kernel.agent_addr,
@@ -2146,13 +2103,11 @@ class AgentRegistry:
 
     async def upload_file(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        session: SessionRow,
         filename: str,
         payload: bytes,
     ) -> Mapping[str, Any]:
-        session = await self.get_session(session_name_or_id, access_key)
-        async with self.handle_kernel_exception("upload_file", session.id, access_key):
+        async with self.handle_session_exception("upload_file", session.id):
             async with RPCContext(
                 session.main_kernel.agent,
                 session.main_kernel.agent_addr,
@@ -2164,15 +2119,10 @@ class AgentRegistry:
 
     async def download_file(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        session: SessionRow,
         filepath: str,
     ) -> bytes:
-        session = await self.get_session(
-            session_name_or_id,
-            access_key,
-        )
-        async with self.handle_kernel_exception("download_file", session.id, access_key):
+        async with self.handle_session_exception("download_file", session.id):
             async with RPCContext(
                 session.main_kernel.agent,
                 session.main_kernel.agent_addr,
@@ -2184,15 +2134,10 @@ class AgentRegistry:
 
     async def list_files(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        session: SessionRow,
         path: str,
     ) -> Mapping[str, Any]:
-        session = await self.get_session(
-            session_name_or_id,
-            access_key,
-        )
-        async with self.handle_kernel_exception("list_files", session.id, access_key):
+        async with self.handle_session_exception("list_files", session.id):
             async with RPCContext(
                 session.main_kernel.agent,
                 session.main_kernel.agent_addr,
@@ -2204,11 +2149,9 @@ class AgentRegistry:
 
     async def get_logs_from_agent(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        session: SessionRow,
     ) -> str:
-        session = await self.get_session(session_name_or_id, access_key, only_main_kern=True)
-        async with self.handle_kernel_exception("get_logs_from_agent", session.id, access_key):
+        async with self.handle_session_exception("get_logs_from_agent", session.id):
             async with RPCContext(
                 session.main_kernel.agent,
                 session.main_kernel.agent_addr,
@@ -2221,9 +2164,7 @@ class AgentRegistry:
 
     async def increment_session_usage(
         self,
-        session_name: str,
-        access_key: AccessKey,
-        conn: SAConnection = None,
+        session: SessionRow,
     ) -> None:
         pass
         # async with reenter_txn(self.db, conn) as conn:
@@ -2454,7 +2395,6 @@ class AgentRegistry:
     async def set_session_status(
         self,
         session_id: SessionId,
-        access_key: AccessKey,
         status: SessionStatus,
         reason: str = "",
         **extra_fields,
@@ -2483,7 +2423,6 @@ class AgentRegistry:
                     .values(**data)
                     .where(
                         (SessionRow.id == session_id)
-                        & (SessionRow.access_key == access_key)
                         & ~(SessionRow.status.in_(DEAD_SESSION_STATUSES)),
                     )
                 )
@@ -2695,7 +2634,7 @@ class AgentRegistry:
                 result = await db_sess.execute(query)
                 session = result.scalars().first().session
                 sibling_kernels = session.kernels
-                sess_status = aggregate_kernel_status([k.status for k in sibling_kernels])
+                sess_status = aggregate_kernel_status(sibling_kernels, KernelStatus.TERMINATED)
                 now = datetime.now(tzutc())
                 if sess_status != session.status:
                     values = {
@@ -2736,65 +2675,50 @@ class AgentRegistry:
     ) -> None:
         await self.clean_session(session_id)
 
-    async def _get_user_email(
-        self,
-        kernel,
-    ) -> str:
-        async with self.db.begin_readonly() as db_conn:
-            query = (
-                sa.select([users.c.email])
-                .select_from(users)
-                .where(users.c.uuid == kernel["user_uuid"])
-            )
-            result = await db_conn.execute(query)
-            user_email = str(result.scalar())
-            user_email = user_email.replace("@", "_")
-        return user_email
-
     async def get_commit_status(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        kernel_id: KernelId,
+        agent_id: AgentId,
+        agent_addr: str,
+        session_id: SessionId,
+        *,
+        sub_dir: str,
     ) -> Mapping[str, str]:
-        kernel = await self.get_session(session_name_or_id, access_key)
-        email = await self._get_user_email(kernel)
-        async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
+        async with self.handle_session_exception("commit_session", session_id):
             async with RPCContext(
-                kernel["agent"],
-                kernel["agent_addr"],
+                agent_id,
+                agent_addr,
                 invoke_timeout=None,
-                order_key=kernel["id"],
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                return await rpc.call.get_commit_status(str(kernel["id"]), email)
+                return await rpc.call.get_commit_status(str(kernel_id), sub_dir)
 
     async def commit_session(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        session: SessionRow,
+        *,
+        sub_dir: str,
         filename: str | None,
     ) -> Mapping[str, Any]:
         """
         Commit a main kernel's container of the given session.
         """
-
-        kernel = await self.get_session(session_name_or_id, access_key)
-        email = await self._get_user_email(kernel)
+        kernel: KernelRow = session.main_kernel
         now = datetime.now(tzutc()).strftime("%Y-%m-%dT%HH%MM%SS")
-        shortend_sname = kernel["session_name"][:SESSION_NAME_LEN_LIMIT]
-        registry, _, filtered = kernel["image"].partition("/")
+        shortend_sname = session.name[:SESSION_NAME_LEN_LIMIT]
+        registry, _, filtered = kernel.image.partition("/")
         img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
-        async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
+        async with self.handle_session_exception("commit_session", session.id):
             async with RPCContext(
-                kernel["agent"],
-                kernel["agent_addr"],
+                kernel.agent,
+                kernel.agent_addr,
                 invoke_timeout=None,
-                order_key=kernel["id"],
+                order_key=kernel.id,
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), email, filename)
+                resp: Mapping[str, Any] = await rpc.call.commit(str(kernel.id), sub_dir, filename)
         return resp
 
     async def get_agent_local_config(
@@ -2811,16 +2735,16 @@ class AgentRegistry:
 
     async def get_abusing_report(
         self,
-        session_name_or_id: Union[str, SessionId],
-        access_key: AccessKey,
+        kernel_id: KernelId,
+        agent_id: AgentId,
+        agent_addr: str,
     ) -> Optional[Mapping[str, str]]:
-        kernel = await self.get_session(session_name_or_id, access_key)
         async with RPCContext(
-            kernel["agent"],
-            kernel["agent_addr"],
+            agent_id,
+            agent_addr,
             invoke_timeout=None,
         ) as rpc:
-            return await rpc.call.get_abusing_report(str(kernel["id"]))
+            return await rpc.call.get_abusing_report(str(kernel_id))
 
 
 async def check_scaling_group(

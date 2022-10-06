@@ -2,22 +2,8 @@ from __future__ import annotations
 
 import enum
 import uuid
-from collections import OrderedDict
 from datetime import datetime
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Type,
-    TypedDict,
-    TypeVar,
-    Union,
-)
-from uuid import UUID
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence, Type, TypedDict, TypeVar
 
 import graphene
 import sqlalchemy as sa
@@ -27,7 +13,6 @@ from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
 
@@ -71,6 +56,7 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
 __all__ = (
+    "get_user_email",
     "kernels",
     "KernelRow",
     "KernelStatistics",
@@ -145,6 +131,17 @@ DEAD_KERNEL_STATUSES = (
 )
 
 LIVE_STATUS = (KernelStatus.RUNNING,)
+
+
+async def get_user_email(
+    db_session: SASession,
+    kernel: KernelRow,
+) -> str:
+    query = sa.select([users.c.email]).select_from(users).where(users.c.uuid == kernel["user_uuid"])
+    result = await db_session.execute(query)
+    user_email = str(result.scalar())
+    user_email = user_email.replace("@", "_")
+    return user_email
 
 
 def default_hostname(context) -> str:
@@ -340,206 +337,6 @@ class SessionInfo(TypedDict):
     created_at: datetime
 
 
-async def match_session_ids(
-    session_name_or_id: Union[str, UUID],
-    access_key: AccessKey,
-    *,
-    db_connection: SAConnection,
-    extra_cond=None,
-    for_update: bool = False,
-    max_matches: int = 10,
-) -> Sequence[SessionInfo]:
-    """
-    Match the prefix of session ID or session name among the sessions that belongs to the given
-    access key, and return the list of session IDs with matching prefixes.
-    """
-    cond_id = (sa.sql.expression.cast(kernels.c.id, sa.String).like(f"{session_name_or_id}%")) & (
-        kernels.c.access_key == access_key
-    )
-    if extra_cond is not None:
-        cond_id = cond_id & extra_cond
-    cond_equal_name = (kernels.c.session_name == (f"{session_name_or_id}")) & (
-        kernels.c.access_key == access_key
-    )
-    cond_prefix_name = (kernels.c.session_name.like(f"{session_name_or_id}%")) & (
-        kernels.c.access_key == access_key
-    )
-    if extra_cond is not None:
-        cond_equal_name = cond_equal_name & extra_cond
-        cond_prefix_name = cond_prefix_name & extra_cond
-    cond_session_id = (
-        sa.sql.expression.cast(kernels.c.session_id, sa.String).like(f"{session_name_or_id}%")
-    ) & (kernels.c.access_key == access_key)
-    if extra_cond is not None:
-        cond_session_id = cond_session_id & extra_cond
-    info_cols = [
-        kernels.c.session_id,
-        kernels.c.session_name,
-        kernels.c.status,
-        kernels.c.created_at,
-    ]
-    match_sid_by_id = (
-        sa.select(info_cols)
-        .select_from(kernels)
-        .where(
-            (
-                kernels.c.session_id.in_(
-                    sa.select(
-                        [kernels.c.session_id],
-                    )
-                    .select_from(kernels)
-                    .where(cond_id)
-                    .group_by(kernels.c.session_id)
-                    .limit(max_matches)
-                    .offset(0),
-                )
-            )
-            & (kernels.c.cluster_role == DEFAULT_ROLE),
-        )
-        .order_by(sa.desc(kernels.c.created_at))
-    )
-    if for_update:
-        match_sid_by_id = match_sid_by_id.with_for_update()
-    match_sid_by_equal_name = (
-        sa.select(info_cols)
-        .select_from(kernels)
-        .where(
-            (
-                kernels.c.session_id.in_(
-                    sa.select(
-                        [kernels.c.session_id],
-                    )
-                    .select_from(kernels)
-                    .where(cond_equal_name)
-                    .group_by(kernels.c.session_id)
-                    .limit(max_matches)
-                    .offset(0),
-                )
-            )
-            & (kernels.c.cluster_role == DEFAULT_ROLE),
-        )
-        .order_by(sa.desc(kernels.c.created_at))
-    )
-    match_sid_by_prefix_name = (
-        sa.select(info_cols)
-        .select_from(kernels)
-        .where(
-            (
-                kernels.c.session_id.in_(
-                    sa.select(
-                        [kernels.c.session_id],
-                    )
-                    .select_from(kernels)
-                    .where(cond_prefix_name)
-                    .group_by(kernels.c.session_id)
-                    .limit(max_matches)
-                    .offset(0),
-                )
-            )
-            & (kernels.c.cluster_role == DEFAULT_ROLE),
-        )
-        .order_by(sa.desc(kernels.c.created_at))
-    )
-    if for_update:
-        match_sid_by_equal_name = match_sid_by_equal_name.with_for_update()
-        match_sid_by_prefix_name = match_sid_by_prefix_name.with_for_update()
-    match_sid_by_session_id = (
-        sa.select(info_cols)
-        .select_from(kernels)
-        .where(
-            (
-                kernels.c.session_id.in_(
-                    sa.select(
-                        [kernels.c.session_id],
-                    )
-                    .select_from(kernels)
-                    .where(cond_session_id)
-                    .group_by(kernels.c.session_id)
-                    .limit(max_matches)
-                    .offset(0),
-                )
-            )
-            & (kernels.c.cluster_role == DEFAULT_ROLE),
-        )
-        .order_by(sa.desc(kernels.c.created_at))
-    )
-    if for_update:
-        match_sid_by_session_id = match_sid_by_session_id.with_for_update()
-    for match_query in [
-        match_sid_by_session_id,
-        match_sid_by_equal_name,
-        match_sid_by_prefix_name,
-        match_sid_by_id,
-    ]:
-        result = await db_connection.execute(match_query)
-        rows = result.fetchall()
-        if not rows:
-            continue
-        return [
-            SessionInfo(
-                session_id=row["session_id"],
-                session_name=row["session_name"],
-                status=row["status"],
-                created_at=row["created_at"],
-            )
-            for row in rows
-        ]
-    return []
-
-
-async def get_main_kernels(
-    session_ids: Sequence[SessionId],
-    *,
-    db_connection: SAConnection,
-    for_update: bool = False,
-) -> Sequence[Row]:
-    """
-    Return a list of the main kernels for the given session IDs.
-    If a given session ID does not exist, its position will be ``None``.
-    """
-    session_id_to_rows = OrderedDict((session_id, None) for session_id in session_ids)
-    query = (
-        sa.select([kernels])
-        .select_from(kernels)
-        .where(
-            (kernels.c.session_id.in_(session_ids)) & (kernels.c.cluster_role == DEFAULT_ROLE),
-        )
-    )
-    result = await db_connection.execute(query)
-    for row in result.fetchall():
-        session_id_to_rows[row["session_id"]] = row
-    return [*session_id_to_rows.values()]
-
-
-async def get_all_kernels(
-    session_ids: Sequence[SessionId],
-    *,
-    db_connection: SAConnection,
-    for_update: bool = False,
-) -> Sequence[Sequence[Row]]:
-    """
-    Return a list of all belonging kernel lists per the given session IDs
-    in the order they are given.
-    If a given session ID does not exist, an empty list will be returned
-    at the position of that session ID.
-    """
-    session_id_to_rowsets: Dict[SessionId, List[Row]]
-    session_id_to_rowsets = OrderedDict((session_id, []) for session_id in session_ids)
-    for session_id in session_ids:
-        query = (
-            sa.select([sa.text("*")])
-            .select_from(kernels)
-            .where(
-                (kernels.c.session_id == session_id),
-            )
-        )
-        result = await db_connection.execute(query)
-        if result.rowcount == 0:
-            continue
-        session_id_to_rowsets[session_id].extend(row for row in result.fetchall())
-    return [*session_id_to_rowsets.values()]
-
-
 class KernelStatistics:
     @classmethod
     async def batch_load_by_kernel(
@@ -593,6 +390,7 @@ class ComputeContainer(graphene.ObjectType):
 
     # resources
     agent = graphene.String()
+    agent_addr = graphene.String()
     container_id = graphene.String()
     resource_opts = graphene.JSONString()
     occupied_slots = graphene.JSONString()
@@ -634,6 +432,7 @@ class ComputeContainer(graphene.ObjectType):
             "occupied_slots": row["occupied_slots"].to_json(),
             # resources
             "agent": row["agent"] if not hide_agents else None,
+            "agent_addr": row["agent_addr"] if not hide_agents else None,
             "container_id": row["container_id"] if not hide_agents else None,
             "resource_opts": row["resource_opts"],
             # statistics
@@ -666,12 +465,13 @@ class ComputeContainer(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         if access_key is None:
             return None
-        return await graph_ctx.registry.get_abusing_report(self.id, access_key)
+        return await graph_ctx.registry.get_abusing_report(self.id, self.agent, self.agent_addr)
 
     _queryfilter_fieldspec = {
         "image": ("image", None),
         "architecture": ("architecture", None),
         "agent": ("agent", None),
+        "agent_addr": ("agent_addr", None),
         "cluster_idx": ("cluster_idx", None),
         "cluster_role": ("cluster_role", None),
         "cluster_hostname": ("cluster_hostname", None),
@@ -686,6 +486,7 @@ class ComputeContainer(graphene.ObjectType):
         "image": "image",
         "architecture": "architecture",
         "agent": "agent",
+        "agent_addr": "agent_addr",
         "cluster_idx": "cluster_idx",
         "cluster_role": "cluster_role",
         "cluster_hostname": "cluster_hostname",

@@ -46,8 +46,6 @@ from ..models import (
     ScalingGroupRow,
     SessionRow,
     SessionStatus,
-    get_session_by_id,
-    get_sgroup_managed_sessions,
     kernels,
     list_schedulable_agents_by_sgroup,
     recalc_agent_resource_occupancy,
@@ -478,7 +476,7 @@ class SchedulerDispatcher(aobject):
                 await execute_with_retry(_update)
 
             async with self.db.begin_readonly_session() as db_sess:
-                schedulable_sess = await get_session_by_id(
+                schedulable_sess = await SessionRow.get_session_by_id(
                     db_sess,
                     sess_ctx.id,
                     eager_loading_op=(
@@ -1129,7 +1127,7 @@ async def _list_managed_sessions(
     second is pending sessions and third is to-be-cancelled sessions due to pending timeout.
     """
 
-    managed_sessions = await get_sgroup_managed_sessions(db_sess, sgroup_name)
+    managed_sessions = await SessionRow.get_sgroup_managed_sessions(db_sess, sgroup_name)
 
     candidates: List[SessionRow] = []
     cancelleds: List[SessionRow] = []

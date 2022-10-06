@@ -25,7 +25,12 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 
-from ..api.exceptions import MainKernelNotFound, SessionNotFound, TooManyKernelsFound
+from ..api.exceptions import (
+    MainKernelNotFound,
+    SessionNotFound,
+    TooManyKernelsFound,
+    TooManySessionsMatched,
+)
 from ..defs import DEFAULT_ROLE
 from .base import (
     GUID,
@@ -43,7 +48,7 @@ from .base import (
     batch_result_in_session,
 )
 from .group import GroupRow
-from .kernel import ComputeContainer, KernelRow, KernelStatus
+from .kernel import ComputeContainer, KernelRow, KernelStatus, get_user_email
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import UserRow
@@ -61,12 +66,6 @@ __all__ = (
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "USER_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "SessionRow",
-    "match_sessions",
-    "match_sessions_by_id",
-    "get_session_by_id",
-    "get_sgroup_managed_sessions",
-    "get_session",
-    "get_session_with_kernels",
     "SessionDependencyRow",
     "check_all_dependencies",
     "ComputeSession",
@@ -82,6 +81,8 @@ class SessionStatus(enum.Enum):
     PREPARING = 10
     # ---
     RUNNING = 30
+    RESTARTING = 31
+    RUNNING_DEGRADED = 32
     # ---
     TERMINATING = 40
     TERMINATED = 41
@@ -136,41 +137,113 @@ KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
 }
 
 
-def aggregate_kernel_status(kernel_statuses: Sequence[KernelStatus]) -> SessionStatus:
-    """
-    Determine a SessionStatus by statuses of sibling kernel.
-    If any of kernels is pre-running status, the session is assumed pre-running.
-    If any of kernels is running, the session is assumed running.
-    If all of kernels are finished, one of ERROR, CANCELLED, TERMINATING, TERMINATED should be session status.
-    We can set the value of Status enum for representing status,
-    such as status with minimal value can represent the status of session.
-    """
-    candidates = set()
-    priority_finished_status = SessionStatus.TERMINATED
-    is_finished = True
-    for s in kernel_statuses:
-        match s:
-            case KernelStatus.ERROR:
-                priority_finished_status = SessionStatus.ERROR
-            case KernelStatus.TERMINATING:
-                if priority_finished_status != SessionStatus.ERROR:
-                    priority_finished_status = SessionStatus.TERMINATING
-            case KernelStatus.CANCELLED:
-                if priority_finished_status not in (SessionStatus.ERROR, SessionStatus.TERMINATING):
-                    priority_finished_status = SessionStatus.CANCELLED
-            case KernelStatus.TERMINATED:
-                if priority_finished_status not in (
-                    SessionStatus.ERROR,
-                    SessionStatus.CANCELLED,
-                    SessionStatus.TERMINATING,
-                ):
-                    priority_finished_status = SessionStatus.TERMINATED
-            case _:
-                candidates.add(s)
-                is_finished = False
-    if is_finished:
-        return priority_finished_status
-    return KERNEL_SESSION_STATUS_MAPPING[min(candidates, key=lambda s: s.value)]
+def aggregate_kernel_status(
+    kernels: Sequence[KernelRow], target_status: KernelStatus
+) -> SessionStatus:
+    candidate: SessionStatus = KERNEL_SESSION_STATUS_MAPPING[target_status]
+    priority_statuses = [status for status in KernelStatus if status.value < target_status.value]
+    for s in kernels:
+        if s.status == KernelStatus.ERROR:
+            if s.cluster_role == DEFAULT_ROLE:
+                return SessionStatus.ERROR
+            return SessionStatus.RUNNING_DEGRADED
+        elif s.status in priority_statuses:
+            candidate = KERNEL_SESSION_STATUS_MAPPING[s]
+        elif s.status == target_status:
+            continue
+        else:
+            # TODO: handle unexpected kernel status
+            pass
+    return candidate
+
+
+def _build_session_fetch_query(
+    base_cond,
+    access_key: AccessKey | None = None,
+    *,
+    max_matches: int | None,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    do_ordering: bool = False,
+    eager_loading_op: Iterable | None = None,
+):
+    cond = base_cond
+    if access_key is not None:
+        cond = cond & (SessionRow.access_key == access_key)
+    if not allow_stale:
+        cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
+    query = (
+        sa.select(SessionRow)
+        .where(cond)
+        .order_by(sa.desc(SessionRow.created_at))
+        .execution_options(populate_existing=True)
+    )
+    if max_matches:
+        query = query.limit(max_matches).offset(0)
+    if for_update:
+        query = query.with_for_update()
+    if do_ordering:
+        query = query.order_by(SessionRow.created_at)
+
+    if eager_loading_op is not None:
+        query = query.options(*eager_loading_op)
+
+    return query
+
+
+async def _match_sessions_by_id(
+    db_session: SASession,
+    session_id: SessionId,
+    access_key: AccessKey | None = None,
+    *,
+    max_matches: int | None = None,
+    allow_prefix: bool = False,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    eager_loading_op=None,
+) -> List[SessionRow]:
+    if allow_prefix:
+        cond = sa.sql.expression.cast(SessionRow.id, sa.String).like(f"{session_id}%")
+    else:
+        cond = SessionRow.id == session_id
+    query = _build_session_fetch_query(
+        cond,
+        access_key,
+        max_matches=max_matches,
+        allow_stale=allow_stale,
+        for_update=for_update,
+        eager_loading_op=eager_loading_op,
+    )
+
+    result = await db_session.execute(query)
+    return result.scalars().all()
+
+
+async def _match_sessions_by_name(
+    db_session: SASession,
+    session_name: str,
+    access_key: AccessKey,
+    *,
+    max_matches: int | None,
+    allow_prefix: bool = False,
+    allow_stale: bool = True,
+    for_update: bool = False,
+    eager_loading_op=None,
+) -> List[SessionRow]:
+    if allow_prefix:
+        cond = sa.sql.expression.cast(SessionRow.name, sa.String).like(f"{session_name}%")
+    else:
+        cond = SessionRow.name == session_name
+    query = _build_session_fetch_query(
+        cond,
+        access_key,
+        max_matches=max_matches,
+        allow_stale=allow_stale,
+        for_update=for_update,
+        eager_loading_op=eager_loading_op,
+    )
+    result = await db_session.execute(query)
+    return result.scalars().all()
 
 
 class SessionOp(str, enum.Enum):
@@ -346,255 +419,203 @@ class SessionRow(Base):
             )
         return kerns[0]
 
+    @classmethod
+    async def match_sessions(
+        cls,
+        db_session: SASession,
+        session_name_or_id: Union[str, UUID],
+        access_key: AccessKey | None,
+        *,
+        allow_prefix: bool = False,
+        allow_stale: bool = True,
+        for_update: bool = False,
+        max_matches: int = 10,
+        eager_loading_op=None,
+    ) -> List[SessionRow]:
+        """
+        Match the prefix of session ID or session name among the sessions
+        that belongs to the given access key, and return the list of SessionRow.
+        """
 
-async def match_sessions(
-    db_session: SASession,
-    session_name_or_id: Union[str, UUID],
-    access_key: AccessKey | None,
-    *,
-    allow_prefix: bool = False,
-    allow_stale: bool = True,
-    for_update: bool = False,
-    max_matches: int = 10,
-    eager_loading_op=None,
-) -> List[SessionRow]:
-    """
-    Match the prefix of session ID or session name among the sessions
-    that belongs to the given access key, and return the list of SessionRow.
-    """
+        query_list = [aiotools.apartial(_match_sessions_by_name, allow_prefix=allow_prefix)]
+        try:
+            UUID(str(session_name_or_id))
+        except ValueError:
+            pass
+        else:
+            # Fetch id-based query first
+            query_list = [aiotools.apartial(_match_sessions_by_id, allow_prefix=False), *query_list]
+            if allow_prefix:
+                query_list = [
+                    aiotools.apartial(_match_sessions_by_id, allow_prefix=True),
+                    *query_list,
+                ]
 
-    query_list = [aiotools.apartial(get_sessions_by_name, allow_prefix=allow_prefix)]
-    try:
-        UUID(str(session_name_or_id))
-    except ValueError:
-        pass
-    else:
-        # Fetch id-based query first
-        query_list = [aiotools.apartial(match_sessions_by_id, allow_prefix=False), *query_list]
-        if allow_prefix:
-            query_list.append(aiotools.apartial(match_sessions_by_id, allow_prefix=True))
+        for fetch_func in query_list:
+            rows = await fetch_func(
+                db_session,
+                session_name_or_id,
+                access_key,
+                allow_stale=allow_stale,
+                for_update=for_update,
+                max_matches=max_matches,
+                eager_loading_op=eager_loading_op,
+            )
+            if not rows:
+                continue
+            return rows
+        return []
 
-    for fetch_func in query_list:
-        rows = await fetch_func(
+    @classmethod
+    async def get_session(
+        cls,
+        session_name_or_id: Union[str, UUID],
+        access_key: AccessKey | None = None,
+        *,
+        allow_stale: bool = False,
+        for_update: bool = False,
+        db_session: SASession,
+    ) -> SessionRow:
+        """
+        Retrieve the session information by session's UUID,
+        or session's name paired with access_key.
+        This will return the information of the session and the sibling kernel(s).
+
+        :param session_name_or_id: session's id or session's name.
+        :param access_key: Access key used to create session.
+        :param allow_stale: If True, filter "inactive" sessions as well as "active" ones.
+                            If False, filter "active" sessions only.
+        :param for_update: Apply for_update during select query.
+        :param db_session: Database connection for reuse.
+        """
+        session_list = await cls.match_sessions(
             db_session,
             session_name_or_id,
             access_key,
             allow_stale=allow_stale,
             for_update=for_update,
-            max_matches=max_matches,
-            eager_loading_op=eager_loading_op,
         )
-        if not rows:
-            continue
-        return rows
-    return []
-
-
-def _build_session_fetch_query(
-    base_cond,
-    access_key: AccessKey | None = None,
-    *,
-    max_matches: int | None,
-    allow_stale: bool = True,
-    for_update: bool = False,
-    do_ordering: bool = False,
-    eager_loading_op: Iterable | None = None,
-):
-    cond = base_cond
-    if access_key:
-        cond = cond & (SessionRow.access_key == access_key)
-    if not allow_stale:
-        cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
-    query = (
-        sa.select(SessionRow)
-        .where(cond)
-        .order_by(sa.desc(SessionRow.created_at))
-        .execution_options(populate_existing=True)
-    )
-    if max_matches:
-        query = query.limit(max_matches).offset(0)
-    if for_update:
-        query = query.with_for_update()
-    if do_ordering:
-        query = query.order_by(SessionRow.created_at)
-
-    if eager_loading_op is not None:
-        query = query.options(*eager_loading_op)
-
-    return query
-
-
-async def match_sessions_by_id(
-    db_session: SASession,
-    session_id: SessionId,
-    access_key: AccessKey | None = None,
-    *,
-    max_matches: int | None = None,
-    allow_prefix: bool = False,
-    allow_stale: bool = True,
-    for_update: bool = False,
-    eager_loading_op=None,
-) -> List[SessionRow]:
-    if allow_prefix:
-        cond = sa.sql.expression.cast(SessionRow.id, sa.String).like(f"{session_id}%")
-    else:
-        cond = SessionRow.id == session_id
-    query = _build_session_fetch_query(
-        cond,
-        access_key,
-        max_matches=max_matches,
-        allow_stale=allow_stale,
-        for_update=for_update,
-        eager_loading_op=eager_loading_op,
-    )
-
-    result = await db_session.execute(query)
-    return result.scalars().all()
-
-
-async def get_session_by_id(
-    db_session: SASession,
-    session_id: SessionId,
-    access_key: AccessKey | None = None,
-    *,
-    max_matches: int | None = None,
-    allow_stale: bool = True,
-    for_update: bool = False,
-    eager_loading_op=None,
-) -> SessionRow:
-    sessions = await match_sessions_by_id(
-        db_session,
-        session_id,
-        access_key,
-        max_matches=max_matches,
-        allow_stale=allow_stale,
-        for_update=for_update,
-        eager_loading_op=eager_loading_op,
-        allow_prefix=False,
-    )
-    try:
-        return sessions[0]
-    except IndexError:
-        raise SessionNotFound(f"Session (id={session_id}) does not exist.")
-
-
-async def get_sessions_by_name(
-    db_session: SASession,
-    session_name: str,
-    access_key: AccessKey,
-    *,
-    max_matches: int | None,
-    allow_prefix: bool = False,
-    allow_stale: bool = True,
-    for_update: bool = False,
-    eager_loading_op=None,
-) -> List[SessionRow]:
-    if allow_prefix:
-        cond = sa.sql.expression.cast(SessionRow.name, sa.String).like(f"{session_name}%")
-    else:
-        cond = SessionRow.name == session_name
-    query = _build_session_fetch_query(
-        cond,
-        access_key,
-        max_matches=max_matches,
-        allow_stale=allow_stale,
-        for_update=for_update,
-        eager_loading_op=eager_loading_op,
-    )
-    result = await db_session.execute(query)
-    return result.scalars().all()
-
-
-async def get_session(
-    session_name_or_id: Union[str, UUID],
-    access_key: Union[str, AccessKey],
-    *,
-    allow_stale: bool = False,
-    for_update: bool = False,
-    db_session: SASession = None,
-) -> SessionRow:
-    """
-    Retrieve the session information by session's UUID,
-    or session's name paired with access_key.
-    This will return the information of the session and the sibling kernel(s).
-
-    :param session_name_or_id: session's id or session's name.
-    :param access_key: Access key used to create session.
-    :param allow_stale: If True, filter "inactive" sessions as well as "active" ones.
-                        If False, filter "active" sessions only.
-    :param for_update: Apply for_update during select query.
-    :param db_session: Database connection for reuse.
-    """
-    session_list = await match_sessions(
-        db_session,
-        session_name_or_id,
-        AccessKey(access_key),
-        allow_stale=allow_stale,
-        for_update=for_update,
-    )
-    try:
+        if not session_list:
+            raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
+        if len(session_list) > 1:
+            session_infos = [
+                {
+                    "session_id": sess.id,
+                    "session_name": sess.name,
+                    "status": sess.status,
+                    "created_at": sess.created_at,
+                }
+                for sess in session_list
+            ]
+            raise TooManySessionsMatched(extra_data={"matches": session_infos})
         return session_list[0]
-    except IndexError:
-        raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
 
-
-async def get_session_with_kernels(
-    session_name_or_id: str | UUID,
-    access_key: AccessKey | None,
-    *,
-    allow_stale: bool = False,
-    for_update: bool = False,
-    only_main_kern: bool = False,
-    db_session: SASession = None,
-) -> SessionRow:
-    kernel_rel = SessionRow.kernels
-    if only_main_kern:
-        kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
-    kernel_loading_op = (
-        noload("*"),
-        selectinload(kernel_rel).options(
+    @classmethod
+    async def get_session_with_kernels(
+        cls,
+        session_name_or_id: str | UUID,
+        access_key: AccessKey | None = None,
+        *,
+        allow_stale: bool = False,
+        for_update: bool = False,
+        only_main_kern: bool = False,
+        db_session: SASession,
+    ) -> SessionRow:
+        kernel_rel = SessionRow.kernels
+        if only_main_kern:
+            kernel_rel.and_(KernelRow.cluster_role == DEFAULT_ROLE)
+        kernel_loading_op = (
             noload("*"),
-            selectinload(KernelRow.image_row).noload("*"),
-            selectinload(KernelRow.agent_row).noload("*"),
-        ),
-    )
-    session_list = await match_sessions(
-        db_session,
-        session_name_or_id,
-        access_key,
-        allow_stale=allow_stale,
-        for_update=for_update,
-        eager_loading_op=kernel_loading_op,
-    )
-    try:
-        return session_list[0]
-    except IndexError:
-        raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
-
-
-async def get_sgroup_managed_sessions(
-    db_sess: SASession,
-    sgroup_name: str,
-) -> List[SessionRow]:
-    candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
-    query = (
-        sa.select(SessionRow)
-        .where(
-            (SessionRow.scaling_group_name == sgroup_name)
-            & (SessionRow.status.in_(candidate_statues))
-        )
-        .options(
-            noload("*"),
-            selectinload(SessionRow.group).options(noload("*")),
-            selectinload(SessionRow.domain).options(noload("*")),
-            selectinload(SessionRow.access_key_row).options(noload("*")),
-            selectinload(SessionRow.kernels).options(
-                noload("*"), selectinload(KernelRow.image_row).options(noload("*"))
+            selectinload(kernel_rel).options(
+                noload("*"),
+                selectinload(KernelRow.image_row).noload("*"),
+                selectinload(KernelRow.agent_row).noload("*"),
             ),
         )
-    )
-    result = await db_sess.execute(query)
-    return result.scalars().all()
+        session_list = await cls.match_sessions(
+            db_session,
+            session_name_or_id,
+            access_key,
+            allow_stale=allow_stale,
+            for_update=for_update,
+            eager_loading_op=kernel_loading_op,
+        )
+        try:
+            return session_list[0]
+        except IndexError:
+            raise SessionNotFound(f"Session (id={session_name_or_id}) does not exist.")
+
+    @classmethod
+    async def get_session_with_main_kernel(
+        cls,
+        session_name_or_id: str | UUID,
+        access_key: AccessKey | None = None,
+        *,
+        allow_stale: bool = False,
+        for_update: bool = False,
+        db_session: SASession,
+    ) -> SessionRow:
+        return await cls.get_session_with_kernels(
+            session_name_or_id,
+            access_key,
+            allow_stale=allow_stale,
+            for_update=for_update,
+            only_main_kern=True,
+            db_session=db_session,
+        )
+
+    @classmethod
+    async def get_session_by_id(
+        cls,
+        db_session: SASession,
+        session_id: SessionId,
+        access_key: AccessKey | None = None,
+        *,
+        max_matches: int | None = None,
+        allow_stale: bool = True,
+        for_update: bool = False,
+        eager_loading_op=None,
+    ) -> SessionRow:
+        sessions = await _match_sessions_by_id(
+            db_session,
+            session_id,
+            access_key,
+            max_matches=max_matches,
+            allow_stale=allow_stale,
+            for_update=for_update,
+            eager_loading_op=eager_loading_op,
+            allow_prefix=False,
+        )
+        try:
+            return sessions[0]
+        except IndexError:
+            raise SessionNotFound(f"Session (id={session_id}) does not exist.")
+
+    @classmethod
+    async def get_sgroup_managed_sessions(
+        cls,
+        db_sess: SASession,
+        sgroup_name: str,
+    ) -> List[SessionRow]:
+        candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
+        query = (
+            sa.select(SessionRow)
+            .where(
+                (SessionRow.scaling_group_name == sgroup_name)
+                & (SessionRow.status.in_(candidate_statues))
+            )
+            .options(
+                noload("*"),
+                selectinload(SessionRow.group).options(noload("*")),
+                selectinload(SessionRow.domain).options(noload("*")),
+                selectinload(SessionRow.access_key_row).options(noload("*")),
+                selectinload(SessionRow.kernels).options(
+                    noload("*"), selectinload(KernelRow.image_row).options(noload("*"))
+                ),
+            )
+        )
+        result = await db_sess.execute(query)
+        return result.scalars().all()
 
 
 class SessionDependencyRow(Base):
@@ -804,7 +825,16 @@ class ComputeSession(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         if self.status != "RUNNING":
             return None
-        commit_status = await graph_ctx.registry.get_commit_status(self.id, self.access_key)
+        async with graph_ctx.db.begin_readonly_session() as db_sess:
+            query = sa.select(KernelRow).where(
+                (KernelRow.session_id == self.id) & (KernelRow.cluster_role == DEFAULT_ROLE)
+            )
+            kernel = (await db_sess.execute(query)).scalars().first()
+            email = await get_user_email(db_sess, kernel)
+
+        commit_status = await graph_ctx.registry.get_commit_status(
+            kernel.id, kernel.agent, kernel.agent_addr, self.id, sub_dir=email
+        )
         return commit_status["status"]
 
     async def resolve_abusing_reports(
