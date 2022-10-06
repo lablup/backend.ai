@@ -247,14 +247,20 @@ class DockerKernel(AbstractKernel):
                     if fsize > 1048576:
                         raise ValueError("too large file")
                     tarobj.fileobj.seek(0)
-                    tar = tarfile.open(fileobj=tarobj.fileobj)
-                    tarobj = tar.extractfile(tar.getnames()[0])
-                    if tarobj:
-                        tarbytes = tarobj.read()
-                    else:
-                        log.warning("Could not found the file: {0}", abspath)
-                        raise FileNotFoundError(f"Could not found the file: {abspath}")
-                    tar.close()
+
+                    def extract_tarfile(tarobj, abspath) -> bytes:
+                        tar = tarfile.open(fileobj=tarobj.fileobj)
+                        extarobj = tar.extractfile(tar.getnames()[0])
+                        if extarobj:
+                            tarbytes = extarobj.read()
+                        else:
+                            log.warning("Could not found the file: {0}", abspath)
+                            raise FileNotFoundError(f"Could not found the file: {abspath}")
+                        tar.close()
+                        return tarbytes
+
+                    loop = current_loop()
+                    tarbytes = await loop.run_in_executor(None, extract_tarfile, tarobj, abspath)
             except DockerError:
                 log.warning("Could not found the file: {0}", abspath)
                 raise FileNotFoundError(f"Could not found the file: {abspath}")
