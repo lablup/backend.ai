@@ -721,7 +721,7 @@ class ComputeSession(graphene.ObjectType):
     scaling_group = graphene.String()
     service_ports = graphene.JSONString()
     mounts = graphene.List(lambda: graphene.String)
-    occupied_slots = graphene.JSONString()
+    occupying_slots = graphene.JSONString()
 
     # statistics
     num_queries = BigInt()
@@ -788,9 +788,9 @@ class ComputeSession(graphene.ObjectType):
         props = cls.parse_row(ctx, row)
         return cls(**props)
 
-    async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
+    async def resolve_occupying_slots(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         """
-        Calculate the sum of occupied resource slots of all sub-kernels,
+        Calculate the sum of occupying resource slots of all sub-kernels,
         and return the JSON-serializable object from the sum result.
         """
         graph_ctx: GraphQueryContext = info.context
