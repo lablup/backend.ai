@@ -437,25 +437,42 @@ class SessionRow(Base):
         that belongs to the given access key, and return the list of SessionRow.
         """
 
-        query_list = [aiotools.apartial(_match_sessions_by_name, allow_prefix=allow_prefix)]
+        query_list = [
+            aiotools.apartial(
+                _match_sessions_by_name,
+                session_name=str(session_name_or_id),
+                allow_prefix=allow_prefix,
+            )
+        ]
         try:
             UUID(str(session_name_or_id))
         except ValueError:
             pass
         else:
             # Fetch id-based query first
-            query_list = [aiotools.apartial(_match_sessions_by_id, allow_prefix=False), *query_list]
+            assert isinstance(session_name_or_id, UUID)
+            query_list = [
+                aiotools.apartial(
+                    _match_sessions_by_id,
+                    session_id=SessionId(session_name_or_id),
+                    allow_prefix=False,
+                ),
+                *query_list,
+            ]
             if allow_prefix:
                 query_list = [
-                    aiotools.apartial(_match_sessions_by_id, allow_prefix=True),
+                    aiotools.apartial(
+                        _match_sessions_by_id,
+                        session_id=SessionId(session_name_or_id),
+                        allow_prefix=True,
+                    ),
                     *query_list,
                 ]
 
         for fetch_func in query_list:
             rows = await fetch_func(
                 db_session,
-                session_name_or_id,
-                access_key,
+                access_key=access_key,
                 allow_stale=allow_stale,
                 for_update=for_update,
                 max_matches=max_matches,
