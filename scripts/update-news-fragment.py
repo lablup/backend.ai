@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import json
 import argparse
 import tomli as tomllib
 from pathlib import Path
@@ -14,6 +15,14 @@ def get_config():
         config_toml = tomllib.load(conf)
     config = config_toml["tool"]["towncrier"]
     return config
+
+
+def get_repository_labels():
+    directory = os.path.abspath("./github/workflows")
+    config_path = Path(os.path.join(directory, "label-matcher.json"))
+    with open(config_path, encoding='utf-8') as json_f:
+        labels = [x["name"] for x in json.loads(json_f.read())]
+    return labels
 
 
 def main():
@@ -37,6 +46,11 @@ def main():
         sys.exit(1)
     if not args.fragment:
         print("::error ::No fragment types given from args.")
+        sys.exit(1)
+
+    repository_labels = get_repository_labels()
+    if args.fragment not in repository_labels:
+        print(f'Invalid {args.fragment} tag.\nUnable to create/update the news fragment.\n', file=sys.stderr)
         sys.exit(1)
 
     config = get_config()
