@@ -14,6 +14,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import registry
 from sqlalchemy.orm.session import Session
 
+from ai.backend.manager.models import KernelStatus, SessionStatus
 from ai.backend.manager.models.base import GUID, KernelIDColumn, convention
 
 # revision identifiers, used by Alembic.
@@ -23,32 +24,9 @@ branch_labels = None
 depends_on = None
 
 
-KernelStatus = (
-    "PENDING",
-    "SCHEDULED",
-    "PREPARING",
-    "BUILDING",
-    "PULLING",
-    "RUNNING",
-    "RESTARTING",
-    "RESIZING",
-    "SUSPENDED",
-    "TERMINATING",
-    "TERMINATED",
-    "ERROR",
-    "CANCELLED",
-)
+kernel_status = tuple(s.name for s in KernelStatus)
 
-SessionStatus = (
-    "PENDING",
-    "SCHEDULED",
-    "PREPARING",
-    "RUNNING",
-    "TERMINATING",
-    "TERMINATED",
-    "ERROR",
-    "CANCELLED",
-)
+session_status = tuple(s.name for s in SessionStatus)
 
 metadata = sa.MetaData(naming_convention=convention)
 mapper_registry = registry(metadata=metadata)
@@ -114,7 +92,7 @@ def upgrade():
         sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()),
         sa.Column(
             "status",
-            sa.Enum(*KernelStatus),
+            sa.Enum(*kernel_status),
             default="PENDING",
             server_default="PENDING",
             nullable=False,
@@ -197,7 +175,7 @@ def upgrade():
         status = sa.Column(
             "status",
             pgsql.ENUM(
-                *SessionStatus,
+                *session_status,
                 name="sessionstatus",
                 create_type=True,
             ),
@@ -570,7 +548,7 @@ def downgrade():
 
     # Drop ENUM types
     sess_statues = pgsql.ENUM(
-        *SessionStatus,
+        *session_status,
         name="sessionstatus",
     )
     sess_results = pgsql.ENUM("UNDEFINED", "SUCCESS", "FAILURE", name="sessionresults")

@@ -157,12 +157,8 @@ def _list_cmd(name: str = "list", docs: str = None):
                     "PENDING",
                     "SCHEDULED",
                     "PREPARING",
-                    "PULLING",
                     "RUNNING",
-                    "RESTARTING",
                     "TERMINATING",
-                    "RESIZING",
-                    "SUSPENDED",
                     "ERROR",
                 ]
             )
@@ -171,7 +167,6 @@ def _list_cmd(name: str = "list", docs: str = None):
             status = ",".join(
                 [
                     "PREPARING",
-                    "PULLING",
                     "RUNNING",
                 ]
             )
@@ -190,12 +185,9 @@ def _list_cmd(name: str = "list", docs: str = None):
                     "PENDING",
                     "SCHEDULED",
                     "PREPARING",
-                    "PULLING",
                     "RUNNING",
-                    "RESTARTING",
+                    "RUNNING_DEGRADED" "RESTARTING",
                     "TERMINATING",
-                    "RESIZING",
-                    "SUSPENDED",
                     "ERROR",
                     "CANCELLED",
                     "TERMINATED",

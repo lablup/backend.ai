@@ -1205,12 +1205,10 @@ def _fetch_session_names():
             "PENDING",
             "SCHEDULED",
             "PREPARING",
-            "PULLING",
             "RUNNING",
+            "RUNNING_DEGRADED",
             "RESTARTING",
             "TERMINATING",
-            "RESIZING",
-            "SUSPENDED",
             "ERROR",
         ]
     )
