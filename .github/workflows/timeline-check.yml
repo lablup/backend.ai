@@ -16,6 +16,7 @@ jobs:
           changes
           scripts
           packages
+          .github
     - name: Get current branch name
       id: branch-name
       uses: tj-actions/branch-names@v5.5
