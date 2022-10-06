@@ -67,7 +67,7 @@ def main():
 
     files = [basename for basename in files if len(basename.split(".")) == 3]
     if not files:
-        basename = '.'.join([str(0), args.fragment, 'md'])
+        basename = '.'.join([str(args.number if args.number else 0), args.fragment, 'md'])
         output_path = Path(os.path.join(fragment_dir, basename))
         output_path.write_text(args.content)
         print(f'\n### {args.fragment.title()}\n * {args.content} ({basename})', file=sys.stderr)
@@ -76,16 +76,12 @@ def main():
 
     for basename in files:
         parts = basename.split(".")
-        if parts[1] == args.fragment:
-            _basename = basename
-            message = f'Successfully updated the "{parts[1].title()}" news fragment found by towncrier.\n'
-        else:
-            _basename = '.'.join([str(args.number if args.number else 0), args.fragment, 'md'])
-            message = f'Successfully created the "{parts[1].title()}" news fragment found by towncrier.\n'
-        output_path = Path(os.path.join(fragment_dir, _basename))
+        if parts[1] != args.fragment:
+            continue
+        output_path = Path(os.path.join(fragment_dir, basename))
         output_path.write_text(args.content)
-        print(f'\n### {parts[1].title()}\n * {args.content} ({_basename})', file=sys.stderr)
-        print(message, file=sys.stderr)
+        print(f'\n### {parts[1].title()}\n * {args.content} ({basename})', file=sys.stderr)
+        print(f'Successfully updated the "{parts[1].title()}" news fragment found by towncrier.\n', file=sys.stderr)
     sys.exit(0)
 
 
