@@ -1,0 +1,272 @@
+[
+  {
+    "id": 1797645205,
+    "node_id": "MDU6TGFiZWwxNzk3NjQ1MjA1",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/agent",
+    "name": "agent",
+    "color": "7c61cf",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 4329308633,
+    "node_id": "LA_kwDOBC4ECs8AAAABAgwB2Q",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/app-proxy",
+    "name": "app-proxy",
+    "color": "c8bbf2",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 1491889106,
+    "node_id": "MDU6TGFiZWwxNDkxODg5MTA2",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/blocker",
+    "name": "blocker",
+    "color": "ff2222",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 456025123,
+    "node_id": "MDU6TGFiZWw0NTYwMjUxMjM=",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/bug",
+    "name": "bug",
+    "color": "D93F0B",
+    "default": true,
+    "description": ""
+  },
+  {
+    "id": 1797650185,
+    "node_id": "MDU6TGFiZWwxNzk3NjUwMTg1",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/cli",
+    "name": "cli",
+    "color": "e4dbff",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 1797645388,
+    "node_id": "MDU6TGFiZWwxNzk3NjQ1Mzg4",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/client",
+    "name": "client",
+    "color": "c8bbf2",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 1797645434,
+    "node_id": "MDU6TGFiZWwxNzk3NjQ1NDM0",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/common",
+    "name": "common",
+    "color": "7c61cf",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 1797650245,
+    "node_id": "MDU6TGFiZWwxNzk3NjUwMjQ1",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/console",
+    "name": "console",
+    "color": "e4dbff",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 1615664730,
+    "node_id": "MDU6TGFiZWwxNjE1NjY0NzMw",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/docs",
+    "name": "docs",
+    "color": "c4f1ff",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 456025124,
+    "node_id": "MDU6TGFiZWw0NTYwMjUxMjQ=",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/duplicate",
+    "name": "duplicate",
+    "color": "cccccc",
+    "default": true,
+    "description": null
+  },
+  {
+    "id": 4514085828,
+    "node_id": "LA_kwDOBC4ECs8AAAABDQ97xA",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/enhance",
+    "name": "enhance",
+    "color": "1d76db",
+    "default": false,
+    "description": "Optimization, performance improvements, and other enhnacements that do not add user-visible features"
+  },
+  {
+    "id": 1746506134,
+    "node_id": "MDU6TGFiZWwxNzQ2NTA2MTM0",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/enterprise",
+    "name": "enterprise",
+    "color": "445566",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 3660564174,
+    "node_id": "LA_kwDOBC4ECs7aL8bO",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/epic",
+    "name": "epic",
+    "color": "FBCA04",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 456025126,
+    "node_id": "MDU6TGFiZWw0NTYwMjUxMjY=",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/feature",
+    "name": "feature",
+    "color": "1d76db",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 2266209106,
+    "node_id": "MDU6TGFiZWwyMjY2MjA5MTA2",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/good%20first%20issue",
+    "name": "good first issue",
+    "color": "fbca04",
+    "default": true,
+    "description": ""
+  },
+  {
+    "id": 4616305696,
+    "node_id": "LA_kwDOBC4ECs8AAAABEyc8IA",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/hacktoberfest-accepted",
+    "name": "hacktoberfest-accepted",
+    "color": "1d76db",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 456025128,
+    "node_id": "MDU6TGFiZWw0NTYwMjUxMjg=",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/help%20wanted",
+    "name": "help wanted",
+    "color": "fef2c0",
+    "default": true,
+    "description": null
+  },
+  {
+    "id": 2320352723,
+    "node_id": "MDU6TGFiZWwyMzIwMzUyNzIz",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/i18n",
+    "name": "i18n",
+    "color": "fbca04",
+    "default": false,
+    "description": "i18n / L10N related issues"
+  },
+  {
+    "id": 538432807,
+    "node_id": "MDU6TGFiZWw1Mzg0MzI4MDc=",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/infrastructure",
+    "name": "infrastructure",
+    "color": "bbeebb",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 1830268528,
+    "node_id": "MDU6TGFiZWwxODMwMjY4NTI4",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/installer",
+    "name": "installer",
+    "color": "b59cff",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 456025130,
+    "node_id": "MDU6TGFiZWw0NTYwMjUxMzA=",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/invalid",
+    "name": "invalid",
+    "color": "e6e6e6",
+    "default": true,
+    "description": null
+  },
+  {
+    "id": 1484728156,
+    "node_id": "MDU6TGFiZWwxNDg0NzI4MTU2",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/maintenance",
+    "name": "maintenance",
+    "color": "006b75",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 1797645161,
+    "node_id": "MDU6TGFiZWwxNzk3NjQ1MTYx",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/manager",
+    "name": "manager",
+    "color": "7c61cf",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 3680651990,
+    "node_id": "LA_kwDOBC4ECs7bYkrW",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/minor",
+    "name": "minor",
+    "color": "90BA3F",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 4234178013,
+    "node_id": "LA_kwDOBC4ECs78YG3d",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/on-hold",
+    "name": "on-hold",
+    "color": "FEF2C0",
+    "default": false,
+    "description": "Temporarily suspended for further work"
+  },
+  {
+    "id": 456025131,
+    "node_id": "MDU6TGFiZWw0NTYwMjUxMzE=",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/question",
+    "name": "question",
+    "color": "cc317c",
+    "default": true,
+    "description": null
+  },
+  {
+    "id": 2307787525,
+    "node_id": "MDU6TGFiZWwyMzA3Nzg3NTI1",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/refactor",
+    "name": "refactor",
+    "color": "0052CC",
+    "default": false,
+    "description": "Code-level changes for better maintainability and readability"
+  },
+  {
+    "id": 4450478030,
+    "node_id": "LA_kwDOBC4ECs8AAAABCUTnzg",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/require:db-migration",
+    "name": "require:db-migration",
+    "color": "64A8DA",
+    "default": false,
+    "description": "Automatically set when alembic migrations are added or updated"
+  },
+  {
+    "id": 538431308,
+    "node_id": "MDU6TGFiZWw1Mzg0MzEzMDg=",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/security",
+    "name": "security",
+    "color": "bbeebb",
+    "default": false,
+    "description": ""
+  },
+  {
+    "id": 4360599055,
+    "node_id": "LA_kwDOBC4ECs8AAAABA-l2Dw",
+    "url": "https://api.github.com/repos/lablup/backend.ai/labels/skip:changelog",
+    "name": "skip:changelog",
+    "color": "C2E0C6",
+    "default": false,
+    "description": "Make the action workflow to skip towncrier check"
+  }
+]
