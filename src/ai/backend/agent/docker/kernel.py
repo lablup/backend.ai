@@ -7,7 +7,6 @@ import os
 import re
 import shutil
 import subprocess
-import tarfile
 import textwrap
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple
@@ -247,10 +246,9 @@ class DockerKernel(AbstractKernel):
                     if fsize > 1048576:
                         raise ValueError("too large file")
                     tarobj.fileobj.seek(0)
-                    tar = tarfile.open(mode="r", fileobj=tarobj.fileobj)
-                    extarobj = tar.extractfile(tar.getnames()[0])
-                    if extarobj:
-                        tarbytes = extarobj.read()
+                    inner_file = tarobj.extractfile(tarobj.getnames()[0])
+                    if inner_file:
+                        tarbytes = inner_file.read()
                     else:
                         log.warning("Could not found the file: {0}", abspath)
                         raise FileNotFoundError(f"Could not found the file: {abspath}")
