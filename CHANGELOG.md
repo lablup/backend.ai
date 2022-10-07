@@ -16,6 +16,22 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.1 (2022-10-07)
+
+### Features
+* Added `shared_vfolder_info` to get shared folder information and `update_shared_vf_permission` and `remove_shared_vf_permission` API to update and delete shared folder permissions. ([#608](https://github.com/lablup/backend.ai/issues/608))
+* Add `-a` / `--all` option to `backend.ai ps` like `docker ps -a` to list all sessions regardless of the statuses ([#616](https://github.com/lablup/backend.ai/issues/616))
+* Introduce vfolder status to control user access to individual vfolders ([#713](https://github.com/lablup/backend.ai/issues/713))
+* Add a new Agent option to (or not to) force terminate abusing kernels to support the use case for admins to watch what the containers actually do before terminating them. ([#764](https://github.com/lablup/backend.ai/issues/764))
+* Expose `ComputeSession.id` to query filter to enable GraphQL queries filter items by list of id. ([#772](https://github.com/lablup/backend.ai/issues/772))
+
+### Fixes
+* Fix extra vFolder access condition not applied when querying vFolder ([#766](https://github.com/lablup/backend.ai/issues/766))
+* Create vfolder status field in DB schema correctly. ([#768](https://github.com/lablup/backend.ai/issues/768))
+* Prevent unhandled `read_stream` exception which leads to the stuck of newly created sessions in the `PREPARING` status. ([#771](https://github.com/lablup/backend.ai/issues/771))
+* skip resolving fields from dead agent. ([#775](https://github.com/lablup/backend.ai/issues/775))
+
+
 ## 22.09.0 (2022-09-28)
 
 ### Breaking Changes
