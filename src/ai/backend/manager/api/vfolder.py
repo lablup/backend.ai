@@ -153,7 +153,7 @@ def vfolder_permission_required(perm: VFolderPermission):
                     domain_name=domain_name,
                     allowed_vfolder_types=allowed_vfolder_types,
                     extra_vf_conds=(vfolders.c.name == folder_name),
-                    extra_vfperm_conds=invited_perm_cond,
+                    extra_invited_vf_conds=invited_perm_cond,
                     extra_vf_user_conds=vf_user_cond,
                     extra_vf_group_conds=vf_group_cond,
                 )
