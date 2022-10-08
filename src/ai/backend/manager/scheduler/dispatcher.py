@@ -309,7 +309,7 @@ class SchedulerDispatcher(aobject):
                     SessionCancelledEvent(
                         item["session_id"],
                         item["session_creation_id"],
-                        reason="pending timeout",
+                        reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                     ),
                 )
 
@@ -993,7 +993,7 @@ class SchedulerDispatcher(aobject):
                             {
                                 "status": KernelStatus.CANCELLED,
                                 "status_changed": now,
-                                "status_info": KernelLifecycleEventReason.FAILED_TO_START,
+                                "status_info": "failed-to-start",
                                 "status_data": status_data,
                                 "terminated_at": now,
                                 "status_history": sql_json_merge(
@@ -1016,7 +1016,7 @@ class SchedulerDispatcher(aobject):
                     SessionCancelledEvent(
                         session.session_id,
                         session.session_creation_id,
-                        "failed-to-start",
+                        KernelLifecycleEventReason.FAILED_TO_START,
                     ),
                 )
                 async with self.db.begin_readonly() as db_conn:

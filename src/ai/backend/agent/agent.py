@@ -1348,18 +1348,24 @@ class AbstractAgent(
                 if result["status"] == "finished":
                     if result["exitCode"] == 0:
                         await self.produce_event(
-                            SessionSuccessEvent(SessionId(kernel_id), "task-done", 0),
+                            SessionSuccessEvent(
+                                SessionId(kernel_id), KernelLifecycleEventReason.TASK_DONE, 0
+                            ),
                         )
                     else:
                         await self.produce_event(
                             SessionFailureEvent(
-                                SessionId(kernel_id), "task-failed", result["exitCode"]
+                                SessionId(kernel_id),
+                                KernelLifecycleEventReason.TASK_FAILED,
+                                result["exitCode"],
                             ),
                         )
                     break
                 if result["status"] == "exec-timeout":
                     await self.produce_event(
-                        SessionFailureEvent(SessionId(kernel_id), "task-timeout", -2),
+                        SessionFailureEvent(
+                            SessionId(kernel_id), KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                        ),
                     )
                     break
                 opts = {
@@ -1368,7 +1374,9 @@ class AbstractAgent(
                 mode = "continue"
         except asyncio.CancelledError:
             await self.produce_event(
-                SessionFailureEvent(SessionId(kernel_id), "task-cancelled", -2),
+                SessionFailureEvent(
+                    SessionId(kernel_id), KernelLifecycleEventReason.TASK_CANCELLED, -2
+                ),
             )
 
     async def create_kernel(

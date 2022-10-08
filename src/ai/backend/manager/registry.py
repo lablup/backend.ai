@@ -1815,7 +1815,7 @@ class AgentRegistry:
                     rpc_coros.append(
                         rpc.call.destroy_kernel(
                             str(kernel["id"]),
-                            KernelLifecycleEventReason.FAILED_TO_START,
+                            "failed-to-start",
                             suppress_events=True,
                         ),
                     )
@@ -2038,9 +2038,7 @@ class AgentRegistry:
                         )
 
                     if kernel["agent_addr"] is None:
-                        await self.mark_kernel_terminated(
-                            kernel["id"], KernelLifecycleEventReason.MISSING_AGENT_ALLOCATION
-                        )
+                        await self.mark_kernel_terminated(kernel["id"], "missing-agent-allocation")
                         if kernel["cluster_role"] == DEFAULT_ROLE:
                             main_stat = {"status": "terminated"}
                     else:
