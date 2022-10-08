@@ -284,7 +284,13 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     "Each Yn address must at least include the IP address "
     "or the hostname and may include the protocol part and the port number to replace.",
 )
-def download(name, filenames, base_dir, chunk_size, override_storage_proxy):
+@click.option(
+    "--max-retries",
+    type=int,
+    default=20,
+    help="Maximum retry attempt when any failure occurs.",
+)
+def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_retries):
     """
     Download a file from the virtual folder to the current working directory.
     The files with the same names will be overwirtten.
@@ -302,6 +308,7 @@ def download(name, filenames, base_dir, chunk_size, override_storage_proxy):
                 show_progress=True,
                 address_map=override_storage_proxy
                 or APIConfig.DEFAULTS["storage_proxy_address_map"],
+                max_retries=max_retries,
             )
             print_done("Done.")
         except Exception as e:
@@ -502,7 +509,7 @@ def invite(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).invite(perm, emails)
             invited_ids = result.get("invited_ids", [])
-            if len(invited_ids) > 0:
+            if invited_ids:
                 print("Invitation sent to:")
                 for invitee in invited_ids:
                     print("\t- " + invitee)
@@ -587,7 +594,7 @@ def share(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).share(perm, emails)
             shared_emails = result.get("shared_emails", [])
-            if len(shared_emails) > 0:
+            if shared_emails:
                 print("Shared with {} permission to:".format(perm))
                 for _email in shared_emails:
                     print("\t- " + _email)
@@ -612,7 +619,7 @@ def unshare(name, emails):
         try:
             result = session.VFolder(name).unshare(emails)
             unshared_emails = result.get("unshared_emails", [])
-            if len(unshared_emails) > 0:
+            if unshared_emails:
                 print("Unshared from:")
                 for _email in unshared_emails:
                     print("\t- " + _email)
@@ -625,7 +632,15 @@ def unshare(name, emails):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def leave(name):
+@click.option(
+    "-s",
+    "--shared-user-uuid",
+    metavar="SHARED_USER_UUID",
+    type=str,
+    default=None,
+    help="The ID of the person who wants to leave (the person who shared the vfolder).",
+)
+def leave(name, shared_user_uuid):
     """Leave the shared virutal folder.
 
     NAME: Name of a virtual folder
@@ -639,7 +654,7 @@ def leave(name):
             if vfolder_info["is_owner"]:
                 print("You cannot leave a virtual folder you own. Consider using delete instead.")
                 return
-            session.VFolder(name).leave()
+            session.VFolder(name).leave(shared_user_uuid)
             print('Left the shared virtual folder "{}".'.format(name))
 
         except Exception as e:

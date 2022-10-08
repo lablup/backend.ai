@@ -3036,11 +3036,12 @@ class AgentRegistry:
 
         kernel = await self.get_session(session_name_or_id, access_key)
         email = await self._get_user_email(kernel)
-        now = datetime.now(tzutc()).strftime("%Y-%m-%dT%H:%M:%S")
+        now = datetime.now(tzutc()).strftime("%Y-%m-%dT%HH%MM%SS")
         shortend_sname = kernel["session_name"][:SESSION_NAME_LEN_LIMIT]
         registry, _, filtered = kernel["image"].partition("/")
         img_path, _, image_name = filtered.partition("/")
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
+        filename = filename.replace(":", "-")
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
                 kernel["agent"],
@@ -3051,6 +3052,31 @@ class AgentRegistry:
             ) as rpc:
                 resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), email, filename)
         return resp
+
+    async def get_agent_local_config(
+        self,
+        agent_id: AgentId,
+        agent_addr: str,
+    ) -> Mapping[str, str]:
+        async with RPCContext(
+            agent_id,
+            agent_addr,
+            invoke_timeout=None,
+        ) as rpc:
+            return await rpc.call.get_local_config()
+
+    async def get_abusing_report(
+        self,
+        session_name_or_id: Union[str, SessionId],
+        access_key: AccessKey,
+    ) -> Optional[Mapping[str, str]]:
+        kernel = await self.get_session(session_name_or_id, access_key)
+        async with RPCContext(
+            kernel["agent"],
+            kernel["agent_addr"],
+            invoke_timeout=None,
+        ) as rpc:
+            return await rpc.call.get_abusing_report(str(kernel["id"]))
 
 
 async def check_scaling_group(
