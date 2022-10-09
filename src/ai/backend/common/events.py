@@ -195,7 +195,7 @@ class AgentHeartbeatEvent(AbstractEvent):
 class KernelCreationEventArgs:
     kernel_id: KernelId = attr.ib()
     creation_id: str = attr.ib()
-    reason: KernelLifecycleEventReason = attr.ib(default="")
+    reason: KernelLifecycleEventReason | str = attr.ib(default="")
 
     def serialize(self) -> tuple:
         return (
@@ -266,7 +266,7 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
 @attr.s(slots=True, frozen=True)
 class KernelTerminationEventArgs:
     kernel_id: KernelId = attr.ib()
-    reason: KernelLifecycleEventReason = attr.ib(default="")
+    reason: KernelLifecycleEventReason | str = attr.ib(default="")
     exit_code: int = attr.ib(default=-1)
 
     def serialize(self) -> tuple:
@@ -297,7 +297,7 @@ class KernelTerminatedEvent(KernelTerminationEventArgs, AbstractEvent):
 class SessionCreationEventArgs:
     session_id: SessionId = attr.ib()
     creation_id: str = attr.ib()
-    reason: KernelLifecycleEventReason = attr.ib(default="")
+    reason: KernelLifecycleEventReason | str = attr.ib(default="")
 
     def serialize(self) -> tuple:
         return (
@@ -361,7 +361,7 @@ class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
 @attr.s(slots=True, frozen=True)
 class SessionResultEventArgs:
     session_id: SessionId = attr.ib()
-    reason: KernelLifecycleEventReason = attr.ib(default="")
+    reason: KernelLifecycleEventReason | str = attr.ib(default="")
     exit_code: int = attr.ib(default=-1)
 
     def serialize(self) -> tuple:
@@ -531,6 +531,7 @@ EventCallback = Union[
 
 
 class KernelLifecycleEventReason(str, enum.Enum):
+    DEFAULT = ""
     ALREADY_TERMINATED = "already-terminated"
     FAILED_TO_START = "failed-to-start"
     FORCE_TERMINATED = "force-terminated"
