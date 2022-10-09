@@ -531,7 +531,6 @@ EventCallback = Union[
 
 
 class KernelLifecycleEventReason(str, enum.Enum):
-    DEFAULT = ""
     ALREADY_TERMINATED = "already-terminated"
     FAILED_TO_START = "failed-to-start"
     FORCE_TERMINATED = "force-terminated"
