@@ -1928,6 +1928,9 @@ class AbstractAgent(
     async def download_file(self, kernel_id: KernelId, filepath: str):
         return await self.kernel_registry[kernel_id].download_file(filepath)
 
+    async def download_single(self, kernel_id: KernelId, filepath: str):
+        return await self.kernel_registry[kernel_id].download_single(filepath)
+
     async def list_files(self, kernel_id: KernelId, path: str):
         return await self.kernel_registry[kernel_id].list_files(path)
 
