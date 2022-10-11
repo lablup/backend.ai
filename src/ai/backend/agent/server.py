@@ -610,6 +610,12 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def download_single(self, kernel_id: str, filepath: str):
+        log.info("rpc::download_single(k:{0}, fn:{1})", kernel_id, filepath)
+        return await self.agent.download_single(KernelId(UUID(kernel_id)), filepath)
+
+    @rpc_function
+    @collect_error
     async def list_files(self, kernel_id: str, path: str):
         log.info("rpc::list_files(k:{0}, fn:{1})", kernel_id, path)
         return await self.agent.list_files(KernelId(UUID(kernel_id)), path)
