@@ -223,13 +223,12 @@ async def RPCContext(
         deserializer=msgpack.unpackb,
     )
     try:
-        with _timeout(invoke_timeout):
-            async with peer:
-                okey_token = peer.call.order_key.set("")
-                try:
-                    yield peer
-                finally:
-                    peer.call.order_key.reset(okey_token)
+        async with (_timeout(invoke_timeout), peer):
+            okey_token = peer.call.order_key.set("")
+            try:
+                yield peer
+            finally:
+                peer.call.order_key.reset(okey_token)
     except RPCUserError as orig_exc:
         raise AgentError(agent_id, orig_exc.name, orig_exc.repr, orig_exc.args)
     except Exception:
@@ -1542,6 +1541,9 @@ class AgentRegistry:
                     kernel_id = KernelId(uuid.UUID(created_info["id"]))
                     self._post_kernel_creation_infos[kernel_id].set_result(created_info)
                 await asyncio.gather(*post_tasks, return_exceptions=True)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                # What should we do here?
+                return
             except Exception as e:
                 # The agent has already cancelled or issued the destruction lifecycle event
                 # for this batch of kernels.
