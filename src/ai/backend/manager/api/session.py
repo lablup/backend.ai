@@ -2298,7 +2298,7 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
     )
     try:
         await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
-        result = await root_ctx.registry.download_file(session_name, owner_access_key, file)
+        result = await root_ctx.registry.download_single(session_name, owner_access_key, file)
     except asyncio.CancelledError:
         raise
     except BackendError:

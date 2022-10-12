@@ -297,6 +297,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    async def download_single(self, filepath):
+        raise NotImplementedError
+
+    @abstractmethod
     async def list_files(self, path: str):
         raise NotImplementedError
 
