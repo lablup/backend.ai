@@ -594,6 +594,7 @@ class ComputeContainer(graphene.ObjectType):
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
+    abusing_report = graphene.JSONString()
 
     # resources
     agent = graphene.String()
@@ -661,6 +662,16 @@ class ComputeContainer(graphene.ObjectType):
 
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
         return await self.resolve_live_stat(info)
+
+    async def resolve_abusing_report(
+        self,
+        info: graphene.ResolveInfo,
+        access_key: AccessKey | None,
+    ) -> Optional[Mapping[str, Any]]:
+        graph_ctx: GraphQueryContext = info.context
+        if access_key is None:
+            return None
+        return await graph_ctx.registry.get_abusing_report(self.id, access_key)
 
     _queryfilter_fieldspec = {
         "image": ("image", None),
@@ -858,6 +869,7 @@ class ComputeSession(graphene.ObjectType):
     startup_command = graphene.String()
     result = graphene.String()
     commit_status = graphene.String()
+    abusing_reports = graphene.List(lambda: graphene.JSONString)
 
     # resources
     resource_opts = graphene.JSONString()
@@ -968,7 +980,18 @@ class ComputeSession(graphene.ObjectType):
         commit_status = await graph_ctx.registry.get_commit_status(self.id, self.access_key)
         return commit_status["status"]
 
+    async def resolve_abusing_reports(
+        self, info: graphene.ResolveInfo
+    ) -> Iterable[Optional[Mapping[str, Any]]]:
+        containers = self.containers
+        if containers is None:
+            containers = await self.resolve_containers(info)
+        if containers is None:
+            return []
+        return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
+
     _queryfilter_fieldspec = {
+        "id": ("kernels_id", None),
         "type": ("kernels_session_type", lambda s: SessionTypes[s]),
         "name": ("kernels_session_name", None),
         "image": ("kernels_image", None),

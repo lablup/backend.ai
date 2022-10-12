@@ -683,6 +683,9 @@ async def server_main(
         hook_task_factory=root_ctx.local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
     m.prompt = f"monitor (manager[{pidx}@{os.getpid()}]) >>> "
+    # Add some useful console_locals for ease of debugging
+    m.console_locals["root_app"] = root_app
+    m.console_locals["root_ctx"] = root_ctx
     m.start()
 
     # Plugin webapps should be loaded before runner.setup(),

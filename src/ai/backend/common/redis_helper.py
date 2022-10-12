@@ -364,7 +364,7 @@ async def read_stream(
                     block=block_timeout,
                 ),
             )
-            if reply is None:
+            if not reply:
                 continue
             # Keep some latest messages so that other manager
             # processes to have chances of fetching them.

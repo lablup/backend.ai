@@ -357,6 +357,7 @@ class AgentRegistry:
             "shutdown_service": KernelExecutionFailed,
             "upload_file": KernelExecutionFailed,
             "download_file": KernelExecutionFailed,
+            "download_single": KernelExecutionFailed,
             "list_files": KernelExecutionFailed,
             "get_logs_from_agent": KernelExecutionFailed,
             "refresh_session": KernelExecutionFailed,
@@ -2412,6 +2413,23 @@ class AgentRegistry:
             ) as rpc:
                 return await rpc.call.download_file(str(kernel["id"]), filepath)
 
+    async def download_single(
+        self,
+        session_name_or_id: Union[str, SessionId],
+        access_key: AccessKey,
+        filepath: str,
+    ) -> bytes:
+        kernel = await self.get_session(session_name_or_id, access_key)
+        async with self.handle_kernel_exception("download_single", kernel["id"], access_key):
+            async with RPCContext(
+                kernel["agent"],
+                kernel["agent_addr"],
+                invoke_timeout=None,
+                order_key=kernel["id"],
+                keepalive_timeout=self.rpc_keepalive_timeout,
+            ) as rpc:
+                return await rpc.call.download_single(str(kernel["id"]), filepath)
+
     async def list_files(
         self,
         session_name_or_id: Union[str, SessionId],
@@ -3045,6 +3063,31 @@ class AgentRegistry:
             ) as rpc:
                 resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), email, filename)
         return resp
+
+    async def get_agent_local_config(
+        self,
+        agent_id: AgentId,
+        agent_addr: str,
+    ) -> Mapping[str, str]:
+        async with RPCContext(
+            agent_id,
+            agent_addr,
+            invoke_timeout=None,
+        ) as rpc:
+            return await rpc.call.get_local_config()
+
+    async def get_abusing_report(
+        self,
+        session_name_or_id: Union[str, SessionId],
+        access_key: AccessKey,
+    ) -> Optional[Mapping[str, str]]:
+        kernel = await self.get_session(session_name_or_id, access_key)
+        async with RPCContext(
+            kernel["agent"],
+            kernel["agent_addr"],
+            invoke_timeout=None,
+        ) as rpc:
+            return await rpc.call.get_abusing_report(str(kernel["id"]))
 
 
 async def check_scaling_group(
