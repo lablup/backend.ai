@@ -1547,6 +1547,7 @@ class AgentRegistry:
             except Exception as e:
                 # The agent has already cancelled or issued the destruction lifecycle event
                 # for this batch of kernels.
+                # Should update status of the kernel rows to ERROR ?
                 for binding in items:
                     kernel_id = binding.kernel.kernel_id
                     self.kernel_creation_tracker[kernel_id].cancel()
