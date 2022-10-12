@@ -1,8 +1,8 @@
 """add_vfolder_usage_mode_type
 
-Revision ID: 3773cf1e4077
-Revises: f83d630c0bc9
-Create Date: 2022-10-01 17:15:55.113376
+Revision ID: 5e22558221ce
+Revises: 360af8f33d4e
+Create Date: 2022-10-12 12:17:07.675013
 
 """
 import sqlalchemy as sa
@@ -14,8 +14,8 @@ from ai.backend.manager.models.base import GUID, convention
 from ai.backend.manager.models.vfolder import VFolderUsageMode
 
 # revision identifiers, used by Alembic.
-revision = "3773cf1e4077"
-down_revision = "f83d630c0bc9"
+revision = "5e22558221ce"
+down_revision = "360af8f33d4e"
 branch_labels = None
 depends_on = None
 
