@@ -475,6 +475,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 return MountPermission.READ_WRITE
             return folder_perm
 
+        if mounts:
+            m = mounts[0]
+            print(f"{m.type = }")
+            print(f"{m.source = }")
+            print(f"{m.target = }")
+            print(f"{m.permission = }")
+            print(f"{m.opts = }")
         container_config = {
             "HostConfig": {
                 "Mounts": [

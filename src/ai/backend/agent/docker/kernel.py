@@ -333,6 +333,18 @@ class DockerKernel(AbstractKernel):
         err = raw_err.decode("utf-8")
         return {"files": out, "errors": err, "abspath": str(container_path)}
 
+    async def init_mounted_apps(self) -> None:
+        for mount in self.resource_spec.mounts:
+            if not mount.opts:
+                continue
+            if ("service_defs" not in mount.opts) or ("metadata" not in mount.opts):
+                continue
+            service_defs = mount.opts["service_defs"]  # executable file
+            metadata = mount.opts["metadata"]  # noqa
+            proc = await asyncio.create_subprocess_exec(str(service_defs))
+            if await proc.wait() != 0:
+                raise RuntimeError("Initiating app-type vfolder has failed!")
+
 
 class DockerCodeRunner(AbstractCodeRunner):
 
