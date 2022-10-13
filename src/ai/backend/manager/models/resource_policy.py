@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Dict, Sequence
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
-from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.logging import BraceStyleAdapter
@@ -16,6 +15,7 @@ from .base import (
     BigInt,
     EnumType,
     ResourceSlotColumn,
+    StructuredJSONColumn,
     batch_result,
     metadata,
     set_if_set,
@@ -24,6 +24,7 @@ from .base import (
 )
 from .keypair import keypairs
 from .user import UserRole
+from .vfolder import vfolder_host_permission_schema
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -58,7 +59,11 @@ keypair_resource_policies = sa.Table(
     sa.Column("max_vfolder_count", sa.Integer(), nullable=False),
     sa.Column("max_vfolder_size", sa.BigInteger(), nullable=False),
     sa.Column("idle_timeout", sa.BigInteger(), nullable=False),
-    sa.Column("allowed_vfolder_hosts", pgsql.ARRAY(sa.String), nullable=False),
+    sa.Column(
+        "allowed_vfolder_hosts",
+        StructuredJSONColumn(vfolder_host_permission_schema),
+        nullable=False,
+    ),
     # TODO: implement with a many-to-many association table
     # sa.Column('allowed_scaling_groups', sa.Array(sa.String), nullable=False),
 )

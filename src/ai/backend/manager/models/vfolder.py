@@ -99,6 +99,23 @@ class VFolderPermissionValidator(t.Trafaret):
         return VFolderPermission(value)
 
 
+class VFolderHostPermission(str, enum.Enum):
+    """
+    Atomic permissions for a virtual folder under a host given to a specific access key.
+    """
+
+    CREATE = "create-vfolder"
+    READ = "read-vfolder"  # ls, list, info
+    UPDATE = "update-vfolder"  # rename, update-options
+    DELETE = "delete-vfolder"
+    MOUNT = "mount"
+    UPDATE_FILE = "update-file"  # including mkdir, mv, rename-file, delete-file
+    UPLOAD = "upload"
+    DOWNLOAD = "download"
+    INVITE = "invite"
+    SHARE = "share"
+
+
 class VFolderInvitationState(str, enum.Enum):
     """
     Virtual Folder invitation state.
@@ -130,6 +147,12 @@ class VFolderAccessStatus(str, enum.Enum):
 
     READABLE = "readable"
     UPDATABLE = "updatable"
+
+
+vfolder_host_permission_schema = t.Mapping(
+    t.String,
+    t.List(t.Enum(*[perm.value for perm in VFolderHostPermission])),
+)
 
 
 vfolders = sa.Table(

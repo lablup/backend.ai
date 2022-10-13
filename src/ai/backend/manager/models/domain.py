@@ -18,6 +18,7 @@ from ai.backend.common.types import ResourceSlot
 from ..defs import RESERVED_DOTFILES
 from .base import (
     ResourceSlotColumn,
+    StructuredJSONColumn,
     batch_result,
     metadata,
     set_if_set,
@@ -26,6 +27,7 @@ from .base import (
 )
 from .scaling_group import ScalingGroup
 from .user import UserRole
+from .vfolder import vfolder_host_permission_schema
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -65,7 +67,12 @@ domains = sa.Table(
     ),
     # TODO: separate resource-related fields with new domain resource policy table when needed.
     sa.Column("total_resource_slots", ResourceSlotColumn(), default="{}"),
-    sa.Column("allowed_vfolder_hosts", pgsql.ARRAY(sa.String), nullable=False, default="{}"),
+    sa.Column(
+        "allowed_vfolder_hosts",
+        StructuredJSONColumn(vfolder_host_permission_schema),
+        nullable=False,
+        default={},
+    ),
     sa.Column("allowed_docker_registries", pgsql.ARRAY(sa.String), nullable=False, default="{}"),
     #: Field for synchronization with external services.
     sa.Column("integration_id", sa.String(length=512)),
