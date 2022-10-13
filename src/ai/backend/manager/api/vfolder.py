@@ -110,12 +110,19 @@ def vfolder_filter_by_status_required(perm: VFolderAccessStatus):
             elif "name" in request.match_info:
                 folder_name = request.match_info["name"]
                 vf_name_conds = vfolders.c.name == folder_name
-            elif isinstance(args[1], dict) and "id" in args[1]:
-                folder_id = args[1]["id"]
+            elif "id" in request.query:
+                folder_id = request.query["id"]
                 vf_name_conds = vfolders.c.id == folder_id
-            elif isinstance(args[1], dict) and "name" in args[1]:
-                folder_name = args[1]["name"]
+            elif "name" in request.query:
+                folder_name = request.query["name"]
                 vf_name_conds = vfolders.c.name == folder_name
+            elif len(args) > 1 and isinstance(args[1], dict):
+                if folder_id := args[1].get("id"):
+                    vf_name_conds = vfolders.c.id == folder_id
+                elif folder_name := args[1].get("name"):
+                    vf_name_conds = vfolders.c.name == folder_name
+                else:
+                    raise VFolderFilterStatusFailed("either vFolder id nor name not supplied")
             else:
                 raise VFolderFilterStatusFailed("either vFolder id nor name not supplied")
             if perm == VFolderAccessStatus.READABLE:

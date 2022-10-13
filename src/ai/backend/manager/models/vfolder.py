@@ -335,8 +335,9 @@ async def query_accessible_vfolders(
         query = (
             sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
             .select_from(j)
-            .where(vfolders.c.user == user_uuid)
         )
+        if user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN:
+            query = query.where(vfolders.c.user == user_uuid)
         await _append_entries(query)
 
         # Scan vfolders shared with me.
