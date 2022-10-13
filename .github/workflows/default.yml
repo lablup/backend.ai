@@ -173,6 +173,8 @@ jobs:
     - uses: actions/checkout@v2
       with:
         submodules: true
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*'
     - name: Apply cache for Pants
       uses: actions/cache@v3
       id: cache
