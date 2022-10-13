@@ -80,7 +80,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
     idle_timeout = BigInt()
     max_vfolder_count = graphene.Int()
     max_vfolder_size = BigInt()
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String)
+    allowed_vfolder_hosts = graphene.JSONString()
 
     @classmethod
     def from_row(
@@ -101,7 +101,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             idle_timeout=row["idle_timeout"],
             max_vfolder_count=row["max_vfolder_count"],
             max_vfolder_size=row["max_vfolder_size"],
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"],
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
         )
 
     @classmethod
@@ -232,7 +232,7 @@ class CreateKeyPairResourcePolicyInput(graphene.InputObjectType):
     idle_timeout = BigInt(required=True)
     max_vfolder_count = graphene.Int(required=True)
     max_vfolder_size = BigInt(required=True)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
 
 
 class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
@@ -244,7 +244,7 @@ class ModifyKeyPairResourcePolicyInput(graphene.InputObjectType):
     idle_timeout = BigInt(required=False)
     max_vfolder_count = graphene.Int(required=False)
     max_vfolder_size = BigInt(required=False)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String, required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
 
 
 class CreateKeyPairResourcePolicy(graphene.Mutation):

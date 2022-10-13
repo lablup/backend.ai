@@ -208,7 +208,7 @@ class Group(graphene.ObjectType):
     modified_at = GQLDateTime()
     domain_name = graphene.String()
     total_resource_slots = graphene.JSONString()
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String)
+    allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
 
     scaling_groups = graphene.List(lambda: graphene.String)
@@ -226,7 +226,7 @@ class Group(graphene.ObjectType):
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
             total_resource_slots=row["total_resource_slots"].to_json(),
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"],
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             integration_id=row["integration_id"],
         )
 
@@ -354,7 +354,7 @@ class GroupInput(graphene.InputObjectType):
     is_active = graphene.Boolean(required=False, default=True)
     domain_name = graphene.String(required=True)
     total_resource_slots = graphene.JSONString(required=False)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String, required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
 
 
@@ -366,7 +366,7 @@ class ModifyGroupInput(graphene.InputObjectType):
     total_resource_slots = graphene.JSONString(required=False)
     user_update_mode = graphene.String(required=False)
     user_uuids = graphene.List(lambda: graphene.String, required=False)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String, required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
 
 

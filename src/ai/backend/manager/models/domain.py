@@ -90,7 +90,7 @@ class Domain(graphene.ObjectType):
     created_at = GQLDateTime()
     modified_at = GQLDateTime()
     total_resource_slots = graphene.JSONString()
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String)
+    allowed_vfolder_hosts = graphene.JSONString()
     allowed_docker_registries = graphene.List(lambda: graphene.String)
     integration_id = graphene.String()
 
@@ -112,7 +112,7 @@ class Domain(graphene.ObjectType):
             created_at=row["created_at"],
             modified_at=row["modified_at"],
             total_resource_slots=row["total_resource_slots"].to_json(),
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"],
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             allowed_docker_registries=row["allowed_docker_registries"],
             integration_id=row["integration_id"],
         )
@@ -160,7 +160,7 @@ class DomainInput(graphene.InputObjectType):
     description = graphene.String(required=False)
     is_active = graphene.Boolean(required=False, default=True)
     total_resource_slots = graphene.JSONString(required=False)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String, required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
     allowed_docker_registries = graphene.List(lambda: graphene.String, required=False)
     integration_id = graphene.String(required=False)
 
@@ -170,7 +170,7 @@ class ModifyDomainInput(graphene.InputObjectType):
     description = graphene.String(required=False)
     is_active = graphene.Boolean(required=False)
     total_resource_slots = graphene.JSONString(required=False)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String, required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
     allowed_docker_registries = graphene.List(lambda: graphene.String, required=False)
     integration_id = graphene.String(required=False)
 
