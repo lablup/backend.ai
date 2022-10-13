@@ -3024,6 +3024,8 @@ class AgentRegistry:
         access_key: AccessKey,
     ) -> Mapping[str, str]:
         kernel = await self.get_session(session_name_or_id, access_key)
+        if kernel["agent"] is None or kernel["agent_addr"] is None:
+            return {}
         email = await self._get_user_email(kernel)
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
@@ -3046,6 +3048,8 @@ class AgentRegistry:
         """
 
         kernel = await self.get_session(session_name_or_id, access_key)
+        if kernel["agent"] is None or kernel["agent_addr"] is None:
+            return {}
         email = await self._get_user_email(kernel)
         now = datetime.now(tzutc()).strftime("%Y-%m-%dT%HH%MM%SS")
         shortend_sname = kernel["session_name"][:SESSION_NAME_LEN_LIMIT]
@@ -3082,6 +3086,8 @@ class AgentRegistry:
         access_key: AccessKey,
     ) -> Optional[Mapping[str, str]]:
         kernel = await self.get_session(session_name_or_id, access_key)
+        if kernel["agent"] is None or kernel["agent_addr"] is None:
+            return None
         async with RPCContext(
             kernel["agent"],
             kernel["agent_addr"],
