@@ -49,7 +49,7 @@ def main():
                 % (changelog_url, tag)
             )
             content += (
-                "\n\n### Full Commitlog\n\nCheck out [the full commit logs](%s) between release (%s) and (%s).\n"
+                "\n\n### Full Commit Logs\n\nCheck out [the full commit logs](%s) between release (%s) and (%s).\n"
                 % (commitlog_url, prev_tag, tag)
             )
             if not args.draft:
