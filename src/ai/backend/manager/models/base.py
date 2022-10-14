@@ -26,6 +26,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    overload,
 )
 
 import graphene
@@ -335,10 +336,27 @@ class PermissionListColumn(TypeDecorator):
         super().__init__(sa.String)
         self._perm_type = perm_type
 
-    def process_bind_param(self, value: Sequence[AbstractPermission] | None, dialect) -> List[str]:
+    @overload
+    def process_bind_param(self, value: Sequence[AbstractPermission], dialect) -> List[str]:
+        ...
+
+    @overload
+    def process_bind_param(self, value: Sequence[str], dialect) -> List[str]:
+        ...
+
+    @overload
+    def process_bind_param(self, value: None, dialect) -> List[str]:
+        ...
+
+    def process_bind_param(
+        self, value: Sequence[AbstractPermission] | Sequence[str] | None, dialect
+    ) -> List[str]:
         if value is None:
             return []
-        return [perm.value for perm in value]
+        try:
+            return [self._perm_type(perm).value for perm in value]
+        except ValueError:
+            raise InvalidAPIParameters(f"Invalid value for binding to {self._perm_type}")
 
     def process_result_value(self, value: Sequence[str] | None, dialect) -> set[AbstractPermission]:
         if value is None:
