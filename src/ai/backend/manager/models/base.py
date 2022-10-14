@@ -37,7 +37,7 @@ from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql.language import ast
-from sqlalchemy.dialects.postgresql import CIDR, ENUM, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -96,6 +96,30 @@ pgsql_connect_opts = {
 # helper functions
 def zero_if_none(val):
     return 0 if val is None else val
+
+
+class AbstractPermission(str, enum.Enum):
+    """
+    Abstract enum type for permissions
+    """
+
+
+class VFolderHostPermission(AbstractPermission):
+    """
+    Atomic permissions for a virtual folder under a host given to a specific access key.
+    """
+
+    ALL = "*"
+    CREATE = "create-vfolder"
+    READ = "read-vfolder"  # ls, list, info
+    UPDATE = "update-vfolder"  # rename, update-options
+    DELETE = "delete-vfolder"
+    MOUNT = "mount"
+    UPDATE_FILE = "update-file"  # including mkdir, mv, rename-file, delete-file
+    UPLOAD = "upload"
+    DOWNLOAD = "download"
+    INVITE = "invite"
+    SHARE = "share"
 
 
 class EnumType(TypeDecorator, SchemaType):
@@ -318,6 +342,55 @@ class IPColumn(TypeDecorator):
         if value is None:
             return None
         return ReadableCIDR(value)
+
+
+class PermissionListColumn(TypeDecorator):
+    """
+    A column type to convert Permission values back and forth.
+    """
+
+    impl = ARRAY
+    cache_ok = True
+
+    def __init__(self, perm_type: Type[AbstractPermission]) -> None:
+        super().__init__(sa.String)
+        self._perm_type = perm_type
+
+    def process_bind_param(self, value: Sequence[AbstractPermission] | None, dialect) -> List[str]:
+        if value is None:
+            return []
+        return [perm.value for perm in value]
+
+    def process_result_value(
+        self, value: Sequence[str] | None, dialect
+    ) -> List[AbstractPermission]:
+        if value is None:
+            return []
+        return [self._perm_type(perm) for perm in value]
+
+
+class VFolderHostPermissionColumn(TypeDecorator):
+    """
+    A column type to convert vfolder host permission back and forth.
+    """
+
+    impl = JSONB
+    cache_ok = True
+    perm_col = PermissionListColumn(VFolderHostPermission)
+
+    def process_bind_param(self, value: Mapping[str, Any] | None, dialect) -> Mapping[str, Any]:
+        if value is None:
+            return {}
+        return {
+            host: self.perm_col.process_bind_param(perms, None) for host, perms in value.items()
+        }
+
+    def process_result_value(self, value: Mapping[str, Any] | None, dialect) -> Mapping[str, Any]:
+        if value is None:
+            return {}
+        return {
+            host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()
+        }
 
 
 class CurrencyTypes(enum.Enum):

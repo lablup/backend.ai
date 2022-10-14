@@ -18,7 +18,7 @@ from ai.backend.common.types import ResourceSlot
 from ..defs import RESERVED_DOTFILES
 from .base import (
     ResourceSlotColumn,
-    StructuredJSONColumn,
+    VFolderHostPermissionColumn,
     batch_result,
     metadata,
     set_if_set,
@@ -27,7 +27,6 @@ from .base import (
 )
 from .scaling_group import ScalingGroup
 from .user import UserRole
-from .vfolder import vfolder_host_permission_schema
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -69,7 +68,7 @@ domains = sa.Table(
     sa.Column("total_resource_slots", ResourceSlotColumn(), default="{}"),
     sa.Column(
         "allowed_vfolder_hosts",
-        StructuredJSONColumn(vfolder_host_permission_schema),
+        VFolderHostPermissionColumn(),
         nullable=False,
         default={},
     ),
@@ -112,7 +111,7 @@ class Domain(graphene.ObjectType):
             created_at=row["created_at"],
             modified_at=row["modified_at"],
             total_resource_slots=row["total_resource_slots"].to_json(),
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"],
             allowed_docker_registries=row["allowed_docker_registries"],
             integration_id=row["integration_id"],
         )

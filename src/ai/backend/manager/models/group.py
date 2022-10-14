@@ -33,7 +33,7 @@ from .base import (
     GUID,
     IDColumn,
     ResourceSlotColumn,
-    StructuredJSONColumn,
+    VFolderHostPermissionColumn,
     batch_multiresult,
     batch_result,
     metadata,
@@ -45,7 +45,6 @@ from .base import (
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserRole
 from .utils import execute_with_retry
-from .vfolder import vfolder_host_permission_schema
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -120,7 +119,7 @@ groups = sa.Table(
     sa.Column("total_resource_slots", ResourceSlotColumn(), default="{}"),
     sa.Column(
         "allowed_vfolder_hosts",
-        StructuredJSONColumn(vfolder_host_permission_schema),
+        VFolderHostPermissionColumn(),
         nullable=False,
         default={},
     ),
@@ -226,7 +225,7 @@ class Group(graphene.ObjectType):
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
             total_resource_slots=row["total_resource_slots"].to_json(),
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"],
             integration_id=row["integration_id"],
         )
 

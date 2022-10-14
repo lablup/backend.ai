@@ -12,8 +12,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.sql.expression import bindparam
 
-from ai.backend.manager.models.base import GUID, metadata
-from ai.backend.manager.models.vfolder import VFolderHostPermission
+from ai.backend.manager.models.base import GUID, VFolderHostPermission, metadata
 
 # revision identifiers, used by Alembic.
 revision = "5bce905c21e5"

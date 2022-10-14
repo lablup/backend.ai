@@ -15,7 +15,7 @@ from .base import (
     BigInt,
     EnumType,
     ResourceSlotColumn,
-    StructuredJSONColumn,
+    VFolderHostPermissionColumn,
     batch_result,
     metadata,
     set_if_set,
@@ -24,7 +24,6 @@ from .base import (
 )
 from .keypair import keypairs
 from .user import UserRole
-from .vfolder import vfolder_host_permission_schema
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -61,7 +60,7 @@ keypair_resource_policies = sa.Table(
     sa.Column("idle_timeout", sa.BigInteger(), nullable=False),
     sa.Column(
         "allowed_vfolder_hosts",
-        StructuredJSONColumn(vfolder_host_permission_schema),
+        VFolderHostPermissionColumn(),
         nullable=False,
     ),
     # TODO: implement with a many-to-many association table
@@ -101,7 +100,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             idle_timeout=row["idle_timeout"],
             max_vfolder_count=row["max_vfolder_count"],
             max_vfolder_size=row["max_vfolder_size"],
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"],
         )
 
     @classmethod
