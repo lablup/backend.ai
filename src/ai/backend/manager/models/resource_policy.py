@@ -100,7 +100,7 @@ class KeyPairResourcePolicy(graphene.ObjectType):
             idle_timeout=row["idle_timeout"],
             max_vfolder_count=row["max_vfolder_count"],
             max_vfolder_size=row["max_vfolder_size"],
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"],
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
         )
 
     @classmethod

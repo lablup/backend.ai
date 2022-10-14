@@ -214,6 +214,30 @@ AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
 
 
+class AbstractPermission(str, enum.Enum):
+    """
+    Abstract enum type for permissions
+    """
+
+
+class VFolderHostPermission(AbstractPermission):
+    """
+    Atomic permissions for a virtual folder under a host given to a specific access key.
+    """
+
+    ALL = "*"
+    CREATE = "create-vfolder"
+    READ = "read-vfolder"  # ls, list, info
+    UPDATE = "update-vfolder"  # rename, update-options
+    DELETE = "delete-vfolder"
+    MOUNT = "mount"
+    UPDATE_FILE = "update-file"  # including mkdir, mv, rename-file, delete-file
+    UPLOAD = "upload"
+    DOWNLOAD = "download"
+    INVITE = "invite"
+    SHARE = "share"
+
+
 class LogSeverity(str, enum.Enum):
     CRITICAL = "critical"
     ERROR = "error"
@@ -786,6 +810,31 @@ class VFolderMount(JSONSerializableMixin):
                 t.Key("mount_perm"): tx.Enum(MountPermission),
             }
         )
+
+
+class VfHostPermissionMap(dict, JSONSerializableMixin):
+    def union(self, other: Any) -> VfHostPermissionMap:
+        if self is other:
+            return self
+        if not isinstance(other, dict):
+            raise ValueError(f"Invalid merge. expected `dict` type, got {type(other)} type")
+        inter = {host: set([*perms, *other[host]]) for host, perms in self.items() if host in other}
+        return VfHostPermissionMap(
+            {**self, **other, **inter}
+        )  # The last component in comprehensive overrides keys.
+
+    def to_json(self) -> dict[str, Any]:
+        return {host: [perm.name for perm in perms] for host, perms in self.items()}
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        from . import validators as tx
+
+        return t.Dict(t.String, t.List(tx.Enum(VFolderHostPermission)))
 
 
 class ImageRegistry(TypedDict):

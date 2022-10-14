@@ -111,7 +111,7 @@ class Domain(graphene.ObjectType):
             created_at=row["created_at"],
             modified_at=row["modified_at"],
             total_resource_slots=row["total_resource_slots"].to_json(),
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"],
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             allowed_docker_registries=row["allowed_docker_registries"],
             integration_id=row["integration_id"],
         )

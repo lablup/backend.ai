@@ -48,12 +48,15 @@ from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    AbstractPermission,
     BinarySize,
     JSONSerializableMixin,
     KernelId,
     ReadableCIDR,
     ResourceSlot,
     SessionId,
+    VfHostPermissionMap,
+    VFolderHostPermission,
 )
 from ai.backend.manager.models.utils import execute_with_retry
 
@@ -96,30 +99,6 @@ pgsql_connect_opts = {
 # helper functions
 def zero_if_none(val):
     return 0 if val is None else val
-
-
-class AbstractPermission(str, enum.Enum):
-    """
-    Abstract enum type for permissions
-    """
-
-
-class VFolderHostPermission(AbstractPermission):
-    """
-    Atomic permissions for a virtual folder under a host given to a specific access key.
-    """
-
-    ALL = "*"
-    CREATE = "create-vfolder"
-    READ = "read-vfolder"  # ls, list, info
-    UPDATE = "update-vfolder"  # rename, update-options
-    DELETE = "delete-vfolder"
-    MOUNT = "mount"
-    UPDATE_FILE = "update-file"  # including mkdir, mv, rename-file, delete-file
-    UPLOAD = "upload"
-    DOWNLOAD = "download"
-    INVITE = "invite"
-    SHARE = "share"
 
 
 class EnumType(TypeDecorator, SchemaType):
@@ -361,12 +340,10 @@ class PermissionListColumn(TypeDecorator):
             return []
         return [perm.value for perm in value]
 
-    def process_result_value(
-        self, value: Sequence[str] | None, dialect
-    ) -> List[AbstractPermission]:
+    def process_result_value(self, value: Sequence[str] | None, dialect) -> set[AbstractPermission]:
         if value is None:
-            return []
-        return [self._perm_type(perm) for perm in value]
+            return set()
+        return set(self._perm_type(perm) for perm in value)
 
 
 class VFolderHostPermissionColumn(TypeDecorator):
@@ -385,12 +362,12 @@ class VFolderHostPermissionColumn(TypeDecorator):
             host: self.perm_col.process_bind_param(perms, None) for host, perms in value.items()
         }
 
-    def process_result_value(self, value: Mapping[str, Any] | None, dialect) -> Mapping[str, Any]:
+    def process_result_value(self, value: Mapping[str, Any] | None, dialect) -> VfHostPermissionMap:
         if value is None:
-            return {}
-        return {
-            host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()
-        }
+            return VfHostPermissionMap()
+        return VfHostPermissionMap(
+            {host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()}
+        )
 
 
 class CurrencyTypes(enum.Enum):
