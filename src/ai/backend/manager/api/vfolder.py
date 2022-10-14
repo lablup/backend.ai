@@ -105,22 +105,22 @@ def vfolder_filter_by_status_required(perm: VFolderAccessStatus):
             user_uuid = request["user"]["uuid"]
             allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
             if "id" in request.match_info:
-                folder_id = request.match_info["id"]
-                vf_name_conds = vfolders.c.id == folder_id
+                path_folder_id = request.match_info["id"]
+                vf_name_conds = vfolders.c.id == path_folder_id
             elif "name" in request.match_info:
-                folder_name = request.match_info["name"]
-                vf_name_conds = vfolders.c.name == folder_name
+                path_folder_name = request.match_info["name"]
+                vf_name_conds = vfolders.c.name == path_folder_name
             elif "id" in request.query:
-                folder_id = request.query["id"]
-                vf_name_conds = vfolders.c.id == folder_id
+                query_folder_id = request.query["id"]
+                vf_name_conds = vfolders.c.id == query_folder_id
             elif "name" in request.query:
-                folder_name = request.query["name"]
-                vf_name_conds = vfolders.c.name == folder_name
+                query_folder_name = request.query["name"]
+                vf_name_conds = vfolders.c.name == query_folder_name
             elif len(args) > 1 and isinstance(args[1], dict):
-                if folder_id := args[1].get("id"):
-                    vf_name_conds = vfolders.c.id == folder_id
-                elif folder_name := args[1].get("name"):
-                    vf_name_conds = vfolders.c.name == folder_name
+                if body_folder_id := args[1].get("id"):
+                    vf_name_conds = vfolders.c.id == body_folder_id
+                elif body_folder_name := args[1].get("name"):
+                    vf_name_conds = vfolders.c.name == body_folder_name
                 else:
                     raise VFolderFilterStatusFailed("either vFolder id nor name not supplied")
             else:

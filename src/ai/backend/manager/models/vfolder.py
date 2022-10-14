@@ -332,10 +332,9 @@ async def query_accessible_vfolders(
     if "user" in allowed_vfolder_types:
         # Scan my owned vfolders.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = (
-            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
-            .select_from(j)
-        )
+        query = sa.select(
+            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
+        ).select_from(j)
         if user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN:
             query = query.where(vfolders.c.user == user_uuid)
         await _append_entries(query)
