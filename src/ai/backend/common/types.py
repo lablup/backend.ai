@@ -8,7 +8,7 @@ import numbers
 import sys
 import uuid
 from abc import ABCMeta, abstractmethod
-from collections import UserDict, namedtuple
+from collections import UserDict, defaultdict, namedtuple
 from contextvars import ContextVar
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
@@ -818,10 +818,10 @@ class VfHostPermissionMap(dict, JSONSerializableMixin):
             return self
         if not isinstance(other, dict):
             raise ValueError(f"Invalid merge. expected `dict` type, got {type(other)} type")
-        inter = {host: set([*perms, *other[host]]) for host, perms in self.items() if host in other}
-        return VfHostPermissionMap(
-            {**self, **other, **inter}
-        )  # The last component in comprehensive overrides keys.
+        union_map: Dict[str, set] = defaultdict(set)
+        for host, perms in [*self.items(), *other.items()]:
+            union_map[host] |= set(perms)
+        return VfHostPermissionMap(union_map)
 
     def to_json(self) -> dict[str, Any]:
         return {host: [perm.name for perm in perms] for host, perms in self.items()}
