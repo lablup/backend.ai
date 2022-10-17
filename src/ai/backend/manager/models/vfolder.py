@@ -256,6 +256,7 @@ async def query_accessible_vfolders(
     conn: SAConnection,
     user_uuid: uuid.UUID,
     *,
+    allow_privileged_access=False,
     user_role=None,
     domain_name=None,
     allowed_vfolder_types=None,
@@ -335,7 +336,9 @@ async def query_accessible_vfolders(
         query = sa.select(
             vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
         ).select_from(j)
-        if user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN:
+        if not allow_privileged_access or (
+            user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
+        ):
             query = query.where(vfolders.c.user == user_uuid)
         await _append_entries(query)
 

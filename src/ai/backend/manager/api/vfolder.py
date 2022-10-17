@@ -138,6 +138,7 @@ async def ensure_vfolder_status(
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
             extra_vf_conds=(vf_name_conds & vf_status_conds),
+            allow_privileged_access=True,
         )
         if len(entries) == 0:
             raise VFolderFilterStatusFailed()
