@@ -132,7 +132,7 @@ class Agent(graphene.ObjectType):
         mega = 2**20
         return cls(
             id=row["id"],
-            status=row["status"],
+            status=row["status"].name,
             status_changed=row["status_changed"],
             region=row["region"],
             scaling_group=row["scaling_group"],
@@ -192,13 +192,13 @@ class Agent(graphene.ObjectType):
         self,
         info: graphene.ResolveInfo,
     ) -> Optional[Mapping[str, HardwareMetadata]]:
-        if self.status != AgentStatus.ALIVE:
+        if self.status != AgentStatus.ALIVE.name:
             return None
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.registry.gather_agent_hwinfo(self.id)
 
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
-        if self.status != AgentStatus.ALIVE:
+        if self.status != AgentStatus.ALIVE.name:
             return None
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.registry.get_agent_local_config(self.id, self.addr)
