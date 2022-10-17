@@ -3106,14 +3106,17 @@ class AgentRegistry:
         access_key: AccessKey,
     ) -> Optional[Mapping[str, str]]:
         kernel = await self.get_session(session_name_or_id, access_key)
-        if kernel["agent"] is None or kernel["agent_addr"] is None:
+        if kernel["status"] != KernelStatus.RUNNING:
             return None
-        async with RPCContext(
-            kernel["agent"],
-            kernel["agent_addr"],
-            invoke_timeout=None,
-        ) as rpc:
-            return await rpc.call.get_abusing_report(str(kernel["id"]))
+        try:
+            async with RPCContext(
+                kernel["agent"],
+                kernel["agent_addr"],
+                invoke_timeout=None,
+            ) as rpc:
+                return await rpc.call.get_abusing_report(str(kernel["id"]))
+        except InvalidAPIParameters:
+            return None
 
 
 async def check_scaling_group(
