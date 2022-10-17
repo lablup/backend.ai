@@ -104,7 +104,7 @@ async def ensure_vfolder_status(
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
-    
+
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     if folder_id:
         vf_name_conds = vfolders.c.id == folder_id
@@ -719,7 +719,9 @@ async def list_allowed_types(request: web.Request) -> web.Response:
 @server_status_required(READ_ALLOWED)
 @vfolder_permission_required(VFolderPermission.READ_ONLY)
 async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.READABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     resp: Dict[str, Any] = {}
     folder_name = request.match_info["name"]
@@ -925,7 +927,9 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
     )
 )
 async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     old_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -976,7 +980,9 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
 async def update_vfolder_options(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     updated_fields = {}
     if params["cloneable"] is not None and params["cloneable"] != row["cloneable"]:
@@ -1008,7 +1014,9 @@ async def update_vfolder_options(
     )
 )
 async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1044,7 +1052,9 @@ async def mkdir(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 async def create_download_session(
     request: web.Request, params: Any, row: VFolderRow
 ) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     log_fmt = "VFOLDER.CREATE_DOWNLOAD_SESSION(ak:{}, vf:{}, path:{})"
     log_args = (request["keypair"]["access_key"], row["name"], params["path"])
@@ -1083,7 +1093,9 @@ async def create_download_session(
     )
 )
 async def create_upload_session(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1123,7 +1135,9 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
     )
 )
 async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1162,7 +1176,9 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
     )
 )
 async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1201,7 +1217,9 @@ async def move_file(request: web.Request, params: Any, row: VFolderRow) -> web.R
     )
 )
 async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1240,7 +1258,9 @@ async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> we
     )
 )
 async def list_files(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.READABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1367,7 +1387,9 @@ async def update_invitation(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def invite(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1663,7 +1685,9 @@ async def delete_invitation(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def share(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     """
     Share a group folder to users with overriding permission.
 
@@ -1776,7 +1800,9 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
     """
     Unshare a group folder from users.
     """
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     folder_name = request.match_info["name"]
@@ -1825,7 +1851,9 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
 @auth_required
 @server_status_required(ALL_ALLOWED)
 async def delete(request: web.Request) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
@@ -1915,7 +1943,9 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
     Cannot leave a group vfolder or a vfolder that the requesting user owns.
     """
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     if row["ownership_type"] == VFolderOwnershipType.GROUP:
         raise InvalidAPIParameters("Cannot leave a group vfolder.")
 
@@ -1966,7 +1996,9 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     ),
 )
 async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"])
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+    )
     resp: Dict[str, Any] = {}
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
