@@ -200,6 +200,10 @@ async def RPCContext(
     order_key: str = None,
     keepalive_timeout: int = 60,
 ) -> AsyncIterator[PeerInvoker]:
+    if agent_id is None or addr is None:
+        raise InvalidAPIParameters(
+            f"expected valid agent id and agent address, got {agent_id=} and {addr=}"
+        )
     keepalive_retry_count = 3
     keepalive_interval = keepalive_timeout // keepalive_retry_count
     if keepalive_interval < 2:
@@ -3024,6 +3028,10 @@ class AgentRegistry:
         access_key: AccessKey,
     ) -> Mapping[str, str]:
         kernel = await self.get_session(session_name_or_id, access_key)
+        if kernel["status"] != KernelStatus.RUNNING:
+            raise InvalidAPIParameters(
+                f"Unable to get commit status since kernel(id: {kernel['id']}) is currently not RUNNING."
+            )
         email = await self._get_user_email(kernel)
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
@@ -3044,8 +3052,11 @@ class AgentRegistry:
         """
         Commit a main kernel's container of the given session.
         """
-
         kernel = await self.get_session(session_name_or_id, access_key)
+        if kernel["status"] != KernelStatus.RUNNING:
+            raise InvalidAPIParameters(
+                f"Unable to commit since kernel(id: {kernel['id']}) is currently not RUNNING."
+            )
         email = await self._get_user_email(kernel)
         now = datetime.now(tzutc()).strftime("%Y-%m-%dT%HH%MM%SS")
         shortend_sname = kernel["session_name"][:SESSION_NAME_LEN_LIMIT]
@@ -3082,6 +3093,8 @@ class AgentRegistry:
         access_key: AccessKey,
     ) -> Optional[Mapping[str, str]]:
         kernel = await self.get_session(session_name_or_id, access_key)
+        if kernel["status"] != KernelStatus.RUNNING:
+            return None
         async with RPCContext(
             kernel["agent"],
             kernel["agent_addr"],
