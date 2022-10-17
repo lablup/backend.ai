@@ -256,6 +256,8 @@ async def query_accessible_vfolders(
     conn: SAConnection,
     user_uuid: uuid.UUID,
     *,
+    # when enabled, skip vfolder ownership check if user role is admin or superadmin
+    allow_privileged_access=False,
     user_role=None,
     domain_name=None,
     allowed_vfolder_types=None,
@@ -332,11 +334,13 @@ async def query_accessible_vfolders(
     if "user" in allowed_vfolder_types:
         # Scan my owned vfolders.
         j = vfolders.join(users, vfolders.c.user == users.c.uuid)
-        query = (
-            sa.select(vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True)
-            .select_from(j)
-            .where(vfolders.c.user == user_uuid)
-        )
+        query = sa.select(
+            vfolders_selectors + [vfolders.c.permission, users.c.email], use_labels=True
+        ).select_from(j)
+        if not allow_privileged_access or (
+            user_role != UserRole.ADMIN and user_role != UserRole.SUPERADMIN
+        ):
+            query = query.where(vfolders.c.user == user_uuid)
         await _append_entries(query)
 
         # Scan vfolders shared with me.
