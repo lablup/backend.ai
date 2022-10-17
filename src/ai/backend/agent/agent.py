@@ -420,6 +420,10 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         )
         entrypoint_sh_path = self.resolve_krunner_filepath("runner/entrypoint.sh")
 
+        pantompass_path = self.resolve_krunner_filepath("runner/fantompass.py")
+        hash_phrase_path = self.resolve_krunner_filepath("runner/hash_phrase.py")
+        words_json_path = self.resolve_krunner_filepath("runner/words.json")
+
         if matched_libc_style == "musl":
             terminfo_path = self.resolve_krunner_filepath("runner/terminfo.alpine3.8")
             _mount(MountTypes.BIND, terminfo_path, "/home/work/.terminfo")
@@ -427,6 +431,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         _mount(MountTypes.BIND, dotfile_extractor_path, "/opt/kernel/extract_dotfiles.py")
         _mount(MountTypes.BIND, entrypoint_sh_path, "/opt/kernel/entrypoint.sh")
         _mount(MountTypes.BIND, suexec_path, "/opt/kernel/su-exec")
+        _mount(MountTypes.BIND, pantompass_path, "/opt/kernel/fantompass.py")
+        _mount(MountTypes.BIND, hash_phrase_path, "/opt/kernel/hash_phrase.py")
+        _mount(MountTypes.BIND, words_json_path, "/opt/kernel/words.json")
         if jail_path is not None:
             _mount(MountTypes.BIND, jail_path, "/opt/kernel/jail")
         _mount(MountTypes.BIND, hook_path, "/opt/kernel/libbaihook.so")
