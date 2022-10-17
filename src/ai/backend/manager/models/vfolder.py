@@ -256,6 +256,7 @@ async def query_accessible_vfolders(
     conn: SAConnection,
     user_uuid: uuid.UUID,
     *,
+    # when enabled, skip vfolder ownership check if user role is admin or superadmin
     allow_privileged_access=False,
     user_role=None,
     domain_name=None,
