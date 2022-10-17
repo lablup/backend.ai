@@ -200,6 +200,10 @@ async def RPCContext(
     order_key: str = None,
     keepalive_timeout: int = 60,
 ) -> AsyncIterator[PeerInvoker]:
+    if agent_id is None or addr is None:
+        raise InvalidAPIParameters(
+            f"expected valid agent id and agent address, got {type(agent_id)} and {type(addr)}"
+        )
     keepalive_retry_count = 3
     keepalive_interval = keepalive_timeout // keepalive_retry_count
     if keepalive_interval < 2:
@@ -3024,18 +3028,21 @@ class AgentRegistry:
         access_key: AccessKey,
     ) -> Mapping[str, str]:
         kernel = await self.get_session(session_name_or_id, access_key)
-        if kernel["agent"] is None or kernel["agent_addr"] is None:
-            return {}
+        if kernel["status"] != KernelStatus.RUNNING:
+            return {"status": "", "kernel": str(kernel["id"])}
         email = await self._get_user_email(kernel)
-        async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
-            async with RPCContext(
-                kernel["agent"],
-                kernel["agent_addr"],
-                invoke_timeout=None,
-                order_key=kernel["id"],
-                keepalive_timeout=self.rpc_keepalive_timeout,
-            ) as rpc:
-                return await rpc.call.get_commit_status(str(kernel["id"]), email)
+        try:
+            async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
+                async with RPCContext(
+                    kernel["agent"],
+                    kernel["agent_addr"],
+                    invoke_timeout=None,
+                    order_key=kernel["id"],
+                    keepalive_timeout=self.rpc_keepalive_timeout,
+                ) as rpc:
+                    return await rpc.call.get_commit_status(str(kernel["id"]), email)
+        except InvalidAPIParameters:
+            return {"status": "", "kernel": str(kernel["id"])}
 
     async def commit_session(
         self,
@@ -3048,8 +3055,12 @@ class AgentRegistry:
         """
 
         kernel = await self.get_session(session_name_or_id, access_key)
-        if kernel["agent"] is None or kernel["agent_addr"] is None:
-            return {}
+        if kernel["status"] != KernelStatus.RUNNING:
+            return {
+                "bgtask_id": "",
+                "kernel": str(kernel["id"]),
+                "path": "",
+            }
         email = await self._get_user_email(kernel)
         now = datetime.now(tzutc()).strftime("%Y-%m-%dT%HH%MM%SS")
         shortend_sname = kernel["session_name"][:SESSION_NAME_LEN_LIMIT]
@@ -3058,14 +3069,23 @@ class AgentRegistry:
         filename = f"{now}_{shortend_sname}_{image_name}.tar.gz"
         filename = filename.replace(":", "-")
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
-            async with RPCContext(
-                kernel["agent"],
-                kernel["agent_addr"],
-                invoke_timeout=None,
-                order_key=kernel["id"],
-                keepalive_timeout=self.rpc_keepalive_timeout,
-            ) as rpc:
-                resp: Mapping[str, Any] = await rpc.call.commit(str(kernel["id"]), email, filename)
+            try:
+                async with RPCContext(
+                    kernel["agent"],
+                    kernel["agent_addr"],
+                    invoke_timeout=None,
+                    order_key=kernel["id"],
+                    keepalive_timeout=self.rpc_keepalive_timeout,
+                ) as rpc:
+                    resp: Mapping[str, Any] = await rpc.call.commit(
+                        str(kernel["id"]), email, filename
+                    )
+            except InvalidAPIParameters:
+                return {
+                    "bgtask_id": "",
+                    "kernel": str(kernel["id"]),
+                    "path": "",
+                }
         return resp
 
     async def get_agent_local_config(
