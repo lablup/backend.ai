@@ -1,8 +1,8 @@
 Backend.AI
 ==========
 
-[![PyPI release version](https://badge.fury.io/py/backend.ai.svg)](https://pypi.org/project/backend.ai/)
-![Supported Python versions](https://img.shields.io/pypi/pyversions/backend.ai.svg)
+[![PyPI version](https://badge.fury.io/py/backend.ai-manager.svg)](https://badge.fury.io/py/backend.ai-manager)
+![Supported Python versions](https://img.shields.io/pypi/pyversions/backend.ai-manager.svg)
 [![Gitter](https://badges.gitter.im/lablup/backend.ai.svg)](https://gitter.im/lablup/backend.ai)
 
 Backend.AI is a streamlined, container-based computing cluster orchestrator
