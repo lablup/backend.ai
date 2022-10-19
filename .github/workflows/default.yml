@@ -174,7 +174,7 @@ jobs:
       with:
         submodules: true
     - name: Fetch remote tags
-      run: git fetch origin 'refs/tags/*:refs/tags/*'
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Apply cache for Pants
       uses: actions/cache@v3
       id: cache

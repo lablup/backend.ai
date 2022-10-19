@@ -16,6 +16,17 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.2 (2022-10-18)
+
+### Fixes
+* Fix missing unpacking of the tar file before downloading a single file from a session container ([#778](https://github.com/lablup/backend.ai/issues/778))
+* Update mutation error message for better readability. ([#782](https://github.com/lablup/backend.ai/issues/782))
+* Raise error if target kernel is not yet ready to accept RPC call. ([#787](https://github.com/lablup/backend.ai/issues/787))
+* Correct agent status compare in resolver. ([#788](https://github.com/lablup/backend.ai/issues/788))
+* Resolve error in getting vfolder inode usage by converting the human-readable string of `inode_size` to `inode_count` number. ([#789](https://github.com/lablup/backend.ai/issues/789))
+* Fix admin not being able to access some vFolder APIs which referring vFolders that requesting user does not own ([#791](https://github.com/lablup/backend.ai/issues/791))
+
+
 ## 22.09.1 (2022-10-07)
 
 ### Features
