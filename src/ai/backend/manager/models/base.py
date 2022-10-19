@@ -56,8 +56,8 @@ from ai.backend.common.types import (
     ReadableCIDR,
     ResourceSlot,
     SessionId,
-    VfHostPermissionMap,
     VFolderHostPermission,
+    VFolderHostPermissionMap,
 )
 from ai.backend.manager.models.utils import execute_with_retry
 
@@ -380,10 +380,12 @@ class VFolderHostPermissionColumn(TypeDecorator):
             host: self.perm_col.process_bind_param(perms, None) for host, perms in value.items()
         }
 
-    def process_result_value(self, value: Mapping[str, Any] | None, dialect) -> VfHostPermissionMap:
+    def process_result_value(
+        self, value: Mapping[str, Any] | None, dialect
+    ) -> VFolderHostPermissionMap:
         if value is None:
-            return VfHostPermissionMap()
-        return VfHostPermissionMap(
+            return VFolderHostPermissionMap()
+        return VFolderHostPermissionMap(
             {host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()}
         )
 

@@ -812,16 +812,16 @@ class VFolderMount(JSONSerializableMixin):
         )
 
 
-class VfHostPermissionMap(dict, JSONSerializableMixin):
-    def union(self, other: Any) -> VfHostPermissionMap:
+class VFolderHostPermissionMap(dict, JSONSerializableMixin):
+    def __or__(self, other: Any) -> VFolderHostPermissionMap:
         if self is other:
             return self
         if not isinstance(other, dict):
-            raise ValueError(f"Invalid merge. expected `dict` type, got {type(other)} type")
+            raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
         union_map: Dict[str, set] = defaultdict(set)
         for host, perms in [*self.items(), *other.items()]:
             union_map[host] |= set(perms)
-        return VfHostPermissionMap(union_map)
+        return VFolderHostPermissionMap(union_map)
 
     def to_json(self) -> dict[str, Any]:
         return {host: [perm.name for perm in perms] for host, perms in self.items()}
