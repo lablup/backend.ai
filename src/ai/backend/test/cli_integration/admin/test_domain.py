@@ -44,7 +44,18 @@ def test_add_domain(run: ClientRunnerFunc):
     assert test_domain.get("is_active") is False, "Domain active status mismatch"
     assert test_domain.get("total_resource_slots") == {}, "Domain total resource slots mismatch"
     assert test_domain.get("allowed_vfolder_hosts") == {
-        "local:volume1": ["*"],
+        "local:volume1": [
+            "create-vfolder",
+            "read-vfolder",
+            "update-vfolder",
+            "delete-vfolder",
+            "mount",
+            "update-file",
+            "upload",
+            "download",
+            "invite",
+            "share",
+        ],
     }, "Domain allowed vfolder hosts mismatch"
     assert test_domain.get("allowed_docker_registries") == [
         "cr.backend.ai"
@@ -94,7 +105,18 @@ def test_update_domain(run: ClientRunnerFunc):
     assert test_domain.get("is_active") is True, "Domain active status mismatch"
     assert test_domain.get("total_resource_slots") == {}, "Domain total resource slots mismatch"
     assert test_domain.get("allowed_vfolder_hosts") == {
-        "local:volume2": ["*"],
+        "local:volume2": [
+            "create-vfolder",
+            "read-vfolder",
+            "update-vfolder",
+            "delete-vfolder",
+            "mount",
+            "update-file",
+            "upload",
+            "download",
+            "invite",
+            "share",
+        ],
     }, "Domain allowed vfolder hosts mismatch"
     assert test_domain.get("allowed_docker_registries") == [
         "cr1.backend.ai"

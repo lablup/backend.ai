@@ -66,7 +66,18 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
         test_krp.get("max_containers_per_session") == 2
     ), "Test keypair resouce policy max containers per session mismatch"
     assert test_krp.get("allowed_vfolder_hosts") == {
-        "local:volume1": ["*"],
+        "local:volume1": [
+            "create-vfolder",
+            "read-vfolder",
+            "update-vfolder",
+            "delete-vfolder",
+            "mount",
+            "update-file",
+            "upload",
+            "download",
+            "invite",
+            "share",
+        ],
     }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
@@ -132,7 +143,18 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
         test_krp.get("max_containers_per_session") == 1
     ), "Test keypair resouce policy max containers per session mismatch"
     assert test_krp.get("allowed_vfolder_hosts") == {
-        "local:volume2": ["*"],
+        "local:volume2": [
+            "create-vfolder",
+            "read-vfolder",
+            "update-vfolder",
+            "delete-vfolder",
+            "mount",
+            "update-file",
+            "upload",
+            "download",
+            "invite",
+            "share",
+        ],
     }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
 

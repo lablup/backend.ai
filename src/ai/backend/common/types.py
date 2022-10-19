@@ -225,7 +225,6 @@ class VFolderHostPermission(AbstractPermission):
     Atomic permissions for a virtual folder under a host given to a specific access key.
     """
 
-    ALL = "*"
     CREATE = "create-vfolder"
     READ = "read-vfolder"  # ls, list, info
     UPDATE = "update-vfolder"  # rename, update-options

@@ -21,7 +21,7 @@ branch_labels = None
 depends_on = None
 
 
-ALL_HOST_PERMISSIONS = [VFolderHostPermission.ALL.value]
+ALL_HOST_PERMISSIONS = [perm.value for perm in VFolderHostPermission]
 
 
 def upgrade() -> None:
