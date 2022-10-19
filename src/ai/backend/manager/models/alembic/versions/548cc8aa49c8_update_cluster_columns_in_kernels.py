@@ -7,6 +7,7 @@ Create Date: 2020-09-08 18:50:05.594899
 """
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "548cc8aa49c8"
@@ -31,9 +32,9 @@ def upgrade():
         "UPDATE kernels k "
         "  SET cluster_size = (SELECT COUNT(*) FROM kernels j WHERE j.session_id = k.session_id);"
     )
-    conn.execute(query)
+    conn.execute(text(query))
     query = "UPDATE kernels SET cluster_hostname = CONCAT(role, CAST(idx AS TEXT));"
-    conn.execute(query)
+    conn.execute(text(query))
     op.alter_column("kernels", "cluster_hostname", nullable=False)
 
     op.alter_column("kernels", "idx", new_column_name="cluster_idx", nullable=False)
