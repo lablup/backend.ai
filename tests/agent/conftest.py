@@ -118,7 +118,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
         pass
 
 
-@pytest.fixture(scope="session", autouse=False)
+@pytest.fixture(scope="session", autouse=True)
 def test_local_instance_id(session_mocker, test_id):
     mock_generate_local_instance_id = session_mocker.patch(
         "ai.backend.agent.agent.generate_local_instance_id",
