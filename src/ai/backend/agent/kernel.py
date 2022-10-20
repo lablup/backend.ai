@@ -304,13 +304,6 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     async def list_files(self, path: str):
         raise NotImplementedError
 
-    @abstractmethod
-    async def init_mounted_apps(self):
-        """
-        Initiate app-type vfolders which are mounted on the kernel.
-        """
-        raise NotImplementedError
-
     async def execute(
         self,
         run_id: Optional[str],

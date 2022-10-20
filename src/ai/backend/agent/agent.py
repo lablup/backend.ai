@@ -1626,7 +1626,6 @@ class AbstractAgent(
                                     break
             if self.local_config["debug"]["log-kernel-config"]:
                 log.debug("service ports:\n{!r}", pretty(service_ports))
-            await kernel_obj.init_mounted_apps()
         except asyncio.CancelledError:
             log.warning("cancelled waiting of container startup (k:{})", kernel_id)
             raise

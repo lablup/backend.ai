@@ -321,11 +321,6 @@ class KubernetesKernel(AbstractKernel):
 
         return {"files": "", "errors": "", "abspath": str(container_path)}
 
-    async def init_mounted_apps(self):
-        # TODO: Implement mounting app-type vfolder on Kubernetes kernel.
-        log.error("Mounting app-type vfolder in Kubernetes is not supported yet.")
-        raise NotImplementedError
-
 
 class KubernetesCodeRunner(AbstractCodeRunner):
 

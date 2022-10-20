@@ -12,7 +12,7 @@ from collections import UserDict, namedtuple
 from contextvars import ContextVar
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -328,6 +328,11 @@ class MountTypes(str, enum.Enum):
     TMPFS = "tmpfs"
     K8S_GENERIC = "k8s-generic"
     K8S_HOSTPATH = "k8s-hostpath"
+
+
+class MountedAppConfig(TypedDict):
+    service_def: Path
+    metadata: Path
 
 
 class HostPortPair(namedtuple("HostPortPair", "host port")):
