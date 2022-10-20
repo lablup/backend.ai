@@ -72,8 +72,8 @@ class libnuma:
                 return get_cpus()
 
     @staticmethod
-    async def get_core_topology(limit_cpus=None) -> tuple[list[int]]:
-        topo: tuple[list[int]] = tuple([] for _ in range(libnuma.num_nodes()))
+    async def get_core_topology(limit_cpus=None) -> tuple[list[int], ...]:
+        topo: tuple[list[int], ...] = tuple([] for _ in range(libnuma.num_nodes()))
         for c in await libnuma.get_available_cores():
             if limit_cpus is not None and c not in limit_cpus:
                 continue
