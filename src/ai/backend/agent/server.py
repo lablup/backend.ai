@@ -653,6 +653,12 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def remove_image(self, image: str) -> None:
+        log.debug("rpc::remove_image(name:{})", image)
+        return await self.agent.remove_image(image)
+
+    @rpc_function
+    @collect_error
     async def reset_agent(self):
         log.debug("rpc::reset()")
         kernel_ids = tuple(self.agent.kernel_registry.keys())

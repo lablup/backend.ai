@@ -1667,6 +1667,14 @@ class AbstractAgent(
             "attached_devices": attached_devices,
         }
 
+    async def remove_image(self, image_name: str) -> None:
+        self.images = {img: _hash for img, _hash in self.images.items() if img != image_name}
+        return await self._remove_image(image_name)
+
+    @abstractmethod
+    async def _remove_image(self, image_name: str) -> None:
+        raise NotImplementedError
+
     @abstractmethod
     async def destroy_kernel(
         self,

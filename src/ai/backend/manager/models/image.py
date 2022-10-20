@@ -31,11 +31,12 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, ImageAlias, ResourceSlot
+from ai.backend.common.types import AgentId, BinarySize, ImageAlias, ResourceSlot
 from ai.backend.manager.api.exceptions import ImageNotFound
 from ai.backend.manager.container_registry import get_container_registry
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
+from .agent import AgentStatus, agents
 from .base import (
     Base,
     BigInt,
@@ -750,6 +751,12 @@ class ForgetImage(graphene.Mutation):
                 ],
             )
             await session.delete(image_row)
+            agent_query = sa.select([agents.c.id, agents.c.addr]).where(
+                agents.c.status == AgentStatus.ALIVE
+            )
+            agents_rows = (await session.execute(agent_query)).fetchall()
+            for agent in agents_rows:
+                await ctx.registry.remove_image(image_row.name, AgentId(agent.id), agent.addr)
         return ForgetImage(ok=True, msg="")
 
 

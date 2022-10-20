@@ -3102,6 +3102,14 @@ class AgentRegistry:
         ) as rpc:
             return await rpc.call.get_abusing_report(str(kernel["id"]))
 
+    async def remove_image(self, image: str, agent_id: AgentId, agent_addr: str) -> None:
+        async with RPCContext(
+            agent_id,
+            agent_addr,
+            invoke_timeout=None,
+        ) as rpc:
+            return await rpc.call.remove_image(image)
+
 
 async def check_scaling_group(
     conn: SAConnection,

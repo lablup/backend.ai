@@ -941,6 +941,10 @@ class KubernetesAgent(
             restarting=restarting,
         )
 
+    async def _remove_image(self, image_name: str) -> None:
+        # Removing image from K8s is not possible
+        return
+
     async def destroy_kernel(
         self, kernel_id: KernelId, container_id: Optional[ContainerId]
     ) -> None:

@@ -1189,6 +1189,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             data,
         )
 
+    async def _remove_image(self, image_name: str) -> None:
+        try:
+            async with closing_async(Docker()) as docker:
+                await docker.images.delete(image_name)
+        finally:
+            await docker.close()
+
     async def destroy_kernel(
         self,
         kernel_id: KernelId,
