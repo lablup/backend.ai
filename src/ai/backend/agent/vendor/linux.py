@@ -1,5 +1,6 @@
 import ctypes
 import ctypes.util
+import logging
 import os
 import sys
 from pathlib import Path
@@ -7,6 +8,9 @@ from typing import Iterator
 
 import aiotools
 
+from ai.backend.common.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
 _numa_supported = False
 
 if sys.platform == "linux":
@@ -57,19 +61,27 @@ class libnuma:
     @staticmethod
     @aiotools.lru_cache(maxsize=1)
     async def get_available_cores() -> set[int]:
-        match sys.platform:
-            case "linux":
-                docker_cpuset_path = Path("/sys/fs/cgroup/cpuset/docker/cpuset.cpus")
-                try:
-                    docker_cpuset = docker_cpuset_path.read_text()
-                    return {*parse_cpuset(docker_cpuset)}
-                except (IOError, ValueError):
+        cpuset_source = "the system cpu count"
+        try:
+            match sys.platform:
+                case "linux":
+                    docker_cpuset_path = Path("/sys/fs/cgroup/cpuset/docker/cpuset.cpus")
                     try:
-                        return os.sched_getaffinity(0)
-                    except AttributeError:
-                        return get_cpus()
-            case _:
-                return get_cpus()
+                        docker_cpuset = docker_cpuset_path.read_text()
+                        cpuset = {*parse_cpuset(docker_cpuset)}
+                        cpuset_source = "the docker cgroup"
+                        return cpuset
+                    except (IOError, ValueError):
+                        try:
+                            cpuset = os.sched_getaffinity(0)
+                            cpuset_source = "the scheduler affinity mask of the agent process"
+                            return cpuset
+                        except AttributeError:
+                            return get_cpus()
+                case _:
+                    return get_cpus()
+        finally:
+            log.debug("read the available cpuset from {}", cpuset_source)
 
     @staticmethod
     async def get_core_topology(limit_cpus=None) -> tuple[list[int], ...]:
