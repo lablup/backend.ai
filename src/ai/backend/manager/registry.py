@@ -1538,6 +1538,7 @@ class AgentRegistry:
                                 "BACKENDAI_KERNEL_IMAGE": str(binding.kernel.image_ref),
                                 "BACKENDAI_CLUSTER_ROLE": binding.kernel.cluster_role,
                                 "BACKENDAI_CLUSTER_IDX": str(binding.kernel.cluster_idx),
+                                "BACKENDAI_CLUSTER_LOCAL_RANK": str(index),
                                 "BACKENDAI_CLUSTER_HOST": str(binding.kernel.cluster_hostname),
                             },
                             "resource_slots": binding.kernel.requested_slots.to_json(),
@@ -1550,7 +1551,7 @@ class AgentRegistry:
                             "agent_addr": binding.agent_alloc_ctx.agent_addr,
                             "scaling_group": binding.agent_alloc_ctx.scaling_group,
                         }
-                        for binding in items
+                        for index, binding in enumerate(items)
                     ],
                     cluster_info,
                 )
