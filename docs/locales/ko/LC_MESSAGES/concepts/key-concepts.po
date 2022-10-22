@@ -59,7 +59,7 @@ msgstr ""
 
 #: ../../concepts/key-concepts.rst:22 8a9cf7d51c224c7b85fc2e1facc48c0a
 msgid "Manager and Agents"
-msgstr "매니저와 에이전트"
+msgstr "관리자와 에이전트"
 
 #: ../../concepts/key-concepts.rst:23 dafa6944b67c45279546dea685b1d301
 msgid ""
@@ -74,9 +74,9 @@ msgid ""
 "to appropriate agents and sessions. It also collects the output of sessions "
 "and responds the users with them."
 msgstr ""
-"Backend.AI 매니저는 클러스터의 중앙 제어를 담당합니다. 매니저는 유저의"
-"요청을 수락하거나, 세션을 생성/삭제하거나, 코드 실행 요청을 적절한 에이전트와"
-"세션에 라우팅하는 역할을 담당합니다. 매니저는 세션의 출력 값을 수집하고, 이 출력"
+"Backend.AI 관리자는 클러스터의 중앙 제어를 담당합니다. 관리자는 유저의 "
+"요청을 수락하거나, 세션을 생성/삭제하거나, 코드 실행 요청을 적절한 에이전트와 "
+"세션에 라우팅하는 역할을 담당합니다. 관리자는 세션의 출력 값을 수집하고, 이 출력"
 "값을 이용하여 유저에 응답하는 역할을 수행합니다."
 
 #: ../../concepts/key-concepts.rst:29 105a17e1cf2a42b480783b0e90976a0f
@@ -88,9 +88,9 @@ msgid ""
 "new sessions on idle servers to load balance."
 msgstr ""
 "Backend.AI 에이전트는 각각의 워커 서버를 관리하기 위해 설치되는 작은 데몬입니다."
-"에이전트는 커널 컨테이너의 생명주기를 관리하고 모니터링하며, 세션의 입/출력을"
-"중재하는 역할을 수행합니다. 각 에이전트는 담당하는 서버의 자원 용량과 상황을"
-"제공함으로써 매니저가 로드 밸런싱을 위해 유휴 서버에 새로운 세션을 할당할 수"
+"에이전트는 커널 컨테이너의 생명주기를 관리하고 모니터링하며, 세션의 입/출력을 "
+"중재하는 역할을 수행합니다. 각 에이전트는 담당하는 서버의 자원 용량과 상황을 "
+"제공함으로써 관리자가 로드 밸런싱을 위해 유휴 서버에 새로운 세션을 할당할 수 "
 "있도록 합니다."
 
 #: ../../concepts/key-concepts.rst:34 2fe56c8b00ee4845888e114e185df32b
@@ -115,7 +115,7 @@ msgid ""
 "if needed."
 msgstr ""
 "Backend.AI는 유저 API 요청에 따라 컴퓨팅 세션을 컨테이너의 형태로 생성합니다."
-"각 컴퓨팅 세션은 (여러 노드에 분산되어 있는) 한 개 이상의 컨테이너를"
+"각 컴퓨팅 세션은 (여러 노드에 분산되어 있는) 한 개 이상의 컨테이너를 "
 "가질 수 있으며, 이러한 멤버 컨테이너들을 \"커널\" 이라고 부릅니다."
 "이러한 다중 컨테이너 세션은 대규모 분산 및 병렬 컴퓨팅에 사용됩니다."
 "에이전트는 필요에 따라 자동으로 커널 이미지를 가져오고 업데이트합니다."
@@ -142,6 +142,8 @@ msgid ""
 "The manager server (the HTTPS 443 port) should be exposed to the public "
 "Internet or the network that your client can access."
 msgstr ""
+"관리자 서버 (HTTPS 443 포트) 는 반드시 공용 인터넷 또는 여러분의 클라이언트"
+"가 접근할 수 있는 네트워크에 열려 있어야 합니다."
 
 #: ../../concepts/key-concepts.rst:51 ba55a7a664684fd38465dec9361a5153
 msgid ""
@@ -149,6 +151,8 @@ msgid ""
 "the same local private network where any traffic between them are "
 "transparently allowed."
 msgstr ""
+"관리자, 에이전트와 기타 데이터베이스/저장소 서버는 상호간의 트래픽이 "
+"투명하게 허용되는 로컬 비공개 네트워크에 같이 함께 상주하여야 합니다."
 
 #: ../../concepts/key-concepts.rst:52 8cd138ce6bb14e08adf98e7172349357
 msgid ""
@@ -156,10 +160,13 @@ msgid ""
 "for the storage using a secondary network interface on each server, such as "
 "Infiniband and RoCE adaptors."
 msgstr ""
+"대용량의 빅데이터 처리의 경우, Infiniband와 RoCE 어댑터 등을 사용하면 "
+"각 서버의 보조 네트워크 인터페이스를 이용하여 저장소를 위한 네트워크를 "
+"분리할 수 있습니다."
 
 #: ../../concepts/key-concepts.rst:55 d47fa62d79d144b3b3c51cf6f80c12c8
 msgid "Databases"
-msgstr ""
+msgstr "데이터베이스"
 
 #: ../../concepts/key-concepts.rst:56 33dde74e15ea41a0a447aff03f70051a
 msgid ""
@@ -173,6 +180,9 @@ msgid ""
 "compute sessions (which may be composed of one or more kernels). They also "
 "store user metadata such as keypairs and resource usage statistics."
 msgstr ""
+"에이전트와 (하나 이상의 커널로 구성된) 컴퓨팅 세션의 수명을 추적하기 위해 "
+"Redis와 PostgreSQL이 사용됩니다. 이 서비스들은 키 페어와 자원 사용 현황 등 "
+"유저 메타데이터를 저장하는 데에도 사용됩니다."
 
 #: ../../concepts/key-concepts.rst:62 c32de0da35314430b8cbef129058b02d
 msgid "Configuration Management"
