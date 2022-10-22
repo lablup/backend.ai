@@ -48,8 +48,8 @@ msgid ""
 "the mono-repo."
 msgstr ""
 "개발을 위해서 백엔드와 프론트 스택을 실행할 수 있는 세가지 방법이 있습니다. :numref:`dev-setup-standard`, :numref"
-":`dev-setup-app`, and :numref:`dev-setup-staticwebui`의 세가지 방법입니다."
-"이 페이지의 가이드에서 사용하는 ``scripts/install-dev.sh``는 모든 세가지 케이스를 커버합니다."
+":`dev-setup-app`, 그리고 :numref:`dev-setup-staticwebui` 의 세가지 방법입니다."
+"이 페이지의 가이드에서 사용하는 ``scripts/install-dev.sh`` 는 모든 세가지 케이스를 커버합니다."
 "유일한 차이는 모노 레포지토리의 Web UI를 런칭할 때 뿐이기 때문입니다."
 
 #: ../../install/development-setup.rst:22 4b1b80dee0e94398a542fa6b8126670c
@@ -66,7 +66,7 @@ msgstr "Electron 기반의 데스크톱 앱의 Backend.AI 오픈 소스 구성 �
 msgid ""
 "A development setup of Backend.AI open source components with pre-built "
 "web UI from the ``backend.ai-app`` repository"
-msgstr "``backend.ai-app`` 레포지토리의 pre-built web UI 기반의 Backend.AI 오픈 소스 구성 요소 개발 설정"
+msgstr " ``backend.ai-app`` 레포지토리의 pre-built web UI 기반의 Backend.AI 오픈 소스 구성 요소 개발 설정"
 
 #: ../../install/development-setup.rst:101 1acde67561224931b2d2db32b1c1365d
 msgid "Installation from Source"
@@ -105,7 +105,7 @@ msgstr ""
 msgid ""
 "Ensure that you have the Python version specified in ``pants.toml`` on "
 "your ``PATH``."
-msgstr "``PATH``에 ``pants.toml``에 명시된 파이썬의 구체적인 버전을 가지고 있는지 확인해 주어야 합니다."
+msgstr "``PATH`` 에 ``pants.toml`` 에 명시된 파이썬의 구체적인 버전을 가지고 있는지 확인해 주어야 합니다."
 
 #: ../../install/development-setup.rst:118 3134a12b16464539bffa7d62525e6674
 msgid ""
@@ -156,7 +156,7 @@ msgid ""
 "The script requires ``sudo`` to check and install several system packages"
 " such as ``build-essential``."
 msgstr ""
-"스크립트를 실행해 ``build-essential``와 같은 시스템 패키지를 설치하고 체크하는데 ``sudo`` 명령어가 필요합니다."
+"스크립트를 실행해 ``build-essential`` 와 같은 시스템 패키지를 설치하고 체크하는데 ``sudo`` 명령어가 필요합니다."
 
 #: ../../install/development-setup.rst:158 a47899b3041742a985788915c4de8273
 msgid ""
@@ -169,8 +169,8 @@ msgid ""
 "using ``-h`` / ``--help`` option, such as installing the CUDA mockup "
 "plugin together, etc."
 msgstr ""
-"이 스크립트는 `Pants <https://pantsbuild.org>`_를 부트스트랩하고, halfstack container들을"
-"``docker compose``를 이용하여 만들어 줍니다. 실행의 끝에서는 스크립트는 manager와 agent와 같은 서비스 daemon들을"
+"이 스크립트는 `Pants <https://pantsbuild.org>`_ 를 부트스트랩하고, halfstack container들을"
+"``docker compose`` 를 이용하여 만들어 줍니다. 실행의 끝에서는 스크립트는 manager와 agent와 같은 서비스 daemon들을"
 "런칭하는 몇몇개의 명령 예시들을 보여줄 것입니다."
 
 #: ../../install/development-setup.rst:169 05f10ae7f0d74deebd1b7d87c8c0b8ac
@@ -190,7 +190,7 @@ msgid ""
 "``scripts/install-dev.sh`` inside that directory."
 msgstr ""
 "만일 여러 인스턴트/버전의 개발 환경을 이 스크립트를 활용해 설치하고 싶다면, 레포지토리를 다른 장소에 클론하고"
-"``scripts/install-dev.sh``를 디렉토리 내에서 실행시켜주면 됩니다"
+"``scripts/install-dev.sh`` 를 디렉토리 내에서 실행시켜주면 됩니다"
 
 #: ../../install/development-setup.rst:179 7d3fc8d29a914d34b775dd0e48e72e92
 msgid ""
@@ -198,7 +198,7 @@ msgid ""
 "to confuse ``docker compose`` so that it can distinguish the containers "
 "for each setup."
 msgstr ""
-"``docker compose``와 헷갈리지 않기 위해서 working-copy 폴더를 다르게 네이밍 해주는 것이 중요합니다."
+"``docker compose`` 와 헷갈리지 않기 위해서 working-copy 폴더를 다르게 네이밍 해주는 것이 중요합니다."
 "그렇게 해서, 각각의 컨테이너의 설정을 구별해 줄 수 있습니다."
 #: ../../install/development-setup.rst:182 356f7da4be1149008223fd851255a710
 msgid ""
@@ -210,7 +210,7 @@ msgid ""
 msgstr ""
 "``scripts/install-dev.sh``의 모든 포트넘버를 커스텀하는 경우가 아니라면, 여러개의 작업 복사본 사이에서 스위치 할 때,"
 "``docker compose -f docker-compose.halfstack.current.yml down`` 과 ``docker compose -f docker-compose.halfstack.current.yml up -d``"
-"를 실행시켜주어야 합니다"
+" 를 실행시켜주어야 합니다"
 
 #: ../../install/development-setup.rst:188 1a1db31206d9496f8999623e0cfdb6e6
 msgid ""
@@ -253,7 +253,7 @@ msgid ""
 "``CAP_SYS_ADMIN``, ``CAP_SYS_PTRACE``, and ``CAP_DAC_OVERRIDE``."
 msgstr ""
 "Backend.AI가 sysfs/cgroup 리소스 통계를 모으도록 허용하기 위해서는 ``CAP_SYS_ADMIN``, ``CAP_SYS_PTRACE``, ``CAP_DAC_OVERRIDE``"
-"의 리눅스의 능력이 필요합니다."
+" 의 리눅스의 능력이 필요합니다."
 
 #: ../../install/development-setup.rst:216 0f7fcbdb18da4afbb80e84cd800a0af8
 msgid "Verifying Installation"
@@ -268,8 +268,8 @@ msgid ""
 "convenient because you don't have to setup a new SSH connection whenever "
 "adding a new terminal."
 msgstr ""
-"``scripts/install-dev.sh``을 실행한 후 나오는 사용방법을 참조하십시오."
-"`tmux <https://github.com/tmux/tmux/wiki>` 를 여러 터미널을 하나의 SSH 세션에서 열때 사용하는 것을 추천합니다."
+"``scripts/install-dev.sh`` 을 실행한 후 나오는 사용방법을 참조하십시오."
+" `tmux <https://github.com/tmux/tmux/wiki>` 를 여러 터미널을 하나의 SSH 세션에서 열때 사용하는 것을 추천합니다."
 "터미널 앱은 tab 인터페이스를 제공할 수 있지만, 리모트 서버들을 이용하는 경우에는 tmux가 새로운 터미널을 열때마다 SSH 연결의 설정을 해줄 필요가 없기 때문에 더 편리합니다."
 
 #: ../../install/development-setup.rst:225 d1522d3930e14f77b8d493664d9a8baf
@@ -299,7 +299,7 @@ msgid ""
 "directory.  That's all."
 msgstr ""
 "모든 도커 컨테이너를 ``docker compose -f docker-"
-"compose.halfstack.current.yml down``를 사용하여 컨테이너를 멈추고 working copy 폴더"
+"compose.halfstack.current.yml down`` 를 사용하여 컨테이너를 멈추고 working copy 폴더"
 "를 통째로 지워주십시오. 그게 답니다."
 
 #: ../../install/development-setup.rst:265 ee92e0d769354d48a90ad362d5ec1326
@@ -317,7 +317,7 @@ msgstr "Daily Workflows"
 
 #: ../../install/development-setup.rst:272 d6e6be4734ea4b9e8df740c9ef9184a9
 msgid "Check out :doc:`/dev/daily-workflows` for your reference."
-msgstr ":doc:`/dev/daily-workflows`를 참고해보실 수 있습니다."
+msgstr ":doc:`/dev/daily-workflows` 를 참고해보실 수 있습니다."
 
 #~ msgid "`rust <https://rustup.rs/>`_ (for bootstrapping Pants)"
 #~ msgstr "`rust <https://rustup.rs/>`_ (for bootstrapping Pants)"
