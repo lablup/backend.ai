@@ -25,7 +25,7 @@ msgstr "API 개요"
 #: ../../concepts/api-overview.rst:4 c41cae658e2d49bda5ee7e4207d959f5
 msgid "Backend.AI API v3 consists of two parts: User APIs and Admin APIs."
 msgstr ""
-"Backend.AI API v3는 사용자 API와 관리자 API의 두 종류로 구성되어 있습니다."
+"Backend.AI API v3는 사용자 API와 관리자 API 두 종류로 구성되어 있습니다."
 
 #: ../../concepts/api-overview.rst:8 c489d07c833141da994bb2e2d893a702
 msgid ""
