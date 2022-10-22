@@ -921,6 +921,7 @@ class KernelEnqueueingConfig(TypedDict):
     image_ref: ImageRef
     cluster_role: str
     cluster_idx: int
+    local_rank: int
     cluster_hostname: str
     creation_config: dict
     bootstrap_script: str

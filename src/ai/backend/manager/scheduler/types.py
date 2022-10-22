@@ -314,6 +314,7 @@ class KernelInfo:
     agent_addr: str
     cluster_role: str
     cluster_idx: int
+    local_rank: int
     cluster_hostname: str
     image_ref: ImageRef
     resource_opts: Mapping[str, Any]
@@ -335,6 +336,7 @@ class KernelInfo:
             kernels.c.agent_addr,  # for scheduled kernels
             kernels.c.cluster_role,
             kernels.c.cluster_idx,
+            kernels.c.local_rank,
             kernels.c.cluster_hostname,
             kernels.c.image,
             kernels.c.architecture,
@@ -356,6 +358,7 @@ class KernelInfo:
             agent_addr=row["agent_addr"],
             cluster_role=row["cluster_role"],
             cluster_idx=row["cluster_idx"],
+            local_rank=row["local_rank"],
             cluster_hostname=row["cluster_hostname"],
             image_ref=ImageRef(row["image"], [row["registry"]], row["architecture"]),
             resource_opts=row["resource_opts"],

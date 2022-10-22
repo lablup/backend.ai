@@ -872,10 +872,13 @@ class AgentRegistry:
                 # the first kernel_config is repliacted to sub-containers
                 assert kernel_enqueue_configs[0]["cluster_role"] == DEFAULT_ROLE
                 kernel_enqueue_configs[0]["cluster_idx"] = 1
+                kernel_enqueue_configs[0]["local_rank"] = 0
                 for i in range(cluster_size - 1):
+                    increased_index = i + 1
                     sub_kernel_config = cast(KernelEnqueueingConfig, {**kernel_enqueue_configs[0]})
                     sub_kernel_config["cluster_role"] = "sub"
-                    sub_kernel_config["cluster_idx"] = i + 1
+                    sub_kernel_config["cluster_idx"] = increased_index
+                    sub_kernel_config["local_rank"] = increased_index
                     sub_kernel_config["cluster_hostname"] = sub_kernel_config["cluster_role"] + str(
                         sub_kernel_config["cluster_idx"]
                     )
@@ -921,6 +924,7 @@ class AgentRegistry:
                 "cluster_size": cluster_size,
                 "cluster_role": sa.bindparam("cluster_role"),
                 "cluster_idx": sa.bindparam("cluster_idx"),
+                "local_rank": sa.bindparam("local_rank"),
                 "cluster_hostname": sa.bindparam("cluster_hostname"),
                 "scaling_group": checked_scaling_group,
                 "domain_name": user_scope.domain_name,
@@ -1094,6 +1098,7 @@ class AgentRegistry:
                     "kernel_id": kernel_id,
                     "cluster_role": kernel["cluster_role"],
                     "cluster_idx": kernel["cluster_idx"],
+                    "local_rank": kernel["local_rank"],
                     "cluster_hostname": f"{kernel['cluster_role']}{kernel['cluster_idx']}",
                     "image": image_ref.canonical,
                     "architecture": image_ref.architecture,
@@ -1527,6 +1532,7 @@ class AgentRegistry:
                             "session_type": scheduled_session.session_type.value,
                             "cluster_role": binding.kernel.cluster_role,
                             "cluster_idx": binding.kernel.cluster_idx,
+                            "local_rank": binding.kernel.local_rank,
                             "cluster_hostname": binding.kernel.cluster_hostname,
                             "idle_timeout": resource_policy["idle_timeout"],
                             "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
@@ -1538,7 +1544,7 @@ class AgentRegistry:
                                 "BACKENDAI_KERNEL_IMAGE": str(binding.kernel.image_ref),
                                 "BACKENDAI_CLUSTER_ROLE": binding.kernel.cluster_role,
                                 "BACKENDAI_CLUSTER_IDX": str(binding.kernel.cluster_idx),
-                                "BACKENDAI_CLUSTER_LOCAL_RANK": str(index),
+                                "BACKENDAI_CLUSTER_LOCAL_RANK": str(binding.kernel.local_rank),
                                 "BACKENDAI_CLUSTER_HOST": str(binding.kernel.cluster_hostname),
                             },
                             "resource_slots": binding.kernel.requested_slots.to_json(),
@@ -1551,7 +1557,7 @@ class AgentRegistry:
                             "agent_addr": binding.agent_alloc_ctx.agent_addr,
                             "scaling_group": binding.agent_alloc_ctx.scaling_group,
                         }
-                        for index, binding in enumerate(items)
+                        for binding in items
                     ],
                     cluster_info,
                 )

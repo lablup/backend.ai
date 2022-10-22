@@ -571,6 +571,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                             "image_ref": requested_image_ref,
                             "cluster_role": DEFAULT_ROLE,
                             "cluster_idx": 1,
+                            "local_rank": 0,
                             "cluster_hostname": f"{DEFAULT_ROLE}1",
                             "creation_config": params["config"],
                             "bootstrap_script": params["bootstrap_script"],
