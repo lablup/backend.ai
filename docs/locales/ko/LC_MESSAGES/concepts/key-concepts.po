@@ -39,7 +39,7 @@ msgid ""
 ":numref:`server-arch-diagram` shows a brief Backend.AI server-side "
 "architecture where the components are what you need to install and configure."
 msgstr ""
-":numref: `server-arch-diagram`은 설치하고 설정해야 할 구성요소인 Backend.AI 서버 단의 "
+":numref:`server-arch-diagram` 은 설치하고 설정해야 할 구성요소인 Backend.AI 서버 단의 "
 "구조를 간략하게 보여줍니다."
 
 #: ../../concepts/key-concepts.rst:17 715df25fba85409a91f3ed774cd0b5f1
