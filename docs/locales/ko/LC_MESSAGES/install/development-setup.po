@@ -35,6 +35,8 @@ msgid ""
 "production setup uses per-service independent virtual environments and "
 "relies on a separately provisioned app proxy pool."
 msgstr ""
+"development 설정에는 백앤드를 위한 모노 레포지토리와 프론트엔드를 위한 side-by-side 레포지토리 하나가 필요합니다."
+"반면에, production 설정은 서비스별 독립적인 가상 환경을 사용하며 별도로 프로비저닝된 애플리케이션 프록시 풀에 의존합니다."
 
 #: ../../install/development-setup.rst:13 29627354616242198ae3df4a8c56db5c
 msgid ""
@@ -45,26 +47,30 @@ msgid ""
 "cases because the only difference is that how you launch the Web UI from "
 "the mono-repo."
 msgstr ""
+"개발을 위해서 백엔드와 프론트 스택을 실행할 수 있는 세가지 방법이 있습니다. :numref:`dev-setup-standard`, :numref"
+":`dev-setup-app`, and :numref:`dev-setup-staticwebui`의 세가지 방법입니다."
+"이 페이지의 가이드에서 사용하는 ``scripts/install-dev.sh``는 모든 세가지 케이스를 커버합니다."
+"유일한 차이는 모노 레포지토리의 Web UI를 런칭할 때 뿐이기 때문입니다."
 
 #: ../../install/development-setup.rst:22 4b1b80dee0e94398a542fa6b8126670c
 msgid "A standard development setup of Backend.AI open source components"
-msgstr ""
+msgstr "Backend.AI 오픈소스 컴포넌츠의 표준 개발 설정"
 
 #: ../../install/development-setup.rst:28 e6b1d7f935b14edb8ee54e197f844008
 msgid ""
 "A development setup of Backend.AI open source components for Electron-"
 "based desktop app"
-msgstr ""
+msgstr "Electron 기반의 데스크톱 앱의 Backend.AI 오픈 소스 구성 요소 개발 설정"
 
 #: ../../install/development-setup.rst:35 b6f55301dd6b4278801091737983ed5c
 msgid ""
 "A development setup of Backend.AI open source components with pre-built "
 "web UI from the ``backend.ai-app`` repository"
-msgstr ""
+msgstr "``backend.ai-app`` 레포지토리의 pre-built web UI 기반의 Backend.AI 오픈 소스 구성 요소 개발 설정"
 
 #: ../../install/development-setup.rst:101 1acde67561224931b2d2db32b1c1365d
 msgid "Installation from Source"
-msgstr ""
+msgstr "소스로 설치"
 
 #: ../../install/development-setup.rst:103 fe8264c058f1466ba2dfa6f83a92f799
 msgid ""
@@ -72,6 +78,8 @@ msgid ""
 " script that installs all server-side components in editable states with "
 "just one command."
 msgstr ""
+"자동화된 스크립트를 제공하여 개발자들이 온보딩하기 편한 환경을 제공합니다." 
+"모든 서버 측의 컴포넌츠는 단 하나의 명령으로 편집 가능한 상태가 됩니다."
 
 #: ../../install/development-setup.rst:108 9aa76967affd4f6cbf44342d571dbb78
 msgid "Prerequisites"
@@ -148,6 +156,7 @@ msgid ""
 "The script requires ``sudo`` to check and install several system packages"
 " such as ``build-essential``."
 msgstr ""
+"스크립트를 실행해 ``build-essential``와 같은 시스템 패키지를 설치하고 체크하는데 ``sudo`` 명령어가 필요합니다."
 
 #: ../../install/development-setup.rst:158 a47899b3041742a985788915c4de8273
 msgid ""
@@ -160,6 +169,9 @@ msgid ""
 "using ``-h`` / ``--help`` option, such as installing the CUDA mockup "
 "plugin together, etc."
 msgstr ""
+"이 스크립트는 `Pants <https://pantsbuild.org>`_를 부트스트랩하고, halfstack container들을"
+"``docker compose``를 이용하여 만들어 줍니다. 실행의 끝에서는 스크립트는 manager와 agent와 같은 서비스 daemon들을"
+"런칭하는 몇몇개의 명령 예시들을 보여줄 것입니다."
 
 #: ../../install/development-setup.rst:169 05f10ae7f0d74deebd1b7d87c8c0b8ac
 msgid ""
@@ -168,6 +180,8 @@ msgid ""
 "changed the installation instruction completely with introduction of "
 "Pants."
 msgstr ""
+"우리는 플러그인을 제외한 모든 Python 기반 구성 요소를 포함하는 semi-mono 저장소로 패키지별 저장소로 이동시켰습니다. 
+"이것은 팬츠의 도입으로 설치 방법이 완전히 바뀌었습니다."
 
 #: ../../install/development-setup.rst:175 99570bb3c9ae45598ffb8d5fc491c0f8
 msgid ""
@@ -175,6 +189,8 @@ msgid ""
 "this script, just clone the repository in another location and run "
 "``scripts/install-dev.sh`` inside that directory."
 msgstr ""
+"만일 여러 인스턴트/버전의 개발 환경을 이 스크립트를 활용해 설치하고 싶다면, 레포지토리를 다른 장소에 클론하고"
+"``scripts/install-dev.sh``를 디렉토리 내에서 실행시켜주면 됩니다"
 
 #: ../../install/development-setup.rst:179 7d3fc8d29a914d34b775dd0e48e72e92
 msgid ""
@@ -182,7 +198,8 @@ msgid ""
 "to confuse ``docker compose`` so that it can distinguish the containers "
 "for each setup."
 msgstr ""
-
+"``docker compose``와 헷갈리지 않기 위해서 working-copy 폴더를 다르게 네이밍 해주는 것이 중요합니다."
+"그렇게 해서, 각각의 컨테이너의 설정을 구별해 줄 수 있습니다."
 #: ../../install/development-setup.rst:182 356f7da4be1149008223fd851255a710
 msgid ""
 "Unless you customize all port numbers by the options of ``scripts"
@@ -191,6 +208,9 @@ msgid ""
 "compose.halfstack.current.yml up -d`` when switching between multiple "
 "working copies."
 msgstr ""
+"``scripts/install-dev.sh``의 모든 포트넘버를 커스텀하는 경우가 아니라면, 여러개의 작업 복사본 사이에서 스위치 할 때,"
+"``docker compose -f docker-compose.halfstack.current.yml down`` 과 ``docker compose -f docker-compose.halfstack.current.yml up -d``"
+"를 실행시켜주어야 합니다"
 
 #: ../../install/development-setup.rst:188 1a1db31206d9496f8999623e0cfdb6e6
 msgid ""
@@ -198,6 +218,8 @@ msgid ""
 "kernel and TensorFlow CPU-only kernel.  To try out other images, you have"
 " to pull them manually afterwards."
 msgstr ""
+"기본적으로, 이 스크립트는 도커 이미지를 통해 표준 파이썬 커널과 TensorFlow CPU-only kernel을 pull해 옵니다."
+"다른 도커 이미지를 사용해 보기 위해서는, 추후에 수동적으로 pull을 해주어야 합니다."
 
 #: ../../install/development-setup.rst:194 731efa1f17b143dfa27fd68ed020ee8e
 msgid ""
@@ -205,6 +227,7 @@ msgid ""
 "ARM64 platforms, because users need to rebuild the whole computation "
 "library stack, although more supported images will come in the future."
 msgstr ""
+
 
 #: ../../install/development-setup.rst:200 6364a7f7131e451f8da90b603e562dad
 msgid ""
@@ -275,11 +298,11 @@ msgstr ""
 
 #: ../../install/development-setup.rst:270 3a84ec398d3e4e6eaa32b3152f88429d
 msgid "Daily Workflows"
-msgstr ""
+msgstr "Daily Workflows"
 
 #: ../../install/development-setup.rst:272 d6e6be4734ea4b9e8df740c9ef9184a9
 msgid "Check out :doc:`/dev/daily-workflows` for your reference."
-msgstr ""
+msgstr ":doc:`/dev/daily-workflows`를 참고해보실 수 있습니다."
 
 #~ msgid "`rust <https://rustup.rs/>`_ (for bootstrapping Pants)"
 #~ msgstr ""
