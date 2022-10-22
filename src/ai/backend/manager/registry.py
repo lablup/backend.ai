@@ -3029,7 +3029,7 @@ class AgentRegistry:
     ) -> Mapping[str, str]:
         kernel = await self.get_session(session_name_or_id, access_key)
         if kernel["status"] != KernelStatus.RUNNING:
-            return {"status": None, "kernel": str(kernel["id"])}
+            return {"status": "", "kernel": str(kernel["id"])}
         email = await self._get_user_email(kernel)
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
