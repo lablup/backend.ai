@@ -49,7 +49,7 @@ msgid ""
 "virtual folder have read-write-delete permission for the folder."
 msgstr "또한, 여러분은 가상 폴더를 다른 사용자와 공유할 수 있으며, "
 "적절한 권한을 부여하여 초대할 수 있습니다. 현재, 권한은 각각 세 가지 레벨로 구분됩니다: 읽기 전용, 읽기-쓰기, 읽기-쓰기-삭제. "
-"이들은 각각 ``'ro'``, ``'rw'``, ``'wd'``라는 짧은 문자열로 표현됩니다. 가상 폴더의 소유자는 폴더에 대해 읽기-쓰기-삭제 권한을 가집니다."
+"이들은 각각 ``'ro'`` , ``'rw'``, ``'wd'`` 라는 짧은 문자열로 표현됩니다. 가상 폴더의 소유자는 폴더에 대해 읽기-쓰기-삭제 권한을 가집니다."
 
 #: ../../manager/user-api/vfolders.rst:21 5e48b61ced6240b7806ba6ac59f82870
 msgid "Listing Virtual Folders"
@@ -305,7 +305,7 @@ msgid ""
 "(optional) If this parameter is ``True``, it returns all virtual folders, "
 "including those that do not belong to the current user. Only available for "
 "superadmin (default: ``False``)."
-msgstr "(선택 사항) 이 매개 변수가 ``True`` 인 경우, 현재 사용자에게 속하지 않는 모든 가상 폴더를 반환합니다. 슈퍼 관리자만 사용할 수 있습니다 (기본값: ``False``)."
+msgstr "(선택 사항) 매개 변수가 ``True`` 인 경우, 현재 사용자가 속하지 않는 모든 가상 폴더를 반환합니다. 슈퍼 관리자만이 해당 매개변수를 사용할 수 있습니다 (기본값: ``False``)."
 
 #: ../../manager/user-api/vfolders.rst:43
 #: ../../manager/user-api/vfolders.rst:183 2db0b3145006491d9c3bb29f448bc54e
@@ -325,7 +325,7 @@ msgstr "``str``"
 msgid ""
 "(optional) If this parameter is set, it returns the virtual folders that "
 "belong to the specified group. Have no effect in user-type virtual folders."
-msgstr "(선택 사항) 이 매개 변수가 설정되면, 지정된 그룹에 속한 가상 폴더를 반환합니다. 사용자 유형 가상 폴더에는 영향을 미치지 않습니다."
+msgstr "(선택 사항) 매개 변수가 설정되면, 지정된 그룹에 속한 가상 폴더를 반환합니다. 사용자 유형 가상 폴더에는 영향을 미치지 않습니다."
 
 #: ../../manager/user-api/vfolders.rst:49
 #: ../../manager/user-api/vfolders.rst:113
@@ -403,7 +403,7 @@ msgstr "응답"
 #: d8d605d2c91648fd9c3083e3d0765fe8 dcd82c942b0840eb95a1a97f8c26467d
 #: e36cd2cf4a0340cea28576f42e2f00e1
 msgid "HTTP Status Code"
-msgstr "HTTP Status Code"
+msgstr "HTTP 상태 코드"
 
 #: ../../manager/user-api/vfolders.rst:57
 #: ../../manager/user-api/vfolders.rst:121
@@ -467,7 +467,7 @@ msgstr "200 OK"
 #: bf0247b358e34f79abdf8229ae9b6a86 c561a5c72802412b95d99898eca0a59b
 #: dc8c905e9e6646f3ba3fb501e25da539
 msgid "Success."
-msgstr "성공."
+msgstr "성공"
 
 #: ../../manager/user-api/vfolders.rst:64
 #: ../../manager/user-api/vfolders.rst:128
@@ -552,7 +552,7 @@ msgstr "``list[object]``"
 
 #: ../../manager/user-api/vfolders.rst:69 6f2a978b7ae647aca1be26f65bd2fd2b
 msgid "A list of :ref:`vfolder-list-item-object`."
-msgstr ":ref:`vfolder-list-item-object` 목록."
+msgstr ":ref:`vfolder-list-item-object` 목록"
 
 #: ../../manager/user-api/vfolders.rst:71
 #: ../../manager/user-api/vfolders.rst:138
@@ -574,7 +574,7 @@ msgstr "가상 폴더 호스트 목록"
 msgid ""
 "Returns the list of available host names where the current keypair can "
 "create new virtual folders."
-msgstr "현재 키 쌍이 새로운 가상 폴더를 만들 수 있는 호스트 이름 목록을 반환합니다."
+msgstr "새로운 가상 폴더를 만들 수 있는 현재 keypair의 호스트 이름 목록을 반환합니다."
 
 #: ../../manager/user-api/vfolders.rst:104 fd7151a44b32406d901754eac49f8b6a
 msgid "URI: ``/folders/_/hosts``"
@@ -582,11 +582,11 @@ msgstr "URI: ``/folders/_/hosts``"
 
 #: ../../manager/user-api/vfolders.rst:110 d15bf9f7b21a440399bbfc2ce7bc8ece
 msgid "None."
-msgstr "None."
+msgstr "없음"
 
 #: ../../manager/user-api/vfolders.rst:131 be8781e1730243f49278db54a2df0b77
 msgid "``default``"
-msgstr "``기본값``"
+msgstr "``default``"
 
 #: ../../manager/user-api/vfolders.rst:132
 #: ../../manager/user-api/vfolders.rst:168
@@ -660,7 +660,7 @@ msgstr "``str``"
 
 #: ../../manager/user-api/vfolders.rst:133 f1b468550e594757999638d12108f1e1
 msgid "The default virtual folder host."
-msgstr "기본 가상 폴더 호스트입니다."
+msgstr "기본 가상 폴더 호스트"
 
 #: ../../manager/user-api/vfolders.rst:134 513bf48463fc4e8f806f4e937e04943a
 msgid "``allowed``"
@@ -685,7 +685,7 @@ msgstr "사용 가능한 가상 폴더 호스트 목록"
 
 #: ../../manager/user-api/vfolders.rst:149 3a7d4addc0a94fab9df2305b85b78101
 msgid "Creating a Virtual Folder"
-msgstr "가상 폴더 생성하기"
+msgstr "가상 폴더 생성"
 
 #: ../../manager/user-api/vfolders.rst:152
 #: ../../manager/user-api/vfolders.rst:356
@@ -720,7 +720,7 @@ msgstr "현재 API 키와 연결된 가상 폴더를 생성합니다."
 #: d55a174a5bef4adf91d5f958cd2c8593 eeabd6abba9c4574a2ec848e6aa0bbcb
 #: f7684a118e6e4c0a954143738675ffb2
 msgid "``name``"
-msgstr "``이름``"
+msgstr "``name``"
 
 #: ../../manager/user-api/vfolders.rst:169
 #: ../../manager/user-api/vfolders.rst:277
@@ -745,17 +745,17 @@ msgstr "``이름``"
 #: a79c7b1d3d2243cfb7e69751937876e3 c057f89e92be4b04a0b86d188f1560cb
 #: ceddb7e8ce804e73be4d20d25b4162f0 d8408c8edd8340d39275503d388e3522
 msgid "The human-readable name of the virtual folder."
-msgstr "인간이 읽을 수 있는 가상 폴더 명."
+msgstr "사람이 읽을 수 있는 가상 폴더 이름"
 
 #: ../../manager/user-api/vfolders.rst:170
 #: ../../manager/user-api/vfolders.rst:233 5ffe7f38acfa427798f4a9e40ec61369
 #: 96b5087bb9084448b1241263705bd040
 msgid "``host``"
-msgstr "```host``"
+msgstr "``host``"
 
 #: ../../manager/user-api/vfolders.rst:172 cf81d3ac17e647c8aaa54cd645b28be8
 msgid "(optional) The name of the virtual folder host."
-msgstr "(선택 사항) 가상 폴더 호스트의 이름."
+msgstr "(선택 사항) 가상 폴더 호스트의 이름"
 
 #: ../../manager/user-api/vfolders.rst:173
 #: ../../manager/user-api/vfolders.rst:1316 8f76300b36d942cfb6752eb277f72d1f
@@ -768,7 +768,7 @@ msgstr "``mode``"
 msgid ""
 "(optional) The purpose of the virtual folder. Allowed values are "
 "``general``, ``model``, and ``data`` (default: ``general``)."
-msgstr "(선택 사항) 가상 폴더의 목적. 허용되는 값은 ``general``, ``model``, ``data`` (기본값: ``general``) 입니다."
+msgstr "(선택 사항) 가상 폴더의 목적. 가능한 값은 ``general``, ``model``, ``data`` (기본값: ``general``) 입니다."
 
 #: ../../manager/user-api/vfolders.rst:177
 #: ../../manager/user-api/vfolders.rst:1196
@@ -783,16 +783,16 @@ msgid ""
 "(optional) The default share permission of the virtual folder. The owner of "
 "the virtual folder always have ``wd`` permission regardless of this "
 "parameter. Allowed values are ``ro``, ``rw``, and ``wd`` (default: ``rw``)."
-msgstr "(선택 사항) 가상 폴더의 기본 공유 권한."
-"가상 폴더의 소유자는 이 매개 변수와 관계없이 항상 ``wd`` 권한을 가집니다."
-"허용되는 값은 ``ro``, ``rw``, ``wd`` (기본값: ``rw``) 입니다."
+msgstr "(선택 사항) 가상 폴더의 기본 공유 권한. "
+"가상 폴더의 소유자는 해당 매개 변수와 관계없이 항상 ``wd`` 권한을 가집니다. "
+"가능한 값은 ``ro``, ``rw``, ``wd`` (기본값: ``rw``) 입니다."
 
 #: ../../manager/user-api/vfolders.rst:185 ae053ff941b44c709088201faf457c7c
 msgid ""
 "(optional) If this parameter is set, it creates a group-type virtual folder. "
 "If empty, it creates a user-type virtual folder."
-msgstr "(선택 사항) 이 매개 변수가 설정되면 그룹 유형의 가상 폴더가 생성됩니다."
-"만약 비어 있으면, 사용자 유형의 가상 폴더가 생성됩니다."
+msgstr "(선택 사항) 해당 매개 변수가 설정되면 그룹 유형의 가상 폴더가 생성됩니다. "
+"만약 비어 있다면, 사용자 유형의 가상 폴더가 생성됩니다."
 
 #: ../../manager/user-api/vfolders.rst:187 8a1b92443cf74d7fb255c2ef040f3101
 #, fuzzy
@@ -810,9 +810,9 @@ msgid ""
 "(optional) Set the quota of the virtual folder in bytes. Note, however, that "
 "the quota is only supported under the xfs filesystems. Other filesystems "
 "that do not support per-directory quota will ignore this parameter."
-msgstr "(선택 사항) 가상 폴더의 쿼터를 바이트 단위로 설정합니다."
-"하지만 쿼터는 xfs 파일 시스템에서만 지원됩니다."
-"디렉토리 단위 쿼터를 지원하지 않는 다른 파일 시스템은 이 매개 변수를 무시합니다."
+msgstr "(선택 사항) 가상 폴더의 쿼터를 바이트 단위로 설정합니다. "
+"하지만 쿼터는 xfs 파일 시스템에서만 지원됩니다. "
+"디렉토리 단위 쿼터를 지원하지 않는 다른 파일 시스템은 해당 매개 변수를 무시합니다."
 
 #: ../../manager/user-api/vfolders.rst:211
 #: ../../manager/user-api/vfolders.rst:387
@@ -858,7 +858,7 @@ msgstr "406 Not acceptable"
 msgid ""
 "You have exceeded internal limits of virtual folders. (e.g., the maximum "
 "number of folders you can have.)"
-msgstr "여러분은 가상 폴더의 내부 제한을 초과했습니다. (예: 여러분이 가질 수 있는 최대 폴더 수.)"
+msgstr "가상 폴더의 개수 제한을 초과했습니다. (예: 여러분이 가질 수 있는 최대 폴더 개수)"
 
 #: ../../manager/user-api/vfolders.rst:227 1dcccf97c7cb4a558eab7abe5c5eb9d0
 msgid "``id``"
@@ -873,15 +873,15 @@ msgstr "``slug``"
 
 #: ../../manager/user-api/vfolders.rst:229 c0cafb732ed3409989d5b4ec0eb51134
 msgid "The unique folder ID used for later API calls."
-msgstr "최신 API 호출을 위해 사용되는 고유한 폴더 ID."
+msgstr "최신 API 호출을 위해 사용되는 고유한 폴더 ID"
 
 #: ../../manager/user-api/vfolders.rst:232 ee5cbe1a9e064b6abe9df13b3e200a65
 msgid "The human-readable name of the created virtual folder."
-msgstr "만들어진 가상 폴더의 사람이 읽을 수 있는 이름."
+msgstr "만들어진 가상 폴더의 사람이 읽을 수 있는 이름"
 
 #: ../../manager/user-api/vfolders.rst:235 db0d75fc2388468b9d5157a8ce578036
 msgid "The name of the virtual folder host where the new folder is created."
-msgstr "새 폴더가 생성된 가상 폴더 호스트의 이름."
+msgstr "새 폴더가 생성된 가상 폴더 호스트의 이름"
 
 #: ../../manager/user-api/vfolders.rst:256 f75ed99d97c94fbc8ebff0d9835a79cd
 msgid "Getting Virtual Folder Information"
@@ -898,8 +898,9 @@ msgid ""
 "Retrieves information about a virtual folder. For performance reasons, the "
 "returned information may not be real-time; usually they are updated every a "
 "few seconds in the server-side."
-msgstr "가상 폴더의 정보를 검색합니다."
-"성능상의 이유로, 반환된 정보는 실시간이 아닐 수 있습니다; 보통 서버측에서 몇 초마다 업데이트됩니다."
+msgstr "가상 폴더의 정보를 검색합니다. "
+"성능상의 이유로, 반환된 정보는 실시간이 아닐 수 있습니다; "
+"보통 서버측에서 몇 초마다 업데이트됩니다."
 
 #: ../../manager/user-api/vfolders.rst:289 e8729b2865b44f558fab8a1ff5db1485
 msgid "The information is successfully returned."
@@ -978,7 +979,7 @@ msgstr "이 API가 호출되면 내용을 되돌릴 수 있는 방법이 없습�
 
 #: ../../manager/user-api/vfolders.rst:345 9ed08ed99fd343c3a5017d0ce2c8e22f
 msgid "204 No Content"
-msgstr "204 내용 없음"
+msgstr "204 No Content"
 
 #: ../../manager/user-api/vfolders.rst:346 2a17a9bf45cd44d6a6ef4f023721f0cc
 msgid "The folder is successfully destroyed."
@@ -1032,12 +1033,12 @@ msgstr "커널-종료"
 
 #: ../../manager/user-api/vfolders.rst:376 26facf4f7cbe4a60a5d3429f5a2cd7af
 msgid "New virtual folder name."
-msgstr "새 가상 폴더 이름."
+msgstr "새로운 가상 폴더 이름"
 
 #: ../../manager/user-api/vfolders.rst:388 9d3fa8c747564d0e867bb6f062bd4c00
 #, fuzzy
 msgid "The folder is successfully renamed."
-msgstr "세션이 종료되었습니다."
+msgstr "세션이 종료되었습니다"
 
 #: ../../manager/user-api/vfolders.rst:390 38e95b9a89784f908ed43f5311b0876c
 msgid ""
@@ -1097,8 +1098,8 @@ msgid ""
 "Upload a local file to a virtual folder associated with the current keypair. "
 "Internally, the Manager will deligate the upload to a Backend.AI Storage-"
 "Proxy service. JSON web token is used for the authenticaiton of the request."
-msgstr "현재 키 쌍과 연결된 가상 폴더에 로컬 파일을 업로드합니다."
-"Manager는 내부적으로 Backend.AI Storage-Proxy 서비스에 업로드를 위임합니다."
+msgstr "현재 keypair와 연결된 가상 폴더에 로컬 파일을 업로드합니다. "
+"Manager는 내부적으로 Backend.AI Storage-Proxy 서비스에 업로드를 위임합니다. "
 "JSON 웹 토큰은 요청 인증에 사용됩니다."
 
 #: ../../manager/user-api/vfolders.rst:452 39d651f9748e4b849b9b617a7b3cfc21
@@ -1135,7 +1136,7 @@ msgstr "``mode``"
 msgid ""
 "JSON web token for the authentication of the upload session to Storage-Proxy "
 "service."
-msgstr ""
+msgstr "JSON 웹 토큰은 저장-프록시 서비스에 업로드 세션 인증에 사용됩니다."
 
 #: ../../manager/user-api/vfolders.rst:501
 #: ../../manager/user-api/vfolders.rst:620 5e6e6288da9c4463ab17c3d0190460e5
@@ -1159,8 +1160,8 @@ msgid ""
 "Create a new directory in the virtual folder associated with current "
 "keypair. this API recursively creates parent directories if they does not "
 "exist."
-msgstr "현재 키 쌍에서 연결된 가상 폴더에 새 디렉토리를 생성합니다."
-"이 API는 존재하지 않는 상위 디렉토리를 재귀적으로 생성합니다."
+msgstr "현재 keypair에서 연결된 가상 폴더에 새 디렉토리를 생성합니다. "
+"이 API는 존재하지 않는 상위 디렉토리를 재귀적으로 생성합니다. "
 
 #: ../../manager/user-api/vfolders.rst:512 c075496804e44194a5ee5b6f6a371f94
 msgid "URI: ``/folders/:name/mkdir``"
@@ -1184,7 +1185,7 @@ msgstr "``path``"
 #: ../../manager/user-api/vfolders.rst:538 be90bbf0baf0480d94a609e38967f212
 msgid ""
 "If ``True``, the parent directories will be created if they do not exist."
-msgstr "만약 ``True``일 때, 상위 디렉토리가 존재하지 않으면 생성됩니다."
+msgstr "만약 ``True`` 일 때, 상위 디렉토리가 존재하지 않으면 생성됩니다."
 
 #: ../../manager/user-api/vfolders.rst:539 e1de9f6d1bf443bc84e528b7240dbbae
 #, fuzzy
@@ -1217,8 +1218,8 @@ msgid ""
 "current keypair. Internally, the Manager will deligate the download to a "
 "Backend.AI Storage-Proxy service. JSON web token is used for the "
 "authenticaiton of the request."
-msgstr "현재 키 쌍에서 연결된 가상 폴더에 있는 파일 또는 디렉토리를 다운로드합니다."
-"내부적으로, Manager는 Backend.AI Storage-Proxy 서비스에 다운로드를 위임합니다."
+msgstr "현재 keypair에서 연결된 가상 폴더에 있는 파일 또는 디렉토리를 다운로드합니다. "
+"내부적으로, Manager는 Backend.AI Storage-Proxy 서비스에 다운로드를 위임합니다. "
 "JSON 웹 토큰은 요청의 인증에 사용됩니다."
 
 #: ../../manager/user-api/vfolders.rst:571 3c169e4aa6ea47c28f118fb0b0f50804
@@ -1238,8 +1239,8 @@ msgstr "``path``"
 #: ../../manager/user-api/vfolders.rst:592 fe849e18d9cc4bf78448d680381b0f19
 msgid ""
 "If this parameter is ``True`` and ``path`` is a directory, the directory "
-"will be archived into a zip file on the fly (default: ``False``)."
-msgstr "이 매개변수가 ``True``이고 ``path``가 디렉토리일 경우,"
+"will be archived into a zip file on the fly (default: ``False``). "
+msgstr "해당 매개변수가 ``True`` 고 ``path``가 디렉토리일 경우, "
 "디렉토리는 zip 파일로 압축됩니다 (기본값: ``False``)."
 
 #: ../../manager/user-api/vfolders.rst:606 9e28a6379941401a8ea3bd41a4a18f37
@@ -1383,7 +1384,7 @@ msgid ""
 "Invite other users to share a virtual folder with proper permissions. If a "
 "user is already invited, then this API does not create a new invitation or "
 "update the permission of the existing invitation."
-msgstr "적절한 권한으로 가상 폴더를 공유할 다른 사용자를 초대합니다."
+msgstr "적절한 권한으로 가상 폴더를 공유할 다른 사용자를 초대합니다. "
 "사용자가 이미 초대되어 있다면 이 API는 새로운 초대장을 생성하지 않거나 기존 초대장의 권한을 업데이트하지 않습니다."
 
 #: ../../manager/user-api/vfolders.rst:766 576b82afbe1c48cdb5521a90fad2347a
@@ -1511,7 +1512,8 @@ msgstr "보낸 초대장 목록"
 msgid ""
 "Returns the list of virtual folder invitations the requested user sent. This "
 "does not include the invitations those are already accepted or rejected."
-msgstr "요청한 사용자가 보낸 가상 폴더 초대장 목록을 반환합니다. 이미 수락하거나 거절한 초대장은 포함되지 않습니다."
+msgstr "요청한 사용자가 보낸 가상 폴더 초대장 목록을 반환합니다. "
+"이미 수락하거나 거절한 초대장은 포함되지 않습니다."
 
 #: ../../manager/user-api/vfolders.rst:911 074a63563fdb4c3eb56808d6110e8eda
 msgid "URI: ``/folders/invitations/list-sent``"
@@ -1600,7 +1602,7 @@ msgstr "``folder_path``"
 msgid ""
 "(Optional) The unique virtual folder ID to list shared users. If not "
 "specified, all users who shares any virtual folders the requester created."
-msgstr "(선택 사항) 공유된 사용자를 나열할 가상 폴더의 고유 ID입니다."
+msgstr "(선택 사항) 공유된 사용자를 나열할 가상 폴더의 고유 ID입니다. "
 "지정하지 않으면 요청자가 생성한 모든 가상 폴더를 공유하는 사용자를 나열합니다."
 
 #: ../../manager/user-api/vfolders.rst:1088 72b5d8e8bdfc40b4afa37bf1f4fafb39
@@ -1664,7 +1666,7 @@ msgstr "권한을 덮어쓰는 사용자에게 그룹 가상 폴더를 공유합
 #: ../../manager/user-api/vfolders.rst:1171 b08bfcb1038e4882b2032eb6b9e4c6c4
 msgid ""
 "This will create vfolder_permission(s) relation directly without creating "
-"invitation(s). Only group virtual folders are allowed to be shared directly."
+"invitation(s). Only group virtual folders are allowed to be shared directly. "
 msgstr "생성된 초대장을 통해 vfolder_permission 관계를 직접 생성합니다. 그룹 가상 폴더만 직접 공유할 수 있습니다."
 
 #: ../../manager/user-api/vfolders.rst:1174 b8925c29c2014b30bdbae9cc574536cf
@@ -1678,7 +1680,7 @@ msgstr "이 API는 그룹 가상 폴더를 읽기 전용 권한으로 모든 그
 #: ../../manager/user-api/vfolders.rst:1178
 #: ../../manager/user-api/vfolders.rst:1236 a3a7d709ed304ba59458ecd35694ec8f
 #: be30533beba8418fb97116348ed6a87f
-msgid "NOTE: This API is only available for group virtual folders."
+msgid "NOTE: This API is only available for group virtual folders. "
 msgstr "노트: 이 API는 그룹 가상 폴더에만 사용할 수 있습니다."
 
 #: ../../manager/user-api/vfolders.rst:1180 bae4b5a55a3e422fb9fc1bda426376d6
@@ -1686,7 +1688,7 @@ msgid "URI: ``/folders/:name/share``"
 msgstr "URI: ``/folders/:name/share``"
 
 #: ../../manager/user-api/vfolders.rst:1198 ff2f8481ff3f42dca1acc58ea6992dd0
-msgid "Overriding permission to share the group virtual folder."
+msgid "Overriding permission to share the group virtual folder. "
 msgstr "가상 폴더를 공유할 권한을 덮어쓰기"
 
 #: ../../manager/user-api/vfolders.rst:1201 23367033c7ad4e37a8d9dca5f61659b5
@@ -1702,7 +1704,7 @@ msgid "``shared_emails``"
 msgstr "``shared_emails``"
 
 #: ../../manager/user-api/vfolders.rst:1228 919997d324c849d992601d9771458c6a
-msgid "A list of user emails those are succesfully shared the virtual folder."
+msgid "A list of user emails those are succesfully shared the virtual folder. "
 msgstr "사용자 이메일 목록이 성공적으로 가상 폴더에 공유되었습니다."
 
 #: ../../manager/user-api/vfolders.rst:1232 5c013c190a0a4394a19e08157f8539db
@@ -1757,7 +1759,7 @@ msgstr "``code``"
 
 #: ../../manager/user-api/vfolders.rst:1309 da905dcd8a1d4a5881316ef28cb0649a
 msgid "If ``True``, cloned virtual folder will be cloneable again."
-msgstr "만약 ``True``라면, 복제된 가상 폴더는 다시 복제할 수 있습니다."
+msgstr "만약 ``True`` 라면, 복제된 가상 폴더는 다시 복제할 수 있습니다."
 
 #: ../../manager/user-api/vfolders.rst:1310 5628dcde3aee425ab9e00a4a3e67e134
 msgid "``target_name``"
@@ -1779,7 +1781,7 @@ msgstr "새 가상 폴더의 타겟 호스트 볼륨"
 #: ../../manager/user-api/vfolders.rst:1318 488a29fff1b9488f9da72b8d4db2c865
 msgid ""
 "(optional) The purpose of the new virtual folder. Allowed values are "
-"``general``, ``model``, and ``data`` (default: ``general``)."
+"``general``, ``model``, and ``data`` (default: ``general``). "
 msgstr "(선택 사항) 새 가상 폴더의 목적. 허용되는 값은 ``general``, ``model``, "
 "``data`` (기본값: ``general``)입니다."
 
@@ -1787,8 +1789,8 @@ msgstr "(선택 사항) 새 가상 폴더의 목적. 허용되는 값은 ``gener
 msgid ""
 "(optional) The default share permission of the new virtual folder. The owner "
 "of the virtual folder always have ``wd`` permission regardless of this "
-"parameter. Allowed values are ``ro``, ``rw``, and ``wd`` (default: ``rw``)."
-msgstr "(선택 사항) 새 가상 폴더의 기본 공유 권한. 가상 폴더의 소유자는 이 매개변수와 "
+"parameter. Allowed values are ``ro``, ``rw``, and ``wd`` (default: ``rw``). "
+msgstr "(선택 사항) 새 가상 폴더의 기본 공유 권한. 가상 폴더의 소유자는 해당 매개변수와 "
 "무관하게 항상 ``wd`` 권한을 가집니다. 허용되는 값은 ``ro``, ``rw``, ``wd`` 입니다."
 
 #: ../../manager/user-api/vfolders.rst:1339 40637bea9897471f9f000aa4aa1f19e0
