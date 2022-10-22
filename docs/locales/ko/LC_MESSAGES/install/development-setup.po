@@ -269,7 +269,7 @@ msgid ""
 "adding a new terminal."
 msgstr ""
 "``scripts/install-dev.sh`` 을 실행한 후 나오는 사용방법을 참조하십시오."
-" `tmux <https://github.com/tmux/tmux/wiki>` 를 여러 터미널을 하나의 SSH 세션에서 열때 사용하는 것을 추천합니다."
+" `tmux <https://github.com/tmux/tmux/wiki>`_ 를 여러 터미널을 하나의 SSH 세션에서 열때 사용하는 것을 추천합니다."
 "터미널 앱은 tab 인터페이스를 제공할 수 있지만, 리모트 서버들을 이용하는 경우에는 tmux가 새로운 터미널을 열때마다 SSH 연결의 설정을 해줄 필요가 없기 때문에 더 편리합니다."
 
 #: ../../install/development-setup.rst:225 d1522d3930e14f77b8d493664d9a8baf
