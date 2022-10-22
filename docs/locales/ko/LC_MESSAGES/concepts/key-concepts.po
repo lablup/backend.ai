@@ -271,4 +271,4 @@ msgstr ""
 
 #: ../../concepts/key-concepts.rst:88 36fcf7bdbcd749e98c171bba805b68c5
 msgid "For a single-node setup, you may simply use an empty local directory."
-msgstr "단일 노드 설정을 하고 싶다면, 간단하게 빈 로컬 디렉토리를 사용할 수 있습니다."
+msgstr "단일 노드 설정을 위해, 간단하게 빈 로컬 디렉토리를 사용할 수도 있습니다."
