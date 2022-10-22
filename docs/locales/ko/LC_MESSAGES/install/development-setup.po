@@ -149,7 +149,7 @@ msgstr ""
 #: ../../install/development-setup.rst:145 62ae26b4b2924d718f9121ebece3bfd0
 #, fuzzy
 msgid "Running the install-dev script"
-msgstr "스크립트 실행"
+msgstr "install-dev 스크립트 실행"
 
 #: ../../install/development-setup.rst:155 b182d00d28294043bff62aef33eaf826
 msgid ""
