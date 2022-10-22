@@ -4,7 +4,6 @@
 # Documentation package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
 #
-#, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
@@ -127,7 +126,6 @@ msgid "`Docker <https://docs.docker.com/install/>`_"
 msgstr "`docker <https://docs.docker.com/install/>`_"
 
 #: ../../install/development-setup.rst:134 96da977606074f228ae05aa9524c6ee9
-#, fuzzy
 msgid "`Docker Compose <https://docs.docker.com/compose/install/>`_ (v2 required)"
 msgstr "`docker-compose <https://docs.docker.com/compose/install/>`_"
 
@@ -147,7 +145,6 @@ msgstr ""
 "locale 설정을 유지해주세요."
 
 #: ../../install/development-setup.rst:145 62ae26b4b2924d718f9121ebece3bfd0
-#, fuzzy
 msgid "Running the install-dev script"
 msgstr "install-dev 스크립트 실행"
 
