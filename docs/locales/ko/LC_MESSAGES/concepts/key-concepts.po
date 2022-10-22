@@ -266,7 +266,7 @@ msgstr ""
 "반드시 모든 클러스터 노드에서 동일해야 한다는 것입니다. (예를 들면, "
 "``/mnt/vfroot/mynfs`` 와 같이 말이죠) 일반적인 설정으로는 (NFS 또는 SMB를 통해 "
 "제공되는) 중앙 집중식 네트워크 저장소를 사용합니다만, 높은 확장성을 위해 CephFS나 "
-"GlusterFS, Alluxio와 같이 AWS S3과 같은 개별 저장소에 백업되면서 빠른 in-memory
+"GlusterFS, Alluxio와 같이 AWS S3과 같은 개별 저장소에 백업되면서 빠른 in-memory "
 "캐시를 지원하는 분산 파일 시스템 또한 사용할 수 있습니다."
 
 #: ../../concepts/key-concepts.rst:88 36fcf7bdbcd749e98c171bba805b68c5
