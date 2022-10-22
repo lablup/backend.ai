@@ -87,7 +87,7 @@ msgid ""
 "resource capacity and status of its server, so that the manager can assign "
 "new sessions on idle servers to load balance."
 msgstr ""
-"Backend.AI 에이전트는 각각의 워커 서버를 관리하기 위해 설치되는 작은 데몬입니다."
+"Backend.AI 에이전트는 각각의 워커 서버를 관리하기 위해 설치되는 작은 데몬입니다. "
 "에이전트는 커널 컨테이너의 생명주기를 관리하고 모니터링하며, 세션의 입/출력을 "
 "중재하는 역할을 수행합니다. 각 에이전트는 담당하는 서버의 자원 용량과 상황을 "
 "제공함으로써 관리자가 로드 밸런싱을 위해 유휴 서버에 새로운 세션을 할당할 수 "
@@ -114,11 +114,11 @@ msgid ""
 "at large scales. The agent automatically pulls and updates the kernel images "
 "if needed."
 msgstr ""
-"Backend.AI는 유저 API 요청에 따라 컴퓨팅 세션을 컨테이너의 형태로 생성합니다."
+"Backend.AI는 유저 API 요청에 따라 컴퓨팅 세션을 컨테이너의 형태로 생성합니다. "
 "각 컴퓨팅 세션은 (여러 노드에 분산되어 있는) 한 개 이상의 컨테이너를 "
 "가질 수 있으며, 이러한 멤버 컨테이너들을 \"커널\" 이라고 부릅니다."
-"이러한 다중 컨테이너 세션은 대규모 분산 및 병렬 컴퓨팅에 사용됩니다."
-"에이전트는 필요에 따라 자동으로 커널 이미지를 가져오고 업데이트합니다."
+"이러한 다중 컨테이너 세션은 대규모 분산 및 병렬 컴퓨팅에 사용됩니다. "
+"에이전트는 필요에 따라 자동으로 커널 이미지를 가져오고 업데이트합니다. "
 
 
 #: ../../concepts/key-concepts.rst:44 cbcd6265e88d42a09bfc2363087b41b5
@@ -135,7 +135,7 @@ msgstr ""
 
 #: ../../concepts/key-concepts.rst:48 db30343b5a4a400d975d72949e4d11b7
 msgid "The primary networking requirements are:"
-msgstr "기초적인 네트워킹 요구 사항은 다음과 같습니다:"
+msgstr "기초적인 네트워킹 요구 사항은 다음과 같습니다: "
 
 #: ../../concepts/key-concepts.rst:50 5d1215df3f12479d9903bd78351aa4bf
 msgid ""
@@ -143,7 +143,7 @@ msgid ""
 "Internet or the network that your client can access."
 msgstr ""
 "관리자 서버 (HTTPS 443 포트) 는 반드시 공용 인터넷 또는 여러분의 클라이언트"
-"가 접근할 수 있는 네트워크에 열려 있어야 합니다."
+"가 접근할 수 있는 네트워크에 열려 있어야 합니다. "
 
 #: ../../concepts/key-concepts.rst:51 ba55a7a664684fd38465dec9361a5153
 msgid ""
@@ -186,7 +186,7 @@ msgstr ""
 
 #: ../../concepts/key-concepts.rst:62 c32de0da35314430b8cbef129058b02d
 msgid "Configuration Management"
-msgstr ""
+msgstr "설정 관리"
 
 #: ../../concepts/key-concepts.rst:63 73133b1397074a2083994f50b540a2ec
 msgid ""
@@ -202,10 +202,15 @@ msgid ""
 "deployments, we recommend to use an etcd cluster composed of odd (3 or "
 "higher) number of nodes to keep high availability."
 msgstr ""
+"대부분의 클러스터 단계 설정들은 etcd 서버 또는 클러스터에 저장됩니다. "
+"etcd 서버는 서비스 복구에도 사용됩니다; 새로운 에이전트가 실행될 경우, "
+"에이전트들은 etcd를 통해 스스로를 클러스터 매니저에 등록합니다. 배포 환경의 "
+"경우 높은 기용성을 위해 홀수 개 (3개 이상) 의 노드로 구성된 etcd 클러스터를 "
+"사용하는 것이 좋습니다."
 
 #: ../../concepts/key-concepts.rst:70 2cb447f480134873853364d43130bd1a
 msgid "Virtual Folders"
-msgstr ""
+msgstr "가상 폴더"
 
 #: ../../concepts/key-concepts.rst:71 94b8e50778e84281956cf88ec9e1530c
 msgid ""
