@@ -117,6 +117,7 @@ Backend.AI provides an abstraction layer on top of existing network-based storag
 Each vfolder works like a cloud storage that can be mounted into any computation
 sessions and shared between users and user groups with differentiated privileges.
 
+### For WSL2 follow https://learn.microsoft.com/en-us/windows/wsl/install
 
 Major Components
 ----------------
