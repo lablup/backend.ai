@@ -105,13 +105,13 @@ msgstr ""
 msgid ""
 "Ensure that you have the Python version specified in ``pants.toml`` on "
 "your ``PATH``."
-msgstr ""
+msgstr "``PATH``에 ``pants.toml``에 명시된 파이썬의 구체적인 버전을 가지고 있는지 확인해 주어야 합니다."
 
 #: ../../install/development-setup.rst:118 3134a12b16464539bffa7d62525e6674
 msgid ""
 "Depending on your Linux Distribution, you may have to additionally "
 "install a sysmte package that enables Python's `pip` command."
-msgstr ""
+msgstr "리눅스의 분배에 따라, 파이썬의 `pip` 명령을 할 수 있게 하는 시스템 패키지를 추가로 설치해야할 수 있습니다."
 
 #: ../../install/development-setup.rst:120 9a012081cd444a4fb642be8c1938d8dd
 msgid "Ubuntu"
@@ -268,8 +268,8 @@ msgid ""
 "convenient because you don't have to setup a new SSH connection whenever "
 "adding a new terminal."
 msgstr ""
-"``scripts/install-dev.sh`을 실행한 후 나오는 사용방법을 참조하십시오."
-"`tmux <https://github.com/tmux/tmux/wiki>`_를 여러 터미널을 하나의 SHH 세션에서 열때 사용하는 것을 추천합니다."
+"``scripts/install-dev.sh``을 실행한 후 나오는 사용방법을 참조하십시오."
+"`tmux <https://github.com/tmux/tmux/wiki>` 를 여러 터미널을 하나의 SSH 세션에서 열때 사용하는 것을 추천합니다."
 "터미널 앱은 tab 인터페이스를 제공할 수 있지만, 리모트 서버들을 이용하는 경우에는 tmux가 새로운 터미널을 열때마다 SSH 연결의 설정을 해줄 필요가 없기 때문에 더 편리합니다."
 
 #: ../../install/development-setup.rst:225 d1522d3930e14f77b8d493664d9a8baf
