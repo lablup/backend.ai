@@ -29,6 +29,7 @@ from ..output.types import FieldSpec
 from ..session import AsyncSession, Session
 from ..types import Undefined, undefined
 from . import events
+from .defs import CLI_ENV_PREFIX
 from .params import CommaSeparatedListType
 from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
@@ -353,7 +354,10 @@ def _create_cmd(docs: str = None):
     return create
 
 
-main.command(aliases=["start"])(_create_cmd(docs='Alias of "session create"'))
+main.command(
+    aliases=["start"],
+    context_settings={"auto_envvar_prefix": CLI_ENV_PREFIX},
+)(_create_cmd(docs='Alias of "session create"'))
 session.command()(_create_cmd())
 
 

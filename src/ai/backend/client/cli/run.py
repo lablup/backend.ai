@@ -23,6 +23,7 @@ from ..compat import asyncio_run, current_loop
 from ..config import local_cache_path
 from ..exceptions import BackendError
 from ..session import AsyncSession
+from .defs import CLI_ENV_PREFIX
 from .params import CommaSeparatedListType, RangeExprOptionType
 from .pretty import (
     format_info,
@@ -261,7 +262,9 @@ def prepare_mount_arg(
     return list(mounts), mount_map
 
 
-@main.command()
+@main.command(
+    context_settings={"auto_envvar_prefix": CLI_ENV_PREFIX},
+)
 @click.argument("image", type=str)
 @click.argument("files", nargs=-1, type=click.Path())
 @click.option(
