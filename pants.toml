@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.13.0rc0"
+pants_version = "2.13.1rc2"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
