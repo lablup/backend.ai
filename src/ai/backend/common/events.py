@@ -191,11 +191,27 @@ class AgentHeartbeatEvent(AbstractEvent):
         return cls(value[0])
 
 
+class KernelLifecycleEventReason(str, enum.Enum):
+    ALREADY_TERMINATED = "already-terminated"
+    FAILED_TO_START = "failed-to-start"
+    FORCE_TERMINATED = "force-terminated"
+    KILLED_BY_EVENT = "killed-by-event"
+    PENDING_TIMEOUT = "pending-timeout"
+    SELF_TERMINATED = "self-terminated"
+    TASK_DONE = "task-done"
+    TASK_FAILED = "task-failed"
+    TASK_TIMEOUT = "task-timeout"
+    TASK_CANCELLED = "task-cancelled"
+    TASK_FINISHED = "task-finished"
+    UNKOWN = "unknown"
+    USER_REQUESTED = "user-requested"
+
+
 @attr.s(slots=True, frozen=True)
 class KernelCreationEventArgs:
     kernel_id: KernelId = attr.ib()
     creation_id: str = attr.ib()
-    reason: KernelLifecycleEventReason | str = attr.ib(default="")
+    reason: KernelLifecycleEventReason = attr.ib(default=KernelLifecycleEventReason.UNKOWN)
 
     def serialize(self) -> tuple:
         return (
@@ -266,7 +282,7 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
 @attr.s(slots=True, frozen=True)
 class KernelTerminationEventArgs:
     kernel_id: KernelId = attr.ib()
-    reason: KernelLifecycleEventReason | str = attr.ib(default="")
+    reason: KernelLifecycleEventReason = attr.ib(default=KernelLifecycleEventReason.UNKNOWN)
     exit_code: int = attr.ib(default=-1)
 
     def serialize(self) -> tuple:
@@ -297,7 +313,7 @@ class KernelTerminatedEvent(KernelTerminationEventArgs, AbstractEvent):
 class SessionCreationEventArgs:
     session_id: SessionId = attr.ib()
     creation_id: str = attr.ib()
-    reason: KernelLifecycleEventReason | str = attr.ib(default="")
+    reason: KernelLifecycleEventReason = attr.ib(default=KernelLifecycleEventReason.UNKNOWN)
 
     def serialize(self) -> tuple:
         return (
@@ -361,7 +377,7 @@ class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
 @attr.s(slots=True, frozen=True)
 class SessionResultEventArgs:
     session_id: SessionId = attr.ib()
-    reason: KernelLifecycleEventReason | str = attr.ib(default="")
+    reason: KernelLifecycleEventReason = attr.ib(default=KernelLifecycleEventReason.UNKNOWN)
     exit_code: int = attr.ib(default=-1)
 
     def serialize(self) -> tuple:
@@ -528,21 +544,6 @@ EventCallback = Union[
     Callable[[TContext, AgentId, TEvent], Coroutine[Any, Any, None]],
     Callable[[TContext, AgentId, TEvent], None],
 ]
-
-
-class KernelLifecycleEventReason(str, enum.Enum):
-    ALREADY_TERMINATED = "already-terminated"
-    FAILED_TO_START = "failed-to-start"
-    FORCE_TERMINATED = "force-terminated"
-    KILLED_BY_EVENT = "killed-by-event"
-    PENDING_TIMEOUT = "pending-timeout"
-    SELF_TERMINATED = "self-terminated"
-    TASK_DONE = "task-done"
-    TASK_FAILED = "task-failed"
-    TASK_TIMEOUT = "task-timeout"
-    TASK_CANCELLED = "task-cancelled"
-    TASK_FINISHED = "task-finished"
-    USER_REQUESTED = "user-requested"
 
 
 @attr.s(auto_attribs=True, slots=True, frozen=True, eq=False, order=False)
