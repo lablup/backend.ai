@@ -48,6 +48,9 @@ async def run(cmd: Sequence[Union[str, Path]]) -> str:
 
 
 class BaseVolume(AbstractVolume):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        Path.mkdir(self.trash_path, parents=True, exist_ok=True)
 
     # ------ volume operations -------
 
@@ -75,18 +78,30 @@ class BaseVolume(AbstractVolume):
             lambda: vfpath.mkdir(0o755, parents=True, exist_ok=exist_ok),
         )
 
+    @staticmethod
+    def _clean_empty_parents(path: Path) -> None:
+        # remove intermediate prefix directories if they become empty
+        if not os.listdir(path.parent):
+            path.parent.rmdir()
+        if not os.listdir(path.parent.parent):
+            path.parent.parent.rmdir()
+
     async def delete_vfolder(self, vfid: UUID) -> None:
         vfpath = self.mangle_vfpath(vfid)
-        dst = self.trash_path / vfpath
+        dst = self.trash_path / self.mangle_rel_path(vfid)
         loop = asyncio.get_running_loop()
+
+        def _delete_vfolder():
+            shutil.move(vfpath, dst)
+            self._clean_empty_parents(vfpath)
 
         await loop.run_in_executor(
             None,
-            lambda: shutil.move(vfpath, dst),
+            _delete_vfolder,
         )
 
     async def purge_vfolder(self, vfid: UUID) -> None:
-        vfpath = self.trash_path / self.mangle_vfpath(vfid)
+        vfpath = self.trash_path / self.mangle_rel_path(vfid)
         loop = asyncio.get_running_loop()
 
         def _purge_vfolder():
@@ -94,17 +109,22 @@ class BaseVolume(AbstractVolume):
                 shutil.rmtree(vfpath)
             except FileNotFoundError:
                 pass
+            self._clean_empty_parents(vfpath)
 
         await loop.run_in_executor(None, _purge_vfolder)
 
     async def recover_vfolder(self, vfid: UUID) -> None:
-        src = self.trash_path / self.mangle_vfpath(vfid)
+        src = self.trash_path / self.mangle_rel_path(vfid)
         dst = self.mangle_vfpath(vfid)
         loop = asyncio.get_running_loop()
 
+        def _recover_vfolder():
+            shutil.move(src, dst)
+            self._clean_empty_parents(src)
+
         await loop.run_in_executor(
             None,
-            lambda: shutil.move(src, dst),
+            _recover_vfolder,
         )
 
     async def clone_vfolder(

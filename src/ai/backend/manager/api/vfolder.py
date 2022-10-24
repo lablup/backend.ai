@@ -767,6 +767,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "is_owner": is_owner,
         "permission": permission,
         "usage_mode": row["usage_mode"],
+        "status": row["status"],
         "cloneable": row["cloneable"],
         "max_size": row["max_size"],
     }
@@ -2006,7 +2007,7 @@ async def purge(request: web.Request) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-async def recover(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+async def recover(request: web.Request) -> web.Response:
     await ensure_vfolder_status(
         request, VFolderAccessStatus.RECOVERABLE, folder_name=request.match_info["name"]
     )
