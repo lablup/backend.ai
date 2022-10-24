@@ -17,7 +17,7 @@ branch_labels = None
 depends_on = None
 
 DELETING = "deleting"
-enum_name = "vfolderoperationstatus"
+enum_name = "vfolderstatus"
 ERROR = "error"
 DELETE_ONGOING = "delete-ongoing"  # vfolder is moving to trash bin
 DELETE_COMPLETE = "deleted-complete"  # vfolder is in trash bin
@@ -29,7 +29,6 @@ PURGE_COMPLETE = "purged-complete"  # vfolder is permanently removed
 def upgrade():
     op.execute(f"ALTER TYPE {enum_name} RENAME VALUE '{DELETING}' TO '{DELETE_ONGOING}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{ERROR}'")
-    op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{DELETE_ONGOING}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{DELETE_COMPLETE}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{RECOVER_ONGOING}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{PURGE_ONGOING}'")
@@ -45,15 +44,6 @@ def downgrade():
         text(
             f"""DELETE FROM pg_enum
         WHERE enumlabel = '{ERROR}'
-        AND enumtypid = (
-            SELECT oid FROM pg_type WHERE typname = '{enum_name}'
-        )"""
-        )
-    )
-    op.execute(
-        text(
-            f"""DELETE FROM pg_enum
-        WHERE enumlabel = '{DELETE_ONGOING}'
         AND enumtypid = (
             SELECT oid FROM pg_type WHERE typname = '{enum_name}'
         )"""
