@@ -1,0 +1,1 @@
+Return empty commit status for non-running sessions to prevent constant 400 errors in the frontend.
