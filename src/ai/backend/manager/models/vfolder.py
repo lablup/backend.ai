@@ -3,14 +3,18 @@ from __future__ import annotations
 import enum
 import os.path
 import uuid
+from contextlib import asynccontextmanager as actxmgr
+from datetime import datetime
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Set
+from typing import TYPE_CHECKING, Any, AsyncIterator, List, Mapping, Optional, Sequence, Set
 
 import graphene
 import sqlalchemy as sa
 import trafaret as t
 from dateutil.parser import parse as dtparse
+from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
+from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
@@ -32,8 +36,11 @@ from .base import (
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import UserRole
+from .utils import sql_json_merge
 
 if TYPE_CHECKING:
+    from sqlalchemy.sql.expression import BinaryExpression
+
     from .gql import GraphQueryContext
     from .storage import StorageSessionManager
 
@@ -54,6 +61,7 @@ __all__: Sequence[str] = (
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
+    "vfolder_status_ctxmgr",
 )
 
 
@@ -118,8 +126,13 @@ class VFolderOperationStatus(str, enum.Enum):
     READY = "ready"
     PERFORMING = "performing"
     CLONING = "cloning"
-    DELETING = "deleting"
     MOUNTED = "mounted"
+    ERROR = "error"
+    DELETE_ONGOING = "delete-ongoing"  # vfolder is moving to trash bin
+    DELETE_COMPLETE = "deleted-complete"  # vfolder is in trash bin
+    RECOVER_ONGOING = "recover-ongoing"  # vfolder is being recovered from trash bin
+    PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed from trash bin
+    PURGE_COMPLETE = "purged-complete"  # vfolder is permanently removed
 
 
 class VFolderAccessStatus(str, enum.Enum):
@@ -130,6 +143,8 @@ class VFolderAccessStatus(str, enum.Enum):
 
     READABLE = "readable"
     UPDATABLE = "updatable"
+    RECOVERABLE = "recoverable"
+    PURGABLE = "purgable"
 
 
 vfolders = sa.Table(
@@ -172,6 +187,14 @@ vfolders = sa.Table(
         server_default=VFolderOperationStatus.READY.value,
         nullable=False,
     ),
+    # status_history records the most recent status changes for each status
+    # e.g)
+    # {
+    #   "ready": "2022-10-22T10:22:30",
+    #   "delete-pending": "2022-10-22T11:40:30",
+    #   "delete-ongoing": "2022-10-25T10:22:30"
+    # }
+    sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
     sa.CheckConstraint(
         "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
         "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
@@ -672,6 +695,64 @@ async def prepare_vfolder_mounts(
                 )
 
     return matched_vfolder_mounts
+
+
+@actxmgr
+async def vfolder_status_ctxmgr(
+    conn: SAConnection,
+    target_vfolder_cond: BinaryExpression,
+    enter_status: VFolderOperationStatus,
+    exit_status: VFolderOperationStatus,
+) -> AsyncIterator[None]:
+    query = (
+        sa.update(vfolders)
+        .values(
+            status=enter_status,
+            status_history=sql_json_merge(
+                vfolders.c.status_history,
+                (),
+                {
+                    enter_status.name: datetime.now(tzutc()).isoformat(),
+                },
+            ),
+        )
+        .where(target_vfolder_cond)
+    )
+    await conn.execute(query)
+    try:
+        yield
+    except Exception:
+        query = (
+            sa.update(vfolders)
+            .values(
+                status=VFolderOperationStatus.ERROR,
+                status_history=sql_json_merge(
+                    vfolders.c.status_history,
+                    (),
+                    {
+                        VFolderOperationStatus.ERROR.name: datetime.now(tzutc()).isoformat(),
+                    },
+                ),
+            )
+            .where(target_vfolder_cond)
+        )
+        await conn.execute(query)
+        raise
+    query = (
+        sa.update(vfolders)
+        .values(
+            status=exit_status,
+            status_history=sql_json_merge(
+                vfolders.c.status_history,
+                (),
+                {
+                    exit_status.name: datetime.now(tzutc()).isoformat(),
+                },
+            ),
+        )
+        .where(target_vfolder_cond)
+    )
+    await conn.execute(query)
 
 
 class VirtualFolder(graphene.ObjectType):

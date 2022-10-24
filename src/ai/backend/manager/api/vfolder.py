@@ -57,6 +57,7 @@ from ..models import (
     verify_vfolder_name,
     vfolder_invitations,
     vfolder_permissions,
+    vfolder_status_ctxmgr,
     vfolders,
 )
 from .auth import admin_required, auth_required, superadmin_required
@@ -113,23 +114,29 @@ async def ensure_vfolder_status(
     else:
         raise VFolderFilterStatusFailed("either vFolder id nor name not supplied")
 
-    if perm == VFolderAccessStatus.READABLE:
-        # if READABLE access status is requested, all operation status is accepted.
-        vf_status_conds = vfolders.c.status.in_(
-            [
-                VFolderOperationStatus.READY,
-                VFolderOperationStatus.PERFORMING,
-                VFolderOperationStatus.CLONING,
-                VFolderOperationStatus.DELETING,
-                VFolderOperationStatus.MOUNTED,
-            ]
-        )
-    elif perm == VFolderAccessStatus.UPDATABLE:
-        # if UPDATABLE access status is requested, only READY operation status is accepted.
-        vf_status_conds = vfolders.c.status == VFolderOperationStatus.READY
-    else:
-        # Otherwise, raise VFolderFilterStatusNotAvailable()
-        raise VFolderFilterStatusNotAvailable()
+    match perm:
+        case VFolderAccessStatus.READABLE:
+            # if READABLE access status is requested, all operation status is accepted.
+            vf_status_conds = vfolders.c.status.in_(
+                [
+                    VFolderOperationStatus.READY,
+                    VFolderOperationStatus.PERFORMING,
+                    VFolderOperationStatus.CLONING,
+                    VFolderOperationStatus.ERROR,
+                    VFolderOperationStatus.DELETE_COMPLETE,
+                    VFolderOperationStatus.MOUNTED,
+                ]
+            )
+        case VFolderAccessStatus.UPDATABLE:
+            # if UPDATABLE access status is requested, only READY operation status is accepted.
+            vf_status_conds = vfolders.c.status == VFolderOperationStatus.READY
+        case VFolderAccessStatus.PURGABLE:
+            vf_status_conds = vfolders.c.status == VFolderOperationStatus.DELETE_COMPLETE
+        case VFolderAccessStatus.RECOVERABLE:
+            vf_status_conds = vfolders.c.status == VFolderOperationStatus.DELETE_COMPLETE
+        case _:
+            # Otherwise, raise VFolderFilterStatusNotAvailable()
+            raise VFolderFilterStatusNotAvailable()
     async with root_ctx.db.begin_readonly() as conn:
         entries = await query_accessible_vfolders(
             conn,
@@ -587,26 +594,25 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         )
         folder_host = await conn.scalar(query)
         folder_id = uuid.UUID(params["id"])
-        query = (
-            sa.update(vfolders)
-            .values(status=VFolderOperationStatus.DELETING)
-            .where(vfolders.c.id == folder_id)
-        )
-        await conn.execute(query)
-        query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
-        await conn.execute(query)
-    # fs-level deletion may fail or take longer time
-    # but let's complete the db transaction to reflect that it's deleted.
-    async with root_ctx.storage_manager.request(
-        folder_host,
-        "POST",
-        "folder/delete",
-        json={
-            "volume": root_ctx.storage_manager.split_host(folder_host)[1],
-            "vfid": str(folder_id),
-        },
-    ):
-        pass
+        # fs-level deletion may fail or take longer time
+        # but let's complete the db transaction to reflect that it's deleted.
+        cond = vfolders.c.id == folder_id
+        async with vfolder_status_ctxmgr(
+            conn,
+            cond,
+            VFolderOperationStatus.DELETE_ONGOING,
+            VFolderOperationStatus.DELETE_COMPLETE,
+        ):
+            async with root_ctx.storage_manager.request(
+                folder_host,
+                "POST",
+                "folder/delete",
+                json={
+                    "volume": root_ctx.storage_manager.split_host(folder_host)[1],
+                    "vfid": str(folder_id),
+                },
+            ):
+                pass
     return web.Response(status=204)
 
 
@@ -1901,30 +1907,171 @@ async def delete(request: web.Request) -> web.Response:
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder " "that is not owned by myself.")
+    folder_host = entry["host"]
+    folder_id = entry["id"]
+    proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
+    # fs-level mv may fail or take longer time
+    # but let's complete the db transaction to reflect that it's deleted.
+    async with root_ctx.db.begin() as conn:
+        cond = vfolders.c.name == folder_name
+        async with vfolder_status_ctxmgr(
+            conn,
+            cond,
+            VFolderOperationStatus.DELETE_ONGOING,
+            VFolderOperationStatus.DELETE_COMPLETE,
+        ):
+            async with root_ctx.storage_manager.request(
+                proxy_name,
+                "POST",
+                "folder/delete",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(folder_id),
+                },
+            ):
+                pass
+    return web.Response(status=204)
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+async def purge(request: web.Request) -> web.Response:
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.PURGABLE, folder_name=request.match_info["name"]
+    )
+    root_ctx: RootContext = request.app["_root.context"]
+    folder_name = request.match_info["name"]
+    access_key = request["keypair"]["access_key"]
+    domain_name = request["user"]["domain_name"]
+    user_role = request["user"]["role"]
+    user_uuid = request["user"]["uuid"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+    log.info("VFOLDER.PURGE (ak:{}, vf:{})", access_key, folder_name)
+    async with root_ctx.db.begin() as conn:
+        entries = await query_accessible_vfolders(
+            conn,
+            user_uuid,
+            user_role=user_role,
+            domain_name=domain_name,
+            allowed_vfolder_types=allowed_vfolder_types,
+            extra_vf_conds=(vfolders.c.name == folder_name),
+        )
+        # FIXME: For now, multiple entries on purge vfolder will raise an error. Will be fixed in 22.06
+        if len(entries) > 1:
+            log.error(
+                "VFOLDER.PURGE(folder name:{}, hosts:{}",
+                folder_name,
+                [entry["host"] for entry in entries],
+            )
+            raise TooManyVFoldersFound(
+                extra_msg="Multiple folders with the same name.",
+                extra_data=None,
+            )
+        elif len(entries) == 0:
+            raise InvalidAPIParameters("No such vfolder.")
+        # query_accesible_vfolders returns list
+        entry = entries[0]
+        # Folder owner OR user who have DELETE permission can delete folder.
+        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
+            raise InvalidAPIParameters("Cannot purge the vfolder " "that is not owned by myself.")
         query = (
             sa.update(vfolders)
-            .values(status=VFolderOperationStatus.DELETING)
+            .values(status=VFolderOperationStatus.PURGE_ONGOING)
             .where(vfolders.c.name == folder_name)
         )
         await conn.execute(query)
 
-        folder_host = entry["host"]
-        folder_id = entry["id"]
-        query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
-        await conn.execute(query)
+    folder_host = entry["host"]
+    folder_id = entry["id"]
+    proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
     # fs-level deletion may fail or take longer time
     # but let's complete the db transaction to reflect that it's deleted.
+    async with root_ctx.db.begin() as conn:
+        cond = vfolders.c.name == folder_name
+        async with vfolder_status_ctxmgr(
+            conn, cond, VFolderOperationStatus.PURGE_ONGOING, VFolderOperationStatus.PURGE_COMPLETE
+        ):
+            async with root_ctx.storage_manager.request(
+                proxy_name,
+                "POST",
+                "folder/purge",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(folder_id),
+                },
+            ):
+                pass
+    return web.Response(status=204)
+
+
+@auth_required
+@server_status_required(ALL_ALLOWED)
+async def recover(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    await ensure_vfolder_status(
+        request, VFolderAccessStatus.RECOVERABLE, folder_name=request.match_info["name"]
+    )
+    root_ctx: RootContext = request.app["_root.context"]
+    folder_name = request.match_info["name"]
+    access_key = request["keypair"]["access_key"]
+    domain_name = request["user"]["domain_name"]
+    user_role = request["user"]["role"]
+    user_uuid = request["user"]["uuid"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+    log.info("VFOLDER.RECOVER (ak:{}, vf:{})", access_key, folder_name)
+    async with root_ctx.db.begin() as conn:
+        entries = await query_accessible_vfolders(
+            conn,
+            user_uuid,
+            user_role=user_role,
+            domain_name=domain_name,
+            allowed_vfolder_types=allowed_vfolder_types,
+            extra_vf_conds=(vfolders.c.name == folder_name),
+        )
+        # FIXME: For now, multiple entries on purge vfolder will raise an error. Will be fixed in 22.06
+        if len(entries) > 1:
+            log.error(
+                "VFOLDER.RECOVER(folder name:{}, hosts:{}",
+                folder_name,
+                [entry["host"] for entry in entries],
+            )
+            raise TooManyVFoldersFound(
+                extra_msg="Multiple folders with the same name.",
+                extra_data=None,
+            )
+        elif len(entries) == 0:
+            raise InvalidAPIParameters("No such vfolder.")
+        # query_accesible_vfolders returns list
+        entry = entries[0]
+        # Folder owner OR user who have DELETE permission can recover folder.
+        if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
+            raise InvalidAPIParameters("Cannot recover the vfolder " "that is not owned by myself.")
+        query = (
+            sa.update(vfolders)
+            .values(status=VFolderOperationStatus.RECOVER_ONGOING)
+            .where(vfolders.c.name == folder_name)
+        )
+        await conn.execute(query)
+
+    folder_host = entry["host"]
+    folder_id = entry["id"]
     proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
-    async with root_ctx.storage_manager.request(
-        proxy_name,
-        "POST",
-        "folder/delete",
-        json={
-            "volume": volume_name,
-            "vfid": str(folder_id),
-        },
-    ):
-        pass
+    # fs-level mv may fail or take longer time
+    # but let's complete the db transaction to reflect that it's deleted.
+    async with root_ctx.db.begin() as conn:
+        cond = vfolders.c.name == folder_name
+        async with vfolder_status_ctxmgr(
+            conn, cond, VFolderOperationStatus.RECOVER_ONGOING, VFolderOperationStatus.READY
+        ):
+            async with root_ctx.storage_manager.request(
+                proxy_name,
+                "POST",
+                "folder/recover",
+                json={
+                    "volume": volume_name,
+                    "vfid": str(folder_id),
+                },
+            ):
+                pass
     return web.Response(status=204)
 
 
@@ -2711,6 +2858,8 @@ def create_app(default_cors_options):
     vfolder_resource = cors.add(app.router.add_resource(r"/{name}"))
     cors.add(vfolder_resource.add_route("GET", get_info))
     cors.add(vfolder_resource.add_route("DELETE", delete))
+    cors.add(add_route("POST", r"/{name}/purge", purge))
+    cors.add(add_route("POST", r"/{name}/recover", recover))
     cors.add(add_route("GET", r"/_/hosts", list_hosts))
     cors.add(add_route("GET", r"/_/all-hosts", list_all_hosts))
     cors.add(add_route("GET", r"/_/allowed-types", list_allowed_types))

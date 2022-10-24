@@ -155,6 +155,40 @@ async def delete_vfolder(request: web.Request) -> web.Response:
             return web.Response(status=204)
 
 
+async def purge_vfolder(request: web.Request) -> web.Response:
+    async with check_params(
+        request,
+        t.Dict(
+            {
+                t.Key("volume"): t.String(),
+                t.Key("vfid"): tx.UUID(),
+            },
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "purge_vfolder", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            await volume.purge_vfolder(params["vfid"])
+            return web.Response(status=204)
+
+
+async def recover_vfolder(request: web.Request) -> web.Response:
+    async with check_params(
+        request,
+        t.Dict(
+            {
+                t.Key("volume"): t.String(),
+                t.Key("vfid"): tx.UUID(),
+            },
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "recover_vfolder", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            await volume.recover_vfolder(params["vfid"])
+            return web.Response(status=204)
+
+
 async def clone_vfolder(request: web.Request) -> web.Response:
     async with check_params(
         request,
@@ -634,6 +668,8 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
     app.router.add_route("POST", "/folder/create", create_vfolder)
     app.router.add_route("POST", "/folder/delete", delete_vfolder)
+    app.router.add_route("POST", "/folder/purge", purge_vfolder)
+    app.router.add_route("POST", "/folder/recover", recover_vfolder)
     app.router.add_route("POST", "/folder/clone", clone_vfolder)
     app.router.add_route("GET", "/folder/mount", get_vfolder_mount)
     app.router.add_route("GET", "/volume/performance-metric", get_performance_metric)

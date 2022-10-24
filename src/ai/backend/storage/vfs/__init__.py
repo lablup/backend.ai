@@ -77,20 +77,35 @@ class BaseVolume(AbstractVolume):
 
     async def delete_vfolder(self, vfid: UUID) -> None:
         vfpath = self.mangle_vfpath(vfid)
+        dst = self.trash_path / vfpath
         loop = asyncio.get_running_loop()
 
-        def _delete_vfolder():
+        await loop.run_in_executor(
+            None,
+            lambda: shutil.move(vfpath, dst),
+        )
+
+    async def purge_vfolder(self, vfid: UUID) -> None:
+        vfpath = self.trash_path / self.mangle_vfpath(vfid)
+        loop = asyncio.get_running_loop()
+
+        def _purge_vfolder():
             try:
                 shutil.rmtree(vfpath)
             except FileNotFoundError:
                 pass
-            # remove intermediate prefix directories if they become empty
-            if not os.listdir(vfpath.parent):
-                vfpath.parent.rmdir()
-            if not os.listdir(vfpath.parent.parent):
-                vfpath.parent.parent.rmdir()
 
-        await loop.run_in_executor(None, _delete_vfolder)
+        await loop.run_in_executor(None, _purge_vfolder)
+
+    async def recover_vfolder(self, vfid: UUID) -> None:
+        src = self.trash_path / self.mangle_vfpath(vfid)
+        dst = self.mangle_vfpath(vfid)
+        loop = asyncio.get_running_loop()
+
+        await loop.run_in_executor(
+            None,
+            lambda: shutil.move(src, dst),
+        )
 
     async def clone_vfolder(
         self,

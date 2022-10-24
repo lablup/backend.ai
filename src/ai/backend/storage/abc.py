@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from pathlib import Path, PurePath, PurePosixPath
-from typing import Any, AsyncIterator, Final, FrozenSet, Mapping, Sequence
+from typing import Any, AsyncIterator, Final, FrozenSet, Mapping, Optional, Sequence
 from uuid import UUID
 
 from ai.backend.common.types import BinarySize, HardwareMetadata
@@ -25,11 +25,13 @@ class AbstractVolume(metaclass=ABCMeta):
         mount_path: Path,
         *,
         fsprefix: PurePath = None,
+        trash_path: Optional[PurePath] = None,
         options: Mapping[str, Any] = None,
     ) -> None:
         self.local_config = local_config
         self.mount_path = mount_path
         self.fsprefix = fsprefix or PurePath(".")
+        self.trash_path = self.mount_path / (trash_path or PurePath(".trash"))
         self.config = options or {}
 
     async def init(self) -> None:
@@ -83,6 +85,14 @@ class AbstractVolume(metaclass=ABCMeta):
 
     @abstractmethod
     async def delete_vfolder(self, vfid: UUID) -> None:
+        pass
+
+    @abstractmethod
+    async def purge_vfolder(self, vfid: UUID) -> None:
+        pass
+
+    @abstractmethod
+    async def recover_vfolder(self, vfid: UUID) -> None:
         pass
 
     @abstractmethod
