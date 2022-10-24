@@ -7,6 +7,7 @@ Create Date: 2020-01-06 13:56:50.885635
 """
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import GUID
 
@@ -43,18 +44,18 @@ def upgrade():
 
     # Set idx to 1 (previous sessions are all composed of one kernel)
     query = "UPDATE kernels SET idx = 1;"
-    conn.execute(query)
+    conn.execute(text(query))
 
     # Convert "master" to "main"
     # NOTE: "main" is defined from ai.backend.manager.defs.DEFAULT_ROLE
     op.alter_column("kernels", "role", server_default="main")
     query = "UPDATE kernels SET role = 'main' WHERE role = 'master'"
-    conn.execute(query)
+    conn.execute(text(query))
 
     # First a session_id column as nullable and fill it up before setting it non-nullable.
     op.add_column("kernels", sa.Column("session_id", GUID, nullable=True))
     query = "UPDATE kernels SET session_id = kernels.id WHERE role = 'main'"
-    conn.execute(query)
+    conn.execute(text(query))
     # If we upgrade from a database downgraded in the past with sub-kernel records,
     # we loose the information of kernel_id -> session_id mapping.
     # Try to restore it by getting the session ID of a main-kernel record which is created
@@ -75,7 +76,7 @@ def upgrade():
     )
     WHERE t.role <> 'main'
     """
-    conn.execute(query)
+    conn.execute(text(query))
     op.alter_column("kernels", "session_id", nullable=False)
 
     op.alter_column("kernels", "sess_id", new_column_name="session_name")
@@ -99,7 +100,7 @@ def downgrade():
     op.alter_column("kernels", "role", server_default="master")
     conn = op.get_bind()
     query = "UPDATE kernels SET role = 'master' WHERE role = 'main'"
-    conn.execute(query)
+    conn.execute(text(query))
 
     op.drop_column("kernels", "cluster_mode")
     op.drop_column("kernels", "idx")

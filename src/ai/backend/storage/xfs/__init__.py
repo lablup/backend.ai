@@ -250,6 +250,7 @@ class XfsVolume(BaseVolume):
             raise ExecutionError("unexpected format for xfs_quota report")
         proj_name, used_size, _, _, _, _, inode_used, _, _, _, _ = report.split()
         used_bytes = int(BinarySize.finite_from_str(used_size))
+        inode_count = int(BinarySize.finite_from_str(inode_used))
         if not str(vfid).startswith(proj_name):
             raise ExecutionError("vfid and project name does not match")
-        return VFolderUsage(file_count=int(inode_used), used_bytes=used_bytes)
+        return VFolderUsage(file_count=inode_count, used_bytes=used_bytes)
