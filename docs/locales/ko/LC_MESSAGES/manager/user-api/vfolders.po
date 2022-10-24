@@ -1767,7 +1767,7 @@ msgstr "``target_name``"
 
 #: ../../manager/user-api/vfolders.rst:1312 71559885111249d8966e3abc512fda0e
 msgid "The name of the new virtual folder."
-msgstr "새 가상 폴더의 이름."
+msgstr "새 가상 폴더의 이름"
 
 #: ../../manager/user-api/vfolders.rst:1313 e38cd397dc244fdeaab5e1b55244c2b1
 #, fuzzy
@@ -1776,7 +1776,7 @@ msgstr "``result``"
 
 #: ../../manager/user-api/vfolders.rst:1315 c08c251a7c9e41258be6cc0f3a4725e0
 msgid "The targe host volume of the new virtual folder."
-msgstr "새 가상 폴더의 타겟 호스트 볼륨."
+msgstr "새 가상 폴더의 타겟 호스트 볼륨"
 
 #: ../../manager/user-api/vfolders.rst:1318 488a29fff1b9488f9da72b8d4db2c865
 msgid ""
