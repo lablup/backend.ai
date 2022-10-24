@@ -1038,7 +1038,7 @@ msgstr "새로운 가상 폴더 이름"
 #: ../../manager/user-api/vfolders.rst:388 9d3fa8c747564d0e867bb6f062bd4c00
 #, fuzzy
 msgid "The folder is successfully renamed."
-msgstr "세션이 종료되었습니다"
+msgstr "폴더 이름이 성공적으로 변경되었습니다."
 
 #: ../../manager/user-api/vfolders.rst:390 38e95b9a89784f908ed43f5311b0876c
 msgid ""
@@ -1484,8 +1484,8 @@ msgid "Rejecting an Invitation"
 msgstr "초대 거절하기"
 
 #: ../../manager/user-api/vfolders.rst:860 00496ff599584b2f8169a1051c9b5a9a
-msgid "Reject an invitation"
-msgstr "초대 거절하기"
+msgid "Reject an invitation."
+msgstr "초대를 거절합니다."
 
 #: ../../manager/user-api/vfolders.rst:862 3cfeee287bed48ee8f7d8ea397f439ec
 msgid "URI: ``/folders/invitations/delete``"
@@ -1553,8 +1553,8 @@ msgid "Leave an Shared Virtual Folder"
 msgstr "공유된 가상 폴더 나가기"
 
 #: ../../manager/user-api/vfolders.rst:999 606f8ca27af4433699362dc105a6c564
-msgid "Leave a shared virtual folder"
-msgstr "공유된 가상 폴더 나가기"
+msgid "Leave a shared virtual folder."
+msgstr "공유된 가상 폴더에서 나갑니다."
 
 #: ../../manager/user-api/vfolders.rst:1001 e7fd5ff0661443dab91c1f506e4fd116
 msgid ""
