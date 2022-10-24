@@ -251,6 +251,34 @@ class DockerKernel(AbstractKernel):
                 raise FileNotFoundError(f"Could not found the file: {abspath}")
         return tarbytes
 
+    async def download_single(self, filepath: str):
+        container_id = self.data["container_id"]
+        async with closing_async(Docker()) as docker:
+            container = docker.containers.container(container_id)
+            home_path = PurePosixPath("/home/work")
+            try:
+                abspath = home_path / filepath
+                abspath.relative_to(home_path)
+            except ValueError:
+                raise PermissionError("You cannot download files outside /home/work")
+            try:
+                with await container.get_archive(str(abspath)) as tarobj:
+                    tarobj.fileobj.seek(0, 2)
+                    fsize = tarobj.fileobj.tell()
+                    if fsize > 1048576:
+                        raise ValueError("too large file")
+                    tarobj.fileobj.seek(0)
+                    inner_file = tarobj.extractfile(tarobj.getnames()[0])
+                    if inner_file:
+                        tarbytes = inner_file.read()
+                    else:
+                        log.warning("Could not found the file: {0}", abspath)
+                        raise FileNotFoundError(f"Could not found the file: {abspath}")
+            except DockerError:
+                log.warning("Could not found the file: {0}", abspath)
+                raise FileNotFoundError(f"Could not found the file: {abspath}")
+        return tarbytes
+
     async def list_files(self, container_path: str):
         container_id = self.data["container_id"]
 

@@ -973,10 +973,8 @@ class ComputeSession(graphene.ObjectType):
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeSession.by_dependency")
         return await loader.load(self.id)
 
-    async def resolve_commit_status(self, info: graphene.ResolveInfo) -> Optional[str]:
+    async def resolve_commit_status(self, info: graphene.ResolveInfo) -> str:
         graph_ctx: GraphQueryContext = info.context
-        if self.status != "RUNNING":
-            return None
         commit_status = await graph_ctx.registry.get_commit_status(self.id, self.access_key)
         return commit_status["status"]
 
@@ -991,6 +989,7 @@ class ComputeSession(graphene.ObjectType):
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
     _queryfilter_fieldspec = {
+        "id": ("kernels_id", None),
         "type": ("kernels_session_type", lambda s: SessionTypes[s]),
         "name": ("kernels_session_name", None),
         "image": ("kernels_image", None),

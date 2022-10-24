@@ -260,6 +260,11 @@ class KubernetesKernel(AbstractKernel):
 
         return None
 
+    async def download_single(self, filepath: str):
+        # TODO: Implement download single file operations with pure Kubernetes API
+        log.error("download_single() in the k8s backend is not supported yet.")
+        raise NotImplementedError
+
     async def list_files(self, container_path: str):
         # TODO: Implement file operations with pure Kubernetes API
         await kube_config.load_kube_config()
