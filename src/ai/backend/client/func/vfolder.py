@@ -32,6 +32,7 @@ __all__ = ("VFolder",)
 _default_list_fields = (
     vfolder_fields["host"],
     vfolder_fields["name"],
+    vfolder_fields["status"],
     vfolder_fields["created_at"],
     vfolder_fields["creator"],
     vfolder_fields["group_id"],
@@ -153,6 +154,18 @@ class VFolder(BaseFunction):
     @api_function
     async def delete(self):
         rqst = Request("DELETE", "/folders/{0}".format(self.name))
+        async with rqst.fetch():
+            return {}
+
+    @api_function
+    async def purge(self):
+        rqst = Request("POST", "/folders/{0}/purge".format(self.name))
+        async with rqst.fetch():
+            return {}
+
+    @api_function
+    async def recover(self):
+        rqst = Request("POST", "/folders/{0}/recover".format(self.name))
         async with rqst.fetch():
             return {}
 

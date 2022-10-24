@@ -281,6 +281,7 @@ vfolder_fields = FieldSet(
         FieldSpec("creator"),
         FieldSpec("unmanaged_path"),
         FieldSpec("usage_mode"),
+        FieldSpec("status"),
         FieldSpec("permission"),
         FieldSpec("ownership_type"),
         FieldSpec("max_files"),
