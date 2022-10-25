@@ -48,6 +48,7 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     BinarySize,
     ClusterInfo,
+    ClusterSSHPortMapping,
     ContainerId,
     DeviceId,
     DeviceName,
@@ -138,6 +139,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     port_pool: Set[int]
     agent_sockpath: Path
     resource_lock: asyncio.Lock
+    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
 
     def __init__(
         self,
@@ -149,6 +151,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
         restarting: bool = False,
+        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> None:
         super().__init__(kernel_id, kernel_config, local_config, computers, restarting=restarting)
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
@@ -166,6 +169,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.container_configs = []
         self.domain_socket_proxies = []
         self.computer_docker_args = {}
+
+        self.cluster_ssh_port_mapping = cluster_ssh_port_mapping
 
     def _kernel_resource_spec_read(self, filename):
         with open(filename, "r") as f:
@@ -666,15 +671,26 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         # PHASE 4: Run!
         container_bind_host = self.local_config["container"]["bind-host"]
         advertised_kernel_host = self.local_config["container"].get("advertised-host")
-        exposed_ports = [2000, 2001]
+        repl_ports = [2000, 2001]
+        if len(service_ports) + len(repl_ports) > len(self.port_pool):
+            raise RuntimeError("Container ports are not sufficiently available.")
+        exposed_ports = repl_ports
+        host_ports = [self.port_pool.pop() for _ in repl_ports]
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
-        if len(exposed_ports) > len(self.port_pool):
-            raise RuntimeError("Container ports are not sufficiently available.")
-        host_ports = []
-        for eport in exposed_ports:
-            hport = self.port_pool.pop()
-            host_ports.append(hport)
+            if (
+                sport["name"] == "sshd"
+                and self.cluster_ssh_port_mapping
+                and (
+                    ssh_host_port := self.cluster_ssh_port_mapping.get(
+                        self.kernel_config["cluster_hostname"]
+                    )
+                )
+            ):
+                host_ports.append(ssh_host_port[1])
+            else:
+                hport = self.port_pool.pop()
+                host_ports.append(hport)
 
         container_log_size = self.local_config["agent"]["container-logs"]["max-length"]
         container_log_file_count = 5
@@ -735,6 +751,23 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 },
             )
+
+        if container_config["HostConfig"].get("NetworkMode") == "host":
+            intrinsic_ports = {
+                "replin": host_ports[0],
+                "replout": host_ports[1],
+            }
+            for index, port_info in enumerate(service_ports):
+                if port_info["name"] == "sshd":
+                    intrinsic_ports["sshd"] = host_ports[index + 2]
+                elif port_info["name"] == "ttyd":
+                    intrinsic_ports["ttyd"] = host_ports[index + 2]
+
+            def _write_file():
+                with open(self.config_dir / "intrinsic-ports.json", "w") as fw:
+                    fw.write(json.dumps(intrinsic_ports))
+
+            await current_loop().run_in_executor(None, _write_file)
 
         if resource_opts and resource_opts.get("shmem"):
             shmem = int(resource_opts.get("shmem", "0"))
@@ -837,12 +870,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 else:
                     ctnr_host_port_map[port] = host_port
             for sport in service_ports:
+                sport["host_ports"] = tuple(
+                    ctnr_host_port_map[cport] for cport in sport["container_ports"]
+                )
                 if container_config["HostConfig"].get("NetworkMode") == "host":
                     sport["container_ports"] = sport["host_ports"]
-                else:
-                    sport["host_ports"] = tuple(
-                        ctnr_host_port_map[cport] for cport in sport["container_ports"]
-                    )
 
         return {
             "container_id": container._id,
@@ -1168,6 +1200,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
+        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> DockerKernelCreationContext:
         return DockerKernelCreationContext(
             kernel_id,
@@ -1178,6 +1211,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.agent_sockpath,
             self.resource_lock,
             restarting=restarting,
+            cluster_ssh_port_mapping=cluster_ssh_port_mapping,
         )
 
     async def restart_kernel__load_config(

@@ -113,6 +113,8 @@ class BaseRunner(metaclass=ABCMeta):
 
     services_running: Dict[str, asyncio.subprocess.Process]
 
+    intrinsic_host_ports_mapping: Mapping[str, int]
+
     _build_success: Optional[bool]
 
     # Set by subclasses.
@@ -146,6 +148,8 @@ class BaseRunner(metaclass=ABCMeta):
         self.started_at: float = time.monotonic()
         self.services_running = {}
 
+        self.intrinsic_host_ports_mapping = {}
+
         # If the subclass implements interatcive user inputs, it should set a
         # asyncio.Queue-like object to self.user_input_queue in the
         # init_with_loop() method.
@@ -164,10 +168,26 @@ class BaseRunner(metaclass=ABCMeta):
         loop.set_default_executor(executor)
 
         self.zctx = zmq.asyncio.Context()
+
+        intrinsic_host_ports_mapping_path = Path("/home/config/intrinsic-ports.json")
+        if intrinsic_host_ports_mapping_path.is_file():
+
+            def _read_file():
+                return intrinsic_host_ports_mapping_path.read_text()
+
+            intrinsic_host_ports_mapping = json.loads(
+                await asyncio.get_running_loop().run_in_executor(None, _read_file)
+            )
+            self.intrinsic_host_ports_mapping = intrinsic_host_ports_mapping
+
+        insock_port = self.intrinsic_host_ports_mapping.get("replin", "2000")
+        outsock_port = self.intrinsic_host_ports_mapping.get("replout", "2001")
         self.insock = self.zctx.socket(zmq.PULL)
-        self.insock.bind("tcp://*:2000")
+        self.insock.bind(f"tcp://*:{insock_port}")
+        print(f"binding to tcp://*:{insock_port}")
         self.outsock = self.zctx.socket(zmq.PUSH)
-        self.outsock.bind("tcp://*:2001")
+        self.outsock.bind(f"tcp://*:{outsock_port}")
+        print(f"binding to tcp://*:{outsock_port}")
 
         self.log_queue = janus.Queue()
         self.task_queue = asyncio.Queue()
@@ -797,7 +817,9 @@ class BaseRunner(metaclass=ABCMeta):
         )
 
     async def main_loop(self, cmdargs):
-        user_input_server = await asyncio.start_server(self.handle_user_input, "127.0.0.1", 65000)
+        user_input_server = await asyncio.start_unix_server(
+            self.handle_user_input, "/tmp/bai-user-input.sock"
+        )
         await self._init_with_loop()
         await self._init_jupyter_kernel()
 
@@ -811,7 +833,7 @@ class BaseRunner(metaclass=ABCMeta):
             self._start_service(
                 {
                     "name": "sshd",
-                    "port": 2200,
+                    "port": self.intrinsic_host_ports_mapping.get("sshd", 2200),
                     "protocol": "tcp",
                 },
                 user_requested=False,
@@ -821,7 +843,7 @@ class BaseRunner(metaclass=ABCMeta):
             self._start_service(
                 {
                     "name": "ttyd",
-                    "port": 7681,
+                    "port": self.intrinsic_host_ports_mapping.get("ttyd", 7681),
                     "protocol": "http",
                 },
                 user_requested=False,

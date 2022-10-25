@@ -238,6 +238,7 @@ class PendingSession:
             kernels.c.startup_command,
             kernels.c.preopen_ports,
             kernels.c.created_at,
+            kernels.c.use_host_network,
         }
 
     @classmethod

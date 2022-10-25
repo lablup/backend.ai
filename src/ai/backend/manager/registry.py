@@ -1231,6 +1231,7 @@ class AgentRegistry:
         }
 
         network_name: Optional[str] = None
+        cluster_ssh_port_mapping: Optional[Dict[str, Tuple[str, int]]] = None
         if not scheduled_session.use_host_network:
             if scheduled_session.cluster_mode == ClusterMode.SINGLE_NODE:
                 if scheduled_session.cluster_size > 1:
@@ -1274,6 +1275,33 @@ class AgentRegistry:
                     raise
         else:
             network_name = "host"
+            if scheduled_session.cluster_size > 1:
+                keyfunc = lambda item: item.kernel.cluster_role
+                cluster_ssh_port_mapping = {}
+                for cluster_role, group_iterator in itertools.groupby(
+                    sorted(kernel_agent_bindings, key=keyfunc),
+                    key=keyfunc,
+                ):
+                    for index, item in enumerate(group_iterator):
+                        assert item.agent_alloc_ctx.agent_id is not None
+                        async with RPCContext(
+                            item.agent_alloc_ctx.agent_id,
+                            item.agent_alloc_ctx.agent_addr,
+                            invoke_timeout=None,
+                            order_key=str(scheduled_session.session_id),
+                            keepalive_timeout=self.rpc_keepalive_timeout,
+                        ) as rpc:
+                            port = await rpc.call.assign_port()
+                            log.debug("allocated port {}", port)
+                            agent_addr = item.agent_alloc_ctx.agent_addr.replace(
+                                "tcp://", ""
+                            ).split(":", maxsplit=1)[0]
+                            cluster_ssh_port_mapping[f"{cluster_role}{index+1}"] = (
+                                agent_addr,
+                                port,
+                            )
+                            item.allocated_host_ports.add(port)
+
         keyfunc = lambda item: item.kernel.cluster_role
         replicas = {
             cluster_role: len([*group_iterator])
@@ -1282,26 +1310,6 @@ class AgentRegistry:
                 key=keyfunc,
             )
         }
-        cluster_ssh_port_mapping: Optional[Dict[str, Any]] = None
-
-        if scheduled_session.cluster_size > 1:
-            cluster_ssh_port_mapping = {}
-            for cluster_role, group_iterator in itertools.groupby(
-                sorted(kernel_agent_bindings, key=keyfunc),
-                key=keyfunc,
-            ):
-                for index, item in enumerate(group_iterator):
-                    assert item.agent_alloc_ctx.agent_id is not None
-                    async with RPCContext(
-                        item.agent_alloc_ctx.agent_id,
-                        item.agent_alloc_ctx.agent_addr,
-                        invoke_timeout=None,
-                        order_key=str(scheduled_session.session_id),
-                        keepalive_timeout=self.rpc_keepalive_timeout,
-                    ) as rpc:
-                        port = await rpc.call.assign_port(scheduled_session.session_id)
-                        cluster_ssh_port_mapping[f"{cluster_role}{index+1}"] = port
-                        item.allocated_host_ports.add(port)
 
         cluster_info = ClusterInfo(
             mode=scheduled_session.cluster_mode,
@@ -1553,7 +1561,7 @@ class AgentRegistry:
                             "internal_data": scheduled_session.internal_data,
                             "auto_pull": auto_pull,
                             "preopen_ports": scheduled_session.preopen_ports,
-                            "allocated_host_ports": binding.allocated_host_ports,
+                            "allocated_host_ports": list(binding.allocated_host_ports),
                         }
                         for binding in items
                     ],
@@ -2142,6 +2150,7 @@ class AgentRegistry:
                             kernels.c.cluster_size,
                             kernels.c.agent,
                             kernels.c.agent_addr,
+                            kernels.c.use_host_network,
                         ]
                     )
                     .select_from(kernels)
@@ -2156,37 +2165,38 @@ class AgentRegistry:
         session = await execute_with_retry(_fetch)
         if session is None:
             return
-        if session["cluster_mode"] == ClusterMode.SINGLE_NODE and session["cluster_size"] > 1:
-            network_name = f'bai-singlenode-{session["session_id"]}'
-            try:
-                async with RPCContext(
-                    session["agent"],  # the main-container's agent
-                    session["agent_addr"],
-                    invoke_timeout=None,
-                    order_key=session["session_id"],
-                    keepalive_timeout=self.rpc_keepalive_timeout,
-                ) as rpc:
-                    await rpc.call.destroy_local_network(network_name)
-            except Exception:
-                log.exception(f"Failed to destroy the agent-local network {network_name}")
-        elif session["cluster_mode"] == ClusterMode.MULTI_NODE:
-            network_name = f'bai-multinode-{session["session_id"]}'
-            try:
+        if not session["use_host_network"]:
+            if session["cluster_mode"] == ClusterMode.SINGLE_NODE and session["cluster_size"] > 1:
+                network_name = f'bai-singlenode-{session["session_id"]}'
                 try:
-                    # await rpc.call.destroy_overlay_network(network_name)
-                    await asyncio.sleep(2.0)
-                    network = await self.docker.networks.get(network_name)
-                    await network.delete()
-                except aiodocker.DockerError as e:
-                    if e.status == 404:
-                        # It may have been auto-destructed when the last container was detached.
-                        pass
-                    else:
-                        raise
-            except Exception:
-                log.exception(f"Failed to destroy the overlay network {network_name}")
-        else:
-            pass
+                    async with RPCContext(
+                        session["agent"],  # the main-container's agent
+                        session["agent_addr"],
+                        invoke_timeout=None,
+                        order_key=session["session_id"],
+                        keepalive_timeout=self.rpc_keepalive_timeout,
+                    ) as rpc:
+                        await rpc.call.destroy_local_network(network_name)
+                except Exception:
+                    log.exception(f"Failed to destroy the agent-local network {network_name}")
+            elif session["cluster_mode"] == ClusterMode.MULTI_NODE:
+                network_name = f'bai-multinode-{session["session_id"]}'
+                try:
+                    try:
+                        # await rpc.call.destroy_overlay_network(network_name)
+                        await asyncio.sleep(2.0)
+                        network = await self.docker.networks.get(network_name)
+                        await network.delete()
+                    except aiodocker.DockerError as e:
+                        if e.status == 404:
+                            # It may have been auto-destructed when the last container was detached.
+                            pass
+                        else:
+                            raise
+                except Exception:
+                    log.exception(f"Failed to destroy the overlay network {network_name}")
+            else:
+                pass
 
     async def restart_session(
         self,

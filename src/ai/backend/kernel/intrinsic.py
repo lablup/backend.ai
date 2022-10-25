@@ -93,9 +93,9 @@ async def init_sshd_service(child_env):
         if cluster_ssh_port_mapping_path.is_file():
             cluster_ssh_port_mapping = json.loads(cluster_ssh_port_mapping_path.read_text())
             with open(user_ssh_config_path, "a") as f:
-                for host, port in cluster_ssh_port_mapping.items():
+                for host, (hostname, port) in cluster_ssh_port_mapping.items():
                     f.write(f"\nHost {host}\n")
-                    f.write("\tHostName localhost\n")
+                    f.write(f"\tHostName {hostname}\n")
                     f.write(f"\tPort {port}\n")
                     f.write("\tStrictHostKeyChecking no\n")
                     f.write("\tIdentityFile /home/config/ssh/id_cluster\n")

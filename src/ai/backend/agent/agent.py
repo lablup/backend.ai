@@ -91,6 +91,7 @@ from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
+    ClusterSSHPortMapping,
     ContainerId,
     DeviceId,
     DeviceName,
@@ -1306,6 +1307,7 @@ class AbstractAgent(
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
+        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> AbstractKernelCreationContext:
         raise NotImplementedError
 
@@ -1393,6 +1395,7 @@ class AbstractAgent(
             kernel_id,
             kernel_config,
             restarting=restarting,
+            cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
         )
         environ: MutableMapping[str, str] = {**kernel_config["environ"]}
 
@@ -1515,21 +1518,26 @@ class AbstractAgent(
         if preopen_ports is None:
             preopen_ports = []
 
-        if ctx.kernel_config["cluster_role"] in ("main", "master"):
-            for sport in parse_service_ports(image_labels.get("ai.backend.service-ports", "")):
-                port_map[sport["name"]] = sport
-            port_map["sshd"] = {
+        service_ports.append(
+            {
                 "name": "sshd",
                 "protocol": ServicePortProtocols("tcp"),
                 "container_ports": (2200,),
                 "host_ports": (None,),
             }
-            port_map["ttyd"] = {
+        )
+        service_ports.append(
+            {
                 "name": "ttyd",
                 "protocol": ServicePortProtocols("http"),
                 "container_ports": (7681,),
                 "host_ports": (None,),
             }
+        )
+
+        if ctx.kernel_config["cluster_role"] in ("main", "master"):
+            for sport in parse_service_ports(image_labels.get("ai.backend.service-ports", "")):
+                port_map[sport["name"]] = sport
             for port_no in preopen_ports:
                 sport = {
                     "name": str(port_no),
