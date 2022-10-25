@@ -78,7 +78,7 @@ def get_docker_connector() -> tuple[yarl.URL, aiohttp.BaseConnector]:
     if raw_docker_host := os.environ.get("DOCKER_HOST", None):
         docker_host = yarl.URL(raw_docker_host)
         match docker_host.scheme:
-            case "http":
+            case "http" | "https":
                 return docker_host, aiohttp.TCPConnector()
             case "unix":
                 search_paths = [Path(docker_host.path)]
