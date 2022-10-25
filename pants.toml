@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.13.0rc0"
+pants_version = "2.13.1rc2"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
@@ -43,7 +43,7 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export ::` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.10.7"]
+interpreter_constraints = ["CPython==3.10.8"]
 lockfile_generator = "pex"
 tailor_pex_binary_targets = false
 

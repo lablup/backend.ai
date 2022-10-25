@@ -71,7 +71,7 @@ ignore_missing_imports = true
 mypy_path = "stubs:src"
 namespace_packages = true
 explicit_package_bases = true
-python_executable = "dist/export/python/virtualenvs/python-default/3.10.7/bin/python"
+python_executable = "dist/export/python/virtualenvs/python-default/3.10.8/bin/python"
 
 [tool.black]
 line-length = 100

@@ -3029,9 +3029,7 @@ class AgentRegistry:
     ) -> Mapping[str, str]:
         kernel = await self.get_session(session_name_or_id, access_key)
         if kernel["status"] != KernelStatus.RUNNING:
-            raise InvalidAPIParameters(
-                f"Unable to get commit status since kernel(id: {kernel['id']}) is currently not RUNNING."
-            )
+            return {"status": "", "kernel": str(kernel["id"])}
         email = await self._get_user_email(kernel)
         async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
             async with RPCContext(
