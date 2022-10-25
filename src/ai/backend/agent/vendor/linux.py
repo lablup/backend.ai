@@ -9,6 +9,7 @@ from typing import Iterator
 import aiohttp
 import aiotools
 
+from ai.backend.common.docker import get_docker_connector
 from ai.backend.common.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -42,19 +43,6 @@ def parse_cpuset(value: str) -> Iterator[int]:
             yield from range(int(begin), int(end) + 1)
         else:
             yield int(begin)
-
-
-def find_docker_socket() -> Path:
-    _search_paths = [
-        Path("/run/docker.sock"),
-        Path("/var/run/docker.sock"),
-        Path.home() / ".docker/run/docker.sock",
-    ]
-    for p in _search_paths:
-        if p.exists() and p.is_socket():
-            return p
-    else:
-        raise FileNotFoundError("could not find the docker socket")
 
 
 class libnuma:
@@ -92,23 +80,14 @@ class libnuma:
                             return cpuset
                         except AttributeError:
                             return get_cpus()
-                case "darwin":
+                case "darwin" | "win32":
                     try:
-                        unix_conn = aiohttp.UnixConnector(os.fsdecode(find_docker_socket()))
-                        async with aiohttp.ClientSession(connector=unix_conn) as sess:
-                            async with sess.get("http://docker/info") as resp:
+                        docker_host, connector = get_docker_connector()
+                        async with aiohttp.ClientSession(connector=connector) as sess:
+                            async with sess.get(docker_host / "info") as resp:
                                 data = await resp.json()
                                 return {idx for idx in range(data["NCPU"])}
-                    except (FileNotFoundError, aiohttp.ClientError):
-                        return get_cpus()
-                case "win32":
-                    try:
-                        npipe_conn = aiohttp.NamedPipeConnector(r"\\.\pipe\docker_engine")
-                        async with aiohttp.ClientSession(connector=npipe_conn) as sess:
-                            async with sess.get("http://docker/info") as resp:
-                                data = await resp.json()
-                                return {idx for idx in range(data["NCPU"])}
-                    except aiohttp.ClientError:
+                    except (RuntimeError, aiohttp.ClientError):
                         return get_cpus()
                 case _:
                     return get_cpus()
