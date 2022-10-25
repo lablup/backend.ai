@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Iterator
 
+import aiohttp
 import aiotools
 
 from ai.backend.common.logging import BraceStyleAdapter
@@ -43,6 +44,19 @@ def parse_cpuset(value: str) -> Iterator[int]:
             yield int(begin)
 
 
+def find_docker_socket() -> Path:
+    _search_paths = [
+        Path("/run/docker.sock"),
+        Path("/var/run/docker.sock"),
+        Path.home() / ".docker/run/docker.sock",
+    ]
+    for p in _search_paths:
+        if p.exists() and p.is_socket():
+            return p
+    else:
+        raise FileNotFoundError("could not find the docker socket")
+
+
 class libnuma:
     @staticmethod
     def node_of_cpu(core) -> int:
@@ -78,6 +92,24 @@ class libnuma:
                             return cpuset
                         except AttributeError:
                             return get_cpus()
+                case "darwin":
+                    try:
+                        unix_conn = aiohttp.UnixConnector(os.fsdecode(find_docker_socket()))
+                        async with aiohttp.ClientSession(connector=unix_conn) as sess:
+                            async with sess.get("http://docker/info") as resp:
+                                data = await resp.json()
+                                return {idx for idx in range(data["NCPU"])}
+                    except (FileNotFoundError, aiohttp.ClientError):
+                        return get_cpus()
+                case "win32":
+                    try:
+                        npipe_conn = aiohttp.NamedPipeConnector(r"\\.\pipe\docker_engine")
+                        async with aiohttp.ClientSession(connector=npipe_conn) as sess:
+                            async with sess.get("http://docker/info") as resp:
+                                data = await resp.json()
+                                return {idx for idx in range(data["NCPU"])}
+                    except aiohttp.ClientError:
+                        return get_cpus()
                 case _:
                     return get_cpus()
         finally:
