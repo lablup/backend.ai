@@ -1815,7 +1815,7 @@ class AgentRegistry:
                     rpc_coros.append(
                         rpc.call.destroy_kernel(
                             str(kernel["id"]),
-                            "failed-to-start",
+                            KernelLifecycleEventReason.FAILED_TO_START,
                             suppress_events=True,
                         ),
                     )
@@ -1826,7 +1826,7 @@ class AgentRegistry:
         session_getter: SessionGetter,
         *,
         forced: bool = False,
-        reason: Optional[str] = None,
+        reason: Optional[KernelLifecycleEventReason] = None,
     ) -> Mapping[str, Any]:
         """
         Destroy session kernels. Do not destroy
