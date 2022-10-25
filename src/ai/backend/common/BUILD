@@ -10,7 +10,8 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
-        "src/ai/backend/common/plugin:src",  # not auto-inferred
+        "src/ai/backend/common/plugin:src",
+        "src/ai/backend/common/web/session:src",  # not auto-inferred
         "!!stubs/trafaret:stubs",
     ],
     provides=python_artifact(
