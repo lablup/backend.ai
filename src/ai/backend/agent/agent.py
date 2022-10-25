@@ -1556,7 +1556,7 @@ class AbstractAgent(
                 service_ports.append(
                     {
                         "name": f"hostport{index+1}",
-                        "protocol": ServicePortProtocols("tcp"),
+                        "protocol": ServicePortProtocols("internal"),
                         "container_ports": (port,),
                         "host_ports": (port,),
                     }
@@ -1680,7 +1680,9 @@ class AbstractAgent(
             "repl_out_port": kernel_obj["repl_out_port"],
             "stdin_port": kernel_obj["stdin_port"],  # legacy
             "stdout_port": kernel_obj["stdout_port"],  # legacy
-            "service_ports": service_ports,
+            "service_ports": [
+                port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL
+            ],
             "container_id": kernel_obj["container_id"],
             "resource_spec": resource_spec.to_json_serializable_dict(),
             "attached_devices": attached_devices,

@@ -244,6 +244,7 @@ class ServicePortProtocols(str, enum.Enum):
     HTTP = "http"
     TCP = "tcp"
     PREOPEN = "preopen"
+    INTERNAL = "internal"
 
 
 class SessionTypes(str, enum.Enum):
