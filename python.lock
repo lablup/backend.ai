@@ -20,7 +20,8 @@
 //     "aiohttp_cors~=0.7",
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.1",
-//     "aiomonitor-ng~=0.6.0",
+//     "aiomonitor-ng~=0.7.0",
+//     "aioredis[hiredis]~=2.0.1",
 //     "aiosqlite~=0.17.0",
 //     "aiotools~=1.5.9",
 //     "aiotusclient~=0.1.4",
@@ -342,23 +343,49 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "010871ae7f51a68fb315a112c3a3e8c617b321e12708405a99eef7c0fc0a4884",
-              "url": "https://files.pythonhosted.org/packages/65/16/024998efe68bba425fe1e5c937585da33cbc15a8e6599748ec937ced23d8/aiomonitor_ng-0.6.0-py3-none-any.whl"
+              "hash": "9f159c1ac9bd0d103095ff03fa2020d5e3f46764d402ffc7fab6b7614235428d",
+              "url": "https://files.pythonhosted.org/packages/6c/b8/6555a292bd744e8ab8aae36005925ff67783dc69c2c873255c867bc0fb68/aiomonitor_ng-0.7.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "2c7abe539f4d26a4002fde61b7fbd9aa6d4c66e28b6b31f5a414c2593707e9fa",
-              "url": "https://files.pythonhosted.org/packages/d0/21/f2990624e3c92f421d6bf25c0f65d3e3c6bdb380de01cf1ae5efede6de76/aiomonitor-ng-0.6.0.tar.gz"
+              "hash": "8dcf63e60779da45e967077e82a41d3b352bafee4326e11f02ebd4d71e5b1f73",
+              "url": "https://files.pythonhosted.org/packages/fb/18/05c571cdcc5c6b8d8be0d4023dd592831fcdce432e2381b88146a3b49d50/aiomonitor-ng-0.7.0.tar.gz"
             }
           ],
           "project_name": "aiomonitor-ng",
           "requires_dists": [
             "aioconsole",
+            "attrs>=20",
+            "click>=8",
+            "janus>=1.0",
             "prompt-toolkit>=3.0",
-            "terminaltables"
+            "terminaltables",
+            "typing-extensions>=4.1"
           ],
           "requires_python": null,
-          "version": "0.6"
+          "version": "0.7"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "9ac0d0b3b485d293b8ca1987e6de8658d7dafcca1cddfcd1d506cae8cdebfdd6",
+              "url": "https://files.pythonhosted.org/packages/9b/a9/0da089c3ae7a31cbcd2dcf0214f6f571e1295d292b6139e2bac68ec081d0/aioredis-2.0.1-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "eaa51aaf993f2d71f54b70527c440437ba65340588afeb786cd87c55c89cd98e",
+              "url": "https://files.pythonhosted.org/packages/2e/cf/9eb144a0b05809ffc5d29045c4b51039000ea275bc1268d0351c9e7dfc06/aioredis-2.0.1.tar.gz"
+            }
+          ],
+          "project_name": "aioredis",
+          "requires_dists": [
+            "async-timeout",
+            "hiredis>=1.0; implementation_name == \"cpython\" and extra == \"hiredis\"",
+            "typing-extensions"
+          ],
+          "requires_python": ">=3.6",
+          "version": "2.0.1"
         },
         {
           "artifacts": [
@@ -973,19 +1000,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "854bf444933e37f5824ae7bfc1e98d5bce2ebe4160d46b5edf346a89358e99da",
-              "url": "https://files.pythonhosted.org/packages/77/8b/7550e87b2d308a1b711725dfaddc19c695f8c5fa413c640b2be01662f4e6/colorama-0.4.5-py2.py3-none-any.whl"
+              "hash": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6",
+              "url": "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e6c6b4334fc50988a639d9b98aa429a0b57da6e17b9a44f0451f930b6967b7a4",
-              "url": "https://files.pythonhosted.org/packages/2b/65/24d033a9325ce42ccbfa3ca2d0866c7e89cc68e5b9d92ecaba9feef631df/colorama-0.4.5.tar.gz"
+              "hash": "08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44",
+              "url": "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz"
             }
           ],
           "project_name": "colorama",
           "requires_dists": [],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "0.4.5"
+          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7",
+          "version": "0.4.6"
         },
         {
           "artifacts": [
@@ -3538,19 +3565,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "601d45b5e9979d2b931de5403aa11153626a1eadd1ce9727b21f24673ced5ceb",
-              "url": "https://files.pythonhosted.org/packages/c8/66/c755376ae5d82106b9240ff3cb009f9a2fb5625aa81f76116bc8374d66ba/types_setuptools-65.5.0.1-py3-none-any.whl"
+              "hash": "2d33e4ef0d35cd2da48a143eb02184f58398381ddb1f772eff20ccc4126fec13",
+              "url": "https://files.pythonhosted.org/packages/07/e0/699564435f3aacc21ec62ae8bc963315e964a11dda364e3f0b724c71ea91/types_setuptools-65.5.0.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5b297081c8f1fbd992cd8b305a97ed96ee6ffc765e9115124029597dd10b8a71",
-              "url": "https://files.pythonhosted.org/packages/2c/c9/63a09a2eaf9d37538fc885ffc25829f76956d3dc281238439e0d5b4ac910/types-setuptools-65.5.0.1.tar.gz"
+              "hash": "9847de6d7087fb1dd4a88c2a21543d1b86a6179c36744f081974303fe2f30f50",
+              "url": "https://files.pythonhosted.org/packages/5f/c0/ae2509853766832dceee90c946a2c134b29c3cd4011b6cfc18cbc43fcdd5/types-setuptools-65.5.0.2.tar.gz"
             }
           ],
           "project_name": "types-setuptools",
           "requires_dists": [],
           "requires_python": null,
-          "version": "65.5.0.1"
+          "version": "65.5.0.2"
         },
         {
           "artifacts": [
@@ -3902,7 +3929,8 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.99",
+  "pex_version": "2.1.108",
+  "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
     "Jinja2~=3.1.2",
@@ -3916,7 +3944,8 @@
     "aiohttp_cors~=0.7",
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.1",
-    "aiomonitor-ng~=0.6.0",
+    "aiomonitor-ng~=0.7.0",
+    "aioredis[hiredis]~=2.0.1",
     "aiosqlite~=0.17.0",
     "aiotools~=1.5.9",
     "aiotusclient~=0.1.4",
