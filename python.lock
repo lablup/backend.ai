@@ -18,11 +18,9 @@
 //     "aiodocker~=0.21.0",
 //     "aiofiles~=0.8.0",
 //     "aiohttp_cors~=0.7",
-//     "aiohttp_session[aioredis]~=2.11",
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.1",
 //     "aiomonitor-ng~=0.6.0",
-//     "aioredis[hiredis]~=2.0.1",
 //     "aiosqlite~=0.17.0",
 //     "aiotools~=1.5.9",
 //     "aiotusclient~=0.1.4",
@@ -324,32 +322,6 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d5451b72ba748d72ef01f55c3af45b63be2d40b2bdadf47407007e1270343384",
-              "url": "https://files.pythonhosted.org/packages/13/e3/affe80cf6d906f5a8ca7d084b780c340d90f7649c0683ed1e65dd88c5bdf/aiohttp_session-2.11.0-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "0fdf39600f6a05c4943ef6c7b099071ca9854413111a26761626244be5015dc4",
-              "url": "https://files.pythonhosted.org/packages/3b/a7/0b97b9a2e3a553a86a6703f86b0e9b1afb2b262849700e8f80015c0f643f/aiohttp-session-2.11.0.tar.gz"
-            }
-          ],
-          "project_name": "aiohttp-session",
-          "requires_dists": [
-            "aiohttp>=3.8",
-            "aiomcache>=0.5.2; extra == \"aiomcache\"",
-            "aioredis>=2.0.0; extra == \"aioredis\"",
-            "cryptography; extra == \"pycrypto\"",
-            "cryptography; extra == \"secure\"",
-            "pynacl; extra == \"pynacl\"",
-            "typing-extensions>=3.7.4; python_version < \"3.8\""
-          ],
-          "requires_python": ">=3.7",
-          "version": "2.11"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
               "hash": "b31cbf99142ca0c93cfc180e3f32fcdca0bcab35367e1380bc70dfaaf88cdc60",
               "url": "https://files.pythonhosted.org/packages/fe/0c/e1db340ac8d75af3e51236696077e399cc3dfe8ea25d2a524066bff196a9/aiohttp_sse-2.1.0-py3-none-any.whl"
             },
@@ -387,28 +359,6 @@
           ],
           "requires_python": null,
           "version": "0.6"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "9ac0d0b3b485d293b8ca1987e6de8658d7dafcca1cddfcd1d506cae8cdebfdd6",
-              "url": "https://files.pythonhosted.org/packages/9b/a9/0da089c3ae7a31cbcd2dcf0214f6f571e1295d292b6139e2bac68ec081d0/aioredis-2.0.1-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "eaa51aaf993f2d71f54b70527c440437ba65340588afeb786cd87c55c89cd98e",
-              "url": "https://files.pythonhosted.org/packages/2e/cf/9eb144a0b05809ffc5d29045c4b51039000ea275bc1268d0351c9e7dfc06/aioredis-2.0.1.tar.gz"
-            }
-          ],
-          "project_name": "aioredis",
-          "requires_dists": [
-            "async-timeout",
-            "hiredis>=1.0; implementation_name == \"cpython\" and extra == \"hiredis\"",
-            "typing-extensions"
-          ],
-          "requires_python": ">=3.6",
-          "version": "2.0.1"
         },
         {
           "artifacts": [
@@ -2556,21 +2506,21 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "8d82e7087868e94dd8d7d418e5088ce64f7daab4b36db654cbaedb46f9d1ca80",
-              "url": "https://files.pythonhosted.org/packages/37/82/43382713811f0ddd9fff1ed778af6818cc2080ccd425e3eba540be690fb6/PyJWT-2.5.0-py3-none-any.whl"
+              "hash": "d83c3d892a77bbb74d3e1a2cfa90afaadb60945205d1095d9221f04466f64c14",
+              "url": "https://files.pythonhosted.org/packages/40/46/505f0dd53c14096f01922bf93a7abb4e40e29a06f858abbaa791e6954324/PyJWT-2.6.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e77ab89480905d86998442ac5788f35333fa85f65047a534adc38edf3c88fc3b",
-              "url": "https://files.pythonhosted.org/packages/d4/63/6f57a751c9e3135856b44e2c29c548741ec14db3d24b9666e97292aa968e/PyJWT-2.5.0.tar.gz"
+              "hash": "69285c7e31fc44f68a1feb309e948e0df53259d579295e6cfe2b1792329f05fd",
+              "url": "https://files.pythonhosted.org/packages/75/65/db64904a7f23e12dbf0565b53de01db04d848a497c6c9b87e102f74c9304/PyJWT-2.6.0.tar.gz"
             }
           ],
           "project_name": "pyjwt",
           "requires_dists": [
             "coverage[toml]==5.0.4; extra == \"dev\"",
             "coverage[toml]==5.0.4; extra == \"tests\"",
-            "cryptography>=3.3.1; extra == \"crypto\"",
-            "cryptography>=3.3.1; extra == \"dev\"",
+            "cryptography>=3.4.0; extra == \"crypto\"",
+            "cryptography>=3.4.0; extra == \"dev\"",
             "pre-commit; extra == \"dev\"",
             "pytest<7.0.0,>=6.0.0; extra == \"dev\"",
             "pytest<7.0.0,>=6.0.0; extra == \"tests\"",
@@ -2578,13 +2528,11 @@
             "sphinx-rtd-theme; extra == \"docs\"",
             "sphinx<5.0.0,>=4.5.0; extra == \"dev\"",
             "sphinx<5.0.0,>=4.5.0; extra == \"docs\"",
-            "types-cryptography>=3.3.21; extra == \"crypto\"",
-            "types-cryptography>=3.3.21; extra == \"dev\"",
             "zope.interface; extra == \"dev\"",
             "zope.interface; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "2.5"
+          "version": "2.6"
         },
         {
           "artifacts": [
@@ -3572,19 +3520,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "eda5fd9e80f453143902db5547ca6506a3af44476ad080db7d18840da532ab19",
-              "url": "https://files.pythonhosted.org/packages/e4/12/09014572cb7fc20c57bafe3df8ab6f712e7b7b14d5202acfcc721af21ac2/types_redis-4.3.21.2-py3-none-any.whl"
+              "hash": "77ee5b8ca3a779e09807348c7f0b33c0f38a46096cd6c8a2e0176b28b3784b34",
+              "url": "https://files.pythonhosted.org/packages/48/7a/629039d1d17fd19c63cd5a3e1e9edd4497684a116d7166fe313a4ef262f3/types_redis-4.3.21.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ab542249a47d3903b94162e6395ae6be0cc0f562fd184ed51a0a34d8a7021a39",
-              "url": "https://files.pythonhosted.org/packages/36/ed/dda8cf24f45d619cf411956d9118b804454de123a0845f055a2cc5702112/types-redis-4.3.21.2.tar.gz"
+              "hash": "2e1f184056188c8754ded0b5173dc01824d2bfe41975fe318068a68beedfb62c",
+              "url": "https://files.pythonhosted.org/packages/7a/10/df69fba61a22e5578bda81321d99e2ce46d833fabd3b6fee610f965afc69/types-redis-4.3.21.3.tar.gz"
             }
           ],
           "project_name": "types-redis",
           "requires_dists": [],
           "requires_python": null,
-          "version": "4.3.21.2"
+          "version": "4.3.21.3"
         },
         {
           "artifacts": [
@@ -3966,11 +3914,9 @@
     "aiodocker~=0.21.0",
     "aiofiles~=0.8.0",
     "aiohttp_cors~=0.7",
-    "aiohttp_session[aioredis]~=2.11",
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.1",
     "aiomonitor-ng~=0.6.0",
-    "aioredis[hiredis]~=2.0.1",
     "aiosqlite~=0.17.0",
     "aiotools~=1.5.9",
     "aiotusclient~=0.1.4",
