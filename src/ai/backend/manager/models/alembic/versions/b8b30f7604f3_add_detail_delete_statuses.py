@@ -26,7 +26,6 @@ DELETE_ONGOING = "delete-ongoing"  # vfolder is moving to trash bin
 DELETE_COMPLETE = "deleted-complete"  # vfolder is in trash bin
 RECOVER_ONGOING = "recover-ongoing"  # vfolder is being recovered from trash bin
 PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed from trash bin
-PURGE_COMPLETE = "purged-complete"  # vfolder is permanently removed
 
 
 def upgrade():
@@ -35,7 +34,6 @@ def upgrade():
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{DELETE_COMPLETE}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{RECOVER_ONGOING}'")
     op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{PURGE_ONGOING}'")
-    op.execute(f"ALTER TYPE {enum_name} ADD VALUE '{PURGE_COMPLETE}'")
     op.add_column(
         "vfolders", sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null())
     )
@@ -60,7 +58,7 @@ def downgrade():
         ),
     )
     vfolder_delete_query = sa.delete(vfolders).where(
-        vfolders.c.status.in_([DELETE_COMPLETE, PURGE_ONGOING, PURGE_COMPLETE])
+        vfolders.c.status.in_([DELETE_COMPLETE, PURGE_ONGOING])
     )
     connection.execute(vfolder_delete_query)
 
@@ -102,15 +100,6 @@ def downgrade():
         text(
             f"""DELETE FROM pg_enum
         WHERE enumlabel = '{PURGE_ONGOING}'
-        AND enumtypid = (
-            SELECT oid FROM pg_type WHERE typname = '{enum_name}'
-        )"""
-        )
-    )
-    op.execute(
-        text(
-            f"""DELETE FROM pg_enum
-        WHERE enumlabel = '{PURGE_COMPLETE}'
         AND enumtypid = (
             SELECT oid FROM pg_type WHERE typname = '{enum_name}'
         )"""

@@ -1990,7 +1990,9 @@ async def purge(request: web.Request) -> web.Response:
     async with root_ctx.db.begin() as conn:
         cond = vfolders.c.name == folder_name
         async with vfolder_status_ctxmgr(
-            conn, cond, VFolderOperationStatus.PURGE_ONGOING, VFolderOperationStatus.PURGE_COMPLETE
+            conn,
+            cond,
+            VFolderOperationStatus.PURGE_ONGOING,
         ):
             async with root_ctx.storage_manager.request(
                 proxy_name,
@@ -2002,6 +2004,7 @@ async def purge(request: web.Request) -> web.Response:
                 },
             ):
                 pass
+        await conn.execute(sa.delete(vfolders).where(cond))
     return web.Response(status=204)
 
 

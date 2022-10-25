@@ -132,7 +132,7 @@ class VFolderOperationStatus(str, enum.Enum):
     DELETE_COMPLETE = "deleted-complete"  # vfolder is in trash bin
     RECOVER_ONGOING = "recover-ongoing"  # vfolder is being recovered from trash bin
     PURGE_ONGOING = "purge-ongoing"  # vfolder is being removed from trash bin
-    PURGE_COMPLETE = "purged-complete"  # vfolder is permanently removed
+    # PURGE_COMPLETE = "purged-complete"  # vfolder is permanently removed
 
 
 class VFolderAccessStatus(str, enum.Enum):
@@ -701,24 +701,25 @@ async def prepare_vfolder_mounts(
 async def vfolder_status_ctxmgr(
     conn: SAConnection,
     target_vfolder_cond: BinaryExpression,
-    enter_status: VFolderOperationStatus,
-    exit_status: VFolderOperationStatus,
+    enter_status: VFolderOperationStatus | None = None,
+    exit_status: VFolderOperationStatus | None = None,
 ) -> AsyncIterator[None]:
-    query = (
-        sa.update(vfolders)
-        .values(
-            status=enter_status,
-            status_history=sql_json_merge(
-                vfolders.c.status_history,
-                (),
-                {
-                    enter_status.name: datetime.now(tzutc()).isoformat(),
-                },
-            ),
+    if enter_status is not None:
+        query = (
+            sa.update(vfolders)
+            .values(
+                status=enter_status,
+                status_history=sql_json_merge(
+                    vfolders.c.status_history,
+                    (),
+                    {
+                        enter_status.name: datetime.now(tzutc()).isoformat(),
+                    },
+                ),
+            )
+            .where(target_vfolder_cond)
         )
-        .where(target_vfolder_cond)
-    )
-    await conn.execute(query)
+        await conn.execute(query)
     try:
         yield
     except Exception:
@@ -738,21 +739,22 @@ async def vfolder_status_ctxmgr(
         )
         await conn.execute(query)
         raise
-    query = (
-        sa.update(vfolders)
-        .values(
-            status=exit_status,
-            status_history=sql_json_merge(
-                vfolders.c.status_history,
-                (),
-                {
-                    exit_status.name: datetime.now(tzutc()).isoformat(),
-                },
-            ),
+    if exit_status is not None:
+        query = (
+            sa.update(vfolders)
+            .values(
+                status=exit_status,
+                status_history=sql_json_merge(
+                    vfolders.c.status_history,
+                    (),
+                    {
+                        exit_status.name: datetime.now(tzutc()).isoformat(),
+                    },
+                ),
+            )
+            .where(target_vfolder_cond)
         )
-        .where(target_vfolder_cond)
-    )
-    await conn.execute(query)
+        await conn.execute(query)
 
 
 class VirtualFolder(graphene.ObjectType):
