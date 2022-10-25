@@ -8,7 +8,10 @@ Create Date: 2022-10-24 13:35:41.852654
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.sql import text
+
+from ai.backend.manager.models.base import GUID, convention
 
 # revision identifiers, used by Alembic.
 revision = "b8b30f7604f3"
@@ -39,7 +42,35 @@ def upgrade():
 
 
 def downgrade():
+    connection = op.get_bind()
+    metadata = sa.MetaData(naming_convention=convention)
+    vfolders = sa.Table(
+        "vfolders",
+        metadata,
+        sa.Column(
+            "id",
+            GUID(),
+            nullable=False,
+            primary_key=True,
+        ),
+        sa.Column(
+            "status",
+            ENUM,
+            nullable=False,
+        ),
+    )
+    vfolder_delete_query = sa.delete(vfolders).where(
+        vfolders.c.status.in_([DELETE_COMPLETE, PURGE_ONGOING, PURGE_COMPLETE])
+    )
+    connection.execute(vfolder_delete_query)
+
+    vfolder_update_query = (
+        sa.update(vfolders).where(vfolders.c.status == ERROR).values({"status": "ready"})
+    )
+    connection.execute(vfolder_update_query)
+
     op.execute(f"ALTER TYPE {enum_name} RENAME VALUE '{DELETE_ONGOING}' TO '{DELETING}'")
+
     op.execute(
         text(
             f"""DELETE FROM pg_enum
