@@ -666,6 +666,18 @@ class AgentRPCServer(aobject):
                 log.exception("reset: destroying {0}", kernel_id)
         await asyncio.gather(*tasks)
 
+    @rpc_function
+    @collect_error
+    async def assign_port(self):
+        log.debug("rpc::assign_port()")
+        return self.agent.port_pool.pop()
+
+    @rpc_function
+    @collect_error
+    async def collect_port(self, port_no: int):
+        log.debug("rpc::collect_port(port_no:{})", port_no)
+        self.agent.port_pool.add(port_no)
+
 
 @aiotools.server
 async def server_main_logwrapper(

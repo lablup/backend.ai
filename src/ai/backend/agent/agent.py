@@ -213,8 +213,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         raise NotImplementedError
 
     @abstractmethod
-    async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
+    async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         """
+        Prepare container to accept SSH connection.
         Install the ssh keypair inside the kernel from cluster_info.
         """
         raise NotImplementedError
@@ -1483,7 +1484,7 @@ class AbstractAgent(
 
         # Prepare networking.
         await ctx.apply_network(cluster_info)
-        await ctx.install_ssh_keypair(cluster_info)
+        await ctx.prepare_ssh(cluster_info)
 
         # Mount vfolders and krunner stuffs.
         if not restarting:
@@ -1543,6 +1544,16 @@ class AbstractAgent(
                 service_ports.append(sport)
                 for cport in sport["container_ports"]:
                     exposed_ports.append(cport)
+            for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
+                service_ports.append(
+                    {
+                        "name": f"hostport{index+1}",
+                        "protocol": ServicePortProtocols("tcp"),
+                        "container_ports": (port,),
+                        "host_ports": (port,),
+                    }
+                )
+                exposed_ports.append(port)
             log.debug("exposed ports: {!r}", exposed_ports)
 
         runtime_type = image_labels.get("ai.backend.runtime-type", "python")

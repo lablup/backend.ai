@@ -24,6 +24,7 @@ from typing import (
     NewType,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Type,
     TypedDict,
@@ -817,6 +818,7 @@ class ClusterInfo(TypedDict):
     replicas: Mapping[str, int]  # per-role kernel counts
     network_name: Optional[str]
     ssh_keypair: Optional[ClusterSSHKeyPair]
+    cluster_ssh_port_mapping: Optional[Mapping[str, int]]
 
 
 class ClusterSSHKeyPair(TypedDict):
@@ -861,6 +863,7 @@ class KernelCreationConfig(TypedDict):
     startup_command: Optional[str]
     internal_data: Optional[Mapping[str, Any]]
     preopen_ports: List[int]
+    allocated_host_ports: Set[int]
 
 
 class KernelEnqueueingConfig(TypedDict):

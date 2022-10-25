@@ -219,6 +219,7 @@ kernels = sa.Table(
     sa.Column("stdout_port", sa.Integer(), nullable=False),  # legacy for stream_pty
     sa.Column("service_ports", pgsql.JSONB(), nullable=True),
     sa.Column("preopen_ports", sa.ARRAY(sa.Integer), nullable=True),
+    sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False),
     # Lifecycle
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
     sa.Column(

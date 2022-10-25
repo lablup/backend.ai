@@ -58,6 +58,7 @@ from ai.backend.common.types import (
     MountTypes,
     ResourceSlot,
     Sentinel,
+    ServicePort,
     SlotName,
     current_resource_slots,
 )
@@ -404,7 +405,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         )
 
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
-        if cluster_info["network_name"] is not None:
+        if cluster_info["network_name"] == "host":
+            self.container_configs.append(
+                {
+                    "HostConfig": {
+                        "NetworkMode": "host",
+                    },
+                }
+            )
+        elif cluster_info["network_name"] is not None:
             self.container_configs.append(
                 {
                     "HostConfig": {
@@ -444,12 +453,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 }
             )
 
-    async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
+    async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
         if sshkey is None:
             return
 
-        def _write_keypair():
+        def _write_config():
             try:
                 priv_key_path = self.config_dir / "ssh" / "id_cluster"
                 pub_key_path = self.config_dir / "ssh" / "id_cluster.pub"
@@ -463,10 +472,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         os.chown(str(priv_key_path), uid, gid)
                         os.chown(str(pub_key_path), uid, gid)
                 priv_key_path.chmod(0o600)
+                if cluster_ssh_port_mapping := cluster_info["cluster_ssh_port_mapping"]:
+                    port_mapping_json_path = self.config_dir / "ssh" / "port-mapping.json"
+                    port_mapping_json_path.write_text(json.dumps(cluster_ssh_port_mapping))
             except Exception:
                 log.exception("error while writing cluster keypair")
 
-        current_loop().run_in_executor(None, _write_keypair)  # ???
+        current_loop().run_in_executor(None, _write_config)  # ???
 
     async def process_mounts(self, mounts: Sequence[Mount]):
         def fix_unsupported_perm(folder_perm: MountPermission) -> MountPermission:
@@ -517,7 +529,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
-        service_ports,
+        service_ports: List[ServicePort],
     ) -> DockerKernel:
         loop = current_loop()
 
@@ -809,8 +821,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             stdin_port = 0
             stdout_port = 0
             for idx, port in enumerate(exposed_ports):
-                host_port = int((await container.port(port))[0]["HostPort"])
-                assert host_port == host_ports[idx]
+                if container_config["HostConfig"].get("NetworkMode") == "host":
+                    host_port = host_ports[idx]
+                else:
+                    host_port = int((await container.port(port))[0]["HostPort"])
+                    assert host_port == host_ports[idx]
                 if port == 2000:  # intrinsic
                     repl_in_port = host_port
                 elif port == 2001:  # intrinsic
@@ -822,9 +837,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 else:
                     ctnr_host_port_map[port] = host_port
             for sport in service_ports:
-                sport["host_ports"] = tuple(
-                    ctnr_host_port_map[cport] for cport in sport["container_ports"]
-                )
+                if container_config["HostConfig"].get("NetworkMode") == "host":
+                    sport["container_ports"] = sport["host_ports"]
+                else:
+                    sport["host_ports"] = tuple(
+                        ctnr_host_port_map[cport] for cport in sport["container_ports"]
+                    )
 
         return {
             "container_id": container._id,

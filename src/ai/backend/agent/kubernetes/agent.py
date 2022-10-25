@@ -237,7 +237,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         pass
 
-    async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
+    async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
         if sshkey is None:
             return
