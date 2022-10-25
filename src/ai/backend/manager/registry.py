@@ -72,6 +72,7 @@ from ai.backend.common.types import (
     ClusterInfo,
     ClusterMode,
     ClusterSSHKeyPair,
+    ClusterSSHPortMapping,
     DeviceId,
     HardwareMetadata,
     KernelEnqueueingConfig,
@@ -1321,7 +1322,9 @@ class AgentRegistry:
                 if scheduled_session.cluster_size > 1
                 else None
             ),
-            cluster_ssh_port_mapping=cluster_ssh_port_mapping,
+            cluster_ssh_port_mapping=cast(
+                Optional[ClusterSSHPortMapping], cluster_ssh_port_mapping
+            ),
         )
         scheduled_session.environ.update(
             {

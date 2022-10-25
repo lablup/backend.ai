@@ -103,6 +103,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     Sentinel,
+    ServicePort,
     ServicePortProtocols,
     SessionId,
     SlotName,
@@ -1512,8 +1513,8 @@ class AbstractAgent(
             attached_devices[dev_name] = devices
 
         exposed_ports = [2000, 2001]
-        service_ports = []
-        port_map = {}
+        service_ports: List[ServicePort] = []
+        port_map: Dict[str, ServicePort] = {}
         preopen_ports = ctx.kernel_config.get("preopen_ports")
         if preopen_ports is None:
             preopen_ports = []
@@ -1539,14 +1540,14 @@ class AbstractAgent(
             for sport in parse_service_ports(image_labels.get("ai.backend.service-ports", "")):
                 port_map[sport["name"]] = sport
             for port_no in preopen_ports:
-                sport = {
+                preopen_sport: ServicePort = {
                     "name": str(port_no),
                     "protocol": ServicePortProtocols("preopen"),
                     "container_ports": (port_no,),
                     "host_ports": (None,),
                 }
-                service_ports.append(sport)
-                for cport in sport["container_ports"]:
+                service_ports.append(preopen_sport)
+                for cport in preopen_sport["container_ports"]:
                     exposed_ports.append(cport)
             for sport in port_map.values():
                 service_ports.append(sport)
@@ -1672,7 +1673,9 @@ class AbstractAgent(
 
         # The startup command for the batch-type sessions will be executed by the manager
         # upon firing of the "session_started" event.
-
+        public_service_ports: List[ServicePort] = [
+            port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL
+        ]
         return {
             "id": KernelId(kernel_id),
             "kernel_host": str(kernel_obj["kernel_host"]),
@@ -1680,9 +1683,7 @@ class AbstractAgent(
             "repl_out_port": kernel_obj["repl_out_port"],
             "stdin_port": kernel_obj["stdin_port"],  # legacy
             "stdout_port": kernel_obj["stdout_port"],  # legacy
-            "service_ports": [
-                port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL
-            ],
+            "service_ports": public_service_ports,
             "container_id": kernel_obj["container_id"],
             "resource_spec": resource_spec.to_json_serializable_dict(),
             "attached_devices": attached_devices,

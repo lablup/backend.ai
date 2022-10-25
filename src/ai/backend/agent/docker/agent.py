@@ -870,11 +870,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 else:
                     ctnr_host_port_map[port] = host_port
             for sport in service_ports:
-                sport["host_ports"] = tuple(
+                created_host_ports: Tuple[int, ...] = tuple(
                     ctnr_host_port_map[cport] for cport in sport["container_ports"]
                 )
+                sport["host_ports"] = created_host_ports
                 if container_config["HostConfig"].get("NetworkMode") == "host":
-                    sport["container_ports"] = sport["host_ports"]
+                    sport["container_ports"] = created_host_ports
 
         return {
             "container_id": container._id,
