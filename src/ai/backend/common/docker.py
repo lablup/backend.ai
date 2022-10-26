@@ -2,7 +2,10 @@ import ipaddress
 import itertools
 import json
 import logging
+import os
 import re
+import sys
+from pathlib import Path
 from typing import (
     Any,
     Dict,
@@ -13,6 +16,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
     Union,
 )
 
@@ -67,6 +71,48 @@ default_repository = "lablup"
 
 MIN_KERNELSPEC = 1
 MAX_KERNELSPEC = 1
+
+
+def get_docker_connector() -> tuple[yarl.URL, aiohttp.BaseConnector]:
+    connector_cls: Type[aiohttp.UnixConnector] | Type[aiohttp.NamedPipeConnector]
+    if raw_docker_host := os.environ.get("DOCKER_HOST", None):
+        docker_host = yarl.URL(raw_docker_host)
+        match docker_host.scheme:
+            case "http" | "https":
+                return docker_host, aiohttp.TCPConnector()
+            case "unix":
+                search_paths = [Path(docker_host.path)]
+                connector_cls = aiohttp.UnixConnector
+            case "npipe":
+                search_paths = [Path(docker_host.path.replace("/", "\\"))]
+                connector_cls = aiohttp.NamedPipeConnector
+            case _ as unknown_scheme:
+                raise RuntimeError("Unsupported connection scheme", unknown_scheme)
+    else:
+        match sys.platform:
+            case "linux" | "darwin":
+                search_paths = [
+                    Path("/run/docker.sock"),
+                    Path("/var/run/docker.sock"),
+                    Path.home() / ".docker/run/docker.sock",
+                ]
+                connector_cls = aiohttp.UnixConnector
+            case "win32":
+                search_paths = [
+                    Path(r"\\.\pipe\docker_engine"),
+                ]
+                connector_cls = aiohttp.NamedPipeConnector
+            case _ as unsupported_platform:
+                raise RuntimeError("Unsupported platform", unsupported_platform)
+    for p in search_paths:
+        if p.exists() and (p.is_socket() or p.is_fifo()):
+            decoded_path = os.fsdecode(p)
+            return (
+                yarl.URL("http://localhost"),
+                connector_cls(decoded_path),
+            )
+    else:
+        raise RuntimeError("could not find the docker socket")
 
 
 async def login(
