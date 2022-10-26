@@ -1639,39 +1639,7 @@ class AbstractAgent(
             if not self._pending_creation_tasks[kernel_id]:
                 del self._pending_creation_tasks[kernel_id]
 
-        # Finally we are done.
-        await self.produce_event(
-            KernelStartedEvent(
-                kernel_id,
-                creation_id,
-                creation_info={
-                    "id": KernelId(kernel_id),
-                    "kernel_host": str(kernel_obj["kernel_host"]),
-                    "repl_in_port": kernel_obj["repl_in_port"],
-                    "repl_out_port": kernel_obj["repl_out_port"],
-                    "stdin_port": kernel_obj["stdin_port"],  # legacy
-                    "stdout_port": kernel_obj["stdout_port"],  # legacy
-                    "service_ports": service_ports,
-                    "container_id": kernel_obj["container_id"],
-                    "resource_spec": resource_spec.to_json_serializable_dict(),
-                    "attached_devices": attached_devices,
-                    "scaling_group": kernel_config["scaling_group"],
-                    "agent_addr": kernel_config["agent_addr"],
-                },
-            ),
-        )
-
-        if kernel_config["session_type"] == "batch" and kernel_config["cluster_role"] == "main":
-            self._ongoing_exec_batch_tasks.add(
-                asyncio.create_task(
-                    self.execute_batch(kernel_id, kernel_config["startup_command"] or ""),
-                ),
-            )
-
-        # The startup command for the batch-type sessions will be executed by the manager
-        # upon firing of the "session_started" event.
-
-        return {
+        kernel_creation_info: KernelCreationResult = {
             "id": KernelId(kernel_id),
             "kernel_host": str(kernel_obj["kernel_host"]),
             "repl_in_port": kernel_obj["repl_in_port"],
@@ -1685,6 +1653,27 @@ class AbstractAgent(
             "scaling_group": kernel_config["scaling_group"],
             "agent_addr": kernel_config["agent_addr"],
         }
+
+        # Finally we are done.
+        await self.produce_event(
+            KernelStartedEvent(
+                kernel_id,
+                creation_id,
+                creation_info=kernel_creation_info,
+            ),
+        )
+
+        if kernel_config["session_type"] == "batch" and kernel_config["cluster_role"] == "main":
+            self._ongoing_exec_batch_tasks.add(
+                asyncio.create_task(
+                    self.execute_batch(kernel_id, kernel_config["startup_command"] or ""),
+                ),
+            )
+
+        # The startup command for the batch-type sessions will be executed by the manager
+        # upon firing of the "session_started" event.
+
+        return kernel_creation_info
 
     @abstractmethod
     async def destroy_kernel(
