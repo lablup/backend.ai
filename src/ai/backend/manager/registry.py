@@ -1564,31 +1564,42 @@ class AgentRegistry:
                     self._post_kernel_creation_infos[kernel_id].set_exception(e)
                 await asyncio.gather(*post_tasks, return_exceptions=True)
                 async with self.db.begin() as conn:
-                    values = {
-                        "scaling_group": agent_alloc_ctx.scaling_group,
-                        "status": KernelStatus.ERROR,
-                        "status_info": f"other-error ({e!r})",
-                        "status_data": {
-                            "error": {
-                                "src": "other",
-                                "name": e.__class__.__name__,
-                                "repr": repr(e),
+                    update_query = kernels.update().values(
+                        {
+                            "id": sa.bindparam("b_kernel_id"),
+                            "agent": sa.bindparam("b_agent_id"),
+                            "agent_addr": sa.bindparam("agent_addr"),
+                            "scaling_group": sa.bindparam("scaling_group"),
+                            "status": KernelStatus.ERROR,
+                            "status_info": f"other-error ({e!r})",
+                            "status_data": {
+                                "error": {
+                                    "src": "other",
+                                    "name": e.__class__.__name__,
+                                    "repr": repr(e),
+                                },
                             },
-                        },
-                        "status_history": sql_json_merge(
-                            kernels.c.status_history,
-                            (),
-                            {
-                                KernelStatus.ERROR.name: datetime.now(tzutc()).isoformat(),
-                            },
-                        ),
-                    }
-                    update_query = (
-                        kernels.update()
-                        .values(values)
-                        .where(kernels.c.id.in_([binding.kernel.kernel_id for binding in items]))
+                            "status_history": sql_json_merge(
+                                kernels.c.status_history,
+                                (),
+                                {
+                                    KernelStatus.ERROR.name: datetime.now(tzutc()).isoformat(),
+                                },
+                            ),
+                        }
                     )
-                    await conn.execute(update_query)
+                    await conn.execute(
+                        update_query,
+                        [
+                            {
+                                "b_kernel_id": binding.kernel.kernel_id,
+                                "b_agent_id": binding.agent_alloc_ctx.agent_id,
+                                "agent_addr": binding.agent_alloc_ctx.agent_addr,
+                                "scaling_group": binding.agent_alloc_ctx.scaling_group,
+                            }
+                            for binding in items
+                        ],
+                    )
                 raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
