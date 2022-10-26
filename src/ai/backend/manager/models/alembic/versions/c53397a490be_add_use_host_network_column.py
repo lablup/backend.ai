@@ -7,6 +7,7 @@ Create Date: 2022-10-25 17:02:31.709513
 """
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.sql.expression import false
 
 # revision identifiers, used by Alembic.
 revision = "c53397a490be"
@@ -17,7 +18,10 @@ depends_on = None
 
 def upgrade():
     op.add_column(
-        "kernels", sa.Column("use_host_network", sa.BOOLEAN(), nullable=False, default=False)
+        "kernels",
+        sa.Column(
+            "use_host_network", sa.BOOLEAN(), nullable=False, server_default=false(), default=False
+        ),
     )
 
 
