@@ -841,6 +841,8 @@ class KernelCreationResult(TypedDict):
     repl_out_port: int
     stdin_port: int  # legacy
     stdout_port: int  # legacy
+    scaling_group: str
+    agent_addr: str
 
 
 class KernelCreationConfig(TypedDict):
@@ -861,6 +863,8 @@ class KernelCreationConfig(TypedDict):
     startup_command: Optional[str]
     internal_data: Optional[Mapping[str, Any]]
     preopen_ports: List[int]
+    scaling_group: str
+    agent_addr: str
 
 
 class KernelEnqueueingConfig(TypedDict):

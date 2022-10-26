@@ -385,6 +385,8 @@ class AgentRPCServer(aobject):
             if len(errors) == 1:
                 raise errors[0]
             raise aiotools.TaskGroupError("agent.create_kernels() failed", errors)
+        agent_addr = raw_configs[0]["agent_addr"]
+        scaling_group = raw_configs[0]["scaling_group"]
         raw_results = [
             {
                 "id": str(result["id"]),
@@ -397,6 +399,8 @@ class AgentRPCServer(aobject):
                 "container_id": result["container_id"],
                 "resource_spec": result["resource_spec"],
                 "attached_devices": result["attached_devices"],
+                "agent_addr": agent_addr,
+                "scaling_group": scaling_group,
             }
             for result in results
         ]
