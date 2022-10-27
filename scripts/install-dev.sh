@@ -113,6 +113,10 @@ usage() {
   echo "  ${LWHITE}--ipc-base-path PATH${NC}"
   echo "    The base path for IPC sockets and shared temporary files."
   echo "    (default: /tmp/backend.ai/ipc)"
+  echo ""
+  echo "  ${LWHITE}--var-base-path PATH${NC}"
+  echo "    The base path for shared data files."
+  echo "    (default: ./var/lib/backend.ai)"
 }
 
 show_error() {
@@ -203,7 +207,6 @@ if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
   echo "Please \`cd\` there and run \`./scripts/install-dev.sh <args>\`"
   exit 1
 fi
-VAR_BASE_PATH=$(relpath "${ROOT_PATH}/var/lib/backend.ai")
 PLUGIN_PATH=$(relpath "${ROOT_PATH}/plugins")
 HALFSTACK_VOLUME_PATH=$(relpath "${ROOT_PATH}/volumes")
 PANTS_VERSION=$(cat pants.toml | $bpython -c 'import sys,re;m=re.search("pants_version = \"([^\"]+)\"", sys.stdin.read());print(m.group(1) if m else sys.exit(1))')
@@ -230,6 +233,7 @@ WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
 IPC_BASE_PATH="/tmp/backend.ai/ipc"
+VAR_BASE_PATH=$(relpath "${ROOT_PATH}/var/lib/backend.ai")
 VFOLDER_REL_PATH="vfroot/local"
 LOCAL_STORAGE_PROXY="local"
 # MUST be one of the real storage volumes
@@ -263,6 +267,8 @@ while [ $# -gt 0 ]; do
     --agent-watcher-port=*) AGENT_WATCHER_PORT="${1#*=}" ;;
     --ipc-base-path)        IPC_BASE_PATH=$2; shift ;;
     --ipc-base-path=*)      IPC_BASE_PATH="${1#*=}" ;;
+    --var-base-path)        VAR_BASE_PATH=$2; shift ;;
+    --var-base-path=*)      VAR_BASE_PATH="${1#*=}" ;;
     --codespaces-on-create) CODESPACES_ON_CREATE=1 ;;
     --codespaces-post-create) CODESPACES_POST_CREATE=1 ;;
     *)
@@ -705,7 +711,7 @@ configure_backendai() {
   sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./manager.toml
   sed_inplace "s/port = 8100/port = ${POSTGRES_PORT}/" ./manager.toml
   sed_inplace "s/port = 8081/port = ${MANAGER_PORT}/" ./manager.toml
-  sed_inplace "s@ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./manager.toml
+  sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./manager.toml
   cp configs/manager/halfstack.alembic.ini ./alembic.ini
   sed_inplace "s/localhost:8100/localhost:${POSTGRES_PORT}/" ./alembic.ini
   ./backend.ai mgr etcd put config/redis/addr "127.0.0.1:${REDIS_PORT}"
@@ -720,7 +726,8 @@ configure_backendai() {
   sed_inplace "s/port = 8120/port = ${ETCD_PORT}/" ./agent.toml
   sed_inplace "s/port = 6001/port = ${AGENT_RPC_PORT}/" ./agent.toml
   sed_inplace "s/port = 6009/port = ${AGENT_WATCHER_PORT}/" ./agent.toml
-  sed_inplace "s@ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./manager.toml
+  sed_inplace "s@\(# \)\{0,1\}ipc-base-path = .*@ipc-base-path = "'"'"${IPC_BASE_PATH}"'"'"@" ./manager.toml
+  sed_inplace "s@\(# \)\{0,1\}var-base-path = .*@var-base-path = "'"'"${VAR_BASE_PATH}"'"'"@" ./manager.toml
   if [ $ENABLE_CUDA -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
@@ -728,7 +735,6 @@ configure_backendai() {
   else
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
-  sed_inplace 's@var-base-path = .*$@var-base-path = "'"${VAR_BASE_PATH}"'"@' ./agent.toml
 
   # configure storage-proxy
   cp configs/storage-proxy/sample.toml ./storage-proxy.toml
