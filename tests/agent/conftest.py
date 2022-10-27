@@ -50,6 +50,12 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
     var_base_path.mkdir(parents=True, exist_ok=True)
     etcd_addr = etcd_container[1]
 
+    registry_state_path = var_base_path / f"last_registry.{test_id}.dat"
+    try:
+        os.unlink(registry_state_path)
+    except FileNotFoundError:
+        pass
+
     cfg = {
         "agent": {
             "region": f"rg-{test_id}",
@@ -106,25 +112,19 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
         pass
     yield cfg
     shutil.rmtree(ipc_base_path)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def test_local_instance_id(local_config, session_mocker, test_id):
-    var_base_path = local_config["agent"]["var-base-path"]
-    registry_state_path = var_base_path / f"last_registry.{test_id}.dat"
     try:
         os.unlink(registry_state_path)
     except FileNotFoundError:
         pass
+
+
+@pytest.fixture(scope="session", autouse=True)
+def test_local_instance_id(session_mocker, test_id):
     mock_generate_local_instance_id = session_mocker.patch(
         "ai.backend.agent.agent.generate_local_instance_id",
     )
     mock_generate_local_instance_id.return_value = f"i-{test_id}"
     yield
-    try:
-        os.unlink(registry_state_path)
-    except FileNotFoundError:
-        pass
 
 
 @pytest.fixture(scope="session")

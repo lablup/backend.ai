@@ -37,6 +37,7 @@ import zmq
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from aiohttp import web
+from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
@@ -1346,6 +1347,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             network = await docker.networks.get(network_name)
             await network.delete()
 
+    @preserve_termination_log
     async def monitor_docker_events(self):
         async def handle_action_start(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
             await self.inject_container_lifecycle_event(

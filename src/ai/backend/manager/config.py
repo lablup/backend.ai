@@ -229,7 +229,7 @@ manager_local_config_iv = (
             ),
             t.Key("manager"): t.Dict(
                 {
-                    t.Key("ipc-base-path", default="/tmp/backend.ai/manager/ipc"): tx.Path(
+                    t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
                         type="dir", auto_create=True
                     ),
                     t.Key("num-proc", default=_max_cpu_count): t.Int[1:_max_cpu_count],
