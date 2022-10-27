@@ -153,7 +153,7 @@ if [[ "$OSTYPE" == "linux-gnu" ]]; then
   if [ $(id -u) = "0" ]; then
     docker_sudo=''
   else
-    docker_sudo='sudo'
+    docker_sudo='sudo -E'
   fi
 else
   docker_sudo=''
@@ -161,7 +161,7 @@ fi
 if [ $(id -u) = "0" ]; then
   sudo=''
 else
-  sudo='sudo'
+  sudo='sudo -E'
 fi
 
 # Detect distribution
