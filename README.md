@@ -107,7 +107,7 @@ in a secure way.
 * SSH
    * All container sessions have intrinsic SSH/SFTP/SCP support with auto-generated per-user SSH keypair.
      PyCharm and other IDEs can use on-demand sessions using SSH remote interpreters.
-* VSCode (coming soon)
+* VSCode
    * Most container sessions have intrinsic web-based VSCode support.
 
 ### Working with Storage
