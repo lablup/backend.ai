@@ -1,4 +1,6 @@
 import argparse
+import random
+import string
 
 import hash_phrase
 
@@ -33,7 +35,7 @@ if __name__ == "__main__":
     passphrase = "salt"
     host = "main1"
     login = "work"
-    modifier = ""
+    modifier = "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
 
     hash = hash_phrase.hash_phrase(
         passphrase + host + login + modifier,
