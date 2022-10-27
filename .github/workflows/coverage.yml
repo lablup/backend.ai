@@ -1,0 +1,64 @@
+name: coverage
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    # ref) https://crontab.guru/
+    # The time is based on UTC
+    - cron: '0 15 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  test-coverage:
+    if: ${{ contains(fromJson('["schedule", "workflow_dispatch"]'), github.event_name) || (!contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == true) }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+        submodules: true
+    - name: Apply cache for Pants
+      uses: actions/cache@v3
+      id: cache
+      with:
+        # pants-specific cache
+        path: |
+          ~/.cache/pants/setup
+          ~/.cache/pants/lmdb_store
+          ~/.cache/pants/named_caches
+        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
+    - name: Create LFS file hash list
+      run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
+    - name: Restore LFS cache
+      uses: actions/cache@v3
+      id: lfs-cache
+      with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+    - name: Git LFS Pull
+      run: git lfs pull
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
+    - name: Bootstrap Pants
+      run: |
+        mkdir .tmp
+        ./pants --no-verify-config version
+    - name: Run the full test suite
+      run: |
+        ./pants test --use-coverage tests::
+    - name: Upload coverage report
+      uses: codecov/codecov-action@v3
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants.coverage.log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.

@@ -1,6 +1,6 @@
-'''
+"""
 Wrapper of msgpack-python with good defaults.
-'''
+"""
 
 from typing import Any
 

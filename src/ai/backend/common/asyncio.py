@@ -2,26 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from typing import (
-    Any,
-    Awaitable,
-    Callable,
-    Collection,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    cast,
-)
+from typing import Any, Awaitable, Callable, Collection, Sequence, Tuple, Type, TypeVar, cast
 
 __all__ = (
-    'AsyncBarrier',
-    'cancel_tasks',
-    'current_loop',
-    'run_through',
+    "AsyncBarrier",
+    "cancel_tasks",
+    "current_loop",
+    "run_through",
 )
 
-RT = TypeVar('RT')
+RT = TypeVar("RT")
 
 
 async def cancel_tasks(
@@ -43,10 +33,10 @@ async def cancel_tasks(
 
 
 current_loop: Callable[[], asyncio.AbstractEventLoop]
-if hasattr(asyncio, 'get_running_loop'):
+if hasattr(asyncio, "get_running_loop"):
     current_loop = asyncio.get_running_loop  # type: ignore
 else:
-    current_loop = asyncio.get_event_loop    # type: ignore
+    current_loop = asyncio.get_event_loop  # type: ignore
 
 
 async def run_through(

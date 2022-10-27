@@ -46,19 +46,18 @@ from ai.backend.common.types import (
 from .alloc_map import AbstractAllocMap as AbstractAllocMap  # noqa: F401
 from .alloc_map import AllocationStrategy as AllocationStrategy  # noqa: F401
 from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
-from .alloc_map import (  # noqa: F401
-    DiscretePropertyAllocMap as DiscretePropertyAllocMap,
-)
+from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # noqa: F401
 from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
 from .stats import ContainerMeasurement, NodeMeasurement, StatContext
 from .types import Container as SessionContainer
+from .types import MountInfo
 
 if TYPE_CHECKING:
     from io import TextIOWrapper
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.resources"))
 
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
@@ -87,7 +86,7 @@ class KernelResourceSpec:
     scratch_disk_size: int
     """The size of scratch disk. (not implemented yet)"""
 
-    mounts: List['Mount'] = attr.Factory(list)
+    mounts: List["Mount"] = attr.Factory(list)
     """The mounted vfolder list."""
 
     def freeze(self) -> None:
@@ -103,29 +102,29 @@ class KernelResourceSpec:
         # setattr(self, '__setattr__', _frozen_setattr)  # <-- __setattr__ is read-only... :(
 
     def write_to_string(self) -> str:
-        mounts_str = ','.join(map(str, self.mounts))
-        slots_str = json.dumps({
-            k: str(v) for k, v in self.slots.items()
-        })
+        mounts_str = ",".join(map(str, self.mounts))
+        slots_str = json.dumps({k: str(v) for k, v in self.slots.items()})
 
-        resource_str = f'CID={self.container_id}\n'
-        resource_str += f'SCRATCH_SIZE={BinarySize(self.scratch_disk_size):m}\n'
-        resource_str += f'MOUNTS={mounts_str}\n'
-        resource_str += f'SLOTS={slots_str}\n'
+        resource_str = f"CID={self.container_id}\n"
+        resource_str += f"SCRATCH_SIZE={BinarySize(self.scratch_disk_size):m}\n"
+        resource_str += f"MOUNTS={mounts_str}\n"
+        resource_str += f"SLOTS={slots_str}\n"
 
         for device_name, slots in self.allocations.items():
             for slot_name, per_device_alloc in slots.items():
-                if not (slot_name.startswith(f'{device_name}.') or slot_name == device_name):
-                    raise ValueError(f'device_name ({device_name}) must be a prefix of '
-                                     f'slot_name ({slot_name})')
+                if not (slot_name.startswith(f"{device_name}.") or slot_name == device_name):
+                    raise ValueError(
+                        f"device_name ({device_name}) must be a prefix of "
+                        f"slot_name ({slot_name})"
+                    )
                 pieces = []
                 for dev_id, alloc in per_device_alloc.items():
-                    if known_slot_types.get(slot_name, 'count') == 'bytes':
-                        pieces.append(f'{dev_id}:{BinarySize(alloc):s}')
+                    if known_slot_types.get(slot_name, "count") == "bytes":
+                        pieces.append(f"{dev_id}:{BinarySize(alloc):s}")
                     else:
-                        pieces.append(f'{dev_id}:{alloc}')
-                alloc_str = ','.join(pieces)
-                resource_str += f'{slot_name.upper()}_SHARES={alloc_str}\n'
+                        pieces.append(f"{dev_id}:{alloc}")
+                alloc_str = ",".join(pieces)
+                resource_str += f"{slot_name.upper()}_SHARES={alloc_str}\n"
 
         return resource_str
 
@@ -133,12 +132,12 @@ class KernelResourceSpec:
         file.write(self.write_to_string())
 
     @classmethod
-    def read_from_string(cls, text: str) -> 'KernelResourceSpec':
+    def read_from_string(cls, text: str) -> "KernelResourceSpec":
         kvpairs = {}
-        for line in text.split('\n'):
-            if '=' not in line:
+        for line in text.split("\n"):
+            if "=" not in line:
                 continue
-            key, val = line.strip().split('=', maxsplit=1)
+            key, val = line.strip().split("=", maxsplit=1)
             kvpairs[key] = val
         allocations = cast(
             MutableMapping[
@@ -148,62 +147,64 @@ class KernelResourceSpec:
             defaultdict(lambda: defaultdict(Decimal)),
         )
         for key, val in kvpairs.items():
-            if key.endswith('_SHARES'):
+            if key.endswith("_SHARES"):
                 slot_name = SlotName(key[:-7].lower())
-                device_name = DeviceName(slot_name.split('.')[0])
+                device_name = DeviceName(slot_name.split(".")[0])
                 per_device_alloc: MutableMapping[DeviceId, Decimal] = {}
-                for entry in val.split(','):
-                    raw_dev_id, _, raw_alloc = entry.partition(':')
+                for entry in val.split(","):
+                    raw_dev_id, _, raw_alloc = entry.partition(":")
                     if not raw_dev_id or not raw_alloc:
                         continue
                     dev_id = DeviceId(raw_dev_id)
                     try:
-                        if known_slot_types.get(slot_name, 'count') == 'bytes':
+                        if known_slot_types.get(slot_name, "count") == "bytes":
                             alloc = Decimal(BinarySize.from_str(raw_alloc))
                         else:
                             alloc = Decimal(raw_alloc)
                     except KeyError as e:
-                        log.warning('A previously launched container has '
-                                    'unknown slot type: {}. Ignoring it.',
-                                    e.args[0])
+                        log.warning(
+                            "A previously launched container has "
+                            "unknown slot type: {}. Ignoring it.",
+                            e.args[0],
+                        )
                         continue
                     per_device_alloc[dev_id] = alloc
                 allocations[device_name][slot_name] = per_device_alloc
-        mounts = [Mount.from_str(m) for m in kvpairs['MOUNTS'].split(',') if m]
+        mounts = [Mount.from_str(m) for m in kvpairs["MOUNTS"].split(",") if m]
         return cls(
-            container_id=kvpairs.get('CID', 'unknown'),
-            scratch_disk_size=BinarySize.finite_from_str(kvpairs['SCRATCH_SIZE']),
+            container_id=kvpairs.get("CID", "unknown"),
+            scratch_disk_size=BinarySize.finite_from_str(kvpairs["SCRATCH_SIZE"]),
             allocations=dict(allocations),
-            slots=ResourceSlot(json.loads(kvpairs['SLOTS'])),
+            slots=ResourceSlot(json.loads(kvpairs["SLOTS"])),
             mounts=mounts,
         )
 
     @classmethod
-    def read_from_file(cls, file: TextIOWrapper) -> 'KernelResourceSpec':
-        text = '\n'.join(file.readlines())
+    def read_from_file(cls, file: TextIOWrapper) -> "KernelResourceSpec":
+        text = "\n".join(file.readlines())
         return cls.read_from_string(text)
 
     @classmethod
-    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> 'KernelResourceSpec':
-        text = '\n'.join(await file.readlines())  # type: ignore
+    async def aread_from_file(cls, file: AsyncTextIOWrapper) -> "KernelResourceSpec":
+        text = "\n".join(await file.readlines())  # type: ignore
         return cls.read_from_string(text)
 
     def to_json_serializable_dict(self) -> Mapping[str, Any]:
         o = attr.asdict(self)
-        for slot_name, alloc in o['slots'].items():
-            if known_slot_types.get(slot_name, 'count') == 'bytes':
-                o['slots'] = f'{BinarySize(alloc):s}'
+        for slot_name, alloc in o["slots"].items():
+            if known_slot_types.get(slot_name, "count") == "bytes":
+                o["slots"] = f"{BinarySize(alloc):s}"
             else:
-                o['slots'] = str(alloc)
-        for dev_name, dev_alloc in o['allocations'].items():
+                o["slots"] = str(alloc)
+        for dev_name, dev_alloc in o["allocations"].items():
             for slot_name, per_device_alloc in dev_alloc.items():
                 for dev_id, alloc in per_device_alloc.items():
-                    if known_slot_types.get(slot_name, 'count') == 'bytes':
-                        alloc = f'{BinarySize(alloc):s}'
+                    if known_slot_types.get(slot_name, "count") == "bytes":
+                        alloc = f"{BinarySize(alloc):s}"
                     else:
                         alloc = str(alloc)
-                    o['allocations'][dev_name][slot_name][dev_id] = alloc
-        o['mounts'] = list(map(str, self.mounts))
+                    o["allocations"][dev_name][slot_name][dev_id] = alloc
+        o["mounts"] = list(map(str, self.mounts))
         return o
 
     def to_json(self) -> str:
@@ -211,17 +212,17 @@ class KernelResourceSpec:
 
 
 @attr.s(auto_attribs=True)
-class AbstractComputeDevice():
+class AbstractComputeDevice:
     device_id: DeviceId
-    hw_location: str            # either PCI bus ID or arbitrary string
-    numa_node: Optional[int]    # NUMA node ID (None if not applicable)
-    memory_size: int            # bytes of available per-accelerator memory
-    processing_units: int       # number of processing units (e.g., cores, SMP)
+    hw_location: str  # either PCI bus ID or arbitrary string
+    numa_node: Optional[int]  # NUMA node ID (None if not applicable)
+    memory_size: int  # bytes of available per-accelerator memory
+    processing_units: int  # number of processing units (e.g., cores, SMP)
 
 
 class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
-    key: DeviceName = DeviceName('accelerator')
+    key: DeviceName = DeviceName("accelerator")
     slot_types: Sequence[Tuple[SlotName, SlotTypes]]
     exclusive_slot_types: Set[str]
 
@@ -279,7 +280,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def create_alloc_map(self) -> 'AbstractAllocMap':
+    async def create_alloc_map(self) -> "AbstractAllocMap":
         """
         Create and return an allocation map for this plugin.
         """
@@ -341,21 +342,43 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     async def get_node_hwinfo(self) -> HardwareMetadata:
         raise NotImplementedError
 
+    @abstractmethod
+    async def get_docker_networks(
+        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[str]:
+        """
+        Returns reference string (e.g. Id, name, ...) of docker networks
+        to attach to container for accelerator to work properly.
+        """
+        return []
+
+    @abstractmethod
+    async def generate_mounts(
+        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[MountInfo]:
+        """
+        Populates additional files/directories under `source_path`
+        to mount to container and returns `MountInfo`.
+        Agent will then read this `MountInfo`s and mount files/directories.
+        """
+        return []
+
 
 class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
-    plugin_group = 'backendai_accelerator_v20'
+    plugin_group = "backendai_accelerator_v20"
 
     @classmethod
     def discover_plugins(
         cls,
         plugin_group: str,
+        allowlist: set[str] = None,
         blocklist: set[str] = None,
     ) -> Iterator[Tuple[str, Type[AbstractComputePlugin]]]:
-        scanned_plugins = [*super().discover_plugins(plugin_group, blocklist)]
+        scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
 
         def accel_lt_intrinsic(item):
             # push back "intrinsic" plugins (if exists)
-            if item[0] in ('cpu', 'mem'):
+            if item[0] in ("cpu", "mem"):
                 return 0
             return -1
 
@@ -375,11 +398,11 @@ class Mount:
     opts: Optional[Mapping[str, Any]] = None
 
     def __str__(self):
-        return f'{self.source}:{self.target}:{self.permission.value}'
+        return f"{self.source}:{self.target}:{self.permission.value}"
 
     @classmethod
     def from_str(cls, s):
-        source, target, perm = s.split(':')
+        source, target, perm = s.split(":")
         source = Path(source)
         type = MountTypes.BIND
         if not source.is_absolute():
@@ -387,12 +410,12 @@ class Mount:
                 source = str(source)
                 type = MountTypes.VOLUME
             else:
-                raise ValueError('Mount source must be an absolute path '
-                                 'if it is not a volume name.',
-                                 source)
+                raise ValueError(
+                    "Mount source must be an absolute path " "if it is not a volume name.", source
+                )
         target = Path(target)
         if not target.is_absolute():
-            raise ValueError('Mount target must be an absolute path.', target)
+            raise ValueError("Mount target must be an absolute path.", target)
         perm = MountPermission(perm)
         return cls(type, source, target, perm, None)
 
@@ -403,6 +426,6 @@ def bitmask2set(mask: int) -> FrozenSet[int]:
     while mask > 0:
         if (mask & 1) == 1:
             bset.append(bpos)
-        mask = (mask >> 1)
+        mask = mask >> 1
         bpos += 1
     return frozenset(bset)

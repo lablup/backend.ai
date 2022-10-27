@@ -12,13 +12,7 @@ from kubernetes_asyncio import client as K8sClient
 from kubernetes_asyncio import config as K8sConfig
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    DeviceId,
-    DeviceModelInfo,
-    DeviceName,
-    SlotName,
-    SlotTypes,
-)
+from ai.backend.common.types import DeviceId, DeviceModelInfo, DeviceName, SlotName, SlotTypes
 
 from .. import __version__
 from ..resources import (
@@ -27,6 +21,7 @@ from ..resources import (
     AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
+    MountInfo,
 )
 from ..stats import ContainerMeasurement, NodeMeasurement, StatContext
 from .agent import Container
@@ -41,13 +36,14 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
         ret = await container.stats(stream=False)  # TODO: cache
     except RuntimeError as e:
         msg = str(e.args[0]).lower()
-        if 'event loop is closed' in msg or 'session is closed' in msg:
+        if "event loop is closed" in msg or "session is closed" in msg:
             return None
         raise
     except (DockerError, aiohttp.ClientError) as e:
         log.error(
-            'cannot read stats (cid:{}): client error: {!r}.',
-            short_cid, e,
+            "cannot read stats (cid:{}): client error: {!r}.",
+            short_cid,
+            e,
         )
         return None
     else:
@@ -60,19 +56,18 @@ async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]
         # The API may return an invalid or empty result upon container termination.
         if ret is None or not isinstance(ret, dict):
             log.warning(
-                'cannot read stats (cid:{}): got an empty result: {}',
-                short_cid, ret,
+                "cannot read stats (cid:{}): got an empty result: {}",
+                short_cid,
+                ret,
             )
             return None
-        if (
-            ret['read'].startswith('0001-01-01') or
-            ret['preread'].startswith('0001-01-01')
-        ):
+        if ret["read"].startswith("0001-01-01") or ret["preread"].startswith("0001-01-01"):
             return None
         return ret
 
 
 # Pseudo-plugins for intrinsic devices (CPU and the main memory)
+
 
 class CPUDevice(AbstractComputeDevice):
     pass
@@ -85,9 +80,9 @@ class CPUPlugin(AbstractComputePlugin):
 
     config_watch_enabled = False
 
-    key = DeviceName('cpu')
+    key = DeviceName("cpu")
     slot_types = [
-        (SlotName('cpu'), SlotTypes.COUNT),
+        (SlotName("cpu"), SlotTypes.COUNT),
     ]
 
     async def init(self, context: Any = None) -> None:
@@ -103,17 +98,17 @@ class CPUPlugin(AbstractComputePlugin):
         await K8sConfig.load_kube_config()
         core_api = K8sClient.CoreV1Api()
 
-        nodes = (await core_api.list_node()).to_dict()['items']
-        overcommit_factor = int(os.environ.get('BACKEND_CPU_OVERCOMMIT_FACTOR', '1'))
+        nodes = (await core_api.list_node()).to_dict()["items"]
+        overcommit_factor = int(os.environ.get("BACKEND_CPU_OVERCOMMIT_FACTOR", "1"))
         assert 1 <= overcommit_factor <= 10
 
         return [
             CPUDevice(
-                device_id=DeviceId(node['metadata']['uid']),
-                hw_location='root',
+                device_id=DeviceId(node["metadata"]["uid"]),
+                hw_location="root",
                 numa_node=None,
                 memory_size=0,
-                processing_units=int(node['status']['capacity']['cpu']) * overcommit_factor,
+                processing_units=int(node["status"]["capacity"]["cpu"]) * overcommit_factor,
             )
             for i, node in zip(range(len(nodes)), nodes)
             # if 'node-role.kubernetes.io/master' not in node['metadata']['labels'].keys()
@@ -121,9 +116,9 @@ class CPUPlugin(AbstractComputePlugin):
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
-        log.debug('available_slots: {}', devices)
+        log.debug("available_slots: {}", devices)
         return {
-            SlotName('cpu'): Decimal(sum(dev.processing_units for dev in devices)),
+            SlotName("cpu"): Decimal(sum(dev.processing_units for dev in devices)),
         }
 
     def get_version(self) -> str:
@@ -131,9 +126,9 @@ class CPUPlugin(AbstractComputePlugin):
 
     async def extra_info(self) -> Mapping[str, str]:
         return {
-            'agent_version': __version__,
-            'machine': platform.machine(),
-            'os_type': platform.system(),
+            "agent_version": __version__,
+            "machine": platform.machine(),
+            "os_type": platform.system(),
         }
 
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
@@ -148,15 +143,15 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Sequence[ContainerMeasurement]:
         # TODO: Implement Kubernetes-specific container metric collection
 
-        return [
-        ]
+        return []
 
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
             device_slots={
-                dev.device_id:
-                    DeviceSlotInfo(SlotTypes.COUNT, SlotName('cpu'), Decimal(dev.processing_units))
+                dev.device_id: DeviceSlotInfo(
+                    SlotTypes.COUNT, SlotName("cpu"), Decimal(dev.processing_units)
+                )
                 for dev in devices
             },
         )
@@ -185,27 +180,39 @@ class CPUPlugin(AbstractComputePlugin):
         resource_spec = await get_resource_spec_from_container(container.backend_obj)
         if resource_spec is None:
             return
-        alloc_map.apply_allocation({
-            SlotName('cpu'):
-                resource_spec.allocations[DeviceName('cpu')][SlotName('cpu')],
-        })
+        alloc_map.apply_allocation(
+            {
+                SlotName("cpu"): resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")],
+            }
+        )
 
     async def get_attached_devices(
         self,
-        device_alloc: Mapping[SlotName,
-        Mapping[DeviceId, Decimal]],
+        device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids = [*device_alloc[SlotName('cpu')].keys()]
+        device_ids = [*device_alloc[SlotName("cpu")].keys()]
         available_devices = await self.list_devices()
         attached_devices: List[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
-                attached_devices.append({
-                    'device_id': device.device_id,
-                    'model_name': '',
-                    'data': {'cores': len(device_ids)},
-                })
+                attached_devices.append(
+                    {
+                        "device_id": device.device_id,
+                        "model_name": "",
+                        "data": {"cores": len(device_ids)},
+                    }
+                )
         return attached_devices
+
+    async def generate_mounts(
+        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[MountInfo]:
+        return []
+
+    async def get_docker_networks(
+        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[str]:
+        return []
 
 
 class MemoryDevice(AbstractComputeDevice):
@@ -222,9 +229,9 @@ class MemoryPlugin(AbstractComputePlugin):
 
     config_watch_enabled = False
 
-    key = DeviceName('mem')
+    key = DeviceName("mem")
     slot_types = [
-        (SlotName('mem'), SlotTypes.BYTES),
+        (SlotName("mem"), SlotTypes.BYTES),
     ]
 
     async def init(self, context: Any = None) -> None:
@@ -240,18 +247,18 @@ class MemoryPlugin(AbstractComputePlugin):
         await K8sConfig.load_kube_config()
         core_api = K8sClient.CoreV1Api()
 
-        nodes = (await core_api.list_node()).to_dict()['items']
-        overcommit_factor = int(os.environ.get('BACKEND_MEM_OVERCOMMIT_FACTOR', '1'))
+        nodes = (await core_api.list_node()).to_dict()["items"]
+        overcommit_factor = int(os.environ.get("BACKEND_MEM_OVERCOMMIT_FACTOR", "1"))
         assert 1 <= overcommit_factor <= 10
         mem = 0
         for node in nodes:
             # if 'node-role.kubernetes.io/master' in node['metadata']['labels'].keys():
             #     continue
-            mem += int(node['status']['capacity']['memory'][:-2]) * 1024
+            mem += int(node["status"]["capacity"]["memory"][:-2]) * 1024
         return [
             MemoryDevice(
-                device_id=DeviceId('root'),
-                hw_location='root',
+                device_id=DeviceId("root"),
+                hw_location="root",
                 numa_node=0,
                 memory_size=mem * overcommit_factor,
                 processing_units=0,
@@ -261,7 +268,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
         return {
-            SlotName('mem'): Decimal(sum(dev.memory_size for dev in devices)),
+            SlotName("mem"): Decimal(sum(dev.memory_size for dev in devices)),
         }
 
     def get_version(self) -> str:
@@ -274,8 +281,9 @@ class MemoryPlugin(AbstractComputePlugin):
         # TODO: Create our own k8s metric collector
         return []
 
-    async def gather_container_measures(self, ctx: StatContext, container_ids: Sequence[str]) \
-            -> Sequence[ContainerMeasurement]:
+    async def gather_container_measures(
+        self, ctx: StatContext, container_ids: Sequence[str]
+    ) -> Sequence[ContainerMeasurement]:
         # TODO: Implement Kubernetes-specific container metric collection
         return []
 
@@ -283,8 +291,9 @@ class MemoryPlugin(AbstractComputePlugin):
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
             device_slots={
-                dev.device_id:
-                    DeviceSlotInfo(SlotTypes.BYTES, SlotName('mem'), Decimal(dev.memory_size))
+                dev.device_id: DeviceSlotInfo(
+                    SlotTypes.BYTES, SlotName("mem"), Decimal(dev.memory_size)
+                )
                 for dev in devices
             },
         )
@@ -307,23 +316,37 @@ class MemoryPlugin(AbstractComputePlugin):
         alloc_map: AbstractAllocMap,
     ) -> None:
         assert isinstance(alloc_map, DiscretePropertyAllocMap)
-        memory_limit = container.backend_obj['HostConfig']['Memory']
-        alloc_map.apply_allocation({
-            SlotName('mem'): {DeviceId('root'): memory_limit},
-        })
+        memory_limit = container.backend_obj["HostConfig"]["Memory"]
+        alloc_map.apply_allocation(
+            {
+                SlotName("mem"): {DeviceId("root"): memory_limit},
+            }
+        )
 
     async def get_attached_devices(
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> Sequence[DeviceModelInfo]:
-        device_ids = [*device_alloc[SlotName('mem')].keys()]
+        device_ids = [*device_alloc[SlotName("mem")].keys()]
         available_devices = await self.list_devices()
         attached_devices: List[DeviceModelInfo] = []
         for device in available_devices:
             if device.device_id in device_ids:
-                attached_devices.append({
-                    'device_id': device.device_id,
-                    'model_name': '',
-                    'data': {},
-                })
+                attached_devices.append(
+                    {
+                        "device_id": device.device_id,
+                        "model_name": "",
+                        "data": {},
+                    }
+                )
         return attached_devices
+
+    async def generate_mounts(
+        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[MountInfo]:
+        return []
+
+    async def get_docker_networks(
+        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[str]:
+        return []

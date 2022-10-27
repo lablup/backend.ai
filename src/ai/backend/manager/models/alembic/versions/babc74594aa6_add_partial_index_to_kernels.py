@@ -9,22 +9,22 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = 'babc74594aa6'
-down_revision = 'c3e74dcf1808'
+revision = "babc74594aa6"
+down_revision = "c3e74dcf1808"
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
     op.create_index(
-        op.f('ix_kernels_unique_sess_token'),
-        'kernels', ['access_key', 'sess_id'],
+        op.f("ix_kernels_unique_sess_token"),
+        "kernels",
+        ["access_key", "sess_id"],
         unique=True,
-        postgresql_where=sa.text(
-            "kernels.status != 'TERMINATED' and "
-            "kernels.role = 'master'"),
+        postgresql_where=sa.text("kernels.status != 'TERMINATED' and " "kernels.role = 'master'"),
     )
 
 
 def downgrade():
-    op.drop_index(op.f('ix_kernels_unique_sess_token'), table_name='kernels')
+    # op.drop_index(op.f("ix_kernels_unique_sess_token"), table_name="kernels")
+    pass

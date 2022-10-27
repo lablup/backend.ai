@@ -8,12 +8,13 @@ Create Date: 2019-05-29 23:17:17.762968
 import textwrap
 
 from alembic import op
+from sqlalchemy.sql import text
 
 from ai.backend.manager.models import UserRole
 
 # revision identifiers, used by Alembic.
-revision = 'e18ed5fcfedf'
-down_revision = 'c5e4e764f9e3'
+revision = "e18ed5fcfedf"
+down_revision = "c5e4e764f9e3"
 branch_labels = None
 depends_on = None
 
@@ -25,16 +26,24 @@ def upgrade():
 
     # Add superadmin to user role choices.
     userrole_choices = list(map(lambda v: v.value, UserRole))
-    assert 'superadmin' in userrole_choices, 'superadmin in UserRole is required!'
+    assert "superadmin" in userrole_choices, "superadmin in UserRole is required!"
 
     conn = op.get_bind()
-    conn.execute('ALTER TYPE userrole RENAME TO userrole__;')
-    conn.execute('CREATE TYPE userrole as enum (%s)' % ("'" + "','".join(userrole_choices) + "'"))
-    conn.execute(textwrap.dedent('''\
+    conn.execute(text("ALTER TYPE userrole RENAME TO userrole__;"))
+    conn.execute(
+        text("CREATE TYPE userrole as enum (%s)" % ("'" + "','".join(userrole_choices) + "'"))
+    )
+    conn.execute(
+        text(
+            textwrap.dedent(
+                """\
         ALTER TABLE users
             ALTER COLUMN role TYPE userrole USING role::text::userrole;
-    '''))
-    conn.execute('DROP TYPE userrole__;')
+    """
+            )
+        )
+    )
+    conn.execute(text("DROP TYPE userrole__;"))
 
     # Set admin@lablup.com's role as superadmin.
     # Also, set admin@lablup.com's domain to default.
@@ -44,14 +53,16 @@ def upgrade():
     # So, this policy is changed to simply adopt superadmin role, and superadmin can also have
     # domain and groups as well.
     query = "SELECT uuid FROM users where email = 'admin@lablup.com';"
-    result = conn.execute(query).first()
-    uuid = result.uuid if hasattr(result, 'uuid') else None
+    result = conn.execute(text(query)).first()
+    uuid = result.uuid if hasattr(result, "uuid") else None
     if uuid is not None:  # update only when admin@lablup.com user exist
-        query = textwrap.dedent('''\
+        query = textwrap.dedent(
+            """\
             UPDATE users SET domain_name = 'default', role = 'superadmin'
             WHERE email = 'admin@lablup.com';
-        ''')
-        conn.execute(query)
+        """
+        )
+        conn.execute(text(query))
 
 
 def downgrade():
@@ -60,19 +71,27 @@ def downgrade():
     # ### end Alembic commands ###
 
     userrole_choices = list(map(lambda v: v.value, UserRole))
-    if 'superadmin' in userrole_choices:
-        userrole_choices.remove('superadmin')
+    if "superadmin" in userrole_choices:
+        userrole_choices.remove("superadmin")
         conn = op.get_bind()
 
         # First, change all superadmin role to admin.
         query = textwrap.dedent("UPDATE users SET role = 'admin' WHERE role = 'superadmin';")
-        conn.execute(query)
+        conn.execute(text(query))
 
         # Remove superadmin from user role choices.
-        conn.execute('ALTER TYPE userrole RENAME TO userrole___;')
-        conn.execute('CREATE TYPE userrole as enum (%s)' % ("'" + "','".join(userrole_choices) + "'"))
-        conn.execute(textwrap.dedent('''\
+        conn.execute(text("ALTER TYPE userrole RENAME TO userrole___;"))
+        conn.execute(
+            text("CREATE TYPE userrole as enum (%s)" % ("'" + "','".join(userrole_choices) + "'"))
+        )
+        conn.execute(
+            text(
+                textwrap.dedent(
+                    """\
             ALTER TABLE users
                 ALTER COLUMN role TYPE userrole USING role::text::userrole;
-        '''))
-        conn.execute('DROP TYPE userrole___;')
+        """
+                )
+            )
+        )
+        conn.execute(text("DROP TYPE userrole___;"))

@@ -45,18 +45,17 @@ from ..utils import ProgressReportingReader
 from ..versioning import get_id_or_name, get_naming
 from .base import BaseFunction, api_function
 
-__all__ = (
-    'ComputeSession',
-)
+__all__ = ("ComputeSession",)
 
 _default_list_fields = (
-    session_fields['session_id'],
-    session_fields['image'],
-    session_fields['type'],
-    session_fields['status'],
-    session_fields['status_info'],
-    session_fields['status_changed'],
-    session_fields['result'],
+    session_fields["session_id"],
+    session_fields["image"],
+    session_fields["type"],
+    session_fields["status"],
+    session_fields["status_info"],
+    session_fields["status_changed"],
+    session_fields["result"],
+    session_fields["abusing_reports"],
 )
 
 
@@ -114,12 +113,12 @@ class ComputeSession(BaseFunction):
         :param fields: Additional per-user query fields to fetch.
         """
         return await generate_paginated_results(
-            'compute_session_list',
+            "compute_session_list",
             {
-                'status': (status, 'String'),
-                'access_key': (access_key, 'String'),
-                'filter': (filter, 'String'),
-                'order': (order, 'String'),
+                "status": (status, "String"),
+                "access_key": (access_key, "String"),
+                "filter": (filter, "String"),
+                "order": (order, "String"),
             },
             fields,
             page_offset=page_offset,
@@ -129,20 +128,26 @@ class ComputeSession(BaseFunction):
     @api_function
     @classmethod
     async def hello(cls) -> str:
-        rqst = Request('GET', '/')
+        rqst = Request("GET", "/")
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
     @classmethod
     async def get_task_logs(
-        cls, task_id: str, *,
+        cls,
+        task_id: str,
+        *,
         chunk_size: int = 8192,
     ) -> AsyncIterator[bytes]:
-        prefix = get_naming(api_session.get().api_version, 'path')
-        rqst = Request('GET', f'/{prefix}/_/logs', params={
-            'taskId': task_id,
-        })
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "GET",
+            f"/{prefix}/_/logs",
+            params={
+                "taskId": task_id,
+            },
+        )
         async with rqst.fetch() as resp:
             while True:
                 chunk = await resp.raw_response.content.read(chunk_size)
@@ -154,9 +159,10 @@ class ComputeSession(BaseFunction):
     @classmethod
     async def get_or_create(
         cls,
-        image: str, *,
+        image: str,
+        *,
         name: str = None,
-        type_: str = 'interactive',
+        type_: str = "interactive",
         starts_at: str = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
@@ -170,7 +176,7 @@ class ComputeSession(BaseFunction):
         resources: Mapping[str, int] = None,
         resource_opts: Mapping[str, int] = None,
         cluster_size: int = 1,
-        cluster_mode: Literal['single-node', 'multi-node'] = 'single-node',
+        cluster_mode: Literal["single-node", "multi-node"] = "single-node",
         domain_name: str = None,
         group_name: str = None,
         bootstrap_script: str = None,
@@ -244,10 +250,9 @@ class ComputeSession(BaseFunction):
         :returns: The :class:`ComputeSession` instance.
         """
         if name is not None:
-            assert 4 <= len(name) <= 64, \
-                   'Client session token should be 4 to 64 characters long.'
+            assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
         else:
-            name = f'pysdk-{secrets.token_hex(5)}'
+            name = f"pysdk-{secrets.token_hex(5)}"
         if mounts is None:
             mounts = []
         if mount_map is None:
@@ -263,65 +268,71 @@ class ComputeSession(BaseFunction):
             group_name = api_session.get().config.group
 
         mounts.extend(api_session.get().config.vfolder_mounts)
-        prefix = get_naming(api_session.get().api_version, 'path')
-        rqst = Request('POST', f'/{prefix}')
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request("POST", f"/{prefix}")
         params: Dict[str, Any] = {
-            'tag': tag,
-            get_naming(api_session.get().api_version, 'name_arg'): name,
-            'config': {
-                'mounts': mounts,
-                'environ': envs,
-                'resources': resources,
-                'resource_opts': resource_opts,
-                'scalingGroup': scaling_group,
+            "tag": tag,
+            get_naming(api_session.get().api_version, "name_arg"): name,
+            "config": {
+                "mounts": mounts,
+                "environ": envs,
+                "resources": resources,
+                "resource_opts": resource_opts,
+                "scalingGroup": scaling_group,
             },
         }
-        if api_session.get().api_version >= (6, '20220315'):
-            params['dependencies'] = dependencies
-            params['callback_url'] = callback_url
-        if api_session.get().api_version >= (6, '20200815'):
-            params['clusterSize'] = cluster_size
-            params['clusterMode'] = cluster_mode
+        if api_session.get().api_version >= (6, "20220315"):
+            params["dependencies"] = dependencies
+            params["callback_url"] = callback_url
+        if api_session.get().api_version >= (6, "20200815"):
+            params["clusterSize"] = cluster_size
+            params["clusterMode"] = cluster_mode
         else:
-            params['config']['clusterSize'] = cluster_size
-        if api_session.get().api_version >= (5, '20191215'):
-            params['starts_at'] = starts_at
-            params['bootstrap_script'] = bootstrap_script
+            params["config"]["clusterSize"] = cluster_size
+        if api_session.get().api_version >= (5, "20191215"):
+            params["starts_at"] = starts_at
+            params["bootstrap_script"] = bootstrap_script
             if assign_agent is not None:
-                params['config'].update({
-                    'mount_map': mount_map,
-                    'preopen_ports': preopen_ports,
-                    'agentList': assign_agent,
-                })
+                params["config"].update(
+                    {
+                        "mount_map": mount_map,
+                        "preopen_ports": preopen_ports,
+                        "agentList": assign_agent,
+                    }
+                )
             else:
-                params['config'].update({
-                    'mount_map': mount_map,
-                    'preopen_ports': preopen_ports,
-                })
-        if api_session.get().api_version >= (4, '20190615'):
-            params.update({
-                'owner_access_key': owner_access_key,
-                'domain': domain_name,
-                'group': group_name,
-                'type': type_,
-                'enqueueOnly': enqueue_only,
-                'maxWaitSeconds': max_wait,
-                'reuseIfExists': not no_reuse,
-                'startupCommand': startup_command,
-            })
-        if api_session.get().api_version > (4, '20181215'):
-            params['image'] = image
+                params["config"].update(
+                    {
+                        "mount_map": mount_map,
+                        "preopen_ports": preopen_ports,
+                    }
+                )
+        if api_session.get().api_version >= (4, "20190615"):
+            params.update(
+                {
+                    "owner_access_key": owner_access_key,
+                    "domain": domain_name,
+                    "group": group_name,
+                    "type": type_,
+                    "enqueueOnly": enqueue_only,
+                    "maxWaitSeconds": max_wait,
+                    "reuseIfExists": not no_reuse,
+                    "startupCommand": startup_command,
+                }
+            )
+        if api_session.get().api_version > (4, "20181215"):
+            params["image"] = image
         else:
-            params['lang'] = image
+            params["lang"] = image
         rqst.set_json(params)
         async with rqst.fetch() as resp:
             data = await resp.json()
             o = cls(name, owner_access_key)  # type: ignore
             if api_session.get().api_version[0] >= 5:
-                o.id = UUID(data['sessionId'])
-            o.created = data.get('created', True)     # True is for legacy
-            o.status = data.get('status', 'RUNNING')
-            o.service_ports = data.get('servicePorts', [])
+                o.id = UUID(data["sessionId"])
+            o.created = data.get("created", True)  # True is for legacy
+            o.status = data.get("status", "RUNNING")
+            o.service_ports = data.get("servicePorts", [])
             o.domain = domain_name
             o.group = group_name
             return o
@@ -330,7 +341,8 @@ class ComputeSession(BaseFunction):
     @classmethod
     async def create_from_template(
         cls,
-        template_id: str, *,
+        template_id: str,
+        *,
         name: Union[str, Undefined] = undefined,
         type_: Union[str, Undefined] = undefined,
         starts_at: str = None,
@@ -346,7 +358,7 @@ class ComputeSession(BaseFunction):
         resources: Union[Mapping[str, int], Undefined] = undefined,
         resource_opts: Union[Mapping[str, int], Undefined] = undefined,
         cluster_size: Union[int, Undefined] = undefined,
-        cluster_mode: Union[Literal['single-node', 'multi-node'], Undefined] = undefined,
+        cluster_mode: Union[Literal["single-node", "multi-node"], Undefined] = undefined,
         domain_name: Union[str, Undefined] = undefined,
         group_name: Union[str, Undefined] = undefined,
         bootstrap_script: Union[str, Undefined] = undefined,
@@ -421,10 +433,9 @@ class ComputeSession(BaseFunction):
         :returns: The :class:`ComputeSession` instance.
         """
         if name is not undefined:
-            assert 4 <= len(name) <= 64, \
-                   'Client session token should be 4 to 64 characters long.'
+            assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
         else:
-            name = f'pysdk-{secrets.token_urlsafe(8)}'
+            name = f"pysdk-{secrets.token_urlsafe(8)}"
 
         if domain_name is undefined:
             # Even if config.domain is None, it can be guessed in the manager by user information.
@@ -435,48 +446,48 @@ class ComputeSession(BaseFunction):
             mounts = []
         if api_session.get().config.vfolder_mounts:
             mounts.extend(api_session.get().config.vfolder_mounts)
-        prefix = get_naming(api_session.get().api_version, 'path')
-        rqst = Request('POST', f'/{prefix}/_/create-from-template')
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request("POST", f"/{prefix}/_/create-from-template")
         params: Dict[str, Any]
         params = {
-            'template_id': template_id,
-            'tag': tag,
-            'image': image,
-            'domain': domain_name,
-            'group': group_name,
-            get_naming(api_session.get().api_version, 'name_arg'): name,
-            'bootstrap_script': bootstrap_script,
-            'enqueueOnly': enqueue_only,
-            'maxWaitSeconds': max_wait,
-            'reuseIfExists': not no_reuse,
-            'startupCommand': startup_command,
-            'owner_access_key': owner_access_key,
-            'type': type_,
-            'starts_at': starts_at,
-            'config': {
-                'mounts': mounts,
-                'mount_map': mount_map,
-                'environ': envs,
-                'resources': resources,
-                'resource_opts': resource_opts,
-                'scalingGroup': scaling_group,
+            "template_id": template_id,
+            "tag": tag,
+            "image": image,
+            "domain": domain_name,
+            "group": group_name,
+            get_naming(api_session.get().api_version, "name_arg"): name,
+            "bootstrap_script": bootstrap_script,
+            "enqueueOnly": enqueue_only,
+            "maxWaitSeconds": max_wait,
+            "reuseIfExists": not no_reuse,
+            "startupCommand": startup_command,
+            "owner_access_key": owner_access_key,
+            "type": type_,
+            "starts_at": starts_at,
+            "config": {
+                "mounts": mounts,
+                "mount_map": mount_map,
+                "environ": envs,
+                "resources": resources,
+                "resource_opts": resource_opts,
+                "scalingGroup": scaling_group,
             },
         }
-        if api_session.get().api_version >= (6, '20200815'):
-            params['clusterSize'] = cluster_size
-            params['clusterMode'] = cluster_mode
+        if api_session.get().api_version >= (6, "20200815"):
+            params["clusterSize"] = cluster_size
+            params["clusterMode"] = cluster_mode
         else:
-            params['config']['clusterSize'] = cluster_size
+            params["config"]["clusterSize"] = cluster_size
         params = cast(Dict[str, Any], drop(params, undefined))
         rqst.set_json(params)
         async with rqst.fetch() as resp:
             data = await resp.json()
             o = cls(name, owner_access_key if owner_access_key is not undefined else None)
             if api_session.get().api_version[0] >= 5:
-                o.id = UUID(data['sessionId'])
-            o.created = data.get('created', True)     # True is for legacy
-            o.status = data.get('status', 'RUNNING')
-            o.service_ports = data.get('servicePorts', [])
+                o.id = UUID(data["sessionId"])
+            o.created = data.get("created", True)  # True is for legacy
+            o.status = data.get("status", "RUNNING")
+            o.service_ports = data.get("servicePorts", [])
             o.domain = domain_name
             o.group = group_name
             return o
@@ -495,15 +506,15 @@ class ComputeSession(BaseFunction):
     def get_session_identity_params(self) -> Mapping[str, str]:
         if self.id:
             identity_params = {
-                'sessionId': str(self.id),
+                "sessionId": str(self.id),
             }
         else:
             assert self.name is not None
             identity_params = {
-                'sessionName': self.name,
+                "sessionName": self.name,
             }
             if self.owner_access_key:
-                identity_params['owner_access_key'] = self.owner_access_key
+                identity_params["owner_access_key"] = self.owner_access_key
         return identity_params
 
     @api_function
@@ -515,12 +526,13 @@ class ComputeSession(BaseFunction):
         """
         params = {}
         if self.owner_access_key is not None:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         if forced:
-            params['forced'] = 'true'
+            params["forced"] = "true"
         rqst = Request(
-            'DELETE', f'/{prefix}/{self.name}',
+            "DELETE",
+            f"/{prefix}/{self.name}",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -536,10 +548,11 @@ class ComputeSession(BaseFunction):
         """
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            'PATCH', f'/{prefix}/{self.name}',
+            "PATCH",
+            f"/{prefix}/{self.name}",
             params=params,
         )
         async with rqst.fetch():
@@ -550,16 +563,34 @@ class ComputeSession(BaseFunction):
         """
         Renames Session ID of running compute session.
         """
-        params = {'name': new_id}
+        params = {"name": new_id}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            'POST', f'/{prefix}/{self.name}/rename',
+            "POST",
+            f"/{prefix}/{self.name}/rename",
             params=params,
         )
         async with rqst.fetch():
             pass
+
+    @api_function
+    async def commit(self):
+        """
+        Commit a running session to a tar file in the agent host.
+        """
+        params = {}
+        if self.owner_access_key:
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "POST",
+            f"/{prefix}/{self.name}/commit",
+            params=params,
+        )
+        async with rqst.fetch() as resp:
+            return await resp.json()
 
     @api_function
     async def interrupt(self):
@@ -570,10 +601,11 @@ class ComputeSession(BaseFunction):
         """
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            'POST', f'/{prefix}/{self.name}/interrupt',
+            "POST",
+            f"/{prefix}/{self.name}/interrupt",
             params=params,
         )
         async with rqst.fetch():
@@ -598,21 +630,24 @@ class ComputeSession(BaseFunction):
         opts = {} if opts is None else opts
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            'POST', f'/{prefix}/{self.name}/complete',
+            "POST",
+            f"/{prefix}/{self.name}/complete",
             params=params,
         )
-        rqst.set_json({
-            'code': code,
-            'options': {
-                'row': int(opts.get('row', 0)),
-                'col': int(opts.get('col', 0)),
-                'line': opts.get('line', ''),
-                'post': opts.get('post', ''),
-            },
-        })
+        rqst.set_json(
+            {
+                "code": code,
+                "options": {
+                    "row": int(opts.get("row", 0)),
+                    "col": int(opts.get("col", 0)),
+                    "line": opts.get("line", ""),
+                    "post": opts.get("post", ""),
+                },
+            }
+        )
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -623,10 +658,11 @@ class ComputeSession(BaseFunction):
         """
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            'GET', f'/{prefix}/{self.name}',
+            "GET",
+            f"/{prefix}/{self.name}",
             params=params,
         )
         async with rqst.fetch() as resp:
@@ -639,20 +675,37 @@ class ComputeSession(BaseFunction):
         """
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            'GET', f'/{prefix}/{self.name}/logs',
+            "GET",
+            f"/{prefix}/{self.name}/logs",
             params=params,
         )
         async with rqst.fetch() as resp:
             return await resp.json()
 
     @api_function
-    async def execute(self, run_id: str = None,
-                      code: str = None,
-                      mode: str = 'query',
-                      opts: dict = None):
+    async def get_status_history(self):
+        """
+        Retrieves the status transition history of the compute session.
+        """
+        params = {}
+        if self.owner_access_key:
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "GET",
+            f"/{prefix}/{self.name}/status-history",
+            params=params,
+        )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    async def execute(
+        self, run_id: str = None, code: str = None, mode: str = "query", opts: dict = None
+    ):
         """
         Executes a code snippet directly in the compute session or sends a set of
         build/clean/execute commands to the compute session.
@@ -679,59 +732,70 @@ class ComputeSession(BaseFunction):
         opts = opts if opts is not None else {}
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
-        if mode in {'query', 'continue', 'input'}:
-            assert code is not None, \
-                   'The code argument must be a valid string even when empty.'
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
+        if mode in {"query", "continue", "input"}:
+            assert code is not None, "The code argument must be a valid string even when empty."
             rqst = Request(
-                'POST', f'/{prefix}/{self.name}',
+                "POST",
+                f"/{prefix}/{self.name}",
                 params=params,
             )
-            rqst.set_json({
-                'mode': mode,
-                'code': code,
-                'runId': run_id,
-            })
-        elif mode == 'batch':
+            rqst.set_json(
+                {
+                    "mode": mode,
+                    "code": code,
+                    "runId": run_id,
+                }
+            )
+        elif mode == "batch":
             rqst = Request(
-                'POST', f'/{prefix}/{self.name}',
+                "POST",
+                f"/{prefix}/{self.name}",
                 params=params,
             )
-            rqst.set_json({
-                'mode': mode,
-                'code': code,
-                'runId': run_id,
-                'options': {
-                    'clean': opts.get('clean', None),
-                    'build': opts.get('build', None),
-                    'buildLog': bool(opts.get('buildLog', False)),
-                    'exec': opts.get('exec', None),
-                },
-            })
-        elif mode == 'complete':
+            rqst.set_json(
+                {
+                    "mode": mode,
+                    "code": code,
+                    "runId": run_id,
+                    "options": {
+                        "clean": opts.get("clean", None),
+                        "build": opts.get("build", None),
+                        "buildLog": bool(opts.get("buildLog", False)),
+                        "exec": opts.get("exec", None),
+                    },
+                }
+            )
+        elif mode == "complete":
             rqst = Request(
-                'POST', f'/{prefix}/{self.name}',
+                "POST",
+                f"/{prefix}/{self.name}",
                 params=params,
             )
-            rqst.set_json({
-                'code': code,
-                'options': {
-                    'row': int(opts.get('row', 0)),
-                    'col': int(opts.get('col', 0)),
-                    'line': opts.get('line', ''),
-                    'post': opts.get('post', ''),
-                },
-            })
+            rqst.set_json(
+                {
+                    "code": code,
+                    "options": {
+                        "row": int(opts.get("row", 0)),
+                        "col": int(opts.get("col", 0)),
+                        "line": opts.get("line", ""),
+                        "post": opts.get("post", ""),
+                    },
+                }
+            )
         else:
-            raise BackendClientError('Invalid execution mode: {0}'.format(mode))
+            raise BackendClientError("Invalid execution mode: {0}".format(mode))
         async with rqst.fetch() as resp:
-            return (await resp.json())['result']
+            return (await resp.json())["result"]
 
     @api_function
-    async def upload(self, files: Sequence[Union[str, Path]],
-                     basedir: Union[str, Path] = None,
-                     show_progress: bool = False):
+    async def upload(
+        self,
+        files: Sequence[Union[str, Path]],
+        basedir: Union[str, Path] = None,
+        show_progress: bool = False,
+    ):
         """
         Uploads the given list of files to the compute session.
         You may refer them in the batch-mode execution or from the code
@@ -752,37 +816,40 @@ class ComputeSession(BaseFunction):
         """
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
-        base_path = (
-            Path.cwd() if basedir is None
-            else Path(basedir).resolve()
-        )
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
+        base_path = Path.cwd() if basedir is None else Path(basedir).resolve()
         files = [Path(file).resolve() for file in files]
         total_size = 0
         for file_path in files:
             total_size += Path(file_path).stat().st_size
-        tqdm_obj = tqdm(desc='Uploading files',
-                        unit='bytes', unit_scale=True,
-                        total=total_size,
-                        disable=not show_progress)
+        tqdm_obj = tqdm(
+            desc="Uploading files",
+            unit="bytes",
+            unit_scale=True,
+            total=total_size,
+            disable=not show_progress,
+        )
         with tqdm_obj:
             attachments = []
             for file_path in files:
                 try:
-                    attachments.append(AttachedFile(
-                        str(Path(file_path).relative_to(base_path)),
-                        ProgressReportingReader(str(file_path),
-                                                tqdm_instance=tqdm_obj),
-                        'application/octet-stream',
-                    ))
+                    attachments.append(
+                        AttachedFile(
+                            str(Path(file_path).relative_to(base_path)),
+                            ProgressReportingReader(str(file_path), tqdm_instance=tqdm_obj),
+                            "application/octet-stream",
+                        )
+                    )
                 except ValueError:
-                    msg = 'File "{0}" is outside of the base directory "{1}".' \
-                          .format(file_path, base_path)
+                    msg = 'File "{0}" is outside of the base directory "{1}".'.format(
+                        file_path, base_path
+                    )
                     raise ValueError(msg) from None
 
             rqst = Request(
-                'POST', f'/{prefix}/{self.name}/upload',
+                "POST",
+                f"/{prefix}/{self.name}/upload",
                 params=params,
             )
             rqst.attach_files(attachments)
@@ -790,9 +857,12 @@ class ComputeSession(BaseFunction):
                 return resp
 
     @api_function
-    async def download(self, files: Sequence[Union[str, Path]],
-                       dest: Union[str, Path] = '.',
-                       show_progress: bool = False):
+    async def download(
+        self,
+        files: Sequence[Union[str, Path]],
+        dest: Union[str, Path] = ".",
+        show_progress: bool = False,
+    ):
         """
         Downloads the given list of files from the compute session.
 
@@ -804,34 +874,41 @@ class ComputeSession(BaseFunction):
         """
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            'GET', f'/{prefix}/{self.name}/download',
+            "GET",
+            f"/{prefix}/{self.name}/download",
             params=params,
         )
-        rqst.set_json({
-            'files': [*map(str, files)],
-        })
+        rqst.set_json(
+            {
+                "files": [*map(str, files)],
+            }
+        )
         file_names = []
         async with rqst.fetch() as resp:
             loop = current_loop()
-            tqdm_obj = tqdm(desc='Downloading files',
-                            unit='bytes', unit_scale=True,
-                            total=resp.content.total_bytes,
-                            disable=not show_progress)
+            tqdm_obj = tqdm(
+                desc="Downloading files",
+                unit="bytes",
+                unit_scale=True,
+                total=resp.content.total_bytes,
+                disable=not show_progress,
+            )
             reader = aiohttp.MultipartReader.from_response(resp.raw_response)
             with tqdm_obj as pbar:
                 while True:
                     part = cast(aiohttp.BodyPartReader, await reader.next())
                     if part is None:
                         break
-                    assert part.headers.get(hdrs.CONTENT_ENCODING, 'identity').lower() == 'identity'
-                    assert part.headers.get(hdrs.CONTENT_TRANSFER_ENCODING, 'binary').lower() in (
-                        'binary', '8bit', '7bit',
+                    assert part.headers.get(hdrs.CONTENT_ENCODING, "identity").lower() == "identity"
+                    assert part.headers.get(hdrs.CONTENT_TRANSFER_ENCODING, "binary").lower() in (
+                        "binary",
+                        "8bit",
+                        "7bit",
                     )
-                    fp = tempfile.NamedTemporaryFile(suffix='.tar',
-                                                     delete=False)
+                    fp = tempfile.NamedTemporaryFile(suffix=".tar", delete=False)
                     while True:
                         chunk = await part.read_chunk(DEFAULT_CHUNK_SIZE)
                         if not chunk:
@@ -843,10 +920,10 @@ class ComputeSession(BaseFunction):
                         tarf.extractall(path=dest)
                         file_names.extend(tarf.getnames())
                     os.unlink(fp.name)
-        return {'file_names': file_names}
+        return {"file_names": file_names}
 
     @api_function
-    async def list_files(self, path: Union[str, Path] = '.'):
+    async def list_files(self, path: Union[str, Path] = "."):
         """
         Gets the list of files in the given path inside the compute session
         container.
@@ -855,15 +932,18 @@ class ComputeSession(BaseFunction):
         """
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         rqst = Request(
-            'GET', f'/{prefix}/{self.name}/files',
+            "GET",
+            f"/{prefix}/{self.name}/files",
             params=params,
         )
-        rqst.set_json({
-            'path': path,
-        })
+        rqst.set_json(
+            {
+                "path": path,
+            }
+        )
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -871,18 +951,36 @@ class ComputeSession(BaseFunction):
     async def stream_app_info(self):
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         id_or_name = get_id_or_name(api_session.get().api_version, self)
         api_rqst = Request(
-            'GET', f'/stream/{prefix}/{id_or_name}/apps',
+            "GET",
+            f"/stream/{prefix}/{id_or_name}/apps",
             params=params,
         )
         async with api_rqst.fetch() as resp:
             return await resp.json()
 
+    @api_function
+    async def get_abusing_report(self):
+        """
+        Retrieves abusing reports of session's sibling kernels.
+        """
+        params = {}
+        if self.owner_access_key:
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "GET",
+            f"/{prefix}/{self.name}/abusing-report",
+            params=params,
+        )
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
     # only supported in AsyncAPISession
-    def listen_events(self, scope: Literal['*', 'session', 'kernel'] = '*') -> SSEContextManager:
+    def listen_events(self, scope: Literal["*", "session", "kernel"] = "*") -> SSEContextManager:
         """
         Opens the stream of the kernel lifecycle events.
         Only the master kernel of each session is monitored.
@@ -891,22 +989,24 @@ class ComputeSession(BaseFunction):
         """
         if api_session.get().api_version[0] >= 6:
             request = Request(
-                'GET', '/events/session',
+                "GET",
+                "/events/session",
                 params={
                     **self.get_session_identity_params(),
-                    'scope': scope,
+                    "scope": scope,
                 },
             )
         else:
             assert self.name is not None
             params = {
-                get_naming(api_session.get().api_version, 'event_name_arg'): self.name,
+                get_naming(api_session.get().api_version, "event_name_arg"): self.name,
             }
             if self.owner_access_key:
-                params['owner_access_key'] = self.owner_access_key
-            path = get_naming(api_session.get().api_version, 'session_events_path')
+                params["owner_access_key"] = self.owner_access_key
+            path = get_naming(api_session.get().api_version, "session_events_path")
             request = Request(
-                'GET', path,
+                "GET",
+                path,
                 params=params,
             )
         return request.connect_events()
@@ -923,19 +1023,20 @@ class ComputeSession(BaseFunction):
         """
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         id_or_name = get_id_or_name(api_session.get().api_version, self)
         request = Request(
-            'GET', f'/stream/{prefix}/{id_or_name}/pty',
+            "GET",
+            f"/stream/{prefix}/{id_or_name}/pty",
             params=params,
         )
         return request.connect_websocket(response_cls=StreamPty)
 
     # only supported in AsyncAPISession
-    def stream_execute(self, code: str = '', *,
-                       mode: str = 'query',
-                       opts: dict = None) -> WebSocketContextManager:
+    def stream_execute(
+        self, code: str = "", *, mode: str = "query", opts: dict = None
+    ) -> WebSocketContextManager:
         """
         Executes a code snippet in the streaming mode.
         Since the returned websocket represents a run loop, there is no need to
@@ -943,33 +1044,36 @@ class ComputeSession(BaseFunction):
         """
         params = {}
         if self.owner_access_key:
-            params['owner_access_key'] = self.owner_access_key
-        prefix = get_naming(api_session.get().api_version, 'path')
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
         id_or_name = get_id_or_name(api_session.get().api_version, self)
         opts = {} if opts is None else opts
-        if mode == 'query':
+        if mode == "query":
             opts = {}
-        elif mode == 'batch':
+        elif mode == "batch":
             opts = {
-                'clean': opts.get('clean', None),
-                'build': opts.get('build', None),
-                'buildLog': bool(opts.get('buildLog', False)),
-                'exec': opts.get('exec', None),
+                "clean": opts.get("clean", None),
+                "build": opts.get("build", None),
+                "buildLog": bool(opts.get("buildLog", False)),
+                "exec": opts.get("exec", None),
             }
         else:
-            msg = 'Invalid stream-execution mode: {0}'.format(mode)
+            msg = "Invalid stream-execution mode: {0}".format(mode)
             raise BackendClientError(msg)
         request = Request(
-            'GET', f'/stream/{prefix}/{id_or_name}/execute',
+            "GET",
+            f"/stream/{prefix}/{id_or_name}/execute",
             params=params,
         )
 
         async def send_code(ws):
-            await ws.send_json({
-                'code': code,
-                'mode': mode,
-                'options': opts,
-            })
+            await ws.send_json(
+                {
+                    "code": code,
+                    "mode": mode,
+                    "options": opts,
+                }
+            )
 
         return request.connect_websocket(on_enter=send_code)
 
@@ -980,16 +1084,24 @@ class StreamPty(WebSocketResponse):
     provides additional functions to control the terminal.
     """
 
-    __slots__ = ('ws', )
+    __slots__ = ("ws",)
 
     async def resize(self, rows, cols):
-        await self.ws.send_str(json.dumps({
-            'type': 'resize',
-            'rows': rows,
-            'cols': cols,
-        }))
+        await self.ws.send_str(
+            json.dumps(
+                {
+                    "type": "resize",
+                    "rows": rows,
+                    "cols": cols,
+                }
+            )
+        )
 
     async def restart(self):
-        await self.ws.send_str(json.dumps({
-            'type': 'restart',
-        }))
+        await self.ws.send_str(
+            json.dumps(
+                {
+                    "type": "restart",
+                }
+            )
+        )

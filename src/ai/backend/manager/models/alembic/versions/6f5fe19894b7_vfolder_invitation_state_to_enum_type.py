@@ -12,15 +12,15 @@ from sqlalchemy.dialects import postgresql
 from ai.backend.manager.models import VFolderInvitationState
 
 # revision identifiers, used by Alembic.
-revision = '6f5fe19894b7'
-down_revision = '48ab2dfefba9'
+revision = "6f5fe19894b7"
+down_revision = "48ab2dfefba9"
 branch_labels = None
 depends_on = None
 
 vfinvs_choices = list(map(lambda v: v.value, VFolderInvitationState))
 vfolderinvitationstate = postgresql.ENUM(
     *vfinvs_choices,
-    name='vfolderinvitationstate',
+    name="vfolderinvitationstate",
 )
 
 
@@ -29,9 +29,12 @@ def upgrade():
     pass
     # ### end Alembic commands ###
     vfolderinvitationstate.create(op.get_bind())
-    op.alter_column('vfolder_invitations', column_name='state',
-                    type_=sa.Enum(*vfinvs_choices, name='vfolderinvitationstate'),
-                    postgresql_using='state::vfolderinvitationstate')
+    op.alter_column(
+        "vfolder_invitations",
+        column_name="state",
+        type_=sa.Enum(*vfinvs_choices, name="vfolderinvitationstate"),
+        postgresql_using="state::vfolderinvitationstate",
+    )
 
 
 def downgrade():
@@ -39,7 +42,10 @@ def downgrade():
     pass
     # ### end Alembic commands ###
     vfolderinvitationstate.create(op.get_bind())
-    op.alter_column('vfolder_invitations', column_name='state',
-                    type_=sa.String(length=10),
-                    postgresql_using='state::text::vfolderinvitationstate')
+    op.alter_column(
+        "vfolder_invitations",
+        column_name="state",
+        type_=sa.String(length=10),
+        postgresql_using="state::text::vfolderinvitationstate",
+    )
     vfolderinvitationstate.drop(op.get_bind())

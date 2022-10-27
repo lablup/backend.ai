@@ -55,9 +55,6 @@ local_settings.py
 instance/
 .webassets-cache
 
-# Scrapy stuff:
-.scrapy
-
 # Sphinx documentation
 docs/_build/
 
@@ -79,17 +76,15 @@ venv/
 .venv/
 ENV/
 
-# Spyder project settings
-.spyderproject
-
-# Rope project settings
-.ropeproject
-
 # IDE/vim
 .idea
 *.swp
 *.swo
-.vscode
+.vscode/
+/.vimrc
+/.nvimrc
+/.exrc
+.vim/
 
 # Pants
 /.pants.d/
@@ -117,6 +112,13 @@ ENV/
 /volumes/
 /vfroot/
 /*.pid
+/scratches/
+
+# Additional clones for editable components
+/src/ai/backend/webui/
 
 # Release artifacts
 /CHANGELOG_RELEASE.md
+
+# macOS specific
+.DS_Store

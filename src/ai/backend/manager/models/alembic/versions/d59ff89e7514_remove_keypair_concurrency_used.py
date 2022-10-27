@@ -9,17 +9,24 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = 'd59ff89e7514'
-down_revision = '0f7a4b643940'
+revision = "d59ff89e7514"
+down_revision = "0f7a4b643940"
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
-    op.drop_column('keypairs', 'concurrency_used')
+    op.drop_column("keypairs", "concurrency_used")
 
 
 def downgrade():
-    op.add_column('keypairs', sa.Column(
-        'concurrency_used', sa.Integer, nullable=True, default=0, server_default=0,
-    ))
+    op.add_column(
+        "keypairs",
+        sa.Column(
+            "concurrency_used",
+            sa.Integer,
+            nullable=True,
+            default=0,
+            server_default="0",
+        ),
+    )

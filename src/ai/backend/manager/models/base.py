@@ -37,7 +37,7 @@ from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql.language import ast
-from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
+from sqlalchemy.dialects.postgresql import CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -45,11 +45,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
+from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     BinarySize,
     JSONSerializableMixin,
     KernelId,
+    ReadableCIDR,
     ResourceSlot,
     SessionId,
 )
@@ -71,7 +73,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 # The common shared metadata instance
 convention = {
-    "ix": 'ix_%(column_0_label)s',
+    "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
     "ck": "ck_%(table_name)s_%(constraint_name)s",
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
@@ -82,11 +84,11 @@ mapper_registry = registry(metadata=metadata)
 Base: Any = mapper_registry.generate_base()  # TODO: remove Any after #422 is merged
 
 pgsql_connect_opts = {
-    'server_settings': {
-        'jit': 'off',
+    "server_settings": {
+        "jit": "off",
         # 'deadlock_timeout': '10000',  # FIXME: AWS RDS forbids settings this via connection arguments
-        'lock_timeout': '60000',  # 60 secs
-        'idle_in_transaction_session_timeout': '60000',  # 60 secs
+        "lock_timeout": "60000",  # 60 secs
+        "idle_in_transaction_session_timeout": "60000",  # 60 secs
     },
 }
 
@@ -109,8 +111,8 @@ class EnumType(TypeDecorator, SchemaType):
 
     def __init__(self, enum_cls, **opts):
         assert issubclass(enum_cls, enum.Enum)
-        if 'name' not in opts:
-            opts['name'] = enum_cls.__name__.lower()
+        if "name" not in opts:
+            opts["name"] = enum_cls.__name__.lower()
         self._opts = opts
         enums = (m.name for m in enum_cls)
         super().__init__(*enums, **opts)
@@ -143,8 +145,8 @@ class EnumValueType(TypeDecorator, SchemaType):
 
     def __init__(self, enum_cls, **opts):
         assert issubclass(enum_cls, enum.Enum)
-        if 'name' not in opts:
-            opts['name'] = enum_cls.__name__.lower()
+        if "name" not in opts:
+            opts["name"] = enum_cls.__name__.lower()
         self._opts = opts
         enums = (m.value for m in enum_cls)
         super().__init__(*enums, **opts)
@@ -180,9 +182,9 @@ class ResourceSlotColumn(TypeDecorator):
     def process_result_value(self, raw_value: Dict[str, str], dialect):
         # legacy handling
         interim_value: Dict[str, Any] = raw_value
-        mem = raw_value.get('mem')
+        mem = raw_value.get("mem")
         if isinstance(mem, str) and not mem.isdigit():
-            interim_value['mem'] = BinarySize.from_str(mem)
+            interim_value["mem"] = BinarySize.from_str(mem)
         return ResourceSlot.from_json(interim_value) if raw_value is not None else None
 
     def copy(self):
@@ -202,7 +204,7 @@ class StructuredJSONColumn(TypeDecorator):
         self._schema = schema
 
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'sqlite':
+        if dialect.name == "sqlite":
             return dialect.type_descriptor(sa.JSON)
         else:
             return super().load_dialect_impl(dialect)
@@ -295,12 +297,35 @@ class URLColumn(TypeDecorator):
             return yarl.URL(value)
 
 
+class IPColumn(TypeDecorator):
+    """
+    A column type to convert IP string values back and forth to CIDR.
+    """
+
+    impl = CIDR
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        try:
+            cidr = ReadableCIDR(value).address
+        except InvalidIpAddressValue:
+            raise InvalidAPIParameters(f"{value} is invalid IP address value")
+        return cidr
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return ReadableCIDR(value)
+
+
 class CurrencyTypes(enum.Enum):
-    KRW = 'KRW'
-    USD = 'USD'
+    KRW = "KRW"
+    USD = "USD"
 
 
-UUID_SubType = TypeVar('UUID_SubType', bound=uuid.UUID)
+UUID_SubType = TypeVar("UUID_SubType", bound=uuid.UUID)
 
 
 class GUID(TypeDecorator, Generic[UUID_SubType]):
@@ -308,12 +333,13 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
     Platform-independent GUID type.
     Uses PostgreSQL's UUID type, otherwise uses CHAR(16) storing as raw bytes.
     """
+
     impl = CHAR
     uuid_subtype_func: ClassVar[Callable[[Any], Any]] = lambda v: v
     cache_ok = True
 
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
+        if dialect.name == "postgresql":
             return dialect.type_descriptor(UUID())
         else:
             return dialect.type_descriptor(CHAR(16))
@@ -325,7 +351,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
         #       Therefore, we just do isinstance on uuid.UUID only below.
         if value is None:
             return value
-        elif dialect.name == 'postgresql':
+        elif dialect.name == "postgresql":
             if isinstance(value, uuid.UUID):
                 return str(value)
             else:
@@ -357,19 +383,20 @@ class KernelIDColumnType(GUID[KernelId]):
     cache_ok = True
 
 
-def IDColumn(name='id'):
-    return sa.Column(name, GUID, primary_key=True,
-                     server_default=sa.text("uuid_generate_v4()"))
+def IDColumn(name="id"):
+    return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
 
 
-def SessionIDColumn(name='id'):
-    return sa.Column(name, SessionIDColumnType, primary_key=True,
-                     server_default=sa.text("uuid_generate_v4()"))
+def SessionIDColumn(name="id"):
+    return sa.Column(
+        name, SessionIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
 
-def KernelIDColumn(name='id'):
-    return sa.Column(name, KernelIDColumnType, primary_key=True,
-                     server_default=sa.text("uuid_generate_v4()"))
+def KernelIDColumn(name="id"):
+    return sa.Column(
+        name, KernelIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
 
 def ForeignKeyIDColumn(name, fk_field, nullable=True):
@@ -391,26 +418,28 @@ class DataLoaderManager:
 
     def __init__(self) -> None:
         self.cache = {}
-        self.mod = sys.modules['ai.backend.manager.models']
+        self.mod = sys.modules["ai.backend.manager.models"]
 
     @staticmethod
     def _get_key(otname: str, args, kwargs) -> int:
         """
         Calculate the hash of the all arguments and keyword arguments.
         """
-        key = (otname, ) + args
+        key = (otname,) + args
         for item in kwargs.items():
             key += item
         return hash(key)
 
-    def get_loader(self, context: GraphQueryContext, objtype_name: str, *args, **kwargs) -> DataLoader:
+    def get_loader(
+        self, context: GraphQueryContext, objtype_name: str, *args, **kwargs
+    ) -> DataLoader:
         k = self._get_key(objtype_name, args, kwargs)
         loader = self.cache.get(k)
         if loader is None:
-            objtype_name, has_variant, variant_name = objtype_name.partition('.')
+            objtype_name, has_variant, variant_name = objtype_name.partition(".")
             objtype = getattr(self.mod, objtype_name)
             if has_variant:
-                batch_load_fn = getattr(objtype, 'batch_load_' + variant_name)
+                batch_load_fn = getattr(objtype, "batch_load_" + variant_name)
             else:
                 batch_load_fn = objtype.batch_load
             loader = DataLoader(
@@ -453,8 +482,7 @@ class BigInt(Scalar):
     def coerce_bigint(value):
         num = int(value)
         if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
-            raise ValueError(
-                'Cannot serialize integer out of the safe range.')
+            raise ValueError("Cannot serialize integer out of the safe range.")
         if not (MIN_INT <= num <= MAX_INT):
             # treat as float
             return float(int(num))
@@ -468,8 +496,7 @@ class BigInt(Scalar):
         if isinstance(node, ast.IntValue):
             num = int(node.value)
             if not (SAFE_MIN_INT <= num <= SAFE_MAX_INT):
-                raise ValueError(
-                    'Cannot parse integer out of the safe range.')
+                raise ValueError("Cannot parse integer out of the safe range.")
             if not (MIN_INT <= num <= MAX_INT):
                 # treat as float
                 return float(int(num))
@@ -486,8 +513,8 @@ class PaginatedList(graphene.Interface):
 
 
 # ref: https://github.com/python/mypy/issues/1212
-_GenericSQLBasedGQLObject = TypeVar('_GenericSQLBasedGQLObject', bound='_SQLBasedGQLObject')
-_Key = TypeVar('_Key')
+_GenericSQLBasedGQLObject = TypeVar("_GenericSQLBasedGQLObject", bound="_SQLBasedGQLObject")
+_Key = TypeVar("_Key")
 
 
 class _SQLBasedGQLObject(Protocol):
@@ -543,15 +570,16 @@ async def batch_multiresult(
 
 
 def privileged_query(required_role: UserRole):
-
     def wrap(func):
-
         @functools.wraps(func)
-        async def wrapped(executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
+        async def wrapped(
+            executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs
+        ) -> Any:
             from .user import UserRole
+
             ctx: GraphQueryContext = info.context
-            if ctx.user['role'] != UserRole.SUPERADMIN:
-                raise GenericForbidden('superadmin privilege required')
+            if ctx.user["role"] != UserRole.SUPERADMIN:
+                raise GenericForbidden("superadmin privilege required")
             return await func(executor, info, *args, **kwargs)
 
         return wrapped
@@ -562,7 +590,7 @@ def privileged_query(required_role: UserRole):
 def scoped_query(
     *,
     autofill_user: bool = False,
-    user_key: str = 'access_key',
+    user_key: str = "access_key",
 ):
     """
     Prepends checks for domain/group/user access rights depending
@@ -576,21 +604,23 @@ def scoped_query(
     """
 
     def wrap(resolve_func):
-
         @functools.wraps(resolve_func)
-        async def wrapped(executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
+        async def wrapped(
+            executor: AsyncioExecutor, info: graphene.ResolveInfo, *args, **kwargs
+        ) -> Any:
             from .user import UserRole
+
             ctx: GraphQueryContext = info.context
-            client_role = ctx.user['role']
-            if user_key == 'access_key':
+            client_role = ctx.user["role"]
+            if user_key == "access_key":
                 client_user_id = ctx.access_key
-            elif user_key == 'email':
-                client_user_id = ctx.user['email']
+            elif user_key == "email":
+                client_user_id = ctx.user["email"]
             else:
-                client_user_id = ctx.user['uuid']
-            client_domain = ctx.user['domain_name']
-            domain_name = kwargs.get('domain_name', None)
-            group_id = kwargs.get('group_id', None)
+                client_user_id = ctx.user["uuid"]
+            client_domain = ctx.user["domain_name"]
+            domain_name = kwargs.get("domain_name", None)
+            group_id = kwargs.get("group_id", None)
             user_id = kwargs.get(user_key, None)
             if client_role == UserRole.SUPERADMIN:
                 if autofill_user:
@@ -618,10 +648,10 @@ def scoped_query(
                     raise GenericForbidden
                 user_id = client_user_id
             else:
-                raise InvalidAPIParameters('Unknown client role')
-            kwargs['domain_name'] = domain_name
+                raise InvalidAPIParameters("Unknown client role")
+            kwargs["domain_name"] = domain_name
             if group_id is not None:
-                kwargs['group_id'] = group_id
+                kwargs["group_id"] = group_id
             kwargs[user_key] = user_id
             return await resolve_func(executor, info, *args, **kwargs)
 
@@ -631,43 +661,43 @@ def scoped_query(
 
 
 def privileged_mutation(required_role, target_func=None):
-
     def wrap(func):
-
         @functools.wraps(func)
         async def wrapped(cls, root, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
             from .group import groups  # , association_groups_users
             from .user import UserRole
+
             ctx: GraphQueryContext = info.context
             permitted = False
             if required_role == UserRole.SUPERADMIN:
-                if ctx.user['role'] == required_role:
+                if ctx.user["role"] == required_role:
                     permitted = True
             elif required_role == UserRole.ADMIN:
-                if ctx.user['role'] == UserRole.SUPERADMIN:
+                if ctx.user["role"] == UserRole.SUPERADMIN:
                     permitted = True
-                elif ctx.user['role'] == UserRole.USER:
+                elif ctx.user["role"] == UserRole.USER:
                     permitted = False
                 else:
                     if target_func is None:
-                        return cls(False, 'misconfigured privileged mutation: no target_func', None)
+                        return cls(False, "misconfigured privileged mutation: no target_func", None)
                     target_domain, target_group = target_func(*args, **kwargs)
                     if target_domain is None and target_group is None:
-                        return cls(False, 'misconfigured privileged mutation: '
-                                          'both target_domain and target_group missing', None)
+                        return cls(
+                            False,
+                            "misconfigured privileged mutation: "
+                            "both target_domain and target_group missing",
+                            None,
+                        )
                     permit_chains = []
                     if target_domain is not None:
-                        if ctx.user['domain_name'] == target_domain:
+                        if ctx.user["domain_name"] == target_domain:
                             permit_chains.append(True)
                     if target_group is not None:
                         async with ctx.db.begin() as conn:
                             # check if the group is part of the requester's domain.
-                            query = (
-                                groups.select()
-                                .where(
-                                    (groups.c.id == target_group) &
-                                    (groups.c.domain_name == ctx.user['domain_name']),
-                                )
+                            query = groups.select().where(
+                                (groups.c.id == target_group)
+                                & (groups.c.domain_name == ctx.user["domain_name"]),
                             )
                             result = await conn.execute(query)
                             if result.rowcount > 0:
@@ -695,8 +725,8 @@ def privileged_mutation(required_role, target_func=None):
     return wrap
 
 
-ResultType = TypeVar('ResultType', bound=graphene.ObjectType)
-ItemType = TypeVar('ItemType', bound=graphene.ObjectType)
+ResultType = TypeVar("ResultType", bound=graphene.ObjectType)
+ItemType = TypeVar("ItemType", bound=graphene.ObjectType)
 
 
 async def simple_db_mutate(
@@ -734,6 +764,9 @@ async def simple_db_mutate(
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
         return result_cls(False, f"integrity error: {e}")
+    except sa.exc.StatementError as e:
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
@@ -793,6 +826,9 @@ async def simple_db_mutate_returning_item(
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
         return result_cls(False, f"integrity error: {e}", None)
+    except sa.exc.StatementError as e:
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
@@ -800,8 +836,12 @@ async def simple_db_mutate_returning_item(
 
 
 def set_if_set(
-    src: object, target: MutableMapping[str, Any], name: str, *,
-    clean_func=None, target_key: Optional[str] = None,
+    src: object,
+    target: MutableMapping[str, Any],
+    name: str,
+    *,
+    clean_func=None,
+    target_key: Optional[str] = None,
 ) -> None:
     v = getattr(src, name)
     # NOTE: unset optional fields are passed as null.
@@ -829,7 +869,9 @@ async def populate_fixture(
                 elif isinstance(col.type, EnumValueType):
                     for row in rows:
                         row[col.name] = col.type._enum_cls(row[col.name])
-                elif isinstance(col.type, (StructuredJSONObjectColumn, StructuredJSONObjectListColumn)):
+                elif isinstance(
+                    col.type, (StructuredJSONObjectColumn, StructuredJSONObjectListColumn)
+                ):
                     for row in rows:
                         row[col.name] = col.type._schema.from_json(row[col.name])
             await conn.execute(sa.dialects.postgresql.insert(table, rows).on_conflict_do_nothing())
