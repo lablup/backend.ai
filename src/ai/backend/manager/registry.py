@@ -1562,16 +1562,14 @@ class AgentRegistry:
                     kernel_id = binding.kernel.kernel_id
                     self.kernel_creation_tracker[kernel_id].cancel()
                     self._post_kernel_creation_infos[kernel_id].set_exception(e)
-                await asyncio.gather(*post_tasks, return_exceptions=True)
-                async with self.db.begin() as conn:
-                    update_query = kernels.update().values(
-                        {
-                            "id": sa.bindparam("b_kernel_id"),
-                            "agent": sa.bindparam("b_agent_id"),
-                            "agent_addr": sa.bindparam("agent_addr"),
-                            "scaling_group": sa.bindparam("scaling_group"),
-                            "status": KernelStatus.ERROR,
-                            "status_info": f"other-error ({e!r})",
+                    await self.set_kernel_status(
+                        kernel_id,
+                        KernelStatus.ERROR,
+                        f"other-error ({e!r})",
+                        extra_data={
+                            "agent": binding.agent_alloc_ctx.agent_id,
+                            "agent_addr": binding.agent_alloc_ctx.agent_addr,
+                            "scaling_group": binding.agent_alloc_ctx.scaling_group,
                             "status_data": {
                                 "error": {
                                     "src": "other",
@@ -1579,27 +1577,9 @@ class AgentRegistry:
                                     "repr": repr(e),
                                 },
                             },
-                            "status_history": sql_json_merge(
-                                kernels.c.status_history,
-                                (),
-                                {
-                                    KernelStatus.ERROR.name: datetime.now(tzutc()).isoformat(),
-                                },
-                            ),
-                        }
+                        },
                     )
-                    await conn.execute(
-                        update_query,
-                        [
-                            {
-                                "b_kernel_id": binding.kernel.kernel_id,
-                                "b_agent_id": binding.agent_alloc_ctx.agent_id,
-                                "agent_addr": binding.agent_alloc_ctx.agent_addr,
-                                "scaling_group": binding.agent_alloc_ctx.scaling_group,
-                            }
-                            for binding in items
-                        ],
-                    )
+                await asyncio.gather(*post_tasks, return_exceptions=True)
                 raise
 
     async def create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:
@@ -2795,6 +2775,8 @@ class AgentRegistry:
         kernel_id: KernelId,
         status: KernelStatus,
         reason: str = "",
+        *,
+        extra_data: Optional[Mapping[str, Any]] = None,
     ) -> None:
         assert status != KernelStatus.TERMINATED, (
             "TERMINATED status update must be handled in " "mark_kernel_terminated()"
@@ -2814,6 +2796,9 @@ class AgentRegistry:
         }
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data["terminated_at"] = now
+
+        if extra_data is not None:
+            data = {**data, **extra_data}
 
         async def _update() -> None:
             async with self.db.begin() as conn:
