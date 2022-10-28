@@ -108,13 +108,13 @@ from .defs import DEFAULT_ROLE, INTRINSIC_SLOTS
 from .exceptions import MultiAgentError
 from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    AVAILABLE_NEXT_KERNEL_STATUSES,
     DEAD_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AgentStatus,
     ImageRow,
     KernelStatus,
     agents,
-    determine_available_kernel_status,
     kernels,
     keypair_resource_policies,
     prepare_dotfiles,
@@ -2804,7 +2804,7 @@ class AgentRegistry:
             async with self.db.begin() as conn:
                 kernel_query = sa.select([kernels.c.status]).where(kernels.c.id == kernel_id)
                 current_status = (await conn.execute(kernel_query)).scalar()
-                if status in determine_available_kernel_status(current_status):
+                if status in AVAILABLE_NEXT_KERNEL_STATUSES[current_status]:
                     query = sa.update(kernels).values(data).where(kernels.c.id == kernel_id)
                     await conn.execute(query)
 
