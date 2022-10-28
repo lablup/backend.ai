@@ -593,7 +593,6 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                     agent_list=params["config"]["agent_list"],
                     dependency_sessions=params["dependencies"],
                     callback_url=params["callback_url"],
-                    use_host_network=root_ctx.local_config["manager"]["use-host-network"],
                 )
             ),
         )
@@ -1127,7 +1126,6 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
                         user_role=request["user"]["role"],
                     ),
                     session_tag=params["tag"],
-                    use_host_network=root_ctx.local_config["manager"]["use-host-network"],
                 ),
             )
         )

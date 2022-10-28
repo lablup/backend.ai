@@ -122,6 +122,7 @@ from .models import (
     query_allowed_sgroups,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
+    scaling_groups,
     session_dependencies,
     users,
 )
@@ -812,7 +813,6 @@ class AgentRegistry:
         agent_list: Sequence[str] = None,
         dependency_sessions: Sequence[SessionId] = None,
         callback_url: URL = None,
-        use_host_network=False,
     ) -> SessionId:
 
         session_id = SessionId(uuid.uuid4())
@@ -841,6 +841,13 @@ class AgentRegistry:
                     f"falling back to {checked_scaling_group}",
                 )
 
+            use_host_network_query = (
+                sa.select([scaling_groups.c.use_host_network])
+                .select_from(scaling_groups)
+                .where(scaling_groups.c.name == checked_scaling_group)
+            )
+            use_host_network_result = await conn.execute(use_host_network_query)
+            use_host_network = use_host_network_result.scalar()
             # Translate mounts/mount_map into vfolder mounts
             requested_mounts = kernel_enqueue_configs[0]["creation_config"].get("mounts") or []
             requested_mount_map = (

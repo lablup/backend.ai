@@ -23,7 +23,14 @@ def upgrade():
             "use_host_network", sa.BOOLEAN(), nullable=False, server_default=false(), default=False
         ),
     )
+    op.add_column(
+        "scaling_groups",
+        sa.Column(
+            "use_host_network", sa.BOOLEAN(), nullable=False, server_default=false(), default=False
+        ),
+    )
 
 
 def downgrade():
     op.drop_column("kernels", "use_host_network")
+    op.drop_column("scaling_groups", "use_host_network")
