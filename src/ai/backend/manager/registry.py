@@ -114,7 +114,7 @@ from .models import (
     ImageRow,
     KernelStatus,
     agents,
-    determine_available_next_status,
+    determine_available_kernel_status,
     kernels,
     keypair_resource_policies,
     prepare_dotfiles,
@@ -2819,7 +2819,7 @@ class AgentRegistry:
             async with self.db.begin() as conn:
                 kernel_query = sa.select([kernels.c.status]).where(kernels.c.id == kernel_id)
                 current_status = (await conn.execute(kernel_query)).scalar()
-                if status in determine_available_next_status(current_status):
+                if status in determine_available_kernel_status(current_status):
                     query = sa.update(kernels).values(data).where(kernels.c.id == kernel_id)
                     await conn.execute(query)
 
