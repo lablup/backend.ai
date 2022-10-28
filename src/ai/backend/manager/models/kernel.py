@@ -73,7 +73,7 @@ if TYPE_CHECKING:
 __all__ = (
     "kernels",
     "session_dependencies",
-    "AVAILABLE_NEXT_KERNEL_STATUSES",
+    "KERNEL_STATUS_TRANSITION_MAP",
     "KernelStatistics",
     "KernelStatus",
     "ComputeContainer",
@@ -155,7 +155,7 @@ def default_hostname(context) -> str:
     return f"{params['cluster_role']}{params['cluster_idx']}"
 
 
-AVAILABLE_NEXT_KERNEL_STATUSES: Mapping[KernelStatus, set[KernelStatus]] = {
+KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
     KernelStatus.PENDING: {
         s for s in KernelStatus if s not in (KernelStatus.PENDING, KernelStatus.TERMINATED)
     },
