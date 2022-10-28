@@ -73,7 +73,7 @@ if TYPE_CHECKING:
 __all__ = (
     "kernels",
     "session_dependencies",
-    "determine_available_next_status",
+    "determine_available_kernel_status",
     "KernelStatistics",
     "KernelStatus",
     "ComputeContainer",
@@ -155,75 +155,77 @@ def default_hostname(context) -> str:
     return f"{params['cluster_role']}{params['cluster_idx']}"
 
 
-def determine_available_next_status(status: KernelStatus) -> List[KernelStatus]:
-    blocking_statuses: List[KernelStatus]
-    match status:
+def determine_available_kernel_status(current_status: KernelStatus) -> List[KernelStatus]:
+    """
+    Returns a list of available next KernelStatus from parameter "current_status".
+    """
+
+    unavailable_statuses: List[KernelStatus]
+    match current_status:
         case KernelStatus.PENDING:
-            blocking_statuses = [
-                KernelStatus.PENDING,
+            unavailable_statuses = [
+                KernelStatus.TERMINATED,
             ]
         case KernelStatus.SCHEDULED:
-            blocking_statuses = [
+            unavailable_statuses = [
                 KernelStatus.PENDING,
-                KernelStatus.SCHEDULED,
+                KernelStatus.TERMINATED,
             ]
         case KernelStatus.PREPARING:
-            blocking_statuses = [
+            unavailable_statuses = [
+                KernelStatus.PENDING,
+                KernelStatus.SCHEDULED,
+                KernelStatus.TERMINATED,
+            ]
+        case KernelStatus.BUILDING:
+            unavailable_statuses = [
+                KernelStatus.PENDING,
+                KernelStatus.SCHEDULED,
+                KernelStatus.TERMINATED,
+            ]
+        case KernelStatus.PULLING:
+            unavailable_statuses = [
+                KernelStatus.PENDING,
+                KernelStatus.SCHEDULED,
+                KernelStatus.BUILDING,
+                KernelStatus.TERMINATED,
+            ]
+        case KernelStatus.RUNNING:
+            unavailable_statuses = [
                 KernelStatus.PENDING,
                 KernelStatus.SCHEDULED,
                 KernelStatus.PREPARING,
-            ]
-        case KernelStatus.BUILDING:
-            blocking_statuses = [
-                KernelStatus.PENDING,
-                KernelStatus.SCHEDULED,
-                KernelStatus.BUILDING,
-            ]
-        case KernelStatus.PULLING:
-            blocking_statuses = [
-                KernelStatus.PENDING,
-                KernelStatus.SCHEDULED,
                 KernelStatus.BUILDING,
                 KernelStatus.PULLING,
-            ]
-        case KernelStatus.RUNNING:
-            blocking_statuses = [
-                KernelStatus.PENDING,
-                KernelStatus.SCHEDULED,
-                KernelStatus.BUILDING,
-                KernelStatus.PULLING,
+                KernelStatus.TERMINATED,
             ]
         case KernelStatus.RESTARTING:
-            blocking_statuses = [
+            unavailable_statuses = [
                 KernelStatus.PENDING,
                 KernelStatus.SCHEDULED,
+                KernelStatus.TERMINATED,
             ]
         case KernelStatus.RESIZING:
-            blocking_statuses = [
+            unavailable_statuses = [
                 KernelStatus.PENDING,
                 KernelStatus.SCHEDULED,
+                KernelStatus.TERMINATED,
             ]
         case KernelStatus.SUSPENDED:
-            blocking_statuses = [
+            unavailable_statuses = [
                 KernelStatus.PENDING,
                 KernelStatus.SCHEDULED,
+                KernelStatus.TERMINATED,
             ]
         case KernelStatus.TERMINATING:
-            blocking_statuses = [
-                KernelStatus.PENDING,
-                KernelStatus.SCHEDULED,
-            ]
+            return [KernelStatus.TERMINATED, KernelStatus.ERROR]
         case KernelStatus.TERMINATED:
-            blocking_statuses = [s for s in KernelStatus if s != KernelStatus.TERMINATING]
+            return [KernelStatus.ERROR]
         case KernelStatus.ERROR:
-            blocking_statuses = []
+            return []
         case KernelStatus.CANCELLED:
-            blocking_statuses = [
-                s
-                for s in KernelStatus
-                if s not in (KernelStatus.PENDING, KernelStatus.SCHEDULED, KernelStatus.PREPARING)
-            ]
-    return [s for s in KernelStatus if s not in blocking_statuses]
+            return [KernelStatus.ERROR]
+    return [s for s in KernelStatus if s not in (current_status, *unavailable_statuses)]
 
 
 kernels = sa.Table(
