@@ -21,16 +21,15 @@ import tomli
 import uvloop
 import yarl
 from aiohttp import web
-from aiohttp_session import get_session
-from aiohttp_session import setup as setup_session
-from aiohttp_session.redis_storage import RedisStorage
-from aioredis import Redis as AioRedisLegacy
 from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
+from ai.backend.common.web.session import get_session
+from ai.backend.common.web.session import setup as setup_session
+from ai.backend.common.web.session.redis_storage import RedisStorage
 
 from . import __version__, user_agent
 from .config import config_iv
@@ -482,19 +481,12 @@ async def server_main(
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
     )
-    # FIXME: remove after aio-libs/aiohttp-session#704 is merged
-    aioredis_legacy_client = await AioRedisLegacy.from_url(
-        str(redis_url),
-        socket_keepalive=True,
-        socket_keepalive_options=keepalive_options,
-    )
 
     if pidx == 0 and config["session"]["flush_on_startup"]:
         await app["redis"].flushdb()
         log.info("flushed session storage.")
     redis_storage = RedisStorage(
-        # FIXME: replace to app['redis'] after aio-libs/aiohttp-session#704 is merged
-        aioredis_legacy_client,
+        app["redis"],
         max_age=config["session"]["max_age"],
     )
 

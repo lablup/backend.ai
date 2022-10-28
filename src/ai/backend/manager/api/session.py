@@ -1341,7 +1341,7 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
     except BackendError:
         log.exception("GET_COMMIT_STATUS: exception")
         raise
-    resp = {"stats": status_info["status"], "kernel": status_info["kernel"]}
+    resp = {"status": status_info["status"], "kernel": status_info["kernel"]}
     return web.json_response(resp, status=200)
 
 
