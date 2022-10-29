@@ -1,10 +1,12 @@
 import random
+from collections import defaultdict
 from decimal import ROUND_DOWN, Decimal
 
 import attr
 import pytest
 
 from ai.backend.agent.alloc_map import (
+    AffinityMap,
     AllocationStrategy,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
@@ -20,9 +22,57 @@ from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId, SlotName, SlotTypes
 
 
-@attr.s(auto_attribs=True)
+@attr.s(auto_attribs=True, frozen=True)
 class DummyDevice(AbstractComputeDevice):
     pass
+
+
+def test_affinity_map():
+    devices = [
+        DummyDevice(DeviceId("a0"), "cpu", "", 0, 0, 1),
+        DummyDevice(DeviceId("a1"), "cpu", "", 0, 0, 1),
+        DummyDevice(DeviceId("a2"), "cpu", "", 0, 0, 1),
+        DummyDevice(DeviceId("b0"), "cpu", "", 1, 0, 1),
+        DummyDevice(DeviceId("b1"), "cpu", "", 1, 0, 1),
+        DummyDevice(DeviceId("b2"), "cpu", "", 1, 0, 1),
+        DummyDevice(DeviceId("c0"), "cpu", "", 2, 0, 1),
+        DummyDevice(DeviceId("c1"), "cpu", "", 2, 0, 1),
+        DummyDevice(DeviceId("d0"), "cpu", "", 3, 0, 1),
+        DummyDevice(DeviceId("d1"), "cpu", "", 3, 0, 1),
+        DummyDevice(DeviceId("d2"), "cpu", "", 3, 0, 1),
+        DummyDevice(DeviceId("d3"), "cpu", "", 3, 0, 1),
+        DummyDevice(DeviceId("x0"), "cuda", "", 0, 0, 1),
+        DummyDevice(DeviceId("x1"), "cuda", "", 1, 0, 1),
+    ]
+    m = AffinityMap.build(devices)
+
+    largest_component = set()
+    for device, distance in m.get_distance_ordered_neighbors(None, "cpu"):
+        largest_component.add(device.device_id)
+        assert distance == 0
+    assert largest_component == {"d0", "d1", "d2", "d3"}
+
+    largest_component = set()
+    for device, distance in m.get_distance_ordered_neighbors(None, "cuda"):
+        largest_component.add(device.device_id)
+        assert distance == 0
+    assert largest_component == {"x0"} or largest_component == {"x1"}
+
+    distance_sets = defaultdict(set)
+    for device, distance in m.get_distance_ordered_neighbors(devices[-1], "cpu"):  # x1
+        distance_sets[distance].add(device.device_id)
+    assert distance_sets[0] == {"b0", "b1", "b2"}
+
+    distance_sets = defaultdict(set)
+    for device, distance in m.get_distance_ordered_neighbors(devices[6], "cpu"):  # c0
+        distance_sets[distance].add(device.device_id)
+    assert distance_sets[0] == {"c0", "c1"}
+
+    distance_sets = defaultdict(set)
+    for device, distance in m.get_distance_ordered_neighbors(devices[0], "cuda"):  # a0
+        distance_sets[distance].add(device.device_id)
+    assert distance_sets[0] == {"x0"}
+    assert distance_sets[1] == {"x1"}
 
 
 @pytest.mark.parametrize("alloc_strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])

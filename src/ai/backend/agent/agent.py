@@ -112,6 +112,7 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
+from .alloc_map import AffinityMap
 from .exception import AgentError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
@@ -590,10 +591,14 @@ class AbstractAgent(
 
         alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers, self.slots = await self.detect_resources()
+        all_devices: list[AbstractComputeDevice] = []
         for name, computer in computers.items():
             devices = await computer.list_devices()
+            all_devices.extend(devices)
             alloc_map = await computer.create_alloc_map()
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
+        # TODO: build affinity map
+        self.affinity_map = AffinityMap.build(all_devices)
 
         if not self._skip_initial_scan:
             self.images = await self.scan_images()
@@ -1460,7 +1465,6 @@ class AbstractAgent(
                         if slot_name.startswith(dev_name)
                     }
                     try:
-                        # TODO: support allocate_evenly()
                         resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
                             device_specific_slots, context_tag=dev_name
                         )

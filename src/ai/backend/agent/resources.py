@@ -211,9 +211,10 @@ class KernelResourceSpec:
         return json.dumps(self.to_json_serializable_dict())
 
 
-@attr.s(auto_attribs=True)
+@attr.s(auto_attribs=True, frozen=True)
 class AbstractComputeDevice:
     device_id: DeviceId
+    device_type: str
     hw_location: str  # either PCI bus ID or arbitrary string
     numa_node: Optional[int]  # NUMA node ID (None if not applicable)
     memory_size: int  # bytes of available per-accelerator memory
