@@ -112,7 +112,7 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
-from .alloc_map import AffinityMap
+from .affinity_map import AffinityHint, AffinityMap
 from .exception import AgentError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
@@ -1450,15 +1450,23 @@ class AbstractAgent(
 
         # Realize ComputeDevice (including accelerators) allocations.
         slots = resource_spec.slots
-        dev_names: Set[DeviceName] = set()
+        dev_names: set[DeviceName] = set()
         for slot_name in slots.keys():
             dev_name = slot_name.split(".", maxsplit=1)[0]
             dev_names.add(DeviceName(dev_name))
 
         if not restarting:
+            alloc_order = [  # TODO: make it configurable
+                DeviceName("cuda"),
+                DeviceName("cpu"),
+                DeviceName("mem"),
+            ]
+            ordered_dev_names = sorted(dev_names, key=lambda item: alloc_order.index(item))
+            affinity_hint = AffinityHint(None, self.affinity_map)
             async with self.resource_lock:
-                for dev_name in dev_names:
+                for dev_name in ordered_dev_names:
                     computer_set = self.computers[dev_name]
+                    device_id_map = {device.device_id: device for device in computer_set.devices}
                     device_specific_slots = {
                         SlotName(slot_name): Decimal(alloc)
                         for slot_name, alloc in slots.items()
@@ -1466,11 +1474,19 @@ class AbstractAgent(
                     }
                     try:
                         resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
-                            device_specific_slots, context_tag=dev_name
+                            device_specific_slots,
+                            affinity_hint,
+                            context_tag=dev_name,
                         )
                         log.debug(
                             "{} allocations: {}", dev_name, resource_spec.allocations[dev_name]
                         )
+                        hint_devices: list[AbstractComputeDevice] = []
+                        for slot_name, per_device_alloc in resource_spec.allocations[
+                            dev_name
+                        ].items():
+                            hint_devices.extend(device_id_map[k] for k in per_device_alloc.keys())
+                        affinity_hint = AffinityHint(hint_devices, self.affinity_map)
                     except ResourceError as e:
                         log.info(
                             "resource allocation failed ({}): {} of {}\n" "(alloc map: {})",

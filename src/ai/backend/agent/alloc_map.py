@@ -7,23 +7,14 @@ import operator
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from decimal import ROUND_DOWN, Decimal
-from typing import (
-    TYPE_CHECKING,
-    FrozenSet,
-    Iterable,
-    Mapping,
-    MutableMapping,
-    Optional,
-    Sequence,
-    TypeVar,
-)
+from typing import FrozenSet, Iterable, Mapping, MutableMapping, Optional, Sequence, TypeVar
 
 import attr
-import networkx as nx
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DeviceId, SlotName, SlotTypes
 
+from .affinity_map import AffinityHint
 from .exception import (
     InsufficientResource,
     InvalidResourceArgument,
@@ -31,8 +22,9 @@ from .exception import (
     NotMultipleOfQuantum,
 )
 
-if TYPE_CHECKING:
-    from .resources import AbstractComputeDevice
+log = BraceStyleAdapter(logging.getLogger(__name__))
+log_alloc_map: bool = False
+T = TypeVar("T")
 
 
 class AllocationStrategy(enum.Enum):
@@ -40,16 +32,11 @@ class AllocationStrategy(enum.Enum):
     EVENLY = 1
 
 
-@attr.s(auto_attribs=True)
+@attr.define()
 class DeviceSlotInfo:
     slot_type: SlotTypes
     slot_name: SlotName
     amount: Decimal
-
-
-log = BraceStyleAdapter(logging.getLogger(__name__))
-log_alloc_map: bool = False
-T = TypeVar("T")
 
 
 def distribute(num_items: int, groups: Sequence[T]) -> Mapping[T, int]:
@@ -67,56 +54,6 @@ def round_down(from_dec: Decimal, with_dec: Decimal):
     if remainder < 0:
         remainder += with_dec
     return from_dec - remainder
-
-
-class AffinityMap(nx.Graph):
-    def get_distance_ordered_neighbors(
-        self,
-        src_device: Optional[AbstractComputeDevice],
-        device_type: str,
-    ) -> Sequence[tuple[AbstractComputeDevice, int]]:
-        """
-        Get the list of neighbor devices and their distance from the given source device with the same type.
-        If the given sourec device is None, it will return the list of devices with the same type,
-        but the first largest connected component from the devices sharing the lowest distance values.
-        """
-        if src_device is not None:
-            neighbors = [
-                device for device in self.neighbors(src_device) if device.device_type == device_type
-            ]
-            neighbors.sort(key=lambda device: self.edges[src_device, device]["weight"])
-            return [(device, self.edges[src_device, device]["weight"]) for device in neighbors]
-        else:
-            distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
-            subgraph = nx.subgraph_view(
-                self,
-                filter_node=lambda device: device.device_type == device_type,
-            )
-            for u, v, weight in subgraph.edges.data("weight"):
-                distance_sets[weight].add_edge(u, v)
-            device_cluster_list = []
-            for distance, device_set in distance_sets.items():
-                components = nx.connected_components(device_set)
-                for component in components:
-                    device_cluster_list.append((distance, component))
-            device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
-            largest_component: list[tuple[AbstractComputeDevice, int]] = []
-            for distance, device_set in device_cluster_list[:1]:
-                for device in device_set:
-                    largest_component.append((device, distance))
-            return largest_component
-
-    @classmethod
-    def build(cls, devices: Sequence[AbstractComputeDevice]) -> AffinityMap:
-        g = cls()
-        for device1 in devices:
-            for device2 in devices:
-                g.add_edge(
-                    device1,
-                    device2,
-                    weight=abs((device2.numa_node or 0) - (device1.numa_node or 0)),
-                )
-        return g
 
 
 class AbstractAllocMap(metaclass=ABCMeta):
@@ -174,7 +111,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
     def allocate(
         self,
         slots: Mapping[SlotName, Decimal],
-        affinity_map: nx.Graph,
+        affinity_hint: AffinityHint,
         *,
         context_tag: Optional[str] = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
@@ -237,7 +174,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
     def allocate(
         self,
         slots: Mapping[SlotName, Decimal],
-        affinity_map: nx.Graph,
+        affinity_hint: AffinityHint,
         *,
         context_tag: Optional[str] = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
@@ -265,14 +202,14 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
 
         return self._allocate_impl[self.allocation_strategy](
             requested_slots,
-            affinity_map,
+            affinity_hint,
             context_tag=context_tag,
         )
 
     def _allocate_by_filling(
         self,
         requested_slots: Mapping[SlotName, Decimal],
-        affinity_map: nx.Graph,
+        affinity_hint: AffinityHint,
         *,
         context_tag: Optional[str] = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
@@ -322,7 +259,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
     def _allocate_evenly(
         self,
         requested_slots: Mapping[SlotName, Decimal],
-        affinity_map: nx.Graph,
+        affinity_hint: AffinityHint,
         *,
         context_tag: Optional[str] = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
@@ -424,7 +361,7 @@ class FractionAllocMap(AbstractAllocMap):
     def allocate(
         self,
         slots: Mapping[SlotName, Decimal],
-        affinity_map: nx.Graph,
+        affinity_hint: AffinityHint,
         *,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal("0.01"),
@@ -442,7 +379,7 @@ class FractionAllocMap(AbstractAllocMap):
 
         calculated_alloc_map = self._allocate_impl[self.allocation_strategy](
             requested_slots,
-            affinity_map,
+            affinity_hint,
             context_tag=context_tag,
             min_memory=min_memory,
         )
@@ -467,7 +404,7 @@ class FractionAllocMap(AbstractAllocMap):
     def _allocate_by_filling(
         self,
         requested_slots: Mapping[SlotName, Decimal],
-        affinity_map: nx.Graph,
+        affinity_hint: AffinityHint,
         *,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal(0.01),
@@ -528,7 +465,7 @@ class FractionAllocMap(AbstractAllocMap):
     def _allocate_evenly(
         self,
         requested_slots: Mapping[SlotName, Decimal],
-        affinity_map: nx.Graph,
+        affinity_hint: AffinityHint,
         *,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal(0.01),

@@ -62,7 +62,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.resources"))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attr.define(slots=True)
 class KernelResourceSpec:
     """
     This struct-like object stores the kernel resource allocation information
@@ -211,10 +211,10 @@ class KernelResourceSpec:
         return json.dumps(self.to_json_serializable_dict())
 
 
-@attr.s(auto_attribs=True, frozen=True)
+@attr.define(frozen=True)
 class AbstractComputeDevice:
     device_id: DeviceId
-    device_type: str
+    device_name: DeviceName
     hw_location: str  # either PCI bus ID or arbitrary string
     numa_node: Optional[int]  # NUMA node ID (None if not applicable)
     memory_size: int  # bytes of available per-accelerator memory
