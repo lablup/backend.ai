@@ -819,7 +819,11 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
             raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
         union_map: Dict[str, set] = defaultdict(set)
         for host, perms in [*self.items(), *other.items()]:
-            union_map[host] |= set(perms)
+            try:
+                perm_list = [VFolderHostPermission(perm) for perm in perms]
+            except ValueError:
+                raise ValueError(f"Invalid type. Permissions of Host `{host}` are ({perms})")
+            union_map[host] |= set(perm_list)
         return VFolderHostPermissionMap(union_map)
 
     def to_json(self) -> dict[str, Any]:
