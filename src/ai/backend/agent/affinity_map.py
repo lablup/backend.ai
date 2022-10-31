@@ -19,22 +19,71 @@ class AffinityHint:
 
 
 class AffinityMap(nx.Graph):
+    """
+    Represents the distance matrix of all device pairs from all compute device plugins.
+    """
+
     def get_distance_ordered_neighbors(
         self,
-        src_device: Optional[AbstractComputeDevice],
+        src_devices: Optional[Sequence[AbstractComputeDevice]],
         device_name: DeviceName,
-    ) -> Sequence[tuple[AbstractComputeDevice, int]]:
+    ) -> Sequence[Sequence[tuple[AbstractComputeDevice, int]]]:
         """
-        Get the list of neighbor devices and their distance from the given source device with the same type.
-        If the given sourec device is None, it will return the list of devices with the same type,
-        but the first largest connected component from the devices sharing the lowest distance values.
+        Get the list of neighbor device clusters and their distance from the given source_devices
+        with the same name.
+
+        Example:
+            Given a 4-core dual socket system:
+
+            If the prior allocator has assigned (gpu0@node0, gpu1@node1),
+            it will return (cpu0-3@node0, cpu4-7@node1).
+
+            If the prior allocator has assigned (gpu0@node0, gpu1@node0),
+            it will return (cpu0-3@node0) only.
+
+        If source_devices is None, it will return the first largest connected component from the
+        device distance matrix sharing the lowest distance values.
         """
-        if src_device is not None:
-            neighbors = [
-                device for device in self.neighbors(src_device) if device.device_name == device_name
-            ]
-            neighbors.sort(key=lambda device: self.edges[src_device, device]["weight"])
-            return [(device, self.edges[src_device, device]["weight"]) for device in neighbors]
+        if src_devices is not None:
+            neighbor_components = []
+            print("src_devices:", ",".join(d.device_id for d in src_devices))
+
+            zero_distance_components = nx.subgraph_view(
+                self,
+                filter_node=lambda v: v in src_devices,
+                filter_edge=lambda u, v: self.edges[u, v]["weight"] == 0,
+            )
+            for src_device_component in nx.connected_components(zero_distance_components):
+                src_device = next(iter(src_device_component))
+                print(f"for src_device {src_device}:")
+                distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
+                for v in self.neighbors(src_device):
+                    if v.device_name == device_name:
+                        weight = self.edges[src_device, v]["weight"]
+                        distance_sets[weight].add_edge(src_device, v, weight=weight)
+                device_cluster_list = []
+                for distance, device_set in distance_sets.items():
+                    components = nx.connected_components(device_set)
+                    for component in components:
+                        device_cluster_list.append((distance, component))
+                print("device_cluster_list", device_cluster_list)
+                # sort by: low distance first, large component first
+                device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
+                largest_component: list[tuple[AbstractComputeDevice, int]] = []
+                for distance, device_set in device_cluster_list[:1]:
+                    for device in device_set:
+                        if device == src_device:
+                            continue
+                        largest_component.append((device, distance))
+                neighbor_components.append(largest_component)
+            print(
+                "neighbor_components:",
+                ", ".join(
+                    "{" + ",".join(d.device_id for d, distance in c) + "}"
+                    for c in neighbor_components
+                ),
+            )
+            return neighbor_components
         else:
             distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
             subgraph = nx.subgraph_view(
@@ -48,15 +97,17 @@ class AffinityMap(nx.Graph):
                 components = nx.connected_components(device_set)
                 for component in components:
                     device_cluster_list.append((distance, component))
+            # sort by: low distance first, large component first
             device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
             largest_component: list[tuple[AbstractComputeDevice, int]] = []
             for distance, device_set in device_cluster_list[:1]:
                 for device in device_set:
                     largest_component.append((device, distance))
-            return largest_component
+            return [largest_component]
 
     @classmethod
     def build(cls, devices: Sequence[AbstractComputeDevice]) -> AffinityMap:
+        # TODO: allow compute plugins to customize distance calculation
         g = cls()
         for device1 in devices:
             for device2 in devices:

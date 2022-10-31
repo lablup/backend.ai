@@ -1,4 +1,4 @@
-from collections import defaultdict
+from typing import Sequence
 
 import attr
 
@@ -9,7 +9,16 @@ from ai.backend.common.types import DeviceId, DeviceName
 
 @attr.define(frozen=True)
 class DummyDevice(AbstractComputeDevice):
-    pass
+    def __str__(self) -> str:
+        return self.device_id
+
+    def __repr__(self) -> str:
+        # for simpler output of debug prints
+        return self.device_id
+
+
+def _devid(value: Sequence[tuple[AbstractComputeDevice, int]]) -> set[tuple[DeviceId, int]]:
+    return {(d.device_id, distance) for d, distance in value}
 
 
 def test_affinity_map():
@@ -31,30 +40,51 @@ def test_affinity_map():
     ]
     m = AffinityMap.build(devices)
 
-    largest_component = set()
-    for device, distance in m.get_distance_ordered_neighbors(None, DeviceName("cpu")):
-        largest_component.add(device.device_id)
-        assert distance == 0
-    assert largest_component == {"d0", "d1", "d2", "d3"}
+    print()
+    print("expecting: {d0,d1,d2,d3}")
+    neighbor_groups = m.get_distance_ordered_neighbors(
+        None,
+        DeviceName("cpu"),
+    )
+    assert _devid(neighbor_groups[0]) == {("d0", 0), ("d1", 0), ("d2", 0), ("d3", 0)}
+    print()
 
-    largest_component = set()
-    for device, distance in m.get_distance_ordered_neighbors(None, DeviceName("cuda")):
-        largest_component.add(device.device_id)
-        assert distance == 0
-    assert largest_component == {"x0"} or largest_component == {"x1"}
+    print("expecting: {x0} or {x1}")
+    neighbor_groups = m.get_distance_ordered_neighbors(
+        None,
+        DeviceName("cuda"),
+    )
+    assert _devid(neighbor_groups[0]) == {("x0", 0)} or _devid(neighbor_groups[0]) == {("x1", 0)}
+    print()
 
-    distance_sets = defaultdict(set)
-    for device, distance in m.get_distance_ordered_neighbors(devices[-1], DeviceName("cpu")):  # x1
-        distance_sets[distance].add(device.device_id)
-    assert distance_sets[0] == {"b0", "b1", "b2"}
+    print("expecting: {a0,a1,a2}")
+    neighbor_groups = m.get_distance_ordered_neighbors(
+        [devices[-2]],  # x0
+        DeviceName("cpu"),
+    )
+    assert _devid(neighbor_groups[0]) == {("a0", 0), ("a1", 0), ("a2", 0)}
+    print()
 
-    distance_sets = defaultdict(set)
-    for device, distance in m.get_distance_ordered_neighbors(devices[6], DeviceName("cpu")):  # c0
-        distance_sets[distance].add(device.device_id)
-    assert distance_sets[0] == {"c0", "c1"}
+    print("expecting: {b0,b1,b2}")
+    neighbor_groups = m.get_distance_ordered_neighbors(
+        [devices[-1]],  # x1
+        DeviceName("cpu"),
+    )
+    assert _devid(neighbor_groups[0]) == {("b0", 0), ("b1", 0), ("b2", 0)}
+    print()
 
-    distance_sets = defaultdict(set)
-    for device, distance in m.get_distance_ordered_neighbors(devices[0], DeviceName("cuda")):  # a0
-        distance_sets[distance].add(device.device_id)
-    assert distance_sets[0] == {"x0"}
-    assert distance_sets[1] == {"x1"}
+    print("expecting: {x0},{x1}")
+    neighbor_groups = m.get_distance_ordered_neighbors(
+        [devices[0], devices[1], devices[3], devices[4]],  # a0, a1, b0, b1 (two NUMA nodes)
+        DeviceName("cuda"),
+    )
+    assert _devid(neighbor_groups[0]) == {("x0", 0)}
+    assert _devid(neighbor_groups[1]) == {("x1", 0)}
+    print()
+
+    print("expecting: {x0}")
+    neighbor_groups = m.get_distance_ordered_neighbors(
+        [devices[0], devices[1]],  # a0, a1 (single NUMA node)
+        DeviceName("cuda"),
+    )
+    assert _devid(neighbor_groups[0]) == {("x0", 0)}

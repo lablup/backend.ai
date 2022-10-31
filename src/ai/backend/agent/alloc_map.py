@@ -12,7 +12,7 @@ from typing import FrozenSet, Iterable, Mapping, MutableMapping, Optional, Seque
 import attr
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import DeviceId, SlotName, SlotTypes
+from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
 
 from .affinity_map import AffinityHint
 from .exception import (
@@ -216,10 +216,27 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
         for slot_name, alloc in requested_slots.items():
             slot_allocation: dict[DeviceId, Decimal] = {}
-
+            device_name = DeviceName(slot_name.partition(".")[0])
+            neighbor_groups = affinity_hint.affinity_map.get_distance_ordered_neighbors(
+                affinity_hint.devices, device_name
+            )
+            # TODO: reimplement using neighbor groups
+            device_distances_dict = {d.device_id: distance for d, distance in neighbor_groups}
             sorted_dev_allocs = sorted(
-                self.allocations[slot_name].items(),  # k: slot_name, v: per-device alloc
-                key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
+                (
+                    (k, v)
+                    for k, v in self.allocations[
+                        slot_name
+                    ].items()  # k: slot_name, v: per-device alloc
+                    if self.device_slots[k] in device_distances_dict
+                ),
+                key=lambda pair: (
+                    # TODO: 1st sort key: neighbor group
+                    # 2nd sort key: NUMA distance to the base device (ascending)
+                    # 3rd sort key: remaining amount (descending)
+                    device_distances_dict[self.device_slots[pair[0]]],
+                    self.device_slots[pair[0]].amount - pair[1],
+                ),
                 reverse=True,
             )
 
@@ -254,6 +271,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 if remaining_alloc == 0:
                     break
             allocation[slot_name] = slot_allocation
+
+        # TODO: update affinity_hint.devices
         return allocation
 
     def _allocate_evenly(
