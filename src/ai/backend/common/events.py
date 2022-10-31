@@ -28,6 +28,7 @@ from typing import (
 )
 
 import attr
+from aiomonitor.task import preserve_termination_log
 from aiotools.context import aclosing
 from aiotools.server import process_index
 from aiotools.taskgroup import PersistentTaskGroup
@@ -778,6 +779,7 @@ class EventDispatcher(aobject):
             )
             await asyncio.sleep(0)
 
+    @preserve_termination_log
     async def _consume_loop(self) -> None:
         async with aclosing(
             redis_helper.read_stream_by_group(
@@ -803,6 +805,7 @@ class EventDispatcher(aobject):
                 except Exception:
                     log.exception("EventDispatcher.consume(): unexpected-error")
 
+    @preserve_termination_log
     async def _subscribe_loop(self) -> None:
         async with aclosing(
             redis_helper.read_stream(
