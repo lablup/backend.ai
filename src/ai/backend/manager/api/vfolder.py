@@ -32,7 +32,7 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import VFolderHostPermissionMap
+from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap
 
 from ..models import (
     AgentStatus,
@@ -357,7 +357,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     conn, resource_policy, domain_name, user_uuid
                 )
             # TODO: handle legacy host lists assuming that volume names don't overlap?
-            if folder_host not in allowed_hosts:
+            if (
+                folder_host not in allowed_hosts
+                or VFolderHostPermission.CREATE not in allowed_hosts[folder_host]
+            ):
                 raise InvalidAPIParameters("You are not allowed to use this vfolder host.")
 
         # Check resource policy's max_vfolder_count
@@ -655,6 +658,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         }
         for proxy_name, volume_data in all_volumes
         if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
+        and VFolderHostPermission.READ in allowed_hosts[f"{proxy_name}:{volume_data['name']}"]
     }
     resp = {
         "default": default_host,
