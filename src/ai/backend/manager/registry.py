@@ -119,6 +119,7 @@ from .models import (
     SessionDependencyRow,
     SessionRow,
     SessionStatus,
+    UserRow,
     agents,
     aggregate_kernel_status,
     kernels,
@@ -2124,20 +2125,37 @@ class AgentRegistry:
 
     async def download_file(
         self,
-        session_name_or_id: Union[str, SessionId],
+        session: SessionRow,
         access_key: AccessKey,
         filepath: str,
     ) -> bytes:
-        kernel = await self.get_session(session_name_or_id, access_key)
+        kernel = session.main_kernel
         async with self.handle_session_exception("download_file", kernel.session_id, access_key):
             async with RPCContext(
-                kernel["agent"],
-                kernel["agent_addr"],
+                kernel.agent,
+                kernel.agent_addr,
                 invoke_timeout=None,
-                order_key=kernel["id"],
+                order_key=kernel.id,
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                return await rpc.call.download_file(str(kernel["id"]), filepath)
+                return await rpc.call.download_file(str(kernel.id), filepath)
+
+    async def download_single(
+        self,
+        session: SessionRow,
+        access_key: AccessKey,
+        filepath: str,
+    ) -> bytes:
+        kernel = session.main_kernel
+        async with self.handle_session_exception("download_single", kernel.session_id, access_key):
+            async with RPCContext(
+                kernel.agent,
+                kernel.agent_addr,
+                invoke_timeout=None,
+                order_key=kernel.id,
+                keepalive_timeout=self.rpc_keepalive_timeout,
+            ) as rpc:
+                return await rpc.call.download_single(str(kernel.id), filepath)
 
     async def list_files(
         self,
@@ -2675,29 +2693,37 @@ class AgentRegistry:
     ) -> None:
         await self.clean_session(session_id)
 
+    async def _get_user_email(
+        self,
+        kernel: KernelRow,
+    ) -> str:
+        async with self.db.begin_readonly() as db_conn:
+            query = sa.select(UserRow.email).where(UserRow.uuid == kernel.user_uuid)
+            result = await db_conn.execute(query)
+            user_email = str(result.scalar())
+            user_email = user_email.replace("@", "_")
+        return user_email
+
     async def get_commit_status(
         self,
-        kernel_id: KernelId,
-        agent_id: AgentId,
-        agent_addr: str,
-        session_id: SessionId,
-        *,
-        sub_dir: str,
+        session: SessionRow,
     ) -> Mapping[str, str]:
-        async with self.handle_session_exception("commit_session", session_id):
+        kernel: KernelRow = session.main_kernel
+        if kernel.status != KernelStatus.RUNNING:
+            return {"status": "", "kernel": str(kernel.id)}
+        email = await self._get_user_email(kernel)
+        async with self.handle_session_exception("commit_session", session.id):
             async with RPCContext(
-                agent_id,
-                agent_addr,
+                kernel.agent_id,
+                kernel.agent_addr,
                 invoke_timeout=None,
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                return await rpc.call.get_commit_status(str(kernel_id), sub_dir)
+                return await rpc.call.get_commit_status(str(kernel.id), email)
 
     async def commit_session(
         self,
         session: SessionRow,
-        *,
-        sub_dir: str,
         filename: str | None,
     ) -> Mapping[str, Any]:
         """
@@ -2709,6 +2735,7 @@ class AgentRegistry:
             raise InvalidAPIParameters(
                 f"Unable to commit since kernel(id: {kernel.id}) of session(id: {session.id}) is currently not RUNNING."
             )
+        email = await self._get_user_email(kernel)
         now = datetime.now(tzutc()).strftime("%Y-%m-%dT%HH%MM%SS")
         shortend_sname = session.name[:SESSION_NAME_LEN_LIMIT]
         registry, _, filtered = kernel.image.partition("/")
@@ -2723,7 +2750,7 @@ class AgentRegistry:
                 order_key=kernel.id,
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                resp: Mapping[str, Any] = await rpc.call.commit(str(kernel.id), sub_dir, filename)
+                resp: Mapping[str, Any] = await rpc.call.commit(str(kernel.id), email, filename)
         return resp
 
     async def get_agent_local_config(

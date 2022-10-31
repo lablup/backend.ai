@@ -843,14 +843,11 @@ class ComputeSession(graphene.ObjectType):
         if self.status != "RUNNING":
             return None
         async with graph_ctx.db.begin_readonly_session() as db_sess:
-            query = sa.select(KernelRow).where(
-                (KernelRow.session_id == self.id) & (KernelRow.cluster_role == DEFAULT_ROLE)
+            session = await SessionRow.get_session_with_main_kernel(
+                self.id, self.access_key, db_session=db_sess
             )
-            kernel = (await db_sess.execute(query)).scalars().first()
-
         commit_status = await graph_ctx.registry.get_commit_status(
-            kernel.id,
-            self.access_key,
+            session,
         )
         return commit_status["status"]
 

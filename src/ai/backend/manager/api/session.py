@@ -108,7 +108,6 @@ from ..models import (
 from ..models import association_groups_users as agus
 from ..models import (
     domains,
-    get_user_email,
     groups,
     kernels,
     keypair_resource_policies,
@@ -1366,11 +1365,7 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
             session = await SessionRow.get_session_with_main_kernel(
                 session_name, owner_access_key, db_session=db_sess
             )
-            kernel = session.main_kernel
-            email = await get_user_email(db_sess, kernel)
-        status_info = await root_ctx.registry.get_commit_status(
-            kernel.id, kernel.agent, kernel.agent_addr, session.id, sub_dir=email
-        )
+        status_info = await root_ctx.registry.get_commit_status(session)
     except BackendError:
         log.exception("GET_COMMIT_STATUS: exception")
         raise
@@ -1443,11 +1438,10 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
             session = await SessionRow.get_session_with_main_kernel(
                 session_name, owner_access_key, db_session=db_sess
             )
-            email = await get_user_email(db_sess, session.main_kernel)
 
         resp: Mapping[str, Any] = await asyncio.shield(
             app_ctx.rpc_ptask_group.create_task(
-                root_ctx.registry.commit_session(session, sub_dir=email, filename=filename),
+                root_ctx.registry.commit_session(session, filename=filename),
             ),
         )
     except BackendError:
