@@ -1374,7 +1374,7 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
     except BackendError:
         log.exception("GET_COMMIT_STATUS: exception")
         raise
-    resp = {"stats": status_info["status"], "kernel": status_info["kernel"]}
+    resp = {"status": status_info["status"], "kernel": status_info["kernel"]}
     return web.json_response(resp, status=200)
 
 
@@ -2367,7 +2367,7 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
                 session_name, owner_access_key, db_session=db_sess
             )
         await root_ctx.registry.increment_session_usage(session)
-        result = await root_ctx.registry.download_file(session, file)
+        result = await root_ctx.registry.download_single(session, owner_access_key, file)
     except asyncio.CancelledError:
         raise
     except BackendError:

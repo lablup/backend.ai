@@ -1,1 +1,0 @@
-Prevent unhandled `read_stream` exception which leads to the stuck of newly created sessions in the `PREPARING` status.

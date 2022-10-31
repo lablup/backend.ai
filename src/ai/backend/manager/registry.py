@@ -204,6 +204,10 @@ async def RPCContext(
     order_key: str = None,
     keepalive_timeout: int = 60,
 ) -> AsyncIterator[PeerInvoker]:
+    if agent_id is None or addr is None:
+        raise InvalidAPIParameters(
+            f"expected valid agent id and agent address, got {agent_id=} and {addr=}"
+        )
     keepalive_retry_count = 3
     keepalive_interval = keepalive_timeout // keepalive_retry_count
     if keepalive_interval < 2:
@@ -360,6 +364,7 @@ class AgentRegistry:
             "shutdown_service": KernelExecutionFailed,
             "upload_file": KernelExecutionFailed,
             "download_file": KernelExecutionFailed,
+            "download_single": KernelExecutionFailed,
             "list_files": KernelExecutionFailed,
             "get_logs_from_agent": KernelExecutionFailed,
             "refresh_session": KernelExecutionFailed,
@@ -2119,18 +2124,20 @@ class AgentRegistry:
 
     async def download_file(
         self,
-        session: SessionRow,
+        session_name_or_id: Union[str, SessionId],
+        access_key: AccessKey,
         filepath: str,
     ) -> bytes:
-        async with self.handle_session_exception("download_file", session.id):
+        kernel = await self.get_session(session_name_or_id, access_key)
+        async with self.handle_session_exception("download_file", kernel.session_id, access_key):
             async with RPCContext(
-                session.main_kernel.agent,
-                session.main_kernel.agent_addr,
+                kernel["agent"],
+                kernel["agent_addr"],
                 invoke_timeout=None,
-                order_key=session.main_kernel.id,
+                order_key=kernel["id"],
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
-                return await rpc.call.download_file(str(session.main_kernel.id), filepath)
+                return await rpc.call.download_file(str(kernel["id"]), filepath)
 
     async def list_files(
         self,
@@ -2696,7 +2703,12 @@ class AgentRegistry:
         """
         Commit a main kernel's container of the given session.
         """
+
         kernel: KernelRow = session.main_kernel
+        if kernel.status != KernelStatus.RUNNING:
+            raise InvalidAPIParameters(
+                f"Unable to commit since kernel(id: {kernel.id}) of session(id: {session.id}) is currently not RUNNING."
+            )
         now = datetime.now(tzutc()).strftime("%Y-%m-%dT%HH%MM%SS")
         shortend_sname = session.name[:SESSION_NAME_LEN_LIMIT]
         registry, _, filtered = kernel.image.partition("/")

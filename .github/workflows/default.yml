@@ -1,6 +1,9 @@
 name: default
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+    types: [labeled, unlabeled, opened, synchronize, reopened]
 
 jobs:
   lint:
@@ -173,6 +176,8 @@ jobs:
     - uses: actions/checkout@v2
       with:
         submodules: true
+    - name: Fetch remote tags
+      run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Apply cache for Pants
       uses: actions/cache@v3
       id: cache

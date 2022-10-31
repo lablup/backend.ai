@@ -48,7 +48,7 @@ from .base import (
     batch_result_in_session,
 )
 from .group import GroupRow
-from .kernel import ComputeContainer, KernelRow, KernelStatus, get_user_email
+from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import UserRow
@@ -847,10 +847,10 @@ class ComputeSession(graphene.ObjectType):
                 (KernelRow.session_id == self.id) & (KernelRow.cluster_role == DEFAULT_ROLE)
             )
             kernel = (await db_sess.execute(query)).scalars().first()
-            email = await get_user_email(db_sess, kernel)
 
         commit_status = await graph_ctx.registry.get_commit_status(
-            kernel.id, kernel.agent, kernel.agent_addr, self.id, sub_dir=email
+            kernel.id,
+            self.access_key,
         )
         return commit_status["status"]
 

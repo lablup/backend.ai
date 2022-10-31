@@ -811,6 +811,9 @@ async def simple_db_mutate(
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
         return result_cls(False, f"integrity error: {e}")
+    except sa.exc.StatementError as e:
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
@@ -870,6 +873,9 @@ async def simple_db_mutate_returning_item(
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
         return result_cls(False, f"integrity error: {e}", None)
+    except sa.exc.StatementError as e:
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
