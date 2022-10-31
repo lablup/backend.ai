@@ -21,6 +21,7 @@ from .exception import (
     InvalidResourceArgument,
     InvalidResourceCombination,
     NotMultipleOfQuantum,
+    ResourceError,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -245,8 +246,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             slot_allocation: dict[DeviceId, Decimal] = {}
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
             if log_alloc_map:
-                log.debug("DiscretePropertyAllocMap: allocating {} {}", slot_name, alloc)
-                log.debug("DiscretePropertyAllocMap: current-alloc: {!r}", sorted_dev_allocs)
+                log.debug("DiscretePropertyAllocMap(FILL): allocating {} {}", slot_name, alloc)
+                log.debug("DiscretePropertyAllocMap(FILL): current-alloc: {!r}", sorted_dev_allocs)
 
             total_allocatable = int(0)
             remaining_alloc = Decimal(alloc).normalize()
@@ -276,7 +277,6 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                     break
             allocation[slot_name] = slot_allocation
 
-        # TODO: update affinity_hint.devices
         return allocation
 
     def _allocate_evenly(
@@ -291,8 +291,17 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         for slot_name, requested_alloc in requested_slots.items():
             new_alloc: MutableMapping[DeviceId, Decimal] = defaultdict(Decimal)
             remaining_alloc = int(Decimal(requested_alloc))
+            if log_alloc_map:
+                log.debug(
+                    "DiscretePropertyAllocMap(EVENLY): allocating {} {}", slot_name, requested_alloc
+                )
 
+            repeats = 0
             while remaining_alloc > 0:
+                # prevent infinite loop
+                if repeats >= 100:
+                    raise ResourceError("too many repeats until allocation")
+
                 # calculate remaining slots per device
                 total_allocatable = int(
                     sum(
@@ -310,10 +319,16 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                         str(total_allocatable),
                     )
 
+                sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
+                if log_alloc_map and repeats == 0:
+                    log.debug(
+                        "DiscretePropertyAllocMap(EVENLY): current-alloc: {!r}", sorted_dev_allocs
+                    )
+
                 # calculate the amount to spread out
                 nonzero_devs = [
                     dev_id
-                    for dev_id, current_alloc in self.allocations[slot_name].items()
+                    for dev_id, current_alloc in sorted_dev_allocs
                     if self.device_slots[dev_id].amount - current_alloc - new_alloc[dev_id] > 0
                 ]
                 initial_diffs = distribute(remaining_alloc, nonzero_devs)
@@ -326,7 +341,6 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 }
 
                 # distribute the remainig alloc to the remaining slots.
-                sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
                 for dev_id, current_alloc in sorted_dev_allocs:
                     diff = diffs[dev_id]
                     new_alloc[dev_id] += diff
@@ -334,9 +348,13 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                     if remaining_alloc == 0:
                         break
 
+                repeats += 1
+
             for dev_id, allocated in new_alloc.items():
                 self.allocations[slot_name][dev_id] += allocated
             allocation[slot_name] = {k: v for k, v in new_alloc.items() if v > 0}
+            if log_alloc_map:
+                log.debug("DiscretePropertyAllocMap(EVENLY): new-alloc: {!r}", new_alloc)
 
         return allocation
 
@@ -436,8 +454,8 @@ class FractionAllocMap(AbstractAllocMap):
             sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
 
             if log_alloc_map:
-                log.debug("FractionAllocMap: allocating {} {}", slot_name, alloc)
-                log.debug("FractionAllocMap: current-alloc: {!r}", sorted_dev_allocs)
+                log.debug("FractionAllocMap(FILL): allocating {} {}", slot_name, alloc)
+                log.debug("FractionAllocMap(FILL): current-alloc: {!r}", sorted_dev_allocs)
 
             slot_type = self.slot_types.get(slot_name, SlotTypes.COUNT)
             if slot_type in (SlotTypes.COUNT, SlotTypes.BYTES):
@@ -572,8 +590,8 @@ class FractionAllocMap(AbstractAllocMap):
             )
 
             if log_alloc_map:
-                log.debug("FractionAllocMap: allocating {} {}", slot_name, alloc)
-                log.debug("FractionAllocMap: current-alloc: {!r}", sorted_dev_allocs)
+                log.debug("FractionAllocMap(EVENLY): allocating {} {}", slot_name, alloc)
+                log.debug("FractionAllocMap(EVENLY): current-alloc: {!r}", sorted_dev_allocs)
 
             # check if there is enough resource for allocation
             total_allocatable = Decimal(0)

@@ -48,10 +48,10 @@ class AffinityMap(nx.Graph):
                 largest_component.append((device, distance))
         return largest_component
 
-    def get_largest_device_cluster_with_lowest_distance(
+    def get_device_clusters_with_lowest_distance(
         self,
         device_name: DeviceName,
-    ) -> Sequence[tuple[AbstractComputeDevice, int]]:
+    ) -> Sequence[Sequence[tuple[AbstractComputeDevice, int]]]:
         distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
         subgraph = nx.subgraph_view(
             self,
@@ -62,15 +62,16 @@ class AffinityMap(nx.Graph):
         device_cluster_list = []
         for distance, device_set in distance_sets.items():
             components = nx.connected_components(device_set)
+            device_cluster = []
+            if distance > 0:
+                continue
             for component in components:
-                device_cluster_list.append((distance, component))
-        # sort by: low distance first, large component first
-        device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
-        largest_component: list[tuple[AbstractComputeDevice, int]] = []
-        for distance, device_set in device_cluster_list[:1]:
-            for device in device_set:
-                largest_component.append((device, distance))
-        return largest_component
+                for device in component:
+                    device_cluster.append((device, distance))
+            device_cluster_list.append(device_cluster)
+        # sort by: large component first
+        device_cluster_list.sort(key=lambda device_cluster: -len(device_cluster))
+        return device_cluster_list
 
     def get_distance_ordered_neighbors(
         self,
@@ -124,8 +125,8 @@ class AffinityMap(nx.Graph):
             #   - If we do interleaved allocation for the first device type,
             #     all subsequent alloactions for other device types will automatically
             #     do interleaving because we use neighbor groups.
-            largest_component = self.get_largest_device_cluster_with_lowest_distance(device_name)
-            return [largest_component]
+            components = self.get_device_clusters_with_lowest_distance(device_name)
+            return components
 
     @classmethod
     def build(cls, devices: Sequence[AbstractComputeDevice]) -> AffinityMap:

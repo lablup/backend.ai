@@ -1458,6 +1458,8 @@ class AbstractAgent(
         if not restarting:
             alloc_order = [  # TODO: make it configurable
                 DeviceName("cuda"),
+                DeviceName("rocm"),
+                DeviceName("tpu"),
                 DeviceName("cpu"),
                 DeviceName("mem"),
             ]
