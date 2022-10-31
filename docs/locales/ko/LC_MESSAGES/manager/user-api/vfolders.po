@@ -26,7 +26,7 @@ msgstr "가상 폴더"
 msgid ""
 "Virtual folders provide access to shared, persistent, and reused files "
 "across different sessions."
-msgstr "가상 폴더는 여러 다른 세션애서 공유되며, 지속적이고, 재사용 가능한 파일을 제공합니다."
+msgstr "가상 폴더는 여러 다른 세션에서 공유되며, 지속적이고, 재사용 가능한 파일을 제공합니다."
 
 #: ../../manager/user-api/vfolders.rst:7 2b0b10a2cf3d4446aa1f63f1252d4105
 msgid ""
