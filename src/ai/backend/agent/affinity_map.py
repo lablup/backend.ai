@@ -23,6 +23,55 @@ class AffinityMap(nx.Graph):
     Represents the distance matrix of all device pairs from all compute device plugins.
     """
 
+    def get_largest_device_cluster_with_lowest_distance_from_src_device(
+        self,
+        device_name: DeviceName,
+        src_device: AbstractComputeDevice,
+    ) -> Sequence[tuple[AbstractComputeDevice, int]]:
+        distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
+        for v in self.neighbors(src_device):
+            if v.device_name == device_name:
+                weight = self.edges[src_device, v]["weight"]
+                distance_sets[weight].add_edge(src_device, v, weight=weight)
+        device_cluster_list = []
+        for distance, device_set in distance_sets.items():
+            components = nx.connected_components(device_set)
+            for component in components:
+                device_cluster_list.append((distance, component))
+        # sort by: low distance first, large component first
+        device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
+        largest_component: list[tuple[AbstractComputeDevice, int]] = []
+        for distance, device_set in device_cluster_list[:1]:
+            for device in device_set:
+                if device == src_device:
+                    continue
+                largest_component.append((device, distance))
+        return largest_component
+
+    def get_largest_device_cluster_with_lowest_distance(
+        self,
+        device_name: DeviceName,
+    ) -> Sequence[tuple[AbstractComputeDevice, int]]:
+        distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
+        subgraph = nx.subgraph_view(
+            self,
+            filter_node=lambda device: device.device_name == device_name,
+        )
+        for u, v, weight in subgraph.edges.data("weight"):
+            distance_sets[weight].add_edge(u, v)
+        device_cluster_list = []
+        for distance, device_set in distance_sets.items():
+            components = nx.connected_components(device_set)
+            for component in components:
+                device_cluster_list.append((distance, component))
+        # sort by: low distance first, large component first
+        device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
+        largest_component: list[tuple[AbstractComputeDevice, int]] = []
+        for distance, device_set in device_cluster_list[:1]:
+            for device in device_set:
+                largest_component.append((device, distance))
+        return largest_component
+
     def get_distance_ordered_neighbors(
         self,
         src_devices: Optional[Sequence[AbstractComputeDevice]],
@@ -46,63 +95,36 @@ class AffinityMap(nx.Graph):
         """
         if src_devices is not None:
             neighbor_components = []
-            print("src_devices:", ",".join(d.device_id for d in src_devices))
-
+            # print("src_devices:", ",".join(d.device_id for d in src_devices))
             zero_distance_components = nx.subgraph_view(
                 self,
                 filter_node=lambda v: v in src_devices,
                 filter_edge=lambda u, v: self.edges[u, v]["weight"] == 0,
             )
             for src_device_component in nx.connected_components(zero_distance_components):
+                # take the first device in this neighbor group
                 src_device = next(iter(src_device_component))
-                print(f"for src_device {src_device}:")
-                distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
-                for v in self.neighbors(src_device):
-                    if v.device_name == device_name:
-                        weight = self.edges[src_device, v]["weight"]
-                        distance_sets[weight].add_edge(src_device, v, weight=weight)
-                device_cluster_list = []
-                for distance, device_set in distance_sets.items():
-                    components = nx.connected_components(device_set)
-                    for component in components:
-                        device_cluster_list.append((distance, component))
-                print("device_cluster_list", device_cluster_list)
-                # sort by: low distance first, large component first
-                device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
-                largest_component: list[tuple[AbstractComputeDevice, int]] = []
-                for distance, device_set in device_cluster_list[:1]:
-                    for device in device_set:
-                        if device == src_device:
-                            continue
-                        largest_component.append((device, distance))
+                largest_component = (
+                    self.get_largest_device_cluster_with_lowest_distance_from_src_device(
+                        device_name,
+                        src_device,
+                    )
+                )
                 neighbor_components.append(largest_component)
-            print(
-                "neighbor_components:",
-                ", ".join(
-                    "{" + ",".join(d.device_id for d, distance in c) + "}"
-                    for c in neighbor_components
-                ),
-            )
+            # print(
+            #     "neighbor_components:",
+            #     ", ".join(
+            #         "{" + ",".join(d.device_id for d, distance in c) + "}"
+            #         for c in neighbor_components
+            #     ),
+            # )
             return neighbor_components
         else:
-            distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
-            subgraph = nx.subgraph_view(
-                self,
-                filter_node=lambda device: device.device_name == device_name,
-            )
-            for u, v, weight in subgraph.edges.data("weight"):
-                distance_sets[weight].add_edge(u, v)
-            device_cluster_list = []
-            for distance, device_set in distance_sets.items():
-                components = nx.connected_components(device_set)
-                for component in components:
-                    device_cluster_list.append((distance, component))
-            # sort by: low distance first, large component first
-            device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
-            largest_component: list[tuple[AbstractComputeDevice, int]] = []
-            for distance, device_set in device_cluster_list[:1]:
-                for device in device_set:
-                    largest_component.append((device, distance))
+            # TODO: implement the interleaving policy
+            #   - If we do interleaved allocation for the first device type,
+            #     all subsequent alloactions for other device types will automatically
+            #     do interleaving because we use neighbor groups.
+            largest_component = self.get_largest_device_cluster_with_lowest_distance(device_name)
             return [largest_component]
 
     @classmethod

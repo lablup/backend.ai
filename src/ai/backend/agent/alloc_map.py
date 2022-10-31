@@ -10,6 +10,7 @@ from decimal import ROUND_DOWN, Decimal
 from typing import FrozenSet, Iterable, Mapping, MutableMapping, Optional, Sequence, TypeVar
 
 import attr
+import more_itertools
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
@@ -106,6 +107,32 @@ class AbstractAllocMap(metaclass=ABCMeta):
             for device_id, alloc in per_device_alloc.items():
                 bufs.append(f"  {device_id}: {alloc}")
         return "\n".join(bufs)
+
+    def get_current_allocations(
+        self, affinity_hint: AffinityHint, slot_name: SlotName
+    ) -> Sequence[tuple[DeviceId, Decimal]]:
+        device_name = DeviceName(slot_name.partition(".")[0])
+        neighbor_groups = affinity_hint.affinity_map.get_distance_ordered_neighbors(
+            affinity_hint.devices, device_name
+        )
+        neighbor_sorted_dev_allocs = []
+        for neighbors in neighbor_groups:
+            neighbor_device_ids = {d.device_id for d, distance in neighbors}
+            neighbor_sorted_dev_alloc = sorted(
+                (
+                    (device_id, alloc)
+                    for device_id, alloc in self.allocations[slot_name].items()
+                    if device_id in neighbor_device_ids
+                ),
+                key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
+                reverse=True,
+            )
+            neighbor_sorted_dev_allocs.append(neighbor_sorted_dev_alloc)
+        sorted_dev_allocs = [
+            (device_id, alloc)
+            for device_id, alloc in more_itertools.interleave(*neighbor_sorted_dev_allocs)
+        ]
+        return sorted_dev_allocs
 
     @abstractmethod
     def allocate(
@@ -216,30 +243,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
         for slot_name, alloc in requested_slots.items():
             slot_allocation: dict[DeviceId, Decimal] = {}
-            device_name = DeviceName(slot_name.partition(".")[0])
-            neighbor_groups = affinity_hint.affinity_map.get_distance_ordered_neighbors(
-                affinity_hint.devices, device_name
-            )
-            # TODO: reimplement using neighbor groups
-            device_distances_dict = {d.device_id: distance for d, distance in neighbor_groups}
-            sorted_dev_allocs = sorted(
-                (
-                    (k, v)
-                    for k, v in self.allocations[
-                        slot_name
-                    ].items()  # k: slot_name, v: per-device alloc
-                    if self.device_slots[k] in device_distances_dict
-                ),
-                key=lambda pair: (
-                    # TODO: 1st sort key: neighbor group
-                    # 2nd sort key: NUMA distance to the base device (ascending)
-                    # 3rd sort key: remaining amount (descending)
-                    device_distances_dict[self.device_slots[pair[0]]],
-                    self.device_slots[pair[0]].amount - pair[1],
-                ),
-                reverse=True,
-            )
-
+            sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
             if log_alloc_map:
                 log.debug("DiscretePropertyAllocMap: allocating {} {}", slot_name, alloc)
                 log.debug("DiscretePropertyAllocMap: current-alloc: {!r}", sorted_dev_allocs)
@@ -322,11 +326,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 }
 
                 # distribute the remainig alloc to the remaining slots.
-                sorted_dev_allocs = sorted(
-                    self.allocations[slot_name].items(),  # k: slot_name, v: per-device alloc
-                    key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
-                    reverse=True,
-                )
+                sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
                 for dev_id, current_alloc in sorted_dev_allocs:
                     diff = diffs[dev_id]
                     new_alloc[dev_id] += diff
@@ -433,11 +433,7 @@ class FractionAllocMap(AbstractAllocMap):
             slot_allocation: MutableMapping[DeviceId, Decimal] = {}
 
             # fill up starting from the most free devices
-            sorted_dev_allocs = sorted(
-                self.allocations[slot_name].items(),
-                key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
-                reverse=True,
-            )
+            sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
 
             if log_alloc_map:
                 log.debug("FractionAllocMap: allocating {} {}", slot_name, alloc)
@@ -565,11 +561,7 @@ class FractionAllocMap(AbstractAllocMap):
         for slot_name, alloc in requested_slots.items():
             slot_allocation: MutableMapping[DeviceId, Decimal] = {}
             remaining_alloc = Decimal(alloc).normalize()
-            sorted_dev_allocs = sorted(
-                self.allocations[slot_name].items(),
-                key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
-                reverse=True,
-            )
+            sorted_dev_allocs = self.get_current_allocations(affinity_hint, slot_name)
 
             # do not consider devices whose remaining resource under min_memory
             sorted_dev_allocs = list(
