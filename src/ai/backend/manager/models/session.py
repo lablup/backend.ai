@@ -168,7 +168,7 @@ def _build_session_fetch_query(
     eager_loading_op: Iterable | None = None,
 ):
     cond = base_cond
-    if access_key is not None:
+    if access_key:
         cond = cond & (SessionRow.access_key == access_key)
     if not allow_stale:
         cond = cond & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
@@ -185,7 +185,7 @@ def _build_session_fetch_query(
     if do_ordering:
         query = query.order_by(SessionRow.created_at)
 
-    if eager_loading_op is not None:
+    if eager_loading_op:
         query = query.options(*eager_loading_op)
 
     return query
