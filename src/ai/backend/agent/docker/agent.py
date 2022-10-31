@@ -31,6 +31,7 @@ from typing import (
     Union,
 )
 
+import aiohttp
 import aiotools
 import pkg_resources
 import zmq
@@ -867,6 +868,15 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def __ainit__(self) -> None:
         async with closing_async(Docker()) as docker:
+            docker_host = ""
+            match docker.connector:
+                case aiohttp.TCPConnector():
+                    docker_host = docker.docker_host
+                case aiohttp.NamedPipeConnector() | aiohttp.UnixConnector() as connector:
+                    docker_host = connector.path
+                case _:
+                    docker_host = "(unknown)"
+            log.info("accessing the local Docker daemon via {}", docker_host)
             if not self._skip_initial_scan:
                 docker_version = await docker.version()
                 log.info(
