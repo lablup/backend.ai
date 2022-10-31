@@ -1659,7 +1659,11 @@ class AbstractAgent(
             KernelStartedEvent(
                 kernel_id,
                 creation_id,
-                creation_info=kernel_creation_info,
+                creation_info={
+                    **kernel_creation_info,
+                    "id": str(KernelId(kernel_id)),
+                    "container_id": str(kernel_obj["container_id"]),
+                },
             ),
         )
 
@@ -1672,7 +1676,6 @@ class AbstractAgent(
 
         # The startup command for the batch-type sessions will be executed by the manager
         # upon firing of the "session_started" event.
-
         return kernel_creation_info
 
     @abstractmethod

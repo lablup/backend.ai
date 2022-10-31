@@ -1378,6 +1378,18 @@ class AgentRegistry:
             # Record kernel access information
             try:
                 async with self.db.begin() as conn:
+                    kernel_query = (
+                        sa.select(kernels.c.status)
+                        .where(kernels.c.id == created_info["id"])
+                        .with_for_update(skip_locked=True)
+                    )
+                    current_status = (await conn.execute(kernel_query)).scalar()
+                    # current_status is None when kernel_query is locked by concurrent query.
+                    if (
+                        current_status is None
+                        or KernelStatus.RUNNING not in KERNEL_STATUS_TRANSITION_MAP[current_status]
+                    ):
+                        return
                     agent_host = URL(created_info["agent_addr"]).host
                     kernel_host = created_info.get("kernel_host", agent_host)
                     service_ports = created_info.get("service_ports", [])
@@ -1408,7 +1420,7 @@ class AgentRegistry:
                     values["occupied_slots"] = actual_allocs
                     self._kernel_actual_allocated_resources[created_info["id"]] = actual_allocs
                     update_query = (
-                        kernels.update().values(values).where(kernels.c.id == created_info["id"])
+                        sa.update(kernels).values(values).where(kernels.c.id == created_info["id"])
                     )
                     await conn.execute(update_query)
             except Exception:
@@ -1532,6 +1544,8 @@ class AgentRegistry:
                             "internal_data": scheduled_session.internal_data,
                             "auto_pull": auto_pull,
                             "preopen_ports": scheduled_session.preopen_ports,
+                            "agent_addr": binding.agent_alloc_ctx.agent_addr,
+                            "scaling_group": binding.agent_alloc_ctx.scaling_group,
                         }
                         for binding in items
                     ],

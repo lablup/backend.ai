@@ -202,6 +202,12 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
             KernelStatus.TERMINATED,
         )
     },
+    KernelStatus.RUNNING: {
+        KernelStatus.RESTARTING,
+        KernelStatus.RESIZING,
+        KernelStatus.TERMINATING,
+        KernelStatus.ERROR,
+    },
     KernelStatus.RESTARTING: {
         s
         for s in KernelStatus
