@@ -21,6 +21,34 @@ def _devid(value: Sequence[tuple[AbstractComputeDevice, int]]) -> set[tuple[Devi
     return {(d.device_id, distance) for d, distance in value}
 
 
+def test_affinity_map_init():
+    # only a single device
+    devices = [
+        DummyDevice(DeviceId("a0"), DeviceName("cpu"), "", 0, 0, 1),
+    ]
+    m = AffinityMap.build(devices)
+    neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
+    assert _devid(neighbor_groups[0]) == {("a0", 0)}
+
+    # numa_node is None
+    devices = [
+        DummyDevice(DeviceId("a0"), DeviceName("cpu"), "", None, 0, 1),
+        DummyDevice(DeviceId("a1"), DeviceName("cpu"), "", None, 0, 1),
+    ]
+    m = AffinityMap.build(devices)
+    neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
+    assert _devid(neighbor_groups[0]) == {("a0", 0), ("a1", 0)}
+
+    # numa_node is -1 (cloud instances)
+    devices = [
+        DummyDevice(DeviceId("a0"), DeviceName("cpu"), "", -1, 0, 1),
+        DummyDevice(DeviceId("a1"), DeviceName("cpu"), "", -1, 0, 1),
+    ]
+    m = AffinityMap.build(devices)
+    neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
+    assert _devid(neighbor_groups[0]) == {("a0", 0), ("a1", 0)}
+
+
 def test_affinity_map():
     devices = [
         DummyDevice(DeviceId("a0"), DeviceName("cpu"), "", 0, 0, 1),
@@ -40,66 +68,58 @@ def test_affinity_map():
     ]
     m = AffinityMap.build(devices)
 
-    print()
-    print("expecting: {d0,d1,d2,d3}")
+    # expecting: {d0,d1,d2,d3}
     neighbor_groups = m.get_distance_ordered_neighbors(
         None,
         DeviceName("cpu"),
     )
     assert _devid(neighbor_groups[0]) == {("d0", 0), ("d1", 0), ("d2", 0), ("d3", 0)}
-    print()
 
-    print("expecting: {x0} or {x1}")
+    # expecting: {x0} or {x1}
     neighbor_groups = m.get_distance_ordered_neighbors(
         None,
         DeviceName("cuda"),
     )
     assert _devid(neighbor_groups[0]) == {("x0", 0)} or _devid(neighbor_groups[0]) == {("x1", 0)}
-    print()
 
-    print("expecting: {a0,a1,a2}")
+    # expecting: {a0,a1,a2}
     neighbor_groups = m.get_distance_ordered_neighbors(
         [devices[-2]],  # x0
         DeviceName("cpu"),
     )
     assert _devid(neighbor_groups[0]) == {("a0", 0), ("a1", 0), ("a2", 0)}
-    print()
 
-    print("expecting: {b0,b1,b2}")
+    # expecting: {b0,b1,b2}
     neighbor_groups = m.get_distance_ordered_neighbors(
         [devices[-1]],  # x1
         DeviceName("cpu"),
     )
     assert _devid(neighbor_groups[0]) == {("b0", 0), ("b1", 0), ("b2", 0)}
-    print()
 
-    print("expecting: {a0,a1,a2},{b0,b1,b2}")
+    # expecting: {a0,a1,a2},{b0,b1,b2}
     neighbor_groups = m.get_distance_ordered_neighbors(
         [devices[-2], devices[-1]],  # x0, x1
         DeviceName("cpu"),
     )
     assert _devid(neighbor_groups[0]) == {("a0", 0), ("a1", 0), ("a2", 0)}
     assert _devid(neighbor_groups[1]) == {("b0", 0), ("b1", 0), ("b2", 0)}
-    print()
 
-    print("expecting: {b0,b1,b2}")
+    # expecting: {b0,b1,b2}
     neighbor_groups = m.get_distance_ordered_neighbors(
         [devices[-1]],  # x1
         DeviceName("cpu"),
     )
     assert _devid(neighbor_groups[0]) == {("b0", 0), ("b1", 0), ("b2", 0)}
-    print()
 
-    print("expecting: {x0},{x1}")
+    # expecting: {x0},{x1}
     neighbor_groups = m.get_distance_ordered_neighbors(
         [devices[0], devices[1], devices[3], devices[4]],  # a0, a1, b0, b1 (two NUMA nodes)
         DeviceName("cuda"),
     )
     assert _devid(neighbor_groups[0]) == {("x0", 0)}
     assert _devid(neighbor_groups[1]) == {("x1", 0)}
-    print()
 
-    print("expecting: {x0}")
+    # expecting: {x0}
     neighbor_groups = m.get_distance_ordered_neighbors(
         [devices[0], devices[1]],  # a0, a1 (single NUMA node)
         DeviceName("cuda"),
