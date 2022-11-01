@@ -1201,7 +1201,7 @@ class AbstractAgent(
                             KernelId(UUID(body["ID"])),
                             ContainerId(body["CID"]),
                             LifecycleEvent.DESTROY,
-                            body.get("reason", KernelLifecycleEventReason.ANOMALY_DETECTED),
+                            KernelLifecycleEventReason.get_or_anomaly_detected(body.get("reason")),
                         )
                         await self.loop.run_in_executor(None, _rm, reported_kernel)
                     else:

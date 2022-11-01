@@ -210,9 +210,18 @@ class KernelLifecycleEventReason(str, enum.Enum):
     TASK_TIMEOUT = "task-timeout"
     TASK_CANCELLED = "task-cancelled"
     TASK_FINISHED = "task-finished"
+    TEMP = ""
     TERMINATED_UNKNOWN_CONTAINER = "terminated-unknown-container"
     UNKNOWN = "unknown"
     USER_REQUESTED = "user-requested"
+
+    @classmethod
+    def get_or_anomaly_detected(cls, reason: Optional[str]):
+        if reason:
+            cls.TEMP = reason
+            return cls.TEMP
+        else:
+            return cls.ANOMALY_DETECTED
 
 
 @attr.s(slots=True, frozen=True)
