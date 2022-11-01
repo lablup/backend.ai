@@ -214,11 +214,18 @@ class KernelResourceSpec:
 @attr.define(frozen=True)
 class AbstractComputeDevice:
     device_id: DeviceId
-    device_name: DeviceName
     hw_location: str  # either PCI bus ID or arbitrary string
     numa_node: Optional[int]  # NUMA node ID (None if not applicable)
     memory_size: int  # bytes of available per-accelerator memory
     processing_units: int  # number of processing units (e.g., cores, SMP)
+    device_name: DeviceName = attr.field()
+
+    @device_name.default
+    def _generate_default_device_name(self):
+        # It is recommended to explicitly set `device_name` but this is for
+        # legacy compute-device plugins.
+        # e.g., "CPUDevice" -> "cpu", "CUDADevice" -> "cuda"
+        return self.__class__.__name__.removesuffix("Device").lower()
 
 
 class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
