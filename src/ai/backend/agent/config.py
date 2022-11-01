@@ -83,7 +83,8 @@ agent_local_config_iv = (
                         "allocation-order", default=["cuda", "rocm", "tpu", "cpu", "mem"]
                     ): t.List(t.String),
                     t.Key("affinity-policy", default=AffinityPolicy.INTERLEAVED): tx.Enum(
-                        AffinityPolicy
+                        AffinityPolicy,
+                        use_name=True,
                     ),
                 }
             ).allow_extra("*"),

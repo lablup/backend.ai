@@ -155,8 +155,8 @@ class AbstractAllocMap(metaclass=ABCMeta):
         else:
             # After the first device type allocation, we should interleave *ALWAYS*
             # for when the first device type allocation result has devices from multiple NUMA nodes.
-            # (e.g., even with the PREFER_SINGLE_NODE policy, there may be device from multiple NUMA
-            # nodes if the requested amount exceeds the device availability of a single node)
+            # (e.g., even with the PREFER_SINGLE_NODE policy, there may be devices from multiple
+            # NUMA nodes if the requested amount exceeds the device availability of a single node)
             iter_func = more_itertools.interleave_longest
         sorted_dev_allocs: list[tuple[DeviceId, Decimal]] = [
             (device_id, alloc) for device_id, alloc in iter_func(*neighbor_sorted_dev_allocs)
