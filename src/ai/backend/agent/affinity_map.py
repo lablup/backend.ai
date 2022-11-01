@@ -37,7 +37,7 @@ class AffinityMap(nx.Graph):
     ) -> Sequence[tuple[AbstractComputeDevice, int]]:
         distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
         for v in self.neighbors(src_device):
-            if v.device_name == device_name:
+            if v.device_name() == device_name:
                 weight = self.edges[src_device, v]["weight"]
                 distance_sets[weight].add_edge(src_device, v, weight=weight)
         device_cluster_list = []
@@ -60,22 +60,18 @@ class AffinityMap(nx.Graph):
         device_name: DeviceName,
     ) -> Sequence[Sequence[tuple[AbstractComputeDevice, int]]]:
         weight = 0
-        while True:
-            subgraph = nx.subgraph_view(
-                self,
-                filter_node=lambda u: u.device_name == device_name,
-                filter_edge=lambda u, v: self.edges[u, v]["weight"] == weight,
-            )
-            components = nx.connected_components(subgraph)
-            device_cluster_list = []
-            for component in components:
-                device_cluster = []
-                for device in component:
-                    device_cluster.append((device, weight))
-                device_cluster_list.append(device_cluster)
-            if device_cluster_list:
-                break
-            weight += 1
+        subgraph = nx.subgraph_view(
+            self,
+            filter_node=lambda u: u.device_name() == device_name,
+            filter_edge=lambda u, v: self.edges[u, v]["weight"] == weight,
+        )
+        components = nx.connected_components(subgraph)
+        device_cluster_list = []
+        for component in components:
+            device_cluster = []
+            for device in component:
+                device_cluster.append((device, weight))
+            device_cluster_list.append(device_cluster)
         # sort by: large component first
         device_cluster_list.sort(key=lambda device_cluster: -len(device_cluster))
         return device_cluster_list

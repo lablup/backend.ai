@@ -119,7 +119,6 @@ class CPUPlugin(AbstractComputePlugin):
         return [
             CPUDevice(
                 device_id=DeviceId(str(core_idx)),
-                device_name=DeviceName("cpu"),
                 hw_location="root",
                 numa_node=libnuma.node_of_cpu(core_idx),
                 memory_size=0,
@@ -352,7 +351,6 @@ class MemoryPlugin(AbstractComputePlugin):
         return [
             MemoryDevice(
                 device_id=DeviceId("root"),
-                device_name=DeviceName("mem"),
                 hw_location="root",
                 numa_node=0,  # the kernel setting will do the job.
                 memory_size=overcommit_factor * memory_size,

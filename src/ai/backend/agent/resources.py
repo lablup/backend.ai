@@ -218,14 +218,15 @@ class AbstractComputeDevice:
     numa_node: Optional[int]  # NUMA node ID (None if not applicable)
     memory_size: int  # bytes of available per-accelerator memory
     processing_units: int  # number of processing units (e.g., cores, SMP)
-    device_name: DeviceName = attr.field()
 
-    @device_name.default
-    def _generate_default_device_name(self):
-        # It is recommended to explicitly set `device_name` but this is for
-        # legacy compute-device plugins.
+    def device_name(self) -> DeviceName:
+        # It is recommended to explicitly override this -- this is to
+        # avoid modification of existing compute-device plugins.
         # e.g., "CPUDevice" -> "cpu", "CUDADevice" -> "cuda"
-        return self.__class__.__name__.removesuffix("Device").lower()
+        # The reason to make this a method is to avoid attr.field() with factory/default
+        # does not allow mixing non-kw-only fields coming after it, meaning that
+        # we need to anyway modify the existing plugin codes.
+        return DeviceName(self.__class__.__name__.removesuffix("Device").lower())
 
 
 class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
