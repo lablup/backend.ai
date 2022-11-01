@@ -103,7 +103,6 @@ class AffinityMap(nx.Graph):
         """
         if src_devices is not None:
             neighbor_components = []
-            # print("src_devices:", ",".join(d.device_id for d in src_devices))
             zero_distance_components = nx.subgraph_view(
                 self,
                 filter_node=lambda v: v in src_devices,
@@ -119,19 +118,8 @@ class AffinityMap(nx.Graph):
                     )
                 )
                 neighbor_components.append(largest_component)
-            # print(
-            #     "neighbor_components:",
-            #     ", ".join(
-            #         "{" + ",".join(d.device_id for d, distance in c) + "}"
-            #         for c in neighbor_components
-            #     ),
-            # )
             return neighbor_components
         else:
-            # TODO: implement the interleaving policy
-            #   - If we do interleaved allocation for the first device type,
-            #     all subsequent alloactions for other device types will automatically
-            #     do interleaving because we use neighbor groups.
             components = self.get_device_clusters_with_lowest_distance(device_name)
             return components
 
