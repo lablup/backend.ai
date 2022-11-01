@@ -144,7 +144,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
             case AffinityPolicy.PREFER_SINGLE_NODE:
                 iter_func = itertools.chain
             case AffinityPolicy.INTERLEAVED:
-                iter_func = more_itertools.interleave
+                iter_func = more_itertools.interleave_longest
         sorted_dev_allocs: list[tuple[DeviceId, Decimal]] = [
             (device_id, alloc) for device_id, alloc in iter_func(*neighbor_sorted_dev_allocs)
         ]
