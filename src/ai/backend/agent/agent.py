@@ -112,7 +112,7 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
-from .affinity_map import AffinityHint, AffinityMap, AffinityPolicy
+from .affinity_map import AffinityHint, AffinityMap
 from .exception import AgentError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
@@ -597,7 +597,6 @@ class AbstractAgent(
             all_devices.extend(devices)
             alloc_map = await computer.create_alloc_map()
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
-        # TODO: build affinity map
         self.affinity_map = AffinityMap.build(all_devices)
 
         if not self._skip_initial_scan:
@@ -1456,16 +1455,13 @@ class AbstractAgent(
             dev_names.add(DeviceName(dev_name))
 
         if not restarting:
-            alloc_order = [  # TODO: make it configurable
-                DeviceName("cuda"),
-                DeviceName("rocm"),
-                DeviceName("tpu"),
-                DeviceName("cpu"),
-                DeviceName("mem"),
+            alloc_order = [
+                DeviceName(name) for name in self.local_config["resource"]["allocation-order"]
             ]
             ordered_dev_names = sorted(dev_names, key=lambda item: alloc_order.index(item))
-            # TODO: make the affinity policy configurable
-            affinity_hint = AffinityHint(None, self.affinity_map, AffinityPolicy.INTERLEAVED)
+            affinity_hint = AffinityHint(
+                None, self.affinity_map, self.local_config["resource"]["affinity-policy"]
+            )
             async with self.resource_lock:
                 for dev_name in ordered_dev_names:
                     computer_set = self.computers[dev_name]

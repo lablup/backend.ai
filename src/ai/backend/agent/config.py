@@ -5,6 +5,7 @@ import trafaret as t
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 
+from .affinity_map import AffinityPolicy
 from .stats import StatModes
 from .types import AgentBackend
 
@@ -78,6 +79,12 @@ agent_local_config_iv = (
                     t.Key("reserved-cpu", default=1): t.Int,
                     t.Key("reserved-mem", default="1G"): tx.BinarySize,
                     t.Key("reserved-disk", default="8G"): tx.BinarySize,
+                    t.Key(
+                        "allocation-order", default=["cuda", "rocm", "tpu", "cpu", "mem"]
+                    ): t.List(t.String),
+                    t.Key("affinity-policy", default=AffinityPolicy.INTERLEAVED): tx.Enum(
+                        AffinityPolicy
+                    ),
                 }
             ).allow_extra("*"),
             t.Key("debug"): t.Dict(

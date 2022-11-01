@@ -243,6 +243,13 @@ reserved-mem = "1G"
 # This will be subtracted from the resource capacity reported to the manager.
 reserved-disk = "8G"
 
+# The order of device allocation.
+allocation-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+
+# How we mix up devices from multiple different NUMA nodes?
+# Options: PREFER_SINGLE_NODE, INTERLEAVED
+affinity-policy = "INTERLEAVED"
+
 
 [debug]
 # Enable or disable the debug-level logging.
