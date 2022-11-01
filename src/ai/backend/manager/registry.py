@@ -874,11 +874,10 @@ class AgentRegistry:
                 kernel_enqueue_configs[0]["cluster_idx"] = 1
                 kernel_enqueue_configs[0]["local_rank"] = 0
                 for i in range(cluster_size - 1):
-                    increased_index = i + 1
                     sub_kernel_config = cast(KernelEnqueueingConfig, {**kernel_enqueue_configs[0]})
                     sub_kernel_config["cluster_role"] = "sub"
-                    sub_kernel_config["cluster_idx"] = increased_index
-                    sub_kernel_config["local_rank"] = increased_index
+                    sub_kernel_config["cluster_idx"] = i + 1
+                    sub_kernel_config["local_rank"] = i
                     sub_kernel_config["cluster_hostname"] = sub_kernel_config["cluster_role"] + str(
                         sub_kernel_config["cluster_idx"]
                     )
