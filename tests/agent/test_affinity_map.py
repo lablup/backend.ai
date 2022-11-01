@@ -1,7 +1,6 @@
 from typing import Sequence
 
 import attr
-import more_itertools
 
 from ai.backend.agent.affinity_map import AffinityMap
 from ai.backend.agent.resources import AbstractComputeDevice
@@ -81,11 +80,6 @@ def test_affinity_map():
     )
     assert _devid(neighbor_groups[0]) == {("a0", 0), ("a1", 0), ("a2", 0)}
     assert _devid(neighbor_groups[1]) == {("b0", 0), ("b1", 0), ("b2", 0)}
-    print(neighbor_groups)
-    neighbor_order_index = [
-        d.device_id for d, distance in more_itertools.interleave(*neighbor_groups)
-    ]
-    print("interleaved:", neighbor_order_index)
     print()
 
     print("expecting: {b0,b1,b2}")

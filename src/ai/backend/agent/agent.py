@@ -1478,7 +1478,7 @@ class AbstractAgent(
                     try:
                         resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
                             device_specific_slots,
-                            affinity_hint,
+                            affinity_hint=affinity_hint,
                             context_tag=dev_name,
                         )
                         log.debug(

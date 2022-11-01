@@ -27,7 +27,7 @@ class AffinityHint:
 
 class AffinityMap(nx.Graph):
     """
-    Represents the distance matrix of all device pairs from all compute device plugins.
+    Represents the NUMA distance matrix of all device pairs from all compute device plugins.
     """
 
     def get_largest_device_cluster_with_lowest_distance_from_src_device(
@@ -59,22 +59,17 @@ class AffinityMap(nx.Graph):
         self,
         device_name: DeviceName,
     ) -> Sequence[Sequence[tuple[AbstractComputeDevice, int]]]:
-        distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
         subgraph = nx.subgraph_view(
             self,
-            filter_node=lambda device: device.device_name == device_name,
+            filter_node=lambda u: u.device_name == device_name,
+            filter_edge=lambda u, v: self.edges[u, v]["weight"] == 0,
         )
-        for u, v, weight in subgraph.edges.data("weight"):
-            distance_sets[weight].add_edge(u, v)
+        components = nx.connected_components(subgraph)
         device_cluster_list = []
-        for distance, device_set in distance_sets.items():
-            components = nx.connected_components(device_set)
+        for component in components:
             device_cluster = []
-            if distance > 0:
-                continue
-            for component in components:
-                for device in component:
-                    device_cluster.append((device, distance))
+            for device in component:
+                device_cluster.append((device, 0))
             device_cluster_list.append(device_cluster)
         # sort by: large component first
         device_cluster_list.sort(key=lambda device_cluster: -len(device_cluster))
@@ -105,7 +100,7 @@ class AffinityMap(nx.Graph):
             neighbor_components = []
             zero_distance_components = nx.subgraph_view(
                 self,
-                filter_node=lambda v: v in src_devices,
+                filter_node=lambda u: u in src_devices,
                 filter_edge=lambda u, v: self.edges[u, v]["weight"] == 0,
             )
             for src_device_component in nx.connected_components(zero_distance_components):

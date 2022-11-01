@@ -120,9 +120,15 @@ class AbstractAllocMap(metaclass=ABCMeta):
         return "\n".join(bufs)
 
     def get_current_allocations(
-        self, affinity_hint: AffinityHint, slot_name: SlotName
+        self, affinity_hint: Optional[AffinityHint], slot_name: SlotName
     ) -> Sequence[tuple[DeviceId, Decimal]]:
         device_name = DeviceName(slot_name.partition(".")[0])
+        if affinity_hint is None:  # for legacy
+            return sorted(
+                self.allocations[slot_name].items(),  # k: slot_name, v: per-device alloc
+                key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
+                reverse=True,
+            )
         neighbor_groups = affinity_hint.affinity_map.get_distance_ordered_neighbors(
             affinity_hint.devices, device_name
         )
@@ -154,8 +160,8 @@ class AbstractAllocMap(metaclass=ABCMeta):
     def allocate(
         self,
         slots: Mapping[SlotName, Decimal],
-        affinity_hint: AffinityHint,
         *,
+        affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         """
@@ -217,8 +223,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
     def allocate(
         self,
         slots: Mapping[SlotName, Decimal],
-        affinity_hint: AffinityHint,
         *,
+        affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         # prune zero alloc slots
@@ -245,15 +251,15 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
 
         return self._allocate_impl[self.allocation_strategy](
             requested_slots,
-            affinity_hint,
+            affinity_hint=affinity_hint,
             context_tag=context_tag,
         )
 
     def _allocate_by_filling(
         self,
         requested_slots: Mapping[SlotName, Decimal],
-        affinity_hint: AffinityHint,
         *,
+        affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
@@ -297,8 +303,8 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
     def _allocate_evenly(
         self,
         requested_slots: Mapping[SlotName, Decimal],
-        affinity_hint: AffinityHint,
         *,
+        affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
         allocation: dict[SlotName, dict[DeviceId, Decimal]] = {}
@@ -413,8 +419,8 @@ class FractionAllocMap(AbstractAllocMap):
     def allocate(
         self,
         slots: Mapping[SlotName, Decimal],
-        affinity_hint: AffinityHint,
         *,
+        affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal("0.01"),
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
@@ -431,7 +437,7 @@ class FractionAllocMap(AbstractAllocMap):
 
         calculated_alloc_map = self._allocate_impl[self.allocation_strategy](
             requested_slots,
-            affinity_hint,
+            affinity_hint=affinity_hint,
             context_tag=context_tag,
             min_memory=min_memory,
         )
@@ -456,8 +462,8 @@ class FractionAllocMap(AbstractAllocMap):
     def _allocate_by_filling(
         self,
         requested_slots: Mapping[SlotName, Decimal],
-        affinity_hint: AffinityHint,
         *,
+        affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal(0.01),
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
@@ -513,8 +519,8 @@ class FractionAllocMap(AbstractAllocMap):
     def _allocate_evenly(
         self,
         requested_slots: Mapping[SlotName, Decimal],
-        affinity_hint: AffinityHint,
         *,
+        affinity_hint: Optional[AffinityHint] = None,
         context_tag: Optional[str] = None,
         min_memory: Decimal = Decimal(0.01),
     ) -> Mapping[SlotName, Mapping[DeviceId, Decimal]]:
