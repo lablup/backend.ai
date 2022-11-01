@@ -112,7 +112,7 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
-from .affinity_map import AffinityHint, AffinityMap
+from .affinity_map import AffinityHint, AffinityMap, AffinityPolicy
 from .exception import AgentError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
@@ -1464,7 +1464,8 @@ class AbstractAgent(
                 DeviceName("mem"),
             ]
             ordered_dev_names = sorted(dev_names, key=lambda item: alloc_order.index(item))
-            affinity_hint = AffinityHint(None, self.affinity_map)
+            # TODO: make the affinity policy configurable
+            affinity_hint = AffinityHint(None, self.affinity_map, AffinityPolicy.INTERLEAVED)
             async with self.resource_lock:
                 for dev_name in ordered_dev_names:
                     computer_set = self.computers[dev_name]
@@ -1488,7 +1489,9 @@ class AbstractAgent(
                             dev_name
                         ].items():
                             hint_devices.extend(device_id_map[k] for k in per_device_alloc.keys())
-                        affinity_hint = AffinityHint(hint_devices, self.affinity_map)
+                        affinity_hint = AffinityHint(
+                            hint_devices, self.affinity_map, affinity_hint.policy
+                        )
                     except ResourceError as e:
                         log.info(
                             "resource allocation failed ({}): {} of {}\n" "(alloc map: {})",

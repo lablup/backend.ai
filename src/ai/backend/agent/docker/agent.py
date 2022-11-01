@@ -871,6 +871,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             docker_host = ""
             match docker.connector:
                 case aiohttp.TCPConnector():
+                    assert docker.docker_host is not None
                     docker_host = docker.docker_host
                 case aiohttp.NamedPipeConnector() | aiohttp.UnixConnector() as connector:
                     docker_host = connector.path

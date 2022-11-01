@@ -2,12 +2,22 @@ from __future__ import annotations
 
 import enum
 import fnmatch
+import itertools
 import logging
 import operator
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from decimal import ROUND_DOWN, Decimal
-from typing import FrozenSet, Iterable, Mapping, MutableMapping, Optional, Sequence, TypeVar
+from typing import (
+    Callable,
+    FrozenSet,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Sequence,
+    TypeVar,
+)
 
 import attr
 import more_itertools
@@ -15,7 +25,7 @@ import more_itertools
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DeviceId, DeviceName, SlotName, SlotTypes
 
-from .affinity_map import AffinityHint
+from .affinity_map import AffinityHint, AffinityPolicy
 from .exception import (
     InsufficientResource,
     InvalidResourceArgument,
@@ -129,9 +139,14 @@ class AbstractAllocMap(metaclass=ABCMeta):
                 reverse=True,
             )
             neighbor_sorted_dev_allocs.append(neighbor_sorted_dev_alloc)
-        sorted_dev_allocs = [
-            (device_id, alloc)
-            for device_id, alloc in more_itertools.interleave(*neighbor_sorted_dev_allocs)
+        iter_func: Callable
+        match affinity_hint.policy:
+            case AffinityPolicy.PREFER_SINGLE_NODE:
+                iter_func = itertools.chain
+            case AffinityPolicy.INTERLEAVED:
+                iter_func = more_itertools.interleave
+        sorted_dev_allocs: list[tuple[DeviceId, Decimal]] = [
+            (device_id, alloc) for device_id, alloc in iter_func(*neighbor_sorted_dev_allocs)
         ]
         return sorted_dev_allocs
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 from collections import defaultdict
 from typing import TYPE_CHECKING, Optional, Sequence
 
@@ -12,10 +13,16 @@ if TYPE_CHECKING:
     from .resources import AbstractComputeDevice
 
 
+class AffinityPolicy(enum.Enum):
+    PREFER_SINGLE_NODE = 0
+    INTERLEAVED = 1
+
+
 @attr.define()
 class AffinityHint:
     devices: Optional[Sequence[AbstractComputeDevice]]
     affinity_map: AffinityMap
+    policy: AffinityPolicy
 
 
 class AffinityMap(nx.Graph):
