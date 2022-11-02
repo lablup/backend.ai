@@ -134,7 +134,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
         )
         neighbor_sorted_dev_allocs = []
         for neighbors in neighbor_groups:
-            neighbor_device_ids = {d.device_id for d, distance in neighbors}
+            neighbor_device_ids = {d.device_id for d in neighbors}
             neighbor_sorted_dev_alloc = sorted(
                 (
                     (device_id, alloc)

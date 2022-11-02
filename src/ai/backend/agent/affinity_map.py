@@ -38,7 +38,7 @@ class AffinityMap(nx.Graph):
         self,
         device_name: DeviceName,
         src_device: AbstractComputeDevice,
-    ) -> Sequence[tuple[AbstractComputeDevice, int]]:
+    ) -> Sequence[AbstractComputeDevice]:
         distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
         for v in self.neighbors(src_device):
             if v.device_name == device_name:
@@ -51,19 +51,20 @@ class AffinityMap(nx.Graph):
                 device_cluster_list.append((distance, component))
         # sort by: low distance first, large component first
         device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
-        largest_component: list[tuple[AbstractComputeDevice, int]] = []
+        largest_component: list[AbstractComputeDevice] = []
         for distance, device_set in device_cluster_list[:1]:
             for device in device_set:
                 if device == src_device:
                     continue
-                largest_component.append((device, distance))
+                largest_component.append(device)
         return largest_component
 
     def get_device_clusters_with_lowest_distance(
         self,
         device_name: DeviceName,
-    ) -> Sequence[Sequence[tuple[AbstractComputeDevice, int]]]:
+    ) -> Sequence[Sequence[AbstractComputeDevice]]:
         device_cluster_list = []
+        # FIXME: this is the intended logic but causes infinite loop.
         # for weight in range(self.max_weight + 1):
         for weight in [0]:
             subgraph = nx.subgraph_view(
@@ -76,16 +77,13 @@ class AffinityMap(nx.Graph):
                 device_cluster_list.append((weight, component))
         # sort by: low distance first, large component first
         device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
-        return [
-            [(device, distance) for device in device_set]
-            for distance, device_set in device_cluster_list
-        ]
+        return [device_set for distance, device_set in device_cluster_list]
 
     def get_distance_ordered_neighbors(
         self,
         src_devices: Optional[Sequence[AbstractComputeDevice]],
         device_name: DeviceName,
-    ) -> Sequence[Sequence[tuple[AbstractComputeDevice, int]]]:
+    ) -> Sequence[Sequence[AbstractComputeDevice]]:
         """
         Get the list of neighbor device clusters and their distance from the given source_devices
         with the same name.
