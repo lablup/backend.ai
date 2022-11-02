@@ -59,7 +59,7 @@ def parse_api_version(value: str) -> Tuple[int, str]:
 T = TypeVar("T")
 
 
-def default_clean(v: Union[str, Mapping]) -> T:
+def default_clean(v: T | Any) -> T:
     return cast(T, v)
 
 
