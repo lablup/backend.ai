@@ -93,6 +93,7 @@ from ai.backend.common.types import (
     ClusterInfo,
     ContainerId,
     DeviceId,
+    DeviceModelInfo,
     DeviceName,
     HardwareMetadata,
     ImageRegistry,
@@ -1522,11 +1523,18 @@ class AbstractAgent(
         await ctx.process_mounts(resource_spec.mounts)
 
         # Get attached devices information (including model_name).
-        attached_devices = {}
+        serialized_attached_devices = {}
         for dev_name, device_alloc in resource_spec.allocations.items():
             computer_set = self.computers[dev_name]
             devices = await computer_set.instance.get_attached_devices(device_alloc)
-            attached_devices[dev_name] = devices
+            serialized_attached_devices[dev_name] = [
+                DeviceModelInfo(
+                    device_id=str(device_info["device_id"]),
+                    model_name=device_info["model_name"],
+                    data=device_info["data"],
+                )
+                for device_info in devices
+            ]
 
         exposed_ports = [2000, 2001]
         service_ports = []
@@ -1685,7 +1693,7 @@ class AbstractAgent(
             "service_ports": service_ports,
             "container_id": kernel_obj["container_id"],
             "resource_spec": resource_spec.to_json_serializable_dict(),
-            "attached_devices": attached_devices,
+            "attached_devices": serialized_attached_devices,
         }
 
     @abstractmethod
