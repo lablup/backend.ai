@@ -35,7 +35,7 @@ from ..api.exceptions import (
     ObjectNotFound,
     TooManyKernelsFound,
 )
-from .acl import VFolderPermission
+from .acl import VFolderAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
@@ -488,7 +488,7 @@ class Queries(graphene.ObjectType):
     )
 
     permissions = graphene.Field(
-        VFolderPermission,
+        VFolderAtomicPermission,
     )
 
     @staticmethod
@@ -1413,12 +1413,12 @@ class Queries(graphene.ObjectType):
             raise TooManyKernelsFound
 
     @staticmethod
-    async def resolve_permission(
+    async def resolve_permissions(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
-    ) -> VFolderPermission:
+    ) -> VFolderAtomicPermission:
         graph_ctx: GraphQueryContext = info.context
-        return await VFolderPermission.load_all(graph_ctx)
+        return await VFolderAtomicPermission.load_all(graph_ctx)
 
 
 class GQLMutationPrivilegeCheckMiddleware:
