@@ -110,7 +110,7 @@ class DoTerminateSessionEvent(AbstractEvent):
     name = "do_terminate_session"
 
     session_id: SessionId = attr.ib()
-    reason: str = attr.ib()
+    reason: KernelLifecycleEventReason = attr.ib()
 
     def serialize(self) -> tuple:
         return (
@@ -219,6 +219,10 @@ class KernelLifecycleEventReason(str, enum.Enum):
         if reason:
             return reason
         return cls.ANOMALY_DETECTED
+
+    @staticmethod
+    def idle_checker_name(checker_name: str):
+        return f"idle-{checker_name}"
 
 
 @attr.s(slots=True, frozen=True)
