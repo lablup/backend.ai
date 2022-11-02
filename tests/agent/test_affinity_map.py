@@ -1,7 +1,6 @@
 from typing import Sequence
 
 import attrs
-import networkx as nx
 
 from ai.backend.agent.affinity_map import AffinityMap
 from ai.backend.agent.resources import AbstractComputeDevice
