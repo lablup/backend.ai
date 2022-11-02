@@ -211,16 +211,20 @@ class KernelResourceSpec:
         return json.dumps(self.to_json_serializable_dict())
 
 
-@attr.define(frozen=True)
+@attr.define(frozen=True, auto_attribs=True)
 class AbstractComputeDevice:
     device_id: DeviceId
+    device_name: DeviceName = attr.field(
+        kw_only=True
+    )  # should be same to the slot name's prefix part
     hw_location: str  # either PCI bus ID or arbitrary string
     numa_node: Optional[int]  # NUMA node ID (None if not applicable)
     memory_size: int  # bytes of available per-accelerator memory
     processing_units: int  # number of processing units (e.g., cores, SMP)
 
-    def device_name(self) -> DeviceName:
-        # It is recommended to explicitly override this -- this is to
+    @device_name.default
+    def _device_name(self) -> DeviceName:
+        # It is recommended to explicitly set this attribute -- this is to
         # avoid modification of existing compute-device plugins.
         # e.g., "CPUDevice" -> "cpu", "CUDADevice" -> "cuda"
         # The reason to make this a method is to avoid attr.field() with factory/default

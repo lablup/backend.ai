@@ -351,6 +351,7 @@ class MemoryPlugin(AbstractComputePlugin):
         return [
             MemoryDevice(
                 device_id=DeviceId("root"),
+                device_name=self.key,
                 hw_location="root",
                 numa_node=0,  # the kernel setting will do the job.
                 memory_size=overcommit_factor * memory_size,

@@ -1,14 +1,17 @@
 from typing import Sequence
 
-import attr
+import attrs
+import networkx as nx
 
 from ai.backend.agent.affinity_map import AffinityMap
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId, DeviceName
 
 
-@attr.define(frozen=True)
-class CPUDevice(AbstractComputeDevice):
+@attrs.define()
+class DummyDevice(AbstractComputeDevice):
+    extra_prop1: str = attrs.field(default="zzz")
+
     def __str__(self) -> str:
         return self.device_id
 
@@ -17,8 +20,10 @@ class CPUDevice(AbstractComputeDevice):
         return self.device_id
 
 
-@attr.define(frozen=True)
-class CUDADevice(AbstractComputeDevice):
+@attrs.define()
+class CPUDevice(AbstractComputeDevice):
+    extra_prop1: str = attrs.field(default="yyy")
+
     def __str__(self) -> str:
         return self.device_id
 
@@ -29,6 +34,35 @@ class CUDADevice(AbstractComputeDevice):
 
 def _devid(value: Sequence[tuple[AbstractComputeDevice, int]]) -> set[tuple[DeviceId, int]]:
     return {(d.device_id, distance) for d, distance in value}
+
+
+def test_custom_device_class():
+    # should be hashable
+    device0 = CPUDevice(DeviceId("1"), "", 0, 0, 1)
+    hash(device0)
+    assert device0.device_name == "cpu"
+
+    device1 = DummyDevice(DeviceId("x"), "", 0, 0, 1)
+    hash(device1)
+    assert device1.device_name == "dummy"
+
+    device1s = DummyDevice(DeviceId("x"), "", 0, 0, 1)
+    assert device1s.device_name == "dummy"
+
+    assert device1 == device1s
+    assert hash(device1) == hash(device1s)
+    assert id(device1) != (device1s)
+
+    device2 = DummyDevice(DeviceId("x"), "", 0, 0, 1, device_name=DeviceName("accel"))
+    assert device2.device_name == "accel"
+
+    assert device1 != device2
+    assert hash(device1) != hash(device2)
+    assert id(device1) != (device2)
+
+    g = AffinityMap.build([device0, device1, device1s, device2])
+    print([*g.edges()])
+    assert g.size() == 6
 
 
 def test_affinity_map_init():
@@ -61,20 +95,20 @@ def test_affinity_map_init():
 
 def test_affinity_map():
     devices = [
-        CPUDevice(DeviceId("a0"), "", 0, 0, 1),
-        CPUDevice(DeviceId("a1"), "", 0, 0, 1),
-        CPUDevice(DeviceId("a2"), "", 0, 0, 1),
-        CPUDevice(DeviceId("b0"), "", 1, 0, 1),
-        CPUDevice(DeviceId("b1"), "", 1, 0, 1),
-        CPUDevice(DeviceId("b2"), "", 1, 0, 1),
-        CPUDevice(DeviceId("c0"), "", 2, 0, 1),
-        CPUDevice(DeviceId("c1"), "", 2, 0, 1),
-        CPUDevice(DeviceId("d0"), "", 3, 0, 1),
-        CPUDevice(DeviceId("d1"), "", 3, 0, 1),
-        CPUDevice(DeviceId("d2"), "", 3, 0, 1),
-        CPUDevice(DeviceId("d3"), "", 3, 0, 1),
-        CUDADevice(DeviceId("x0"), "", 0, 0, 1),
-        CUDADevice(DeviceId("x1"), "", 1, 0, 1),
+        DummyDevice(DeviceId("a0"), "", 0, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("a1"), "", 0, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("a2"), "", 0, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b0"), "", 1, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b1"), "", 1, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b2"), "", 1, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("c0"), "", 2, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("c1"), "", 2, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d0"), "", 3, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d1"), "", 3, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d2"), "", 3, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d3"), "", 3, 0, 1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("x0"), "", 0, 0, 1, device_name=DeviceName("cuda")),
+        DummyDevice(DeviceId("x1"), "", 1, 0, 1, device_name=DeviceName("cuda")),
     ]
     m = AffinityMap.build(devices)
 
