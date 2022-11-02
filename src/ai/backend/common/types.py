@@ -825,7 +825,7 @@ class ClusterSSHKeyPair(TypedDict):
 
 
 class DeviceModelInfo(TypedDict):
-    device_id: DeviceId
+    device_id: DeviceId | str
     model_name: str
     data: Mapping[str, Any]
 
