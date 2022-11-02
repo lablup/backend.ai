@@ -88,7 +88,10 @@ def list(ctx: CLIContext, domain_name) -> None:
 @click.option("-i", "--inactive", is_flag=True, help="New group will be inactive.")
 @click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
 @click.option(
-    "--allowed-vfolder-hosts", type=str, multiple=True, help="Allowed virtual folder hosts."
+    "--allowed-vfolder-hosts",
+    type=str,
+    default="{}",
+    help="Allowed virtual folder hosts.",
 )
 def add(
     ctx: CLIContext,
@@ -143,9 +146,7 @@ def add(
 @click.option("-d", "--description", type=str, help="Description of the group")
 @click.option("--is-active", type=bool, help="Set group inactive.")
 @click.option("--total-resource-slots", type=str, help="Update total resource slots.")
-@click.option(
-    "--allowed-vfolder-hosts", type=str, multiple=True, help="Allowed virtual folder hosts."
-)
+@click.option("--allowed-vfolder-hosts", type=str, help="Allowed virtual folder hosts.")
 def update(
     ctx: CLIContext, gid, name, description, is_active, total_resource_slots, allowed_vfolder_hosts
 ):

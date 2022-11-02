@@ -137,7 +137,7 @@ class Group(BaseFunction):
         description: str = "",
         is_active: bool = True,
         total_resource_slots: str = None,
-        allowed_vfolder_hosts: Iterable[str] = None,
+        allowed_vfolder_hosts: str = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -183,7 +183,7 @@ class Group(BaseFunction):
         description: str = None,
         is_active: bool = None,
         total_resource_slots: str = None,
-        allowed_vfolder_hosts: Iterable[str] = None,
+        allowed_vfolder_hosts: str = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:

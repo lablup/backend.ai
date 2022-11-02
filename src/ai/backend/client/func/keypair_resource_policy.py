@@ -54,7 +54,7 @@ class KeypairResourcePolicy(BaseFunction):
         max_vfolder_count: int,
         max_vfolder_size: int,
         idle_timeout: int,
-        allowed_vfolder_hosts: Sequence[str],
+        allowed_vfolder_hosts: str = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
@@ -102,7 +102,7 @@ class KeypairResourcePolicy(BaseFunction):
         max_vfolder_count: int,
         max_vfolder_size: int,
         idle_timeout: int,
-        allowed_vfolder_hosts: Sequence[str],
+        allowed_vfolder_hosts: str = None,
     ) -> dict:
         """
         Updates an existing keypair resource policy with the given options.
