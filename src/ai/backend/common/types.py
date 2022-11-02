@@ -827,7 +827,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
         return VFolderHostPermissionMap(union_map)
 
     def to_json(self) -> dict[str, Any]:
-        return {host: [perm.name for perm in perms] for host, perms in self.items()}
+        return {host: [perm.value for perm in perms] for host, perms in self.items()}
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
