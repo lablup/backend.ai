@@ -9,7 +9,7 @@ from .base import BaseFunction, api_function
 
 __all__ = ("Permission",)
 
-_default_list_fields = (permission_fields["vfolder_permission_list"],)
+_default_list_fields = (permission_fields["vfolder_host_permission_list"],)
 
 
 class Permission(BaseFunction):

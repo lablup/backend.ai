@@ -417,7 +417,7 @@ class Queries(graphene.ObjectType):
     )
 
     # super-admin only
-    vfolder_permission_list = graphene.Field(
+    vfolder_host_permission_list = graphene.Field(
         VirtualFolderPermissionList,
         limit=graphene.Int(required=True),
         offset=graphene.Int(required=True),
@@ -1207,7 +1207,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
-    async def resolve_vfolder_permission_list(
+    async def resolve_vfolder_host_permission_list(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         limit: int,

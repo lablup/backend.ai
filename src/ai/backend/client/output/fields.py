@@ -295,6 +295,6 @@ vfolder_fields = FieldSet(
 
 permission_fields = FieldSet(
     [
-        FieldSpec("vfolder_permission_list"),
+        FieldSpec("vfolder_host_permission_list"),
     ]
 )

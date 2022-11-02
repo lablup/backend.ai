@@ -22,14 +22,14 @@ def get_all_vfolder_permissions() -> List[str]:
 
 def get_all_permissions() -> Mapping[str, Any]:
     return {
-        "vfolder_permission_list": get_all_vfolder_permissions(),
+        "vfolder_host_permission_list": get_all_vfolder_permissions(),
     }
 
 
 class VFolderAtomicPermission(graphene.ObjectType):
-    vfolder_permission_list = graphene.List(lambda: graphene.String)
+    vfolder_host_permission_list = graphene.List(lambda: graphene.String)
 
-    async def resolve_vfolder_permission_list(self, info: graphene.ResolveInfo) -> List[str]:
+    async def resolve_vfolder_host_permission_list(self, info: graphene.ResolveInfo) -> List[str]:
         return get_all_vfolder_permissions()
 
     @classmethod
