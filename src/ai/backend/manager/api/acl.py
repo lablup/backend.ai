@@ -7,7 +7,7 @@ from aiohttp import web
 
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..models.acl import get_all_permission
+from ..models.acl import get_all_permissions
 from .auth import auth_required
 from .manager import ALL_ALLOWED, server_status_required
 
@@ -20,7 +20,7 @@ async def get_permission(request: web.Request) -> web.Response:
     access_key = request["keypair"]["access_key"]
     log.info("GET_PERMISSION (ak:{})", access_key)
 
-    return web.json_response(get_all_permission(), status=200)
+    return web.json_response(get_all_permissions(), status=200)
 
 
 async def init(app: web.Application) -> None:

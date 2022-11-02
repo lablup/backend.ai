@@ -11,18 +11,18 @@ if TYPE_CHECKING:
 
 
 __all__: Sequence[str] = (
-    "Permission",
-    "get_all_permission",
+    "VFolderPermission",
+    "get_all_permissions",
 )
 
 
-def get_all_permission() -> Mapping[str, Any]:
+def get_all_permissions() -> Mapping[str, Any]:
     return {
-        "vfolder_permission_list": [perm.value for perm in VFolderHostPermission],
+        "vfolder_host_permission_list": [perm.value for perm in VFolderHostPermission],
     }
 
 
-class Permission(graphene.ObjectType):
+class VFolderPermission(graphene.ObjectType):
     class Meta:
         interfaces: tuple = tuple()
 
@@ -32,5 +32,5 @@ class Permission(graphene.ObjectType):
     async def load_all(
         cls,
         graph_ctx: GraphQueryContext,
-    ) -> Permission:
-        return cls(**get_all_permission())
+    ) -> VFolderPermission:
+        return cls(**get_all_permissions())
