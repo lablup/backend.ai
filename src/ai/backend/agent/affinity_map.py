@@ -64,7 +64,8 @@ class AffinityMap(nx.Graph):
         device_name: DeviceName,
     ) -> Sequence[Sequence[tuple[AbstractComputeDevice, int]]]:
         device_cluster_list = []
-        for weight in range(self.max_weight + 1):
+        # for weight in range(self.max_weight + 1):
+        for weight in [0]:
             subgraph = nx.subgraph_view(
                 self,
                 filter_node=lambda u: u.device_name == device_name,
@@ -128,15 +129,14 @@ class AffinityMap(nx.Graph):
         # TODO: allow compute plugins to customize distance calculation
         g = cls()
         max_weight = 0
-        for device1 in devices:
-            for device2 in devices:
+        devices_copy = list(devices)
+        while devices_copy:
+            device1 = devices_copy.pop(0)
+            g.add_edge(device1, device1, weight=0)
+            for device2 in devices_copy:
                 weight = abs((max(0, device2.numa_node or 0)) - max(0, (device1.numa_node or 0)))
                 if max_weight < weight:
                     max_weight = weight
-                g.add_edge(
-                    device1,
-                    device2,
-                    weight=weight,
-                )
+                g.add_edge(device1, device2, weight=weight)
         g.max_weight = max_weight
         return g
