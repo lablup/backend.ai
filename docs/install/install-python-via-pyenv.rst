@@ -91,6 +91,13 @@ Activate the virtualenv for the current shell
 
    $ pyenv shell myvenv
 
+Check the Python version
+-------------------------
+
+.. code-block:: console
+
+   $ python --version
+
 Activate the virtualenv when your shell goes into a directory
 -------------------------------------------------------------
 
