@@ -651,6 +651,7 @@ async def server_main(
     _args: List[Any],
 ) -> AsyncIterator[None]:
     subapp_pkgs = [
+        ".acl",
         ".etcd",
         ".events",
         ".auth",
