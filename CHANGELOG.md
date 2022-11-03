@@ -16,6 +16,27 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.4 (2022-10-26)
+
+### Features
+* Improve the agent's CPU core detection to use Docker's cgroup cpusets for better compatibility with other frameworks dedicating CPU cores exclusively ([#804](https://github.com/lablup/backend.ai/issues/804))
+
+
+## 22.09.3 (2022-10-25)
+
+### Features
+* Adopt aiohttp_session implementation as a part of common module ([#752](https://github.com/lablup/backend.ai/issues/752))
+* Update aiomonitor-ng to v0.7 and apply cancellation tracking to long-running tasks ([#808](https://github.com/lablup/backend.ai/issues/808))
+
+### Fixes
+* Return empty commit status for non-running sessions to prevent constant 400 errors in the frontend. ([#820](https://github.com/lablup/backend.ai/issues/820))
+* Fix a typo on response message to describe the status when calling GET session commit API ([#821](https://github.com/lablup/backend.ai/issues/821))
+
+### Miscellaneous
+* Bump base Python version from 3.10.7 to 3.10.8 to resolve potential bugs. ([#801](https://github.com/lablup/backend.ai/issues/801))
+* Do not create a subshell in executing the `py` and `backend.ai` scripts. ([#819](https://github.com/lablup/backend.ai/issues/819))
+
+
 ## 22.09.2 (2022-10-18)
 
 ### Fixes
