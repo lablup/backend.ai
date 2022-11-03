@@ -34,6 +34,12 @@ class UnsupportedBaseDistroError(RuntimeError):
     pass
 
 
+class DockerContainerCreationError(Exception):
+    def __init__(self, *args, container_id):
+        super().__init__(*args)
+        self.container_id = container_id
+
+
 class K8sError(Exception):
     def __init__(self, message):
         super().__init__(message)
