@@ -64,7 +64,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import AsyncFileWriter, current_loop
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
-from ..exception import InitializationError, UnsupportedResource
+from ..exception import DockerContainerCreationError, InitializationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
@@ -778,9 +778,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             await writer.write(f"{k}={v}\n")
 
                 await container.start()
-            except asyncio.CancelledError:
-                raise
-            except Exception:
+            except asyncio.CancelledError as e:
+                try:
+                    cid = container._id
+                except (UnboundLocalError, AttributeError):
+                    raise e
+                raise DockerContainerCreationError(str(cid))
+            except Exception as e:
                 # Oops, we have to restore the allocated resources!
                 if (
                     sys.platform.startswith("linux")
@@ -794,7 +798,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 async with self.resource_lock:
                     for dev_name, device_alloc in resource_spec.allocations.items():
                         self.computers[dev_name].alloc_map.free(device_alloc)
-                raise
+                try:
+                    cid = container._id
+                except (UnboundLocalError, AttributeError):
+                    raise e
+                raise DockerContainerCreationError(str(cid))
 
             additional_network_names: Set[str] = set()
             for dev_name, device_alloc in resource_spec.allocations.items():
@@ -1242,6 +1250,15 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 try:
                     with timeout(60):
                         await self.collect_logs(kernel_id, container_id, log_iter())
+                except DockerError as e:
+                    if e.status == 404:
+                        log.warning(
+                            "container is already cleaned or missing (k:{}, cid:{})",
+                            kernel_id,
+                            container_id,
+                        )
+                    else:
+                        raise
                 except asyncio.TimeoutError:
                     log.warning(
                         "timeout for collecting container logs (k:{}, cid:{})",
