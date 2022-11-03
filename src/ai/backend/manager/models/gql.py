@@ -417,7 +417,7 @@ class Queries(graphene.ObjectType):
     )
 
     # super-admin only
-    vfolder_host_permission_list = graphene.Field(
+    vfolder_permission_list = graphene.Field(
         VirtualFolderPermissionList,
         limit=graphene.Int(required=True),
         offset=graphene.Int(required=True),
@@ -487,7 +487,7 @@ class Queries(graphene.ObjectType):
         access_key=graphene.String(),
     )
 
-    permissions = graphene.Field(
+    vfolder_host_permissions = graphene.Field(
         VFolderAtomicPermission,
     )
 
@@ -1207,7 +1207,7 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
-    async def resolve_vfolder_host_permission_list(
+    async def resolve_vfolder_permission_list(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         limit: int,
@@ -1413,7 +1413,7 @@ class Queries(graphene.ObjectType):
             raise TooManyKernelsFound
 
     @staticmethod
-    async def resolve_permissions(
+    async def resolve_vfolder_host_permissions(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
     ) -> VFolderAtomicPermission:
