@@ -9,7 +9,7 @@ class CliContextInfo:
     info: Dict = attr.field()
 
 
-class ExitCode(enum.Enum):
+class ExitCode(enum.IntEnum):
     OK = 0
     FAILURE = 1
     TIMEOUT = 2
