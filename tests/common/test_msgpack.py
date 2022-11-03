@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from pathlib import PosixPath
 
-from dateutil.tz import tzutc
+from dateutil.tz import gettz, tzutc
 
 from ai.backend.common import msgpack
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import BinarySize, SlotTypes
 
 
 def test_msgpack_with_unicode():
@@ -45,13 +46,39 @@ def test_msgpack_uuid():
     assert unpacked["device_id"] == device_id
 
 
+def test_msgpack_uuid_as_map_key():
+    device_id = uuid.uuid4()
+    data = {device_id: 1234}
+    packed = msgpack.packb(data)
+    unpacked = msgpack.unpackb(packed)
+    assert isinstance(next(iter(unpacked.keys())), uuid.UUID)
+    assert unpacked[device_id] == 1234
+
+
 def test_msgpack_datetime():
     now = datetime.now(tzutc())
     data = {"timestamp": now}
     packed = msgpack.packb(data)
     unpacked = msgpack.unpackb(packed)
-    assert isinstance(unpacked["timestamp"], datetime)
-    assert unpacked["timestamp"] == now
+    t = unpacked["timestamp"]
+    assert isinstance(t, datetime)
+    assert t.tzinfo is not None
+    tzname = t.tzname()
+    assert tzname is not None
+    assert tzname.startswith("UTC")  # should be always UTC
+    assert t == now
+
+    now = datetime.now(gettz("KST"))
+    data = {"timestamp": now}
+    packed = msgpack.packb(data)
+    unpacked = msgpack.unpackb(packed)
+    t = unpacked["timestamp"]
+    assert isinstance(t, datetime)
+    assert t.tzinfo is not None
+    tzname = t.tzname()
+    assert tzname is not None
+    assert tzname.startswith("UTC")  # should be always UTC
+    assert t == now
 
 
 def test_msgpack_decimal():
@@ -70,8 +97,8 @@ def test_msgpack_binarysize():
     data = {"size": size}
     packed = msgpack.packb(data)
     unpacked = msgpack.unpackb(packed)
-    assert isinstance(unpacked["size"], int)
-    assert unpacked["size"] == size
+    assert isinstance(unpacked["size"], BinarySize)
+    assert unpacked["size"] == 70368744177664
 
     size = BinarySize.from_str("Infinity")
     data = {"size": size}
@@ -79,3 +106,22 @@ def test_msgpack_binarysize():
     unpacked = msgpack.unpackb(packed)
     assert isinstance(unpacked["size"], Decimal)
     assert unpacked["size"] == Decimal("Infinity")
+
+
+def test_msgpack_enum():
+    value = SlotTypes.COUNT
+    data = {"slot_type": value}
+    packed = msgpack.packb(data)
+    unpacked = msgpack.unpackb(packed)
+    assert isinstance(unpacked["slot_type"], SlotTypes)
+    assert unpacked["slot_type"] == SlotTypes.COUNT
+
+
+def test_msgpack_posixpath():
+    path = PosixPath.cwd()
+    # NOTE: In UNIX-like OS, pathlib.Path is also PosixPath
+    data = {"path": path}
+    packed = msgpack.packb(data)
+    unpacked = msgpack.unpackb(packed)
+    assert isinstance(unpacked["path"], PosixPath)
+    assert unpacked["path"] == path

@@ -1366,9 +1366,12 @@ class AgentRegistry:
             for slot_name, allocation_by_device in alloc_map.items():
                 total_allocs: List[Decimal] = []
                 for allocation in allocation_by_device.values():
-                    if BinarySize.suffix_map.get(allocation[-1].lower()) is not None:
+                    if (
+                        isinstance(allocation, BinarySize)
+                        and BinarySize.suffix_map.get(allocation[-1].lower()) is not None
+                    ):
                         total_allocs.append(Decimal(BinarySize.from_str(allocation)))
-                    else:
+                    else:  # maybe Decimal("Infinity"), etc.
                         total_allocs.append(Decimal(allocation))
                 slots[slot_name] = str(sum(total_allocs))
         return slots
