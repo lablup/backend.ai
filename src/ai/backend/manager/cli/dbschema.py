@@ -90,6 +90,8 @@ def oneshot(cli_ctx: CLIContext, alembic_config) -> None:
         alembic_cfg.attributes["connection"] = connection
         metadata.create_all(engine, checkfirst=False)
         log.info("Stamping alembic version to head...")
+        # without this env.py would not run when command.stamp() is executed
+        invoked_programmatically.set(False)
         command.stamp(alembic_cfg, "head")
 
     def _upgrade_sync(connection: Connection) -> None:
