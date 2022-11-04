@@ -37,6 +37,7 @@ import zmq
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from aiohttp import web
+from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
@@ -418,22 +419,30 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 }
             )
-            # RDMA mounts
-            ib_root = Path("/dev/infiniband")
-            if ib_root.is_dir() and (ib_root / "uverbs0").exists():
-                self.container_configs.append(
-                    {
-                        "HostConfig": {
-                            "Devices": [
-                                {
-                                    "PathOnHost": "/dev/infiniband",
-                                    "PathInContainer": "/dev/infiniband",
-                                    "CgroupPermissions": "rwm",
-                                },
-                            ],
-                        },
-                    }
-                )
+        elif self.local_config["container"].get("alternative-bridge") is not None:
+            self.container_configs.append(
+                {
+                    "HostConfig": {
+                        "NetworkMode": self.local_config["container"]["alternative-bridge"],
+                    },
+                }
+            )
+        # RDMA mounts
+        ib_root = Path("/dev/infiniband")
+        if ib_root.is_dir() and (ib_root / "uverbs0").exists():
+            self.container_configs.append(
+                {
+                    "HostConfig": {
+                        "Devices": [
+                            {
+                                "PathOnHost": "/dev/infiniband",
+                                "PathInContainer": "/dev/infiniband",
+                                "CgroupPermissions": "rwm",
+                            },
+                        ],
+                    },
+                }
+            )
 
     async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
@@ -952,7 +961,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     kernel_id = "(unknown)"
                     try:
                         kernel_id = await get_kernel_id_from_container(container)
-                        if kernel_id is None:
+                        if kernel_id is None or kernel_id not in self.kernel_registry:
                             return
                         if container["State"]["Status"] in status_filter:
                             await container.show()
@@ -1338,6 +1347,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             network = await docker.networks.get(network_name)
             await network.delete()
 
+    @preserve_termination_log
     async def monitor_docker_events(self):
         async def handle_action_start(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
             await self.inject_container_lifecycle_event(

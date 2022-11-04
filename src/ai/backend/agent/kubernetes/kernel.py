@@ -202,11 +202,11 @@ class KubernetesKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
-    async def check_duplicate_commit(self, path):
+    async def check_duplicate_commit(self, kernel_id, subdir):
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
 
-    async def commit(self, path, lock_path, filename):
+    async def commit(self, kernel_id, subdir, filename):
         # TODO: Implement container commit on Kubernetes kernel.
         log.error("Committing in Kubernetes is not supported yet.")
         raise NotImplementedError
@@ -259,6 +259,11 @@ class KubernetesKernel(AbstractKernel):
                 log.debug("stream: {}", event)
 
         return None
+
+    async def download_single(self, filepath: str):
+        # TODO: Implement download single file operations with pure Kubernetes API
+        log.error("download_single() in the k8s backend is not supported yet.")
+        raise NotImplementedError
 
     async def list_files(self, container_path: str):
         # TODO: Implement file operations with pure Kubernetes API

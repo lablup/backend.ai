@@ -37,7 +37,7 @@ from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
 from graphql.language import ast
-from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID
+from sqlalchemy.dialects.postgresql import CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -45,11 +45,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
+from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     BinarySize,
     JSONSerializableMixin,
     KernelId,
+    ReadableCIDR,
     ResourceSlot,
     SessionId,
 )
@@ -293,6 +295,29 @@ class URLColumn(TypeDecorator):
             return None
         if value is not None:
             return yarl.URL(value)
+
+
+class IPColumn(TypeDecorator):
+    """
+    A column type to convert IP string values back and forth to CIDR.
+    """
+
+    impl = CIDR
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        try:
+            cidr = ReadableCIDR(value).address
+        except InvalidIpAddressValue:
+            raise InvalidAPIParameters(f"{value} is invalid IP address value")
+        return cidr
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return ReadableCIDR(value)
 
 
 class CurrencyTypes(enum.Enum):
@@ -739,6 +764,9 @@ async def simple_db_mutate(
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
         return result_cls(False, f"integrity error: {e}")
+    except sa.exc.StatementError as e:
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
@@ -798,6 +826,9 @@ async def simple_db_mutate_returning_item(
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
         return result_cls(False, f"integrity error: {e}", None)
+    except sa.exc.StatementError as e:
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:

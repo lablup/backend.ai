@@ -277,11 +277,11 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, path):
+    async def check_duplicate_commit(self, kernel_id, subdir):
         raise NotImplementedError
 
     @abstractmethod
-    async def commit(self, path, lock_path, filename):
+    async def commit(self, kernel_id, subdir, filename):
         raise NotImplementedError
 
     @abstractmethod
@@ -294,6 +294,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     @abstractmethod
     async def download_file(self, filepath):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def download_single(self, filepath):
         raise NotImplementedError
 
     @abstractmethod
