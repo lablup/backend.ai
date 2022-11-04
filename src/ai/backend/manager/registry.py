@@ -1367,7 +1367,7 @@ class AgentRegistry:
                 total_allocs: List[Decimal] = []
                 for allocation in allocation_by_device.values():
                     if (
-                        isinstance(allocation, BinarySize)
+                        isinstance(allocation, (BinarySize, str))
                         and BinarySize.suffix_map.get(allocation[-1].lower()) is not None
                     ):
                         total_allocs.append(Decimal(BinarySize.from_str(allocation)))
