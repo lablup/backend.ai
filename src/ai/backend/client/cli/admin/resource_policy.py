@@ -98,7 +98,7 @@ def list(ctx):
     "--allowed-vfolder-hosts",
     default=json.dumps(
         {
-            "local": [
+            "local:volume1": [
                 "create-vfolder",
                 "read-vfolder",
                 "update-vfolder",
