@@ -5,6 +5,7 @@ from typing import Any, Mapping, Optional, Sequence
 
 import attr
 
+from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.types import ContainerId, KernelId, MountTypes
 
 
@@ -65,7 +66,7 @@ class ContainerLifecycleEvent:
     kernel_id: KernelId
     container_id: Optional[ContainerId]
     event: LifecycleEvent
-    reason: str
+    reason: KernelLifecycleEventReason
     done_future: Optional[asyncio.Future] = None
     exit_code: Optional[int] = None
     suppress_events: bool = False

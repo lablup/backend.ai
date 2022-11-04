@@ -41,6 +41,7 @@ from ai.backend.common.events import (
     ExecutionFinishedEvent,
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
+    KernelLifecycleEventReason,
     SessionStartedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
@@ -188,7 +189,10 @@ class IdleCheckerHost:
                             session["id"],
                         )
                         await self._event_producer.produce_event(
-                            DoTerminateSessionEvent(session["id"], f"idle-{checker.name}"),
+                            DoTerminateSessionEvent(
+                                session["id"],
+                                KernelLifecycleEventReason.idle_checker_name(checker.name),
+                            ),
                         )
                         # If any one of checkers decided to terminate the session,
                         # we can skip over remaining checkers.

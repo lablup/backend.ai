@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import enum
 import hashlib
 import logging
 import secrets
@@ -110,7 +111,7 @@ class DoTerminateSessionEvent(AbstractEvent):
     name = "do_terminate_session"
 
     session_id: SessionId = attr.ib()
-    reason: str = attr.ib()
+    reason: KernelLifecycleEventReason = attr.ib()
 
     def serialize(self) -> tuple:
         return (
@@ -191,6 +192,40 @@ class AgentHeartbeatEvent(AbstractEvent):
         return cls(value[0])
 
 
+class KernelLifecycleEventReason(str, enum.Enum):
+    AGENT_TERMINATION = "agent-termination"
+    ALREADY_TERMINATED = "already-terminated"
+    ANOMALY_DETECTED = "anomaly-detected"
+    EXEC_TIMEOUT = "exec-timeout"
+    FAILED_TO_START = "failed-to-start"
+    FORCE_TERMINATED = "force-terminated"
+    KILLED_BY_EVENT = "killed-by-event"
+    NEW_CONTAINER_STARTED = "new-container-started"
+    PENDING_TIMEOUT = "pending-timeout"
+    RESTARTING = "restarting"
+    RESTART_TIMEOUT = "restart-timeout"
+    RESUMING_AGENT_OPERATION = "resuming-agent-operation"
+    SELF_TERMINATED = "self-terminated"
+    TASK_DONE = "task-done"
+    TASK_FAILED = "task-failed"
+    TASK_TIMEOUT = "task-timeout"
+    TASK_CANCELLED = "task-cancelled"
+    TASK_FINISHED = "task-finished"
+    TERMINATED_UNKNOWN_CONTAINER = "terminated-unknown-container"
+    UNKNOWN = "unknown"
+    USER_REQUESTED = "user-requested"
+
+    @classmethod
+    def get_or_anomaly_detected(cls, reason: Optional[str]):
+        if reason:
+            return reason
+        return cls.ANOMALY_DETECTED
+
+    @staticmethod
+    def idle_checker_name(checker_name: str):
+        return f"idle-{checker_name}"
+
+
 @attr.s(slots=True, frozen=True)
 class KernelCreationEventArgs:
     kernel_id: KernelId = attr.ib()
@@ -266,7 +301,7 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
 @attr.s(slots=True, frozen=True)
 class KernelTerminationEventArgs:
     kernel_id: KernelId = attr.ib()
-    reason: str = attr.ib(default="")
+    reason: KernelLifecycleEventReason = attr.ib(default=KernelLifecycleEventReason.UNKNOWN)
     exit_code: int = attr.ib(default=-1)
 
     def serialize(self) -> tuple:
@@ -297,7 +332,7 @@ class KernelTerminatedEvent(KernelTerminationEventArgs, AbstractEvent):
 class SessionCreationEventArgs:
     session_id: SessionId = attr.ib()
     creation_id: str = attr.ib()
-    reason: str = attr.ib(default="")
+    reason: KernelLifecycleEventReason = attr.ib(default=KernelLifecycleEventReason.UNKNOWN)
 
     def serialize(self) -> tuple:
         return (
@@ -361,7 +396,7 @@ class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
 @attr.s(slots=True, frozen=True)
 class SessionResultEventArgs:
     session_id: SessionId = attr.ib()
-    reason: str = attr.ib(default="")
+    reason: KernelLifecycleEventReason = attr.ib(default=KernelLifecycleEventReason.UNKNOWN)
     exit_code: int = attr.ib(default=-1)
 
     def serialize(self) -> tuple:
