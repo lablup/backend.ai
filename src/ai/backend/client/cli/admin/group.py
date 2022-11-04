@@ -9,6 +9,7 @@ from ai.backend.client.func.group import _default_detail_fields, _default_list_f
 from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
+from ..params import JSONParamType
 from ..pretty import print_info
 from ..types import CLIContext
 
@@ -89,7 +90,7 @@ def list(ctx: CLIContext, domain_name) -> None:
 @click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
 @click.option(
     "--allowed-vfolder-hosts",
-    type=str,
+    type=JSONParamType(),
     default="{}",
     help="Allowed virtual folder hosts. "
     'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
@@ -149,7 +150,7 @@ def add(
 @click.option("--total-resource-slots", type=str, help="Update total resource slots.")
 @click.option(
     "--allowed-vfolder-hosts",
-    type=str,
+    type=JSONParamType(),
     help="Allowed virtual folder hosts. "
     'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
 )
