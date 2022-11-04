@@ -131,31 +131,26 @@ class WebSocketProxy:
 async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     request_headers = extra_config_headers.check(request.headers)
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
-    try:
-        if secure_context:
-            if not request.content:
-                request["payload"] = ""
-                return await handler(request)
-            config = request.app["config"]
-            scheme = config["service"]["force_endpoint_protocol"]
-            if scheme is None:
-                scheme = request.scheme
-            api_endpoint = f"{scheme}://{request.host}"
-            payload = await request.text()
-            initial_vector, real_payload = payload.split(":")
-            key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + initial_vector * 2)[
-                0:32
-            ]
-            crypt = AES.new(
-                bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(initial_vector, encoding="utf8")
-            )
-            b64p = base64.b64decode(real_payload)
-            request["payload"] = unpad(crypt.decrypt(bytes(b64p)), 16)
-        else:
+    if secure_context:
+        if not request.content:
             request["payload"] = ""
-        return await handler(request)
-    except (Exception, base64.binascii.Error):
-        raise
+            return await handler(request)
+        config = request.app["config"]
+        scheme = config["service"]["force_endpoint_protocol"]
+        if scheme is None:
+            scheme = request.scheme
+        api_endpoint = f"{scheme}://{request.host}"
+        payload = await request.text()
+        initial_vector, real_payload = payload.split(":")
+        key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + initial_vector * 2)[0:32]
+        crypt = AES.new(
+            bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(initial_vector, encoding="utf8")
+        )
+        b64p = base64.b64decode(real_payload)
+        request["payload"] = unpad(crypt.decrypt(bytes(b64p)), 16)
+    else:
+        request["payload"] = ""
+    return await handler(request)
 
 
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
