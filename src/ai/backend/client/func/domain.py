@@ -1,5 +1,6 @@
+import json
 import textwrap
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from ai.backend.client.output.fields import domain_fields
 from ai.backend.client.output.types import FieldSpec
@@ -99,7 +100,7 @@ class Domain(BaseFunction):
         description: str = "",
         is_active: bool = True,
         total_resource_slots: str = None,
-        allowed_vfolder_hosts: str = None,
+        allowed_vfolder_hosts: Mapping[str, Sequence[str]] = None,
         allowed_docker_registries: Iterable[str] = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
@@ -125,7 +126,7 @@ class Domain(BaseFunction):
                 "description": description,
                 "is_active": is_active,
                 "total_resource_slots": total_resource_slots,
-                "allowed_vfolder_hosts": allowed_vfolder_hosts,
+                "allowed_vfolder_hosts": json.dumps(allowed_vfolder_hosts),
                 "allowed_docker_registries": allowed_docker_registries,
                 "integration_id": integration_id,
             },
@@ -142,7 +143,7 @@ class Domain(BaseFunction):
         description: str = None,
         is_active: bool = None,
         total_resource_slots: str = None,
-        allowed_vfolder_hosts: str = None,
+        allowed_vfolder_hosts: Mapping[str, Sequence[str]] = None,
         allowed_docker_registries: Iterable[str] = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
@@ -167,7 +168,7 @@ class Domain(BaseFunction):
                 "description": description,
                 "is_active": is_active,
                 "total_resource_slots": total_resource_slots,
-                "allowed_vfolder_hosts": allowed_vfolder_hosts,
+                "allowed_vfolder_hosts": json.dumps(allowed_vfolder_hosts),
                 "allowed_docker_registries": allowed_docker_registries,
                 "integration_id": integration_id,
             },
