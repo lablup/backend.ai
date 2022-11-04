@@ -27,10 +27,10 @@ class Permission(BaseFunction):
         query = textwrap.dedent(
             """\
             query {
-                permissions {$fields}
+                vfolder_host_permissions {$fields}
             }
         """
         )
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(query)
-        return data["permissions"]
+        return data["vfolder_host_permissions"]
