@@ -112,7 +112,8 @@ def list(ctx):
             ]
         }
     ),
-    help="Locations to create virtual folders.",
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
 )
 def add(
     ctx: CLIContext,
@@ -189,7 +190,12 @@ def add(
     type=int,
     help="The maximum period of time allowed for kernels to wait " "further requests.",
 )
-@click.option("--allowed-vfolder-hosts", type=str, help="Locations to create virtual folders.")
+@click.option(
+    "--allowed-vfolder-hosts",
+    type=str,
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
+)
 def update(
     ctx: CLIContext,
     name,

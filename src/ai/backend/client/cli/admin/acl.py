@@ -21,7 +21,6 @@ def permission():
 def list(ctx: CLIContext) -> None:
     """
     List atomic permissions.
-    (admin privilege required)
     """
     with Session() as session:
         try:

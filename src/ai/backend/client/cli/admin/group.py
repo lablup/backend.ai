@@ -91,7 +91,8 @@ def list(ctx: CLIContext, domain_name) -> None:
     "--allowed-vfolder-hosts",
     type=str,
     default="{}",
-    help="Allowed virtual folder hosts.",
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
 )
 def add(
     ctx: CLIContext,
@@ -146,7 +147,12 @@ def add(
 @click.option("-d", "--description", type=str, help="Description of the group")
 @click.option("--is-active", type=bool, help="Set group inactive.")
 @click.option("--total-resource-slots", type=str, help="Update total resource slots.")
-@click.option("--allowed-vfolder-hosts", type=str, help="Allowed virtual folder hosts.")
+@click.option(
+    "--allowed-vfolder-hosts",
+    type=str,
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
+)
 def update(
     ctx: CLIContext, gid, name, description, is_active, total_resource_slots, allowed_vfolder_hosts
 ):
