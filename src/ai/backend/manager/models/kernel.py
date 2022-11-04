@@ -242,9 +242,9 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
         )
     },
     KernelStatus.TERMINATING: {KernelStatus.TERMINATED, KernelStatus.ERROR},
-    KernelStatus.TERMINATED: {KernelStatus.ERROR},
+    KernelStatus.TERMINATED: set(),
     KernelStatus.ERROR: set(),
-    KernelStatus.CANCELLED: {KernelStatus.ERROR},
+    KernelStatus.CANCELLED: set(),
 }
 
 
