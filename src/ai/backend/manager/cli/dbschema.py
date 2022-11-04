@@ -90,9 +90,10 @@ def oneshot(cli_ctx: CLIContext, alembic_config) -> None:
         alembic_cfg.attributes["connection"] = connection
         metadata.create_all(engine, checkfirst=False)
         log.info("Stamping alembic version to head...")
-        # without this env.py would not run when command.stamp() is executed
-        invoked_programmatically.set(False)
-        command.stamp(alembic_cfg, "head")
+        script = ScriptDirectory.from_config(alembic_cfg)
+        head_rev = script.get_heads()[0]
+        connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
+        connection.exec_driver_sql(f"INSERT INTO alembic_version VALUES('{head_rev}')")
 
     def _upgrade_sync(connection: Connection) -> None:
         alembic_cfg.attributes["connection"] = connection
