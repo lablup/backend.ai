@@ -19,7 +19,7 @@ class Sentinel(enum.Enum):
 SENTINEL: Final = Sentinel.token
 
 
-@attrs.define(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class FSPerfMetric:
     # iops
     iops_read: int
@@ -32,13 +32,13 @@ class FSPerfMetric:
     io_usec_write: float
 
 
-@attrs.define(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class FSUsage:
     capacity_bytes: BinarySize
     used_bytes: BinarySize
 
 
-@attrs.define(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class VolumeInfo:
     backend: str
     path: Path
@@ -57,7 +57,7 @@ class VolumeInfo:
         )
 
 
-@attrs.define(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class VFolderCreationOptions:
     quota: Optional[BinarySize]
 
@@ -74,13 +74,13 @@ class VFolderCreationOptions:
         return VFolderCreationOptions(quota=quota)
 
 
-@attrs.define(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class VFolderUsage:
     file_count: int
     used_bytes: int
 
 
-@attrs.define(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class Stat:
     size: int
     owner: str
