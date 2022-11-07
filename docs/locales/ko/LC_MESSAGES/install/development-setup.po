@@ -53,7 +53,7 @@ msgstr ""
 
 #: ../../install/development-setup.rst:22 4b1b80dee0e94398a542fa6b8126670c
 msgid "A standard development setup of Backend.AI open source components"
-msgstr "Backend.AI 오픈소스 컴포넌츠의 표준 개발 설정"
+msgstr "Backend.AI 오픈소스 구성 요소의 표준 개발 설정"
 
 #: ../../install/development-setup.rst:28 e6b1d7f935b14edb8ee54e197f844008
 msgid ""
