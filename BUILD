@@ -22,7 +22,7 @@ python_requirements(
         "types-cachetools": ["cachetools"],
         "types-Jinja2": ["Jinja2"],
         "types-PyYAML": ["yaml"],
-        "types-python-dateutil": ["dateutil"],
+        "types-python-dateutil": ["dateutil", "dateutil.parser", "dateutil.tz"],
         "types-redis": ["redis"],
         "types-six": ["six"],
         "types-tabulate": ["tabulate"],
