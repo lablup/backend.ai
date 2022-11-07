@@ -283,7 +283,7 @@ msgstr "agent를 위한 다른 터미널을 열어 실행하기:"
 
 #: ../../install/development-setup.rst:243 746ed199e50e425e9cd7f6b65396397e
 msgid "Open yet another terminal for client and run:"
-msgstr "또 또 다른 터미널을 열어 client를 실행하기:"
+msgstr "client를 위한 또 다른 터미널을 열어 실행하기:"
 
 #: ../../install/development-setup.rst:261 1bc47557a583487b9e34c7ca20b3089f
 msgid "Resetting the environment"
