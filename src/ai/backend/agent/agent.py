@@ -45,7 +45,7 @@ from typing import (
 from uuid import UUID
 
 import aiotools
-import attr
+import attrs
 import pkg_resources
 import snappy
 import zmq
@@ -93,7 +93,6 @@ from ai.backend.common.types import (
     ClusterInfo,
     ContainerId,
     DeviceId,
-    DeviceModelInfo,
     DeviceName,
     HardwareMetadata,
     ImageRegistry,
@@ -489,14 +488,14 @@ KernelCreationContextType = TypeVar(
 )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class RestartTracker:
     request_lock: asyncio.Lock
     destroy_event: asyncio.Event
     done_event: asyncio.Event
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ComputerContext:
     instance: AbstractComputePlugin
     devices: Collection[AbstractComputeDevice]
@@ -950,7 +949,7 @@ class AbstractAgent(
                 if isinstance(ev, Sentinel):
                     await self.save_last_registry(force=True)
                     return
-                # attr currently does not support customizing getstate/setstate dunder methods
+                # attrs currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
                 if self.local_config["debug"]["log-events"]:
                     log.info(f"lifecycle event: {ev!r}")
@@ -1523,18 +1522,11 @@ class AbstractAgent(
         await ctx.process_mounts(resource_spec.mounts)
 
         # Get attached devices information (including model_name).
-        serialized_attached_devices = {}
+        attached_devices = {}
         for dev_name, device_alloc in resource_spec.allocations.items():
             computer_set = self.computers[dev_name]
             devices = await computer_set.instance.get_attached_devices(device_alloc)
-            serialized_attached_devices[dev_name] = [
-                DeviceModelInfo(
-                    device_id=str(device_info["device_id"]),
-                    model_name=device_info["model_name"],
-                    data=device_info["data"],
-                )
-                for device_info in devices
-            ]
+            attached_devices[dev_name] = devices
 
         exposed_ports = [2000, 2001]
         service_ports = []
@@ -1611,7 +1603,7 @@ class AbstractAgent(
 
         if self.local_config["debug"]["log-kernel-config"]:
             log.info(
-                "kernel starting with resource spec: \n{0}", pretty(attr.asdict(resource_spec))
+                "kernel starting with resource spec: \n{0}", pretty(attrs.asdict(resource_spec))
             )
         kernel_obj: KernelObjectType = await ctx.spawn(
             resource_spec,
@@ -1692,8 +1684,8 @@ class AbstractAgent(
             "stdout_port": kernel_obj["stdout_port"],  # legacy
             "service_ports": service_ports,
             "container_id": kernel_obj["container_id"],
-            "resource_spec": resource_spec.to_json_serializable_dict(),
-            "attached_devices": serialized_attached_devices,
+            "resource_spec": attrs.asdict(resource_spec),
+            "attached_devices": attached_devices,
         }
 
     @abstractmethod

@@ -71,7 +71,7 @@ config_iv = t.Dict(
         ).allow_extra("*"),
         t.Key("plugin"): t.Dict(
             {
-                t.Key("page", default=None): t.Null | t.String(allow_blank=True),
+                t.Key("page", default=None): t.Null | tx.StringList(empty_str_as_empty_list=True),
             }
         ).allow_extra("*"),
         t.Key("pipeline"): t.Dict(

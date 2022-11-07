@@ -21,9 +21,9 @@ click>=7.1.2
 coloredlogs~=15.0
 colorama>=0.4.4
 cryptography>=2.8
-etcetra==0.1.13
-graphene~=2.1.9
+etcetra==0.1.14
 faker~=13.12.0
+graphene~=2.1.9
 hiredis~=1.1.0
 humanize>=3.1.0
 inquirer~=2.9.2
@@ -53,6 +53,7 @@ rich~=12.2
 SQLAlchemy[postgresql_asyncpg]~=1.4.40
 setproctitle~=1.2.2
 tabulate~=0.8.9
+temporenc~=0.1.0
 tblib~=1.7
 tenacity>=8.0
 tomli~=2.0.1

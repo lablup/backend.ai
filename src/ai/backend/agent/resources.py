@@ -10,7 +10,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Collection,
-    FrozenSet,
     Iterator,
     List,
     Mapping,
@@ -25,7 +24,7 @@ from typing import (
 )
 
 import aiodocker
-import attr
+import attrs
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
@@ -62,7 +61,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.resources"))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 
 
-@attr.define(slots=True)
+@attrs.define(slots=True)
 class KernelResourceSpec:
     """
     This struct-like object stores the kernel resource allocation information
@@ -86,7 +85,7 @@ class KernelResourceSpec:
     scratch_disk_size: int
     """The size of scratch disk. (not implemented yet)"""
 
-    mounts: List["Mount"] = attr.Factory(list)
+    mounts: List["Mount"] = attrs.Factory(list)
     """The mounted vfolder list."""
 
     def freeze(self) -> None:
@@ -190,7 +189,7 @@ class KernelResourceSpec:
         return cls.read_from_string(text)
 
     def to_json_serializable_dict(self) -> Mapping[str, Any]:
-        o = attr.asdict(self)
+        o = attrs.asdict(self)
         for slot_name, alloc in o["slots"].items():
             if known_slot_types.get(slot_name, "count") == "bytes":
                 o["slots"] = f"{BinarySize(alloc):s}"
@@ -217,10 +216,10 @@ class KernelResourceSpec:
         return json.dumps(self.to_json_serializable_dict())
 
 
-@attr.define(frozen=True, auto_attribs=True)
+@attrs.define(frozen=True, auto_attribs=True)
 class AbstractComputeDevice:
     device_id: DeviceId
-    device_name: DeviceName = attr.field(
+    device_name: DeviceName = attrs.field(
         kw_only=True
     )  # should be same to the slot name's prefix part
     hw_location: str  # either PCI bus ID or arbitrary string
@@ -408,7 +407,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
         self.plugins[plugin.key] = plugin
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class Mount:
     type: MountTypes
     source: Optional[Path]
@@ -437,14 +436,3 @@ class Mount:
             raise ValueError("Mount target must be an absolute path.", target)
         perm = MountPermission(perm)
         return cls(type, source, target, perm, None)
-
-
-def bitmask2set(mask: int) -> FrozenSet[int]:
-    bpos = 0
-    bset = []
-    while mask > 0:
-        if (mask & 1) == 1:
-            bset.append(bpos)
-        mask = mask >> 1
-        bpos += 1
-    return frozenset(bset)
