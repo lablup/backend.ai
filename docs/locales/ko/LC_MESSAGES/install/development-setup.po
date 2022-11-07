@@ -279,7 +279,7 @@ msgstr "manager를 위한 터미널을 열고 실행하기:"
 
 #: ../../install/development-setup.rst:237 22ac665c3b6b422fade28923bb9c3f71
 msgid "Open another terminal for agent and run:"
-msgstr "또 다른 agent를 위한 터미널을 열어 실행하기:"
+msgstr "agent를 위한 다른 터미널을 열어 실행하기:"
 
 #: ../../install/development-setup.rst:243 746ed199e50e425e9cd7f6b65396397e
 msgid "Open yet another terminal for client and run:"
