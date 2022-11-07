@@ -62,22 +62,22 @@ def test_msgpack_datetime():
     unpacked = msgpack.unpackb(packed)
     t = unpacked["timestamp"]
     assert isinstance(t, datetime)
-    assert t.tzinfo is not None
-    tzname = t.tzname()
-    assert tzname is not None
-    assert tzname.startswith("UTC")  # should be always UTC
+    if t.tzinfo is not None:
+        tzname = t.tzname()
+        assert tzname is not None
+        assert tzname.startswith("UTC")  # should be always UTC
     assert t == now
 
-    now = datetime.now(gettz("KST"))
+    now = datetime.now(gettz("Asia/Seoul"))
     data = {"timestamp": now}
     packed = msgpack.packb(data)
     unpacked = msgpack.unpackb(packed)
     t = unpacked["timestamp"]
     assert isinstance(t, datetime)
-    assert t.tzinfo is not None
-    tzname = t.tzname()
-    assert tzname is not None
-    assert tzname.startswith("UTC")  # should be always UTC
+    if t.tzinfo is not None:
+        tzname = t.tzname()
+        assert tzname is not None
+        assert tzname.startswith("UTC")  # should be always UTC
     assert t == now
 
 
