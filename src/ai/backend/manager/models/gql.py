@@ -9,7 +9,7 @@ import graphene
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor
+    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.etcd import AsyncEtcd

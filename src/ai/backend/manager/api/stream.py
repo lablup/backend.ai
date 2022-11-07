@@ -35,7 +35,7 @@ import aiohttp
 import aiohttp_cors
 import aiotools
 import attr
-import grpc
+import grpc  # pants: no-infer-dep
 import trafaret as t
 import zmq
 import zmq.asyncio

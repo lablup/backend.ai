@@ -10,9 +10,9 @@ import attr
 import graphene
 import trafaret as t
 from aiohttp import web
-from graphql.error import GraphQLError, format_error
-from graphql.execution import ExecutionResult
-from graphql.execution.executors.asyncio import AsyncioExecutor
+from graphql.error import GraphQLError, format_error  # pants: no-infer-dep
+from graphql.execution import ExecutionResult  # pants: no-infer-dep
+from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
