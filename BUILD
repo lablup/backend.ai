@@ -7,7 +7,7 @@ python_requirements(
         "attrs": ["attr", "attrs"],
         "aiohttp-session": ["aiohttp_session"],
         "pycryptodome": ["Crypto"],
-        "python-dateutil": ["dateutil"],
+        "python-dateutil": ["dateutil", "dateutil.parser", "dateutil.tz"],
         "python-json-logger": ["pythonjsonlogger"],
         "python-snappy": ["snappy"],
         "pyzmq": ["zmq"],
