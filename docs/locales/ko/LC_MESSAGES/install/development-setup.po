@@ -250,7 +250,7 @@ msgid ""
 "``CAP_SYS_ADMIN``, ``CAP_SYS_PTRACE``, and ``CAP_DAC_OVERRIDE``."
 msgstr ""
 "Backend.AI가 sysfs/cgroup 리소스 통계를 모으도록 허용하기 위해서는 ``CAP_SYS_ADMIN``, ``CAP_SYS_PTRACE``, ``CAP_DAC_OVERRIDE``"
-" 의 리눅스의 능력이 필요합니다."
+" 의 리눅스 Capability 설정이 필요합니다."
 
 #: ../../install/development-setup.rst:216 0f7fcbdb18da4afbb80e84cd800a0af8
 msgid "Verifying Installation"
