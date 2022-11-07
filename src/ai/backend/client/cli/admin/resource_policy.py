@@ -12,7 +12,6 @@ from ai.backend.client.func.keypair_resource_policy import (
 from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
-from ..params import JSONParamType
 from ..pretty import print_info
 from ..types import CLIContext
 
@@ -97,7 +96,7 @@ def list(ctx):
 )
 @click.option(
     "--allowed-vfolder-hosts",
-    type=JSONParamType(),
+    type=str,
     default=json.dumps(
         {
             "local:volume1": [
@@ -194,7 +193,7 @@ def add(
 )
 @click.option(
     "--allowed-vfolder-hosts",
-    type=JSONParamType(),
+    type=str,
     help="Allowed virtual folder hosts. "
     'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
 )

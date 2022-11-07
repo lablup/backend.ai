@@ -1,6 +1,5 @@
-import json
 import textwrap
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Sequence
 
 from ai.backend.client.output.fields import group_fields
 from ai.backend.client.output.types import FieldSpec
@@ -138,7 +137,7 @@ class Group(BaseFunction):
         description: str = "",
         is_active: bool = True,
         total_resource_slots: str = None,
-        allowed_vfolder_hosts: Mapping[str, Sequence[str]] = None,
+        allowed_vfolder_hosts: str = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -168,7 +167,7 @@ class Group(BaseFunction):
                 "is_active": is_active,
                 "domain_name": domain_name,
                 "total_resource_slots": total_resource_slots,
-                "allowed_vfolder_hosts": json.dumps(allowed_vfolder_hosts),
+                "allowed_vfolder_hosts": allowed_vfolder_hosts,
                 "integration_id": integration_id,
             },
         }
@@ -184,7 +183,7 @@ class Group(BaseFunction):
         description: str = None,
         is_active: bool = None,
         total_resource_slots: str = None,
-        allowed_vfolder_hosts: Mapping[str, Sequence[str]] = None,
+        allowed_vfolder_hosts: str = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -208,7 +207,7 @@ class Group(BaseFunction):
                 "description": description,
                 "is_active": is_active,
                 "total_resource_slots": total_resource_slots,
-                "allowed_vfolder_hosts": json.dumps(allowed_vfolder_hosts),
+                "allowed_vfolder_hosts": allowed_vfolder_hosts,
                 "integration_id": integration_id,
             },
         }

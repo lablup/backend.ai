@@ -1,5 +1,4 @@
-import json
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Sequence
 
 from ai.backend.client.output.fields import keypair_resource_policy_fields
 from ai.backend.client.output.types import FieldSpec
@@ -55,7 +54,7 @@ class KeypairResourcePolicy(BaseFunction):
         max_vfolder_count: int,
         max_vfolder_size: int,
         idle_timeout: int,
-        allowed_vfolder_hosts: Mapping[str, Sequence[str]] = None,
+        allowed_vfolder_hosts: str = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
@@ -84,7 +83,7 @@ class KeypairResourcePolicy(BaseFunction):
                 "max_vfolder_count": max_vfolder_count,
                 "max_vfolder_size": max_vfolder_size,
                 "idle_timeout": idle_timeout,
-                "allowed_vfolder_hosts": json.dumps(allowed_vfolder_hosts),
+                "allowed_vfolder_hosts": allowed_vfolder_hosts,
             },
         }
         data = await api_session.get().Admin._query(q, variables)
@@ -103,7 +102,7 @@ class KeypairResourcePolicy(BaseFunction):
         max_vfolder_count: int,
         max_vfolder_size: int,
         idle_timeout: int,
-        allowed_vfolder_hosts: Mapping[str, Sequence[str]] = None,
+        allowed_vfolder_hosts: str = None,
     ) -> dict:
         """
         Updates an existing keypair resource policy with the given options.
@@ -127,7 +126,7 @@ class KeypairResourcePolicy(BaseFunction):
                 "max_vfolder_count": max_vfolder_count,
                 "max_vfolder_size": max_vfolder_size,
                 "idle_timeout": idle_timeout,
-                "allowed_vfolder_hosts": json.dumps(allowed_vfolder_hosts),
+                "allowed_vfolder_hosts": allowed_vfolder_hosts,
             },
         }
         data = await api_session.get().Admin._query(q, variables)
