@@ -177,7 +177,7 @@ msgid ""
 "changed the installation instruction completely with introduction of "
 "Pants."
 msgstr ""
-"우리는 플러그인을 제외한 모든 Python 기반 구성 요소를 포함하는 semi-mono 저장소로 패키지별 저장소로 이동시켰습니다. 
+"우리는 플러그인을 제외한 모든 Python 기반 구성 요소를 포함하는 semi-mono 저장소로 패키지별 저장소로 이동시켰습니다."
 "이것은 팬츠의 도입으로 설치 방법이 완전히 바뀌었습니다."
 
 #: ../../install/development-setup.rst:175 99570bb3c9ae45598ffb8d5fc491c0f8
