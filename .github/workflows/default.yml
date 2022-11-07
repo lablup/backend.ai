@@ -84,12 +84,6 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
-    - name: Apply cache for mypy
-      uses: actions/cache@v3
-      with:
-        path: |
-          .mypy_cache
-        key: mypy-${{ runner.os }}-${{ hashFiles('pants*.toml', 'tools/mypy.lock') }}-
     - name: Bootstrap Pants
       run: |
         mkdir .tmp
