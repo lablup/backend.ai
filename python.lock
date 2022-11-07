@@ -68,6 +68,7 @@
 //     "setproctitle~=1.2.2",
 //     "tabulate~=0.8.9",
 //     "tblib~=1.7",
+//     "temporenc~=0.1.0",
 //     "tenacity>=8.0",
 //     "tomli~=2.0.1",
 //     "tomlkit~=0.11.1",
@@ -1221,6 +1222,26 @@
           ],
           "requires_python": ">=3.10",
           "version": "0.1.14"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "2ac84b496be68464a2da60da518af3785fff8b7ec0d090a581604bc870bdee41",
+              "url": "https://files.pythonhosted.org/packages/de/4c/2854d9e3dcce78108126aa3634186a64ddbfd06d4d69af74954665529e52/exceptiongroup-1.0.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "affbabf13fb6e98988c38d9c5650e701569fe3c1de3233cfb61c5f33774690ad",
+              "url": "https://files.pythonhosted.org/packages/4f/7e/eca80dbb5c10ec12ffb50884f52ecbff653cb5f443b0529244a748f114da/exceptiongroup-1.0.0.tar.gz"
+            }
+          ],
+          "project_name": "exceptiongroup",
+          "requires_dists": [
+            "pytest>=6; extra == \"test\""
+          ],
+          "requires_python": ">=3.7",
+          "version": "1"
         },
         {
           "artifacts": [
@@ -4033,6 +4054,7 @@
     "setproctitle~=1.2.2",
     "tabulate~=0.8.9",
     "tblib~=1.7",
+    "temporenc~=0.1.0",
     "tenacity>=8.0",
     "tomli~=2.0.1",
     "tomlkit~=0.11.1",
