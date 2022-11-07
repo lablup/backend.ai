@@ -72,6 +72,7 @@ from ai.backend.common.types import (
     ClusterInfo,
     ClusterMode,
     ClusterSSHKeyPair,
+    CommitStatus,
     DeviceId,
     HardwareMetadata,
     KernelEnqueueingConfig,
@@ -2524,6 +2525,8 @@ class AgentRegistry:
         )
         current_addr = agent_info["addr"]
         sgroup = agent_info.get("scaling_group", "default")
+        abuse_report_path = agent_info["agent_info"]
+        auto_terminate = agent_info["abusing_container_auto_terminate"]
         async with self.heartbeat_lock:
 
             instance_rejoin = False
@@ -2548,6 +2551,8 @@ class AgentRegistry:
                                 agents.c.version,
                                 agents.c.compute_plugins,
                                 agents.c.architecture,
+                                agents.c.abuse_report_path,
+                                agents.c.auto_terminate,
                             ]
                         )
                         .select_from(agents)
@@ -2575,6 +2580,8 @@ class AgentRegistry:
                                 "version": agent_info["version"],
                                 "compute_plugins": agent_info["compute_plugins"],
                                 "architecture": agent_info.get("architecture", "x86_64"),
+                                "abuse_report_path": abuse_report_path,
+                                "auto_terminate": auto_terminate,
                             }
                         )
                         result = await conn.execute(insert_query)
@@ -2593,6 +2600,10 @@ class AgentRegistry:
                             updates["compute_plugins"] = agent_info["compute_plugins"]
                         if row["architecture"] != agent_info["architecture"]:
                             updates["architecture"] = agent_info["architecture"]
+                        if row["abuse_report_path"] != abuse_report_path:
+                            updates["abuse_report_path"] = abuse_report_path
+                        if row["auto_terminate"] != auto_terminate:
+                            updates["auto_terminate"] = auto_terminate
                         # occupied_slots are updated when kernels starts/terminates
                         if updates:
                             await self.shared_config.update_resource_slots(slot_key_and_units)
@@ -2616,6 +2627,8 @@ class AgentRegistry:
                                     "version": agent_info["version"],
                                     "compute_plugins": agent_info["compute_plugins"],
                                     "architecture": agent_info["architecture"],
+                                    "abuse_report_path": abuse_report_path,
+                                    "auto_terminate": auto_terminate,
                                 }
                             )
                             .where(agents.c.id == agent_id)
@@ -3034,15 +3047,26 @@ class AgentRegistry:
         if kernel["status"] != KernelStatus.RUNNING:
             return {"status": "", "kernel": str(kernel["id"])}
         email = await self._get_user_email(kernel)
-        async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
-            async with RPCContext(
-                kernel["agent"],
-                kernel["agent_addr"],
-                invoke_timeout=None,
-                order_key=kernel["id"],
-                keepalive_timeout=self.rpc_keepalive_timeout,
-            ) as rpc:
-                return await rpc.call.get_commit_status(str(kernel["id"]), email)
+        hash_name = f"kernel_commit_status.{email}"
+        commit_status_info: Mapping[str, str] = await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.hgetall(hash_name),
+        )
+        if commit_status_info is None:
+            return {"kernel": kernel["id"], "status": CommitStatus.READY.value}
+        return {
+            "kernel": kernel["id"],
+            "status": commit_status_info.get(str(kernel["id"]), CommitStatus.READY.value),
+        }
+        # async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
+        #     async with RPCContext(
+        #         kernel["agent"],
+        #         kernel["agent_addr"],
+        #         invoke_timeout=None,
+        #         order_key=kernel["id"],
+        #         keepalive_timeout=self.rpc_keepalive_timeout,
+        #     ) as rpc:
+        #         return await rpc.call.get_commit_status(str(kernel["id"]), email)
 
     async def commit_session(
         self,

@@ -91,6 +91,7 @@ from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
+    CommitStatus,
     ContainerId,
     DeviceId,
     DeviceName,
@@ -617,6 +618,11 @@ class AbstractAgent(
             abuse_report_path.mkdir(exist_ok=True, parents=True)
             self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 30.0))
 
+        # Report commit status
+        self.timer_tasks.append(
+            aiotools.create_timer(self._report_all_kernel_commit_status_map, 20.0)
+        )
+
         loop = current_loop()
         self.last_registry_written_time = time.monotonic()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
@@ -693,6 +699,46 @@ class AbstractAgent(
         pretty_tb = "".join(traceback.format_tb(tb)).strip()
         await self.produce_event(AgentErrorEvent(pretty_message, pretty_tb))
 
+    async def _report_all_kernel_commit_status_map(self) -> None:
+        """
+        Commit statuses are managed by `lock` file.
+        +- base_commit_path
+        |_ subdir1 (usually user's email)
+            |_ commit_file1 (named by timestamp)
+            |_ commit_file2
+            |_ lock
+                |_ kernel_id1 (means the user is currently committing the kernel)
+                |_ kernel_id2
+        |_ subdir2
+        ...
+
+        `status_map` is like below.
+        {
+            str(subdir1): {
+                str(kernel_id1): CommitStatus.ONGOING.value,
+                str(kernel_id2): CommitStatus.ONGOING.value,
+            },
+            str(subdir2): ...,
+        }
+        """
+        base_commit_path: Path = self.local_config["agent"]["image-commit-path"]
+        status_map = {}
+        for subdir in base_commit_path.iterdir():
+            ongoing_list = [commit_path.name for commit_path in subdir.glob("./**/lock/*")]
+            status_map[str(subdir)] = {kern: CommitStatus.ONGOING.value for kern in ongoing_list}
+
+        async def _set_all_commit_status(r: Redis):
+            pipe = r.pipeline()
+            for subdir, kernel_map in status_map.items():
+                name = f"kernel_commit_status.{subdir}"
+                await pipe.hset(name, mapping=cast(Mapping, kernel_map))
+            return pipe
+
+        await redis_helper.execute(
+            self.redis_stat_pool,
+            _set_all_commit_status,
+        )
+
     async def heartbeat(self, interval: float):
         """
         Send my status information and available kernel images to the manager(s).
@@ -723,6 +769,10 @@ class AbstractAgent(
                     msgpack.packb([(repo_tag, digest) for repo_tag, digest in self.images.items()])
                 ),
                 "architecture": get_arch_name(),
+                "abuse_report_path": self.local_config["agent"].get("abuse-report-path"),
+                "abusing_container_auto_terminate": self.local_config["agent"].get(
+                    "force-terminate-abusing-containers", False
+                ),
             }
             await self.produce_event(AgentHeartbeatEvent(agent_info))
         except asyncio.TimeoutError:
@@ -1919,7 +1969,7 @@ class AbstractAgent(
     async def commit(self, reporter, kernel_id: KernelId, subdir: str, filename: str):
         return await self.kernel_registry[kernel_id].commit(kernel_id, subdir, filename)
 
-    async def get_commit_status(self, kernel_id: KernelId, subdir: str):
+    async def get_commit_status(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)
 
     async def accept_file(self, kernel_id: KernelId, filename: str, filedata):

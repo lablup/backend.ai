@@ -37,7 +37,7 @@ from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId, aobject
+from ai.backend.common.types import CommitStatus, KernelId, aobject
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
@@ -277,7 +277,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    async def check_duplicate_commit(self, kernel_id, subdir):
+    async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
         raise NotImplementedError
 
     @abstractmethod

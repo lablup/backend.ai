@@ -83,6 +83,8 @@ agents = sa.Table(
     sa.Column("version", sa.String(length=64), nullable=False),
     sa.Column("architecture", sa.String(length=32), nullable=False),
     sa.Column("compute_plugins", pgsql.JSONB(), nullable=False, default={}),
+    sa.Column("abuse_report_path", sa.String(length=64), nullable=True),
+    sa.Column("auto_terminate", sa.Boolean(), nullable=False, server_default=true(), default=False),
 )
 
 
@@ -105,6 +107,8 @@ class Agent(graphene.ObjectType):
     version = graphene.String()
     compute_plugins = graphene.JSONString()
     hardware_metadata = graphene.JSONString()
+    abuse_report_path = graphene.String()
+    auto_terminate = graphene.Boolean()
     local_config = graphene.JSONString()
 
     # Legacy fields
@@ -145,6 +149,8 @@ class Agent(graphene.ObjectType):
             lost_at=row["lost_at"],
             version=row["version"],
             compute_plugins=row["compute_plugins"],
+            abuse_report_path=row["abuse_report_path"],
+            auto_terminate=row["auto_terminate"],
             # legacy fields
             mem_slots=BinarySize.from_str(row["available_slots"]["mem"]) // mega,
             cpu_slots=row["available_slots"]["cpu"],
@@ -198,10 +204,14 @@ class Agent(graphene.ObjectType):
         return await graph_ctx.registry.gather_agent_hwinfo(self.id)
 
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
-        if self.status != AgentStatus.ALIVE.name:
-            return None
-        graph_ctx: GraphQueryContext = info.context
-        return await graph_ctx.registry.get_agent_local_config(self.id, self.addr)
+        return {
+            "agent": {
+                "abuse-report-path": str(self.abuse_report_path)
+                if self.abuse_report_path is not None
+                else "",
+                "auto_terminate": self.auto_terminate,
+            },
+        }
 
     _queryfilter_fieldspec = {
         "id": ("id", None),
