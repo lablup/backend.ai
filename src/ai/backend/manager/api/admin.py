@@ -6,7 +6,7 @@ import re
 from typing import TYPE_CHECKING, Any, Iterable, Tuple
 
 import aiohttp_cors
-import attr
+import attrs
 import graphene
 import trafaret as t
 from aiohttp import web
@@ -130,7 +130,7 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
     return web.json_response(result.data, status=200)
 
 
-@attr.s(auto_attribs=True, slots=True, init=False)
+@attrs.define(auto_attribs=True, slots=True, init=False)
 class PrivateContext:
     gql_executor: AsyncioExecutor
     gql_schema: graphene.Schema

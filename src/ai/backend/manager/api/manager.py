@@ -9,7 +9,7 @@ import socket
 from typing import TYPE_CHECKING, Any, Final, FrozenSet, Iterable, Tuple
 
 import aiohttp_cors
-import attr
+import attrs
 import graphene
 import sqlalchemy as sa
 import trafaret as t
@@ -243,7 +243,7 @@ async def perform_scheduler_ops(request: web.Request, params: Any) -> web.Respon
     return web.Response(status=204)
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     status_watch_task: asyncio.Task
 

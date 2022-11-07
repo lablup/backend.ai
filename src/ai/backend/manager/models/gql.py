@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
-import attr
+import attrs
 import graphene
 
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
@@ -104,7 +104,7 @@ from .vfolder import (
 )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class GraphQueryContext:
     schema: graphene.Schema
     dataloader_manager: DataLoaderManager
