@@ -88,7 +88,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: |
-          ~/.mypy_cache
+          .mypy_cache
         key: mypy-${{ runner.os }}-${{ hashFiles('pants*.toml', 'tools/mypy.lock') }}-
     - name: Bootstrap Pants
       run: |
