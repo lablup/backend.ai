@@ -9,6 +9,7 @@ backend_packages = [
     "pants.backend.python.lint.isort",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.experimental.python",
+    "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
     "towncrier_tool",
@@ -44,12 +45,16 @@ enable_resolves = true
 interpreter_constraints = ["CPython==3.10.8"]
 tailor_pex_binary_targets = false
 
+[python-bootstrap]
+search_path = ["<PYENV>", "<PATH>"]
+
 [python-repos]
 indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
 
 [python.resolves]
 python-default = "python.lock"
 python-kernel = "python-kernel.lock"
+pants-plugins = "tools/pants-plugins.lock"
 
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
