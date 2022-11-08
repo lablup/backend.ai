@@ -1300,7 +1300,6 @@ class AgentRegistry:
                             keepalive_timeout=self.rpc_keepalive_timeout,
                         ) as rpc:
                             port = await rpc.call.assign_port()
-                            log.debug("allocated port {}", port)
                             agent_addr = item.agent_alloc_ctx.agent_addr.replace(
                                 "tcp://", ""
                             ).split(":", maxsplit=1)[0]
