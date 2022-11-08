@@ -172,11 +172,11 @@ class BaseRunner(metaclass=ABCMeta):
         intrinsic_host_ports_mapping_path = Path("/home/config/intrinsic-ports.json")
         if intrinsic_host_ports_mapping_path.is_file():
 
-            def _read_file():
-                return intrinsic_host_ports_mapping_path.read_text()
-
             intrinsic_host_ports_mapping = json.loads(
-                await asyncio.get_running_loop().run_in_executor(None, _read_file)
+                await asyncio.get_running_loop().run_in_executor(
+                    None,
+                    lambda: intrinsic_host_ports_mapping_path.read_text(),
+                )
             )
             self.intrinsic_host_ports_mapping = intrinsic_host_ports_mapping
 

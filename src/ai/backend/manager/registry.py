@@ -1309,6 +1309,7 @@ class AgentRegistry:
                                 port,
                             )
                             item.allocated_host_ports.add(port)
+        log.debug("ssh connection info mapping: {}", cluster_ssh_port_mapping)
 
         keyfunc = lambda item: item.kernel.cluster_role
         replicas = {

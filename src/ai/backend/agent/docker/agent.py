@@ -757,17 +757,17 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 "replin": host_ports[0],
                 "replout": host_ports[1],
             }
-            for index, port_info in enumerate(service_ports):
-                if port_info["name"] == "sshd":
-                    intrinsic_ports["sshd"] = host_ports[index + 2]
-                elif port_info["name"] == "ttyd":
-                    intrinsic_ports["ttyd"] = host_ports[index + 2]
+            for index, port_info in enumerate(service_ports[2:], start=2):
+                port_name = port_info["name"]
+                if port_name in ("sshd", "ttyd"):
+                    intrinsic_ports[port_name] = host_ports[index]
 
-            def _write_file():
-                with open(self.config_dir / "intrinsic-ports.json", "w") as fw:
-                    fw.write(json.dumps(intrinsic_ports))
-
-            await current_loop().run_in_executor(None, _write_file)
+            await current_loop().run_in_executor(
+                None,
+                lambda: (self.config_dir / "intrinsic-ports.json").write_text(
+                    json.dumps(intrinsic_ports)
+                ),
+            )
 
         if resource_opts and resource_opts.get("shmem"):
             shmem = int(resource_opts.get("shmem", "0"))

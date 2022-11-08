@@ -674,8 +674,8 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def collect_port(self, port_no: int):
-        log.debug("rpc::collect_port(port_no:{})", port_no)
+    async def release_port(self, port_no: int):
+        log.debug("rpc::release_port(port_no:{})", port_no)
         self.agent.port_pool.add(port_no)
 
 

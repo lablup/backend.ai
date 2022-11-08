@@ -1522,7 +1522,7 @@ class AbstractAgent(
         service_ports.append(
             {
                 "name": "sshd",
-                "protocol": ServicePortProtocols("tcp"),
+                "protocol": ServicePortProtocols.TCP,
                 "container_ports": (2200,),
                 "host_ports": (None,),
             }
@@ -1530,7 +1530,7 @@ class AbstractAgent(
         service_ports.append(
             {
                 "name": "ttyd",
-                "protocol": ServicePortProtocols("http"),
+                "protocol": ServicePortProtocols.HTTP,
                 "container_ports": (7681,),
                 "host_ports": (None,),
             }
@@ -1542,7 +1542,7 @@ class AbstractAgent(
             for port_no in preopen_ports:
                 preopen_sport: ServicePort = {
                     "name": str(port_no),
-                    "protocol": ServicePortProtocols("preopen"),
+                    "protocol": ServicePortProtocols.PREOPEN,
                     "container_ports": (port_no,),
                     "host_ports": (None,),
                 }
@@ -1557,7 +1557,7 @@ class AbstractAgent(
                 service_ports.append(
                     {
                         "name": f"hostport{index+1}",
-                        "protocol": ServicePortProtocols("internal"),
+                        "protocol": ServicePortProtocols.INTERNAL,
                         "container_ports": (port,),
                         "host_ports": (port,),
                     }
