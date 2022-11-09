@@ -130,7 +130,7 @@ async def setup_kwargs_plugin(
 
     # Override the interpreter compatibility range
     interpreter_constraints = InterpreterConstraints(python_setup.interpreter_constraints)
-    python_requires = next(str(ic.specifier) for ic in interpreter_constraints)
+    python_requires = next(str(ic.specifier) for ic in interpreter_constraints)  # type: ignore
     m = re.search(r"==(?P<major>\d+)\.(?P<minor>\d+)", python_requires)
     if m is not None:
         major = int(m.group("major"))
