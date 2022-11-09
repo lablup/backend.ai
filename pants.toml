@@ -9,6 +9,7 @@ backend_packages = [
     "pants.backend.python.lint.isort",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.experimental.python",
+    "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
     "towncrier_tool",
@@ -43,6 +44,10 @@ enable_resolves = true
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.10.8"]
 tailor_pex_binary_targets = false
+resolves_to_interpreter_constraints = "{'python-kernel': ['==3.9.*'], 'pants-plugins': ['>=3.7,<3.10']}"
+
+[python-bootstrap]
+search_path = ["<PYENV>", "<PATH>"]
 
 [python-repos]
 indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
@@ -50,6 +55,7 @@ indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
 [python.resolves]
 python-default = "python.lock"
 python-kernel = "python-kernel.lock"
+pants-plugins = "tools/pants-plugins.lock"
 
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
@@ -101,7 +107,7 @@ report = ["xml", "console"]
 lockfile = "tools/coverage-py.lock"
 
 [mypy]
-version = "mypy>=0.982"
+version = "mypy==0.982"
 interpreter_constraints = ["CPython>=3.10,<4"]
 extra_requirements.add = [
 ]
