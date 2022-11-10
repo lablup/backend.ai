@@ -1651,6 +1651,7 @@ class AbstractAgent(
             "resource_spec": attrs.asdict(resource_spec),
             "scaling_group": kernel_config["scaling_group"],
             "agent_addr": kernel_config["agent_addr"],
+            "attached_devices": attached_devices,
         }
 
         # Finally we are done.
