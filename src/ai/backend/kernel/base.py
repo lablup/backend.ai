@@ -246,7 +246,7 @@ class BaseRunner(metaclass=ABCMeta):
                     self.kernel_client = self.kernel_mgr.client()
                     self.kernel_client.start_channels(shell=True, iopub=True, stdin=True, hb=True)
                     try:
-                        self.kernel_client.wait_for_ready(timeout=10)
+                        self.kernel_client.wait_for_ready(timeout=10)  # type: ignore
                         # self.init_jupyter_kernel()
                     except RuntimeError:
                         # Clean up for client and kernel will be done in `shutdown`.
@@ -259,6 +259,7 @@ class BaseRunner(metaclass=ABCMeta):
 
     async def _shutdown_jupyter_kernel(self):
         if self.kernel_mgr and self.kernel_mgr.is_alive():
+            assert self.kernel_client is not None
             log.info("shutting down " + self.jupyter_kspec_name + " kernel...")
             self.kernel_client.stop_channels()
             self.kernel_mgr.shutdown_kernel()

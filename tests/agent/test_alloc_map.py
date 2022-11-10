@@ -1,7 +1,7 @@
 import random
 from decimal import ROUND_DOWN, Decimal
 
-import attr
+import attrs
 import pytest
 
 from ai.backend.agent.exception import (
@@ -20,7 +20,7 @@ from ai.backend.agent.resources import (
 from ai.backend.common.types import DeviceId, SlotName, SlotTypes
 
 
-@attr.s(auto_attribs=True)
+@attrs.define(auto_attribs=True)
 class DummyDevice(AbstractComputeDevice):
     pass
 

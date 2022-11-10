@@ -45,7 +45,7 @@ from typing import (
 from uuid import UUID
 
 import aiotools
-import attr
+import attrs
 import pkg_resources
 import snappy
 import zmq
@@ -487,14 +487,14 @@ KernelCreationContextType = TypeVar(
 )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class RestartTracker:
     request_lock: asyncio.Lock
     destroy_event: asyncio.Event
     done_event: asyncio.Event
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ComputerContext:
     instance: AbstractComputePlugin
     devices: Collection[AbstractComputeDevice]
@@ -945,7 +945,7 @@ class AbstractAgent(
                 if isinstance(ev, Sentinel):
                     await self.save_last_registry(force=True)
                     return
-                # attr currently does not support customizing getstate/setstate dunder methods
+                # attrs currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
                 if self.local_config["debug"]["log-events"]:
                     log.info(f"lifecycle event: {ev!r}")
@@ -1582,7 +1582,7 @@ class AbstractAgent(
 
         if self.local_config["debug"]["log-kernel-config"]:
             log.info(
-                "kernel starting with resource spec: \n{0}", pretty(attr.asdict(resource_spec))
+                "kernel starting with resource spec: \n{0}", pretty(attrs.asdict(resource_spec))
             )
         kernel_obj: KernelObjectType = await ctx.spawn(
             resource_spec,
@@ -1648,8 +1648,7 @@ class AbstractAgent(
             "stdout_port": kernel_obj["stdout_port"],  # legacy
             "service_ports": service_ports,
             "container_id": kernel_obj["container_id"],
-            "resource_spec": resource_spec.to_json_serializable_dict(),
-            "attached_devices": attached_devices,
+            "resource_spec": attrs.asdict(resource_spec),
             "scaling_group": kernel_config["scaling_group"],
             "agent_addr": kernel_config["agent_addr"],
         }
