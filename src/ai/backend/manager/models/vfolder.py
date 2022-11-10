@@ -4,7 +4,7 @@ import enum
 import os.path
 import uuid
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Set
+from typing import TYPE_CHECKING, Any, overload, List, Mapping, Optional, Sequence, Set
 
 import graphene
 import sqlalchemy as sa
@@ -32,10 +32,12 @@ from .base import (
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import UserRole
+from .group import query_user_accessible_groups, query_admin_accessible_groups
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .storage import StorageSessionManager
+    from sqlalchemy.schema import Column
 
 __all__: Sequence[str] = (
     "vfolders",
@@ -250,6 +252,213 @@ def verify_vfolder_name(folder: str) -> bool:
         if pattern.match(folder):
             return False
     return True
+
+
+def _build_query_own_folders(selectors, user_role, user_uuid) -> sa.sql.Select:
+    from ai.backend.manager.models import users
+
+    j = sa.join(vfolders, users, vfolders.c.user == users.c.uuid)
+    query = sa.select(selectors).select_from(j)
+    if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+        query = query.where(vfolders.c.user == user_uuid)
+    return query
+
+
+async def query_own_vfolders(
+    db_conn: SAConnection,
+    user_uuid: uuid.UUID,
+    user_role: UserRole,
+) -> Sequence[Mapping[str, Any]]:
+    """
+    Query all vfolders user created.
+    """
+    from ai.backend.manager.models import users
+
+    selectors = [vfolders, users.c.email]
+    query = _build_query_own_folders(selectors, user_role, user_uuid)
+    return [row async for row in (await db_conn.stream(query)) if row is not None]
+
+
+async def count_own_vfolders(
+    db_conn: SAConnection,
+    user_uuid: uuid.UUID,
+    user_role: UserRole,
+) -> int:
+    """
+    Count all vfolders user created.
+    """
+
+    selectors = [sa.func.count()]
+    query = _build_query_own_folders(selectors, user_role, user_uuid)
+    return await db_conn.scalar(query)
+
+
+def _build_query_user_type_permission_overriden_vfolders(selectors, user_uuid) -> sa.sql.Select:
+    from ai.backend.manager.models import users
+
+    j = (
+        sa.join(vfolders, vfolder_permissions, vfolders.c.id == vfolder_permissions.c.vfolder, isouter=True)
+        .join(users, vfolders.c.user == users.c.uuid, isouter=True)
+    )
+    query = (
+        sa.select(selectors)
+        .select_from(j)
+        .where(
+            (vfolder_permissions.c.user == user_uuid)
+            & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
+        )
+    )
+    return query
+
+
+async def query_user_type_permission_overriden_vfolders(
+    db_conn: SAConnection,
+    user_uuid: uuid.UUID,
+) -> Sequence[Mapping[str, Any]]:
+    """
+    Query all vfolders which have USER ownership type and overriden permissions,
+    which means `invited`. 
+    """
+    from ai.backend.manager.models import users
+
+    selectors = [vfolders, vfolder_permissions.c.permission, users.c.email]
+    query = _build_query_user_type_permission_overriden_vfolders(selectors, user_uuid)
+    return [row async for row in (await db_conn.stream(query)) if row is not None]
+
+
+async def count_user_type_permission_overriden_vfolders(
+    db_conn: SAConnection,
+    user_uuid: uuid.UUID,
+) -> int:
+    """
+    Count all vfolders which have USER ownership type and overriden permissions.
+    """
+
+    selectors = [sa.func.count()]
+    query = _build_query_user_type_permission_overriden_vfolders(selectors, user_uuid)
+    return await db_conn.scalar(query)
+
+
+def _build_query_project_group_vfolders(selectors, group_ids) -> sa.sql.Select:
+    from ai.backend.manager.models import groups
+
+    j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
+    query = sa.select(selectors).select_from(j)
+    # Do not apply VFolderOwnershipType.GROUP checker clause
+    # because all group-type vfolder rows have group id foreign key. 
+    # .where(vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+    if group_ids is not None:
+        query = query.where(vfolders.c.group.in_(group_ids))
+    return query
+
+
+async def query_project_group_vfolders(
+    db_conn: SAConnection,
+    user_uuid: uuid.UUID,
+    user_role: UserRole,
+    domain_name: str,
+) -> Sequence[Mapping[str, Any]]:
+    """
+    Query vfolders of project groups.
+    """
+    from ai.backend.manager.models import groups
+
+    match user_role:
+        case UserRole.SUPERADMIN:
+            group_ids = None
+        case UserRole.ADMIN:
+            group_ids = await query_admin_accessible_groups(db_conn, domain_name)
+        case UserRole.USER:
+            group_ids = await query_user_accessible_groups(db_conn, user_uuid)
+        case _:
+            group_ids = await query_user_accessible_groups(db_conn, user_uuid)
+
+    selectors = [vfolders, groups.c.name]
+    query = _build_query_project_group_vfolders(selectors, group_ids)
+    
+
+    vfolder_query_result = [row async for row in (await db_conn.stream(query)) if row is not None]
+
+    # Override permissions.
+    j = sa.join(
+        vfolders,
+        vfolder_permissions,
+        vfolders.c.id == vfolder_permissions.c.vfolder,
+    )
+    query = (
+        sa.select(vfolder_permissions.c.permission, vfolder_permissions.c.vfolder)
+        .select_from(j)
+        .where(
+            (vfolder_permissions.c.user == user_uuid),
+        )
+    )
+    if group_ids is not None:
+        query = query.where((vfolders.c.group.in_(group_ids)))
+    overriding_permissions = {row.vfolder: row.permission async for row in (await db_conn.stream(query)) if row is not None}
+
+    return [
+        {
+            **vf,
+            "permission": overriding_permissions.get(vf["id"]) or vf["permission"],
+        } for vf in vfolder_query_result
+    ]
+
+
+async def count_project_group_vfolders(
+    db_conn: SAConnection,
+    user_uuid: uuid.UUID,
+    user_role: UserRole,
+    domain_name: str,
+) -> int:
+    """
+    Count vfolders of project groups.
+    """
+
+    match user_role:
+        case UserRole.SUPERADMIN:
+            group_ids = None
+        case UserRole.ADMIN:
+            group_ids = await query_admin_accessible_groups(db_conn, domain_name)
+        case UserRole.USER:
+            group_ids = await query_user_accessible_groups(db_conn, user_uuid)
+        case _:
+            group_ids = await query_user_accessible_groups(db_conn, user_uuid)
+
+    selectors = [sa.func.count()]
+    query = _build_query_project_group_vfolders(selectors, group_ids)
+    return await db_conn.scalar(query)
+
+
+async def query_all_related_vfolders(
+    db_conn: SAConnection,
+    user_uuid: uuid.UUID,
+    *,
+    user_role: UserRole,
+    domain_name: str,
+) -> Sequence[Mapping[str, Any]]:
+    # Query own vfolders
+    own_vfs = await query_own_vfolders(db_conn, user_uuid, user_role)
+    invited_vfs = await query_user_type_permission_overriden_vfolders(db_conn, user_uuid, user_role)
+
+    # Query project-group vfolders
+    group_vfs = await query_project_group_vfolders(db_conn, user_uuid, user_role, domain_name)
+    return [*own_vfs, *invited_vfs, *group_vfs]
+
+
+async def count_all_related_vfolders(
+    db_conn: SAConnection,
+    user_uuid: uuid.UUID,
+    *,
+    user_role: UserRole,
+    domain_name: str,
+) -> int:
+    # Query own vfolders
+    num_own = await count_own_vfolders(db_conn, user_uuid, user_role)
+    num_invited = await count_user_type_permission_overriden_vfolders(db_conn, user_uuid)
+
+    # Query project-group vfolders
+    num_group = await count_project_group_vfolders(db_conn, user_uuid, user_role, domain_name)
+    return num_own + num_invited + num_group
 
 
 async def query_accessible_vfolders(
