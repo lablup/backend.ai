@@ -44,7 +44,7 @@ enable_resolves = true
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.10.8"]
 tailor_pex_binary_targets = false
-resolves_to_interpreter_constraints = "{'python-default': ['>=3.10.8'], 'python-kernel': ['==3.9.*'], 'pants-plugins': ['>=3.9,<3.10']}"
+resolves_to_interpreter_constraints = "{'python-default': ['==3.10.8'], 'python-kernel': ['==3.9.*'], 'pants-plugins': ['>=3.9,<3.10']}"
 
 [python-bootstrap]
 search_path = ["<PYENV>", "<PATH>"]
