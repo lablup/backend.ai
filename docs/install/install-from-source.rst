@@ -7,10 +7,12 @@ Install from Source
    and install the pre-built wheel distributions, following :doc:`/install/install-from-package`.
 
 
-Setting Up Manager and Agent (single node)
-------------------------------------------
+Setting Up Manager and Agent (single node, all-in-one)
+------------------------------------------------------
 
 Check out :doc:`/install/development-setup`.
+
+.. _multi-node-setup:
 
 Setting Up Additional Agents (multi-node)
 -----------------------------------------
@@ -35,11 +37,17 @@ Installing additional agents in different nodes
 
 First, you need to initialize a working copy of the core repository for each additional agent node.
 As our ``scripts/install-dev.sh`` does not yet provide an "agent-only" installation mode,
-you need to manually perform the same pyenv, Python, and Pants setup procedures as the script does.
+you need to manually perform the same repository cloning along with the pyenv, Python, and Pants setup procedures as the script does.
+
+.. note::
+
+   Since we use the mono-repo for the core packages, there is no way to separately clone the agent sources only.
+   Just clone the entire repository and configure/execute the agent only.
+   Ensure that you **also pull the LFS files and submodules** when you manually clone it.
 
 Once your ``./pants`` is up and working, run ``./pants export ::`` to populate virtualenvs and install dependencies.
 
-Then start to configure ``agent.toml`` by copying it from ``configs/agent/halfstack.toml`` as follows:
+Then start to configure ``agent.toml`` by copying it from `configs/agent/halfstack.toml <https://github.com/lablup/backend.ai/blob/main/configs/agent/halfstack.toml>`_ as follows:
 
 * **agent.toml**
 
@@ -61,8 +69,22 @@ If this is not the case, you should configure firewalls to open all the port num
 There are more complicated setup scenarios such as splitting network planes for control and container-to-container communications,
 but we provide assistance with them for enterprise customers only.
 
-Configuring overlay networks for multi-node training (optional)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Setting Up CUDA Acceleration
+----------------------------
+
+Ensure that your accelerator is properly set up using vendor-specific installation methods.
+
+Clone the accelerator plugin package into ``plugins`` directory if necessary or just use one of the already existing one in the mono-repo.  You also need to configure ``agent.toml``'s ``[agent].allow-compute-plugins`` with the full package path (e.g., ``ai.backend.accelerator.cuda_open``) to activate them.
+
+Setting Up Shared Storage
+-------------------------
+
+To make vfolders working properly with multiple nodes, you must enable and configure Linux NFS to share the manager node's ``vfroot/local`` directory under the working copy and mount it in the same path in all agent nodes.
+
+It is recommended to unify the UID and GID of the storage-proxy service, all of the agent services across nodes, container UID and GID (configurable in ``agent.toml``), and the NFS volume.
+
+Configuring Overlay Networks for Multi-node Training (Optional)
+---------------------------------------------------------------
 
 .. note::
 
