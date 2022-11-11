@@ -2,5 +2,8 @@
 dynamic_ui = false
 colors = true
 
+[python-bootstrap]
+search_path = ["<PATH>"]
+
 [pytest]
 args = ["-vv", "--no-header"]
