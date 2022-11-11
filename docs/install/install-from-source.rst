@@ -74,7 +74,9 @@ Setting Up CUDA Acceleration
 
 Ensure that your accelerator is properly set up using vendor-specific installation methods.
 
-Clone the accelerator plugin package into ``plugins`` directory if necessary or just use one of the already existing one in the mono-repo.  You also need to configure ``agent.toml``'s ``[agent].allow-compute-plugins`` with the full package path (e.g., ``ai.backend.accelerator.cuda_open``) to activate them.
+Clone the accelerator plugin package into ``plugins`` directory if necessary or just use one of the already existing one in the mono-repo.
+
+You also need to configure ``agent.toml``'s ``[agent].allow-compute-plugins`` with the full package path (e.g., ``ai.backend.accelerator.cuda_open``) to activate them.
 
 Setting Up Shared Storage
 -------------------------

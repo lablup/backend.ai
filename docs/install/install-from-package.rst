@@ -49,6 +49,8 @@ Ensure that your accelerator is properly set up using vendor-specific installati
 
 Within the virtualenv for ``backend.ai-agent``, additionally install accelerator plugin packages such as ``backend.ai-accelerator-cuda-open``.  Restart the agent.
 
+You also need to configure ``agent.toml``'s ``[agent].allow-compute-plugins`` with the full package path (e.g., ``ai.backend.accelerator.cuda_open``) to activate them.
+
 Setting Up Multiple Nodes Cluster
 ---------------------------------
 
