@@ -833,14 +833,18 @@ class VirtualFolder(graphene.ObjectType):
             .offset(offset)
         )
         perm_overriden_join = (
-            sa.join(vfolders, vfolder_permissions, vfolders.c.id == vfolder_permissions.c.vfolder, isouter=True)
+            sa.join(
+                vfolders,
+                vfolder_permissions,
+                vfolders.c.id == vfolder_permissions.c.vfolder,
+                isouter=True,
+            )
             .join(users, vfolders.c.user == users.c.uuid, isouter=True)
             .join(groups, vfolders.c.group == groups.c.id, isouter=True)
         )
-        perm_overriden_query = (
-            sa.select([vfolders, users.c.email, groups.c.name.label("groups_name")])
-            .select_from(perm_overriden_join)
-        )
+        perm_overriden_query = sa.select(
+            [vfolders, users.c.email, groups.c.name.label("groups_name")]
+        ).select_from(perm_overriden_join)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
             perm_overriden_query = perm_overriden_query.where(users.c.domain_name == domain_name)
@@ -865,8 +869,9 @@ class VirtualFolder(graphene.ObjectType):
             vfolder_list = [r async for r in (await conn.stream(query))]
             perm_vfolder_list = [r async for r in (await conn.stream(perm_overriden_query))]
             remove_duplicated: Mapping[uuid.UUID, VirtualFolder] = {
-                row["id"]: cls.from_row(graph_ctx, row) for row in [*vfolder_list, *perm_vfolder_list]
-                if cls.from_row(graph_ctx, row) is not None
+                row["id"]: obj
+                for row in [*vfolder_list, *perm_vfolder_list]
+                if (obj := cls.from_row(graph_ctx, row)) is not None
             }
             return list(remove_duplicated.values())
 
