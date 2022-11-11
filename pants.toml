@@ -47,7 +47,7 @@ tailor_pex_binary_targets = false
 resolves_to_interpreter_constraints = "{'python-kernel': ['==3.9.*'], 'pants-plugins': ['>=3.7,<3.10']}"
 
 [python-bootstrap]
-search_path = ["<PYENV>", "<PATH>"]
+search_path = ["<PYENV>"]
 
 [python-repos]
 indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
