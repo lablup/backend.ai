@@ -51,10 +51,10 @@ else
       addgroup -g $GROUP_ID $GROUP_NAME
     fi
     if [ -z "$USER_NAME" ]; then
-      touch bbb111
       USER_NAME=work
       adduser -s /bin/ash -h "/home/$USER_NAME" -H -D -u $USER_ID -G $GROUP_NAME -g "User" $USER_NAME
       usermod -a -G shadow $USER_NAME
+      chmod 0644 /etc/shadow && usermod -aG shadow $USER_NAME
       chgrp shadow /etc/group
     fi
     export SHELL=/bin/ash
@@ -66,19 +66,19 @@ else
       groupadd -g $GROUP_ID $GROUP_NAME
     fi
     if [ -z "$USER_NAME" ]; then
-      touch bbb222
       USER_NAME=work
       useradd -s /bin/bash -d "/home/$USER_NAME" -M -r -u $USER_ID -g $GROUP_NAME -o -c "User" $USER_NAME
-      usermod -a -G shadow work
+      usermod -a -G shadow $USER_NAME
+      chmod 0644 /etc/shadow && usermod -aG shadow $USER_NAME
       chgrp shadow /etc/group
     else
-      touch bbb333
       cp -R "/home/$USER_NAME/*" /home/work/
       cp -R "/home/$USER_NAME/.*" /home/work/
       usermod -s /bin/bash -d /home/work -l work -g $GROUP_NAME $USER_NAME
       USER_NAME=work
       chown -R $USER_NAME:$GROUP_NAME /home/work
       usermod -a -G shadow $USER_NAME
+      chmod 0644 /etc/shadow && usermod -aG shadow $USER_NAME
       chgrp shadow /etc/group
     fi
     export SHELL=/bin/bash
@@ -103,7 +103,6 @@ else
 
   echo "Generate random alpha-numeric password"
   if [ ! -f "$HOME/.password" ]; then
-    touch aaa222
     /opt/kernel/su-exec $USER_ID:$GROUP_ID  /opt/backend.ai/bin/python /opt/kernel/fantompass.py > "$HOME/.password"
     export ALPHA_NUMERIC_VAL=$(cat $HOME/.password)
     chmod 0644 "$HOME/.password"
