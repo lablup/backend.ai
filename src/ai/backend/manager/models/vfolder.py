@@ -843,24 +843,30 @@ class VirtualFolder(graphene.ObjectType):
         )
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
+            perm_overriden_query = perm_overriden_query.where(users.c.domain_name == domain_name)
         if group_id is not None:
             query = query.where(vfolders.c.group == group_id)
+            perm_overriden_query = perm_overriden_query.where(vfolders.c.group == group_id)
         if user_id is not None:
             query = query.where(vfolders.c.user == user_id)
             perm_overriden_query = perm_overriden_query.where(vfolder_permissions.c.user == user_id)
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
+            perm_overriden_query = qfparser.append_filter(perm_overriden_query, filter)
         if order is not None:
             qoparser = QueryOrderParser(cls._queryorder_colmap)
             query = qoparser.append_ordering(query, order)
+            perm_overriden_query = qoparser.append_ordering(perm_overriden_query, order)
         else:
             query = query.order_by(vfolders.c.created_at.desc())
+            perm_overriden_query = perm_overriden_query.order_by(vfolders.c.created_at.desc())
         async with graph_ctx.db.begin_readonly() as conn:
-            vfolder_list = [r for r in (await conn.stream(query)) if r is not None]
-            perm_vfolder_list = [r for r in (await conn.stream(perm_overriden_query)) if r is not None]
-            remove_duplicated = {
+            vfolder_list = [r async for r in (await conn.stream(query))]
+            perm_vfolder_list = [r async for r in (await conn.stream(perm_overriden_query))]
+            remove_duplicated: Mapping[uuid.UUID, VirtualFolder] = {
                 row["id"]: cls.from_row(graph_ctx, row) for row in [*vfolder_list, *perm_vfolder_list]
+                if cls.from_row(graph_ctx, row) is not None
             }
             return list(remove_duplicated.values())
 
