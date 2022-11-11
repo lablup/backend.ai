@@ -5,5 +5,8 @@ colors = true
 [python-bootstrap]
 search_path = ["<PATH>"]
 
+[stats]
+log = true
+
 [pytest]
 args = ["-vv", "--no-header"]
