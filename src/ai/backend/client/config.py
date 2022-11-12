@@ -84,7 +84,6 @@ def get_env(
     :returns: The value processed by the *clean* function.
     """
     load_dotenv(override=True)
-    load_dotenv(override=True, dotenv_path=".sessionenv")
     key = key.upper()
     raw = os.environ.get("BACKEND_" + key)
     if raw is None:

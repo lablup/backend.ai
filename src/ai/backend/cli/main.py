@@ -1,7 +1,10 @@
 import click
+from dotenv import load_dotenv
 
 from .extensions import ExtendedCommandGroup
 from .types import CliContextInfo
+
+load_dotenv(override=True, dotenv_path=".sessionenv")
 
 
 @click.group(
