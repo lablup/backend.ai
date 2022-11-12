@@ -7,7 +7,7 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Backend.AI Documentation 22.06\n"
+"Project-Id-Version: Backend.AI Documentation 22.09\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2022-11-11 22:50-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -18,24 +18,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.10.3\n"
 
-#: ../../client/func/session-template.rst:2 1ff8a9ecff16498e9a7e141feaaf0dc0
-msgid "Session Template Functions"
+#: ../../user/index.rst:2 26ad872b09c04a349469e3cb3371bf5e
+msgid "User Guides"
 msgstr ""
-
-#~ msgid "Return type"
-#~ msgstr ""
-
-#~ msgid ":py:class:`~ai.backend.client.func.session_template.SessionTemplate`"
-#~ msgstr ""
-
-#~ msgid ""
-#~ ":py:class:`~typing.List`\\[:py:class:`~typing.Mapping`\\[:py:class:`str`,"
-#~ " :py:class:`str`]]"
-#~ msgstr ""
-
-#~ msgid ":py:class:`str`"
-#~ msgstr ""
-
-#~ msgid ":py:data:`~typing.Any`"
-#~ msgstr ""
 
