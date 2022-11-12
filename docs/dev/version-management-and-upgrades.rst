@@ -32,7 +32,7 @@ Version Numbering
 
 * The major/minor (\ ``x.y``\ ) version of Backend.AI subprojects will go together to indicate compatibility.  Currently manager/agent/common versions progress this way, while client SDKs have their own version numbers and the API specification has a different ``vN.yyyymmdd`` version format.
 
-  * ``backend.ai-manager 1.2.p`` is guaranteed to be compatible with ``backend.ai-agent 1.2.q`` (where ``p`` and ``q`` are same or different integers)
+  * Generally ``backend.ai-manager 1.2.p`` is compatible with ``backend.ai-agent 1.2.q`` (where ``p`` and ``q`` are same or different integers)
 
     * As of 22.09, this won't be guaranteed any more.  All server-side core component versions should **exactly match** with others, as we release them at once from the mono-repo, even for those who do not have any code changes.
 
