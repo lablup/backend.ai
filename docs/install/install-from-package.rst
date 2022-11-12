@@ -10,7 +10,7 @@ Setting Up Single Node All-in-one Deployment
 
 2. Install Docker and Docker Compose v2.
 
-3. Prepare a Python distribution whose version matches with the package requirements. (e.g,. Backend.AI 22.03 and 22.09 requires Python 3.10) Either:
+3. Prepare a Python distribution whose version matches with the package requirements. (e.g., Backend.AI 22.03 and 22.09 requires Python 3.10) Either:
 
    - Use the Linux distribution's official package
 

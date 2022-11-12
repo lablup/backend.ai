@@ -69,8 +69,8 @@ If this is not the case, you should configure firewalls to open all the port num
 There are more complicated setup scenarios such as splitting network planes for control and container-to-container communications,
 but we provide assistance with them for enterprise customers only.
 
-Setting Up CUDA Acceleration
-----------------------------
+Setting Up Accelerators
+-----------------------
 
 Ensure that your accelerator is properly set up using vendor-specific installation methods.
 
