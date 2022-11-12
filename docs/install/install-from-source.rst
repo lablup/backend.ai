@@ -10,7 +10,7 @@ Install from Source
 Setting Up Manager and Agent (single node, all-in-one)
 ------------------------------------------------------
 
-Check out :doc:`/install/development-setup`.
+Check out :doc:`/dev/development-setup`.
 
 .. _multi-node-setup:
 
