@@ -260,6 +260,9 @@ asyncio = false
 # Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
 enhanced-aiomonitor-task-info = false
 
+# Enable the debug mode of the kernel-runner.
+kernel-runner = false
+
 # Include debug-level logs for internal events.
 log-events = false
 

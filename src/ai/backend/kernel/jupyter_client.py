@@ -2,6 +2,7 @@ import asyncio
 from time import monotonic
 
 import zmq
+import zmq.asyncio
 
 
 async def aexecute_interactive(

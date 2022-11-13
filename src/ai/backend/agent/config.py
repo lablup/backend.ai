@@ -82,19 +82,20 @@ agent_local_config_iv = (
             ).allow_extra("*"),
             t.Key("debug"): t.Dict(
                 {
-                    t.Key("enabled", default=False): t.Bool,
-                    t.Key("asyncio", default=False): t.Bool,
-                    t.Key("enhanced-aiomonitor-task-info", default=False): t.Bool,
-                    t.Key("skip-container-deletion", default=False): t.Bool,
-                    t.Key("log-stats", default=False): t.Bool,
-                    t.Key("log-kernel-config", default=False): t.Bool,
-                    t.Key("log-alloc-map", default=False): t.Bool,
-                    t.Key("log-events", default=False): t.Bool,
-                    t.Key("log-heartbeats", default=False): t.Bool,
-                    t.Key("log-docker-events", default=False): t.Bool,
+                    t.Key("enabled", default=False): t.ToBool,
+                    t.Key("asyncio", default=False): t.ToBool,
+                    t.Key("kernel-runner", default=False): t.ToBool,
+                    t.Key("enhanced-aiomonitor-task-info", default=False): t.ToBool,
+                    t.Key("skip-container-deletion", default=False): t.ToBool,
+                    t.Key("log-stats", default=False): t.ToBool,
+                    t.Key("log-kernel-config", default=False): t.ToBool,
+                    t.Key("log-alloc-map", default=False): t.ToBool,
+                    t.Key("log-events", default=False): t.ToBool,
+                    t.Key("log-heartbeats", default=False): t.ToBool,
+                    t.Key("log-docker-events", default=False): t.ToBool,
                     t.Key("coredump", default=coredump_defaults): t.Dict(
                         {
-                            t.Key("enabled", default=coredump_defaults["enabled"]): t.Bool,
+                            t.Key("enabled", default=coredump_defaults["enabled"]): t.ToBool,
                             t.Key("path", default=coredump_defaults["path"]): tx.Path(
                                 type="dir", auto_create=True
                             ),
@@ -118,7 +119,7 @@ docker_extra_config_iv = t.Dict(
     {
         t.Key("container"): t.Dict(
             {
-                t.Key("swarm-enabled", default=False): t.Bool,
+                t.Key("swarm-enabled", default=False): t.ToBool,
             }
         ).allow_extra("*"),
     }
