@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-11-11 22:50-0600\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,8 +18,151 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.10.3\n"
 
-#: ../../client/func/scaling-group.rst:2 117e82080d1b4134a599613fee1d4bc1
+#: ../../client/func/scaling-group.rst:2 e018892e28b34ad6b79e132d55229f5c
 msgid "Scaling Group Functions"
+msgstr ""
+
+#: aeb28331b5754541bf9fb3d9c3644262
+#: ai.backend.client.func.scaling_group.ScalingGroup:1 of
+msgid "Provides getting scaling-group information required for the current user."
+msgstr ""
+
+#: ai.backend.client.func.scaling_group.ScalingGroup:3
+#: fda42afc3adc4b6784e79b699af19b09 of
+msgid ""
+"The scaling-group is an opaque server-side configuration which splits the"
+" whole cluster into several partitions, so that server administrators can"
+" apply different auto-scaling policies and operation standards to each "
+"partition of agent sets."
+msgstr ""
+
+#: 3ad4a801f67d42e69697c12e2541ba81 9609ee80c92343e084e91d18ce59fbe8
+#: ai.backend.client.func.scaling_group.ScalingGroup.list:1
+#: ai.backend.client.func.scaling_group.ScalingGroup.list_available:1 of
+msgid ""
+"List available scaling groups for the current user, considering the user,"
+" the user's domain, and the designated user group."
+msgstr ""
+
+#: 37a98e5228034b45b421e31fe0fc8035 a7d36358a0e7454fbe5d568c80447663
+#: ai.backend.client.func.scaling_group.ScalingGroup.create
+#: ai.backend.client.func.scaling_group.ScalingGroup.detail
+#: ai.backend.client.func.scaling_group.ScalingGroup.list
+#: ai.backend.client.func.scaling_group.ScalingGroup.update
+#: b485642c530349fba452ff55eae017a0 d7868fcba1784d8fa7528d0286eceb50 of
+msgid "Return type"
+msgstr ""
+
+#: 52fbc92640a8443881869caafba10914
+#: ai.backend.client.func.scaling_group.ScalingGroup.list:5 of
+msgid ":py:class:`~typing.Sequence`\\[:py:class:`dict`]"
+msgstr ""
+
+#: ai.backend.client.func.scaling_group.ScalingGroup.detail:1
+#: f56ab1f1a89d4cea85097d337b178994 of
+msgid "Fetch information of a scaling group by name."
+msgstr ""
+
+#: 0ebca496aa00481b88313749f12ff28b 1b87f72c5940489493faf2d3ac4ae901
+#: 2cc547b7753047d08b1bd1f0eaaf2e16 547e8a93ff21454e8b009c78fe15e030
+#: 7b01737a6a244c99a28ed2df28c0e756 9fd4fceb1b6d42b6a092d4d970bad2cb
+#: ai.backend.client.func.scaling_group.ScalingGroup.associate_domain
+#: ai.backend.client.func.scaling_group.ScalingGroup.associate_group
+#: ai.backend.client.func.scaling_group.ScalingGroup.detail
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_all_domain
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_all_group
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_domain
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_group
+#: de8fda4a609e4109a5700c938e31afac of
+msgid "Parameters"
+msgstr ""
+
+#: 623e0e976cca44a1acef13e68c398060
+#: ai.backend.client.func.scaling_group.ScalingGroup.detail:4 of
+msgid "Name of the scaling group."
+msgstr ""
+
+#: ai.backend.client.func.scaling_group.ScalingGroup.detail:6
+#: edc2c16b03a94c47abcffcb734c0b28e of
+msgid "Additional per-scaling-group query fields."
+msgstr ""
+
+#: 022eba680264494a9c7fba7175772bc5 478137579c064ac7b63b99cd7cfd317a
+#: 840f76bb58ff424f8d4cc633d52bf389
+#: ai.backend.client.func.scaling_group.ScalingGroup.create:4
+#: ai.backend.client.func.scaling_group.ScalingGroup.detail:9
+#: ai.backend.client.func.scaling_group.ScalingGroup.update:4 of
+msgid ":py:class:`dict`"
+msgstr ""
+
+#: a9921e3658e0492f81702a302823a277
+#: ai.backend.client.func.scaling_group.ScalingGroup.create:1 of
+msgid "Creates a new scaling group with the given options."
+msgstr ""
+
+#: ai.backend.client.func.scaling_group.ScalingGroup.update:1
+#: ea2470c84cf746249763a8066eadfb02 of
+msgid "Update existing scaling group."
+msgstr ""
+
+#: a4ce8623d30f441d91d73fae9de429bf
+#: ai.backend.client.func.scaling_group.ScalingGroup.delete:1 of
+msgid "Deletes an existing scaling group."
+msgstr ""
+
+#: 7b7eae19c5724ff5a63733e62cffdf25
+#: ai.backend.client.func.scaling_group.ScalingGroup.associate_domain:1 of
+msgid "Associate scaling_group with domain."
+msgstr ""
+
+#: 18b852019b8f49c2a65bfede9a3257b9 3d7dde9c03b946d182feb2ef9414c899
+#: ai.backend.client.func.scaling_group.ScalingGroup.associate_domain:4
+#: ai.backend.client.func.scaling_group.ScalingGroup.associate_group:4
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_domain:4
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_group:4
+#: e864be87f0e44621a711f7e10ee735c1 f95a1a73282d450f996c503c51e29b67 of
+msgid "The name of a scaling group."
+msgstr ""
+
+#: 12cb2a6f668b4d988ea504cc7e460ed8 251c5e45263f498c884d9c31747f1827
+#: ai.backend.client.func.scaling_group.ScalingGroup.associate_domain:6
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_all_domain:4
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_domain:6
+#: bc60c4bf3b904ddabad30c72ec4c19b8 of
+msgid "The name of a domain."
+msgstr ""
+
+#: 428d17b7116d4906923ed9fcef361673
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_domain:1 of
+msgid "Dissociate scaling_group from domain."
+msgstr ""
+
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_all_domain:1
+#: fd8473846c394ef7a9ee067d9cabe641 of
+msgid "Dissociate all scaling_groups from domain."
+msgstr ""
+
+#: 9c5480f8929944688f9c1edf67b7cd33
+#: ai.backend.client.func.scaling_group.ScalingGroup.associate_group:1 of
+msgid "Associate scaling_group with group."
+msgstr ""
+
+#: 4fbf88c67a074fb2bae11f288c989309 8f0c777b3dbd4eb0bff53609298f108c
+#: ai.backend.client.func.scaling_group.ScalingGroup.associate_group:6
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_all_group:4
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_group:6
+#: b6c528bb53354c8ab58eb10279cf092f of
+msgid "The ID of a group."
+msgstr ""
+
+#: 67f6248c59284a858d4fbfcd88e62260
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_group:1 of
+msgid "Dissociate scaling_group from group."
+msgstr ""
+
+#: 89e30180324f41419f06c44f77078590
+#: ai.backend.client.func.scaling_group.ScalingGroup.dissociate_all_group:1 of
+msgid "Dissociate all scaling_groups from group."
 msgstr ""
 
 #~ msgid ""
