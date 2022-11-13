@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-11-11 22:50-0600\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,8 +18,49 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.10.3\n"
 
-#: ../../client/func/auth.rst:2 6d4d2becf3304120b4f9c154e0b03cd7
+#: ../../client/func/auth.rst:2 9b91038dd2364e94a9bc23ce2f816e95
 msgid "Auth Functions"
+msgstr ""
+
+#: 71ce0765d8734e17aee97beabc2c5232 ai.backend.client.func.auth.Auth:1 of
+msgid ""
+"Provides the function interface for login session management and "
+"authorization."
+msgstr ""
+
+#: ai.backend.client.func.auth.Auth.login:1 cff2325c2454440f9a98a68c3c89e643 of
+msgid ""
+"Log-in into the endpoint with the given user ID and password. It creates "
+"a server-side web session and return a dictionary with "
+"``\"authenticated\"`` boolean field and JSON-encoded raw cookie data."
+msgstr ""
+
+#: 2ff201e7ad434d6b9d9455078874592e 47a775c835294747a4f2c6569aaab197
+#: 826767fc205a4896bfcaf0a36d39a97d ai.backend.client.func.auth.Auth.login
+#: ai.backend.client.func.auth.Auth.logout
+#: ai.backend.client.func.auth.Auth.update_password of
+msgid "Return type"
+msgstr ""
+
+#: 378d397311914b6f913078ad51b4f8ed a8758819569b4dfc8e911575c80d62d5
+#: ai.backend.client.func.auth.Auth.login:7
+#: ai.backend.client.func.auth.Auth.update_password:4 of
+msgid ":py:class:`dict`"
+msgstr ""
+
+#: 83e1a107cb9a4b398195029c866e9f01 ai.backend.client.func.auth.Auth.logout:1
+#: of
+msgid "Log-out from the endpoint. It clears the server-side web session."
+msgstr ""
+
+#: 86373794489e40fbb2d79f02a46ec4b0 ai.backend.client.func.auth.Auth.logout:5
+#: of
+msgid ":py:obj:`None`"
+msgstr ""
+
+#: 465a66f4b1b84d0ab38f31ca877ba5ad
+#: ai.backend.client.func.auth.Auth.update_password:1 of
+msgid "Update user's password. This API works only for account owner."
 msgstr ""
 
 #~ msgid ""

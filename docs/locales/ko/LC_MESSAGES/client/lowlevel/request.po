@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-11-11 22:50-0600\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,23 +19,198 @@ msgstr ""
 "Generated-By: Babel 2.10.3\n"
 
 # 60d8afcc0bef4626aaec7035cfd0c5be
-#: ../../client/lowlevel/request.rst:2 b1182a19eabc4548bbcfb6aafd0202d0
+#: ../../client/lowlevel/request.rst:2 ffcca2ea4f844da2a1c115136d3b192a
 msgid "Request API"
 msgstr "요청 API"
 
 # 60706e4e70a14753a804bcbe9a4ef6d0
-#: ../../client/lowlevel/request.rst:7 a625d887080048f393932eadd14b7dd2
+#: ../../client/lowlevel/request.rst:7 960cf074a93d46f5954c02dc48d3b752
 msgid ""
 "This module provides low-level API request/response interfaces based on "
 "aiohttp."
 msgstr ""
 
 # 13aaaccd7aa948c19b73e9d9c1a97bac
-#: ../../client/lowlevel/request.rst:10 5ccdee5c585641bbaff295f7fe0bc2dc
+#: ../../client/lowlevel/request.rst:10 e5a0d530e1624d49831dc96a2951edab
 msgid ""
 "Depending on the session object where the request is made from, "
 ":class:`Request` and :class:`Response` differentiate their behavior: "
 "works as plain Python functions or returns awaitables."
+msgstr ""
+
+#: ai.backend.client.request.Request:1 df2edd31890f447aaf264ef5d5fe3431 of
+msgid "The API request object."
+msgstr ""
+
+#: ai.backend.client.request.Request.fetch:1 ea36e53775e74bba85363a5739c80777
+#: of
+msgid "Sends the request to the server and reads the response."
+msgstr ""
+
+#: ai.backend.client.request.Request.fetch:3 be40913223c34572b0593d2ff08bd707
+#: of
+msgid ""
+"You may use this method either with plain synchronous Session or "
+"AsyncSession.  Both the followings patterns are valid:"
+msgstr ""
+
+#: 02b26d5903bd426c8731bb22421dc53a 02e153ddb24e469f8b19c52a793f906a
+#: 3e4dff8a88474f4e87851484393a1c99 8169f119f395466ca960ffa6d6184975
+#: 83413cfaed134e7786f711afb58fda96 87d5e0f491ed4bf997a24f96a73d6746
+#: 999c446328b34d8589e6c1729f6582d3
+#: ai.backend.client.request.Request.attach_files
+#: ai.backend.client.request.Request.connect_events
+#: ai.backend.client.request.Request.connect_websocket
+#: ai.backend.client.request.Request.content
+#: ai.backend.client.request.Request.fetch
+#: ai.backend.client.request.Request.set_content
+#: ai.backend.client.request.Request.set_json of
+msgid "Return type"
+msgstr ""
+
+#: 28eca7e520e24d7a91e69711c792c3d8 ai.backend.client.request.Request.fetch:27
+#: of
+msgid ":py:class:`~ai.backend.client.request.FetchContextManager`"
+msgstr ""
+
+#: 4bec9f53bcd64171b2273d2a297720af
+#: ai.backend.client.request.Request.connect_websocket:1 of
+msgid "Creates a WebSocket connection."
+msgstr ""
+
+#: 4442259180dd41d1b14f65fbd028dfad 72167371e7ee4ce2a791cee6d159aece
+#: ai.backend.client.request.Request.connect_events:5
+#: ai.backend.client.request.Request.connect_websocket:5 of
+msgid ""
+"This method only works with "
+":class:`~ai.backend.client.session.AsyncSession`."
+msgstr ""
+
+#: ai.backend.client.request.Request.connect_websocket:9
+#: cb1f65d7e6c741b4b2a9efc29619f34b of
+msgid ":py:class:`~ai.backend.client.request.WebSocketContextManager`"
+msgstr ""
+
+#: 6e83d19580bd471cbb3af5863ad01a03 ai.backend.client.request.Request.content:1
+#: of
+msgid ""
+"Retrieves the content in the original form. Private codes should NOT use "
+"this as it incurs duplicate encoding/decoding."
+msgstr ""
+
+#: 5e87292935bf49db91221bfd95909234 ai.backend.client.request.Request.content:6
+#: of
+msgid ""
+":py:data:`~typing.Union`\\[:py:class:`bytes`, :py:class:`bytearray`, "
+":py:class:`str`, :py:class:`~aiohttp.streams.StreamReader`, "
+":py:class:`~io.IOBase`, :py:obj:`None`]"
+msgstr ""
+
+#: 6ae5dd2646f64f028165cb55bd963340
+#: ai.backend.client.request.Request.set_content:1 of
+msgid "Sets the content of the request."
+msgstr ""
+
+#: 2ba326dd0cd54384b5ddd80a2712c1de
+#: ai.backend.client.request.Request.attach_files:4
+#: ai.backend.client.request.Request.set_content:4
+#: ai.backend.client.request.Request.set_json:4
+#: b36f6b36bb3649008cf5d6402e38cb88 e4190eb435a0455da11478b2a2a6b7be of
+msgid ":py:obj:`None`"
+msgstr ""
+
+#: ai.backend.client.request.Request.set_json:1
+#: f3ca4d6d2807458682f7c14a9df1779b of
+msgid "A shortcut for set_content() with JSON objects."
+msgstr ""
+
+#: 108a3e6e1e7c4ea99d9c41582ae46562
+#: ai.backend.client.request.Request.attach_files:1 of
+msgid "Attach a list of files represented as AttachedFile."
+msgstr ""
+
+#: 9a9d248d97064db1bb4e4a1842d64dd0
+#: ai.backend.client.request.Request.connect_events:1 of
+msgid "Creates a Server-Sent Events connection."
+msgstr ""
+
+#: 4cefaecad49642c8a658ee0f91e59b4c
+#: ai.backend.client.request.Request.connect_events:9 of
+msgid ":py:class:`~ai.backend.client.request.SSEContextManager`"
+msgstr ""
+
+#: ai.backend.client.request.WebSocketResponse:1
+#: d14335a664bf45bbbf2cc5662ff8562e of
+msgid "A high-level wrapper of :class:`aiohttp.ClientWebSocketResponse`."
+msgstr ""
+
+#: 5bd359889dc54d848acf664650ef1bf9
+#: ai.backend.client.request.FetchContextManager:1 of
+msgid "The context manager returned by :func:`Request.fetch`."
+msgstr ""
+
+#: ai.backend.client.request.FetchContextManager:3
+#: be2351a00a3f4690a622a19facc21bc8 of
+msgid "It provides both synchronous and asynchronous context manager interfaces."
+msgstr ""
+
+#: 3450c49791e546d68c033cbf8ec81428
+#: ai.backend.client.request.WebSocketContextManager:1 of
+msgid "The context manager returned by :func:`Request.connect_websocket`."
+msgstr ""
+
+#: 424dbbed67904a60a3af2a8d9083ce0c ai.backend.client.request.AttachedFile:1 of
+msgid "A struct that represents an attached file to the API request."
+msgstr ""
+
+#: 2cd1c8b83e314d22a224088604b2f542 ai.backend.client.request.AttachedFile of
+msgid "Parameters"
+msgstr ""
+
+#: 0a6987dd652b44c9a0d2de88787e0123 ai.backend.client.request.AttachedFile:3 of
+msgid ""
+"The name of file to store. It may include paths and the server will "
+"create parent directories if required."
+msgstr ""
+
+#: 5a6e2c82e3c34a8287d0f8a2c2806769 ai.backend.client.request.AttachedFile:7 of
+msgid "A file-like object that allows stream-reading bytes."
+msgstr ""
+
+#: 1528a1d7be8743359d819d52ce90a72e ai.backend.client.request.AttachedFile:9 of
+msgid ""
+"The content type for the stream.  For arbitrary binary data, use "
+"\"application/octet-stream\"."
+msgstr ""
+
+#: ../../docstring 78ee4c32f7cb41a0895478529e362079
+#: ai.backend.client.request.AttachedFile.content_type:1 of
+msgid "Alias for field number 2"
+msgstr ""
+
+#: ai.backend.client.request.AttachedFile.count:1
+#: b32e051872014fe1bff1f11d4c153eb5 of
+msgid "Return number of occurrences of value."
+msgstr ""
+
+#: ../../docstring 81b96f8951b448eeb933792b6065837c
+#: ai.backend.client.request.AttachedFile.filename:1 of
+msgid "Alias for field number 0"
+msgstr ""
+
+#: aeb05e2bf86c4e48a7150adee0d01090
+#: ai.backend.client.request.AttachedFile.index:1 of
+msgid "Return first index of value."
+msgstr ""
+
+#: 9fedd0ef5dbe402a87bb74d946f6dff7
+#: ai.backend.client.request.AttachedFile.index:3 of
+msgid "Raises ValueError if the value is not present."
+msgstr ""
+
+#: ../../docstring 01c3aeb12e0a41f89eacb10ed7bfa757
+#: ai.backend.client.request.AttachedFile.stream:1 of
+msgid "Alias for field number 1"
 msgstr ""
 
 # 6a21204abb9c47a39a54ed313ddc2180

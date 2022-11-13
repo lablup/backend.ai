@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-11-11 22:50-0600\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,9 +19,43 @@ msgstr ""
 "Generated-By: Babel 2.10.3\n"
 
 # cfebb0640f504b48ad07cc6a8bf4e3e5
-#: ../../client/func/agent.rst:2 d478689c86c04b44b7e0508339563173
+#: ../../client/func/agent.rst:2 44d91850eba24634bf510bde70012361
 msgid "Agent Functions"
 msgstr "에이전트 함수"
+
+#: 2670acd7ab794875bef7ad3d879c4cac ai.backend.client.func.agent.Agent:1 of
+msgid ""
+"Provides a shortcut of :func:`Admin.query() "
+"<ai.backend.client.admin.Admin.query>` that fetches various agent "
+"information."
+msgstr ""
+
+#: 06ea5ccb726c48ab928a2ddbe90634a5 ai.backend.client.func.agent.Agent:7 of
+msgid ""
+"All methods in this function class require your API access key to have "
+"the *admin* privilege."
+msgstr ""
+
+#: 836daef0dcd448ca998cc1c5b248bcf9
+#: ai.backend.client.func.agent.Agent.paginated_list:1 of
+msgid "Lists the keypairs. You need an admin privilege for this operation."
+msgstr ""
+
+#: 6c8e2ba52ff747b48fa781bda78d03b1 71fdeeee89a949fc954315bdaae79cff
+#: ai.backend.client.func.agent.Agent.detail
+#: ai.backend.client.func.agent.Agent.paginated_list of
+msgid "Return type"
+msgstr ""
+
+#: ai.backend.client.func.agent.Agent.paginated_list:5
+#: ee075ff9b6ca4ec8882179ad8e602fc9 of
+msgid ":py:class:`~ai.backend.client.output.types.PaginatedResult`"
+msgstr ""
+
+#: ai.backend.client.func.agent.Agent.detail:2 c3ab76f6fafc4461b79c5eb7b7725486
+#: of
+msgid ":py:class:`~typing.Sequence`\\[:py:class:`dict`]"
+msgstr ""
 
 # aee3c1ef25054aec88d6ec84917eff23
 #~ msgid ""

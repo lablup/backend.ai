@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-11-11 22:50-0600\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,9 +19,58 @@ msgstr ""
 "Generated-By: Babel 2.10.3\n"
 
 # 8ec5acb8a5894dc4a4b2f89cdd1b1b39
-#: ../../client/func/admin.rst:2 26b605f1cde04e8fa14f0387e293692f
+#: ../../client/func/admin.rst:2 fb3a7c91d9f44ae495c3fdee25f73606
 msgid "Admin Functions"
 msgstr "관리자용 함수"
+
+#: a705387be3274e0c84e07e7a1fdaeb5a ai.backend.client.func.admin.Admin:1 of
+msgid "Provides the function interface for making admin GrapQL queries."
+msgstr ""
+
+#: ai.backend.client.func.admin.Admin:5 cb1a7702200e43eeada25730e511f8bd of
+msgid ""
+"Depending on the privilege of your API access key, you may or may not "
+"have access to querying/mutating server-side resources of other users."
+msgstr ""
+
+#: 6fe694bcc8824eeead10e7a88b76e30c ai.backend.client.func.admin.Admin.query:1
+#: of
+msgid "Sends the GraphQL query and returns the response."
+msgstr ""
+
+#: 0f2f3282f53a400e833dcc945fafd90e ai.backend.client.func.admin.Admin.query of
+msgid "Parameters"
+msgstr ""
+
+#: 9f578547c041482ba0f046d83992f1a0 ai.backend.client.func.admin.Admin.query:4
+#: of
+msgid "The GraphQL query string."
+msgstr ""
+
+#: ai.backend.client.func.admin.Admin.query:6 db7a8734b0974ef4a6244c889326cead
+#: of
+msgid ""
+"An optional key-value dictionary to fill the interpolated template "
+"variables in the query."
+msgstr ""
+
+#: 1db45ca429dd4df3a63cb33a193a05df ai.backend.client.func.admin.Admin.query of
+msgid "Return type"
+msgstr ""
+
+#: ai.backend.client.func.admin.Admin.query:10 f88e9a539b1f498ba5fb330eb0138dd8
+#: of
+msgid ":py:data:`~typing.Any`"
+msgstr ""
+
+#: ai.backend.client.func.admin.Admin.query dcd6363e8ae04a0395ce21d312241331 of
+msgid "Returns"
+msgstr ""
+
+#: 9b05b96e59a04d2094dcbd373c626548 ai.backend.client.func.admin.Admin.query:11
+#: of
+msgid "The object parsed from the response JSON string."
+msgstr ""
 
 # a1dcc49b0ed142d49ca971734031a61a
 #~ msgid "Provides the function interface for making admin GrapQL queries."

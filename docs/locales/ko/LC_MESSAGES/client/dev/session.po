@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-11-11 22:50-0600\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,24 +18,24 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.10.3\n"
 
-#: ../../client/dev/session.rst:2 89046fc5a4a04704acdeb5626dc07de2
+#: ../../client/dev/session.rst:2 03e6b3819a8b43bba2829eb01c49e400
 msgid "Client Session"
 msgstr ""
 
-#: ../../client/dev/session.rst:7 55b4c9811ceb4bcbbc6ed472b6fa536c
+#: ../../client/dev/session.rst:7 022415d4f64e41dcb8c176b1c5727d79
 msgid ""
 "This module is the first place to begin with your Python programs that "
 "use Backend.AI API functions."
 msgstr ""
 
-#: ../../client/dev/session.rst:10 edbaf399e7914635aa921c927f87503e
+#: ../../client/dev/session.rst:10 8f3e2fe9516d413995ea3d72cbfd50ce
 msgid ""
 "The high-level API functions cannot be used alone -- you must initiate a "
 "client session first because each session provides *proxy attributes* "
 "that represent API functions and run on the session itself."
 msgstr ""
 
-#: ../../client/dev/session.rst:14 2e49919a2c3a4cf69766fd2acec87116
+#: ../../client/dev/session.rst:14 55bcb4a94c5a446fbe6360e65e545f5a
 msgid ""
 "To achieve this, during initialization session objects internally "
 "construct new types by combining the "
@@ -46,11 +46,149 @@ msgid ""
 "in the API function classes to work with specific *session instances*."
 msgstr ""
 
-#: ../../client/dev/session.rst:21 524c7274a0894782820b82b91174fdfd
+#: ../../client/dev/session.rst:21 0baff2f0815f42eaa697c733f244ea19
 msgid ""
 "When designing your application, please note that session objects are "
 "intended to live long following the process' lifecycle, instead of to be "
 "created and disposed whenever making API requests."
+msgstr ""
+
+#: 1a145f83a331410cb466019deac2b207 ai.backend.client.session.BaseSession:1 of
+msgid "The base abstract class for sessions."
+msgstr ""
+
+#: 08d00a48e33d4be9b03d87fead957682 8e9cb17b15eb49f4a6ee5bf373c125d7
+#: a9a9b810b4dd46a1b30b988119f5b4ea
+#: ai.backend.client.session.AsyncSession.proxy_mode:1
+#: ai.backend.client.session.BaseSession.proxy_mode:1
+#: ai.backend.client.session.Session.proxy_mode:1 of
+msgid "If set True, it skips API version negotiation when opening the session."
+msgstr ""
+
+#: 10feebe1e783449c8f02606460d8690a 193e287971684f2bbf287b316b80f4e0
+#: 3fcd1635f88544a1b469bf7c7c5bb1fe 4fbe37503cbb4a86bcb7da6b9289c622
+#: 7a3a754d73504bb48cd05f334af34ef4 83b37dc5dfb941cc9c2fbd6894690179
+#: 9937c55be3c34fb0bb2489c3e179d53e 9e29c742402e47a4ae73cc821bfdaa93
+#: a5b427ef69104d3a9192869360145efe
+#: ai.backend.client.session.AsyncSession.close
+#: ai.backend.client.session.AsyncSession.closed
+#: ai.backend.client.session.AsyncSession.config
+#: ai.backend.client.session.AsyncSession.open
+#: ai.backend.client.session.AsyncSession.proxy_mode
+#: ai.backend.client.session.BaseSession.close
+#: ai.backend.client.session.BaseSession.closed
+#: ai.backend.client.session.BaseSession.config
+#: ai.backend.client.session.BaseSession.open
+#: ai.backend.client.session.BaseSession.proxy_mode
+#: ai.backend.client.session.Session.close
+#: ai.backend.client.session.Session.closed
+#: ai.backend.client.session.Session.config
+#: ai.backend.client.session.Session.open
+#: ai.backend.client.session.Session.proxy_mode
+#: b3a23d00569a4df49835a43a830bd78a d232e144a21b42b68a073af1c8cd8042
+#: d59c8273ce6b402cb149e435b845ad14 dfb9b7d7ee8a470ab95602740079c86b
+#: ec56e69ae09148208e342fe60a442505 fed6b18dbf42465e8e733a3725fee520 of
+msgid "Return type"
+msgstr ""
+
+#: 00f01ff94c6b46d2b9a113dcf4d63324 36afb88ca4ec4e76af8de54cf213aa9b
+#: 3a76e84e70a544138ccef192ccac4744 71da8299db1b4bb9866b06c2c8bb5ba1
+#: ai.backend.client.session.AsyncSession.closed:4
+#: ai.backend.client.session.AsyncSession.proxy_mode:4
+#: ai.backend.client.session.BaseSession.closed:4
+#: ai.backend.client.session.BaseSession.proxy_mode:4
+#: ai.backend.client.session.Session.closed:4
+#: ai.backend.client.session.Session.proxy_mode:4
+#: bb21803a8abd47f2bbf8674bf0f894dc bc80263a85e146cf9d3ecb7248989566 of
+msgid ":py:class:`bool`"
+msgstr ""
+
+#: 5d9bfdc5b049488298f7ec40092bb4be 997c78c5a0fa4cc9b8826891eed66869
+#: ai.backend.client.session.AsyncSession.open:1
+#: ai.backend.client.session.BaseSession.open:1
+#: ai.backend.client.session.Session.open:1 c353a4f92787464da9246d08cf0bb3a2 of
+msgid "Initializes the session and perform version negotiation."
+msgstr ""
+
+#: 162199471ad44435839da9b9114c5b9e 25369a47bbd84e349a41300c7c1305c6
+#: ai.backend.client.session.BaseSession.close:4
+#: ai.backend.client.session.BaseSession.open:4 of
+msgid ""
+":py:data:`~typing.Optional`\\[:py:obj:`None`, "
+":py:class:`~typing.Awaitable`\\[:py:obj:`None`]]"
+msgstr ""
+
+#: 0699453e598f4b929d4337d127fb1e85 356ffc14361c45e59d06ea337e5c72fd
+#: ai.backend.client.session.AsyncSession.close:1
+#: ai.backend.client.session.BaseSession.close:1 of
+msgid "Terminates the session and releases underlying resources."
+msgstr ""
+
+#: 267937facdab4d48868fbe139606e7ba 3c9c8cbe892d4269a260ae8521f4cb1c
+#: ai.backend.client.session.AsyncSession.closed:1
+#: ai.backend.client.session.BaseSession.closed:1
+#: ai.backend.client.session.Session.closed:1 f2871cd149db463bb39d21ce56cbcc0c
+#: of
+msgid "Checks if the session is closed."
+msgstr ""
+
+#: 0f4add469ba94c50ad542af4677ff188 aace3f74185a4835bb50a831214dbd53
+#: ai.backend.client.session.AsyncSession.config:1
+#: ai.backend.client.session.BaseSession.config:1
+#: ai.backend.client.session.Session.config:1 e1b9ce6a49124bba8d1f00a210161dbc
+#: of
+msgid "The configuration used by this session object."
+msgstr ""
+
+#: 1a4bbb9a036d4436a03b6dc8cb2c33f1 27f595bf03f4418aaf988775b21e24ea
+#: ai.backend.client.session.AsyncSession.config:4
+#: ai.backend.client.session.BaseSession.config:4
+#: ai.backend.client.session.Session.config:4 dd3b42b7485641e8b6a0944959d9fc90
+#: of
+msgid ":py:class:`~ai.backend.client.config.APIConfig`"
+msgstr ""
+
+#: 3af7963dd4ba43b3b66d28178294dbb9 ai.backend.client.session.Session:1 of
+msgid ""
+"A context manager for API client sessions that makes API requests "
+"synchronously. You may call simple request-response APIs like a plain "
+"Python function, but cannot use streaming APIs based on WebSocket and "
+"Server-Sent Events."
+msgstr ""
+
+#: 5c6c51fd6aab449e9d90414cc3984284 6b7ee187afdb48deb62978d98525ed1e
+#: ai.backend.client.session.Session.close:7
+#: ai.backend.client.session.Session.open:4 of
+msgid ":py:obj:`None`"
+msgstr ""
+
+#: a295767cd2224df2a7661ef2920aaa3a ai.backend.client.session.Session.close:1
+#: of
+msgid ""
+"Terminates the session.  It schedules the ``close()`` coroutine of the "
+"underlying aiohttp session and then enqueues a sentinel object to "
+"indicate termination.  Then it waits until the worker thread to self-"
+"terminate by joining."
+msgstr ""
+
+#: ai.backend.client.session.Session.worker_thread:1
+#: e26fb2fd8a794b7e9335b72e5a73d982 of
+msgid ""
+"The thread that internally executes the asynchronous implementations of "
+"the given API functions."
+msgstr ""
+
+#: ai.backend.client.session.AsyncSession:1 f5ecf858811a420d87ea8ecf1967fdb1 of
+msgid ""
+"A context manager for API client sessions that makes API requests "
+"asynchronously. You may call all APIs as coroutines. WebSocket-based APIs"
+" and SSE-based APIs returns special response types."
+msgstr ""
+
+#: 37e164a1f6fa4ab394d98f8c941cfb3f 56fc57e6e00d4c29b969d858196b730a
+#: ai.backend.client.session.AsyncSession.close:4
+#: ai.backend.client.session.AsyncSession.open:4 of
+msgid ":py:class:`~typing.Awaitable`\\[:py:obj:`None`]"
 msgstr ""
 
 #~ msgid "The base abstract class for sessions."
