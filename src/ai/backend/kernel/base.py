@@ -402,6 +402,7 @@ class BaseRunner(metaclass=ABCMeta):
             log.error("query mode is disabled: " "failed to start jupyter kernel")
             return 127
 
+        assert self.kernel_client is not None
         log.debug("executing in query mode...")
 
         async def output_hook(msg):
@@ -453,6 +454,8 @@ class BaseRunner(metaclass=ABCMeta):
                     )
 
         async def stdin_hook(msg):
+            assert self.kernel_client is not None
+            assert self.user_input_queue is not None
             if msg["msg_type"] == "input_request":
                 prompt = msg["content"]["prompt"]
                 password = msg["content"]["password"]
@@ -461,7 +464,7 @@ class BaseRunner(metaclass=ABCMeta):
                 await self.outsock.send_multipart(
                     [b"waiting-input", json.dumps({"is_password": password}).encode("utf-8")]
                 )
-                user_input = await self.user_input_queue.async_q.get()
+                user_input = await self.user_input_queue.get()
                 self.kernel_client.input(user_input)
 
         # Run jupyter kernel's blocking execution method in an executor pool.
@@ -477,7 +480,7 @@ class BaseRunner(metaclass=ABCMeta):
                 stdin_hook=stdin_hook,
             )
         except Exception as e:
-            log.error(str(e))
+            log.exception(str(e))
             return 127
         return 0
 
@@ -529,7 +532,7 @@ class BaseRunner(metaclass=ABCMeta):
         `Runner` subclass should implement its own `complete` method.
         """
         if hasattr(self, "kernel_mgr") and self.kernel_mgr is not None:
-            self.kernel_mgr.interrupt_kernel()
+            await self.kernel_mgr.interrupt_kernel()
 
     async def _send_status(self):
         data = {
