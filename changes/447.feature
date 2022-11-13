@@ -1,2 +1,1 @@
-Make container metadata server's listening port configurable.
-
+Make the listening port of the container metadata server configurable
