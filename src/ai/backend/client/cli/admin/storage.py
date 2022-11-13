@@ -4,10 +4,13 @@ import sys
 
 import click
 
-from ai.backend.client.session import Session
+from ai.backend.cli.types import ExitCode
 from ai.backend.client.output.fields import storage_fields
-from . import admin
+from ai.backend.client.session import Session
+
+from ..extensions import pass_ctx_obj
 from ..types import CLIContext
+from . import admin
 
 
 @admin.group()
@@ -18,21 +21,21 @@ def storage() -> None:
 
 
 @storage.command()
-@click.pass_obj
-@click.argument('vfolder_host')
+@pass_ctx_obj
+@click.argument("vfolder_host")
 def info(ctx: CLIContext, vfolder_host: str) -> None:
     """
     Show the information about the given storage volume.
     (super-admin privilege required)
     """
     fields = [
-        storage_fields['id'],
-        storage_fields['backend'],
-        storage_fields['capabilities'],
-        storage_fields['path'],
-        storage_fields['fsprefix'],
-        storage_fields['hardware_metadata'],
-        storage_fields['performance_metric'],
+        storage_fields["id"],
+        storage_fields["backend"],
+        storage_fields["capabilities"],
+        storage_fields["path"],
+        storage_fields["fsprefix"],
+        storage_fields["hardware_metadata"],
+        storage_fields["performance_metric"],
     ]
     with Session() as session:
         try:
@@ -43,28 +46,24 @@ def info(ctx: CLIContext, vfolder_host: str) -> None:
             ctx.output.print_item(item, fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @storage.command()
-@click.pass_obj
-@click.option('--filter', 'filter_', default=None,
-              help='Set the query filter expression.')
-@click.option('--order', default=None,
-              help='Set the query ordering expression.')
-@click.option('--offset', default=0,
-              help='The index of the current page start for pagination.')
-@click.option('--limit', default=None,
-              help='The page size for pagination.')
+@pass_ctx_obj
+@click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
+@click.option("--order", default=None, help="Set the query ordering expression.")
+@click.option("--offset", default=0, help="The index of the current page start for pagination.")
+@click.option("--limit", default=None, help="The page size for pagination.")
 def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
     """
     List storage volumes.
     (super-admin privilege required)
     """
     fields = [
-        storage_fields['id'],
-        storage_fields['backend'],
-        storage_fields['capabilities'],
+        storage_fields["id"],
+        storage_fields["backend"],
+        storage_fields["capabilities"],
     ]
     try:
         with Session() as session:
@@ -82,4 +81,4 @@ def list(ctx: CLIContext, filter_, order, offset, limit) -> None:
             )
     except Exception as e:
         ctx.output.print_error(e)
-        sys.exit(1)
+        sys.exit(ExitCode.FAILURE)

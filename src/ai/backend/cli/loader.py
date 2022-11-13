@@ -1,4 +1,4 @@
-import click            # noqa: E402
+import click  # noqa: E402
 
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
@@ -6,7 +6,7 @@ from .main import main  # noqa: E402
 
 
 def load_entry_points() -> click.Group:
-    entry_prefix = 'backendai_cli_v10'
+    entry_prefix = "backendai_cli_v10"
     for entrypoint in scan_entrypoints(entry_prefix):
         if entrypoint.name == "_":
             cmd_group: click.Group = entrypoint.load()

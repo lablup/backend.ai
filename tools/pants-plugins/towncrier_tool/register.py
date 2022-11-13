@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from pants.backend.python.goals import lockfile
-from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.goals.export import ExportPythonTool, ExportPythonToolSentinel
+from pants.backend.python.goals.lockfile import GeneratePythonLockfile
 from pants.backend.python.subsystems.python_tool_base import ExportToolOption, PythonToolBase
 from pants.backend.python.subsystems.setup import PythonSetup
 from pants.backend.python.target_types import ConsoleScript
@@ -10,14 +10,9 @@ from pants.core.goals.generate_lockfiles import GenerateToolLockfileSentinel
 from pants.core.util_rules.config_files import ConfigFilesRequest
 from pants.engine.console import Console
 from pants.engine.goal import Goal
-from pants.engine.rules import collect_rules, rule, goal_rule
+from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.unions import UnionRule
-from pants.option.option_types import (
-    ArgsListOption,
-    BoolOption,
-    FileOption,
-    SkipOption,
-)
+from pants.option.option_types import ArgsListOption, BoolOption, FileOption, SkipOption
 from pants.util.docutil import git_url
 from pants.util.strutil import softwrap
 
@@ -81,13 +76,16 @@ class TowncrierSubsystem(PythonToolBase):
             specified_option_name=f"[{self.options_scope}].config",
             discovery=self.config_discovery,
             check_existence=["towncrier.toml", "pyproject.toml"],
-            check_content={"towncrier.toml": b"[tool.towncrier]", "pyproject.toml": b"[tool.towncrier]"},
+            check_content={
+                "towncrier.toml": b"[tool.towncrier]",
+                "pyproject.toml": b"[tool.towncrier]",
+            },
         )
 
 
 class TowncrierGoal(Goal):
-    name = "update-changelog"
-    subsystem_cls = TowncrierSubsystem
+    name = "update-changelog"  # type: ignore
+    subsystem_cls = TowncrierSubsystem  # type: ignore
 
 
 class TowncrierLockfileSentinel(GenerateToolLockfileSentinel):
@@ -102,7 +100,9 @@ class TowncrierExportSentinel(ExportPythonToolSentinel):
 def export_towncrier(_: TowncrierExportSentinel, towncrier: TowncrierSubsystem) -> ExportPythonTool:
     if not towncrier.export:
         return ExportPythonTool(resolve_name=towncrier.options_scope, pex_request=None)
-    return ExportPythonTool(resolve_name=towncrier.options_scope, pex_request=towncrier.to_pex_request())
+    return ExportPythonTool(
+        resolve_name=towncrier.options_scope, pex_request=towncrier.to_pex_request()
+    )
 
 
 @rule

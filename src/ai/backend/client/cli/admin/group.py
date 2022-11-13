@@ -4,16 +4,16 @@ import uuid
 import click
 
 from ai.backend.cli.interaction import ask_yn
+from ai.backend.cli.types import ExitCode
+from ai.backend.client.func.group import _default_detail_fields, _default_list_fields
 from ai.backend.client.session import Session
-from ai.backend.client.func.group import (
-    _default_list_fields,
-    _default_detail_fields,
-)
+
+from ..extensions import pass_ctx_obj
+from ..pretty import print_info
+from ..types import CLIContext
+
 # from ai.backend.client.output.fields import group_fields
 from . import admin
-from ..pretty import print_info
-
-from ..types import CLIContext
 
 
 @admin.group()
@@ -24,8 +24,8 @@ def group() -> None:
 
 
 @group.command()
-@click.pass_obj
-@click.argument('id_or_name', type=str)
+@pass_ctx_obj
+@click.argument("id_or_name", type=str)
 def info(ctx: CLIContext, id_or_name: str) -> None:
     """
     Show the information about the group(s) having the given name.
@@ -50,7 +50,7 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
                 ctx.output.print_item(item, _default_detail_fields)
             except Exception as e:
                 ctx.output.print_error(e)
-                sys.exit(1)
+                sys.exit(ExitCode.FAILURE)
         else:
             # interpret as UUID
             try:
@@ -58,13 +58,14 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
                 ctx.output.print_item(item, _default_detail_fields)
             except Exception as e:
                 ctx.output.print_error(e)
-                sys.exit(1)
+                sys.exit(ExitCode.FAILURE)
 
 
 @group.command()
-@click.pass_obj
-@click.option('-d', '--domain-name', type=str, default=None,
-              help='Domain name to list groups belongs to it.')
+@pass_ctx_obj
+@click.option(
+    "-d", "--domain-name", type=str, default=None, help="Domain name to list groups belongs to it."
+)
 def list(ctx: CLIContext, domain_name) -> None:
     """
     List groups in the given domain.
@@ -76,23 +77,28 @@ def list(ctx: CLIContext, domain_name) -> None:
             ctx.output.print_list(items, _default_list_fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @group.command()
-@click.pass_obj
-@click.argument('domain_name', type=str, metavar='DOMAIN_NAME')
-@click.argument('name', type=str, metavar='NAME')
-@click.option('-d', '--description', type=str, default='',
-              help='Description of new group.')
-@click.option('-i', '--inactive', is_flag=True,
-              help='New group will be inactive.')
-@click.option('--total-resource-slots', type=str, default='{}',
-              help='Set total resource slots.')
-@click.option('--allowed-vfolder-hosts', type=str, multiple=True,
-              help='Allowed virtual folder hosts.')
-def add(ctx: CLIContext, domain_name, name, description, inactive, total_resource_slots,
-        allowed_vfolder_hosts):
+@pass_ctx_obj
+@click.argument("domain_name", type=str, metavar="DOMAIN_NAME")
+@click.argument("name", type=str, metavar="NAME")
+@click.option("-d", "--description", type=str, default="", help="Description of new group.")
+@click.option("-i", "--inactive", is_flag=True, help="New group will be inactive.")
+@click.option("--total-resource-slots", type=str, default="{}", help="Set total resource slots.")
+@click.option(
+    "--allowed-vfolder-hosts", type=str, multiple=True, help="Allowed virtual folder hosts."
+)
+def add(
+    ctx: CLIContext,
+    domain_name,
+    name,
+    description,
+    inactive,
+    total_resource_slots,
+    allowed_vfolder_hosts,
+):
     """
     Add new group. A group must belong to a domain, so DOMAIN_NAME should be provided.
 
@@ -103,7 +109,8 @@ def add(ctx: CLIContext, domain_name, name, description, inactive, total_resourc
     with Session() as session:
         try:
             data = session.Group.create(
-                domain_name, name,
+                domain_name,
+                name,
                 description=description,
                 is_active=not inactive,
                 total_resource_slots=total_resource_slots,
@@ -112,34 +119,36 @@ def add(ctx: CLIContext, domain_name, name, description, inactive, total_resourc
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='group',
-                action_name='add',
+                item_name="group",
+                action_name="add",
             )
-            sys.exit(1)
-        if not data['ok']:
+            sys.exit(ExitCode.FAILURE)
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='group',
-                action_name='add',
+                msg=data["msg"],
+                item_name="group",
+                action_name="add",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
-            item_name='group',
+            item_name="group",
         )
 
 
 @group.command()
-@click.pass_obj
-@click.argument('gid', type=str, metavar='GROUP_ID')
-@click.option('-n', '--name', type=str, help='New name of the group')
-@click.option('-d', '--description', type=str, help='Description of the group')
-@click.option('--is-active', type=bool, help='Set group inactive.')
-@click.option('--total-resource-slots', type=str, help='Update total resource slots.')
-@click.option('--allowed-vfolder-hosts', type=str, multiple=True,
-              help='Allowed virtual folder hosts.')
-def update(ctx: CLIContext, gid, name, description, is_active, total_resource_slots,
-           allowed_vfolder_hosts):
+@pass_ctx_obj
+@click.argument("gid", type=str, metavar="GROUP_ID")
+@click.option("-n", "--name", type=str, help="New name of the group")
+@click.option("-d", "--description", type=str, help="Description of the group")
+@click.option("--is-active", type=bool, help="Set group inactive.")
+@click.option("--total-resource-slots", type=str, help="Update total resource slots.")
+@click.option(
+    "--allowed-vfolder-hosts", type=str, multiple=True, help="Allowed virtual folder hosts."
+)
+def update(
+    ctx: CLIContext, gid, name, description, is_active, total_resource_slots, allowed_vfolder_hosts
+):
     """
     Update an existing group. Domain name is not necessary since group ID is unique.
 
@@ -158,28 +167,28 @@ def update(ctx: CLIContext, gid, name, description, is_active, total_resource_sl
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='group',
-                action_name='update',
+                item_name="group",
+                action_name="update",
             )
-            sys.exit(1)
-        if not data['ok']:
+            sys.exit(ExitCode.FAILURE)
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='group',
-                action_name='update',
+                msg=data["msg"],
+                item_name="group",
+                action_name="update",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                'gid': gid,
+                "gid": gid,
             },
         )
 
 
 @group.command()
-@click.pass_obj
-@click.argument('gid', type=str, metavar='GROUP_ID')
+@pass_ctx_obj
+@click.argument("gid", type=str, metavar="GROUP_ID")
 def delete(ctx: CLIContext, gid):
     """
     Inactivates the existing group. Does not actually delete it for safety.
@@ -192,28 +201,28 @@ def delete(ctx: CLIContext, gid):
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='group',
-                action_name='deletion',
+                item_name="group",
+                action_name="deletion",
             )
-            sys.exit(1)
-        if not data['ok']:
+            sys.exit(ExitCode.FAILURE)
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='group',
-                action_name='deletion',
+                msg=data["msg"],
+                item_name="group",
+                action_name="deletion",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                'gid': gid,
+                "gid": gid,
             },
         )
 
 
 @group.command()
-@click.pass_obj
-@click.argument('gid', type=str, metavar='GROUP_ID')
+@pass_ctx_obj
+@click.argument("gid", type=str, metavar="GROUP_ID")
 def purge(ctx: CLIContext, gid):
     """
     Delete the existing group. This action cannot be undone.
@@ -223,35 +232,35 @@ def purge(ctx: CLIContext, gid):
     with Session() as session:
         try:
             if not ask_yn():
-                print_info('Cancelled')
-                sys.exit(1)
+                print_info("Cancelled")
+                sys.exit(ExitCode.FAILURE)
             data = session.Group.purge(gid)
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='group',
-                action_name='purge',
+                item_name="group",
+                action_name="purge",
             )
-            sys.exit(1)
-        if not data['ok']:
+            sys.exit(ExitCode.FAILURE)
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='group',
-                action_name='purge',
+                msg=data["msg"],
+                item_name="group",
+                action_name="purge",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                'gid': gid,
+                "gid": gid,
             },
         )
 
 
 @group.command()
-@click.pass_obj
-@click.argument('gid', type=str, metavar='GROUP_ID')
-@click.argument('user_uuids', type=str, metavar='USER_UUIDS', nargs=-1)
+@pass_ctx_obj
+@click.argument("gid", type=str, metavar="GROUP_ID")
+@click.argument("user_uuids", type=str, metavar="USER_UUIDS", nargs=-1)
 def add_users(ctx: CLIContext, gid, user_uuids):
     """
     Add users to a group.
@@ -266,29 +275,29 @@ def add_users(ctx: CLIContext, gid, user_uuids):
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='group',
-                action_name='add_users',
+                item_name="group",
+                action_name="add_users",
             )
-            sys.exit(1)
-        if not data['ok']:
+            sys.exit(ExitCode.FAILURE)
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='group',
-                action_name='add_users',
+                msg=data["msg"],
+                item_name="group",
+                action_name="add_users",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                'gid': gid,
+                "gid": gid,
             },
         )
 
 
 @group.command()
-@click.pass_obj
-@click.argument('gid', type=str, metavar='GROUP_ID')
-@click.argument('user_uuids', type=str, metavar='USER_UUIDS', nargs=-1)
+@pass_ctx_obj
+@click.argument("gid", type=str, metavar="GROUP_ID")
+@click.argument("user_uuids", type=str, metavar="USER_UUIDS", nargs=-1)
 def remove_users(ctx: CLIContext, gid, user_uuids):
     """
     Remove users from a group.
@@ -303,20 +312,20 @@ def remove_users(ctx: CLIContext, gid, user_uuids):
         except Exception as e:
             ctx.output.print_mutation_error(
                 e,
-                item_name='group',
-                action_name='users_remove',
+                item_name="group",
+                action_name="users_remove",
             )
-            sys.exit(1)
-        if not data['ok']:
+            sys.exit(ExitCode.FAILURE)
+        if not data["ok"]:
             ctx.output.print_mutation_error(
-                msg=data['msg'],
-                item_name='group',
-                action_name='users_remove',
+                msg=data["msg"],
+                item_name="group",
+                action_name="users_remove",
             )
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                'gid': gid,
+                "gid": gid,
             },
         )

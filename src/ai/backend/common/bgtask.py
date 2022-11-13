@@ -6,24 +6,14 @@ import logging
 import time
 import uuid
 import weakref
-from typing import (
-    Awaitable,
-    Callable,
-    Final,
-    Literal,
-    Optional,
-    TypeAlias,
-    Union,
-    Set,
-    Type,
-)
+from typing import Awaitable, Callable, Final, Literal, Optional, Set, Type, TypeAlias, Union
 
-import aioredis
-import aioredis.client
 from aiohttp import web
 from aiohttp_sse import sse_response
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 
-from . import redis
+from . import redis_helper
 from .events import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
@@ -36,9 +26,11 @@ from .logging import BraceStyleAdapter
 from .types import AgentId, Sentinel
 
 sentinel: Final = Sentinel.TOKEN
-log = BraceStyleAdapter(logging.getLogger('ai.backend.manager.background'))
-TaskResult = Literal['bgtask_done', 'bgtask_cancelled', 'bgtask_failed']
-BgtaskEvents: TypeAlias = BgtaskUpdatedEvent | BgtaskDoneEvent | BgtaskCancelledEvent | BgtaskFailedEvent
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.background"))
+TaskResult = Literal["bgtask_done", "bgtask_cancelled", "bgtask_failed"]
+BgtaskEvents: TypeAlias = (
+    BgtaskUpdatedEvent | BgtaskDoneEvent | BgtaskCancelledEvent | BgtaskFailedEvent
+)
 
 MAX_BGTASK_ARCHIVE_PERIOD: Final = 86400  # 24  hours
 
@@ -68,19 +60,22 @@ class ProgressReporter:
         current, total = self.current_progress, self.total_progress
         redis_producer = self.event_producer.redis_client
 
-        def _pipe_builder(r: aioredis.Redis) -> aioredis.client.Pipeline:
+        async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline(transaction=False)
-            tracker_key = f'bgtask.{self.task_id}'
-            pipe.hset(tracker_key, mapping={
-                'current': str(current),
-                'total': str(total),
-                'msg': message or '',
-                'last_update': str(time.time()),
-            })
-            pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
+            tracker_key = f"bgtask.{self.task_id}"
+            await pipe.hset(
+                tracker_key,
+                mapping={
+                    "current": str(current),
+                    "total": str(total),
+                    "msg": message or "",
+                    "last_update": str(time.time()),
+                },
+            )
+            await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
             return pipe
 
-        await redis.execute(redis_producer, _pipe_builder)
+        await redis_helper.execute(redis_producer, _pipe_builder)
         await self.event_producer.produce_event(
             BgtaskUpdatedEvent(
                 self.task_id,
@@ -131,33 +126,33 @@ class BackgroundTaskManager:
         A aiohttp-based server-sent events (SSE) responder that pushes the bgtask updates
         to the clients.
         """
-        tracker_key = f'bgtask.{task_id}'
+        tracker_key = f"bgtask.{task_id}"
         redis_producer = self.event_producer.redis_client
-        task_info = await redis.execute(
+        task_info = await redis_helper.execute(
             redis_producer,
             lambda r: r.hgetall(tracker_key),
-            encoding='utf-8',
+            encoding="utf-8",
         )
 
-        log.debug('task info: {}', task_info)
+        log.debug("task info: {}", task_info)
         if task_info is None:
             # The task ID is invalid or represents a task completed more than 24 hours ago.
-            raise ValueError('No such background task.')
+            raise ValueError("No such background task.")
 
-        if task_info['status'] != 'started':
+        if task_info["status"] != "started":
             # It is an already finished task!
             async with sse_response(request) as resp:
                 try:
                     body = {
-                        'task_id': str(task_id),
-                        'status': task_info['status'],
-                        'current_progress': task_info['current'],
-                        'total_progress': task_info['total'],
-                        'message': task_info['msg'],
+                        "task_id": str(task_id),
+                        "status": task_info["status"],
+                        "current_progress": task_info["current"],
+                        "total_progress": task_info["total"],
+                        "message": task_info["msg"],
                     }
                     await resp.send(json.dumps(body), event=f"task_{task_info['status']}")
                 finally:
-                    await resp.send('{}', event="server_close")
+                    await resp.send("{}", event="server_close")
             return resp
 
         # It is an ongoing task.
@@ -174,17 +169,19 @@ class BackgroundTaskManager:
                             if task_id != event.task_id:
                                 continue
                             body = {
-                                'task_id': str(task_id),
-                                'message': event.message,
+                                "task_id": str(task_id),
+                                "message": event.message,
                             }
                             if isinstance(event, BgtaskUpdatedEvent):
-                                body['current_progress'] = event.current_progress
-                                body['total_progress'] = event.total_progress
+                                body["current_progress"] = event.current_progress
+                                body["total_progress"] = event.total_progress
                             await resp.send(json.dumps(body), event=event.name, retry=5)
-                            if (isinstance(event, BgtaskDoneEvent) or
-                                isinstance(event, BgtaskFailedEvent) or
-                                isinstance(event, BgtaskCancelledEvent)):
-                                await resp.send('{}', event="server_close")
+                            if (
+                                isinstance(event, BgtaskDoneEvent)
+                                or isinstance(event, BgtaskFailedEvent)
+                                or isinstance(event, BgtaskCancelledEvent)
+                            ):
+                                await resp.send("{}", event="server_close")
                                 break
                         finally:
                             my_queue.task_done()
@@ -197,28 +194,32 @@ class BackgroundTaskManager:
         self,
         func: BackgroundTask,
         name: str = None,
+        **kwargs,
     ) -> uuid.UUID:
         task_id = uuid.uuid4()
         redis_producer = self.event_producer.redis_client
 
-        def _pipe_builder(r: aioredis.Redis) -> aioredis.client.Pipeline:
+        async def _pipe_builder(r: Redis) -> Pipeline:
             pipe = r.pipeline()
-            tracker_key = f'bgtask.{task_id}'
+            tracker_key = f"bgtask.{task_id}"
             now = str(time.time())
-            pipe.hset(tracker_key, mapping={
-                'status': 'started',
-                'current': '0',
-                'total': '0',
-                'msg': '',
-                'started_at': now,
-                'last_update': now,
-            })
-            pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
+            await pipe.hset(
+                tracker_key,
+                mapping={
+                    "status": "started",
+                    "current": "0",
+                    "total": "0",
+                    "msg": "",
+                    "started_at": now,
+                    "last_update": now,
+                },
+            )
+            await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
             return pipe
 
-        await redis.execute(redis_producer, _pipe_builder)
+        await redis_helper.execute(redis_producer, _pipe_builder)
 
-        task = asyncio.create_task(self._wrapper_task(func, task_id, name))
+        task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
         self.ongoing_tasks.add(task)
         return task_id
 
@@ -227,49 +228,54 @@ class BackgroundTaskManager:
         func: BackgroundTask,
         task_id: uuid.UUID,
         task_name: Optional[str],
+        **kwargs,
     ) -> None:
         task_result: TaskResult
         reporter = ProgressReporter(self.event_producer, task_id)
-        message = ''
-        event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[BgtaskFailedEvent] = \
-            BgtaskDoneEvent
+        message = ""
+        event_cls: Type[BgtaskDoneEvent] | Type[BgtaskCancelledEvent] | Type[
+            BgtaskFailedEvent
+        ] = BgtaskDoneEvent
         try:
-            message = await func(reporter) or ''
-            task_result = 'bgtask_done'
+            message = await func(reporter, **kwargs) or ""
+            task_result = "bgtask_done"
         except asyncio.CancelledError:
-            task_result = 'bgtask_cancelled'
+            task_result = "bgtask_cancelled"
             event_cls = BgtaskCancelledEvent
         except Exception as e:
-            task_result = 'bgtask_failed'
+            task_result = "bgtask_failed"
             event_cls = BgtaskFailedEvent
             message = repr(e)
             log.exception("Task {} ({}): unhandled error", task_id, task_name)
         finally:
             redis_producer = self.event_producer.redis_client
 
-            async def _pipe_builder(r: aioredis.Redis):
+            async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
-                tracker_key = f'bgtask.{task_id}'
-                pipe.hset(tracker_key, mapping={
-                    'status': task_result[7:],  # strip "bgtask_"
-                    'msg': message,
-                    'last_update': str(time.time()),
-                })
-                pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
-                await pipe.execute()
+                tracker_key = f"bgtask.{task_id}"
+                await pipe.hset(
+                    tracker_key,
+                    mapping={
+                        "status": task_result[len("bgtask_") :],  # strip "bgtask_"
+                        "msg": message,
+                        "last_update": str(time.time()),
+                    },
+                )
+                await pipe.expire(tracker_key, MAX_BGTASK_ARCHIVE_PERIOD)
+                return pipe
 
-            await redis.execute(redis_producer, _pipe_builder)
+            await redis_helper.execute(redis_producer, _pipe_builder)
             await self.event_producer.produce_event(
                 event_cls(
                     task_id,
                     message=message,
                 ),
             )
-            log.info('Task {} ({}): {}', task_id, task_name or '', task_result)
+            log.info("Task {} ({}): {}", task_id, task_name or "", task_result)
 
     async def shutdown(self) -> None:
         join_tasks = []
-        log.info('Cancelling remaining background tasks...')
+        log.info("Cancelling remaining background tasks...")
         for task in self.ongoing_tasks.copy():
             if task.done():
                 continue

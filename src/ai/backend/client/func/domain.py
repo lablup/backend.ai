@@ -3,33 +3,32 @@ from typing import Iterable, Sequence
 
 from ai.backend.client.output.fields import domain_fields
 from ai.backend.client.output.types import FieldSpec
-from .base import api_function, BaseFunction
-from ..session import api_session
 
-__all__ = (
-    'Domain',
-)
+from ..session import api_session
+from .base import BaseFunction, api_function, resolve_fields
+
+__all__ = ("Domain",)
 
 _default_list_fields = (
-    domain_fields['name'],
-    domain_fields['description'],
-    domain_fields['is_active'],
-    domain_fields['created_at'],
-    domain_fields['total_resource_slots'],
-    domain_fields['allowed_vfolder_hosts'],
-    domain_fields['allowed_docker_registries'],
-    domain_fields['integration_id'],
+    domain_fields["name"],
+    domain_fields["description"],
+    domain_fields["is_active"],
+    domain_fields["created_at"],
+    domain_fields["total_resource_slots"],
+    domain_fields["allowed_vfolder_hosts"],
+    domain_fields["allowed_docker_registries"],
+    domain_fields["integration_id"],
 )
 
 _default_detail_fields = (
-    domain_fields['name'],
-    domain_fields['description'],
-    domain_fields['is_active'],
-    domain_fields['created_at'],
-    domain_fields['total_resource_slots'],
-    domain_fields['allowed_vfolder_hosts'],
-    domain_fields['allowed_docker_registries'],
-    domain_fields['integration_id'],
+    domain_fields["name"],
+    domain_fields["description"],
+    domain_fields["is_active"],
+    domain_fields["created_at"],
+    domain_fields["total_resource_slots"],
+    domain_fields["allowed_vfolder_hosts"],
+    domain_fields["allowed_docker_registries"],
+    domain_fields["integration_id"],
 )
 
 
@@ -56,14 +55,16 @@ class Domain(BaseFunction):
 
         :param fields: Additional per-domain query fields to fetch.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query {
                 domains {$fields}
             }
-        """)
-        query = query.replace('$fields', ' '.join(f.field_ref for f in fields))
+        """
+        )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         data = await api_session.get().Admin._query(query)
-        return data['domains']
+        return data["domains"]
 
     @api_function
     @classmethod
@@ -78,85 +79,101 @@ class Domain(BaseFunction):
         :param name: Name of the domain to fetch.
         :param fields: Additional per-domain query fields to fetch.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             query($name: String) {
                 domain(name: $name) {$fields}
             }
-        """)
-        query = query.replace('$fields', ' '.join(f.field_ref for f in fields))
-        variables = {'name': name}
+        """
+        )
+        query = query.replace("$fields", " ".join(f.field_ref for f in fields))
+        variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
-        return data['domain']
+        return data["domain"]
 
     @api_function
     @classmethod
-    async def create(cls, name: str, description: str = '', is_active: bool = True,
-                     total_resource_slots: str = None,
-                     allowed_vfolder_hosts: Iterable[str] = None,
-                     allowed_docker_registries: Iterable[str] = None,
-                     integration_id: str = None,
-                     fields: Iterable[str] = None) -> dict:
+    async def create(
+        cls,
+        name: str,
+        description: str = "",
+        is_active: bool = True,
+        total_resource_slots: str = None,
+        allowed_vfolder_hosts: Iterable[str] = None,
+        allowed_docker_registries: Iterable[str] = None,
+        integration_id: str = None,
+        fields: Iterable[FieldSpec | str] = None,
+    ) -> dict:
         """
         Creates a new domain with the given options.
         You need an admin privilege for this operation.
         """
-        if fields is None:
-            fields = ('name',)
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($name: String!, $input: DomainInput!) {
                 create_domain(name: $name, props: $input) {
                     ok msg domain {$fields}
                 }
             }
-        """)
-        query = query.replace('$fields', ' '.join(fields))
+        """
+        )
+        resolved_fields = resolve_fields(fields, domain_fields, (domain_fields["name"],))
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
-            'name': name,
-            'input': {
-                'description': description,
-                'is_active': is_active,
-                'total_resource_slots': total_resource_slots,
-                'allowed_vfolder_hosts': allowed_vfolder_hosts,
-                'allowed_docker_registries': allowed_docker_registries,
-                'integration_id': integration_id,
+            "name": name,
+            "input": {
+                "description": description,
+                "is_active": is_active,
+                "total_resource_slots": total_resource_slots,
+                "allowed_vfolder_hosts": allowed_vfolder_hosts,
+                "allowed_docker_registries": allowed_docker_registries,
+                "integration_id": integration_id,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data['create_domain']
+        return data["create_domain"]
 
     @api_function
     @classmethod
-    async def update(cls, name: str, new_name: str = None, description: str = None,
-                     is_active: bool = None, total_resource_slots: str = None,
-                     allowed_vfolder_hosts: Iterable[str] = None,
-                     allowed_docker_registries: Iterable[str] = None,
-                     integration_id: str = None,
-                     fields: Iterable[str] = None) -> dict:
+    async def update(
+        cls,
+        name: str,
+        new_name: str = None,
+        description: str = None,
+        is_active: bool = None,
+        total_resource_slots: str = None,
+        allowed_vfolder_hosts: Iterable[str] = None,
+        allowed_docker_registries: Iterable[str] = None,
+        integration_id: str = None,
+        fields: Iterable[FieldSpec | str] = None,
+    ) -> dict:
         """
         Update existing domain.
         You need an admin privilege for this operation.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($name: String!, $input: ModifyDomainInput!) {
                 modify_domain(name: $name, props: $input) {
                     ok msg
                 }
             }
-        """)
+        """
+        )
         variables = {
-            'name': name,
-            'input': {
-                'name': new_name,
-                'description': description,
-                'is_active': is_active,
-                'total_resource_slots': total_resource_slots,
-                'allowed_vfolder_hosts': allowed_vfolder_hosts,
-                'allowed_docker_registries': allowed_docker_registries,
-                'integration_id': integration_id,
+            "name": name,
+            "input": {
+                "name": new_name,
+                "description": description,
+                "is_active": is_active,
+                "total_resource_slots": total_resource_slots,
+                "allowed_vfolder_hosts": allowed_vfolder_hosts,
+                "allowed_docker_registries": allowed_docker_registries,
+                "integration_id": integration_id,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data['modify_domain']
+        return data["modify_domain"]
 
     @api_function
     @classmethod
@@ -164,16 +181,18 @@ class Domain(BaseFunction):
         """
         Inactivates an existing domain.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($name: String!) {
                 delete_domain(name: $name) {
                     ok msg
                 }
             }
-        """)
-        variables = {'name': name}
+        """
+        )
+        variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
-        return data['delete_domain']
+        return data["delete_domain"]
 
     @api_function
     @classmethod
@@ -181,13 +200,15 @@ class Domain(BaseFunction):
         """
         Deletes an existing domain.
         """
-        query = textwrap.dedent("""\
+        query = textwrap.dedent(
+            """\
             mutation($name: String!) {
                 purge_domain(name: $name) {
                     ok msg
                 }
             }
-        """)
-        variables = {'name': name}
+        """
+        )
+        variables = {"name": name}
         data = await api_session.get().Admin._query(query, variables)
-        return data['purge_domain']
+        return data["purge_domain"]

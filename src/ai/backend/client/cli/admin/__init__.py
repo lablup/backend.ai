@@ -1,4 +1,4 @@
-from ..main import main
+from ai.backend.cli.main import main
 
 
 @main.group()
@@ -15,8 +15,8 @@ from . import (  # noqa
     group,
     image,
     keypair,
-    manager,
     license,
+    manager,
     resource,
     resource_policy,
     scaling_group,

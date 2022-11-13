@@ -1,26 +1,20 @@
 import asyncio
 import signal
-from typing import (
-    Awaitable, Callable, Optional,
-    Collection,
-    TypeVar,
-)
+from typing import Awaitable, Callable, Collection, Optional, TypeVar
 
-__all__ = (
-    'current_loop',
-)
+__all__ = ("current_loop",)
 
 
 current_loop: Callable[[], asyncio.AbstractEventLoop]
-if hasattr(asyncio, 'get_running_loop'):
+if hasattr(asyncio, "get_running_loop"):
     current_loop = asyncio.get_running_loop  # type: ignore
 else:
-    current_loop = asyncio.get_event_loop    # type: ignore
+    current_loop = asyncio.get_event_loop  # type: ignore
 
 
 all_tasks: Callable[[], Collection[asyncio.Task]]
-if hasattr(asyncio, 'all_tasks'):
-    all_tasks = asyncio.all_tasks       # type: ignore
+if hasattr(asyncio, "all_tasks"):
+    all_tasks = asyncio.all_tasks  # type: ignore
 else:
     all_tasks = asyncio.Task.all_tasks  # type: ignore
 
@@ -31,17 +25,18 @@ def _cancel_all_tasks(loop):
         return
     for task in to_cancel:
         task.cancel()
-    loop.run_until_complete(
-        asyncio.gather(*to_cancel, return_exceptions=True))
+    loop.run_until_complete(asyncio.gather(*to_cancel, return_exceptions=True))
     for task in to_cancel:
         if task.cancelled():
             continue
         if task.exception() is not None:
-            loop.call_exception_handler({
-                'message': 'unhandled exception during asyncio.run() shutdown',
-                'exception': task.exception(),
-                'task': task,
-            })
+            loop.call_exception_handler(
+                {
+                    "message": "unhandled exception during asyncio.run() shutdown",
+                    "exception": task.exception(),
+                    "task": task,
+                }
+            )
 
 
 def _asyncio_run(coro, *, debug=False):
@@ -53,29 +48,29 @@ def _asyncio_run(coro, *, debug=False):
     finally:
         try:
             _cancel_all_tasks(loop)
-            if hasattr(loop, 'shutdown_asyncgens'):  # Python 3.6+
+            if hasattr(loop, "shutdown_asyncgens"):  # Python 3.6+
                 loop.run_until_complete(loop.shutdown_asyncgens())
         finally:
             asyncio.set_event_loop(None)
             loop.close()
 
 
-_T = TypeVar('_T')
+_T = TypeVar("_T")
 
 run: Callable[[Awaitable[_T], Optional[bool]], _T]
-if hasattr(asyncio, 'run'):
-    asyncio_run = asyncio.run   # type: ignore
+if hasattr(asyncio, "run"):
+    asyncio_run = asyncio.run  # type: ignore
 else:
     asyncio_run = _asyncio_run  # type: ignore
 
 
-def asyncio_run_forever(setup_coro, shutdown_coro, *,
-                        stop_signals={signal.SIGINT}, debug=False):
-    '''
+def asyncio_run_forever(setup_coro, shutdown_coro, *, stop_signals={signal.SIGINT}, debug=False):
+    """
     A proposed-but-not-implemented asyncio.run_forever() API based on
     @vxgmichel's idea.
     See discussions on https://github.com/python/asyncio/pull/465
-    '''
+    """
+
     async def wait_for_stop():
         loop = current_loop()
         future = loop.create_future()
@@ -96,7 +91,7 @@ def asyncio_run_forever(setup_coro, shutdown_coro, *,
         try:
             loop.run_until_complete(shutdown_coro)
             _cancel_all_tasks(loop)
-            if hasattr(loop, 'shutdown_asyncgens'):  # Python 3.6+
+            if hasattr(loop, "shutdown_asyncgens"):  # Python 3.6+
                 loop.run_until_complete(loop.shutdown_asyncgens())
         finally:
             asyncio.set_event_loop(None)

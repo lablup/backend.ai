@@ -5,20 +5,20 @@ A compatibility module for backported codes from Python 3.6+ standard library.
 import asyncio
 
 __all__ = (
-    'current_loop',
-    'all_tasks',
-    'asyncio_run',
-    'asyncio_run_forever',
+    "current_loop",
+    "all_tasks",
+    "asyncio_run",
+    "asyncio_run_forever",
 )
 
 
-if hasattr(asyncio, 'get_running_loop'):  # Python 3.7+
+if hasattr(asyncio, "get_running_loop"):  # Python 3.7+
     current_loop = asyncio.get_running_loop
 else:
     current_loop = asyncio.get_event_loop
 
 
-if hasattr(asyncio, 'all_tasks'):  # Python 3.7+
+if hasattr(asyncio, "all_tasks"):  # Python 3.7+
     all_tasks = asyncio.all_tasks
 else:
     all_tasks = asyncio.Task.all_tasks  # type: ignore
@@ -30,17 +30,18 @@ def _cancel_all_tasks(loop):
         return
     for task in to_cancel:
         task.cancel()
-    loop.run_until_complete(
-        asyncio.gather(*to_cancel, return_exceptions=True))
+    loop.run_until_complete(asyncio.gather(*to_cancel, return_exceptions=True))
     for task in to_cancel:
         if task.cancelled():
             continue
         if task.exception() is not None:
-            loop.call_exception_handler({
-                'message': 'unhandled exception during asyncio.run() shutdown',
-                'exception': task.exception(),
-                'task': task,
-            })
+            loop.call_exception_handler(
+                {
+                    "message": "unhandled exception during asyncio.run() shutdown",
+                    "exception": task.exception(),
+                    "task": task,
+                }
+            )
 
 
 def _asyncio_run(coro, *, debug=False):
@@ -52,7 +53,7 @@ def _asyncio_run(coro, *, debug=False):
     finally:
         try:
             _cancel_all_tasks(loop)
-            if hasattr(loop, 'shutdown_asyncgens'):  # Python 3.6+
+            if hasattr(loop, "shutdown_asyncgens"):  # Python 3.6+
                 loop.run_until_complete(loop.shutdown_asyncgens())
         finally:
             loop.stop()
@@ -60,7 +61,7 @@ def _asyncio_run(coro, *, debug=False):
             asyncio.set_event_loop(None)
 
 
-if hasattr(asyncio, 'run'):  # Python 3.7+
+if hasattr(asyncio, "run"):  # Python 3.7+
     asyncio_run = asyncio.run
 else:
     asyncio_run = _asyncio_run
@@ -90,7 +91,7 @@ def asyncio_run_forever(server_context, *, debug=False):
     finally:
         try:
             _cancel_all_tasks(loop)
-            if hasattr(loop, 'shutdown_asyncgens'):  # Python 3.6+
+            if hasattr(loop, "shutdown_asyncgens"):  # Python 3.6+
                 loop.run_until_complete(loop.shutdown_asyncgens())
         finally:
             loop.stop()

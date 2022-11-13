@@ -1,20 +1,33 @@
 import asyncio
 from time import monotonic
+
 import zmq
 
 
-async def aexecute_interactive(kernel_client, code, silent=False, store_history=True,
-                               user_expressions=None, allow_stdin=None,
-                               stop_on_error=True, timeout=None,
-                               output_hook=None, stdin_hook=None):
+async def aexecute_interactive(
+    kernel_client,
+    code,
+    silent=False,
+    store_history=True,
+    user_expressions=None,
+    allow_stdin=None,
+    stop_on_error=True,
+    timeout=None,
+    output_hook=None,
+    stdin_hook=None,
+):
     """Async version of jupyter_client's execute_interactive method.
 
     https://github.com/jupyter/jupyter_client/blob/master/jupyter_client/blocking/client.py#L213
     """
-    msg_id = kernel_client.execute(code, silent=silent, store_history=store_history,
-                                   user_expressions=user_expressions,
-                                   allow_stdin=allow_stdin,
-                                   stop_on_error=stop_on_error)
+    msg_id = kernel_client.execute(
+        code,
+        silent=silent,
+        store_history=store_history,
+        user_expressions=user_expressions,
+        allow_stdin=allow_stdin,
+        stop_on_error=stop_on_error,
+    )
 
     stdin_hook = stdin_hook if stdin_hook else kernel_client._stdin_hook_default
     output_hook = output_hook if output_hook else kernel_client._output_hook_default
@@ -44,13 +57,15 @@ async def aexecute_interactive(kernel_client, code, silent=False, store_history=
             raise TimeoutError("Timeout waiting for output")
         if iopub_socket in events:
             msg = kernel_client.iopub_channel.get_msg(timeout=0)
-            if msg['parent_header'].get('msg_id') != msg_id:
+            if msg["parent_header"].get("msg_id") != msg_id:
                 continue  # not from my request
             await output_hook(msg)
 
             # Stop on idle
-            if msg['header']['msg_type'] == 'status' and \
-                    msg['content']['execution_state'] == 'idle':
+            if (
+                msg["header"]["msg_type"] == "status"
+                and msg["content"]["execution_state"] == "idle"
+            ):
                 break
         if stdin_socket in events:
             req = kernel_client.stdin_channel.get_msg(timeout=0)

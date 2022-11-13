@@ -4,21 +4,14 @@ WebSocket-based streaming kernel interaction APIs.
 
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
 import asyncio
 import logging
-from typing import (
-    Any,
-    Awaitable,
-    Callable,
-    Optional,
-    Union,
-)
+from abc import ABCMeta, abstractmethod
+from typing import Any, Awaitable, Callable, Optional, Union
 
 import aiohttp
 import aiotools
-from aiohttp import WSCloseCode
-from aiohttp import web
+from aiohttp import WSCloseCode, web
 
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -33,12 +26,12 @@ class ServiceProxy(metaclass=ABCMeta):
     """
 
     __slots__ = (
-        'ws',
-        'host',
-        'port',
-        'downstream_cb',
-        'upstream_cb',
-        'ping_cb',
+        "ws",
+        "host",
+        "port",
+        "downstream_cb",
+        "upstream_cb",
+        "ping_cb",
     )
 
     def __init__(
@@ -67,7 +60,7 @@ class TCPProxy(ServiceProxy):
 
     __slots__ = (
         *ServiceProxy.__slots__,
-        'down_task',
+        "down_task",
     )
 
     def __init__(self, *args, **kwargs) -> None:
@@ -77,7 +70,7 @@ class TCPProxy(ServiceProxy):
     async def proxy(self) -> web.WebSocketResponse:
         try:
             try:
-                log.debug('Trying to open proxied TCP connection to {}:{}', self.host, self.port)
+                log.debug("Trying to open proxied TCP connection to {}:{}", self.host, self.port)
                 reader, writer = await asyncio.open_connection(self.host, self.port)
             except ConnectionRefusedError:
                 await self.ws.close(code=WSCloseCode.TRY_AGAIN_LATER)
@@ -95,8 +88,7 @@ class TCPProxy(ServiceProxy):
                             if not chunk:
                                 break
                             await self.ws.send_bytes(chunk)
-                        except (RuntimeError, ConnectionResetError,
-                                asyncio.CancelledError):
+                        except (RuntimeError, ConnectionResetError, asyncio.CancelledError):
                             # connection interrupted by client-side
                             break
                         else:
@@ -109,7 +101,7 @@ class TCPProxy(ServiceProxy):
                 finally:
                     await self.ws.close(code=WSCloseCode.GOING_AWAY)
 
-            log.debug('TCPProxy connected {0}:{1}', self.host, self.port)
+            log.debug("TCPProxy connected {0}:{1}", self.host, self.port)
             self.down_task = asyncio.create_task(downstream())
             async for msg in self.ws:
                 if msg.type == web.WSMsgType.BINARY:
@@ -137,15 +129,19 @@ class TCPProxy(ServiceProxy):
             if self.down_task is not None and not self.down_task.done():
                 self.down_task.cancel()
                 await self.down_task
-            log.debug('websocket connection closed')
+            log.debug("websocket connection closed")
         return self.ws
 
 
 class WebSocketProxy:
     __slots__ = (
-        'up_conn', 'down_conn',
-        'upstream_buffer', 'upstream_buffer_task',
-        'downstream_cb', 'upstream_cb', 'ping_cb',
+        "up_conn",
+        "down_conn",
+        "upstream_buffer",
+        "upstream_buffer_task",
+        "downstream_cb",
+        "upstream_cb",
+        "ping_cb",
     )
 
     up_conn: aiohttp.ClientWebSocketResponse
@@ -189,8 +185,7 @@ class WebSocketProxy:
                     if self.ping_cb is not None:
                         await self.ping_cb(msg.data)
                 elif msg.type == aiohttp.WSMsgType.ERROR:
-                    log.error("ws connection closed with exception {}",
-                              self.up_conn.exception())
+                    log.error("ws connection closed with exception {}", self.up_conn.exception())
                     break
                 elif msg.type == aiohttp.WSMsgType.CLOSE:
                     break
@@ -224,7 +219,7 @@ class WebSocketProxy:
         except asyncio.CancelledError:
             raise
         except Exception:
-            log.exception('unexpected error')
+            log.exception("unexpected error")
         finally:
             await self.close_upstream()
 

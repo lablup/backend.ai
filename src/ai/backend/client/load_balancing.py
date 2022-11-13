@@ -3,18 +3,17 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import List, Mapping, Tuple, Type
 
-import attr
+import attrs
 from yarl import URL
 
 
-@attr.s(auto_attribs=True, frozen=True)
-class LoadBalancerConfig():
+@attrs.define(auto_attribs=True, frozen=True)
+class LoadBalancerConfig:
     name: str
     args: Tuple[str, ...]
 
 
 class LoadBalancer(metaclass=ABCMeta):
-
     @staticmethod
     def load(config: LoadBalancerConfig) -> LoadBalancer:
         cls = _cls_map[config.name]
@@ -22,8 +21,8 @@ class LoadBalancer(metaclass=ABCMeta):
 
     @staticmethod
     def clean_config(config: str) -> LoadBalancerConfig:
-        name, _, raw_args = config.partition(':')
-        args = raw_args.split(',')
+        name, _, raw_args = config.partition(":")
+        args = raw_args.split(",")
         return LoadBalancerConfig(name, tuple(args))
 
     @abstractmethod
@@ -64,7 +63,7 @@ class LowestLatencyLoadBalancer(LoadBalancer):
 
 
 _cls_map: Mapping[str, Type[LoadBalancer]] = {
-    'simple_rr': SimpleRRLoadBalancer,
-    'periodic_rr': PeriodicRRLoadBalancer,
-    'lowest_latency': LowestLatencyLoadBalancer,
+    "simple_rr": SimpleRRLoadBalancer,
+    "periodic_rr": PeriodicRRLoadBalancer,
+    "lowest_latency": LowestLatencyLoadBalancer,
 }

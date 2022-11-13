@@ -1,6 +1,1 @@
-python_tests(
-    name="tests",
-    dependencies=[
-        "src/ai/backend/common:lib",
-    ],
-)
+python_tests(name="tests")

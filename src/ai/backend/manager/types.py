@@ -1,23 +1,20 @@
 from __future__ import annotations
 
-import attr
 import enum
 import uuid
-from typing import (
-    Protocol,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Protocol
 
-from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+import attr
 from sqlalchemy.engine.row import Row
+from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 if TYPE_CHECKING:
     from ai.backend.common.lock import AbstractDistributedLock
+
     from .defs import LockID
 
 
 class SessionGetter(Protocol):
-
     def __call__(self, *, db_connection: SAConnection) -> Row:
         ...
 
@@ -29,6 +26,7 @@ class SessionGetter(Protocol):
 # This enables passing of type checks by "value is sentinel" (or "value is Sentinel.token")
 # instead of more expensive "isinstance(value, Sentinel)" because we can assure type checkers
 # to think there is no other possible instances of the Sentinel type.
+
 
 class Sentinel(enum.Enum):
     token = 0
@@ -43,6 +41,5 @@ class UserScope:
 
 
 class DistributedLockFactory(Protocol):
-
     def __call__(self, lock_id: LockID, lifetime_hint: float) -> AbstractDistributedLock:
         ...

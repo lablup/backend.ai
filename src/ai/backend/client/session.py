@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import abc
 import asyncio
-from contextvars import Context, ContextVar, copy_context
 import inspect
+import queue
 import threading
+import warnings
+from contextvars import Context, ContextVar, copy_context
 from typing import (
     Any,
     AsyncIterator,
@@ -13,28 +15,26 @@ from typing import (
     Iterator,
     Literal,
     Tuple,
-    Union,
     TypeVar,
+    Union,
 )
-import queue
-import warnings
 
 import aiohttp
 from multidict import CIMultiDict
-from .config import APIConfig, MIN_API_VERSION, get_config, parse_api_version
+
+from .config import MIN_API_VERSION, APIConfig, get_config, parse_api_version
 from .exceptions import APIVersionWarning, BackendAPIError, BackendClientError
 from .types import Sentinel, sentinel
 
-
 __all__ = (
-    'BaseSession',
-    'Session',
-    'AsyncSession',
-    'api_session',
+    "BaseSession",
+    "Session",
+    "AsyncSession",
+    "api_session",
 )
 
 
-api_session: ContextVar[BaseSession] = ContextVar('api_session')
+api_session: ContextVar[BaseSession] = ContextVar("api_session")
 
 
 async def _negotiate_api_version(
@@ -44,18 +44,23 @@ async def _negotiate_api_version(
     client_version = parse_api_version(config.version)
     try:
         timeout_config = aiohttp.ClientTimeout(
-            total=None, connect=None,
+            total=None,
+            connect=None,
             sock_connect=config.connection_timeout,
             sock_read=config.read_timeout,
         )
-        headers = CIMultiDict([
-            ('User-Agent', config.user_agent),
-        ])
-        probe_url = config.endpoint / 'func/' if config.endpoint_type == 'session' else config.endpoint
+        headers = CIMultiDict(
+            [
+                ("User-Agent", config.user_agent),
+            ]
+        )
+        probe_url = (
+            config.endpoint / "func/" if config.endpoint_type == "session" else config.endpoint
+        )
         async with http_session.get(probe_url, timeout=timeout_config, headers=headers) as resp:
             resp.raise_for_status()
             server_info = await resp.json()
-            server_version = parse_api_version(server_info['version'])
+            server_version = parse_api_version(server_info["version"])
             if server_version > client_version:
                 warnings.warn(
                     "The server API version is higher than the client. "
@@ -119,26 +124,28 @@ async def _close_aiohttp_session(session: aiohttp.ClientSession) -> None:
         await all_is_lost.wait()
 
 
-_Item = TypeVar('_Item')
+_Item = TypeVar("_Item")
 
 
 class _SyncWorkerThread(threading.Thread):
 
-    work_queue: queue.Queue[Union[
-        Tuple[Union[AsyncIterator, Coroutine], Context],
-        Sentinel,
-    ]]
+    work_queue: queue.Queue[
+        Union[
+            Tuple[Union[AsyncIterator, Coroutine], Context],
+            Sentinel,
+        ]
+    ]
     done_queue: queue.Queue[Union[Any, Exception]]
     stream_queue: queue.Queue[Union[Any, Exception, Sentinel]]
     stream_block: threading.Event
     agen_shutdown: bool
 
     __slots__ = (
-        'work_queue',
-        'done_queue',
-        'stream_queue',
-        'stream_block',
-        'agen_shutdown',
+        "work_queue",
+        "done_queue",
+        "stream_queue",
+        "stream_block",
+        "agen_shutdown",
     )
 
     def __init__(self, *args, **kwargs) -> None:
@@ -159,8 +166,7 @@ class _SyncWorkerThread(threading.Thread):
                     break
                 coro, ctx = item
                 if inspect.isasyncgen(coro):
-                    ctx.run(loop.run_until_complete,
-                            self.agen_wrapper(coro))
+                    ctx.run(loop.run_until_complete, self.agen_wrapper(coro))
                 else:
                     try:
                         # FIXME: Once python/mypy#12756 is resolved, remove the type-ignore tag.
@@ -235,17 +241,34 @@ class BaseSession(metaclass=abc.ABCMeta):
     """
 
     __slots__ = (
-        '_config', '_closed', '_context_token', '_proxy_mode',
-        'aiohttp_session', 'api_version',
-        'System', 'Manager', 'Admin',
-        'Agent', 'AgentWatcher', 'ScalingGroup', 'Storage',
-        'Image', 'ComputeSession', 'SessionTemplate',
-        'Domain', 'Group', 'Auth', 'User', 'KeyPair',
-        'BackgroundTask',
-        'EtcdConfig',
-        'Resource', 'KeypairResourcePolicy',
-        'VFolder', 'Dotfile',
-        'ServerLog',
+        "_config",
+        "_closed",
+        "_context_token",
+        "_proxy_mode",
+        "aiohttp_session",
+        "api_version",
+        "System",
+        "Manager",
+        "Admin",
+        "Agent",
+        "AgentWatcher",
+        "ScalingGroup",
+        "Storage",
+        "Image",
+        "ComputeSession",
+        "SessionTemplate",
+        "Domain",
+        "Group",
+        "Auth",
+        "User",
+        "KeyPair",
+        "BackgroundTask",
+        "EtcdConfig",
+        "Resource",
+        "KeypairResourcePolicy",
+        "VFolder",
+        "Dotfile",
+        "ServerLog",
     )
 
     aiohttp_session: aiohttp.ClientSession
@@ -256,7 +279,8 @@ class BaseSession(metaclass=abc.ABCMeta):
     _proxy_mode: bool
 
     def __init__(
-        self, *,
+        self,
+        *,
         config: APIConfig = None,
         proxy_mode: bool = False,
     ) -> None:
@@ -265,27 +289,27 @@ class BaseSession(metaclass=abc.ABCMeta):
         self._proxy_mode = proxy_mode
         self.api_version = parse_api_version(self._config.version)
 
-        from .func.system import System
         from .func.admin import Admin
         from .func.agent import Agent, AgentWatcher
-        from .func.storage import Storage
         from .func.auth import Auth
         from .func.bgtask import BackgroundTask
         from .func.domain import Domain
+        from .func.dotfile import Dotfile
         from .func.etcd import EtcdConfig
         from .func.group import Group
         from .func.image import Image
-        from .func.session import ComputeSession
         from .func.keypair import KeyPair
+        from .func.keypair_resource_policy import KeypairResourcePolicy
         from .func.manager import Manager
         from .func.resource import Resource
-        from .func.keypair_resource_policy import KeypairResourcePolicy
         from .func.scaling_group import ScalingGroup
+        from .func.server_log import ServerLog
+        from .func.session import ComputeSession
         from .func.session_template import SessionTemplate
+        from .func.storage import Storage
+        from .func.system import System
         from .func.user import User
         from .func.vfolder import VFolder
-        from .func.dotfile import Dotfile
-        from .func.server_log import ServerLog
 
         self.System = System
         self.Admin = Admin
@@ -365,12 +389,11 @@ class Session(BaseSession):
     but cannot use streaming APIs based on WebSocket and Server-Sent Events.
     """
 
-    __slots__ = (
-        '_worker_thread',
-    )
+    __slots__ = ("_worker_thread",)
 
     def __init__(
-        self, *,
+        self,
+        *,
         config: APIConfig = None,
         proxy_mode: bool = False,
     ) -> None:
@@ -391,7 +414,8 @@ class Session(BaseSession):
         self._context_token = api_session.set(self)
         if not self._proxy_mode:
             self.api_version = self.worker_thread.execute(
-                _negotiate_api_version(self.aiohttp_session, self.config))
+                _negotiate_api_version(self.aiohttp_session, self.config)
+            )
 
     def close(self) -> None:
         """
@@ -418,13 +442,13 @@ class Session(BaseSession):
         return self._worker_thread
 
     def __enter__(self) -> Session:
-        assert not self.closed, 'Cannot reuse closed session'
+        assert not self.closed, "Cannot reuse closed session"
         self.open()
         if self.config.announcement_handler:
             try:
                 payload = self.Manager.get_announcement()
-                if payload['enabled']:
-                    self.config.announcement_handler(payload['message'])
+                if payload["enabled"]:
+                    self.config.announcement_handler(payload["message"])
             except (BackendClientError, BackendAPIError):
                 # The server may be an old one without annoucement API.
                 pass
@@ -443,7 +467,8 @@ class AsyncSession(BaseSession):
     """
 
     def __init__(
-        self, *,
+        self,
+        *,
         config: APIConfig = None,
         proxy_mode: bool = False,
     ) -> None:
@@ -473,13 +498,13 @@ class AsyncSession(BaseSession):
         return self._aclose()
 
     async def __aenter__(self) -> AsyncSession:
-        assert not self.closed, 'Cannot reuse closed session'
+        assert not self.closed, "Cannot reuse closed session"
         await self.open()
         if self.config.announcement_handler:
             try:
                 payload = await self.Manager.get_announcement()
-                if payload['enabled']:
-                    self.config.announcement_handler(payload['message'])
+                if payload["enabled"]:
+                    self.config.announcement_handler(payload["message"])
             except (BackendClientError, BackendAPIError):
                 # The server may be an old one without annoucement API.
                 pass

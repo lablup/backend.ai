@@ -15,13 +15,13 @@ password = "develove"
 
 [manager]
 num-proc = 4
-service-addr = { host = "127.0.0.1", port = 8081 }
+service-addr = { host = "0.0.0.0", port = 8081 }
 #user = "nobody"
 #group = "nobody"
 ssl-enabled = false
 #ssl-cert = "/etc/backend.ai/ssl/apiserver-fullchain.pem"   # env: BACKNED_SSL_CERT
 #ssl-privkey = "/etc/backend.ai/ssl/apiserver-privkey.pem"  # env: BACKNED_SSL_KEY
-
+# ipc-base-path = "/tmp/backend.ai/ipc"
 heartbeat-timeout = 10.0
 #id = ""
 pid-file = "./manager.pid"             # env: BACKEND_PID_FILE

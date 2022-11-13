@@ -11,8 +11,8 @@ from ai.backend.common.docker import arch_name_aliases
 from ai.backend.common.types import SlotName, SlotTypes
 
 INTRINSIC_SLOTS: Final = {
-    SlotName('cpu'): SlotTypes('count'),
-    SlotName('mem'): SlotTypes('bytes'),
+    SlotName("cpu"): SlotTypes("count"),
+    SlotName("mem"): SlotTypes("bytes"),
 }
 
 MANAGER_ARCH = platform.machine().lower().strip()
@@ -24,11 +24,33 @@ DEFAULT_IMAGE_ARCH = arch_name_aliases.get(MANAGER_ARCH, MANAGER_ARCH)
 # The default container role name for multi-container sessions
 DEFAULT_ROLE: Final = "main"
 
-_RESERVED_VFOLDER_PATTERNS = [r'^\.[a-z0-9]+rc$', r'^\.[a-z0-9]+_profile$']
-RESERVED_DOTFILES = ['.terminfo', '.jupyter', '.ssh', '.ssh/authorized_keys', '.local', '.config']
-RESERVED_VFOLDERS = ['.terminfo', '.jupyter', '.tmux.conf', '.ssh', '/bin', '/boot', '/dev', '/etc',
-                     '/lib', '/lib64', '/media', '/mnt', '/opt', '/proc', '/root', '/run', '/sbin',
-                     '/srv', '/sys', '/tmp', '/usr', '/var', '/home']
+_RESERVED_VFOLDER_PATTERNS = [r"^\.[a-z0-9]+rc$", r"^\.[a-z0-9]+_profile$"]
+RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
+RESERVED_VFOLDERS = [
+    ".terminfo",
+    ".jupyter",
+    ".tmux.conf",
+    ".ssh",
+    "/bin",
+    "/boot",
+    "/dev",
+    "/etc",
+    "/lib",
+    "/lib64",
+    "/media",
+    "/mnt",
+    "/opt",
+    "/proc",
+    "/root",
+    "/run",
+    "/sbin",
+    "/srv",
+    "/sys",
+    "/tmp",
+    "/usr",
+    "/var",
+    "/home",
+]
 RESERVED_VFOLDER_PATTERNS = [re.compile(x) for x in _RESERVED_VFOLDER_PATTERNS]
 
 # Redis database IDs depending on purposes
@@ -37,6 +59,7 @@ REDIS_RLIM_DB: Final = 1
 REDIS_LIVE_DB: Final = 2
 REDIS_IMAGE_DB: Final = 3
 REDIS_STREAM_DB: Final = 4
+REDIS_STREAM_LOCK: Final = 5
 
 
 # The unique identifiers for distributed locks.

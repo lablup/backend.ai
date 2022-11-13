@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 
 from pants.backend.python.goals.setup_py import SetupKwargs, SetupKwargsRequest
+from pants.backend.python.subsystems.setup import PythonSetup
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import Target
@@ -27,7 +29,10 @@ license_classifier_map = {
 
 
 @rule
-async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
+async def setup_kwargs_plugin(
+    request: CustomSetupKwargsRequest,
+    python_setup: PythonSetup,
+) -> SetupKwargs:
     kwargs = request.explicit_kwargs.copy()
 
     # Single-source the version from VERSION.
@@ -84,10 +89,13 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
     spec_path = Path(request.target.address.spec_path)
     if (spec_path / "README.md").is_file():
         readme_path = spec_path / "README.md"
+        long_description_content_type = "text/markdown"
     elif (spec_path / "README.rst").is_file():
         readme_path = spec_path / "README.rst"
+        long_description_content_type = "text/x-rst"
     else:
         readme_path = spec_path / "README"
+        long_description_content_type = "text/plain"
     _digest_contents = await Get(
         DigestContents,
         PathGlobs(
@@ -102,7 +110,7 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
     hardcoded_kwargs = dict(
         version=VERSION,
         long_description=long_description,
-        long_description_content_type="text/markdown",
+        long_description_content_type=long_description_content_type,
         url="https://github.com/lablup/backend.ai",
         project_urls={
             "Documentation": "https://docs.backend.ai/",
@@ -119,6 +127,15 @@ async def setup_kwargs_plugin(request: CustomSetupKwargsRequest) -> SetupKwargs:
             f"{sorted(conflicting_hardcoded_kwargs)}",
         )
     kwargs.update(hardcoded_kwargs)
+
+    # Override the interpreter compatibility range
+    interpreter_constraints = InterpreterConstraints(python_setup.interpreter_constraints)
+    python_requires = next(str(ic.specifier) for ic in interpreter_constraints)  # type: ignore
+    m = re.search(r"==(?P<major>\d+)\.(?P<minor>\d+)", python_requires)
+    if m is not None:
+        major = int(m.group("major"))
+        minor = int(m.group("minor"))
+        kwargs["python_requires"] = f">={major}.{minor},<{major}.{minor + 1}"
 
     return SetupKwargs(kwargs, address=request.target.address)
 

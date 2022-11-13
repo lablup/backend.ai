@@ -1,18 +1,10 @@
 from __future__ import annotations
 
-from typing import (
-    Awaitable,
-    Callable,
-    Iterable,
-    AsyncContextManager,
-    Mapping,
-    Tuple,
-    TYPE_CHECKING,
-)
-from typing_extensions import TypeAlias
+from typing import TYPE_CHECKING, AsyncContextManager, Awaitable, Callable, Iterable, Mapping, Tuple
 
-from aiohttp import web
 import aiohttp_cors
+from aiohttp import web
+from typing_extensions import TypeAlias
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -33,4 +25,4 @@ AppCreator: TypeAlias = Callable[
     Tuple[web.Application, Iterable[WebMiddleware]],
 ]
 
-CleanupContext: TypeAlias = Callable[['RootContext'], AsyncContextManager[None]]
+CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]

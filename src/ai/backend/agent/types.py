@@ -1,33 +1,34 @@
 import asyncio
 import enum
-from typing import (
-    Any, Optional,
-    Mapping,
-    Sequence,
-)
+from pathlib import Path
+from typing import Any, Mapping, Optional, Sequence
 
-import attr
+import attrs
 
-from ai.backend.common.types import (
-    ContainerId,
-    KernelId,
-)
+from ai.backend.common.types import ContainerId, KernelId, MountTypes
 
 
 class AgentBackend(enum.Enum):
     # The list of importable backend names under "ai.backend.agent" pkg namespace.
-    DOCKER = 'docker'
-    KUBERNETES = 'kubernetes'
+    DOCKER = "docker"
+    KUBERNETES = "kubernetes"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class VolumeInfo:
-    name: str             # volume name
-    container_path: str   # in-container path as str
-    mode: str             # 'rw', 'ro', 'rwm'
+    name: str  # volume name
+    container_path: str  # in-container path as str
+    mode: str  # 'rw', 'ro', 'rwm'
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
+class MountInfo:
+    mode: MountTypes
+    src_path: Path
+    dst_path: Path
+
+
+@attrs.define(auto_attribs=True, slots=True)
 class Port:
     host: str
     private_port: int
@@ -35,15 +36,15 @@ class Port:
 
 
 class ContainerStatus(str, enum.Enum):
-    RUNNING = 'running'
-    RESTARTING = 'restarting'
-    PAUSED = 'paused'
-    EXITED = 'exited'
-    DEAD = 'dead'
-    REMOVING = 'removing'
+    RUNNING = "running"
+    RESTARTING = "restarting"
+    PAUSED = "paused"
+    EXITED = "exited"
+    DEAD = "dead"
+    REMOVING = "removing"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class Container:
     id: ContainerId
     status: ContainerStatus
@@ -59,7 +60,7 @@ class LifecycleEvent(int, enum.Enum):
     START = 2
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ContainerLifecycleEvent:
     kernel_id: KernelId
     container_id: Optional[ContainerId]
@@ -73,7 +74,7 @@ class ContainerLifecycleEvent:
         if self.container_id:
             cid = self.container_id[:13]
         else:
-            cid = 'unknown'
+            cid = "unknown"
         return (
             f"LifecycleEvent("
             f"{self.event.name}, "

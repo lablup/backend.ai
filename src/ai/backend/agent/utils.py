@@ -1,13 +1,13 @@
 import asyncio
-from decimal import Decimal
 import hashlib
 import io
 import ipaddress
 import json
 import logging
-from pathlib import Path
 import platform
 import re
+from decimal import Decimal
+from pathlib import Path
 from typing import (
     Any,
     AsyncContextManager,
@@ -23,23 +23,21 @@ from typing import (
     Union,
     overload,
 )
-from typing_extensions import Final
 from uuid import UUID
 
 import aiodocker
-from aiodocker.docker import DockerContainer
 import netifaces
 import trafaret as t
+from aiodocker.docker import DockerContainer
+from typing_extensions import Final
 
 from ai.backend.common import identity
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    PID, HostPID, ContainerPID, KernelId,
-)
+from ai.backend.common.types import PID, ContainerPID, HostPID, KernelId
 from ai.backend.common.utils import current_loop
 
-log = BraceStyleAdapter(logging.getLogger('ai.backend.agent.utils'))
+log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.utils"))
 
 IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
@@ -54,7 +52,7 @@ class SupportsAsyncClose(Protocol):
         ...
 
 
-_SupportsAsyncCloseT = TypeVar('_SupportsAsyncCloseT', bound=SupportsAsyncClose)
+_SupportsAsyncCloseT = TypeVar("_SupportsAsyncCloseT", bound=SupportsAsyncClose)
 
 
 class closing_async(AsyncContextManager[_SupportsAsyncCloseT]):
@@ -74,17 +72,17 @@ class closing_async(AsyncContextManager[_SupportsAsyncCloseT]):
 
 
 def generate_local_instance_id(hint: str) -> str:
-    return hashlib.md5(hint.encode('utf-8')).hexdigest()[:12]
+    return hashlib.md5(hint.encode("utf-8")).hexdigest()[:12]
 
 
 def get_arch_name() -> str:
     ret = platform.machine().lower()
     aliases = {
         "arm64": "aarch64",  # macOS with LLVM
-        "amd64": "x86_64",   # Windows/Linux
-        "x64": "x86_64",     # Windows
-        "x32": "x86",        # Windows
-        "i686": "x86",       # Windows
+        "amd64": "x86_64",  # Windows/Linux
+        "x64": "x86_64",  # Windows
+        "x32": "x86",  # Windows
+        "i686": "x86",  # Windows
     }
     return aliases.get(ret, ret)
 
@@ -137,10 +135,10 @@ def read_sysfs(path: Union[str, Path], type_: Type[Any], default: Any = None) ->
         bool: False,
         int: 0,
         float: 0.0,
-        str: '',
+        str: "",
     }
     if type_ not in def_vals:
-        raise TypeError('unsupported conversion type from sysfs content')
+        raise TypeError("unsupported conversion type from sysfs content")
     if default is None:
         default = def_vals[type_]
     try:
@@ -157,7 +155,7 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
     file_size = path.stat().st_size
 
     def _read_tail() -> bytes:
-        with open(path, 'rb') as f:
+        with open(path, "rb") as f:
             f.seek(max(file_size - nbytes, 0), io.SEEK_SET)
             return f.read(nbytes)
 
@@ -167,22 +165,22 @@ async def read_tail(path: Path, nbytes: int) -> bytes:
 
 async def get_kernel_id_from_container(val: Union[str, DockerContainer]) -> Optional[KernelId]:
     if isinstance(val, DockerContainer):
-        if 'Name' not in val._container:
+        if "Name" not in val._container:
             await val.show()
-        name = val['Name']
+        name = val["Name"]
     elif isinstance(val, str):
         name = val
-    name = name.lstrip('/')
-    if not name.startswith('kernel.'):
+    name = name.lstrip("/")
+    if not name.startswith("kernel."):
         return None
     try:
-        return KernelId(UUID(name.rsplit('.', 2)[-1]))
+        return KernelId(UUID(name.rsplit(".", 2)[-1]))
     except (IndexError, ValueError):
         return None
 
 
-async def get_subnet_ip(etcd: AsyncEtcd, network: str, fallback_addr: str = '0.0.0.0') -> str:
-    raw_subnet = await etcd.get(f'config/network/subnet/{network}')
+async def get_subnet_ip(etcd: AsyncEtcd, network: str, fallback_addr: str = "0.0.0.0") -> str:
+    raw_subnet = await etcd.get(f"config/network/subnet/{network}")
     if raw_subnet is None:
         addr = fallback_addr
     else:
@@ -191,8 +189,7 @@ async def get_subnet_ip(etcd: AsyncEtcd, network: str, fallback_addr: str = '0.0
             addr = fallback_addr
         else:
             local_ipaddrs = [*identity.fetch_local_ipaddrs(subnet)]
-            log.debug('get_subnet_ip(): subnet {} candidates: {}',
-                      subnet, local_ipaddrs)
+            log.debug("get_subnet_ip(): subnet {} candidates: {}", subnet, local_ipaddrs)
             if local_ipaddrs:
                 addr = str(local_ipaddrs[0])
             else:
@@ -201,10 +198,10 @@ async def get_subnet_ip(etcd: AsyncEtcd, network: str, fallback_addr: str = '0.0
 
 
 async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> ContainerPID:
-    kernel_ver = Path('/proc/version').read_text()
-    if m := re.match(r'Linux version (\d+)\.(\d+)\..*', kernel_ver):  # noqa
+    kernel_ver = Path("/proc/version").read_text()
+    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):  # noqa
         kernel_ver_tuple: Tuple[str, str] = m.groups()  # type: ignore
-        if kernel_ver_tuple < ('4', '1'):
+        if kernel_ver_tuple < ("4", "1"):
             # TODO: this should be deprecated when the minimun supported Linux kernel will be 4.1.
             #
             # In CentOs 7, NSPid is not accesible since it is supported from Linux kernel >=4.1.
@@ -238,42 +235,44 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                 docker = aiodocker.Docker()
                 # Get process table from host (docker top information). Filter processes which have
                 # exactly the same COMMAND as with target host process.
-                result = await docker._query_json(f'containers/{container_id}/top', method='GET')
-                procs = result['Processes']
+                result = await docker._query_json(f"containers/{container_id}/top", method="GET")
+                procs = result["Processes"]
                 cmd = list(filter(lambda x: str(host_pid) == x[1], procs))[0][7]
                 host_table = list(filter(lambda x: cmd == x[7], procs))
 
                 # Get process table from inside container (execute 'ps -aux' command from container).
                 # Filter processes which have exactly the same COMMAND like above.
                 result = await docker._query_json(
-                    f'containers/{container_id}/exec',
-                    method='POST',
+                    f"containers/{container_id}/exec",
+                    method="POST",
                     data={
-                        'AttachStdin': False,
-                        'AttachStdout': True,
-                        'AttachStderr': True,
-                        'Cmd': ['ps', '-aux'],
+                        "AttachStdin": False,
+                        "AttachStdout": True,
+                        "AttachStderr": True,
+                        "Cmd": ["ps", "-aux"],
                     },
                 )
-                exec_id = result['Id']
+                exec_id = result["Id"]
                 async with docker._query(
-                    f'exec/{exec_id}/start',
-                    method='POST',
-                    headers={'content-type': 'application/json'},
-                    data=json.dumps({
-                        'Stream': False,  # get response immediately
-                        'Detach': False,
-                        'Tty': False,
-                    }),
+                    f"exec/{exec_id}/start",
+                    method="POST",
+                    headers={"content-type": "application/json"},
+                    data=json.dumps(
+                        {
+                            "Stream": False,  # get response immediately
+                            "Detach": False,
+                            "Tty": False,
+                        }
+                    ),
                 ) as resp:
                     result = await resp.read()
-                    result = result.decode('latin-1').split('\n')
+                    result = result.decode("latin-1").split("\n")
                 result = list(map(lambda x: x.split(), result))
                 head = result[0]
                 procs = result[1:]
-                pid_idx, cmd_idx = head.index('PID'), head.index('COMMAND')
+                pid_idx, cmd_idx = head.index("PID"), head.index("COMMAND")
                 container_table = list(
-                    filter(lambda x: cmd == ' '.join(x[cmd_idx:]) if x else False, procs),
+                    filter(lambda x: cmd == " ".join(x[cmd_idx:]) if x else False, procs),
                 )
 
                 # When there are multiple processes which have the same COMMAND, just get the index of
@@ -288,7 +287,7 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                 else:
                     raise IndexError
                 container_pid = ContainerPID(container_table[process_idx][pid_idx])
-                log.debug('host pid {} is mapped to container pid {}', host_pid, container_pid)
+                log.debug("host pid {} is mapped to container pid {}", host_pid, container_pid)
                 return ContainerPID(PID(int(container_pid)))
             except asyncio.CancelledError:
                 raise
@@ -298,19 +297,22 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                 await docker.close()
 
     try:
-        for p in Path('/sys/fs/cgroup/pids/docker').iterdir():
+        for p in Path("/sys/fs/cgroup/pids/docker").iterdir():
             if not p.is_dir():
                 continue
-            tasks_path = p / 'tasks'
+            tasks_path = p / "tasks"
             cgtasks = [*map(int, tasks_path.read_text().splitlines())]
             if host_pid not in cgtasks:
                 continue
             if p.name == container_id:
-                proc_path = Path(f'/proc/{host_pid}/status')
-                proc_status = {k: v for k, v
-                               in map(lambda l: l.split(':\t'),
-                                      proc_path.read_text().splitlines())}
-                nspids = [*map(lambda pid: ContainerPID(PID(int(pid))), proc_status['NSpid'].split())]
+                proc_path = Path(f"/proc/{host_pid}/status")
+                proc_status = {
+                    k: v
+                    for k, v in map(lambda l: l.split(":\t"), proc_path.read_text().splitlines())
+                }
+                nspids = [
+                    *map(lambda pid: ContainerPID(PID(int(pid))), proc_status["NSpid"].split())
+                ]
                 return nspids[1]
             return InOtherContainerPID
         return NotContainerPID
@@ -331,6 +333,6 @@ def fetch_local_ipaddrs(cidr: IPNetwork) -> Iterable[IPAddress]:
         if addrs is None:
             continue
         for entry in addrs:
-            addr = ipaddress.ip_address(entry['addr'])
+            addr = ipaddress.ip_address(entry["addr"])
             if addr in cidr:
                 yield addr

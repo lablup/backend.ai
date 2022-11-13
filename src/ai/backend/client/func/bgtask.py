@@ -1,11 +1,8 @@
 from typing import Union
 from uuid import UUID
 
+from ..request import Request, SSEContextManager
 from .base import BaseFunction
-from ..request import (
-    Request,
-    SSEContextManager,
-)
 
 
 class BackgroundTask(BaseFunction):
@@ -26,10 +23,11 @@ class BackgroundTask(BaseFunction):
         :returns: a context manager that returns an :class:`SSEResponse` object.
         """
         params = {
-            'task_id': str(self.task_id),
+            "task_id": str(self.task_id),
         }
         request = Request(
-            'GET', '/events/background-task',
+            "GET",
+            "/events/background-task",
             params=params,
         )
         return request.connect_events()

@@ -126,8 +126,7 @@ async def create_vfolder(request: web.Request) -> web.Response:
             {
                 t.Key("volume"): t.String(),
                 t.Key("vfid"): tx.UUID(),
-                t.Key("options", default=None): t.Null
-                | VFolderCreationOptions.as_trafaret(),
+                t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
             },
         ),
     ) as params:
@@ -165,8 +164,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
                 t.Key("src_vfid"): tx.UUID(),
                 t.Key("dst_volume"): t.String(),
                 t.Key("dst_vfid"): tx.UUID(),
-                t.Key("options", default=None): t.Null
-                | VFolderCreationOptions.as_trafaret(),
+                t.Key("options", default=None): t.Null | VFolderCreationOptions.as_trafaret(),
             },
         ),
     ) as params:
@@ -382,7 +380,7 @@ async def get_quota(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid", default=None): t.Null | t.String,
+                t.Key("vfid", default=None): t.Null | tx.UUID,
             },
         ),
     ) as params:
@@ -399,7 +397,7 @@ async def set_quota(request: web.Request) -> web.Response:
         t.Dict(
             {
                 t.Key("volume"): t.String(),
-                t.Key("vfid", default=None): t.Null | t.String,
+                t.Key("vfid", default=None): t.Null | tx.UUID,
                 t.Key("size_bytes"): tx.BinarySize,
             },
         ),
@@ -485,7 +483,7 @@ async def rename_file(request: web.Request) -> web.Response:
                 t.Key("vfid"): tx.UUID(),
                 t.Key("relpath"): tx.PurePath(relative_only=True),
                 t.Key("new_name"): t.String(),
-                t.Key("is_dir"): t.ToBool(),  # ignored since 22.03
+                t.Key("is_dir", default=False): t.ToBool,  # ignored since 22.03
             },
         ),
     ) as params:
@@ -545,8 +543,7 @@ async def create_download_session(request: web.Request) -> web.Response:
             "volume": params["volume"],
             "vfid": str(params["vfid"]),
             "relpath": str(params["relpath"]),
-            "exp": datetime.utcnow()
-            + ctx.local_config["storage-proxy"]["session-expire"],
+            "exp": datetime.utcnow() + ctx.local_config["storage-proxy"]["session-expire"],
         }
         token = jwt.encode(
             token_data,
@@ -583,8 +580,7 @@ async def create_upload_session(request: web.Request) -> web.Response:
             "relpath": str(params["relpath"]),
             "size": params["size"],
             "session": session_id,
-            "exp": datetime.utcnow()
-            + ctx.local_config["storage-proxy"]["session-expire"],
+            "exp": datetime.utcnow() + ctx.local_config["storage-proxy"]["session-expire"],
         }
         token = jwt.encode(
             token_data,
