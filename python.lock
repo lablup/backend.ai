@@ -33,8 +33,8 @@
 //     "asynctest>=0.13.0",
 //     "asyncudp>=0.4",
 //     "attrs>=20.3",
-//     "backend.ai-krunner-alpine~=3.4.0",
-//     "backend.ai-krunner-static-gnu~=2.1.0",
+//     "backend.ai-krunner-alpine~=4.0.0",
+//     "backend.ai-krunner-static-gnu~=3.0.0",
 //     "boto3~=1.26",
 //     "cachetools~=5.2.0",
 //     "callosum~=0.9.10",
@@ -745,13 +745,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "cbcd484588a15551721554d6f1a2c59259bbeca759845dd491b50b7c77fbcc6e",
-              "url": "https://files.pythonhosted.org/packages/b0/77/17bc9e703925c9760795c2be9271aea86840bda6720be8d1fc85e5256581/backend.ai_krunner_alpine-3.4.0-py3-none-any.whl"
+              "hash": "b2c1872e018555fa9f24ee4ff36d27cf21d0755300a3da722779d85d8cb9b6cd",
+              "url": "https://files.pythonhosted.org/packages/bf/0d/6c5acf8e0d6b1aac15118f788324b64fb1211d02d493b4eafbcd3cf34812/backend.ai_krunner_alpine-4.0.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d08743dfb61639128153697d6d41fb430f65c4233ee41e450bfe8a7dae5b7dcf",
-              "url": "https://files.pythonhosted.org/packages/04/fa/90582923f183b2e10c7d642fa9111dedebddec41868bc8b931fcb80beb40/backend.ai-krunner-alpine-3.4.0.tar.gz"
+              "hash": "ebe487c1a908c12e88dd6fa1c15e25ef6408d92516c57f7325846c9a50272778",
+              "url": "https://files.pythonhosted.org/packages/cb/5c/96d833e7e064d5858e4ead5227363b35fc1c29a7393618656a7e3d4782b7/backend.ai-krunner-alpine-4.0.0.tar.gz"
             }
           ],
           "project_name": "backend-ai-krunner-alpine",
@@ -764,24 +764,24 @@
             "wheel>=0.34.2; extra == \"build\""
           ],
           "requires_python": ">=3.6",
-          "version": "3.4"
+          "version": "4"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "70444c3d0d4fd5119bfe6bcdd62eb28873274b402c667fbc7f67134394035df5",
-              "url": "https://files.pythonhosted.org/packages/38/7e/deb12a9a37ec0e1c225b7fc4d0911650659d7a7852db4a5b7d3aa001e45a/backend.ai_krunner_static_gnu-2.1.0-py3-none-manylinux2014_x86_64.macosx_11_0_x86_64.whl"
+              "hash": "4bbe7bbbd5bca290134eb96920221a5de91ceac0e9344ab592fc46ec3413f669",
+              "url": "https://files.pythonhosted.org/packages/4d/1e/734fc6d0b2499fe1605fdd70ef37bf668bceb5dec8b319a19d23cd727392/backend.ai_krunner_static_gnu-3.0.0-py3-none-manylinux2014_x86_64.macosx_11_0_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ee99f4e4ef563c137b06269b7585673f087485afb4473f500a02d8f129ce1d7b",
-              "url": "https://files.pythonhosted.org/packages/03/df/392efdf19b1ead154481fbf6273459bf55128431881f52318deaebab2a0a/backend.ai_krunner_static_gnu-2.1.0-py3-none-manylinux2014_aarch64.macosx_11_0_arm64.whl"
+              "hash": "eda99c3290b64589f1a1a2f7125d4b6b0789a56129596f984d2a9492847b932f",
+              "url": "https://files.pythonhosted.org/packages/aa/63/68af4d9f084c503c158cf5a713d5c78c3e9e4a060515e2d6f899a421780d/backend.ai-krunner-static-gnu-3.0.0.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "b7b79979b075d1d4366b207442b4755d6d37ec0ddbe4cc5c1c3904fb0e73f5a9",
-              "url": "https://files.pythonhosted.org/packages/ea/53/429e06e12184418ffdd00f513cf225cc9c31b89950a73e4fcba0e22d7392/backend.ai-krunner-static-gnu-2.1.0.tar.gz"
+              "hash": "70efd9fbd2e0c8bbfc6c13bcdffb61ea06e0f6879ee04d9a08985fa56eb1d076",
+              "url": "https://files.pythonhosted.org/packages/d0/12/0c9957ba4d6c637dbe70e209a130cef549463f1dd1d394d3e5580831179a/backend.ai_krunner_static_gnu-3.0.0-py3-none-manylinux2014_aarch64.macosx_11_0_arm64.whl"
             }
           ],
           "project_name": "backend-ai-krunner-static-gnu",
@@ -793,7 +793,7 @@
             "wheel>=0.34.2; extra == \"build\""
           ],
           "requires_python": ">=3.6",
-          "version": "2.1"
+          "version": "3"
         },
         {
           "artifacts": [
@@ -4384,8 +4384,8 @@
     "asynctest>=0.13.0",
     "asyncudp>=0.4",
     "attrs>=20.3",
-    "backend.ai-krunner-alpine~=3.4.0",
-    "backend.ai-krunner-static-gnu~=2.1.0",
+    "backend.ai-krunner-alpine~=4.0.0",
+    "backend.ai-krunner-static-gnu~=3.0.0",
     "boto3~=1.26",
     "cachetools~=5.2.0",
     "callosum~=0.9.10",

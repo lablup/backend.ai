@@ -89,5 +89,5 @@ types-setuptools
 types-six
 types-tabulate
 
-backend.ai-krunner-alpine~=3.4.0
-backend.ai-krunner-static-gnu~=2.1.0
+backend.ai-krunner-alpine~=4.0.0
+backend.ai-krunner-static-gnu~=3.0.0
