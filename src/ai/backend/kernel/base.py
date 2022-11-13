@@ -28,7 +28,7 @@ import janus
 import msgpack
 import zmq
 from async_timeout import timeout
-from jupyter_client import KernelManager
+from jupyter_client import AsyncKernelClient, AsyncKernelManager
 from jupyter_client.kernelspec import KernelSpecManager
 
 from .compat import current_loop
@@ -103,8 +103,8 @@ class BaseRunner(metaclass=ABCMeta):
         "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
     }
     jupyter_kspec_name: ClassVar[str] = ""
-    kernel_mgr = None
-    kernel_client = None
+    kernel_mgr: Optional[AsyncKernelManager] = None
+    kernel_client: Optional[AsyncKernelClient] = None
 
     child_env: MutableMapping[str, str]
     subproc: Optional[asyncio.subprocess.Process]
@@ -238,15 +238,16 @@ class BaseRunner(metaclass=ABCMeta):
         for kname in kspecs:
             if self.jupyter_kspec_name in kname:
                 log.debug("starting " + kname + " kernel...")
-                self.kernel_mgr = KernelManager(kernel_name=kname)
-                self.kernel_mgr.start_kernel()
-                if not self.kernel_mgr.is_alive():
+                self.kernel_mgr = AsyncKernelManager(kernel_name=kname)
+                await self.kernel_mgr.start_kernel()
+                if not await self.kernel_mgr.is_alive():
                     log.error("jupyter query mode is disabled: " "failed to start jupyter kernel")
                 else:
-                    self.kernel_client = self.kernel_mgr.client()
+                    self.kernel_client = self.kernel_mgr.client()  # type: ignore
+                    assert self.kernel_client is not None
                     self.kernel_client.start_channels(shell=True, iopub=True, stdin=True, hb=True)
                     try:
-                        self.kernel_client.wait_for_ready(timeout=10)  # type: ignore
+                        await self.kernel_client.wait_for_ready(timeout=10)
                         # self.init_jupyter_kernel()
                     except RuntimeError:
                         # Clean up for client and kernel will be done in `shutdown`.
@@ -261,9 +262,9 @@ class BaseRunner(metaclass=ABCMeta):
         if self.kernel_mgr and self.kernel_mgr.is_alive():
             assert self.kernel_client is not None
             log.info("shutting down " + self.jupyter_kspec_name + " kernel...")
+            await self.kernel_mgr.shutdown_kernel()
             self.kernel_client.stop_channels()
-            self.kernel_mgr.shutdown_kernel()
-            assert not self.kernel_mgr.is_alive(), "ipykernel failed to shutdown"
+            assert not await self.kernel_mgr.is_alive(), "ipykernel failed to shutdown"
 
     async def _init_with_loop(self) -> None:
         if self.init_done is not None:
@@ -798,12 +799,16 @@ class BaseRunner(metaclass=ABCMeta):
         )
 
     async def main_loop(self, cmdargs):
+        log.debug("starting user input server...")
         user_input_server = await asyncio.start_server(self.handle_user_input, "127.0.0.1", 65000)
+        log.debug("initializing krunner...")
         await self._init_with_loop()
+        log.debug("initializing jupyter kernel...")
         await self._init_jupyter_kernel()
 
         user_bootstrap_path = Path("/home/work/bootstrap.sh")
         if user_bootstrap_path.is_file():
+            log.debug("running user bootstrap script...")
             await self._bootstrap(user_bootstrap_path)
 
         log.debug("starting intrinsic services: sshd, ttyd ...")
