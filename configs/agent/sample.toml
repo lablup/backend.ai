@@ -53,6 +53,10 @@ scaling-group = "default"
 # when the agent starts up. [default: false]
 # skip-manager-detection = false
 
+# The port number of container metadata server. Defaults to 40128.
+# Make sure to change source port number in update-metadata-iptables.sh script when changing this value.
+metadata-server-port = 40128
+
 # The port number for aiomonitor.
 # aiomonitor-port = 50200
 

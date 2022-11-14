@@ -524,6 +524,7 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
         )
         shutil.copyfile(proxy_worker_binary, "/tmp/backend.ai/linuxkit-metadata-proxy")
         os.chmod("/tmp/backend.ai/linuxkit-metadata-proxy", 0o755)
+        server_port = local_config["agent"]["metadata-server-port"]
         # Prepare proxy worker container
         proxy_worker_container = PersistentServiceContainer(
             "linuxkit-nsenter:latest",
@@ -533,7 +534,7 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
                     "-c",
                     "ctr -n services.linuxkit t kill --exec-id metaproxy docker;"
                     "ctr -n services.linuxkit t exec --exec-id metaproxy docker "
-                    "/host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port 40128",
+                    f"/host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port {server_port}",
                 ],
                 "HostConfig": {
                     "PidMode": "host",
