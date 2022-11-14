@@ -56,6 +56,8 @@ __all__: Sequence[str] = (
     "prepare_vfolder_mounts",
 )
 
+OVERRIDEN_PERMISSION: str = "overriden_permission"
+
 
 class VFolderUsageMode(str, enum.Enum):
     """
@@ -715,7 +717,7 @@ class VirtualFolder(graphene.ObjectType):
             creator=row["creator"],
             unmanaged_path=row["unmanaged_path"],
             usage_mode=row["usage_mode"],
-            permission=row["permission"],
+            permission=row[OVERRIDEN_PERMISSION] or row["permission"],
             ownership_type=row["ownership_type"],
             max_files=row["max_files"],
             max_size=row["max_size"],  # in MiB
@@ -784,28 +786,35 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
+        from .group import groups
         from .user import users
 
-        j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True)
-        query = sa.select([vfolders.c.id]).select_from(j)
-        perm_overriden_query = sa.select([vfolder_permissions.c.vfolder])
+        j = (
+            sa.join(
+                vfolders,
+                vfolder_permissions,
+                vfolders.c.id == vfolder_permissions.c.vfolder,
+                isouter=True,
+            )
+            .join(users, vfolders.c.user == users.c.uuid, isouter=True)
+            .join(groups, vfolders.c.group == groups.c.id, isouter=True)
+        )
+        query = sa.select([sa.func.count()]).select_from(j)
         if domain_name is not None:
-            query = query.where(users.c.domain_name == domain_name)
+            query = query.where(
+                (users.c.domain_name == domain_name) | (groups.c.domain_name == domain_name)
+            )
         if group_id is not None:
             query = query.where(vfolders.c.group == group_id)
         if user_id is not None:
-            query = query.where(vfolders.c.user == user_id)
-            perm_overriden_query = perm_overriden_query.where(vfolder_permissions.c.user == user_id)
+            query = query.where(
+                (vfolders.c.user == user_id) | (vfolder_permissions.c.user == user_id)
+            )
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
-        vfolder_id_set = set()
         async with graph_ctx.db.begin_readonly() as conn:
-            ids = (await conn.execute(query)).fetchall()
-            vfolder_id_set |= set(ids)
-            ids = (await conn.execute(perm_overriden_query)).fetchall()
-            vfolder_id_set |= set(ids)
-        return len(vfolder_id_set)
+            return await conn.scalar(query)
 
     @classmethod
     async def load_slice(
@@ -823,16 +832,7 @@ class VirtualFolder(graphene.ObjectType):
         from .group import groups
         from .user import users
 
-        j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
-            groups, vfolders.c.group == groups.c.id, isouter=True
-        )
-        query = (
-            sa.select([vfolders, users.c.email, groups.c.name.label("groups_name")])
-            .select_from(j)
-            .limit(limit)
-            .offset(offset)
-        )
-        perm_overriden_join = (
+        j = (
             sa.join(
                 vfolders,
                 vfolder_permissions,
@@ -842,38 +842,43 @@ class VirtualFolder(graphene.ObjectType):
             .join(users, vfolders.c.user == users.c.uuid, isouter=True)
             .join(groups, vfolders.c.group == groups.c.id, isouter=True)
         )
-        perm_overriden_query = sa.select(
-            [vfolders, users.c.email, groups.c.name.label("groups_name")]
-        ).select_from(perm_overriden_join)
+        query = (
+            sa.select(
+                [
+                    vfolders,
+                    users.c.email,
+                    groups.c.name.label("groups_name"),
+                    vfolder_permissions.c.permission.label(OVERRIDEN_PERMISSION),
+                ]
+            )
+            .select_from(j)
+            .limit(limit)
+            .offset(offset)
+        )
         if domain_name is not None:
-            query = query.where(users.c.domain_name == domain_name)
-            perm_overriden_query = perm_overriden_query.where(users.c.domain_name == domain_name)
+            query = query.where(
+                (users.c.domain_name == domain_name) | (groups.c.domain_name == domain_name)
+            )
         if group_id is not None:
             query = query.where(vfolders.c.group == group_id)
-            perm_overriden_query = perm_overriden_query.where(vfolders.c.group == group_id)
         if user_id is not None:
-            query = query.where(vfolders.c.user == user_id)
-            perm_overriden_query = perm_overriden_query.where(vfolder_permissions.c.user == user_id)
+            query = query.where(
+                (vfolders.c.user == user_id) | (vfolder_permissions.c.user == user_id)
+            )
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
-            perm_overriden_query = qfparser.append_filter(perm_overriden_query, filter)
         if order is not None:
             qoparser = QueryOrderParser(cls._queryorder_colmap)
             query = qoparser.append_ordering(query, order)
-            perm_overriden_query = qoparser.append_ordering(perm_overriden_query, order)
         else:
             query = query.order_by(vfolders.c.created_at.desc())
-            perm_overriden_query = perm_overriden_query.order_by(vfolders.c.created_at.desc())
         async with graph_ctx.db.begin_readonly() as conn:
-            vfolder_list = [r async for r in (await conn.stream(query))]
-            perm_vfolder_list = [r async for r in (await conn.stream(perm_overriden_query))]
-            remove_duplicated: Mapping[uuid.UUID, VirtualFolder] = {
-                row["id"]: obj
-                for row in [*vfolder_list, *perm_vfolder_list]
+            return [
+                obj
+                for row in [r async for r in (await conn.stream(query))]
                 if (obj := cls.from_row(graph_ctx, row)) is not None
-            }
-            return list(remove_duplicated.values())
+            ]
 
     @classmethod
     async def batch_load_by_user(
