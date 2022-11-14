@@ -757,13 +757,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
+            container: Optional[DockerContainer] = None
             try:
                 container = await docker.containers.create(
                     config=container_config, name=kernel_name
                 )
+                assert container is not None
                 cid = container._id
-                raise RuntimeError
-
                 resource_spec.container_id = cid
                 # Write resource.txt again to update the contaienr id.
                 with open(self.config_dir / "resource.txt", "w") as f:
@@ -779,13 +779,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             await writer.write(f"{k}={v}\n")
 
                 await container.start()
-            except asyncio.CancelledError as e:
-                try:
-                    cid = container._id
-                except (UnboundLocalError, AttributeError):
-                    raise e
-                raise DockerContainerCreationError(container_id=cid)
-            except Exception as e:
+            except asyncio.CancelledError:
+                if container is not None:
+                    raise DockerContainerCreationError(container_id=cid)
+                raise
+            except Exception:
                 # Oops, we have to restore the allocated resources!
                 if (
                     sys.platform.startswith("linux")
@@ -799,11 +797,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 async with self.resource_lock:
                     for dev_name, device_alloc in resource_spec.allocations.items():
                         self.computers[dev_name].alloc_map.free(device_alloc)
-                try:
-                    cid = container._id
-                except (UnboundLocalError, AttributeError):
-                    raise e
-                raise DockerContainerCreationError(container_id=cid)
+                if container is not None:
+                    raise DockerContainerCreationError(container_id=cid)
+                raise
 
             additional_network_names: Set[str] = set()
             for dev_name, device_alloc in resource_spec.allocations.items():
