@@ -515,7 +515,6 @@ class AbstractAgent(
     port_pool: Set[int]
 
     redis: Redis
-    zmq_ctx: zmq.asyncio.Context
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
     terminating_kernels: Set[KernelId]
@@ -586,8 +585,6 @@ class AbstractAgent(
         self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
 
-        self.zmq_ctx = zmq.asyncio.Context()
-
         resources_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers, self.slots = await self.detect_resources()
         for name, computer in computers.items():
@@ -657,8 +654,6 @@ class AbstractAgent(
         await self.event_producer.close()
         await self.redis_stream_pool.close()
         await self.redis_stat_pool.close()
-
-        self.zmq_ctx.term()
 
     async def produce_event(self, event: AbstractEvent) -> None:
         """
