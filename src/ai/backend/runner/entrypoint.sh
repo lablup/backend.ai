@@ -30,7 +30,6 @@ if [ $USER_ID -eq 0 ]; then
 
   echo "Generate random alpha-numeric password"
   if [ ! -f "$HOME/.password" ]; then
-    touch aaa111
     /opt/backend.ai/bin/python /opt/kernel/fantompass.py > "$HOME/.password"
     export ALPHA_NUMERIC_VAL=$(cat $HOME/.password)
     chmod 0644 "$HOME/.password"
