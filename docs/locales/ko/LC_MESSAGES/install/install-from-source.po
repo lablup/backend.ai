@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-09-13 15:33+0900\n"
+"POT-Creation-Date: 2022-11-11 22:50-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,40 +18,197 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.10.3\n"
 
-#: ../../install/install-from-source.rst:2 7335b416a63346b3816d11d7d7d39536
+#: ../../install/install-from-source.rst:2 1583d3c8b5f44012898d41d7358472d4
 msgid "Install from Source"
 msgstr ""
 
-#: ../../install/install-from-source.rst:6 b2ce0d0620df458caf6c08200622c4cb
+#: ../../install/install-from-source.rst:6 e05809fe6e654795a5b0893dd98d4295
 msgid ""
 "For production deployments, we recommend to create separate virtualenvs "
-"for individual services and install the pre-built wheel distributions."
+"for individual services and install the pre-built wheel distributions, "
+"following :doc:`/install/install-from-package`."
 msgstr ""
 
-#: ../../install/install-from-source.rst:11 431d96a484ab4b70a12683ad8bcbb3c6
-msgid "Setting Up Manager and Agent (single node)"
+#: ../../install/install-from-source.rst:11 f53a2beb30a0490c90912d0a79730de7
+msgid "Setting Up Manager and Agent (single node, all-in-one)"
 msgstr ""
 
-#: ../../install/install-from-source.rst:13 e00f96f3a8514b9185fc3f919169aa9d
-msgid "Check out :doc:`/install/development-setup`."
+#: ../../install/install-from-source.rst:13 6fd54305343b444b90290c03c7ee9be9
+msgid "Check out :doc:`/dev/development-setup`."
 msgstr ""
 
-#: ../../install/install-from-source.rst:16 bcb4ee6996f4471b961abe97f5f34e4f
+#: ../../install/install-from-source.rst:18 08cd640effde4b4aab3cc43a5c4a895c
 msgid "Setting Up Additional Agents (multi-node)"
 msgstr ""
 
-#: ../../install/install-from-source.rst:19 205e8570dcd84c7298a37dfada31d723
+#: ../../install/install-from-source.rst:21 9dac1b3e20cd4cf19b255460962c63d7
 msgid "Updating manager configuration for multi-nodes"
 msgstr ""
 
-#: ../../install/install-from-source.rst:21
-#: ../../install/install-from-source.rst:26 480c552df83f41e1aa03b133226385ea
-#: 5bb556d1a32443be8fffd88983859127
-msgid "(TODO)"
+#: ../../install/install-from-source.rst:23 2f09431502e8460eabf5358b48b78884
+msgid ""
+"Since ``scripts/install-dev.sh`` assumes a single-node all-in-one setup, "
+"it configures the etcd and Redis addresses to be ``127.0.0.1``."
 msgstr ""
 
-#: ../../install/install-from-source.rst:24 d8b0404268f04935b2fd8c780d60b430
+#: ../../install/install-from-source.rst:25 71acd4fdc48a4fba86583258ebbf9fc2
+msgid ""
+"You need to update the etcd configuration of the Redis address so that "
+"additional agent nodes can connect to the Redis server using the address "
+"advertised via etcd:"
+msgstr ""
+
+#: ../../install/install-from-source.rst:33 0ed9598977f540188199515c33819b4c
+msgid ""
+"where ``MANAGER_IP`` is an IP address of the manager node accessible from"
+" other agent nodes."
+msgstr ""
+
+#: ../../install/install-from-source.rst:36 04ecf9e8e114470da0e020d2c5ec58c1
 msgid "Installing additional agents in different nodes"
+msgstr ""
+
+#: ../../install/install-from-source.rst:38 f54d867e27714d00afb8e188305c1d75
+msgid ""
+"First, you need to initialize a working copy of the core repository for "
+"each additional agent node. As our ``scripts/install-dev.sh`` does not "
+"yet provide an \"agent-only\" installation mode, you need to manually "
+"perform the same repository cloning along with the pyenv, Python, and "
+"Pants setup procedures as the script does."
+msgstr ""
+
+#: ../../install/install-from-source.rst:44 e9349f6f07404d3cab36ee4c2b92d511
+msgid ""
+"Since we use the mono-repo for the core packages, there is no way to "
+"separately clone the agent sources only. Just clone the entire repository"
+" and configure/execute the agent only. Ensure that you **also pull the "
+"LFS files and submodules** when you manually clone it."
+msgstr ""
+
+#: ../../install/install-from-source.rst:48 e9866a26ff964ef49c5d0ad653343e14
+msgid ""
+"Once your ``./pants`` is up and working, run ``./pants export ::`` to "
+"populate virtualenvs and install dependencies."
+msgstr ""
+
+#: ../../install/install-from-source.rst:50 ca4e5d23670546dbad1c6a6a87a20aec
+msgid ""
+"Then start to configure ``agent.toml`` by copying it from "
+"`configs/agent/halfstack.toml "
+"<https://github.com/lablup/backend.ai/blob/main/configs/agent/halfstack.toml>`_"
+" as follows:"
+msgstr ""
+
+#: ../../install/install-from-source.rst:52 2bb9f635d5454a4aaf50cc5cdac552de
+msgid "**agent.toml**"
+msgstr ""
+
+#: ../../install/install-from-source.rst:54 8f5f0ee4b23042de8a3b4493ad11349e
+msgid "``[etcd].addr.host``: Replace with ``MANAGER_IP``"
+msgstr ""
+
+#: ../../install/install-from-source.rst:56 4332a8dca72d40fb861fb0d8b97d579d
+msgid "``[agent].rpc-listen-addr.host``: Replace with ``AGENT_IP``"
+msgstr ""
+
+#: ../../install/install-from-source.rst:58 efeb59f2f6ca41fc84924749cdedf216
+msgid "``[container].bind-host``: Replace with ``AGENT_IP``"
+msgstr ""
+
+#: ../../install/install-from-source.rst:60 1bdbb50086314d3c8a6a6ccd5f85aff0
+msgid "``[watcher].service-addr.host``: Replace with ``AGENT_IP``"
+msgstr ""
+
+#: ../../install/install-from-source.rst:62 585de63713ee4ca8ab1b191d09e49143
+msgid ""
+"where ``AGENT_IP`` is an IP address of this agent node accessible from "
+"the manager and ``MANAGER_IP`` is an IP address of the manager node "
+"accessible from this agent node."
+msgstr ""
+
+#: ../../install/install-from-source.rst:64 becae019351a4ae48be0f21d2677bc2d
+msgid ""
+"Now execute ``./backend.ai ag start-server`` to connect this agent node "
+"to an existing manager."
+msgstr ""
+
+#: ../../install/install-from-source.rst:66 51e6d4aa8b1b42a482f9a683e4441868
+msgid ""
+"We assume that the agent and manager nodes reside in a same local "
+"network, where all TCP ports are open to each other. If this is not the "
+"case, you should configure firewalls to open all the port numbers "
+"appearing in ``agent.toml``."
+msgstr ""
+
+#: ../../install/install-from-source.rst:69 48e08129660046a3806cab8ab871e222
+msgid ""
+"There are more complicated setup scenarios such as splitting network "
+"planes for control and container-to-container communications, but we "
+"provide assistance with them for enterprise customers only."
+msgstr ""
+
+#: ../../install/install-from-source.rst:73 28673912bc3f4bb7806f70dc76e2f9bf
+msgid "Setting Up Accelerators"
+msgstr ""
+
+#: ../../install/install-from-source.rst:75 83e5eea24ff7418dac8778c26ee72fb8
+msgid ""
+"Ensure that your accelerator is properly set up using vendor-specific "
+"installation methods."
+msgstr ""
+
+#: ../../install/install-from-source.rst:77 28d72d8758a64b39afa362f02501e072
+msgid ""
+"Clone the accelerator plugin package into ``plugins`` directory if "
+"necessary or just use one of the already existing one in the mono-repo."
+msgstr ""
+
+#: ../../install/install-from-source.rst:79 1f850d850c3b44f7920f90e183ecef1b
+msgid ""
+"You also need to configure ``agent.toml``'s ``[agent].allow-compute-"
+"plugins`` with the full package path (e.g., "
+"``ai.backend.accelerator.cuda_open``) to activate them."
+msgstr ""
+
+#: ../../install/install-from-source.rst:82 718851a410d94154ac5983f1f82849f4
+msgid "Setting Up Shared Storage"
+msgstr ""
+
+#: ../../install/install-from-source.rst:84 7f604512af854145a2384600de275bf0
+msgid ""
+"To make vfolders working properly with multiple nodes, you must enable "
+"and configure Linux NFS to share the manager node's ``vfroot/local`` "
+"directory under the working copy and mount it in the same path in all "
+"agent nodes."
+msgstr ""
+
+#: ../../install/install-from-source.rst:86 5f3ba0ef8c5043e5af5f827b85d9a9ba
+msgid ""
+"It is recommended to unify the UID and GID of the storage-proxy service, "
+"all of the agent services across nodes, container UID and GID "
+"(configurable in ``agent.toml``), and the NFS volume."
+msgstr ""
+
+#: ../../install/install-from-source.rst:89 2e5c30b43c5c4bc1b06f2029c65fb254
+msgid "Configuring Overlay Networks for Multi-node Training (Optional)"
+msgstr ""
+
+#: ../../install/install-from-source.rst:93 761bbcd686ae46698979a2faab197ea0
+msgid ""
+"All other features of Backend.AI except multi-node training work without "
+"this configuration. The Docker Swarm mode is used to configure overlay "
+"networks to ensure privacy between cluster sessions, while the container "
+"monitoring and configuration is done by Backend.AI itself."
+msgstr ""
+
+#: ../../install/install-from-source.rst:97 80ae9bafc5a645018f95053d420b87a5
+msgid ""
+"Currently the cross-node inter-container overlay routing is controlled "
+"via Docker Swarm's overlay networks. In the manager, you need to `create "
+"a Swarm <https://docs.docker.com/engine/swarm/swarm-tutorial/create-"
+"swarm/>`_. In the agent nodes, you need to `join the Swarm "
+"<https://docs.docker.com/engine/swarm/swarm-tutorial/add-nodes/>`_. Then "
+"restart all manager and agent daemons to make it working."
 msgstr ""
 
 #~ msgid ""
@@ -278,5 +435,21 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Updating Manager Configuration for Multi-Nodes"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For production deployments, we recommend "
+#~ "to create separate virtualenvs for "
+#~ "individual services and install the "
+#~ "pre-built wheel distributions."
+#~ msgstr ""
+
+#~ msgid "Setting Up Manager and Agent (single node)"
+#~ msgstr ""
+
+#~ msgid "Check out :doc:`/install/development-setup`."
+#~ msgstr ""
+
+#~ msgid "(TODO)"
 #~ msgstr ""
 

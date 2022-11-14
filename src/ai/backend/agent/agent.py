@@ -1547,7 +1547,8 @@ class AbstractAgent(
 
         runtime_type = image_labels.get("ai.backend.runtime-type", "python")
         runtime_path = image_labels.get("ai.backend.runtime-path", None)
-        cmdargs: List[str] = []
+        cmdargs: list[str] = []
+        krunner_opts: list[str] = []
         if self.local_config["container"]["sandbox-type"] == "jail":
             cmdargs += [
                 "/opt/kernel/jail",
@@ -1556,10 +1557,13 @@ class AbstractAgent(
             ]
             if self.local_config["container"]["jail-args"]:
                 cmdargs += map(lambda s: s.strip(), self.local_config["container"]["jail-args"])
+        if self.local_config["debug"]["kernel-runner"]:
+            krunner_opts.append("--debug")
         cmdargs += [
             "/opt/backend.ai/bin/python",
             "-m",
             "ai.backend.kernel",
+            *krunner_opts,
             runtime_type,
         ]
         if runtime_path is not None:
@@ -1639,9 +1643,32 @@ class AbstractAgent(
             if not self._pending_creation_tasks[kernel_id]:
                 del self._pending_creation_tasks[kernel_id]
 
+        kernel_creation_info: KernelCreationResult = {
+            "id": KernelId(kernel_id),
+            "kernel_host": str(kernel_obj["kernel_host"]),
+            "repl_in_port": kernel_obj["repl_in_port"],
+            "repl_out_port": kernel_obj["repl_out_port"],
+            "stdin_port": kernel_obj["stdin_port"],  # legacy
+            "stdout_port": kernel_obj["stdout_port"],  # legacy
+            "service_ports": service_ports,
+            "container_id": kernel_obj["container_id"],
+            "resource_spec": attrs.asdict(resource_spec),
+            "scaling_group": kernel_config["scaling_group"],
+            "agent_addr": kernel_config["agent_addr"],
+            "attached_devices": attached_devices,
+        }
+
         # Finally we are done.
         await self.produce_event(
-            KernelStartedEvent(kernel_id, creation_id),
+            KernelStartedEvent(
+                kernel_id,
+                creation_id,
+                creation_info={
+                    **kernel_creation_info,
+                    "id": str(KernelId(kernel_id)),
+                    "container_id": str(kernel_obj["container_id"]),
+                },
+            ),
         )
 
         if kernel_config["session_type"] == "batch" and kernel_config["cluster_role"] == "main":
@@ -1653,19 +1680,7 @@ class AbstractAgent(
 
         # The startup command for the batch-type sessions will be executed by the manager
         # upon firing of the "session_started" event.
-
-        return {
-            "id": KernelId(kernel_id),
-            "kernel_host": str(kernel_obj["kernel_host"]),
-            "repl_in_port": kernel_obj["repl_in_port"],
-            "repl_out_port": kernel_obj["repl_out_port"],
-            "stdin_port": kernel_obj["stdin_port"],  # legacy
-            "stdout_port": kernel_obj["stdout_port"],  # legacy
-            "service_ports": service_ports,
-            "container_id": kernel_obj["container_id"],
-            "resource_spec": attrs.asdict(resource_spec),
-            "attached_devices": attached_devices,
-        }
+        return kernel_creation_info
 
     @abstractmethod
     async def destroy_kernel(

@@ -1,31 +1,22 @@
-
 Install on Clouds
------------------
+=================
 
+The minimal instance configuration:
 
-#. Prepare the instances and databases.
+* 1x SSL certificate with a private key for your own domain (for production)
+* 1x manager instance (e.g., t3.xlarge on AWS)
 
+  - For HA setup, you many replicate multiple manager instances running in different availability zones and put a load balancer in front of them.
 
-   * 1x SSL certificate with a private key for your own domain (for production)
-   * 1x gateway instance (e.g., t2.xlarge on AWS)
-   * 1x agent instances (e.g., t2.medium / p2.xlarge on AWS -- for minimal testing)
-   * 1x PostgreSQL instance (e.g., AWS RDS)
-   * 1x Redis instance (e.g., AWS ElasticCache)
-   * 1x etcd cluster
+* Nx agent instances (e.g., t3.medium / p2.xlarge on AWS -- for minimal testing)
 
-     * It is up to you whether to setup a HA-enabled multi-instance cluster or a single-instance cluster with storage backups.
-     * Check out [[this page|Install etcd]] for details. If you install etcd on the same instance where the manager runs, you could try using docker-compose configuration in this meta-repository's code.
+  - If you spawn multiple agents, it is recommended to use a placement group to improve locality for each availability zone.
 
-   * 1x cloud file system (e.g., AWS EFS, Azure FileShare)
-   * All should be in the same virtual private network.
+* 1x PostgreSQL instance (e.g., AWS RDS)
+* 1x Redis instance (e.g., AWS ElasticCache)
+* 1x etcd cluster
 
-#. :doc:`Install Manager </install/install-manager>`
+  - For HA setup, it should consist of 5 separate instances distributed across availability zones.
 
-   * After done, create an image of this instance as a backup.
-
-#. :doc:`Install Agent </install/install-agent>`
-
-
-   * After done, create an image of this instance for ease of manual/autoamtic scaling.
-
-#. :doc:`Configure Autoscaling </install/configure-autoscaling>`
+* 1x cloud file system (e.g., AWS EFS, Azure FileShare)
+* All should be in the same virtual private network (e.g., AWS VPC).
