@@ -32,7 +32,7 @@ hiredis~=1.1.0
 humanize>=3.1.0
 inquirer~=2.9.2
 graphene~=2.1.9
-janus>=0.6.1
+janus~=1.0.0
 Jinja2~=3.1.2
 jupyter-client>=6.0
 kubernetes~=10.0.0
@@ -51,7 +51,7 @@ python-dateutil>=2.8
 python-dotenv~=0.20.0
 python-snappy~=0.6.0
 python-json-logger>=2.0.1
-pyzmq~=23.2.0
+pyzmq~=24.0.1
 PyJWT~=2.0
 PyYAML~=6.0
 packaging>=21.3
@@ -69,7 +69,7 @@ tqdm>=4.61
 trafaret~=2.1
 typeguard~=2.10
 typing_extensions~=4.3
-uvloop>=0.16
+uvloop>=0.17
 yarl>=1.7
 zipstream-new~=1.1.8
 
@@ -89,5 +89,5 @@ types-setuptools
 types-six
 types-tabulate
 
-backend.ai-krunner-alpine~=3.3
-backend.ai-krunner-static-gnu~=2.0
+backend.ai-krunner-alpine~=4.0.0
+backend.ai-krunner-static-gnu~=3.0.0

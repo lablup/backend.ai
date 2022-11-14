@@ -1547,7 +1547,8 @@ class AbstractAgent(
 
         runtime_type = image_labels.get("ai.backend.runtime-type", "python")
         runtime_path = image_labels.get("ai.backend.runtime-path", None)
-        cmdargs: List[str] = []
+        cmdargs: list[str] = []
+        krunner_opts: list[str] = []
         if self.local_config["container"]["sandbox-type"] == "jail":
             cmdargs += [
                 "/opt/kernel/jail",
@@ -1556,10 +1557,13 @@ class AbstractAgent(
             ]
             if self.local_config["container"]["jail-args"]:
                 cmdargs += map(lambda s: s.strip(), self.local_config["container"]["jail-args"])
+        if self.local_config["debug"]["kernel-runner"]:
+            krunner_opts.append("--debug")
         cmdargs += [
             "/opt/backend.ai/bin/python",
             "-m",
             "ai.backend.kernel",
+            *krunner_opts,
             runtime_type,
         ]
         if runtime_path is not None:
