@@ -293,7 +293,7 @@ When each branch has different external package requirements, you should run ``.
 before running codes after ``git switch``-ing between such branches.
 
 Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
-In that case, run ``killall -r pantsd`` (``killall pantsd`` in macOS) and it will be fine.
+In that case, run ``pgrep pantsd | xargs kill`` and it will be fine.
 
 Running entrypoints
 -------------------
@@ -398,7 +398,7 @@ Writing documentation
 
   .. code-block:: console
 
-     $ pyenv virtualenv 3.10.7 venv-bai-docs
+     $ pyenv virtualenv 3.10.8 venv-bai-docs
 
 * Activate the virtualenv and run:
 
@@ -473,7 +473,7 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 
 .. code-block:: console
 
-   $ killall -r pantsd   # just `killall pantsd` in macOS
+   $ pgrep pantsd | xargs kill
    $ rm -r .tmp .pants.d ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and

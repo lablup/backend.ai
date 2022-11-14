@@ -49,14 +49,14 @@ class libnuma:
     @staticmethod
     def node_of_cpu(core) -> int:
         if _numa_supported:
-            return int(_libnuma.numa_node_of_cpu(core))
+            return int(_libnuma.numa_node_of_cpu(core))  # type: ignore
         else:
             return 0
 
     @staticmethod
     def num_nodes() -> int:
         if _numa_supported:
-            return int(_libnuma.numa_num_configured_nodes())
+            return int(_libnuma.numa_num_configured_nodes())  # type: ignore
         else:
             return 1
 
@@ -75,7 +75,7 @@ class libnuma:
                         return cpuset
                     except (IOError, ValueError):
                         try:
-                            cpuset = os.sched_getaffinity(0)
+                            cpuset = os.sched_getaffinity(0)  # type: ignore
                             cpuset_source = "the scheduler affinity mask of the agent process"
                             return cpuset
                         except AttributeError:

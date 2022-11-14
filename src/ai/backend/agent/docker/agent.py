@@ -922,7 +922,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await create_metadata_server(self.local_config, self.kernel_registry),
         )
         await metadata_server_runner.setup()
-        site = web.TCPSite(metadata_server_runner, "0.0.0.0", 40128)
+        site = web.TCPSite(
+            metadata_server_runner,
+            "0.0.0.0",
+            self.local_config["agent"]["metadata-server-port"],
+        )
         await site.start()
         self.metadata_server_runner = metadata_server_runner
         # For legacy accelerator plugins
