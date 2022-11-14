@@ -854,17 +854,18 @@ class AbstractAgent(
                     if ev.done_future is not None:
                         ev.done_future.set_exception(e)
                     raise
-                if ev.container_id is not None:
-                    await self.container_lifecycle_queue.put(
-                        ContainerLifecycleEvent(
-                            ev.kernel_id,
-                            ev.container_id,
-                            LifecycleEvent.CLEAN,
-                            ev.reason,
-                            suppress_events=ev.suppress_events,
-                            done_future=ev.done_future,
-                        ),
-                    )
+                finally:
+                    if ev.container_id is not None:
+                        await self.container_lifecycle_queue.put(
+                            ContainerLifecycleEvent(
+                                ev.kernel_id,
+                                ev.container_id,
+                                LifecycleEvent.CLEAN,
+                                ev.reason,
+                                suppress_events=ev.suppress_events,
+                                done_future=ev.done_future,
+                            ),
+                        )
         except asyncio.CancelledError:
             pass
         except Exception:
