@@ -196,12 +196,14 @@ class KernelCreationEventArgs:
     kernel_id: KernelId = attrs.field()
     creation_id: str = attrs.field()
     reason: str = attrs.field(default="")
+    creation_info: Mapping[str, Any] = attrs.field(factory=dict)
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
             self.creation_id,
             self.reason,
+            self.creation_info,
         )
 
     @classmethod
@@ -210,6 +212,7 @@ class KernelCreationEventArgs:
             kernel_id=KernelId(uuid.UUID(value[0])),
             creation_id=value[1],
             reason=value[2],
+            creation_info=value[3],
         )
 
 
