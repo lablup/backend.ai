@@ -57,6 +57,9 @@ __all__: Sequence[str] = (
     "groups",
     "association_groups_users",
     "resolve_group_name_or_id",
+    "query_suadmin_accessible_groups",
+    "query_admin_accessible_groups",
+    "query_user_accessible_groups",
     "Group",
     "GroupInput",
     "ModifyGroupInput",
@@ -191,6 +194,48 @@ async def resolve_groups(
     return_val = [row["id"] for row in rows]
 
     return return_val
+
+
+async def query_suadmin_accessible_groups(
+    db_conn: SAConnection,
+) -> None:
+    """
+    Query all groups.
+    This function returns `None` since super admin can access all groups
+    and fetching all groups from DB is a big overhead.
+    """
+    return None
+
+
+async def query_admin_accessible_groups(
+    db_conn: SAConnection,
+    domain_name: str,
+) -> Iterable[uuid.UUID]:
+    """
+    Query all groups of the domain the admin belongs to.
+    """
+    query = sa.select([groups.c.id]).select_from(groups).where(groups.c.domain_name == domain_name)
+    result = await db_conn.execute(query)
+    return [grp.id for grp in result.fetchall()]
+
+
+async def query_user_accessible_groups(
+    db_conn: SAConnection,
+    user_uuid: uuid.UUID,
+) -> Iterable[uuid.UUID]:
+    """
+    Query all groups the user belongs to.
+    """
+    from .user import users
+
+    j = sa.join(association_groups_users, users, association_groups_users.c.user_id == users.c.uuid)
+    query = (
+        sa.select([association_groups_users.c.group_id])
+        .select_from(j)
+        .where(association_groups_users.c.user_id == user_uuid)
+    )
+    result = await db_conn.execute(query)
+    return [grp.group_id for grp in result.fetchall()]
 
 
 class Group(graphene.ObjectType):

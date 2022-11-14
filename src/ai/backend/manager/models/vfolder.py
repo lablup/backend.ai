@@ -786,7 +786,7 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
-        from .group import groups
+        from .group import groups, query_user_accessible_groups
         from .user import users
 
         j = (
@@ -804,12 +804,16 @@ class VirtualFolder(graphene.ObjectType):
             query = query.where(
                 (users.c.domain_name == domain_name) | (groups.c.domain_name == domain_name)
             )
+        if user_id is not None:
+            async with graph_ctx.db.begin_readonly() as conn:
+                group_ids = await query_user_accessible_groups(conn, user_id)
+            query = query.where(
+                (vfolders.c.user == user_id)
+                | vfolders.c.group.in_(group_ids)
+                | (vfolder_permissions.c.user == user_id)
+            )
         if group_id is not None:
             query = query.where(vfolders.c.group == group_id)
-        if user_id is not None:
-            query = query.where(
-                (vfolders.c.user == user_id) | (vfolder_permissions.c.user == user_id)
-            )
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
@@ -829,7 +833,7 @@ class VirtualFolder(graphene.ObjectType):
         filter: str = None,
         order: str = None,
     ) -> Sequence[VirtualFolder]:
-        from .group import groups
+        from .group import groups, query_user_accessible_groups
         from .user import users
 
         j = (
@@ -859,12 +863,16 @@ class VirtualFolder(graphene.ObjectType):
             query = query.where(
                 (users.c.domain_name == domain_name) | (groups.c.domain_name == domain_name)
             )
+        if user_id is not None:
+            async with graph_ctx.db.begin_readonly() as conn:
+                group_ids = await query_user_accessible_groups(conn, user_id)
+            query = query.where(
+                (vfolders.c.user == user_id)
+                | vfolders.c.group.in_(group_ids)
+                | (vfolder_permissions.c.user == user_id)
+            )
         if group_id is not None:
             query = query.where(vfolders.c.group == group_id)
-        if user_id is not None:
-            query = query.where(
-                (vfolders.c.user == user_id) | (vfolder_permissions.c.user == user_id)
-            )
         if filter is not None:
             qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
             query = qfparser.append_filter(query, filter)
