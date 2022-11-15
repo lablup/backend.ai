@@ -119,6 +119,55 @@ async def get_hwinfo(request: web.Request) -> web.Response:
             return web.json_response(data)
 
 
+async def list_trash_bin(request: web.Request) -> web.Response:
+    async with check_params(
+        request,
+        t.Dict(
+            {
+                t.Key("volume"): t.String(),
+            },
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "list_trash_bin", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            items = [
+                {
+                    "name": item.name,
+                    "type": item.type.name,
+                    "stat": {
+                        "mode": item.stat.mode,
+                        "size": item.stat.size,
+                        "created": item.stat.created.isoformat(),
+                        "modified": item.stat.modified.isoformat(),
+                    },
+                    "symlink_target": "",
+                }
+                async for item in volume.list_trash_bin()
+            ]
+        return web.json_response(
+            {
+                "items": items,
+            },
+        )
+
+
+async def empty_trash_bin(request: web.Request) -> web.Response:
+    async with check_params(
+        request,
+        t.Dict(
+            {
+                t.Key("volume"): t.String(),
+            },
+        ),
+    ) as params:
+        await log_manager_api_entry(log, "empty_trash_bin", params)
+        ctx: Context = request.app["ctx"]
+        async with ctx.get_volume(params["volume"]) as volume:
+            await volume.empty_trash_bin()
+            return web.Response(status=204)
+
+
 async def create_vfolder(request: web.Request) -> web.Response:
     async with check_params(
         request,
@@ -666,6 +715,8 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("GET", "/", get_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
+    app.router.add_route("GET", "/volume/list-trash", list_trash_bin)
+    app.router.add_route("POST", "/volume/empty-trash", empty_trash_bin)
     app.router.add_route("POST", "/folder/create", create_vfolder)
     app.router.add_route("POST", "/folder/delete", delete_vfolder)
     app.router.add_route("POST", "/folder/purge", purge_vfolder)

@@ -77,6 +77,14 @@ class AbstractVolume(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def list_trash_bin(self) -> AsyncIterator[DirEntry]:
+        pass
+
+    @abstractmethod
+    async def empty_trash_bin(self) -> None:
+        pass
+
+    @abstractmethod
     async def create_vfolder(
         self,
         vfid: UUID,

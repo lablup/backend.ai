@@ -64,6 +64,24 @@ class BaseVolume(AbstractVolume):
             "metadata": {},
         }
 
+    def list_trash_bin(self) -> AsyncIterator[DirEntry]:
+        return self._scandir(self.trash_path)
+
+    async def empty_trash_bin(self) -> None:
+        loop = asyncio.get_running_loop()
+
+        def _purge_vfolder():
+            try:
+                for child in self.trash_path.iterdir():
+                    if child.is_dir():
+                        shutil.rmtree(child)
+                    else:
+                        child.unlink()
+            except FileNotFoundError:
+                pass
+
+        await loop.run_in_executor(None, _purge_vfolder)
+
     async def create_vfolder(
         self,
         vfid: UUID,
@@ -255,12 +273,11 @@ class BaseVolume(AbstractVolume):
 
     # ------ vfolder internal operations -------
 
-    def scandir(self, vfid: UUID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
-        target_path = self.sanitize_vfpath(vfid, relpath)
+    def _scandir(self, target_path: Path) -> AsyncIterator[DirEntry]:
         q: janus.Queue[Union[Sentinel, DirEntry]] = janus.Queue()
         loop = asyncio.get_running_loop()
 
-        def _scandir(q: janus._SyncQueueProxy[Union[Sentinel, DirEntry]]) -> None:
+        def scandir_and_put():
             count = 0
             limit = self.local_config["storage-proxy"]["scandir-limit"]
             try:
@@ -295,11 +312,11 @@ class BaseVolume(AbstractVolume):
             finally:
                 q.put(SENTINEL)
 
-        async def _scan_task(_scandir, q) -> None:
-            await loop.run_in_executor(None, _scandir, q.sync_q)
-
         async def _aiter() -> AsyncIterator[DirEntry]:
-            scan_task = asyncio.create_task(_scan_task(_scandir, q))
+            async def _scan_task(_scandir, q, path) -> None:
+                await loop.run_in_executor(None, _scandir, q.sync_q, path)
+
+            scan_task = asyncio.create_task(_scan_task(scandir_and_put, q, target_path))
             await asyncio.sleep(0)
             try:
                 while True:
@@ -314,6 +331,10 @@ class BaseVolume(AbstractVolume):
                 await q.wait_closed()
 
         return _aiter()
+
+    def scandir(self, vfid: UUID, relpath: PurePosixPath) -> AsyncIterator[DirEntry]:
+        target_path = self.sanitize_vfpath(vfid, relpath)
+        return self._scandir(target_path)
 
     async def mkdir(
         self,
