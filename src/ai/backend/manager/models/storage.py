@@ -95,6 +95,10 @@ class StorageSessionManager:
         return proxy_name, volume_name
 
     async def get_all_volumes(self) -> Iterable[Tuple[str, VolumeInfo]]:
+        """
+        Returns a list of tuple
+        [(proxy_name: str, volume_info: VolumeInfo), ...]
+        """
         try:
             # per-asyncio-task cache
             return _ctx_volumes_cache.get()

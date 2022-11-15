@@ -105,6 +105,10 @@ class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
 
 
+class DoCheckStorageEvent(EmptyEventArgs, AbstractEvent):
+    name = "do_check_storage"
+
+
 @attrs.define(slots=True, frozen=True)
 class DoTerminateSessionEvent(AbstractEvent):
     name = "do_terminate_session"
