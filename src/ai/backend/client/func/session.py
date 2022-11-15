@@ -27,6 +27,7 @@ from tqdm import tqdm
 
 from ai.backend.client.output.fields import session_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE
@@ -181,6 +182,7 @@ class ComputeSession(BaseFunction):
         group_name: str = None,
         bootstrap_script: str = None,
         tag: str = None,
+        architecture: str = DEFAULT_IMAGE_ARCH,
         scaling_group: str = None,
         owner_access_key: str = None,
         preopen_ports: List[int] = None,
@@ -284,6 +286,7 @@ class ComputeSession(BaseFunction):
         if api_session.get().api_version >= (6, "20220315"):
             params["dependencies"] = dependencies
             params["callback_url"] = callback_url
+            params["architecture"] = architecture
         if api_session.get().api_version >= (6, "20200815"):
             params["clusterSize"] = cluster_size
             params["clusterMode"] = cluster_mode
