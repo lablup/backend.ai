@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.4 (2022-10-26)
+
+### Features
+* Improve the agent's CPU core detection to use Docker's cgroup cpusets for better compatibility with other frameworks dedicating CPU cores exclusively ([#804](https://github.com/lablup/backend.ai/issues/804))
+
+
 ## 22.09.3 (2022-10-25)
 
 ### Features

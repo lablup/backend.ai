@@ -9,97 +9,154 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Client SDK for Python 18.12\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
 # 9aecfba673e846429b1cb8a2c86f138d
-#: ../../client/func/manager.rst:2 cf944b63bc224e0ea21987dc6e42de36
+#: ../../client/func/manager.rst:2 9c8afcc3ab5a4aa0890551fcac968997
 msgid "Manager Functions"
 msgstr "매니저 함수"
 
-# 46d58d5b9fc7403c9f08a006a4a872e0
-#: a08c05bf3ec644489a8d515bbc177e60 ai.backend.client.func.manager.Manager:1 of
+#: ai.backend.client.func.manager.Manager:1 b7bac72cce4944ea93eb3fcafea97a32 of
 msgid "Provides controlling of the gateway/manager servers."
-msgstr "게이트웨이 및 매니저 서버의 상태를 관리합니다."
+msgstr ""
 
-# 583433132073464ba44e685bb9d1f70a
 #: ai.backend.client.func.manager.Manager.status:1
-#: c2b33fe7ab03406f9d0f1dbdd2b14dc8 of
+#: bc20b0cf0b36458bb19019c9a6677b31 of
 msgid "Returns the current status of the configured API server."
 msgstr ""
 
-# 082e424418af43daab2795f689eb10ff
-#: 785a77a8934d425c94ff8c8f3839e3ba
+#: 2081a70b34394f2d97928d09734c4d71
 #: ai.backend.client.func.manager.Manager.freeze:1 of
 msgid ""
-"Freezes the configured API server. Any API clients will no longer be able to "
-"create new compute sessions nor create and modify vfolders/keypairs/etc. "
-"This is used to enter the maintenance mode of the server for unobtrusive "
-"manager and/or agent upgrades."
+"Freezes the configured API server. Any API clients will no longer be able"
+" to create new compute sessions nor create and modify "
+"vfolders/keypairs/etc. This is used to enter the maintenance mode of the "
+"server for unobtrusive manager and/or agent upgrades."
 msgstr ""
 
-# b339fd4170bd4ecc808f7d4e364d6cd8
-#: 8bc5016800f14273aedf217d0cc3834e 9617d42482124ce4a953dbb13742525a
-#: 96b07463a6024e3aa9aca9d683dddf91
+#: 277de2f1b6e1468bb865804ac9a2768e 6e2b88250baa43439a38b11b49766e3f
 #: ai.backend.client.func.manager.Manager.freeze
 #: ai.backend.client.func.manager.Manager.scheduler_op
-#: ai.backend.client.func.manager.Manager.update_announcement of
+#: ai.backend.client.func.manager.Manager.update_announcement
+#: dc8a41f95aef4fa1bd206c1b794ded33 of
 msgid "Parameters"
 msgstr ""
 
-# 11a289d9b0b64066a590198a5cccdc10
-#: ai.backend.client.func.manager.Manager.freeze:8
-#: cef49fefce694479b6e703ae6fc88772 of
+#: 743a8adf061f45dca05f01c6768789d3
+#: ai.backend.client.func.manager.Manager.freeze:8 of
 msgid ""
 "If set ``True``, immediately shuts down all running compute sessions "
 "forcibly. If not set, clients who have running compute session are still "
-"able to interact with them though they cannot create new compute sessions."
+"able to interact with them though they cannot create new compute "
+"sessions."
 msgstr ""
 
-# c3580c3e744240f8b48de825d8d0e38e
-#: 0add4e4e492b4b2eb10bda0a5f13d501
+#: 8f36bb63ad264fb8bf6aff1d08b5db7b
 #: ai.backend.client.func.manager.Manager.unfreeze:1 of
 msgid ""
-"Unfreezes the configured API server so that it resumes to normal operation."
+"Unfreezes the configured API server so that it resumes to normal "
+"operation."
 msgstr ""
 
-#: 5ec075baaecf49558ed9467d45152e40
+#: 99882ff1a4f34feb84041d4f1defce7d
 #: ai.backend.client.func.manager.Manager.get_announcement:1 of
 msgid "Get current announcement."
 msgstr ""
 
-#: 4a6c5cbe994448f6a5962f12b08cd38e
+#: 8657876132234605a71a759cfad8b9a6
 #: ai.backend.client.func.manager.Manager.update_announcement:1 of
 msgid "Update (create / delete) announcement."
 msgstr ""
 
-#: 7298da1e7c4d45e68fdce8ece4977212
-#: ai.backend.client.func.manager.Manager.update_announcement:4 of
+#: ai.backend.client.func.manager.Manager.update_announcement:4
+#: e793163b0c0a4deb85131f7bdf2f131c of
 msgid "If set ``False``, delete announcement."
 msgstr ""
 
-#: ai.backend.client.func.manager.Manager.update_announcement:6
-#: b79387dfdbc44ca1885835014960bca3 of
+#: 52306184fbd3440cad3c122d0a733120
+#: ai.backend.client.func.manager.Manager.update_announcement:6 of
 msgid "Announcement message. Required if ``enabled`` is True."
 msgstr ""
 
-#: ai.backend.client.func.manager.Manager.scheduler_op:1
-#: d75a0f43ab8741d988ef591be53a53e5 of
+#: 26e6cf0faf5642f681f50bb916ef1162
+#: ai.backend.client.func.manager.Manager.scheduler_op:1 of
 msgid "Perform a scheduler operation."
 msgstr ""
 
-#: ai.backend.client.func.manager.Manager.scheduler_op:4
-#: e4445253663c4494a91c28d73fc2fcc5 of
+#: 058d03350d4f48258ec08a8ade3f7615
+#: ai.backend.client.func.manager.Manager.scheduler_op:4 of
 msgid "The name of scheduler operation."
 msgstr ""
 
-#: 3b85acd1ea6d474ab685b760af2c97b9
+#: 16f51c1062ba4f1b8bdca8b84e97a098
 #: ai.backend.client.func.manager.Manager.scheduler_op:6 of
 msgid "Arguments specific to the given operation."
 msgstr ""
+
+# 46d58d5b9fc7403c9f08a006a4a872e0
+#~ msgid "Provides controlling of the gateway/manager servers."
+#~ msgstr "게이트웨이 및 매니저 서버의 상태를 관리합니다."
+
+# 583433132073464ba44e685bb9d1f70a
+#~ msgid "Returns the current status of the configured API server."
+#~ msgstr ""
+
+# 082e424418af43daab2795f689eb10ff
+#~ msgid ""
+#~ "Freezes the configured API server. Any"
+#~ " API clients will no longer be "
+#~ "able to create new compute sessions "
+#~ "nor create and modify vfolders/keypairs/etc."
+#~ " This is used to enter the "
+#~ "maintenance mode of the server for "
+#~ "unobtrusive manager and/or agent upgrades."
+#~ msgstr ""
+
+# b339fd4170bd4ecc808f7d4e364d6cd8
+#~ msgid "Parameters"
+#~ msgstr ""
+
+# 11a289d9b0b64066a590198a5cccdc10
+#~ msgid ""
+#~ "If set ``True``, immediately shuts down"
+#~ " all running compute sessions forcibly. "
+#~ "If not set, clients who have "
+#~ "running compute session are still able"
+#~ " to interact with them though they"
+#~ " cannot create new compute sessions."
+#~ msgstr ""
+
+# c3580c3e744240f8b48de825d8d0e38e
+#~ msgid ""
+#~ "Unfreezes the configured API server so"
+#~ " that it resumes to normal operation."
+#~ msgstr ""
+
+#~ msgid "Get current announcement."
+#~ msgstr ""
+
+#~ msgid "Update (create / delete) announcement."
+#~ msgstr ""
+
+#~ msgid "If set ``False``, delete announcement."
+#~ msgstr ""
+
+#~ msgid "Announcement message. Required if ``enabled`` is True."
+#~ msgstr ""
+
+#~ msgid "Perform a scheduler operation."
+#~ msgstr ""
+
+#~ msgid "The name of scheduler operation."
+#~ msgstr ""
+
+#~ msgid "Arguments specific to the given operation."
+#~ msgstr ""
+

@@ -225,11 +225,15 @@ manager_local_config_iv = (
                     t.Key("name"): tx.Slug[2:64],
                     t.Key("user"): t.String,
                     t.Key("password"): t.String,
+                    t.Key("pool-size", default=8): t.ToInt[1:],  # type: ignore
+                    t.Key("max-overflow", default=64): t.ToInt[
+                        -1:  # -1 is infinite  # type: ignore
+                    ],
                 }
             ),
             t.Key("manager"): t.Dict(
                 {
-                    t.Key("ipc-base-path", default="/tmp/backend.ai/manager/ipc"): tx.Path(
+                    t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
                         type="dir", auto_create=True
                     ),
                     t.Key("num-proc", default=_max_cpu_count): t.Int[1:_max_cpu_count],

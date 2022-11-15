@@ -3,13 +3,13 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
-import attr
+import attrs
 import graphene
 
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor
+    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 
     from ai.backend.common.bgtask import BackgroundTaskManager
     from ai.backend.common.etcd import AsyncEtcd
@@ -104,7 +104,7 @@ from .vfolder import (
 )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class GraphQueryContext:
     schema: graphene.Schema
     dataloader_manager: DataLoaderManager
