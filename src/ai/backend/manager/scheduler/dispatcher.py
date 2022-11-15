@@ -174,8 +174,9 @@ class SchedulerDispatcher(aobject):
             self.lock_factory(LockID.LOCKID_STORAGE_TIMER, 10.0),
             self.event_producer,
             lambda: DoCheckStorageEvent(),
-            interval=self.shared_config.data["storage_check_interval_days"]
-            or timedelta(days=10).total_seconds(),
+            interval=timedelta(
+                days=(self.shared_config.data["storage_check_interval_days"] or 10)
+            ).total_seconds(),
             initial_delay=10.0,
         )
         await self.schedule_timer.join()
