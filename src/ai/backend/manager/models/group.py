@@ -121,7 +121,7 @@ groups = sa.Table(
         "allowed_vfolder_hosts",
         VFolderHostPermissionColumn(),
         nullable=False,
-        default={},
+        default="{}",
     ),
     sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
     # dotfiles column, \x90 means empty list in msgpack

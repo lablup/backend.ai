@@ -62,6 +62,7 @@ keypair_resource_policies = sa.Table(
         "allowed_vfolder_hosts",
         VFolderHostPermissionColumn(),
         nullable=False,
+        default="{}",
     ),
     # TODO: implement with a many-to-many association table
     # sa.Column('allowed_scaling_groups', sa.Array(sa.String), nullable=False),

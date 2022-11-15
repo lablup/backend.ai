@@ -70,7 +70,7 @@ domains = sa.Table(
         "allowed_vfolder_hosts",
         VFolderHostPermissionColumn(),
         nullable=False,
-        default={},
+        default="{}",
     ),
     sa.Column("allowed_docker_registries", pgsql.ARRAY(sa.String), nullable=False, default="{}"),
     #: Field for synchronization with external services.

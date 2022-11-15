@@ -1,5 +1,5 @@
 import textwrap
-from typing import Iterable, Sequence
+from typing import Iterable, Optional, Sequence
 
 from ai.backend.client.output.fields import group_fields
 from ai.backend.client.output.types import FieldSpec
@@ -136,8 +136,8 @@ class Group(BaseFunction):
         name: str,
         description: str = "",
         is_active: bool = True,
-        total_resource_slots: str = None,
-        allowed_vfolder_hosts: str = None,
+        total_resource_slots: Optional[str] = None,
+        allowed_vfolder_hosts: Optional[str] = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
@@ -182,8 +182,8 @@ class Group(BaseFunction):
         name: str = None,
         description: str = None,
         is_active: bool = None,
-        total_resource_slots: str = None,
-        allowed_vfolder_hosts: str = None,
+        total_resource_slots: Optional[str] = None,
+        allowed_vfolder_hosts: Optional[str] = None,
         integration_id: str = None,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
