@@ -33,7 +33,7 @@ from typing import (
     overload,
 )
 
-import attr
+import attrs
 import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
@@ -772,7 +772,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-@attr.define(slots=True)
+@attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):
     name: str
     vfid: uuid.UUID
@@ -893,6 +893,8 @@ class KernelCreationResult(TypedDict):
     repl_out_port: int
     stdin_port: int  # legacy
     stdout_port: int  # legacy
+    scaling_group: str
+    agent_addr: str
 
 
 class KernelCreationConfig(TypedDict):
@@ -913,6 +915,8 @@ class KernelCreationConfig(TypedDict):
     startup_command: Optional[str]
     internal_data: Optional[Mapping[str, Any]]
     preopen_ports: List[int]
+    scaling_group: str
+    agent_addr: str
 
 
 class KernelEnqueueingConfig(TypedDict):
@@ -961,7 +965,7 @@ class EtcdRedisConfig(TypedDict, total=False):
     password: Optional[str]
 
 
-@attr.s(auto_attribs=True)
+@attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
     client: Redis | redis.asyncio.sentinel.Sentinel
     service_name: Optional[str]

@@ -37,7 +37,7 @@ from aiodataloader import DataLoader
 from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
-from graphql.language import ast
+from graphql.language import ast  # pants: no-infer-dep
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
@@ -65,7 +65,7 @@ from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor
+    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 
     from .gql import GraphQueryContext
     from .user import UserRole
@@ -178,18 +178,24 @@ class ResourceSlotColumn(TypeDecorator):
     impl = JSONB
     cache_ok = True
 
-    def process_bind_param(self, value: Union[Mapping, ResourceSlot], dialect):
-        if isinstance(value, Mapping) and not isinstance(value, ResourceSlot):
-            return value
-        return value.to_json() if value is not None else None
+    def process_bind_param(
+        self, value: Union[Mapping, ResourceSlot, None], dialect
+    ) -> Optional[Mapping]:
+        if value is None:
+            return None
+        if isinstance(value, ResourceSlot):
+            return value.to_json()
+        return value
 
-    def process_result_value(self, raw_value: Dict[str, str], dialect):
+    def process_result_value(self, raw_value: Dict[str, str], dialect) -> ResourceSlot:
+        if raw_value is None:
+            return ResourceSlot()
         # legacy handling
         interim_value: Dict[str, Any] = raw_value
         mem = raw_value.get("mem")
         if isinstance(mem, str) and not mem.isdigit():
             interim_value["mem"] = BinarySize.from_str(mem)
-        return ResourceSlot.from_json(interim_value) if raw_value is not None else None
+        return ResourceSlot.from_json(interim_value)
 
     def copy(self):
         return ResourceSlotColumn()

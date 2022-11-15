@@ -397,6 +397,8 @@ class AgentRPCServer(aobject):
                 "container_id": result["container_id"],
                 "resource_spec": result["resource_spec"],
                 "attached_devices": result["attached_devices"],
+                "agent_addr": result["agent_addr"],
+                "scaling_group": result["scaling_group"],
             }
             for result in results
         ]
