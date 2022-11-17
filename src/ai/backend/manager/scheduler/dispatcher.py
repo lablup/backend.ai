@@ -528,7 +528,7 @@ class SchedulerDispatcher(aobject):
         """
         log_fmt = _log_fmt.get("")
         log_args = _log_args.get(tuple())
-        requested_architectures = set(k.image_ref.architecture for k in sess_ctx.kernels)
+        requested_architectures = set(k.architecture for k in sess_ctx.kernels)
         if len(requested_architectures) > 1:
             raise GenericBadRequest(
                 "Cannot assign multiple kernels with different architecture"
@@ -746,16 +746,14 @@ class SchedulerDispatcher(aobject):
                     else:
                         # Each kernel may have different images and different architectures
                         compatible_candidate_agents = [
-                            ag
-                            for ag in candidate_agents
-                            if ag.architecture == kernel.image_ref.architecture
+                            ag for ag in candidate_agents if ag.architecture == kernel.architecture
                         ]
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
                                     f"No agents found to be compatible with the image acrhitecture "
                                     f"(image: {kernel.image_ref}, "
-                                    f"arch: {kernel.image_ref.architecture})"
+                                    f"arch: {kernel.architecture})"
                                 ),
                             )
                         # Let the scheduler check the resource availability and decide the target agent

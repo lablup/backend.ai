@@ -327,7 +327,7 @@ existing_session_kernel_ids = [
     ),
 ]
 
-common_image_ref = ImageRef("lablup/python:3.6-ubunt18.04")
+common_image_ref = ImageRef("lablup/python:3.6-ubunt18.04", ["*"], architecture="aarch64")
 common_image = ImageRow(
     name=common_image_ref.canonical,
     image=common_image_ref.name,
@@ -395,9 +395,9 @@ def example_pending_sessions():
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
-                    image_id=common_image.id,
-                    image_row=common_image,
-                    image=common_image,
+                    architecture=common_image_ref.architecture,
+                    registry=common_image_ref.registry,
+                    image=common_image_ref.name,
                     resource_opts={},
                     requested_slots=ResourceSlot(
                         {
@@ -444,7 +444,9 @@ def example_pending_sessions():
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
-                    image_id=common_image.id,
+                    architecture=common_image_ref.architecture,
+                    registry=common_image_ref.registry,
+                    image=common_image_ref.name,
                     resource_opts={},
                     requested_slots=ResourceSlot(
                         {
@@ -491,7 +493,9 @@ def example_pending_sessions():
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
-                    image_id=common_image.id,
+                    architecture=common_image_ref.architecture,
+                    registry=common_image_ref.registry,
+                    image=common_image_ref.name,
                     resource_opts={},
                     requested_slots=ResourceSlot(
                         {
@@ -514,7 +518,9 @@ def example_pending_sessions():
                     cluster_role="sub",
                     cluster_idx=2,
                     cluster_hostname="sub1",
-                    image_id=common_image.id,
+                    architecture=common_image_ref.architecture,
+                    registry=common_image_ref.registry,
+                    image=common_image_ref.name,
                     resource_opts={},
                     requested_slots=ResourceSlot(
                         {
@@ -537,7 +543,9 @@ def example_pending_sessions():
                     cluster_role="sub",
                     cluster_idx=3,
                     cluster_hostname="sub2",
-                    image_id=common_image.id,
+                    architecture=common_image_ref.architecture,
+                    registry=common_image_ref.registry,
+                    image=common_image_ref.name,
                     resource_opts={},
                     requested_slots=ResourceSlot(
                         {
@@ -591,7 +599,9 @@ def example_existing_sessions():
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
-                    image_id=common_image.id,
+                    architecture=common_image_ref.architecture,
+                    registry=common_image_ref.registry,
+                    image=common_image_ref.name,
                     resource_opts={},
                     requested_slots=ResourceSlot(
                         {
@@ -614,7 +624,9 @@ def example_existing_sessions():
                     cluster_role="sub",
                     cluster_idx=2,
                     cluster_hostname="sub1",
-                    image_id=common_image.id,
+                    architecture=common_image_ref.architecture,
+                    registry=common_image_ref.registry,
+                    image=common_image_ref.name,
                     resource_opts={},
                     requested_slots=ResourceSlot(
                         {
@@ -658,7 +670,9 @@ def example_existing_sessions():
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
-                    image_id=common_image.id,
+                    architecture=common_image_ref.architecture,
+                    registry=common_image_ref.registry,
+                    image=common_image_ref.name,
                     resource_opts={},
                     requested_slots=ResourceSlot(
                         {
@@ -702,7 +716,9 @@ def example_existing_sessions():
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
-                    image_id=common_image.id,
+                    architecture=common_image_ref.architecture,
+                    registry=common_image_ref.registry,
+                    image=common_image_ref.name,
                     resource_opts={},
                     requested_slots=ResourceSlot(
                         {
