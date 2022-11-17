@@ -6,12 +6,14 @@ import secrets
 import subprocess
 import sys
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import IO, List, Literal, Optional, Sequence
+from typing import IO, List, Literal, Optional, OrderedDict, Sequence, Union
 
 import click
 import inquirer
+import treelib
 from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
@@ -887,6 +889,61 @@ def logs(session_id):
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
+
+
+def make_dependency_tree(root_node: OrderedDict) -> treelib.Tree:
+    dependency_tree = treelib.Tree()
+
+    root_session_name = root_node["session_name"]
+    session_name_counter: defaultdict = defaultdict(lambda: 1)
+    session_name_counter[root_session_name] += 1
+
+    def get_task_name(session_name: str) -> str:
+        # job_name, task_name, hash_value
+        _, task_name, _ = session_name.split("-")
+        return task_name
+
+    def generate_node_id(session_name: str) -> str:
+        return "@".join([session_name, str(session_name_counter[session_name])])
+
+    dependency_tree.create_node(
+        get_task_name(root_session_name), generate_node_id(root_session_name)
+    )
+
+    def _make_dependency_tree(session_name: str, dependency_sessions: OrderedDict) -> None:
+        for dependency_session in dependency_sessions:
+            dependency_session_name = dependency_session["session_name"]
+            session_name_counter[dependency_session_name] += 1
+
+            dependency_tree.create_node(
+                get_task_name(dependency_session_name),
+                generate_node_id(dependency_session_name),
+                parent=generate_node_id(session_name),
+            )
+
+            _make_dependency_tree(dependency_session_name, dependency_session["depends_on"])
+
+    _make_dependency_tree(root_node["session_name"], root_node["depends_on"])
+    return dependency_tree
+
+
+@session.command("show-graph")
+@click.argument("session_id", metavar="SESSID")
+def show_dependency_graph(session_id: Union[uuid.UUID, str]):
+    """
+    Shows the dependency graph of a compute session.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    """
+    with Session() as session:
+        print_wait("Retrieving the session dependencies graph...")
+        print()
+
+        kernel = session.ComputeSession(str(session_id))
+        make_dependency_tree(kernel.get_dependency_graph()).show()
+
+        print_done("End of dependency graph.")
 
 
 @session.command("status-history")

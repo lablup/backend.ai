@@ -73,6 +73,7 @@ typing_extensions~=4.3
 uvloop>=0.17
 yarl>=1.7
 zipstream-new~=1.1.8
+treelib==1.6.1
 
 # required by ai.backend.test (integration test suite)
 pytest>=7.1.2

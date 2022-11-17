@@ -29,6 +29,7 @@ from typing import (
     Tuple,
     Union,
     cast,
+    get_args,
 )
 from urllib.parse import urlparse
 
@@ -113,6 +114,7 @@ from ..models import (
     query_accessible_vfolders,
     query_bootstrap_script,
     scaling_groups,
+    session_dependencies,
     session_templates,
     users,
     verify_vfolder_name,
@@ -2179,6 +2181,73 @@ async def shutdown_service(request: web.Request, params: Any) -> web.Response:
     return web.Response(status=204)
 
 
+async def find_dependency_sessions(
+    session_name_or_id: Union[uuid.UUID, str], db_connection: SAConnection, access_key: AccessKey
+):
+    session_infos = await match_session_ids(
+        session_name_or_id,
+        access_key=access_key,
+        db_connection=db_connection,
+    )
+
+    assert len(session_infos) >= 1, "session not found!"
+
+    session_id = session_infos[0].get("session_id")
+    session_name = session_infos[0].get("session_name")
+
+    assert isinstance(session_id, get_args(Union[uuid.UUID, str]))
+    assert isinstance(session_name, str)
+
+    query = (
+        sa.select([session_dependencies.c.depends_on])
+        .select_from(session_dependencies)
+        .where(session_dependencies.c.session_id == session_id)
+    )
+
+    session_info: Dict[str, Union[List, str]] = {
+        "session_id": str(session_id),
+        "session_name": session_name,
+        "depends_on": [],
+    }
+
+    dependency_sessions = await db_connection.execute(query)
+    dependency_session_ids = list(
+        map(lambda x: str(x.get("depends_on")), dependency_sessions.mappings().all())
+    )
+
+    session_info["depends_on"] = await asyncio.gather(
+        *map(
+            lambda dependency_session_id: asyncio.create_task(
+                find_dependency_sessions(dependency_session_id, db_connection, access_key)
+            ),
+            dependency_session_ids,
+        )
+    )
+
+    return session_info
+
+
+@server_status_required(READ_ALLOWED)
+@auth_required
+async def get_dependency_graph(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    root_session_name = request.match_info["session_name"]
+
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    log.info(
+        "SHOW_DEPENDENCY_GRAPH (ak:{0}/{1}, s:{2})",
+        requester_access_key,
+        owner_access_key,
+        root_session_name,
+    )
+
+    async with root_ctx.db.begin_readonly() as conn:
+        return web.json_response(
+            await find_dependency_sessions(root_session_name, conn, owner_access_key), status=200
+        )
+
+
 @server_status_required(READ_ALLOWED)
 @auth_required
 async def upload_files(request: web.Request) -> web.Response:
@@ -2617,4 +2686,5 @@ def create_app(
     cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
     cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
     cors.add(app.router.add_route("GET", "/{session_name}/abusing-report", get_abusing_report))
+    cors.add(app.router.add_route("GET", "/{session_name}/dependency-graph", get_dependency_graph))
     return app, []
