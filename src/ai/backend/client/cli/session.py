@@ -17,6 +17,7 @@ from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 from humanize import naturalsize
 from tabulate import tabulate
+from faker import Faker
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
@@ -24,7 +25,6 @@ from ai.backend.cli.types import ExitCode
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
 from ..func.session import ComputeSession
-from ..namegenerator import get_random_name
 from ..output.fields import session_fields
 from ..output.types import FieldSpec
 from ..session import AsyncSession, Session
@@ -257,7 +257,8 @@ def _create_cmd(docs: str = None):
                runtime or programming language.
         """
         if name is None:
-            name = get_random_name()
+            fake = Faker()
+            name = f"{fake.first_name()}_{fake.last_name()}".lower()
         else:
             name = name
 
