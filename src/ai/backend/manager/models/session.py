@@ -696,10 +696,12 @@ class ComputeSession(graphene.ObjectType):
         interfaces = (Item,)
 
     # identity
+    id = graphene.UUID()
+    session_id = graphene.UUID()  # identical to `id`
+    main_kernel_id = graphene.UUID()
     tag = graphene.String()
     name = graphene.String()
     type = graphene.String()
-    session_id = graphene.UUID()
 
     # image
     image = graphene.String()  # image for the main container
@@ -757,8 +759,9 @@ class ComputeSession(graphene.ObjectType):
         row = row.SessionRow
         return {
             # identity
+            "id": row.id,
             "session_id": row.id,
-            "id": row.main_kernel.id,
+            "main_kernel_id": row.main_kernel.id,
             "tag": row.tag,
             "name": row.name,
             "type": row.session_type.name,
@@ -838,17 +841,13 @@ class ComputeSession(graphene.ObjectType):
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeSession.by_dependency")
         return await loader.load(self.id)
 
-    async def resolve_commit_status(self, info: graphene.ResolveInfo) -> Optional[str]:
+    async def resolve_commit_status(self, info: graphene.ResolveInfo) -> str:
         graph_ctx: GraphQueryContext = info.context
-        if self.status != "RUNNING":
-            return None
         async with graph_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session_with_main_kernel(
-                self.id, self.access_key, db_session=db_sess
+            session: SessionRow = await SessionRow.get_session_with_main_kernel(
+                self.id, db_session=db_sess
             )
-        commit_status = await graph_ctx.registry.get_commit_status(
-            session,
-        )
+        commit_status = await graph_ctx.registry.get_commit_status(session)
         return commit_status["status"]
 
     async def resolve_abusing_reports(
@@ -1026,7 +1025,7 @@ class ComputeSession(graphene.ObjectType):
                 query,
                 cls,
                 session_ids,
-                lambda row: row["id"],
+                lambda row: row.id,
             )
 
     @classmethod
@@ -1052,7 +1051,7 @@ class ComputeSession(graphene.ObjectType):
                 query,
                 cls,
                 session_ids,
-                lambda row: row["id"],
+                lambda row: row.id,
             )
 
 

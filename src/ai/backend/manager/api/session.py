@@ -1996,11 +1996,13 @@ async def get_info(request: web.Request) -> web.Response:
         resp["occupiedSlots"] = str(sess.main_kernel.occupied_slots)  # legacy
         resp["occupyingSlots"] = str(sess.occupying_slots)
         resp["requestedSlots"] = str(sess.requested_slots)
-        resp["occupiedShares"] = str(sess.main_kernel.occupied_shares)
+        resp["occupiedShares"] = str(
+            sess.main_kernel.occupied_shares
+        )  # legacy, only caculate main kernel's occupying resource
         resp["environ"] = str(sess.environ)
 
         # Lifecycle
-        resp["status"] = sess.status.name  # "e.g. 'KernelStatus.RUNNING' -> 'RUNNING' "
+        resp["status"] = sess.status.name  # "e.g. 'SessionStatus.RUNNING' -> 'RUNNING' "
         resp["statusInfo"] = str(sess.status_info)
         resp["statusData"] = sess.status_data
         age = datetime.now(tzutc()) - sess.created_at

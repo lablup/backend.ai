@@ -1095,7 +1095,7 @@ class AgentRegistry:
         return slots
 
     async def finalize_running(self, created_info: Mapping[str, Any]) -> None:
-        async def _finalize_running() -> SessionId:
+        async def _finalize_running() -> Optional[SessionId]:
             # Record kernel access information
             try:
                 async with self.db.begin() as conn:
@@ -1110,7 +1110,7 @@ class AgentRegistry:
                         current_status is None
                         or KernelStatus.RUNNING not in KERNEL_STATUS_TRANSITION_MAP[current_status]
                     ):
-                        return
+                        return None
                     agent_host = URL(created_info["agent_addr"]).host
                     kernel_host = created_info.get("kernel_host", agent_host)
                     service_ports = created_info.get("service_ports", [])
@@ -1152,8 +1152,10 @@ class AgentRegistry:
                 raise
 
         session_id = await execute_with_retry(_finalize_running)
+        if session_id is None:
+            return None
 
-        async def _check_session():
+        async def _check_session() -> None:
             async with self.db.begin_session() as db_sess:
                 query = (
                     sa.select(SessionRow)
