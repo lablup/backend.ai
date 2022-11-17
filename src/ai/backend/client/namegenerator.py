@@ -354,7 +354,3 @@ right = [
 
 def get_random_name() -> str:
     return f"{random.choice(left)}_{random.choice(right)}"
-
-
-def duplicated_name(name: str) -> str:
-    return f"{name}{random.randrange(0, 10)}"

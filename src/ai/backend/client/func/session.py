@@ -31,7 +31,7 @@ from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE
 from ..exceptions import BackendClientError
-from ..namegenerator import duplicated_name, get_random_name
+from ..namegenerator import get_random_name
 from ..pagination import generate_paginated_results
 from ..request import (
     AttachedFile,
@@ -253,10 +253,7 @@ class ComputeSession(BaseFunction):
         if name is not None:
             assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
         else:
-            result = await ComputeSession.paginated_list(fields=[session_fields["name"]])
-            names = [item["name"] for item in result.items]
-            if (name := get_random_name()) in names:
-                name = duplicated_name(name)
+            name = get_random_name()
         if mounts is None:
             mounts = []
         if mount_map is None:

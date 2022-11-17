@@ -24,7 +24,7 @@ from ai.backend.cli.types import ExitCode
 from ..compat import asyncio_run
 from ..exceptions import BackendAPIError
 from ..func.session import ComputeSession
-from ..namegenerator import duplicated_name, get_random_name
+from ..namegenerator import get_random_name
 from ..output.fields import session_fields
 from ..output.types import FieldSpec
 from ..session import AsyncSession, Session
@@ -256,6 +256,10 @@ def _create_cmd(docs: str = None):
         IMAGE: The name (and version/platform tags appended after a colon) of session
                runtime or programming language.
         """
+        if name is None:
+            name = get_random_name()
+        else:
+            name = name
 
         ######
         envs = prepare_env_arg(env)
@@ -267,13 +271,6 @@ def _create_cmd(docs: str = None):
         assigned_agent_list = assign_agent
         with Session() as session:
             try:
-                if name is None:
-                    result = session.ComputeSession.paginated_list(fields=[session_fields["name"]])
-                    names = [item["name"] for item in result.items]
-                    if (name := get_random_name()) in names:
-                        name = duplicated_name(name)
-                else:
-                    name = name
                 compute_session = session.ComputeSession.get_or_create(
                     image,
                     name=name,
