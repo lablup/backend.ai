@@ -23,8 +23,8 @@ from uuid import UUID
 
 import aiohttp
 from aiohttp import hdrs
-from tqdm import tqdm
 from faker import Faker
+from tqdm import tqdm
 
 from ai.backend.client.output.fields import session_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
@@ -253,7 +253,7 @@ class ComputeSession(BaseFunction):
         if name is not None:
             assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
         else:
-            faker = Faker()
+            fake = Faker()
             name = f"{fake.first_name()}_{fake.last_name()}".lower()
         if mounts is None:
             mounts = []

@@ -15,9 +15,9 @@ import inquirer
 from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from faker import Faker
 from humanize import naturalsize
 from tabulate import tabulate
-from faker import Faker
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
