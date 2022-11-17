@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
@@ -35,7 +36,6 @@ from .base import (
     Base,
     BigInt,
     EnumType,
-    ForeignKeyIDColumn,
     Item,
     KernelIDColumn,
     PaginatedList,
@@ -291,8 +291,9 @@ kernels = sa.Table(
     sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False),
     sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False),
     sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key")),
+    # `image` is a string shaped "<REGISTRY>/<IMAGE>:<TAG>". it is identical to images.name column
     sa.Column("image", sa.String(length=512)),
-    ForeignKeyIDColumn("image_id", "images.id"),
+    # ForeignKeyIDColumn("image_id", "images.id"),
     sa.Column("architecture", sa.String(length=32), default="x86_64"),
     sa.Column("registry", sa.String(length=512)),
     sa.Column("tag", sa.String(length=64), nullable=True),
@@ -409,8 +410,12 @@ kernels = sa.Table(
 class KernelRow(Base):
     __table__ = kernels
     session = relationship("SessionRow", back_populates="kernels")
-    image_row = relationship("ImageRow", back_populates="kernels")
+    # image_row = relationship("ImageRow", back_populates="kernels")
     agent_row = relationship("AgentRow", back_populates="kernels")
+
+    @property
+    def image_ref(self) -> ImageRef:
+        return ImageRef(self.image, [self.registry], self.architecture)
 
 
 DEFAULT_KERNEL_ORDERING = [

@@ -505,13 +505,13 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
         # NOTE: We can reuse the session IDs of TERMINATED sessions only.
         # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
         async with root_ctx.db.begin_readonly_session() as db_sess:
-            sess = await SessionRow.get_session(
+            sess = await SessionRow.get_session_with_main_kernel(
                 params["session_name"],
                 owner_access_key,
                 db_session=db_sess,
             )
         running_image_ref = ImageRef(
-            sess.image, [sess.main_kernel.registry], sess.main_kernel.architecture
+            sess.main_kernel.image, [sess.main_kernel.registry], sess.main_kernel.architecture
         )
         if running_image_ref != requested_image_ref:
             # The image must be same if get_or_create() called multiple times
@@ -575,7 +575,6 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                     params["session_name"],
                     owner_access_key,
                     {
-                        "image_ref": requested_image_ref,
                         "creation_config": params["config"],
                         "kernel_configs": [
                             {
@@ -1102,9 +1101,6 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
         except AliasResolutionFailed:
             raise ImageNotFound("unknown alias or disallowed registry")
 
-        if node["cluster_role"] == DEFAULT_ROLE:
-            session_image_ref = requested_image_ref
-
         for i in range(node["replicas"]):
             kernel_config["cluster_idx"] = i + 1
             kernel_configs.append(
@@ -1130,7 +1126,6 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
                     params["session_name"],
                     owner_access_key,
                     {
-                        "image_ref": session_image_ref,
                         "creation_config": {
                             "mount_map": mount_map,
                             "environ": environ,
@@ -1985,8 +1980,8 @@ async def get_info(request: web.Request) -> web.Response:
         resp["domainName"] = sess.domain_name
         resp["groupId"] = str(sess.group_id)
         resp["userId"] = str(sess.user_uuid)
-        resp["lang"] = sess.image  # legacy
-        resp["image"] = sess.image
+        resp["lang"] = sess.main_kernel.image  # legacy
+        resp["image"] = sess.main_kernel.image
         resp["architecture"] = sess.main_kernel.architecture
         resp["registry"] = sess.main_kernel.registry
         resp["tag"] = sess.tag

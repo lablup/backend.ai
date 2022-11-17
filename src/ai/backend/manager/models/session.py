@@ -306,11 +306,11 @@ class SessionRow(Base):
     access_key = sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key"))
     access_key_row = relationship("KeyPairRow", back_populates="sessions")
 
-    # if image_id is null, should find a image field from related kernel row.
-    image_id = ForeignKeyIDColumn("image_id", "images.id")
-    # `image` column is identical to kernels `image` column.
-    image = sa.Column("image", sa.String(length=512))
-    image_row = relationship("ImageRow", back_populates="sessions")
+    # # if image_id is null, should find a image field from related kernel row.
+    # image_id = ForeignKeyIDColumn("image_id", "images.id")
+    # # `image` column is identical to kernels `image` column.
+    # image = sa.Column("image", sa.String(length=512))
+    # image_row = relationship("ImageRow", back_populates="sessions")
     tag = sa.Column("tag", sa.String(length=64), nullable=True)
 
     # Resource occupation
@@ -545,7 +545,6 @@ class SessionRow(Base):
             noload("*"),
             selectinload(kernel_rel).options(
                 noload("*"),
-                selectinload(KernelRow.image_row).noload("*"),
                 selectinload(KernelRow.agent_row).noload("*"),
             ),
         )
@@ -626,9 +625,7 @@ class SessionRow(Base):
                 selectinload(SessionRow.group).options(noload("*")),
                 selectinload(SessionRow.domain).options(noload("*")),
                 selectinload(SessionRow.access_key_row).options(noload("*")),
-                selectinload(SessionRow.kernels).options(
-                    noload("*"), selectinload(KernelRow.image_row).options(noload("*"))
-                ),
+                selectinload(SessionRow.kernels).options(noload("*")),
             )
         )
         result = await db_sess.execute(query)
@@ -696,7 +693,6 @@ class ComputeSession(graphene.ObjectType):
         interfaces = (Item,)
 
     # identity
-    id = graphene.UUID()
     session_id = graphene.UUID()  # identical to `id`
     main_kernel_id = graphene.UUID()
     tag = graphene.String()
@@ -767,7 +763,7 @@ class ComputeSession(graphene.ObjectType):
             "type": row.session_type.name,
             # image
             # "image": row.image_id,
-            "image": row.image,
+            "image": row.main_kernel.image,
             "architecture": row.main_kernel.architecture,
             "registry": row.main_kernel.registry,
             "cluster_template": None,  # TODO: implement

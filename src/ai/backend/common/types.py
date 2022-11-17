@@ -868,7 +868,6 @@ class KernelCreationConfig(TypedDict):
 
 
 class SessionEnqueueingConfig(TypedDict):
-    image_ref: ImageRef
     creation_config: dict
     kernel_configs: List[KernelEnqueueingConfig]
 

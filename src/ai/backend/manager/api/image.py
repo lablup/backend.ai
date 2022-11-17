@@ -414,7 +414,6 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
         session_id,
         access_key,
         {
-            "image_ref": importer_image,
             "creation_config": {
                 "scaling_group": params["launchOptions"]["scalingGroup"],
                 "environ": {

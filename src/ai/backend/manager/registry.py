@@ -510,9 +510,10 @@ class AgentRegistry:
 
         session_id = SessionId(uuid.uuid4())
 
-        kernel_enqueue_configs = session_enqueue_configs["kernel_configs"]
-        session_image_ref = session_enqueue_configs["image_ref"]
-        session_creation_config = session_enqueue_configs["creation_config"]
+        kernel_enqueue_configs: List[KernelEnqueueingConfig] = session_enqueue_configs[
+            "kernel_configs"
+        ]
+        session_creation_config: Mapping = session_enqueue_configs["creation_config"]
 
         # Check keypair resource limit
         if cluster_size > int(resource_policy["max_containers_per_session"]):
@@ -624,7 +625,6 @@ class AgentRegistry:
             "callback_url": callback_url,
             "occupying_slots": ResourceSlot(),
             "vfolder_mounts": vfolder_mounts,
-            "image": session_image_ref.canonical,
         }
 
         kernel_shared_data = {
@@ -806,7 +806,7 @@ class AgentRegistry:
                     if not kernel["cluster_hostname"]
                     else kernel["cluster_hostname"],
                     "image": image_ref.canonical,
-                    "image_id": image_row.id,
+                    # "image_id": image_row.id,
                     "architecture": image_ref.architecture,
                     "registry": image_ref.registry,
                     "startup_command": kernel.get("startup_command"),
@@ -920,20 +920,20 @@ class AgentRegistry:
         auto_pull = await self.shared_config.get_raw("config/docker/image/auto_pull")
 
         # Aggregate image registry information
-        keyfunc = lambda item: item.kernel.image_id
+        keyfunc = lambda item: item.kernel.image_ref
         image_infos: MutableMapping[str, ImageRow] = {}
         async with self.db.begin_readonly_session() as session:
-            for image_id, _ in itertools.groupby(
+            for image_ref, _ in itertools.groupby(
                 sorted(kernel_agent_bindings, key=keyfunc),
                 key=keyfunc,
             ):
-                img_query = sa.select(ImageRow).where(ImageRow.id == image_id)
-                img_row: ImageRow = (await session.execute(img_query)).scalars().first()
-                image_ref = img_row.image_ref
+                # img_query = sa.select(ImageRow).where(ImageRow.id == image_id)
+                # img_row: ImageRow = (await session.execute(img_query)).scalars().first()
+                # image_ref = img_row.image_ref
                 log.debug(
                     "start_session(): image ref => {} ({})", image_ref, image_ref.architecture
                 )
-                image_infos[image_id] = img_row
+                image_infos[str(image_ref)] = await ImageRow.resolve(session, [image_ref])
                 registry_url, registry_creds = await get_registry_info(
                     self.shared_config.etcd, image_ref.registry
                 )
@@ -1225,7 +1225,7 @@ class AgentRegistry:
         agent_alloc_ctx: AgentAllocationContext,
         scheduled_session: SessionRow,
         items: Sequence[KernelAgentBinding],
-        image_info,
+        image_info: Mapping[str, Any],
         cluster_info,
     ) -> None:
         loop = asyncio.get_running_loop()
@@ -1260,7 +1260,7 @@ class AgentRegistry:
                 self._post_kernel_creation_tasks[binding.kernel.id] = post_task
                 post_tasks.append(post_task)
             try:
-                get_image_ref = lambda k: image_infos[k.image_id].image_ref
+                get_image_ref = lambda k: image_infos[str(k.image_ref)].image_ref
                 # Issue a batched RPC call to create kernels on this agent
                 created_infos = await rpc.call.create_kernels(
                     kernel_creation_id,
@@ -1274,11 +1274,11 @@ class AgentRegistry:
                                     "url": str(registry_url),
                                     **registry_creds,  # type: ignore
                                 },
-                                "digest": image_infos[binding.kernel.image_id].config_digest,
+                                "digest": image_infos[binding.kernel.image].config_digest,
                                 "repo_digest": None,
                                 "canonical": get_image_ref(binding.kernel).canonical,
                                 "architecture": get_image_ref(binding.kernel).architecture,
-                                "labels": image_infos[binding.kernel.image_id].labels,
+                                "labels": image_infos[binding.kernel.image].labels,
                             },
                             "session_type": scheduled_session.session_type.value,
                             "cluster_role": binding.kernel.cluster_role,
@@ -1583,7 +1583,9 @@ class AgentRegistry:
     async def destroy_session_lowlevel(
         self,
         session_id: SessionId,
-        kernels: Sequence[Row],  # should have (id, agent, agent_addr, container_id) columns
+        kernels: Sequence[
+            Mapping[str, Any]
+        ],  # should have (id, agent, agent_addr, container_id) columns
     ) -> None:
         """
         Destroy the kernels that belongs the to given session unconditionally
@@ -1595,17 +1597,17 @@ class AgentRegistry:
             key=keyfunc,
         ):
             rpc_coros = []
-            destroyed_kernels = []
+            destroyed_kernels: List[Mapping[str, Any]] = []
             grouped_kernels = [*group_iterator]
-            kernel: KernelRow
+            kernel: Mapping[str, Any]
             for kernel in grouped_kernels:
-                if kernel.container_id is not None and kernel.agent_addr is not None:
+                if kernel.get("container_id") is not None and kernel.get("agent_addr") is not None:
                     destroyed_kernels.append(kernel)
             if not destroyed_kernels:
                 return
             async with RPCContext(
-                destroyed_kernels[0].agent,
-                destroyed_kernels[0].agent_addr,
+                destroyed_kernels[0]["agent"],
+                destroyed_kernels[0]["agent_addr"],
                 invoke_timeout=None,
                 order_key=str(session_id),
                 keepalive_timeout=self.rpc_keepalive_timeout,
@@ -1614,7 +1616,7 @@ class AgentRegistry:
                     # internally it enqueues a "destroy" lifecycle event.
                     rpc_coros.append(
                         rpc.call.destroy_kernel(
-                            str(kernel.id),
+                            str(kernel["id"]),
                             "failed-to-start",
                             suppress_events=True,
                         ),

@@ -483,7 +483,6 @@ class SchedulerDispatcher(aobject):
                         noload("*"),
                         selectinload(SessionRow.kernels).options(
                             noload("*"),
-                            selectinload(KernelRow.image_row).noload("*"),
                             selectinload(KernelRow.agent_row).noload("*"),
                         ),
                     ),
@@ -529,7 +528,7 @@ class SchedulerDispatcher(aobject):
         """
         log_fmt = _log_fmt.get("")
         log_args = _log_args.get(tuple())
-        requested_architectures = set(x.image_row.architecture for x in sess_ctx.kernels)
+        requested_architectures = set(k.image_ref.architecture for k in sess_ctx.kernels)
         if len(requested_architectures) > 1:
             raise GenericBadRequest(
                 "Cannot assign multiple kernels with different architecture"
@@ -543,7 +542,7 @@ class SchedulerDispatcher(aobject):
             raise InstanceNotAvailable(
                 extra_msg=(
                     f"No agents found to be compatible with the image acrhitecture "
-                    f"(image[0]: {sess_ctx.main_kernel.image_row.image_ref}, "
+                    f"(image[0]: {sess_ctx.main_kernel.image_ref}, "
                     f"arch: {requested_architecture})"
                 ),
             )
@@ -749,14 +748,14 @@ class SchedulerDispatcher(aobject):
                         compatible_candidate_agents = [
                             ag
                             for ag in candidate_agents
-                            if ag.architecture == kernel.image_row.architecture
+                            if ag.architecture == kernel.image_ref.architecture
                         ]
                         if not compatible_candidate_agents:
                             raise InstanceNotAvailable(
                                 extra_msg=(
                                     f"No agents found to be compatible with the image acrhitecture "
-                                    f"(image: {kernel.image_row.image_ref}, "
-                                    f"arch: {kernel.image_row.image_ref.architecture})"
+                                    f"(image: {kernel.image_ref}, "
+                                    f"arch: {kernel.image_ref.architecture})"
                                 ),
                             )
                         # Let the scheduler check the resource availability and decide the target agent
