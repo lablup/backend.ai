@@ -108,6 +108,7 @@ from .models import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     DEAD_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
+    KERNEL_STATUS_TRANSITION_MAP,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AgentRow,
     AgentStatus,
@@ -228,13 +229,12 @@ async def RPCContext(
         deserializer=msgpack.unpackb,
     )
     try:
-        with _timeout(invoke_timeout):
-            async with peer:
-                okey_token = peer.call.order_key.set("")
-                try:
-                    yield peer
-                finally:
-                    peer.call.order_key.reset(okey_token)
+        async with (_timeout(invoke_timeout), peer):
+            okey_token = peer.call.order_key.set("")
+            try:
+                yield peer
+            finally:
+                peer.call.order_key.reset(okey_token)
     except RPCUserError as orig_exc:
         raise AgentError(agent_id, orig_exc.name, orig_exc.repr, orig_exc.args)
     except Exception:
@@ -1084,12 +1084,106 @@ class AgentRegistry:
             for slot_name, allocation_by_device in alloc_map.items():
                 total_allocs: List[Decimal] = []
                 for allocation in allocation_by_device.values():
-                    if BinarySize.suffix_map.get(allocation[-1].lower()) is not None:
+                    if (
+                        isinstance(allocation, (BinarySize, str))
+                        and BinarySize.suffix_map.get(allocation[-1].lower()) is not None
+                    ):
                         total_allocs.append(Decimal(BinarySize.from_str(allocation)))
-                    else:
+                    else:  # maybe Decimal("Infinity"), etc.
                         total_allocs.append(Decimal(allocation))
                 slots[slot_name] = str(sum(total_allocs))
         return slots
+
+    async def finalize_running(self, created_info: Mapping[str, Any]) -> None:
+        async def _finalize_running() -> SessionId:
+            # Record kernel access information
+            try:
+                async with self.db.begin() as conn:
+                    kernel_query = (
+                        sa.select(kernels.c.status)
+                        .where(kernels.c.id == created_info["id"])
+                        .with_for_update(skip_locked=True)
+                    )
+                    current_status = (await conn.execute(kernel_query)).scalar()
+                    # current_status is None when kernel_query is locked by concurrent query.
+                    if (
+                        current_status is None
+                        or KernelStatus.RUNNING not in KERNEL_STATUS_TRANSITION_MAP[current_status]
+                    ):
+                        return
+                    agent_host = URL(created_info["agent_addr"]).host
+                    kernel_host = created_info.get("kernel_host", agent_host)
+                    service_ports = created_info.get("service_ports", [])
+                    # NOTE: created_info contains resource_spec
+                    values = {
+                        "scaling_group": created_info["scaling_group"],
+                        "status": KernelStatus.RUNNING,
+                        "container_id": created_info["container_id"],
+                        "occupied_shares": {},
+                        "attached_devices": created_info.get("attached_devices", {}),
+                        "kernel_host": kernel_host,
+                        "repl_in_port": created_info["repl_in_port"],
+                        "repl_out_port": created_info["repl_out_port"],
+                        "stdin_port": created_info["stdin_port"],
+                        "stdout_port": created_info["stdout_port"],
+                        "service_ports": service_ports,
+                        "status_history": sql_json_merge(
+                            kernels.c.status_history,
+                            (),
+                            {
+                                KernelStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
+                            },
+                        ),
+                    }
+                    actual_allocs = self.convert_resource_spec_to_resource_slot(
+                        created_info["resource_spec"]["allocations"]
+                    )
+                    values["occupied_slots"] = actual_allocs
+                    self._kernel_actual_allocated_resources[created_info["id"]] = actual_allocs
+                    update_query = (
+                        sa.update(kernels)
+                        .values(values)
+                        .where(kernels.c.id == created_info["id"])
+                        .returning(kernels.c.session_id)
+                    )
+                    return (await conn.execute(update_query)).first()["session_id"]
+            except Exception:
+                log.exception("error while executing _finalize_running")
+                raise
+
+        session_id = await execute_with_retry(_finalize_running)
+
+        async def _check_session():
+            async with self.db.begin_session() as db_sess:
+                query = (
+                    sa.select(SessionRow)
+                    .where(SessionRow.id == session_id)
+                    .options(selectinload(SessionRow.kernels))
+                )
+                result = await db_sess.execute(query)
+                session: SessionRow = result.scalars().first()
+                updated_sess_status = aggregate_kernel_status(
+                    session.kernels,
+                    KernelStatus.RUNNING,
+                )
+                if updated_sess_status != session.status:
+                    update_query = (
+                        sa.update(SessionRow)
+                        .where(SessionRow.id == session_id)
+                        .values(
+                            status=updated_sess_status,
+                            status_history=sql_json_merge(
+                                SessionRow.status_history,
+                                (),
+                                {
+                                    SessionStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
+                                },
+                            ),
+                        )
+                    )
+                    await db_sess.execute(update_query)
+
+        await execute_with_retry(_check_session)
 
     async def _post_create_kernel(
         self,
@@ -1109,86 +1203,14 @@ class AgentRegistry:
             log.exception("post_create_kernel(k:{}) unexpected error", kernel_id)
             return
         else:
+            await self.finalize_running(
+                {
+                    **created_info,
+                    "scaling_group": agent_alloc_ctx.scaling_group,
+                    "agent_addr": agent_alloc_ctx.agent_addr,
+                }
+            )
 
-            async def _finialize_running() -> SessionId:
-                # Record kernel access information
-                try:
-                    async with self.db.begin() as conn:
-                        agent_host = URL(agent_alloc_ctx.agent_addr).host
-                        kernel_host = created_info.get("kernel_host", agent_host)
-                        service_ports = created_info.get("service_ports", [])
-                        # NOTE: created_info contains resource_spec
-                        values = {
-                            "scaling_group": agent_alloc_ctx.scaling_group,
-                            "status": KernelStatus.RUNNING,
-                            "container_id": created_info["container_id"],
-                            "occupied_shares": {},
-                            "attached_devices": created_info.get("attached_devices", {}),
-                            "kernel_host": kernel_host,
-                            "repl_in_port": created_info["repl_in_port"],
-                            "repl_out_port": created_info["repl_out_port"],
-                            "stdin_port": created_info["stdin_port"],
-                            "stdout_port": created_info["stdout_port"],
-                            "service_ports": service_ports,
-                            "status_history": sql_json_merge(
-                                kernels.c.status_history,
-                                (),
-                                {
-                                    KernelStatus.RUNNING.name: datetime.now(tzutc()).isoformat(),
-                                },
-                            ),
-                        }
-                        actual_allocs = self.convert_resource_spec_to_resource_slot(
-                            created_info["resource_spec"]["allocations"]
-                        )
-                        values["occupied_slots"] = actual_allocs
-                        self._kernel_actual_allocated_resources[kernel_id] = actual_allocs
-                        update_query = (
-                            kernels.update()
-                            .values(values)
-                            .where(kernels.c.id == created_info["id"])
-                            .returning(kernels.c.session_id)
-                        )
-                        return (await conn.execute(update_query)).first()["session_id"]
-                except Exception:
-                    log.exception("error while executing _finalize_running")
-                    raise
-
-            session_id = await execute_with_retry(_finialize_running)
-
-            async def _check_session():
-                async with self.db.begin_session() as db_sess:
-                    query = (
-                        sa.select(SessionRow)
-                        .where(SessionRow.id == session_id)
-                        .options(selectinload(SessionRow.kernels))
-                    )
-                    result = await db_sess.execute(query)
-                    session: SessionRow = result.scalars().first()
-                    updated_sess_status = aggregate_kernel_status(
-                        session.kernels,
-                        KernelStatus.RUNNING,
-                    )
-                    if updated_sess_status != session.status:
-                        update_query = (
-                            sa.update(SessionRow)
-                            .where(SessionRow.id == session_id)
-                            .values(
-                                status=updated_sess_status,
-                                status_history=sql_json_merge(
-                                    SessionRow.status_history,
-                                    (),
-                                    {
-                                        SessionStatus.RUNNING.name: datetime.now(
-                                            tzutc()
-                                        ).isoformat(),
-                                    },
-                                ),
-                            )
-                        )
-                        await db_sess.execute(update_query)
-
-            await execute_with_retry(_check_session)
         finally:
             try:
                 await asyncio.sleep(1)
@@ -1279,6 +1301,8 @@ class AgentRegistry:
                             "internal_data": scheduled_session.main_kernel.internal_data,
                             "auto_pull": auto_pull,
                             "preopen_ports": scheduled_session.main_kernel.preopen_ports,
+                            "agent_addr": binding.agent_alloc_ctx.agent_addr,
+                            "scaling_group": binding.agent_alloc_ctx.scaling_group,
                         }
                         for binding in items
                     ],
@@ -1296,6 +1320,12 @@ class AgentRegistry:
                     kernel_id = KernelId(uuid.UUID(created_info["id"]))
                     self._post_kernel_creation_infos[kernel_id].set_result(created_info)
                 await asyncio.gather(*post_tasks, return_exceptions=True)
+            except (asyncio.TimeoutError, asyncio.CancelledError) as e:
+                for binding in items:
+                    kernel_id = binding.kernel.kernel_id
+                    self.kernel_creation_tracker[kernel_id].cancel()
+                    self._post_kernel_creation_infos[kernel_id].set_exception(e)
+                await asyncio.gather(*post_tasks, return_exceptions=True)
             except Exception as e:
                 # The agent has already cancelled or issued the destruction lifecycle event
                 # for this batch of kernels.
@@ -1303,6 +1333,23 @@ class AgentRegistry:
                     kernel_id = binding.kernel.id
                     self.kernel_creation_tracker[kernel_id].cancel()
                     self._post_kernel_creation_infos[kernel_id].set_exception(e)
+                    await self.set_kernel_status(
+                        kernel_id,
+                        KernelStatus.ERROR,
+                        f"other-error ({e!r})",
+                        extra_data={
+                            "agent": binding.agent_alloc_ctx.agent_id,
+                            "agent_addr": binding.agent_alloc_ctx.agent_addr,
+                            "scaling_group": binding.agent_alloc_ctx.scaling_group,
+                            "status_data": {
+                                "error": {
+                                    "src": "other",
+                                    "name": e.__class__.__name__,
+                                    "repr": repr(e),
+                                },
+                            },
+                        },
+                    )
                 await asyncio.gather(*post_tasks, return_exceptions=True)
                 raise
 
@@ -2460,6 +2507,8 @@ class AgentRegistry:
         kernel_id: KernelId,
         status: KernelStatus,
         reason: str = "",
+        *,
+        extra_data: Optional[Mapping[str, Any]] = None,
     ) -> None:
         assert status != KernelStatus.TERMINATED, (
             "TERMINATED status update must be handled in " "mark_kernel_terminated()"
@@ -2480,10 +2529,16 @@ class AgentRegistry:
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data["terminated_at"] = now
 
+        if extra_data is not None:
+            data = {**data, **extra_data}
+
         async def _update() -> None:
             async with self.db.begin() as conn:
-                query = sa.update(kernels).values(data).where(kernels.c.id == kernel_id)
-                await conn.execute(query)
+                kernel_query = sa.select([kernels.c.status]).where(kernels.c.id == kernel_id)
+                current_status = (await conn.execute(kernel_query)).scalar()
+                if status in KERNEL_STATUS_TRANSITION_MAP[current_status]:
+                    query = sa.update(kernels).values(data).where(kernels.c.id == kernel_id)
+                    await conn.execute(query)
 
         await execute_with_retry(_update)
 

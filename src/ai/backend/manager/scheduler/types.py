@@ -17,7 +17,7 @@ from typing import (
     Set,
 )
 
-import attr
+import attrs
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.engine.row import Row
@@ -58,14 +58,14 @@ def merge_resource(
             target[k] = update[k]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class AgentAllocationContext:
     agent_id: Optional[AgentId]
     agent_addr: str
     scaling_group: str
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class AgentContext:
     agent_id: AgentId
     agent_addr: str
@@ -75,13 +75,13 @@ class AgentContext:
     occupied_slots: ResourceSlot
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ScheduleDecision:
     agent_id: AgentId
     kernel_id: KernelId
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class SchedulingContext:
     """
     Context for each scheduling decision.
@@ -91,7 +91,7 @@ class SchedulingContext:
     known_slot_types: Mapping[SlotName, SlotTypes]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ExistingSession:
     kernels: List[KernelInfo]
     access_key: AccessKey
@@ -169,7 +169,7 @@ class ExistingSession:
         return list(items.values())
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class PendingSession:
     """
     Context for individual session-related information used during scheduling.
@@ -299,7 +299,7 @@ class PendingSession:
         return list(items.values())
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KernelInfo:
     """
     Representing invididual kernel info.
@@ -366,13 +366,13 @@ class KernelInfo:
         )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KernelAgentBinding:
     kernel: KernelRow
     agent_alloc_ctx: AgentAllocationContext
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class PredicateResult:
     passed: bool
     message: Optional[str] = None

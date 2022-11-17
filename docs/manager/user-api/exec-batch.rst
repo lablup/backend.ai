@@ -25,7 +25,7 @@ The path may be either absolute or relative, but only sub-directories under ``/h
 
    This API is for uploading frequently-changing source files in prior to batch-mode execution.
    All files uploaded via this API is deleted when the session terminates.
-   Use :doc:`virtual folders </user-api/vfolders>` to store and access larger, persistent,
+   Use :doc:`virtual folders <vfolders>` to store and access larger, persistent,
    static data and library files for your codes.
 
 .. warning::

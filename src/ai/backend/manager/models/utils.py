@@ -172,8 +172,8 @@ async def connect_database(
     db = create_async_engine(
         url,
         connect_args=pgsql_connect_opts,
-        pool_size=8,
-        max_overflow=64,
+        pool_size=local_config["db"]["pool-size"],
+        max_overflow=local_config["db"]["max-overflow"],
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
         isolation_level=isolation_level,
         future=True,

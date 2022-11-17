@@ -35,7 +35,7 @@ from urllib.parse import urlparse
 import aiohttp
 import aiohttp_cors
 import aiotools
-import attr
+import attrs
 import multidict
 import sqlalchemy as sa
 import sqlalchemy.exc
@@ -1491,6 +1491,7 @@ async def handle_kernel_creation_lifecycle(
             event.kernel_id, KernelStatus.PREPARING, event.reason
         )
     elif isinstance(event, KernelStartedEvent):
+        await root_ctx.registry.finalize_running(event.creation_info)
         # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
             tracker.set_result(None)
@@ -2534,7 +2535,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     return response
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     session_creation_tracker: Dict[str, asyncio.Event]
     pending_waits: Set[asyncio.Task[None]]

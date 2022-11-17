@@ -172,6 +172,8 @@ def local_config(
                 "name": test_db,
                 "user": "postgres",
                 "password": "develove",
+                "pool-size": 8,
+                "max-overflow": 64,
             },
             "manager": {
                 "id": f"i-{test_id}",
