@@ -25,7 +25,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -41,6 +41,8 @@ from ai.backend.manager.scheduler.drf import DRFScheduler
 from ai.backend.manager.scheduler.fifo import FIFOSlotScheduler, LIFOSlotScheduler
 from ai.backend.manager.scheduler.mof import MOFScheduler
 from ai.backend.manager.scheduler.predicates import check_reserved_batch_session
+
+ARCH_FOR_TEST = "x86_64"
 
 
 def test_load_intrinsic():
@@ -84,7 +86,7 @@ def example_agents():
         AgentRow(
             id=AgentId("i-001"),
             addr="10.0.1.1:6001",
-            architecture=DEFAULT_IMAGE_ARCH,
+            architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name1,
             available_slots=ResourceSlot(
                 {
@@ -106,7 +108,7 @@ def example_agents():
         AgentRow(
             id=AgentId("i-101"),
             addr="10.0.2.1:6001",
-            architecture=DEFAULT_IMAGE_ARCH,
+            architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name2,
             available_slots=ResourceSlot(
                 {
@@ -134,7 +136,7 @@ def example_mixed_agents():
         AgentRow(
             id=AgentId("i-gpu"),
             addr="10.0.1.1:6001",
-            architecture=DEFAULT_IMAGE_ARCH,
+            architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name1,
             available_slots=ResourceSlot(
                 {
@@ -154,7 +156,7 @@ def example_mixed_agents():
         AgentRow(
             id=AgentId("i-cpu"),
             addr="10.0.2.1:6001",
-            architecture=DEFAULT_IMAGE_ARCH,
+            architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name2,
             available_slots=ResourceSlot(
                 {
@@ -180,7 +182,7 @@ def example_agents_first_one_assigned():
         AgentRow(
             id=AgentId("i-001"),
             addr="10.0.1.1:6001",
-            architecture=DEFAULT_IMAGE_ARCH,
+            architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name1,
             available_slots=ResourceSlot(
                 {
@@ -202,7 +204,7 @@ def example_agents_first_one_assigned():
         AgentRow(
             id=AgentId("i-101"),
             addr="10.0.2.1:6001",
-            architecture=DEFAULT_IMAGE_ARCH,
+            architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name2,
             available_slots=ResourceSlot(
                 {
@@ -230,7 +232,7 @@ def example_agents_no_valid():
         AgentRow(
             id=AgentId("i-001"),
             addr="10.0.1.1:6001",
-            architecture=DEFAULT_IMAGE_ARCH,
+            architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name1,
             available_slots=ResourceSlot(
                 {
@@ -252,7 +254,7 @@ def example_agents_no_valid():
         AgentRow(
             id=AgentId("i-101"),
             addr="10.0.2.1:6001",
-            architecture=DEFAULT_IMAGE_ARCH,
+            architecture=ARCH_FOR_TEST,
             scaling_group=example_sgroup_name2,
             available_slots=ResourceSlot(
                 {
@@ -327,13 +329,13 @@ existing_session_kernel_ids = [
     ),
 ]
 
-common_image_ref = ImageRef("lablup/python:3.6-ubunt18.04", ["*"], architecture="aarch64")
+common_image_ref = ImageRef("lablup/python:3.6-ubunt18.04", ["*"], architecture=ARCH_FOR_TEST)
 common_image = ImageRow(
     name=common_image_ref.canonical,
     image=common_image_ref.name,
     tag=common_image_ref.tag,
     registry=common_image_ref.registry,
-    architecture=DEFAULT_IMAGE_ARCH,
+    architecture=ARCH_FOR_TEST,
 )
 
 _common_dummy_for_pending_session: Mapping[str, Any] = dict(
