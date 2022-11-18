@@ -60,7 +60,7 @@ if TYPE_CHECKING:
 
 
 __all__ = (
-    "aggregate_kernel_status",
+    "determine_session_status",
     "SessionStatus",
     "DEAD_SESSION_STATUSES",
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
@@ -78,6 +78,9 @@ class SessionStatus(enum.Enum):
     PENDING = 0
     # ---
     SCHEDULED = 5
+    # manager can set PENDING and SCHEDULED independently
+    # ---
+    PULLING = 9
     PREPARING = 10
     # ---
     RUNNING = 30
@@ -89,6 +92,18 @@ class SessionStatus(enum.Enum):
     ERROR = 42
     CANCELLED = 43
 
+
+FOLLOWING_SESSION_STATUSES = (
+    # Session statuses that need to wait all sibling kernel
+    SessionStatus.RUNNING,
+    SessionStatus.TERMINATED,
+)
+LEADING_SESSION_STATUSES = (
+    # Session statuses that declare first, do not need to wait any sibling kernel
+    s
+    for s in SessionStatus
+    if s not in FOLLOWING_SESSION_STATUSES
+)
 
 DEAD_SESSION_STATUSES = (
     SessionStatus.CANCELLED,
@@ -125,35 +140,168 @@ KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
     KernelStatus.SCHEDULED: SessionStatus.SCHEDULED,
     KernelStatus.PREPARING: SessionStatus.PREPARING,
     KernelStatus.BUILDING: SessionStatus.PREPARING,
-    KernelStatus.PULLING: SessionStatus.PREPARING,
+    KernelStatus.PULLING: SessionStatus.PULLING,
     KernelStatus.RUNNING: SessionStatus.RUNNING,
-    KernelStatus.RESTARTING: SessionStatus.RUNNING,
+    KernelStatus.RESTARTING: SessionStatus.RESTARTING,
     KernelStatus.RESIZING: SessionStatus.RUNNING,
-    KernelStatus.SUSPENDED: SessionStatus.RUNNING,
+    KernelStatus.SUSPENDED: SessionStatus.ERROR,
     KernelStatus.TERMINATING: SessionStatus.TERMINATING,
     KernelStatus.TERMINATED: SessionStatus.TERMINATED,
     KernelStatus.ERROR: SessionStatus.ERROR,
     KernelStatus.CANCELLED: SessionStatus.CANCELLED,
 }
 
+SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
+    SessionStatus.PENDING: {
+        s for s in SessionStatus if s not in (SessionStatus.PENDING, SessionStatus.TERMINATED)
+    },
+    SessionStatus.SCHEDULED: {
+        s
+        for s in SessionStatus
+        if s
+        not in (
+            SessionStatus.SCHEDULED,
+            SessionStatus.PENDING,
+            SessionStatus.TERMINATED,
+            SessionStatus.CANCELLED,
+        )
+    },
+    SessionStatus.PULLING: {
+        s
+        for s in SessionStatus
+        if s
+        not in (
+            SessionStatus.PULLING,
+            SessionStatus.PENDING,
+            SessionStatus.SCHEDULED,
+            SessionStatus.TERMINATING,  # cannot destroy PULLING session
+            SessionStatus.TERMINATED,
+            SessionStatus.CANCELLED,
+        )
+    },
+    SessionStatus.PREPARING: {
+        s
+        for s in SessionStatus
+        if s
+        not in (
+            SessionStatus.PREPARING,
+            SessionStatus.PENDING,
+            SessionStatus.SCHEDULED,
+            SessionStatus.TERMINATED,
+            SessionStatus.CANCELLED,
+        )
+    },
+    SessionStatus.RUNNING: {
+        SessionStatus.RESTARTING,
+        SessionStatus.TERMINATING,
+        SessionStatus.ERROR,
+    },
+    SessionStatus.RESTARTING: {
+        s
+        for s in SessionStatus
+        if s
+        not in (
+            SessionStatus.RESTARTING,
+            SessionStatus.PENDING,
+            SessionStatus.SCHEDULED,
+            SessionStatus.TERMINATED,
+            SessionStatus.CANCELLED,
+        )
+    },
+    SessionStatus.RUNNING_DEGRADED: {
+        s
+        for s in SessionStatus
+        if s
+        not in (
+            SessionStatus.PENDING,
+            SessionStatus.SCHEDULED,
+            SessionStatus.TERMINATED,
+            SessionStatus.CANCELLED,
+        )
+    },
+    SessionStatus.TERMINATING: {SessionStatus.TERMINATED, SessionStatus.ERROR},
+    SessionStatus.TERMINATED: set(),
+    SessionStatus.ERROR: set(),
+    SessionStatus.CANCELLED: set(),
+}
 
-def aggregate_kernel_status(
-    kernels: Sequence[KernelRow], target_status: KernelStatus
-) -> SessionStatus:
-    candidate: SessionStatus = KERNEL_SESSION_STATUS_MAPPING[target_status]
-    priority_statuses = [status for status in KernelStatus if status.value < target_status.value]
-    for s in kernels:
-        if s.status == KernelStatus.ERROR:
-            if s.cluster_role == DEFAULT_ROLE:
-                return SessionStatus.ERROR
-            return SessionStatus.RUNNING_DEGRADED
-        elif s.status in priority_statuses:
-            candidate = KERNEL_SESSION_STATUS_MAPPING[s]
-        elif s.status == target_status:
-            continue
-        else:
-            # TODO: handle unexpected kernel status
-            pass
+
+def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionStatus:
+    try:
+        main_kern_status = [k.status for k in sibling_kernels if k.cluster_role == DEFAULT_ROLE][0]
+    except IndexError:
+        raise MainKernelNotFound("Cannot determine session status without status of main kernel")
+    candidate: SessionStatus = KERNEL_SESSION_STATUS_MAPPING[main_kern_status]
+    if candidate in LEADING_SESSION_STATUSES:
+        return candidate
+    for k in sibling_kernels:
+        match candidate:
+            case SessionStatus.RUNNING:
+                match k.status:
+                    case (
+                        KernelStatus.PENDING
+                        | KernelStatus.SCHEDULED
+                        | KernelStatus.SUSPENDED
+                        | KernelStatus.TERMINATED
+                        | KernelStatus.CANCELLED
+                    ):
+                        # should not be it
+                        pass
+                    case KernelStatus.BUILDING:
+                        continue
+                    case KernelStatus.PULLING:
+                        candidate = SessionStatus.PULLING
+                    case KernelStatus.PREPARING:
+                        candidate = SessionStatus.PREPARING
+                    case (KernelStatus.RUNNING | KernelStatus.RESTARTING | KernelStatus.RESIZING):
+                        continue
+                    case KernelStatus.TERMINATING | KernelStatus.ERROR:
+                        candidate = SessionStatus.RUNNING_DEGRADED
+            case SessionStatus.TERMINATED:
+                match k.status:
+                    case KernelStatus.PENDING | KernelStatus.CANCELLED:
+                        # should not be it
+                        pass
+                    case (
+                        KernelStatus.SCHEDULED
+                        | KernelStatus.PREPARING
+                        | KernelStatus.BUILDING
+                        | KernelStatus.PULLING
+                        | KernelStatus.RUNNING
+                        | KernelStatus.RESTARTING
+                        | KernelStatus.RESIZING
+                        | KernelStatus.SUSPENDED
+                    ):
+                        pass
+                    case KernelStatus.TERMINATING:
+                        candidate = SessionStatus.TERMINATING
+                    case KernelStatus.TERMINATED:
+                        continue
+                    case KernelStatus.ERROR:
+                        return SessionStatus.ERROR
+            case SessionStatus.RUNNING_DEGRADED:
+                match k.status:
+                    case (
+                        KernelStatus.PENDING
+                        | KernelStatus.SCHEDULED
+                        | KernelStatus.PREPARING
+                        | KernelStatus.BUILDING
+                        | KernelStatus.PULLING
+                        | KernelStatus.RESIZING
+                        | KernelStatus.SUSPENDED
+                        | KernelStatus.CANCELLED
+                    ):
+                        # should not be it
+                        pass
+                    case (
+                        KernelStatus.RUNNING
+                        | KernelStatus.RESTARTING
+                        | KernelStatus.ERROR
+                        | KernelStatus.TERMINATING
+                    ):
+                        continue
+            case _:
+                break
     return candidate
 
 

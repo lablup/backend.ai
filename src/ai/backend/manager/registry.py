@@ -122,7 +122,7 @@ from .models import (
     SessionStatus,
     UserRow,
     agents,
-    aggregate_kernel_status,
+    determine_session_status,
     kernels,
     prepare_dotfiles,
     prepare_vfolder_mounts,
@@ -1166,10 +1166,7 @@ class AgentRegistry:
                 )
                 result = await db_sess.execute(query)
                 session: SessionRow = result.scalars().first()
-                updated_sess_status = aggregate_kernel_status(
-                    session.kernels,
-                    KernelStatus.RUNNING,
-                )
+                updated_sess_status = determine_session_status(session.kernels)
                 if updated_sess_status != session.status:
                     update_query = (
                         sa.update(SessionRow)
@@ -2713,7 +2710,7 @@ class AgentRegistry:
                     session_id, allow_stale=True, db_session=db_sess
                 )
                 sibling_kernels = session.kernels
-                sess_status = aggregate_kernel_status(sibling_kernels, KernelStatus.TERMINATED)
+                sess_status = determine_session_status(sibling_kernels)
                 now = datetime.now(tzutc())
                 if sess_status != session.status:
                     values = {

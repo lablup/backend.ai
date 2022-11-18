@@ -80,6 +80,7 @@ class KernelStatus(enum.Enum):
     PENDING = 0
     # ---
     SCHEDULED = 5
+    # PENDING and SCHEDULED are not necessary anymore
     PREPARING = 10
     # ---
     BUILDING = 20
