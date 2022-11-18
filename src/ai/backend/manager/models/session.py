@@ -62,6 +62,7 @@ if TYPE_CHECKING:
 __all__ = (
     "determine_session_status",
     "SessionStatus",
+    "SESSION_STATUS_TRANSITION_MAP",
     "DEAD_SESSION_STATUSES",
     "AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES",
     "USER_RESOURCE_OCCUPYING_SESSION_STATUSES",
@@ -194,6 +195,7 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
     SessionStatus.RUNNING: {
         SessionStatus.RESTARTING,
         SessionStatus.TERMINATING,
+        SessionStatus.TERMINATED,
         SessionStatus.ERROR,
     },
     SessionStatus.RESTARTING: {

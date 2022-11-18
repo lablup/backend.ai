@@ -109,6 +109,7 @@ from .models import (
     DEAD_KERNEL_STATUSES,
     DEAD_SESSION_STATUSES,
     KERNEL_STATUS_TRANSITION_MAP,
+    SESSION_STATUS_TRANSITION_MAP,
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     AgentRow,
     AgentStatus,
@@ -1167,7 +1168,7 @@ class AgentRegistry:
                 result = await db_sess.execute(query)
                 session: SessionRow = result.scalars().first()
                 updated_sess_status = determine_session_status(session.kernels)
-                if updated_sess_status != session.status:
+                if updated_sess_status in SESSION_STATUS_TRANSITION_MAP[session.status]:
                     update_query = (
                         sa.update(SessionRow)
                         .where(SessionRow.id == session_id)
@@ -2712,7 +2713,7 @@ class AgentRegistry:
                 sibling_kernels = session.kernels
                 sess_status = determine_session_status(sibling_kernels)
                 now = datetime.now(tzutc())
-                if sess_status != session.status:
+                if sess_status in SESSION_STATUS_TRANSITION_MAP[session.status]:
                     values = {
                         "status": sess_status,
                         "status_info": reason,
