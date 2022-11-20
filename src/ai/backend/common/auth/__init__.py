@@ -20,6 +20,8 @@ class ManagerAuthHandler(AbstractClientAuthenticator):
     async def server_public_key(self) -> bytes:
         # TODO: load per-agent public key from database
         #       (need to extend the "agents" table)
+        # NOTE: we need to use contextvars to localize the target agent
+        #       without altering the authenticator interface.
         # TODO: implement the per-agent certificate mgmt UI
         pub, _ = load_certificate("fixtures/agent/agent.key")
         return pub
