@@ -232,6 +232,7 @@ ssl-verify = true
 "aiotools" = "INFO"
 "aiohttp" = "INFO"
 "ai.backend" = "INFO"
+# "callosum.lower.zeromq" = "DEBUG"  # for details of RPC auth & logs
 
 
 [resource]
