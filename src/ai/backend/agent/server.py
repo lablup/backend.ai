@@ -46,6 +46,7 @@ from setproctitle import setproctitle
 from trafaret.dataerror import DataError as TrafaretDataError
 
 from ai.backend.common import config, identity, msgpack, utils
+from ai.backend.common.auth import AgentAuthHandler
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events import EventProducer
@@ -227,6 +228,7 @@ class AgentRPCServer(aobject):
         self.rpc_server = Peer(
             bind=ZeroMQAddress(f"tcp://{rpc_addr}"),
             transport=ZeroMQRPCTransport,
+            authenticator=AgentAuthHandler("local"),
             scheduler=ExitOrderedAsyncScheduler(),
             serializer=msgpack.packb,
             deserializer=msgpack.unpackb,

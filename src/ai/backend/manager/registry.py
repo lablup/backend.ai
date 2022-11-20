@@ -51,6 +51,7 @@ from sqlalchemy.sql.expression import true
 from yarl import URL
 
 from ai.backend.common import msgpack, redis_helper
+from ai.backend.common.auth import ManagerAuthHandler
 from ai.backend.common.docker import ImageRef, get_known_registries, get_registry_info
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -212,6 +213,7 @@ async def RPCContext(
     peer = PeerInvoker(
         connect=ZeroMQAddress(addr),
         transport=ZeroMQRPCTransport,
+        authenticator=ManagerAuthHandler("local"),
         transport_opts={
             "zsock_opts": {
                 zmq.TCP_KEEPALIVE: 1,
