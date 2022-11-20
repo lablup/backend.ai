@@ -11,12 +11,16 @@ from zmq.auth.certs import load_certificate
 class ManagerAuthHandler(AbstractClientAuthenticator):
     def __init__(self, domain: str) -> None:
         self.domain = domain
-        pub, priv = load_certificate("fixtures/manager/manager.key_secret")
-        self.manager_pub_id = pub
-        self.manager_id = priv
+        # TODO: load manager identity from a local certificate
+        # TODO: expose the manager certificate in the admin UI
+        self.manager_pub_id, self.manager_id = load_certificate(
+            "fixtures/manager/manager.key_secret"
+        )
 
     async def server_public_key(self) -> bytes:
         # TODO: load per-agent public key from database
+        #       (need to extend the "agents" table)
+        # TODO: implement the per-agent certificate mgmt UI
         pub, _ = load_certificate("fixtures/agent/agent.key")
         return pub
 
@@ -31,7 +35,9 @@ class ManagerAuthHandler(AbstractClientAuthenticator):
 class AgentAuthHandler(AbstractServerAuthenticator):
     def __init__(self, domain: str) -> None:
         self.domain = domain
+        # TODO: load known manager public key from local_config
         self.manager_pub_id, _ = load_certificate("fixtures/manager/manager.key")
+        # TODO: load agent identity from a local certificate
         self.agent_pub_id, self.agent_id = load_certificate("fixtures/agent/agent.key_secret")
 
     async def server_public_key(self) -> bytes:
