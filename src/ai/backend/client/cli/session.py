@@ -891,24 +891,34 @@ def logs(session_id):
             sys.exit(ExitCode.FAILURE)
 
 
-def make_dependency_tree(root_node: OrderedDict) -> treelib.Tree:
+def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
     dependency_tree = treelib.Tree()
 
     root_session_name = root_node["session_name"]
     session_name_counter: defaultdict = defaultdict(lambda: 1)
     session_name_counter[root_session_name] += 1
 
-    def get_task_name(session_name: str) -> str:
-        # job_name, task_name, hash_value
-        _, task_name, _ = session_name.split("-")
-        return task_name
+    def discard_below_dot(time_str: str) -> str:
+        return time_str.split(".")[0]
 
-    def generate_node_id(session_name: str) -> str:
+    def get_node_name(session: OrderedDict) -> str:
+        # job_name, task_name, hash_value
+        _, task_name, _ = session["session_name"].split("-")
+        status = session["status"].split("KernelStatus.")[1]
+        delta = ""
+
+        if session["status_changed"] != "None":
+            status_changed = datetime.strptime(
+                discard_below_dot(session["status_changed"]), "%Y-%m-%d %H:%M:%S"
+            )
+            delta = f" {discard_below_dot(str(datetime.now() - status_changed))} ago"
+
+        return f'{task_name} ("{status}"{delta})'
+
+    def get_node_id(session_name: str) -> str:
         return "@".join([session_name, str(session_name_counter[session_name])])
 
-    dependency_tree.create_node(
-        get_task_name(root_session_name), generate_node_id(root_session_name)
-    )
+    dependency_tree.create_node(get_node_name(root_node), get_node_id(root_session_name))
 
     def construct_dependency_tree(session_name: str, dependency_sessions: OrderedDict) -> None:
         for dependency_session in dependency_sessions:
@@ -916,9 +926,9 @@ def make_dependency_tree(root_node: OrderedDict) -> treelib.Tree:
             session_name_counter[dependency_session_name] += 1
 
             dependency_tree.create_node(
-                get_task_name(dependency_session_name),
-                generate_node_id(dependency_session_name),
-                parent=generate_node_id(session_name),
+                get_node_name(dependency_session),
+                get_node_id(dependency_session_name),
+                parent=get_node_id(session_name),
             )
 
             construct_dependency_tree(dependency_session_name, dependency_session["depends_on"])
@@ -941,9 +951,9 @@ def show_dependency_graph(session_id: Union[uuid.UUID, str]):
         print()
 
         kernel = session.ComputeSession(str(session_id))
-        make_dependency_tree(kernel.get_dependency_graph()).show()
+        get_dependency_session_tree(kernel.get_dependency_graph()).show()
 
-        print_done("End of dependency graph.")
+        print_done("End of session dependencies graph.")
 
 
 @session.command("status-history")

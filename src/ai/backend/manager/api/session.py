@@ -2203,22 +2203,48 @@ async def find_dependency_sessions(
         assert isinstance(session_id, get_args(Union[uuid.UUID, str]))
         assert isinstance(session_name, str)
 
-        query = (
-            sa.select([session_dependencies.c.depends_on])
+        session_dependency_query = (
+            sa.select(
+                [
+                    session_dependencies.c.depends_on,
+                ]
+            )
             .select_from(session_dependencies)
             .where(session_dependencies.c.session_id == session_id)
+        )
+
+        kernel_query = (
+            sa.select(
+                [
+                    kernels.c.status,
+                    kernels.c.status_changed,
+                ]
+            )
+            .select_from(kernels)
+            .where(kernels.c.session_id == session_id)
+        )
+
+        session_dependency_query_result, kernel_query_result = list(
+            map(
+                lambda result: result.mappings().all(),
+                await asyncio.gather(
+                    db_connection.execute(session_dependency_query),
+                    db_connection.execute(kernel_query),
+                ),
+            )
+        )
+
+        dependency_session_ids = list(
+            map(lambda x: str(x.get("depends_on")), session_dependency_query_result)
         )
 
         session_info: Dict[str, Union[List, str]] = {
             "session_id": session_id,
             "session_name": session_name,
+            "status": str(kernel_query_result[0].get("status")),
+            "status_changed": str(kernel_query_result[0].get("status_changed")),
             "depends_on": [],
         }
-
-        dependency_sessions = await db_connection.execute(query)
-        dependency_session_ids = list(
-            map(lambda x: str(x.get("depends_on")), dependency_sessions.mappings().all())
-        )
 
         if dependency_session_cache.get(session_id):
             session_info["depends_on"] = dependency_session_cache[session_id]
