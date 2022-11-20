@@ -2182,49 +2182,61 @@ async def shutdown_service(request: web.Request, params: Any) -> web.Response:
 
 
 async def find_dependency_sessions(
-    session_name_or_id: Union[uuid.UUID, str], db_connection: SAConnection, access_key: AccessKey
+    root_session_name_or_id: Union[uuid.UUID, str],
+    db_connection: SAConnection,
+    access_key: AccessKey,
 ):
-    session_infos = await match_session_ids(
-        session_name_or_id,
-        access_key=access_key,
-        db_connection=db_connection,
-    )
+    dependency_session_cache: Dict[str, List] = {}
 
-    assert len(session_infos) >= 1, "session not found!"
-
-    session_id = session_infos[0].get("session_id")
-    session_name = session_infos[0].get("session_name")
-
-    assert isinstance(session_id, get_args(Union[uuid.UUID, str]))
-    assert isinstance(session_name, str)
-
-    query = (
-        sa.select([session_dependencies.c.depends_on])
-        .select_from(session_dependencies)
-        .where(session_dependencies.c.session_id == session_id)
-    )
-
-    session_info: Dict[str, Union[List, str]] = {
-        "session_id": str(session_id),
-        "session_name": session_name,
-        "depends_on": [],
-    }
-
-    dependency_sessions = await db_connection.execute(query)
-    dependency_session_ids = list(
-        map(lambda x: str(x.get("depends_on")), dependency_sessions.mappings().all())
-    )
-
-    session_info["depends_on"] = await asyncio.gather(
-        *map(
-            lambda dependency_session_id: asyncio.create_task(
-                find_dependency_sessions(dependency_session_id, db_connection, access_key)
-            ),
-            dependency_session_ids,
+    async def _find_dependency_sessions(session_name_or_id: Union[uuid.UUID, str]):
+        session_infos = await match_session_ids(
+            session_name_or_id,
+            access_key=access_key,
+            db_connection=db_connection,
         )
-    )
 
-    return session_info
+        assert len(session_infos) >= 1, "session not found!"
+
+        session_id = str(session_infos[0].get("session_id"))
+        session_name = session_infos[0].get("session_name")
+
+        assert isinstance(session_id, get_args(Union[uuid.UUID, str]))
+        assert isinstance(session_name, str)
+
+        query = (
+            sa.select([session_dependencies.c.depends_on])
+            .select_from(session_dependencies)
+            .where(session_dependencies.c.session_id == session_id)
+        )
+
+        session_info: Dict[str, Union[List, str]] = {
+            "session_id": session_id,
+            "session_name": session_name,
+            "depends_on": [],
+        }
+
+        dependency_sessions = await db_connection.execute(query)
+        dependency_session_ids = list(
+            map(lambda x: str(x.get("depends_on")), dependency_sessions.mappings().all())
+        )
+
+        if dependency_session_cache.get(session_id):
+            session_info["depends_on"] = dependency_session_cache[session_id]
+            return session_info
+
+        session_info["depends_on"] = await asyncio.gather(
+            *map(
+                lambda dependency_session_id: asyncio.create_task(
+                    _find_dependency_sessions(dependency_session_id)
+                ),
+                dependency_session_ids,
+            )
+        )
+
+        dependency_session_cache[session_id] = cast(List, session_info["depends_on"])
+        return session_info
+
+    return await _find_dependency_sessions(root_session_name_or_id)
 
 
 @server_status_required(READ_ALLOWED)

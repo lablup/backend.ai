@@ -910,7 +910,7 @@ def make_dependency_tree(root_node: OrderedDict) -> treelib.Tree:
         get_task_name(root_session_name), generate_node_id(root_session_name)
     )
 
-    def _make_dependency_tree(session_name: str, dependency_sessions: OrderedDict) -> None:
+    def construct_dependency_tree(session_name: str, dependency_sessions: OrderedDict) -> None:
         for dependency_session in dependency_sessions:
             dependency_session_name = dependency_session["session_name"]
             session_name_counter[dependency_session_name] += 1
@@ -921,9 +921,9 @@ def make_dependency_tree(root_node: OrderedDict) -> treelib.Tree:
                 parent=generate_node_id(session_name),
             )
 
-            _make_dependency_tree(dependency_session_name, dependency_session["depends_on"])
+            construct_dependency_tree(dependency_session_name, dependency_session["depends_on"])
 
-    _make_dependency_tree(root_node["session_name"], root_node["depends_on"])
+    construct_dependency_tree(root_node["session_name"], root_node["depends_on"])
     return dependency_tree
 
 
