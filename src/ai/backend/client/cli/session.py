@@ -891,6 +891,43 @@ def logs(session_id):
             sys.exit(ExitCode.FAILURE)
 
 
+def get_dependency_session_table(root_node: OrderedDict) -> List[OrderedDict]:
+    result = []
+    visited = {}
+
+    # Topological sort using DFS
+    def dfs(session: OrderedDict):
+        visited[session["session_id"]] = True
+        for dependency_session in session["depends_on"]:
+            if not visited.get(dependency_session["session_id"]):
+                dfs(dependency_session)
+
+        result.append(session)
+
+    dfs(root_node)
+    return result
+
+
+def show_dependency_session_table(root_node: OrderedDict) -> None:
+    table = get_dependency_session_table(root_node)
+    header_keys = ["session_name", "session_id", "status", "status_changed"]
+
+    print(
+        tabulate(
+            [
+                header_keys,
+                *map(
+                    lambda item: [
+                        *map(lambda key: item[key], header_keys),
+                    ],
+                    table,
+                ),
+            ],
+            headers="firstrow",
+        )
+    )
+
+
 def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
     dependency_tree = treelib.Tree()
 
@@ -939,19 +976,25 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
 
 @session.command("show-graph")
 @click.argument("session_id", metavar="SESSID")
-def show_dependency_graph(session_id: Union[uuid.UUID, str]):
+@click.option("--table", "-t", is_flag=True, help="Show the dependency graph as a form of table.")
+def show_dependency_graph(session_id: Union[uuid.UUID, str], table: bool):
     """
     Shows the dependency graph of a compute session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
     """
+
     with Session() as session:
         print_wait("Retrieving the session dependencies graph...")
         print()
 
         kernel = session.ComputeSession(str(session_id))
-        get_dependency_session_tree(kernel.get_dependency_graph()).show()
+
+        if table:
+            show_dependency_session_table(kernel.get_dependency_graph())
+        else:
+            get_dependency_session_tree(kernel.get_dependency_graph()).show()
 
         print_done("End of session dependencies graph.")
 
