@@ -15,17 +15,17 @@ jobs:
         fetch-depth: 2
     - name: Apply cache for Pants
       uses: actions/cache@v3
-      id: cache
       with:
         # pants-specific cache
         path: |
           ~/.cache/pants/setup
           ~/.cache/pants/lmdb_store
           ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
+        key: pants-${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -69,17 +69,17 @@ jobs:
         fetch-depth: 2
     - name: Apply cache for Pants
       uses: actions/cache@v3
-      id: cache
       with:
         # pants-specific cache
         path: |
           ~/.cache/pants/setup
           ~/.cache/pants/lmdb_store
           ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
+        key: pants-${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -121,14 +121,13 @@ jobs:
         submodules: true
     - name: Apply cache for Pants
       uses: actions/cache@v3
-      id: cache
       with:
         # pants-specific cache
         path: |
           ~/.cache/pants/setup
           ~/.cache/pants/lmdb_store
           ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
+        key: pants-${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -142,6 +141,7 @@ jobs:
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -160,7 +160,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants test --changed-since=$BASE_REF --changed-dependees=transitive
+        ./pants test --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -201,6 +201,7 @@ jobs:
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
       uses: actions/setup-python@v4

@@ -113,27 +113,21 @@ Install the followings accordingly to your host operating system.
 
 * `pyenv <https://github.com/pyenv/pyenv>`_ and `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_
 
-  - Ensure that you have the Python version specified in ``pants.toml`` on your ``PATH``.
+  - Ensure that you have all of the Python versions specified in ``pants.toml`` with ``pyenv``.
+    (both Python 3.9.x and Python 3.10.8 at the time of writing, but please consult your copy of ``pants.toml`` for the latest information)
 
-  - Depending on your Linux Distribution, you may have to additionally install a sysmte package that enables Python's `pip` command.
-
-    * Ubuntu
-
-      .. code-block:: console
-
-         $ sudo apt install python3-pip
-
-    * Fedora Core & CentOS
-
-      .. code-block:: console
-
-         $ sudo dnf install python3-pip
+  - `Check the prerequisites for Python build environment setup for your system. <https://github.com/pyenv/pyenv/wiki#suggested-build-environment>`_
 
 * `Docker <https://docs.docker.com/install/>`_
 
 * `Docker Compose <https://docs.docker.com/compose/install/>`_ (v2 required)
 
-* `Rust <https://rustup.rs/>`_ (for bootstrapping Pants)
+* (For Linux aarch64/arm64 setups only) `Rust <https://rustup.rs/>`_ to build Pants from its source
+
+.. warning::
+
+   To avoid conflicts with your system Python such as macOS/XCode versions,
+   our default ``pants.toml`` is configured to search only ``pyenv``-provided Python versions.
 
 .. note::
 

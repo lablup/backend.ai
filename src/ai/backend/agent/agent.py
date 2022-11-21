@@ -45,7 +45,7 @@ from typing import (
 from uuid import UUID
 
 import aiotools
-import attr
+import attrs
 import pkg_resources
 import snappy
 import zmq
@@ -494,14 +494,14 @@ KernelCreationContextType = TypeVar(
 )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class RestartTracker:
     request_lock: asyncio.Lock
     destroy_event: asyncio.Event
     done_event: asyncio.Event
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ComputerContext:
     instance: AbstractComputePlugin
     devices: Collection[AbstractComputeDevice]
@@ -522,7 +522,6 @@ class AbstractAgent(
     port_pool: Set[int]
 
     redis: Redis
-    zmq_ctx: zmq.asyncio.Context
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
     terminating_kernels: Set[KernelId]
@@ -593,8 +592,6 @@ class AbstractAgent(
         self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
 
-        self.zmq_ctx = zmq.asyncio.Context()
-
         resources_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers, self.slots = await self.detect_resources()
         for name, computer in computers.items():
@@ -664,8 +661,6 @@ class AbstractAgent(
         await self.event_producer.close()
         await self.redis_stream_pool.close()
         await self.redis_stat_pool.close()
-
-        self.zmq_ctx.term()
 
     async def produce_event(self, event: AbstractEvent) -> None:
         """
@@ -952,7 +947,7 @@ class AbstractAgent(
                 if isinstance(ev, Sentinel):
                     await self.save_last_registry(force=True)
                     return
-                # attr currently does not support customizing getstate/setstate dunder methods
+                # attrs currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
                 if self.local_config["debug"]["log-events"]:
                     log.info(f"lifecycle event: {ev!r}")
@@ -1554,7 +1549,8 @@ class AbstractAgent(
 
         runtime_type = image_labels.get("ai.backend.runtime-type", "python")
         runtime_path = image_labels.get("ai.backend.runtime-path", None)
-        cmdargs: List[str] = []
+        cmdargs: list[str] = []
+        krunner_opts: list[str] = []
         if self.local_config["container"]["sandbox-type"] == "jail":
             cmdargs += [
                 "/opt/kernel/jail",
@@ -1563,10 +1559,13 @@ class AbstractAgent(
             ]
             if self.local_config["container"]["jail-args"]:
                 cmdargs += map(lambda s: s.strip(), self.local_config["container"]["jail-args"])
+        if self.local_config["debug"]["kernel-runner"]:
+            krunner_opts.append("--debug")
         cmdargs += [
             "/opt/backend.ai/bin/python",
             "-m",
             "ai.backend.kernel",
+            *krunner_opts,
             runtime_type,
         ]
         if runtime_path is not None:
@@ -1589,7 +1588,7 @@ class AbstractAgent(
 
         if self.local_config["debug"]["log-kernel-config"]:
             log.info(
-                "kernel starting with resource spec: \n{0}", pretty(attr.asdict(resource_spec))
+                "kernel starting with resource spec: \n{0}", pretty(attrs.asdict(resource_spec))
             )
         kernel_obj: KernelObjectType = await ctx.spawn(
             resource_spec,
@@ -1646,9 +1645,32 @@ class AbstractAgent(
             if not self._pending_creation_tasks[kernel_id]:
                 del self._pending_creation_tasks[kernel_id]
 
+        kernel_creation_info: KernelCreationResult = {
+            "id": KernelId(kernel_id),
+            "kernel_host": str(kernel_obj["kernel_host"]),
+            "repl_in_port": kernel_obj["repl_in_port"],
+            "repl_out_port": kernel_obj["repl_out_port"],
+            "stdin_port": kernel_obj["stdin_port"],  # legacy
+            "stdout_port": kernel_obj["stdout_port"],  # legacy
+            "service_ports": service_ports,
+            "container_id": kernel_obj["container_id"],
+            "resource_spec": attrs.asdict(resource_spec),
+            "scaling_group": kernel_config["scaling_group"],
+            "agent_addr": kernel_config["agent_addr"],
+            "attached_devices": attached_devices,
+        }
+
         # Finally we are done.
         await self.produce_event(
-            KernelStartedEvent(kernel_id, creation_id),
+            KernelStartedEvent(
+                kernel_id,
+                creation_id,
+                creation_info={
+                    **kernel_creation_info,
+                    "id": str(KernelId(kernel_id)),
+                    "container_id": str(kernel_obj["container_id"]),
+                },
+            ),
         )
 
         if kernel_config["session_type"] == "batch" and kernel_config["cluster_role"] == "main":
@@ -1660,19 +1682,7 @@ class AbstractAgent(
 
         # The startup command for the batch-type sessions will be executed by the manager
         # upon firing of the "session_started" event.
-
-        return {
-            "id": KernelId(kernel_id),
-            "kernel_host": str(kernel_obj["kernel_host"]),
-            "repl_in_port": kernel_obj["repl_in_port"],
-            "repl_out_port": kernel_obj["repl_out_port"],
-            "stdin_port": kernel_obj["stdin_port"],  # legacy
-            "stdout_port": kernel_obj["stdout_port"],  # legacy
-            "service_ports": service_ports,
-            "container_id": kernel_obj["container_id"],
-            "resource_spec": resource_spec.to_json_serializable_dict(),
-            "attached_devices": attached_devices,
-        }
+        return kernel_creation_info
 
     @abstractmethod
     async def destroy_kernel(

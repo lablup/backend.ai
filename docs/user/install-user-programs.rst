@@ -1,9 +1,8 @@
 .. role:: raw-html-m2r(raw)
    :format: html
 
-Install User Programs
-=====================
-
+Install User Programs in Session Containers
+===========================================
 
 Sometimes you need new programs or libraries that are not installed in your environment. If so, you can install the new program into your environment.
 
@@ -161,4 +160,4 @@ Now let's run:
 From the run screen, you can press q to return to the terminal.
 
 
- 
+

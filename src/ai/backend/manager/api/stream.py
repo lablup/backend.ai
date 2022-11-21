@@ -34,8 +34,8 @@ from urllib.parse import urlparse
 import aiohttp
 import aiohttp_cors
 import aiotools
-import attr
-import grpc
+import attrs
+import grpc  # pants: no-infer-dep
 import trafaret as t
 import zmq
 import zmq.asyncio
@@ -734,7 +734,7 @@ async def stream_conn_tracker_gc(root_ctx: RootContext, app_ctx: PrivateContext)
         pass
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     stream_pty_handlers: DefaultDict[KernelId, weakref.WeakSet[asyncio.Task]]
     stream_execute_handlers: DefaultDict[KernelId, weakref.WeakSet[asyncio.Task]]
