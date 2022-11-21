@@ -8,6 +8,7 @@ import sys
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
+from graphlib import TopologicalSorter
 from pathlib import Path
 from typing import IO, List, Literal, Optional, OrderedDict, Sequence, Union
 
@@ -892,20 +893,24 @@ def logs(session_id):
 
 
 def get_dependency_session_table(root_node: OrderedDict) -> List[OrderedDict]:
-    result = []
+    ts: TopologicalSorter = TopologicalSorter()
+    session_info_dict = {}
     visited = {}
 
-    # Topological sort using DFS
-    def dfs(session: OrderedDict):
+    def construct_topological_sorter(session: OrderedDict):
         visited[session["session_id"]] = True
+        session_info_dict[session["session_id"]] = session
+        ts.add(
+            session["session_id"],
+            *map(lambda session: session["session_id"], session["depends_on"]),
+        )
+
         for dependency_session in session["depends_on"]:
             if not visited.get(dependency_session["session_id"]):
-                dfs(dependency_session)
+                construct_topological_sorter(dependency_session)
 
-        result.append(session)
-
-    dfs(root_node)
-    return result
+    construct_topological_sorter(root_node)
+    return [*map(lambda session_id: session_info_dict[session_id], [*ts.static_order()])]
 
 
 def show_dependency_session_table(root_node: OrderedDict) -> None:
