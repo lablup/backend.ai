@@ -10,5 +10,5 @@ pytestmark = pytest.mark.integration
 async def test_get_manager_status():
     with Session() as sess:
         resp = sess.Manager.status()
-    assert resp['status'] == 'running'
-    assert 'active_sessions' in resp
+    assert resp["status"] == "running"
+    assert "active_sessions" in resp

@@ -10,4 +10,4 @@ pytestmark = pytest.mark.integration
 async def test_list_agent():
     with Session() as sess:
         result = sess.Agent.list_with_limit(1, 0)
-        assert len(result['items']) == 1
+        assert len(result["items"]) == 1

@@ -7,18 +7,18 @@ from ai.backend.client.auth import generate_signature
 
 def test_generate_signature(defconfig):
     kwargs = dict(
-        method='GET',
+        method="GET",
         version=defconfig.version,
         endpoint=defconfig.endpoint,
         date=datetime.now(tzutc()),
-        rel_url='/path/to/api/',
-        content_type='plain/text',
+        rel_url="/path/to/api/",
+        content_type="plain/text",
         access_key=defconfig.access_key,
         secret_key=defconfig.secret_key,
-        hash_type='md5',
+        hash_type="md5",
     )
     headers, signature = generate_signature(**kwargs)
 
-    assert kwargs['hash_type'].upper() in headers['Authorization']
-    assert kwargs['access_key'] in headers['Authorization']
-    assert signature in headers['Authorization']
+    assert kwargs["hash_type"].upper() in headers["Authorization"]
+    assert kwargs["access_key"] in headers["Authorization"]
+    assert signature in headers["Authorization"]

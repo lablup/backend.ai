@@ -1,14 +1,14 @@
-'''
+"""
 A standalone script to generate some loads to the public API server.
 It assumes that you have already configured the access key and secret key
 as environment variables.
-'''
+"""
 
 import logging
 import multiprocessing
 import secrets
-from statistics import mean, median, stdev
 import time
+from statistics import mean, median, stdev
 
 import pytest
 
@@ -17,33 +17,38 @@ from ai.backend.client.func.session import ComputeSession
 # module-level marker
 pytestmark = pytest.mark.integration
 
-log = logging.getLogger('ai.backend.client.test.load')
+log = logging.getLogger("ai.backend.client.test.load")
 
-sample_code = '''
+sample_code = """
 import os
 print('ls:', os.listdir('.'))
 with open('test.txt', 'w') as f:
     f.write('hello world')
-'''
+"""
 
-sample_code_julia = '''
+sample_code_julia = """
 println("wow")
-'''
+"""
 
 
 def print_stat(msg, times_taken):
-    print('{}: mean {:.2f} secs, median {:.2f} secs, stdev {:.2f}'.format(
-        msg, mean(times_taken), median(times_taken), stdev(times_taken),
-    ))
+    print(
+        "{}: mean {:.2f} secs, median {:.2f} secs, stdev {:.2f}".format(
+            msg,
+            mean(times_taken),
+            median(times_taken),
+            stdev(times_taken),
+        )
+    )
 
 
 def run_create_kernel(_idx):
     begin = time.monotonic()
     try:
-        k = ComputeSession.get_or_create('python3')
+        k = ComputeSession.get_or_create("python3")
         ret = k.kernel_id
     except:
-        log.exception('run_create_kernel')
+        log.exception("run_create_kernel")
         ret = None
     finally:
         end = time.monotonic()
@@ -67,7 +72,7 @@ def create_kernels(concurrency, parallel=False):
             times_taken.append(t)
             kernel_ids.append(kid)
 
-    print_stat('create_kernel', times_taken)
+    print_stat("create_kernel", times_taken)
     return kernel_ids
 
 
@@ -78,10 +83,10 @@ def run_execute_code(kid):
         run_id = secrets.token_hex(8)
         while True:
             result = ComputeSession(kid).execute(run_id, sample_code)
-            console.extend(result['console'])
-            if result['status'] == 'finished':
+            console.extend(result["console"])
+            if result["status"] == "finished":
                 break
-        stdout = ''.join(rec[1] for rec in console if rec[0] == 'stdout')
+        stdout = "".join(rec[1] for rec in console if rec[0] == "stdout")
         end = time.monotonic()
         print(stdout)
         return end - begin
@@ -103,7 +108,7 @@ def execute_codes(kernel_ids, parallel=False):
             if t is not None:
                 times_taken.append(t)
 
-    print_stat('execute_code', times_taken)
+    print_stat("execute_code", times_taken)
 
 
 def run_restart_kernel(kid):
@@ -131,7 +136,7 @@ def restart_kernels(kernel_ids, parallel=False):
             if t is not None:
                 times_taken.append(t)
 
-    print_stat('restart_kernel', times_taken)
+    print_stat("restart_kernel", times_taken)
 
 
 def run_destroy_kernel(kid):
@@ -158,17 +163,20 @@ def destroy_kernels(kernel_ids, parallel=False):
             if t is not None:
                 times_taken.append(t)
 
-    print_stat('destroy_kernel', times_taken)
+    print_stat("destroy_kernel", times_taken)
 
 
-@pytest.mark.parametrize('concurrency,parallel,restart', [
-    (5, False, False),
-    (5, True,  False),
-    (5, False, True),
-    (5, True,  True),
-])
+@pytest.mark.parametrize(
+    "concurrency,parallel,restart",
+    [
+        (5, False, False),
+        (5, True, False),
+        (5, False, True),
+        (5, True, True),
+    ],
+)
 def test_high_load_requests(capsys, defconfig, concurrency, parallel, restart):
-    '''
+    """
     Tests creation and use of multiple concurrent kernels in various ways.
 
     NOTE: This test may fail if your system has too less cores compared to the
@@ -183,11 +191,11 @@ def test_high_load_requests(capsys, defconfig, concurrency, parallel, restart):
     Running this tests with different parameters without no delays between
     parameter sets would cause "503 Service Unavailable" errors as it will
     quickly saturate the resource limit of the developer's PC.
-    '''
+    """
 
     # Show stdout for timing statistics
     with capsys.disabled():
-        print('waiting for previous asynchronous kernel destruction for 5 secs...')
+        print("waiting for previous asynchronous kernel destruction for 5 secs...")
         time.sleep(5)
         kids = create_kernels(concurrency, parallel)
         execute_codes(kids, parallel)
