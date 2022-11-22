@@ -47,7 +47,7 @@ def run_create_kernel(_idx):
     try:
         k = ComputeSession.get_or_create("python3")
         ret = k.kernel_id
-    except:
+    except Exception:
         log.exception("run_create_kernel")
         ret = None
     finally:
