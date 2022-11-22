@@ -109,10 +109,9 @@ class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
 @attrs.define(slots=True, frozen=True)
 class DoTerminateSessionEvent(AbstractEvent):
     name = "do_terminate_session"
-    
+
     session_id: SessionId = attrs.field()
     reason: KernelLifecycleEventReason = attrs.field()
-
 
     def serialize(self) -> tuple:
         return (
