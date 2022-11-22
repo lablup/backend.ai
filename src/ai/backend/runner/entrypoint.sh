@@ -52,9 +52,7 @@ else
     if [ -z "$USER_NAME" ]; then
       USER_NAME=work
       adduser -s /bin/ash -h "/home/$USER_NAME" -H -D -u $USER_ID -G $GROUP_NAME -g "User" $USER_NAME
-      usermod -a -G shadow $USER_NAME
-      chmod 0644 /etc/shadow && usermod -aG shadow $USER_NAME
-      chgrp shadow /etc/group
+      usermod -aG shadow $USER_NAME
     fi
     export SHELL=/bin/ash
   else
@@ -67,18 +65,14 @@ else
     if [ -z "$USER_NAME" ]; then
       USER_NAME=work
       useradd -s /bin/bash -d "/home/$USER_NAME" -M -r -u $USER_ID -g $GROUP_NAME -o -c "User" $USER_NAME
-      usermod -a -G shadow $USER_NAME
-      chmod 0644 /etc/shadow && usermod -aG shadow $USER_NAME
-      chgrp shadow /etc/group
+      usermod -aG shadow $USER_NAME
     else
       cp -R "/home/$USER_NAME/*" /home/work/
       cp -R "/home/$USER_NAME/.*" /home/work/
       usermod -s /bin/bash -d /home/work -l work -g $GROUP_NAME $USER_NAME
       USER_NAME=work
       chown -R $USER_NAME:$GROUP_NAME /home/work
-      usermod -a -G shadow $USER_NAME
-      chmod 0644 /etc/shadow && usermod -aG shadow $USER_NAME
-      chgrp shadow /etc/group
+      usermod -aG shadow $USER_NAME
     fi
     export SHELL=/bin/bash
   fi
@@ -109,6 +103,6 @@ else
   fi
 
   echo "Executing the main program..."
-  exec /opt/kernel/su-exec $USER_ID:$GROUP_ID "$@"
+  exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID,42" "$@"
 
 fi
