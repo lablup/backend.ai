@@ -658,7 +658,6 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         }
         for proxy_name, volume_data in all_volumes
         if f"{proxy_name}:{volume_data['name']}" in allowed_hosts
-        and VFolderHostPermission.READ in allowed_hosts[f"{proxy_name}:{volume_data['name']}"]
     }
     resp = {
         "default": default_host,

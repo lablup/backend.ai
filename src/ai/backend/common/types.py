@@ -226,15 +226,13 @@ class VFolderHostPermission(AbstractPermission):
     """
 
     CREATE = "create-vfolder"
-    READ = "read-vfolder"  # ls, list, info
-    UPDATE = "update-vfolder"  # rename, update-options
+    MODIFY = "modify-vfolder"  # rename, update-options
     DELETE = "delete-vfolder"
-    MOUNT = "mount"
-    UPDATE_FILE = "update-file"  # including mkdir, mv, rename-file, delete-file
-    UPLOAD = "upload"
-    DOWNLOAD = "download"
-    INVITE = "invite"
-    SHARE = "share"
+    MOUNT_IN_SESSION = "mount-in-session"
+    UPLOAD_FILE = "upload-file"
+    DOWNLOAD_FILE = "download-file"
+    INVITE_OTHERS = "invite-others"  # invite other user to user-type vfolder
+    SET_USER_PERM = "set-user-specific-permission"  # override permission of group-type vfolder
 
 
 class LogSeverity(str, enum.Enum):
