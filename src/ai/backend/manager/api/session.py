@@ -118,7 +118,7 @@ from ..models import (
     verify_vfolder_name,
     vfolders,
 )
-from ..models.kernel import match_session_ids
+from ..models.kernel import match_session_ids, session_dependencies
 from ..models.utils import execute_with_retry
 from ..types import UserScope
 from .auth import auth_required
@@ -1851,6 +1851,7 @@ async def rename_session(request: web.Request, params: Any) -> web.Response:
     t.Dict(
         {
             t.Key("forced", default="false"): t.ToBool(),
+            t.Key("recursive", default="false"): t.ToBool(),
             t.Key("owner_access_key", default=None): t.Null | t.String,
         }
     )
@@ -1869,25 +1870,56 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
     #         not request['is_superadmin'] and request['is_admin']:
     #     domain_name = request['user']['domain_name']
     log.info(
-        "DESTROY (ak:{0}/{1}, s:{2}, forced:{3})",
+        "DESTROY (ak:{0}/{1}, s:{2}, forced:{3}, recursive: {4})",
         requester_access_key,
         owner_access_key,
         session_name,
         params["forced"],
+        params["recursive"],
     )
-    last_stat = await root_ctx.registry.destroy_session(
-        functools.partial(
-            root_ctx.registry.get_session,
-            session_name,
-            owner_access_key,
-            # domain_name=domain_name,
-        ),
-        forced=params["forced"],
-    )
-    resp = {
-        "stats": last_stat,
-    }
-    return web.json_response(resp, status=200)
+
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    if params["recursive"]:
+        async with root_ctx.db.begin_readonly() as conn:
+            dependent_session_ids = await find_dependent_sessions(
+                session_name, conn, owner_access_key
+            )
+
+            last_stats = await asyncio.gather(
+                *map(
+                    lambda session_id_or_name: root_ctx.registry.destroy_session(
+                        functools.partial(
+                            root_ctx.registry.get_session,
+                            session_id_or_name,
+                            owner_access_key,
+                            # domain_name=domain_name,
+                        ),
+                        forced=params["forced"],
+                    ),
+                    [*dependent_session_ids, session_name],
+                ),
+                return_exceptions=True,
+            )
+
+            # Consider not found sessions already terminated.
+            last_stats = [*filter(lambda x: not isinstance(x, SessionNotFound), last_stats)]
+
+            return web.json_response(last_stats, status=200)
+    else:
+        last_stat = await root_ctx.registry.destroy_session(
+            functools.partial(
+                root_ctx.registry.get_session,
+                session_name,
+                owner_access_key,
+                # domain_name=domain_name,
+            ),
+            forced=params["forced"],
+        )
+        resp = {
+            "stats": last_stat,
+        }
+        return web.json_response(resp, status=200)
 
 
 @server_status_required(READ_ALLOWED)
@@ -2177,6 +2209,56 @@ async def shutdown_service(request: web.Request, params: Any) -> web.Response:
         log.exception("SHUTDOWN_SERVICE: exception")
         raise
     return web.Response(status=204)
+
+
+async def find_dependent_sessions(
+    root_session_name_or_id: uuid.UUID | str,
+    db_connection: SAConnection,
+    access_key: AccessKey,
+) -> Set[uuid.UUID | str]:
+    async def _find_dependent_sessions(session_name_or_id: uuid.UUID | str):
+        session_infos = await match_session_ids(
+            session_name_or_id,
+            access_key=access_key,
+            db_connection=db_connection,
+        )
+
+        assert len(session_infos) >= 1, "session not found!"
+
+        session_id = str(session_infos[0].get("session_id"))
+
+        dependent_session_getter_query = (
+            sa.select(
+                [
+                    session_dependencies.c.session_id,
+                ]
+            )
+            .select_from(session_dependencies)
+            .where(session_dependencies.c.depends_on.in_([session_id]))
+        )
+
+        dependent_session_ids = set(
+            [
+                dependent_session["session_id"]
+                for dependent_session in await db_connection.execute(dependent_session_getter_query)
+            ]
+        )
+
+        recursive_dependent_session_ids_list: List[Set[uuid.UUID | str]] = await asyncio.gather(
+            *map(
+                lambda dependent_session_id: asyncio.create_task(
+                    _find_dependent_sessions(dependent_session_id)
+                ),
+                dependent_session_ids,
+            )
+        )
+
+        for recursive_dependent_session_ids in recursive_dependent_session_ids_list:
+            dependent_session_ids |= recursive_dependent_session_ids
+
+        return dependent_session_ids
+
+    return await _find_dependent_sessions(root_session_name_or_id)
 
 
 @server_status_required(READ_ALLOWED)

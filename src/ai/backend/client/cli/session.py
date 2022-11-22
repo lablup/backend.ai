@@ -672,7 +672,10 @@ def _destroy_cmd(docs: str = None):
     @click.option(
         "-s", "--stats", is_flag=True, help="Show resource usage statistics after termination"
     )
-    def destroy(session_names, forced, owner, stats):
+    @click.option(
+        "-r", "--recursive", is_flag=True, help="Cancel all the dependant sessions recursively"
+    )
+    def destroy(session_names, forced, owner, stats, recursive):
         """
         Terminate and destroy the given session.
 
@@ -687,7 +690,8 @@ def _destroy_cmd(docs: str = None):
             for session_name in session_names:
                 try:
                     compute_session = session.ComputeSession(session_name, owner)
-                    ret = compute_session.destroy(forced=forced)
+                    ret = compute_session.destroy(forced=forced, recursive=recursive)
+
                 except BackendAPIError as e:
                     print_error(e)
                     if e.status == 404:

@@ -518,7 +518,7 @@ class ComputeSession(BaseFunction):
         return identity_params
 
     @api_function
-    async def destroy(self, *, forced: bool = False):
+    async def destroy(self, *, forced: bool = False, recursive: bool = False):
         """
         Destroys the compute session.
         Since the server literally kills the container(s), all ongoing executions are
@@ -530,6 +530,9 @@ class ComputeSession(BaseFunction):
         prefix = get_naming(api_session.get().api_version, "path")
         if forced:
             params["forced"] = "true"
+        if recursive:
+            params["recursive"] = "true"
+
         rqst = Request(
             "DELETE",
             f"/{prefix}/{self.name}",
