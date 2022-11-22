@@ -1,11 +1,51 @@
-import collections
+import collections.abc
 import functools
 import itertools
 import typing
+from unittest.mock import MagicMock
 
+import aiohttp
 import pytest
 
-from ai.backend.common.docker import ImageRef, PlatformTagSet, default_registry, default_repository
+from ai.backend.common.docker import (
+    ImageRef,
+    PlatformTagSet,
+    default_registry,
+    default_repository,
+    get_docker_connector,
+)
+
+
+@pytest.mark.asyncio
+async def test_get_docker_connector(monkeypatch):
+    monkeypatch.setenv("DOCKER_HOST", "http://localhost:2375")
+    url, connector = get_docker_connector()
+    assert str(url) == "http://localhost:2375"
+    assert isinstance(connector, aiohttp.TCPConnector)
+
+    monkeypatch.setenv("DOCKER_HOST", "https://example.com:2375")
+    url, connector = get_docker_connector()
+    assert str(url) == "https://example.com:2375"
+    assert isinstance(connector, aiohttp.TCPConnector)
+
+    monkeypatch.setenv("DOCKER_HOST", "unix:///run/docker.sock")
+    monkeypatch.setattr("pathlib.Path.exists", lambda self: True)
+    monkeypatch.setattr("pathlib.Path.is_socket", lambda self: True)
+    monkeypatch.setattr("pathlib.Path.is_fifo", lambda self: False)
+    url, connector = get_docker_connector()
+    assert str(url) == "http://localhost"
+    assert isinstance(connector, aiohttp.UnixConnector)
+    assert connector.path == "/run/docker.sock"
+
+    monkeypatch.setenv("DOCKER_HOST", "npipe:////./pipe/docker_engine")
+    monkeypatch.setattr("pathlib.Path.exists", lambda self: True)
+    monkeypatch.setattr("pathlib.Path.is_socket", lambda self: False)
+    monkeypatch.setattr("pathlib.Path.is_fifo", lambda self: True)
+    mock_connector = MagicMock()
+    monkeypatch.setattr("aiohttp.NamedPipeConnector", mock_connector)
+    url, connector = get_docker_connector()
+    assert str(url) == "http://localhost"
+    mock_connector.assert_called_once_with(r"\\.\pipe\docker_engine")
 
 
 def test_image_ref_typing():
