@@ -5,7 +5,7 @@ from aioresponses import aioresponses
 
 from ai.backend.client.config import API_VERSION
 from ai.backend.client.session import Session
-from ai.backend.client.test_utils import AsyncMock
+from ai.backend.testutils.mock import AsyncMock
 
 
 def build_url(config, path: str):

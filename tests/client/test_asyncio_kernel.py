@@ -5,8 +5,8 @@ from unittest import mock
 import pytest
 
 from ai.backend.client.session import AsyncSession
-from ai.backend.client.test_utils import AsyncContextMock, AsyncMock
 from ai.backend.client.versioning import get_naming
+from ai.backend.testutils.mock import AsyncContextMock, AsyncMock
 
 simulated_api_versions = [
     (4, "20190615"),

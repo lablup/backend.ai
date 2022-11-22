@@ -11,7 +11,7 @@ from ai.backend.client.config import API_VERSION, get_config
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import AttachedFile, Request, Response
 from ai.backend.client.session import AsyncSession, Session
-from ai.backend.client.test_utils import AsyncMock
+from ai.backend.testutils.mock import AsyncMock
 
 
 @pytest.fixture(scope="module", autouse=True)

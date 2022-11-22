@@ -9,7 +9,7 @@ from aiotusclient import client
 from ai.backend.client.config import API_VERSION
 from ai.backend.client.request import Request, Response
 from ai.backend.client.session import AsyncSession
-from ai.backend.client.test_utils import AsyncMock
+from ai.backend.testutils.mock import AsyncMock
 
 
 def build_url(config, path: str):

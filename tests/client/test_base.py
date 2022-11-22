@@ -6,7 +6,7 @@ import pytest
 from ai.backend.client.config import API_VERSION
 from ai.backend.client.func.base import BaseFunction, api_function
 from ai.backend.client.session import AsyncSession, Session
-from ai.backend.client.test_utils import AsyncMock
+from ai.backend.testutils.mock import AsyncMock
 
 
 @pytest.fixture(scope="module", autouse=True)
