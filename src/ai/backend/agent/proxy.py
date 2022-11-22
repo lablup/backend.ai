@@ -3,12 +3,12 @@ from asyncio import Future
 from pathlib import Path
 from typing import Set, Tuple
 
-import attr
+import attrs
 
 from ai.backend.common.utils import current_loop
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class DomainSocketProxy:
     host_sock_path: Path
     host_proxy_path: Path

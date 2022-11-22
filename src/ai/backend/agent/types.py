@@ -3,7 +3,7 @@ import enum
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 
-import attr
+import attrs
 
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.types import ContainerId, KernelId, MountTypes
@@ -15,21 +15,21 @@ class AgentBackend(enum.Enum):
     KUBERNETES = "kubernetes"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class VolumeInfo:
     name: str  # volume name
     container_path: str  # in-container path as str
     mode: str  # 'rw', 'ro', 'rwm'
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class MountInfo:
     mode: MountTypes
     src_path: Path
     dst_path: Path
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class Port:
     host: str
     private_port: int
@@ -45,7 +45,7 @@ class ContainerStatus(str, enum.Enum):
     REMOVING = "removing"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class Container:
     id: ContainerId
     status: ContainerStatus
@@ -61,7 +61,7 @@ class LifecycleEvent(int, enum.Enum):
     START = 2
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ContainerLifecycleEvent:
     kernel_id: KernelId
     container_id: Optional[ContainerId]

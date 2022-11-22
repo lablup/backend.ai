@@ -9,129 +9,125 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-11 22:50-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
-#: ../../manager/user-api/exec-batch.rst:2 7c102af7a0ed4ff899494357c822542d
+#: ../../manager/user-api/exec-batch.rst:2 28c41712a6e741908995e71294decc5d
 msgid "Code Execution (Batch Mode)"
 msgstr "코드 실행 (배치 모드)"
 
-#: ../../manager/user-api/exec-batch.rst:4 1f3cc76f474846ad82a086dc6786adc2
+#: ../../manager/user-api/exec-batch.rst:4 adb2a77a6ffd49a59a195947b52c3dca
 #, fuzzy
 msgid ""
-"Some sessions provide the batch mode, which offers an explicit build step "
-"required for multi-module programs or compiled programming languages. In "
-"this mode, you first upload files in prior to execution."
+"Some sessions provide the batch mode, which offers an explicit build step"
+" required for multi-module programs or compiled programming languages. In"
+" this mode, you first upload files in prior to execution."
 msgstr ""
-"일부 커널은 배치 모드를 제공하는데, 이것은 다중 모듈 프로그램이나 컴파일된 프"
-"로그래밍 언어에 필요한 명시적인 빌드 단계를 제공합니다. 이 모드에서는 실행 전"
-"에 먼저 파일을 업로드합니다."
+"일부 커널은 배치 모드를 제공하는데, 이것은 다중 모듈 프로그램이나 컴파일된 프로그래밍 언어에 필요한 명시적인 빌드 단계를 "
+"제공합니다. 이 모드에서는 실행 전에 먼저 파일을 업로드합니다."
 
-#: ../../manager/user-api/exec-batch.rst:9 c365bcf3edcc46ffa36f9bd3557c9c72
+#: ../../manager/user-api/exec-batch.rst:9 71f74c1a7a624233a375c871dccc2d35
 msgid "Uploading files"
 msgstr "파일 업로드"
 
-#: ../../manager/user-api/exec-batch.rst:11 e37aef99d15c49539b76b3f731194979
+#: ../../manager/user-api/exec-batch.rst:11 142e9041e964418a9a6d3af75aba6764
 msgid "URI: ``/session/:id/upload``"
 msgstr "URI: ``/session/:id/upload``"
 
 #: ../../manager/user-api/exec-batch.rst:12
-#: ../../manager/user-api/exec-batch.rst:65 48a1140c0a6b4971b34a25d293cafa73
-#: cbbc12ea41e1449483e06060cf636a8e
+#: ../../manager/user-api/exec-batch.rst:65 79749b6f492545c8a8aa647d3214f702
+#: 7ab6fb3fe419418ca8ba1d25a31dd955
 msgid "Method: ``POST``"
 msgstr "Method: ``POST``"
 
 #: ../../manager/user-api/exec-batch.rst:15
 #: ../../manager/user-api/exec-batch.rst:68
 #: ../../manager/user-api/exec-batch.rst:142
-#: ../../manager/user-api/exec-batch.rst:201 2ceffcff209945ceab0343ea6dac7185
-#: 7b6c76961099489b98ee09c10b5549c2 970148735b324c228a2df3e2f7baedac
-#: b4773849b4e24f8b9d694aa2611b7498
+#: ../../manager/user-api/exec-batch.rst:201 15cb9c9e3b014a418c8a0ca0db9ce0fc
+#: 47951763f0fe41b3812776e3ef024916 4bbf978c910e4f07b0396ff7ff5f36f5
+#: 724022d7f7fa4238a9a530965589628c
 msgid "Parameters"
 msgstr "매개변수들"
 
-#: ../../manager/user-api/exec-batch.rst:17 116415d7cd5f402e935c328a4be62849
+#: ../../manager/user-api/exec-batch.rst:17 db08ac71ff9647858d4e96c322af9486
 #, fuzzy
 msgid ""
 "Upload files to the session. You may upload multiple files at once using "
 "multi-part form-data encoding in the request body (RFC 1867/2388). The "
-"uploaded files are placed under ``/home/work`` directory (which is the home "
-"directory for all sessions by default), and existing files are always "
-"overwritten. If the filename has a directory part, non-existing directories "
-"will be auto-created. The path may be either absolute or relative, but only "
-"sub-directories under ``/home/work`` is allowed to be created."
+"uploaded files are placed under ``/home/work`` directory (which is the "
+"home directory for all sessions by default), and existing files are "
+"always overwritten. If the filename has a directory part, non-existing "
+"directories will be auto-created. The path may be either absolute or "
+"relative, but only sub-directories under ``/home/work`` is allowed to be "
+"created."
 msgstr ""
-"세션에 파일을 업로드 하십시오. 요청 본문 (RFC 1867/2388)에서 다중-파트 폼-데"
-"이터 인코딩을 사용하여 한번에 다중 파일들을 업로드 할 수 있습니다. 업로드된 "
-"파일들은 ``/home/work`` 디렉터리(기본적으로 모든 커널의 홈 디렉터리)하위에 위"
-"치하며, 기존 파일은 항상 덮어씁니다.파일명에 디렉터리 부분이 있다면, 존재하"
-"지 않는 디렉터리가 자동-생성됩니다. 경로는 절대적이거나 상대적일 수 있지만, "
-"``/home/work``하위에 하위-디렉터리들만 생성될 수 있습니다."
+"세션에 파일을 업로드 하십시오. 요청 본문 (RFC 1867/2388)에서 다중-파트 폼-데이터 인코딩을 사용하여 한번에 다중 "
+"파일들을 업로드 할 수 있습니다. 업로드된 파일들은 ``/home/work`` 디렉터리(기본적으로 모든 커널의 홈 디렉터리)하위에 "
+"위치하며, 기존 파일은 항상 덮어씁니다.파일명에 디렉터리 부분이 있다면, 존재하지 않는 디렉터리가 자동-생성됩니다. 경로는 "
+"절대적이거나 상대적일 수 있지만, ``/home/work``하위에 하위-디렉터리들만 생성될 수 있습니다."
 
-#: ../../manager/user-api/exec-batch.rst:26 bad5f414861941e3a57d34d8e7528873
+#: ../../manager/user-api/exec-batch.rst:26 bbb590076e6b46f29e778aaa73ec2dd2
 #, fuzzy
 msgid ""
-"This API is for uploading frequently-changing source files in prior to batch-"
-"mode execution. All files uploaded via this API is deleted when the session "
-"terminates. Use :doc:`virtual folders </user-api/vfolders>` to store and "
+"This API is for uploading frequently-changing source files in prior to "
+"batch-mode execution. All files uploaded via this API is deleted when the"
+" session terminates. Use :doc:`virtual folders <vfolders>` to store and "
 "access larger, persistent, static data and library files for your codes."
 msgstr ""
-"이 API는 배치-모드 실행 전에 자주 변경되는 소스 파일을 업로드 하기 위한 것입"
-"니다.커널이 종료되면 이 API를 통해 업로드된 모든 파일이 삭제됩니다. 코드를 위"
-"해 :doc:`virtual folders </user-api/vfolders>`를 사용하여 더 크고, 영구적인, "
-"정적 데이터 및 라이브러리 파일을 저장하고 액세스하십시오."
+"이 API는 배치-모드 실행 전에 자주 변경되는 소스 파일을 업로드 하기 위한 것입니다.커널이 종료되면 이 API를 통해 업로드된 "
+"모든 파일이 삭제됩니다. 코드를 위해 :doc:`virtual folders </user-api/vfolders>`를 사용하여 더 "
+"크고, 영구적인, 정적 데이터 및 라이브러리 파일을 저장하고 액세스하십시오."
 
-#: ../../manager/user-api/exec-batch.rst:33 e6f6858e7a9c4a3b9a1e78632bf69d4b
+#: ../../manager/user-api/exec-batch.rst:33 44332d50baeb46b78bf6f977137c6f00
 msgid ""
-"You cannot upload files to mounted virtual folders using this API directly. "
-"However, you may copy/move the generated files to virtual folders in your "
-"build script or the main program for later uses."
+"You cannot upload files to mounted virtual folders using this API "
+"directly. However, you may copy/move the generated files to virtual "
+"folders in your build script or the main program for later uses."
 msgstr ""
-"이 API를 사용해서 탑재된 가상 폴더에 직접적으로 파일을 업로드할 수 없습니다."
-"그러나, 이 후 사용을 위해서 빌드 스크립트나 메인 프로그램 안의 가상폴더로 생"
-"성된 파일을 복사/이동할 수 있다."
+"이 API를 사용해서 탑재된 가상 폴더에 직접적으로 파일을 업로드할 수 없습니다.그러나, 이 후 사용을 위해서 빌드 스크립트나 메인"
+" 프로그램 안의 가상폴더로 생성된 파일을 복사/이동할 수 있다."
 
-#: ../../manager/user-api/exec-batch.rst:36 06c7498213a54d90b347981acd1daab2
+#: ../../manager/user-api/exec-batch.rst:36 94c6cc325ecd48daa48e13c0be647cd1
 msgid "There are several limits on this API:"
 msgstr "이 API에는 몇 가지 제한이 있습니다."
 
-#: ../../manager/user-api/exec-batch.rst:41 b2c47c50eafb4498899922a758314749
+#: ../../manager/user-api/exec-batch.rst:41 4e9309dbb40148f3a1cc3c656b921ed4
 msgid "The maximum size of each file"
 msgstr "각 파일의 최대 사이즈"
 
-#: ../../manager/user-api/exec-batch.rst:42 6a6fe34ffcca470fbbe5c5882e728a65
+#: ../../manager/user-api/exec-batch.rst:42 5d98259470f64a9c8390a811b12e5dc0
 msgid "1 MiB"
 msgstr "1 MiB"
 
-#: ../../manager/user-api/exec-batch.rst:43 430268a326454e97b34ad3d801c1b9b7
+#: ../../manager/user-api/exec-batch.rst:43 7ff5702fa1d1438ca0f98de0e5177b3f
 msgid "The number of files per upload request"
 msgstr "업로드 요청당 파일 수"
 
-#: ../../manager/user-api/exec-batch.rst:44 5d535e3997b54479a7075d2316995015
+#: ../../manager/user-api/exec-batch.rst:44 ce6df62a9fc24887ad12d8b9820b0791
 msgid "20"
 msgstr "20"
 
 #: ../../manager/user-api/exec-batch.rst:47
 #: ../../manager/user-api/exec-batch.rst:106
 #: ../../manager/user-api/exec-batch.rst:159
-#: ../../manager/user-api/exec-batch.rst:219 121dc697ae9f4c5d9352003d8c7a95c7
-#: 54dad50bba904426ad4dab9fa662fd3a a975f73c95004c82b00cb22f49a80302
-#: d6f95c3ff1274b52a4657a456ab5a157
+#: ../../manager/user-api/exec-batch.rst:219 20d788e026b94fd682c9ff0777111e77
+#: 522412e1a2034bbabc4c05e63900926d 8626269fc324476caaf2fbcbf307a7ad
+#: d58395e9c63144cdbe37c7f477f1edc2
 msgid "Response"
 msgstr "응답"
 
 #: ../../manager/user-api/exec-batch.rst:53
 #: ../../manager/user-api/exec-batch.rst:112
 #: ../../manager/user-api/exec-batch.rst:164
-#: ../../manager/user-api/exec-batch.rst:224 172bc6d2941e4b509b4f9557548ee9b8
-#: 400fc7bcd3d74bdda6c135e76f7d8c35 924cdfc136d043e0b27d6b0477adc83d
-#: e53f72f7cbc04c1eaf6d74f8056bb610
+#: ../../manager/user-api/exec-batch.rst:224 66d8d22e0e3b455daf13841f67c0a389
+#: 9621ccf10af4404395dc7be62e47594e baa3eaeb61dc4a80999e965f8a55b420
+#: e0bfcf24279c4650a44cc7e5a532625f
 msgid "HTTP Status Code"
 msgstr "HTTP Status Code"
 
@@ -141,48 +137,46 @@ msgstr "HTTP Status Code"
 #: ../../manager/user-api/exec-batch.rst:150
 #: ../../manager/user-api/exec-batch.rst:165
 #: ../../manager/user-api/exec-batch.rst:209
-#: ../../manager/user-api/exec-batch.rst:225 01b6888e6cad4dd8ac8c98f838372278
-#: 5d4e5e537ce144d7ba3b52c763773c57 620b1b3ba89944aa9393177ed04b23bf
-#: 623fd545244f4feca64e0d3afe97fad8 78e927ca38044e6da6ffd316cc20a7e9
-#: 7a1a4a08757a4508a9931d7505e1d2c2 a037dc9420704ebd870f8ae0058ec4f1
+#: ../../manager/user-api/exec-batch.rst:225 01960cdcd11a44c9a5935dd651b393ff
+#: 104f3102c22b40a9839422393ed1f28b 2a21412207a34d5caeff57c29cf24e75
+#: 3162fcf47c74448ba77c621bd6d173a0 4828e453a2b24427bd2a90473a08b101
+#: 5c23d17907eb473794bea88d2a2f35e0 8b6ef3e0797a4c53938efa635af87130
 msgid "Description"
 msgstr "설명"
 
-#: ../../manager/user-api/exec-batch.rst:55 97982212a4414340b27fe4ac97ae644e
+#: ../../manager/user-api/exec-batch.rst:55 bc4405c3db014b49b3e10391d5d4e30c
 msgid "204 OK"
 msgstr "204 OK"
 
 #: ../../manager/user-api/exec-batch.rst:56
 #: ../../manager/user-api/exec-batch.rst:167
-#: ../../manager/user-api/exec-batch.rst:227 1b57f0c0465e4a2aa9fe97325851771d
-#: 23cc63ff17bc49e1ac8971b059bb6d46 c8e89937152e4578bd6f0279672297ac
+#: ../../manager/user-api/exec-batch.rst:227 a97714a04d3643639496e0fc24f41a13
+#: db4bf80e73964612b482fd930d2e9e10 e148876baad24ba1bd9e3ed4bffac7bc
 msgid "Success."
 msgstr "성공."
 
-#: ../../manager/user-api/exec-batch.rst:57 23ae28608a234c318881d5389ad84b91
+#: ../../manager/user-api/exec-batch.rst:57 18e7cd0ec1b14d0caf52654bf7967796
 msgid "400 Bad Request"
 msgstr "400 Bad Request"
 
-#: ../../manager/user-api/exec-batch.rst:58 ddf7fcac6bb64e6cb8df6723371cdef0
+#: ../../manager/user-api/exec-batch.rst:58 64739824b04f48d28363d0aa5add7b3e
 msgid ""
-"Returned when one of the uploaded file exeeds the size limit or there are "
-"too many files."
-msgstr ""
-"업로드된 파일 중 하나가 크기 제한을 초과하거나 파일이 너무 많을 때 반환됩니"
-"다."
+"Returned when one of the uploaded file exeeds the size limit or there are"
+" too many files."
+msgstr "업로드된 파일 중 하나가 크기 제한을 초과하거나 파일이 너무 많을 때 반환됩니다."
 
-#: ../../manager/user-api/exec-batch.rst:62 66aae335231d470f98e0d4d5b0557782
+#: ../../manager/user-api/exec-batch.rst:62 caaa63248ea24a2882a7fda81772e1f3
 msgid "Executing with Build Step"
 msgstr "빌드 단계를 사용하여 실행한다."
 
-#: ../../manager/user-api/exec-batch.rst:64 8aa439186e5341169f21d8360b0d18bc
+#: ../../manager/user-api/exec-batch.rst:64 2ca21bbffc8c4b5b871a128963087618
 msgid "URI: ``/session/:id``"
 msgstr "URI: ``/session/:id``"
 
 #: ../../manager/user-api/exec-batch.rst:74
 #: ../../manager/user-api/exec-batch.rst:148
-#: ../../manager/user-api/exec-batch.rst:207 1b845db47a26464f87fb57f6c2b83e17
-#: 380004829a3c416cab05659b7138f69f cd7e435db8a242fbbd14053017536d97
+#: ../../manager/user-api/exec-batch.rst:207 4ca956ea66d543b5bdfef2572298838e
+#: 5465e9d96fae49b6a640d7e1a3302e3a c64658a392b84fc589e23e626aaad0e1
 msgid "Parameter"
 msgstr "매개변수"
 
@@ -190,47 +184,47 @@ msgstr "매개변수"
 #: ../../manager/user-api/exec-batch.rst:123
 #: ../../manager/user-api/exec-batch.rst:149
 #: ../../manager/user-api/exec-batch.rst:176
-#: ../../manager/user-api/exec-batch.rst:208 060aa8b4d30249b9981c31f201e55eb1
-#: 47601443027341eb886501e1b2bacda1 59875ffc1d1e48eb94176c0a0db3b668
-#: 85642e4b93c94a5485546eba7ee07dcc e4550a3e16c64408a54bddaf387ffb44
+#: ../../manager/user-api/exec-batch.rst:208 52fa7aab171e495d8ce857212dfbcf1d
+#: 7fd1f3d2921d414b9a758971609a816a 9918995182e740a69816de7183b2d7a7
+#: 9fb5a3e4509140728872b2f914d207ec ea1ba96103ee4133b784a865dd55ee24
 msgid "Type"
 msgstr "타입"
 
 #: ../../manager/user-api/exec-batch.rst:77
 #: ../../manager/user-api/exec-batch.rst:151
-#: ../../manager/user-api/exec-batch.rst:210 056eb3d2e28342748d454a4f2bb847d8
-#: 243940f365364c61a17b1cee95abc111 7852196541244c129c0fa605a69ec4f7
+#: ../../manager/user-api/exec-batch.rst:210 7cf29bb24c2e4fe5bda8360e413ff173
+#: e1311ffc3f0a4a03b7cab994f507b42d e914ee20a97d4c8080a716841b5571cc
 msgid "``:id``"
 msgstr "``:id``"
 
 #: ../../manager/user-api/exec-batch.rst:78
 #: ../../manager/user-api/exec-batch.rst:152
-#: ../../manager/user-api/exec-batch.rst:211 244213f1cdb7401398201d098d562027
-#: 4cdce58d351d485db34cc7ec5c29b5a0 6f895b995e0940eca3c3be2703b1c861
+#: ../../manager/user-api/exec-batch.rst:211 452c8f84c9a841ac9eede79b1486dfe1
+#: 6adfacf326934fca8493340f7ea7f6d3 93ad6663c165415dbf9c53df59194e52
 msgid "``slug``"
 msgstr "``slug``"
 
 #: ../../manager/user-api/exec-batch.rst:79
 #: ../../manager/user-api/exec-batch.rst:153
-#: ../../manager/user-api/exec-batch.rst:212 54febd80567e426e9fa7e9478a9f6e82
-#: a81aa8d4162c40f783086433d18c67cc dcd536fc20d74c2bae645d9b61138503
+#: ../../manager/user-api/exec-batch.rst:212 560c5e9f33bc4a2c875d668fad088ddf
+#: c9e6625b0b0d429cbfa200065736d63a ebe5397c05714781b2d5ee63be322866
 #, fuzzy
 msgid "The session ID."
 msgstr "세션 ID."
 
-#: ../../manager/user-api/exec-batch.rst:80 dbd9b9a67230454193c08a57b532274f
+#: ../../manager/user-api/exec-batch.rst:80 a511ea6fb5d9470d8018c614f2e14bec
 msgid "``mode``"
 msgstr "``mode``"
 
-#: ../../manager/user-api/exec-batch.rst:81 839d347a6c9f435bbd8babbdfbaef2d1
+#: ../../manager/user-api/exec-batch.rst:81 59c0e986a64b4d309c5befb0ef0b9835
 msgid "``enum[str]``"
 msgstr "``enum[str]``"
 
-#: ../../manager/user-api/exec-batch.rst:82 415ed0d56ba24b34b19143710ac216e7
+#: ../../manager/user-api/exec-batch.rst:82 f9d7c5f7db4746699cda9648fe7aa0d8
 msgid "A constant string ``\"batch\"``."
 msgstr "상수 문자열 ``\"batch\"``."
 
-#: ../../manager/user-api/exec-batch.rst:83 24c85263947e4a11a0971c303f1ff291
+#: ../../manager/user-api/exec-batch.rst:83 72692c63ce2a4ce08de9bc3b6574edd3
 msgid "``code``"
 msgstr "``code``"
 
@@ -239,182 +233,180 @@ msgstr "``code``"
 #: ../../manager/user-api/exec-batch.rst:155
 #: ../../manager/user-api/exec-batch.rst:179
 #: ../../manager/user-api/exec-batch.rst:182
-#: ../../manager/user-api/exec-batch.rst:185 0abb59fa7df84d8e8c3fb97655775e39
-#: 147474c491e4440a93ec9cdf3772d3c8 1f528db0958c4969a69fc07784d2617c
-#: 42e8d79376324b608a43aebe1df80727 dd6dbac4f3bb49aa95050d9e5f66d1a5
-#: dde30a3eede645568d81ad4a3ed79a7f
+#: ../../manager/user-api/exec-batch.rst:185 051b8c4ab3c04cdba73fd0da5501b52c
+#: 0f701e234e4d439a9e632104bf2c00a2 2aa0af15c04648da9afc8f650311a08b
+#: 74aeba034bff447e8bc82e709123e621 ba6209368a5c49f19e8e0bbadd46e026
+#: bb5a0944b072430da8082febcf14b45b
 msgid "``str``"
 msgstr "``str``"
 
-#: ../../manager/user-api/exec-batch.rst:85 7068daaccdfc4820907b2d1c1bf9648d
+#: ../../manager/user-api/exec-batch.rst:85 e20d6ea3f9904c64b4929b746ba4c938
 msgid "Must be an empty string ``\"\"``."
 msgstr "반드시 빈 문자열 ``\"\"``이어야 합니다."
 
-#: ../../manager/user-api/exec-batch.rst:86 c6f30eee2cf649849f53552a2c31e636
+#: ../../manager/user-api/exec-batch.rst:86 8c65dfef50de45c0964083eb47ebaac2
 msgid "``runId``"
 msgstr "``runId``"
 
-#: ../../manager/user-api/exec-batch.rst:88 a7ec0b38e7a74276ac0823710d13db85
+#: ../../manager/user-api/exec-batch.rst:88 38e27328cdea484b87eafb11e40018e4
 msgid ""
-"A string of client-side unique identifier for this particular run. For more "
-"details about the concept of a run, see :ref:`code-execution-model`. If not "
-"given, the API server will assign a random one in the first response and the "
-"client must use it for the same run afterwards."
+"A string of client-side unique identifier for this particular run. For "
+"more details about the concept of a run, see :ref:`code-execution-model`."
+" If not given, the API server will assign a random one in the first "
+"response and the client must use it for the same run afterwards."
 msgstr ""
-"특정 실행을 위한 클라이언트측 고유 식별자 문자열 입니다. 해당 실행 개념에 대"
-"한 자세한 사항은 \"ref\"`code-execution-model`을 참조하십시오. 문자열이 주어"
-"지지 않는다면, API 서버가 첫 번째 응답에 임의로 하나를 할당할 것이고 클라이언"
-"트는 이후 같은 실행에서 이를 사용해야만 합니다."
+"특정 실행을 위한 클라이언트측 고유 식별자 문자열 입니다. 해당 실행 개념에 대한 자세한 사항은 \"ref\"`code-"
+"execution-model`을 참조하십시오. 문자열이 주어지지 않는다면, API 서버가 첫 번째 응답에 임의로 하나를 할당할 "
+"것이고 클라이언트는 이후 같은 실행에서 이를 사용해야만 합니다."
 
-#: ../../manager/user-api/exec-batch.rst:91 2be3644a230e449da549e5c7e8fae59a
+#: ../../manager/user-api/exec-batch.rst:91 8520433f5f4041c2b1894bd8ca34d04d
 msgid "``options``"
 msgstr "``options``"
 
 #: ../../manager/user-api/exec-batch.rst:92
-#: ../../manager/user-api/exec-batch.rst:126 0ebbd6e051e04eeab367a8cd3f32dfbb
-#: 880fcaa7240647418e798fc46c5de2c3
+#: ../../manager/user-api/exec-batch.rst:126 89bcef8edc064d41858e3ffa4b630f45
+#: d330c463145b40058c8f36acb2364907
 msgid "``object``"
 msgstr "``object``"
 
-#: ../../manager/user-api/exec-batch.rst:93 d69e61a209a94ba483a6eff03131ad6a
+#: ../../manager/user-api/exec-batch.rst:93 6b9e09375ec74f9bb66f89c9748448d7
 msgid ":ref:`batch-execution-query-object`."
 msgstr ":ref:`batch-execution-query-object`."
 
-#: ../../manager/user-api/exec-batch.rst:95 2ef227e8dbbc44d899e9a9bfe8e129c6
+#: ../../manager/user-api/exec-batch.rst:95 391444d8b7524971a56730e262df5a1d
 msgid "Example:"
 msgstr "예시:"
 
 #: ../../manager/user-api/exec-batch.rst:114
 #: ../../manager/user-api/exec-batch.rst:166
-#: ../../manager/user-api/exec-batch.rst:226 099c9cfccd3f4008901d9dc6512dce88
-#: 2055c3fdf1064b3a81573599da234417 8bf4e6823ee54cf58bc2494dc036a00f
+#: ../../manager/user-api/exec-batch.rst:226 12a29d03179747d4b1df64e2339bc897
+#: 862852bbdc304fd7a07519ec194fa6bf fa2aa500d28d4913a59c9dce195cd129
 msgid "200 OK"
 msgstr "200 OK"
 
-#: ../../manager/user-api/exec-batch.rst:115 5e0eddf254534a63b8f50c632f27379c
+#: ../../manager/user-api/exec-batch.rst:115 fb0d443de03b465180ed744228e37d8a
 #, fuzzy
 msgid ""
 "The session has responded with the execution result. The response body "
 "contains a JSON object as described below."
-msgstr ""
-"커널이 실행 결과로 응답했습니다. 응답 본문에는 아래에 설명된 것처럼 JSON 객체"
-"가 포함되어 있습니다."
+msgstr "커널이 실행 결과로 응답했습니다. 응답 본문에는 아래에 설명된 것처럼 JSON 객체가 포함되어 있습니다."
 
 #: ../../manager/user-api/exec-batch.rst:122
-#: ../../manager/user-api/exec-batch.rst:175 814c45eafb244e648e67ce38112f5313
-#: a4959447512b45c7baac8de422602b26
+#: ../../manager/user-api/exec-batch.rst:175 84c9c4f1f812466696497ada872b0d33
+#: dda360f6fa4f4812a19c3737e8fc1910
 msgid "Fields"
 msgstr "필드"
 
 #: ../../manager/user-api/exec-batch.rst:124
-#: ../../manager/user-api/exec-batch.rst:177 18bb18f5156d4987a0ef5056772717e1
-#: f41815fcd1a84bdea1de935ec00a5a50
+#: ../../manager/user-api/exec-batch.rst:177 2b482fdcce354409ae9be721c8077cec
+#: ee21c60b580e49e8b8f2586e78c3cca0
 msgid "Values"
 msgstr "값"
 
-#: ../../manager/user-api/exec-batch.rst:125 2446da2a3ce94668a60610d1119edcb4
+#: ../../manager/user-api/exec-batch.rst:125 ae9d2e0317994500b789741839eb348c
 msgid "``result``"
 msgstr "``result``"
 
-#: ../../manager/user-api/exec-batch.rst:127 b72300f1f8d8481682500da95be2b1e7
+#: ../../manager/user-api/exec-batch.rst:127 3c921c173c7349fc97205edbff4d8e3b
 msgid ":ref:`execution-result-object`."
 msgstr ":ref:`execution-result-object`."
 
-#: ../../manager/user-api/exec-batch.rst:131 3be72b802cfc4067ac2f42e4ba5d6d90
+#: ../../manager/user-api/exec-batch.rst:131 a87c1d9a3a6047e6ae8c88ac61b2be61
 msgid "Listing Files"
 msgstr "나열된 파일"
 
-#: ../../manager/user-api/exec-batch.rst:133 77befdd062b2468d81ab3bea6562211d
+#: ../../manager/user-api/exec-batch.rst:133 335c8737b3384e5480c28b0f2af14f2a
 #, fuzzy
 msgid ""
-"Once files are uploaded to the session or generated during the execution of "
-"the code, there is a need to identify what files actually are in the current "
-"session. In this case, use this API to get the list of files of your compute "
-"sesison."
+"Once files are uploaded to the session or generated during the execution "
+"of the code, there is a need to identify what files actually are in the "
+"current session. In this case, use this API to get the list of files of "
+"your compute sesison."
 msgstr ""
-"코드를 실행하는 동안 파일이 세션에 업로드되거나 생성되면 현재 세션에 실제로 "
-"어떤 파일이 있는지 확인할 필요가 있다. 이 경우 이 API를 사용하여 컴퓨팅 세션"
-"의 파일의 목록을 가져오십시오."
+"코드를 실행하는 동안 파일이 세션에 업로드되거나 생성되면 현재 세션에 실제로 어떤 파일이 있는지 확인할 필요가 있다. 이 경우 이 "
+"API를 사용하여 컴퓨팅 세션의 파일의 목록을 가져오십시오."
 
-#: ../../manager/user-api/exec-batch.rst:138 01a0ac2eee0043fb8c4db1e4f9fc12b6
+#: ../../manager/user-api/exec-batch.rst:138 47d355c073be41b4bf3a8a0e6a1c24f3
 msgid "URI: ``/session/:id/files``"
 msgstr "URI: ``/session/:id/files``"
 
 #: ../../manager/user-api/exec-batch.rst:139
-#: ../../manager/user-api/exec-batch.rst:198 0bf7b023b043489aaf8d7328cb5a9b11
-#: c8671916e27f4a7db8d6ee1c0347cace
+#: ../../manager/user-api/exec-batch.rst:198 512bcda5f15243779c4dade4a66e90f8
+#: c759a2c5d358403a8701d5ddd8bd9f12
 msgid "Method: ``GET``"
 msgstr "메소드 : ``GET``"
 
-#: ../../manager/user-api/exec-batch.rst:154 011b589bf81249878aeb378e585a4245
+#: ../../manager/user-api/exec-batch.rst:154 04ca8747c3424ca68a47cdba21f856ec
 msgid "``path``"
 msgstr "``path``"
 
-#: ../../manager/user-api/exec-batch.rst:156 297ac2b2e6f34270a8efc302663ab5bc
+#: ../../manager/user-api/exec-batch.rst:156 e999cc4a23504c159d6aa556c5945fc4
 msgid "Path inside the session (default: ``/home/work``)."
 msgstr "세션 내부 경로 (default: ``\\home\\work``)."
 
-#: ../../manager/user-api/exec-batch.rst:168 e07453677c774b45bf825c7071f90bff
+#: ../../manager/user-api/exec-batch.rst:168 7076868aa0734ea3ae051ded81b63efb
 msgid "404 Not Found"
 msgstr "404 Not Found"
 
-#: ../../manager/user-api/exec-batch.rst:169 9548111ea20a48659c7a5a2ea9a74f5a
+#: ../../manager/user-api/exec-batch.rst:169 2e906801aaea45e09068a737a3c84994
 msgid "There is no such path."
 msgstr "해당 경로가 존재하지 않습니다."
 
 #: ../../manager/user-api/exec-batch.rst:178
-#: ../../manager/user-api/exec-batch.rst:213 87cc5c83f9a54bc39b3aba5b0db66ade
-#: f2553d11da1d4bd9a5b589d2c2198fb1
+#: ../../manager/user-api/exec-batch.rst:213 6c5a531d9b174958a7595896ee481253
+#: eb800606699a418291beb39df8592eb7
 msgid "``files``"
 msgstr "``files``"
 
-#: ../../manager/user-api/exec-batch.rst:180 371ed75f02044db7b96c94789852e9e0
+#: ../../manager/user-api/exec-batch.rst:180 8fc6c84367314654b126c00332ec95bf
 msgid "Stringified json containing list of files."
 msgstr "파일 목록을 포함하는 문자열화된 json"
 
-#: ../../manager/user-api/exec-batch.rst:181 2fe656b702dd4cc99f3e3ea31b047736
+#: ../../manager/user-api/exec-batch.rst:181 6d9bd3121bc84c08b345bea958bcaf00
 msgid "``folder_path``"
 msgstr "``folder_path``"
 
-#: ../../manager/user-api/exec-batch.rst:183 f21c095b8c224b5584a926ccf3647a59
+#: ../../manager/user-api/exec-batch.rst:183 657a6c26044641aea812bdb9d915b4d9
 msgid "Absolute path inside session."
 msgstr "세션 내부의 절대 경로"
 
-#: ../../manager/user-api/exec-batch.rst:184 c7568f70cf184fa7b54b9d8b53c7ddd5
+#: ../../manager/user-api/exec-batch.rst:184 1f65be84091143708f928f764d6c6437
 msgid "``errors``"
 msgstr "``errors``"
 
-#: ../../manager/user-api/exec-batch.rst:186 a0a582a1d6b54ff2b04b8a217952b2ab
+#: ../../manager/user-api/exec-batch.rst:186 389c543e939e4dfd9f6a99997cea1af1
 msgid "Any errors occurred during scanning the specified path."
 msgstr "지정된 경로를 스캔하는 동안 생성된 오류"
 
-#: ../../manager/user-api/exec-batch.rst:190 ea242c8af0884961a695f3597dd0fbef
+#: ../../manager/user-api/exec-batch.rst:190 3eb9770a2577411d86a4d87c4d994062
 msgid "Downloading Files"
 msgstr "다운로드한 파일"
 
-#: ../../manager/user-api/exec-batch.rst:192 9e9a8414c7354a29bdcf54f96962daca
+#: ../../manager/user-api/exec-batch.rst:192 01fb82482e8640dfaedf9caa2daf0b3d
 msgid "Download files from your compute session."
 msgstr "컴퓨팅 세션에서 파일을 다운로드 하십시오."
 
-#: ../../manager/user-api/exec-batch.rst:194 f0ec6d850e694ee291db8f91bc4d8172
+#: ../../manager/user-api/exec-batch.rst:194 28cddbe55f6b4032b7f13e61be19b3a1
 msgid ""
-"The response contents are multiparts with tarfile binaries. Post-processing, "
-"such as unpacking and save them, should be handled by the client."
+"The response contents are multiparts with tarfile binaries. Post-"
+"processing, such as unpacking and save them, should be handled by the "
+"client."
 msgstr ""
-"응답 내용은 tarfile binaries가 있는 멀티파트입니다. unpacking과 저장 같은 "
-"Post-processing은 클라이언트가 다뤄야만 합니다"
+"응답 내용은 tarfile binaries가 있는 멀티파트입니다. unpacking과 저장 같은 Post-processing은 "
+"클라이언트가 다뤄야만 합니다"
 
-#: ../../manager/user-api/exec-batch.rst:197 cc4ca88a073a4cd6868830130985bd4e
+#: ../../manager/user-api/exec-batch.rst:197 c1e7341e704f459cac731f79c75b2447
 msgid "URI: ``/session/:id/download``"
 msgstr "URI: ``/session/:id/download``"
 
-#: ../../manager/user-api/exec-batch.rst:214 d4e6040188054e3bbfed429629ae6c45
+#: ../../manager/user-api/exec-batch.rst:214 9c3c10c0405a45dc8ef246261c87ed6c
 msgid "``list[str]``"
 msgstr "``list[str]``"
 
-#: ../../manager/user-api/exec-batch.rst:215 a920f5b7adbf454790e2c08ac6250894
+#: ../../manager/user-api/exec-batch.rst:215 29a56346b25c4d5f911e2d3b64bf9c90
 #, fuzzy
 msgid ""
 "File paths inside the session container to download. (maximum 5 files at "
 "once)"
 msgstr "다운로드할 커널 컨테이너 내부 파일 경로 (한 번에 최대 5개의 파일)"
+

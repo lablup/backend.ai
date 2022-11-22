@@ -30,7 +30,7 @@ from typing import (
 )
 
 import aiodocker
-import attr
+import attrs
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
@@ -80,7 +80,7 @@ class AllocationStrategy(enum.Enum):
     EVENLY = 1
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KernelResourceSpec:
     """
     This struct-like object stores the kernel resource allocation information
@@ -104,7 +104,7 @@ class KernelResourceSpec:
     scratch_disk_size: int
     """The size of scratch disk. (not implemented yet)"""
 
-    mounts: List["Mount"] = attr.Factory(list)
+    mounts: List["Mount"] = attrs.Factory(list)
     """The mounted vfolder list."""
 
     def freeze(self) -> None:
@@ -208,20 +208,26 @@ class KernelResourceSpec:
         return cls.read_from_string(text)
 
     def to_json_serializable_dict(self) -> Mapping[str, Any]:
-        o = attr.asdict(self)
+        o = attrs.asdict(self)
         for slot_name, alloc in o["slots"].items():
             if known_slot_types.get(slot_name, "count") == "bytes":
                 o["slots"] = f"{BinarySize(alloc):s}"
             else:
                 o["slots"] = str(alloc)
+        serialized_allocations = {}
         for dev_name, dev_alloc in o["allocations"].items():
+            serialized_dev_alloc = {}
             for slot_name, per_device_alloc in dev_alloc.items():
+                serialized_per_device_alloc = {}
                 for dev_id, alloc in per_device_alloc.items():
                     if known_slot_types.get(slot_name, "count") == "bytes":
-                        alloc = f"{BinarySize(alloc):s}"
+                        serialized_alloc = f"{BinarySize(alloc):s}"
                     else:
-                        alloc = str(alloc)
-                    o["allocations"][dev_name][slot_name][dev_id] = alloc
+                        serialized_alloc = str(alloc)
+                    serialized_per_device_alloc[str(dev_id)] = serialized_alloc
+                serialized_dev_alloc[str(slot_name)] = serialized_per_device_alloc
+            serialized_allocations[str(dev_name)] = serialized_dev_alloc
+        o["allocations"] = serialized_allocations
         o["mounts"] = list(map(str, self.mounts))
         return o
 
@@ -229,7 +235,7 @@ class KernelResourceSpec:
         return json.dumps(self.to_json_serializable_dict())
 
 
-@attr.s(auto_attribs=True)
+@attrs.define(auto_attribs=True)
 class AbstractComputeDevice:
     device_id: DeviceId
     hw_location: str  # either PCI bus ID or arbitrary string
@@ -407,7 +413,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
         self.plugins[plugin.key] = plugin
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class Mount:
     type: MountTypes
     source: Optional[Path]
@@ -438,7 +444,7 @@ class Mount:
         return cls(type, source, target, perm, None)
 
 
-@attr.s(auto_attribs=True)
+@attrs.define(auto_attribs=True)
 class DeviceSlotInfo:
     slot_type: SlotTypes
     slot_name: SlotName

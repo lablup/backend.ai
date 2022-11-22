@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.13.1rc2"
+pants_version = "2.14.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 local_execution_root_dir="%(buildroot)s/.tmp"
 backend_packages = [
@@ -9,6 +9,7 @@ backend_packages = [
     "pants.backend.python.lint.isort",
     "pants.backend.python.typecheck.mypy",
     "pants.backend.experimental.python",
+    "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
     "towncrier_tool",
@@ -19,8 +20,6 @@ pants_ignore = [
     "docs",  # TODO: docs build config
     "*.log"
 ]
-use_deprecated_directory_cli_args_semantics = false  # for 2.13 or later
-use_deprecated_pex_binary_run_semantics = false
 
 [anonymous-telemetry]
 enabled = false
@@ -44,8 +43,11 @@ enable_resolves = true
 #   - Run `./pants export ::` again
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.10.8"]
-lockfile_generator = "pex"
 tailor_pex_binary_targets = false
+resolves_to_interpreter_constraints = "{'python-kernel': ['==3.10.*'], 'pants-plugins': ['>=3.7,<3.10']}"
+
+[python-bootstrap]
+search_path = ["<PYENV>"]
 
 [python-repos]
 indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
@@ -53,6 +55,7 @@ indexes = ["https://dist.backend.ai/pypi/simple/", "https://pypi.org/simple/"]
 [python.resolves]
 python-default = "python.lock"
 python-kernel = "python-kernel.lock"
+pants-plugins = "tools/pants-plugins.lock"
 
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
@@ -96,7 +99,6 @@ extra_requirements.add = [
 args = ["-v", "-m", "'not integration'"]
 lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
-timeout_default = 300
 
 [coverage-py]
 version = "coverage[toml]>=6.4,<7.0"
@@ -105,7 +107,7 @@ report = ["xml", "console"]
 lockfile = "tools/coverage-py.lock"
 
 [mypy]
-version = "mypy>=0.961"
+version = "mypy==0.982"
 interpreter_constraints = ["CPython>=3.10,<4"]
 extra_requirements.add = [
 ]
