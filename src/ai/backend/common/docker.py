@@ -87,7 +87,7 @@ def get_docker_connector() -> tuple[yarl.URL, aiohttp.BaseConnector]:
                 search_paths = [Path(docker_host.path.replace("/", "\\"))]
                 connector_cls = aiohttp.NamedPipeConnector
             case _ as unknown_scheme:
-                raise RuntimeError("Unsupported connection scheme", unknown_scheme)
+                raise RuntimeError("unsupported connection scheme", unknown_scheme)
     else:
         match sys.platform:
             case "linux" | "darwin":
@@ -102,8 +102,8 @@ def get_docker_connector() -> tuple[yarl.URL, aiohttp.BaseConnector]:
                     Path(r"\\.\pipe\docker_engine"),
                 ]
                 connector_cls = aiohttp.NamedPipeConnector
-            case _ as unsupported_platform:
-                raise RuntimeError("Unsupported platform", unsupported_platform)
+            case _ as platform_name:
+                raise RuntimeError("unsupported platform", platform_name)
     for p in search_paths:
         if p.exists() and (p.is_socket() or p.is_fifo()):
             decoded_path = os.fsdecode(p)
