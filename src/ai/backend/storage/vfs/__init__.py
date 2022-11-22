@@ -15,7 +15,7 @@ from uuid import UUID
 import janus
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize, HardwareMetadata
+from ai.backend.common.types import BinarySize, HardwareMetadata, VFolderDeletionResult
 
 from ..abc import CAP_VFOLDER, AbstractVolume
 from ..exception import ExecutionError, InvalidAPIParameters
@@ -104,21 +104,7 @@ class BaseVolume(AbstractVolume):
         if not os.listdir(path.parent.parent):
             path.parent.parent.rmdir()
 
-    async def delete_vfolder(self, vfid: UUID) -> None:
-        vfpath = self.mangle_vfpath(vfid)
-        dst = self.trash_path / self.mangle_rel_path(vfid)
-        loop = asyncio.get_running_loop()
-
-        def _delete_vfolder():
-            shutil.move(vfpath, dst)
-            self._clean_empty_parents(vfpath)
-
-        await loop.run_in_executor(
-            None,
-            _delete_vfolder,
-        )
-
-    async def purge_vfolder(self, vfid: UUID) -> None:
+    async def _purge(self, vfid: UUID) -> None:
         vfpath = self.trash_path / self.mangle_rel_path(vfid)
         loop = asyncio.get_running_loop()
 
@@ -131,7 +117,31 @@ class BaseVolume(AbstractVolume):
 
         await loop.run_in_executor(None, _purge_vfolder)
 
+    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+        if not self.local_config["storage-proxy"].get("use-trash-bin", True):
+            await self._purge(vfid)
+            return VFolderDeletionResult.PURGED
+        vfpath = self.mangle_vfpath(vfid)
+        dst = self.trash_path / self.mangle_rel_path(vfid)
+        loop = asyncio.get_running_loop()
+
+        def _delete_vfolder():
+            shutil.move(vfpath, dst)
+            self._clean_empty_parents(vfpath)
+
+        await loop.run_in_executor(
+            None,
+            _delete_vfolder,
+        )
+        return VFolderDeletionResult.DELETED
+
+    async def purge_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+        await self._purge(vfid)
+        return VFolderDeletionResult.PURGED
+
     async def recover_vfolder(self, vfid: UUID) -> None:
+        if not self.local_config["storage-proxy"].get("use-trash-bin", True):
+            raise ExecutionError("This storage has no trash bin")
         src = self.trash_path / self.mangle_rel_path(vfid)
         dst = self.mangle_vfpath(vfid)
         loop = asyncio.get_running_loop()

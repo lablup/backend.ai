@@ -66,6 +66,7 @@ __all__ = (
     "MountPermissionLiteral",
     "MountTypes",
     "VFolderMount",
+    "VFolderDeletionResult",
     "KernelCreationConfig",
     "KernelCreationResult",
     "ServicePortProtocols",
@@ -786,6 +787,11 @@ class VFolderMount(JSONSerializableMixin):
                 t.Key("mount_perm"): tx.Enum(MountPermission),
             }
         )
+
+
+class VFolderDeletionResult(str, enum.Enum):
+    DELETED = "deleted"
+    PURGED = "purged"
 
 
 class ImageRegistry(TypedDict):

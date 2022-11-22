@@ -145,7 +145,8 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
 @click.argument("name", type=str)
 def delete(name):
     """Delete the given virtual folder.
-    Since deleted virtual folders are located in 'trash bin', `recover()` can reverse this operation.
+    This operation can be irreversible if the storage proxy has trash-bin.
+    If it is set, `recover()` can reverse this operation.
 
     NAME: Name of a virtual folder.
     """

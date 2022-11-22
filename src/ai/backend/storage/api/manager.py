@@ -200,8 +200,12 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.delete_vfolder(params["vfid"])
-            return web.Response(status=204)
+            result = await volume.delete_vfolder(params["vfid"])
+            return web.json_response(
+                {
+                    "result": result.value,
+                },
+            )
 
 
 async def purge_vfolder(request: web.Request) -> web.Response:
@@ -217,8 +221,12 @@ async def purge_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "purge_vfolder", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            await volume.purge_vfolder(params["vfid"])
-            return web.Response(status=204)
+            result = await volume.purge_vfolder(params["vfid"])
+            return web.json_response(
+                {
+                    "result": result.value,
+                },
+            )
 
 
 async def recover_vfolder(request: web.Request) -> web.Response:

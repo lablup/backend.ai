@@ -33,6 +33,7 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import VFolderDeletionResult
 
 from ..models import (
     DEAD_VFOLDER_STATUSES,
@@ -54,11 +55,11 @@ from ..models import (
     keypairs,
     query_accessible_vfolders,
     query_owned_dotfiles,
+    update_vfolder_status,
     users,
     verify_vfolder_name,
     vfolder_invitations,
     vfolder_permissions,
-    vfolder_status_ctxmgr,
     vfolders,
 )
 from .auth import admin_required, auth_required, superadmin_required
@@ -600,22 +601,25 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         # fs-level deletion may fail or take longer time
         # but let's complete the db transaction to reflect that it's deleted.
         cond = vfolders.c.id == folder_id
-        async with vfolder_status_ctxmgr(
-            conn,
-            cond,
-            VFolderOperationStatus.DELETE_ONGOING,
-            VFolderOperationStatus.DELETE_COMPLETE,
+        await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_ONGOING)
+        async with root_ctx.storage_manager.request(
+            folder_host,
+            "POST",
+            "folder/delete",
+            json={
+                "volume": root_ctx.storage_manager.split_host(folder_host)[1],
+                "vfid": str(folder_id),
+            },
+        ) as (_, storage_resp):
+            result = await storage_resp.json()
+        if result is not None and (
+            VFolderDeletionResult(result.get("result")) == VFolderDeletionResult.PURGED
         ):
-            async with root_ctx.storage_manager.request(
-                folder_host,
-                "POST",
-                "folder/delete",
-                json={
-                    "volume": root_ctx.storage_manager.split_host(folder_host)[1],
-                    "vfid": str(folder_id),
-                },
-            ):
-                pass
+            query = sa.delete(vfolders).where(cond)
+            await conn.execute(query)
+        else:
+            await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
+
     return web.Response(status=204)
 
 
@@ -1918,22 +1922,24 @@ async def delete(request: web.Request) -> web.Response:
     # but let's complete the db transaction to reflect that it's deleted.
     async with root_ctx.db.begin() as conn:
         cond = vfolders.c.name == folder_name
-        async with vfolder_status_ctxmgr(
-            conn,
-            cond,
-            VFolderOperationStatus.DELETE_ONGOING,
-            VFolderOperationStatus.DELETE_COMPLETE,
+        await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_ONGOING)
+        async with root_ctx.storage_manager.request(
+            folder_host,
+            "POST",
+            "folder/delete",
+            json={
+                "volume": volume_name,
+                "vfid": str(folder_id),
+            },
+        ) as (_, storage_resp):
+            result = await storage_resp.json()
+        if result is not None and (
+            VFolderDeletionResult(result.get("result")) == VFolderDeletionResult.PURGED
         ):
-            async with root_ctx.storage_manager.request(
-                proxy_name,
-                "POST",
-                "folder/delete",
-                json={
-                    "volume": volume_name,
-                    "vfid": str(folder_id),
-                },
-            ):
-                pass
+            query = sa.delete(vfolders).where(cond)
+            await conn.execute(query)
+        else:
+            await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
     return web.Response(status=204)
 
 
@@ -1978,12 +1984,6 @@ async def purge(request: web.Request) -> web.Response:
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot purge the vfolder " "that is not owned by myself.")
-        query = (
-            sa.update(vfolders)
-            .values(status=VFolderOperationStatus.PURGE_ONGOING)
-            .where(vfolders.c.name == folder_name)
-        )
-        await conn.execute(query)
 
     folder_host = entry["host"]
     folder_id = entry["id"]
@@ -1992,22 +1992,19 @@ async def purge(request: web.Request) -> web.Response:
     # but let's complete the db transaction to reflect that it's deleted.
     async with root_ctx.db.begin() as conn:
         cond = vfolders.c.name == folder_name
-        async with vfolder_status_ctxmgr(
-            conn,
-            cond,
-            VFolderOperationStatus.PURGE_ONGOING,
+        await update_vfolder_status(conn, cond, VFolderOperationStatus.PURGE_ONGOING)
+        async with root_ctx.storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/purge",
+            json={
+                "volume": volume_name,
+                "vfid": str(folder_id),
+            },
         ):
-            async with root_ctx.storage_manager.request(
-                proxy_name,
-                "POST",
-                "folder/purge",
-                json={
-                    "volume": volume_name,
-                    "vfid": str(folder_id),
-                },
-            ):
-                pass
-        await conn.execute(sa.delete(vfolders).where(cond))
+            pass
+        query = sa.delete(vfolders).where(cond)
+        await conn.execute(query)
     return web.Response(status=204)
 
 
@@ -2063,12 +2060,6 @@ async def recover(request: web.Request) -> web.Response:
         # Folder owner OR user who have DELETE permission can recover folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot recover the vfolder " "that is not owned by myself.")
-        query = (
-            sa.update(vfolders)
-            .values(status=VFolderOperationStatus.RECOVER_ONGOING)
-            .where(vfolders.c.name == folder_name)
-        )
-        await conn.execute(query)
 
     folder_host = entry["host"]
     folder_id = entry["id"]
@@ -2077,19 +2068,18 @@ async def recover(request: web.Request) -> web.Response:
     # but let's complete the db transaction to reflect that it's deleted.
     async with root_ctx.db.begin() as conn:
         cond = vfolders.c.name == folder_name
-        async with vfolder_status_ctxmgr(
-            conn, cond, VFolderOperationStatus.RECOVER_ONGOING, VFolderOperationStatus.READY
+        await update_vfolder_status(conn, cond, VFolderOperationStatus.RECOVER_ONGOING)
+        async with root_ctx.storage_manager.request(
+            proxy_name,
+            "POST",
+            "folder/recover",
+            json={
+                "volume": volume_name,
+                "vfid": str(folder_id),
+            },
         ):
-            async with root_ctx.storage_manager.request(
-                proxy_name,
-                "POST",
-                "folder/recover",
-                json={
-                    "volume": volume_name,
-                    "vfid": str(folder_id),
-                },
-            ):
-                pass
+            pass
+        await update_vfolder_status(conn, cond, VFolderOperationStatus.READY)
     return web.Response(status=204)
 
 

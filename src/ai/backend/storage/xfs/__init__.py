@@ -8,7 +8,7 @@ from uuid import UUID
 
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import BinarySize
+from ai.backend.common.types import BinarySize, VFolderDeletionResult
 
 from ..exception import ExecutionError, VFolderCreationError
 from ..types import VFolderCreationOptions, VFolderUsage
@@ -181,7 +181,7 @@ class XfsVolume(BaseVolume):
             await self.delete_vfolder(vfid)
             raise VFolderCreationError("problem in setting vfolder quota")
 
-    async def delete_vfolder(self, vfid: UUID) -> None:
+    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
         async with FileLock(LOCK_FILE):
             await self.registry.read_project_info()
             if vfid in self.registry.name_id_map.keys():
@@ -198,6 +198,7 @@ class XfsVolume(BaseVolume):
                     await self.registry.remove_project_entry(vfid)
             await super().delete_vfolder(vfid)
             await self.registry.read_project_info()
+        return VFolderDeletionResult.PURGED
 
     async def get_quota(self, vfid: UUID) -> BinarySize:
         full_report = await run(

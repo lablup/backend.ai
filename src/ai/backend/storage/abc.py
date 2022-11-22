@@ -5,7 +5,7 @@ from pathlib import Path, PurePath, PurePosixPath
 from typing import Any, AsyncIterator, Final, FrozenSet, Mapping, Optional, Sequence
 from uuid import UUID
 
-from ai.backend.common.types import BinarySize, HardwareMetadata
+from ai.backend.common.types import BinarySize, HardwareMetadata, VFolderDeletionResult
 
 from .exception import InvalidSubpathError, VFolderNotFoundError
 from .types import DirEntry, FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderUsage
@@ -95,12 +95,11 @@ class AbstractVolume(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def delete_vfolder(self, vfid: UUID) -> None:
+    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
         pass
 
-    @abstractmethod
-    async def purge_vfolder(self, vfid: UUID) -> None:
-        pass
+    async def purge_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+        return await self.delete_vfolder(vfid)
 
     @abstractmethod
     async def recover_vfolder(self, vfid: UUID) -> None:

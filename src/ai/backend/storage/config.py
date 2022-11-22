@@ -37,6 +37,7 @@ local_config_iv = (
                         default_gid=_file_perm.st_gid,
                     ),
                     t.Key("aiomonitor-port", default=50300): t.Int[1:65535],
+                    t.Key("use-trash-bin", default=True): t.Null | t.ToBool,
                 },
             ),
             t.Key("logging"): logging_config_iv,

@@ -3,10 +3,9 @@ from __future__ import annotations
 import enum
 import os.path
 import uuid
-from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, AsyncIterator, List, Mapping, Optional, Sequence, Set
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Set
 
 import graphene
 import sqlalchemy as sa
@@ -62,7 +61,7 @@ __all__: Sequence[str] = (
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
-    "vfolder_status_ctxmgr",
+    "update_vfolder_status",
 )
 
 
@@ -705,64 +704,26 @@ async def prepare_vfolder_mounts(
     return matched_vfolder_mounts
 
 
-@actxmgr
-async def vfolder_status_ctxmgr(
+async def update_vfolder_status(
     conn: SAConnection,
     target_vfolder_cond: BinaryExpression,
-    enter_status: VFolderOperationStatus | None = None,
-    exit_status: VFolderOperationStatus | None = None,
-) -> AsyncIterator[None]:
-    if enter_status is not None:
-        query = (
-            sa.update(vfolders)
-            .values(
-                status=enter_status,
-                status_history=sql_json_merge(
-                    vfolders.c.status_history,
-                    (),
-                    {
-                        enter_status.name: datetime.now(tzutc()).isoformat(),
-                    },
-                ),
-            )
-            .where(target_vfolder_cond)
+    update_status: VFolderOperationStatus,
+):
+    query = (
+        sa.update(vfolders)
+        .values(
+            status=update_status,
+            status_history=sql_json_merge(
+                vfolders.c.status_history,
+                (),
+                {
+                    update_status.name: datetime.now(tzutc()).isoformat(),
+                },
+            ),
         )
-        await conn.execute(query)
-    try:
-        yield
-    except Exception:
-        query = (
-            sa.update(vfolders)
-            .values(
-                status=VFolderOperationStatus.ERROR,
-                status_history=sql_json_merge(
-                    vfolders.c.status_history,
-                    (),
-                    {
-                        VFolderOperationStatus.ERROR.name: datetime.now(tzutc()).isoformat(),
-                    },
-                ),
-            )
-            .where(target_vfolder_cond)
-        )
-        await conn.execute(query)
-        raise
-    if exit_status is not None:
-        query = (
-            sa.update(vfolders)
-            .values(
-                status=exit_status,
-                status_history=sql_json_merge(
-                    vfolders.c.status_history,
-                    (),
-                    {
-                        exit_status.name: datetime.now(tzutc()).isoformat(),
-                    },
-                ),
-            )
-            .where(target_vfolder_cond)
-        )
-        await conn.execute(query)
+        .where(target_vfolder_cond)
+    )
+    await conn.execute(query)
 
 
 class VirtualFolder(graphene.ObjectType):

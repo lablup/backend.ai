@@ -20,7 +20,7 @@ branch_labels = None
 depends_on = None
 
 DELETING = "deleting"
-enum_name = "vfolderstatus"
+enum_name = "vfolderoperationstatus"
 ERROR = "error"
 DELETE_ONGOING = "delete-ongoing"  # vfolder is moving to trash bin
 DELETE_COMPLETE = "deleted-complete"  # vfolder is in trash bin
