@@ -191,7 +191,7 @@ class IdleCheckerHost:
                         await self._event_producer.produce_event(
                             DoTerminateSessionEvent(
                                 session["id"],
-                                KernelLifecycleEventReason.idle_checker_name(checker.name),
+                                KernelLifecycleEventReason.from_value(f"idle-{checker.name}"),
                             ),
                         )
                         # If any one of checkers decided to terminate the session,

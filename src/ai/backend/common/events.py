@@ -199,6 +199,9 @@ class KernelLifecycleEventReason(str, enum.Enum):
     EXEC_TIMEOUT = "exec-timeout"
     FAILED_TO_START = "failed-to-start"
     FORCE_TERMINATED = "force-terminated"
+    IDLE_TIMEOUT = "idle-timeout"
+    IDLE_SESSION_LIFETIME = "idle-session_lifetime"
+    IDLE_UTILIZATION = "idle-utilization"
     KILLED_BY_EVENT = "killed-by-event"
     NEW_CONTAINER_STARTED = "new-container-started"
     PENDING_TIMEOUT = "pending-timeout"
@@ -216,14 +219,15 @@ class KernelLifecycleEventReason(str, enum.Enum):
     USER_REQUESTED = "user-requested"
 
     @classmethod
-    def get_or_anomaly_detected(cls, reason: Optional[str]):
-        if reason:
-            return reason
-        return cls.ANOMALY_DETECTED
-
-    @staticmethod
-    def idle_checker_name(checker_name: str):
-        return f"idle-{checker_name}"
+    def from_value(
+        cls, value: Optional[str], alternative: Optional[KernelLifecycleEventReason] = None
+    ) -> KernelLifecycleEventReason:
+        try:
+            return cls(value)
+        except ValueError:
+            if not alternative:
+                alternative = KernelLifecycleEventReason.UNKNOWN
+        return alternative
 
 
 @attr.s(slots=True, frozen=True)
