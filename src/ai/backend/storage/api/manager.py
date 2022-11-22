@@ -17,6 +17,7 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import VFolderDeletionResult
 from ai.backend.storage.exception import ExecutionError
 
 from ..abc import AbstractVolume
@@ -200,7 +201,10 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            result = await volume.delete_vfolder(params["vfid"])
+            if ctx.local_config["storage-proxy"].get("use-trash-bin", True):
+                result = await volume.move_to_trash(params["vfid"])
+            else:
+                result = await volume.purge_vfolder(params["vfid"])
             return web.json_response(
                 {
                     "result": result.value,
@@ -221,7 +225,10 @@ async def purge_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "purge_vfolder", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            result = await volume.purge_vfolder(params["vfid"])
+            if ctx.local_config["storage-proxy"].get("use-trash-bin", True):
+                result = await volume.purge_vfolder(params["vfid"])
+            else:
+                result = VFolderDeletionResult.ALREADY_PURGED
             return web.json_response(
                 {
                     "result": result.value,

@@ -104,23 +104,7 @@ class BaseVolume(AbstractVolume):
         if not os.listdir(path.parent.parent):
             path.parent.parent.rmdir()
 
-    async def _purge(self, vfid: UUID) -> None:
-        vfpath = self.trash_path / self.mangle_rel_path(vfid)
-        loop = asyncio.get_running_loop()
-
-        def _purge_vfolder():
-            try:
-                shutil.rmtree(vfpath)
-            except FileNotFoundError:
-                pass
-            self._clean_empty_parents(vfpath)
-
-        await loop.run_in_executor(None, _purge_vfolder)
-
-    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
-        if not self.local_config["storage-proxy"].get("use-trash-bin", True):
-            await self._purge(vfid)
-            return VFolderDeletionResult.PURGED
+    async def move_to_trash(self, vfid: UUID) -> VFolderDeletionResult:
         vfpath = self.mangle_vfpath(vfid)
         dst = self.trash_path / self.mangle_rel_path(vfid)
         loop = asyncio.get_running_loop()
@@ -133,10 +117,23 @@ class BaseVolume(AbstractVolume):
             None,
             _delete_vfolder,
         )
-        return VFolderDeletionResult.DELETED
+        return VFolderDeletionResult.MOVED_TO_TRASH
+
+    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+        return await self.move_to_trash(vfid)
 
     async def purge_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
-        await self._purge(vfid)
+        vfpath = self.trash_path / self.mangle_rel_path(vfid)
+        loop = asyncio.get_running_loop()
+
+        def _purge_vfolder():
+            try:
+                shutil.rmtree(vfpath)
+            except FileNotFoundError:
+                pass
+            self._clean_empty_parents(vfpath)
+
+        await loop.run_in_executor(None, _purge_vfolder)
         return VFolderDeletionResult.PURGED
 
     async def recover_vfolder(self, vfid: UUID) -> None:

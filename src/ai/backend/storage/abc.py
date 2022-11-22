@@ -95,11 +95,16 @@ class AbstractVolume(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    async def move_to_trash(self, vfid: UUID) -> VFolderDeletionResult:
+        pass
+
+    @abstractmethod
     async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
         pass
 
+    @abstractmethod
     async def purge_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
-        return await self.delete_vfolder(vfid)
+        pass
 
     @abstractmethod
     async def recover_vfolder(self, vfid: UUID) -> None:

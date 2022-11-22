@@ -790,8 +790,9 @@ class VFolderMount(JSONSerializableMixin):
 
 
 class VFolderDeletionResult(str, enum.Enum):
-    DELETED = "deleted"
+    MOVED_TO_TRASH = "moved-to-trash"
     PURGED = "purged"
+    ALREADY_PURGED = "already-purged"
 
 
 class ImageRegistry(TypedDict):

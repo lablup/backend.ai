@@ -133,6 +133,9 @@ class WekaVolume(BaseVolume):
         if options is not None and options.quota is not None:
             await self.set_quota(vfid, options.quota)
 
+    async def move_to_trash(self, vfid: UUID) -> VFolderDeletionResult:
+        return await self.delete_vfolder(vfid)
+
     async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
         assert self._fs_uid is not None
         vfpath = self.mangle_vfpath(vfid)
@@ -143,6 +146,9 @@ class WekaVolume(BaseVolume):
             pass
         await super().delete_vfolder(vfid)
         return VFolderDeletionResult.PURGED
+
+    async def purge_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+        return await self.delete_vfolder(vfid)
 
     async def get_quota(self, vfid: UUID) -> BinarySize:
         assert self._fs_uid is not None

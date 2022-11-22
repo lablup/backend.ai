@@ -200,6 +200,12 @@ class XfsVolume(BaseVolume):
             await self.registry.read_project_info()
         return VFolderDeletionResult.PURGED
 
+    async def move_to_trash(self, vfid: UUID) -> VFolderDeletionResult:
+        return await self.delete_vfolder(vfid)
+
+    async def purge_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+        return await self.delete_vfolder(vfid)
+
     async def get_quota(self, vfid: UUID) -> BinarySize:
         full_report = await run(
             ["sudo", "xfs_quota", "-x", "-c", "report -h", self.mount_path],

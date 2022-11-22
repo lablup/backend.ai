@@ -113,6 +113,9 @@ class NetAppVolume(BaseVolume):
             io_usec_write=metric["latency"]["write"],
         )
 
+    async def move_to_trash(self, vfid: UUID) -> VFolderDeletionResult:
+        return await self.delete_vfolder(vfid)
+
     async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
         vfpath = self.mangle_vfpath(vfid)
 
@@ -155,6 +158,9 @@ class NetAppVolume(BaseVolume):
 
         await read_progress(nfs_path)
         return VFolderDeletionResult.PURGED
+
+    async def purge_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+        return await self.delete_vfolder(vfid)
 
     async def clone_vfolder(
         self,
