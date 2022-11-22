@@ -56,6 +56,7 @@ __all__: Sequence[str] = (
     "VFolderPermissionValidator",
     "VFolderOperationStatus",
     "VFolderAccessStatus",
+    "DEAD_VFOLDER_STATUSES",
     "query_accessible_vfolders",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
@@ -145,6 +146,13 @@ class VFolderAccessStatus(str, enum.Enum):
     UPDATABLE = "updatable"
     RECOVERABLE = "recoverable"
     PURGABLE = "purgable"
+
+
+DEAD_VFOLDER_STATUSES = (
+    VFolderOperationStatus.DELETE_ONGOING,
+    VFolderOperationStatus.DELETE_COMPLETE,
+    VFolderOperationStatus.PURGE_ONGOING,
+)
 
 
 vfolders = sa.Table(

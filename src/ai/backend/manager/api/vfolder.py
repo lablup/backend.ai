@@ -35,6 +35,7 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models import (
+    DEAD_VFOLDER_STATUSES,
     AgentStatus,
     KernelStatus,
     UserRole,
@@ -369,7 +370,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
 
         # Check resource policy's max_vfolder_count
         if resource_policy["max_vfolder_count"] > 0:
-            query = sa.select([sa.func.count()]).where(vfolders.c.user == user_uuid)
+            query = sa.select([sa.func.count()]).where(
+                (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
+            )
             result = await conn.scalar(query)
             if result >= resource_policy["max_vfolder_count"]:
                 raise InvalidAPIParameters("You cannot create more vfolders.")
@@ -2016,6 +2019,7 @@ async def recover(request: web.Request) -> web.Response:
     )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
+    resource_policy = request["keypair"]["resource_policy"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -2023,7 +2027,7 @@ async def recover(request: web.Request) -> web.Response:
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info("VFOLDER.RECOVER (ak:{}, vf:{})", access_key, folder_name)
     async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
+        recover_targets = await query_accessible_vfolders(
             conn,
             user_uuid,
             user_role=user_role,
@@ -2031,21 +2035,31 @@ async def recover(request: web.Request) -> web.Response:
             allowed_vfolder_types=allowed_vfolder_types,
             extra_vf_conds=(vfolders.c.name == folder_name),
         )
-        # FIXME: For now, multiple entries on purge vfolder will raise an error. Will be fixed in 22.06
-        if len(entries) > 1:
+        # FIXME: For now, multiple entries on recover vfolder will raise an error.
+        if len(recover_targets) > 1:
             log.error(
                 "VFOLDER.RECOVER(folder name:{}, hosts:{}",
                 folder_name,
-                [entry["host"] for entry in entries],
+                [entry["host"] for entry in recover_targets],
             )
             raise TooManyVFoldersFound(
                 extra_msg="Multiple folders with the same name.",
                 extra_data=None,
             )
-        elif len(entries) == 0:
+        elif len(recover_targets) == 0:
             raise InvalidAPIParameters("No such vfolder.")
+
+        # Check resource policy's max_vfolder_count
+        if resource_policy["max_vfolder_count"] > 0:
+            query = sa.select([sa.func.count()]).where(
+                (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
+            )
+            result = await conn.scalar(query)
+            if result + len(recover_targets) > resource_policy["max_vfolder_count"]:
+                raise InvalidAPIParameters("You cannot create(or recover) more vfolders.")
+
         # query_accesible_vfolders returns list
-        entry = entries[0]
+        entry = recover_targets[0]
         # Folder owner OR user who have DELETE permission can recover folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot recover the vfolder " "that is not owned by myself.")
@@ -2210,7 +2224,9 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
         # Check resource policy's max_vfolder_count
         if resource_policy["max_vfolder_count"] > 0:
-            query = sa.select([sa.func.count()]).where(vfolders.c.user == user_uuid)
+            query = sa.select([sa.func.count()]).where(
+                (vfolders.c.user == user_uuid) & ~(vfolders.c.status.in_(DEAD_VFOLDER_STATUSES))
+            )
             result = await conn.scalar(query)
             if result >= resource_policy["max_vfolder_count"]:
                 raise InvalidAPIParameters("You cannot create more vfolders.")
