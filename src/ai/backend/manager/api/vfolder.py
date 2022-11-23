@@ -612,14 +612,15 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             },
         ) as (_, storage_resp):
             result = await storage_resp.json()
-        if result is not None and (
-            VFolderDeletionResult(result.get("result")) == VFolderDeletionResult.PURGED
-        ):
-            query = sa.delete(vfolders).where(cond)
-            await conn.execute(query)
-        else:
-            await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
-
+        if result is not None:
+            match VFolderDeletionResult(result.get("result")):
+                case VFolderDeletionResult.PURGED:
+                    query = sa.delete(vfolders).where(cond)
+                    await conn.execute(query)
+                case VFolderDeletionResult.MOVED_TO_TRASH:
+                    await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
+                case VFolderDeletionResult.ALREADY_PURGED:
+                    pass
     return web.Response(status=204)
 
 
@@ -1933,13 +1934,15 @@ async def delete(request: web.Request) -> web.Response:
             },
         ) as (_, storage_resp):
             result = await storage_resp.json()
-        if result is not None and (
-            VFolderDeletionResult(result.get("result")) == VFolderDeletionResult.PURGED
-        ):
-            query = sa.delete(vfolders).where(cond)
-            await conn.execute(query)
-        else:
-            await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
+        if result is not None:
+            match VFolderDeletionResult(result.get("result")):
+                case VFolderDeletionResult.PURGED:
+                    query = sa.delete(vfolders).where(cond)
+                    await conn.execute(query)
+                case VFolderDeletionResult.MOVED_TO_TRASH:
+                    await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
+                case VFolderDeletionResult.ALREADY_PURGED:
+                    pass
     return web.Response(status=204)
 
 
@@ -2001,10 +2004,17 @@ async def purge(request: web.Request) -> web.Response:
                 "volume": volume_name,
                 "vfid": str(folder_id),
             },
-        ):
-            pass
-        query = sa.delete(vfolders).where(cond)
-        await conn.execute(query)
+        ) as (_, storage_resp):
+            result = await storage_resp.json()
+        if result is not None:
+            match VFolderDeletionResult(result.get("result")):
+                case VFolderDeletionResult.PURGED:
+                    query = sa.delete(vfolders).where(cond)
+                    await conn.execute(query)
+                case VFolderDeletionResult.MOVED_TO_TRASH:
+                    await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
+                case VFolderDeletionResult.ALREADY_PURGED:
+                    pass
     return web.Response(status=204)
 
 
