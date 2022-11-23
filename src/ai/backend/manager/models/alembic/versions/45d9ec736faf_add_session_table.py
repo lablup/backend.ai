@@ -1,8 +1,8 @@
 """add_session_table
 
-Revision ID: 8d289333d720
-Revises: 360af8f33d4e
-Create Date: 2022-10-05 14:40:29.012038
+Revision ID: 45d9ec736faf
+Revises: 5bce905c21e5
+Create Date: 2022-11-24 02:07:42.484799
 
 """
 from collections import defaultdict
@@ -12,14 +12,13 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import registry
-from sqlalchemy.orm.session import Session
 
 from ai.backend.manager.models import KernelStatus, SessionStatus
 from ai.backend.manager.models.base import GUID, KernelIDColumn, convention
 
 # revision identifiers, used by Alembic.
-revision = "8d289333d720"
-down_revision = "360af8f33d4e"
+revision = "45d9ec736faf"
+down_revision = "5bce905c21e5"
 branch_labels = None
 depends_on = None
 
