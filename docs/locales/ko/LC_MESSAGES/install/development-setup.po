@@ -104,7 +104,7 @@ msgstr ""
 msgid ""
 "Ensure that you have the Python version specified in ``pants.toml`` on "
 "your ``PATH``."
-msgstr "``PATH`` 에 ``pants.toml`` 에 명시된 파이썬의 구체적인 버전을 가지고 있는지 확인해 주어야 합니다."
+msgstr "``PATH`` 환경변수가 ``pants.toml``\ 에 명시된 파이썬의 구체적인 버전을 가지고 있는지 확인해 주어야 합니다."
 
 #: ../../install/development-setup.rst:118 3134a12b16464539bffa7d62525e6674
 msgid ""
