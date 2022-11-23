@@ -8,7 +8,7 @@ import numbers
 import sys
 import uuid
 from abc import ABCMeta, abstractmethod
-from collections import UserDict, namedtuple
+from collections import UserDict, defaultdict, namedtuple
 from contextvars import ContextVar
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
@@ -212,6 +212,27 @@ MetricKey = NewType("MetricKey", str)
 
 AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
+
+
+class AbstractPermission(str, enum.Enum):
+    """
+    Abstract enum type for permissions
+    """
+
+
+class VFolderHostPermission(AbstractPermission):
+    """
+    Atomic permissions for a virtual folder under a host given to a specific access key.
+    """
+
+    CREATE = "create-vfolder"
+    MODIFY = "modify-vfolder"  # rename, update-options
+    DELETE = "delete-vfolder"
+    MOUNT_IN_SESSION = "mount-in-session"
+    UPLOAD_FILE = "upload-file"
+    DOWNLOAD_FILE = "download-file"
+    INVITE_OTHERS = "invite-others"  # invite other user to user-type vfolder
+    SET_USER_PERM = "set-user-specific-permission"  # override permission of group-type vfolder
 
 
 class LogSeverity(str, enum.Enum):
@@ -786,6 +807,35 @@ class VFolderMount(JSONSerializableMixin):
                 t.Key("mount_perm"): tx.Enum(MountPermission),
             }
         )
+
+
+class VFolderHostPermissionMap(dict, JSONSerializableMixin):
+    def __or__(self, other: Any) -> VFolderHostPermissionMap:
+        if self is other:
+            return self
+        if not isinstance(other, dict):
+            raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
+        union_map: Dict[str, set] = defaultdict(set)
+        for host, perms in [*self.items(), *other.items()]:
+            try:
+                perm_list = [VFolderHostPermission(perm) for perm in perms]
+            except ValueError:
+                raise ValueError(f"Invalid type. Permissions of Host `{host}` are ({perms})")
+            union_map[host] |= set(perm_list)
+        return VFolderHostPermissionMap(union_map)
+
+    def to_json(self) -> dict[str, Any]:
+        return {host: [perm.value for perm in perms] for host, perms in self.items()}
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        from . import validators as tx
+
+        return t.Dict(t.String, t.List(tx.Enum(VFolderHostPermission)))
 
 
 class ImageRegistry(TypedDict):
