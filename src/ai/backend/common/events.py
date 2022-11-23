@@ -200,7 +200,7 @@ class KernelLifecycleEventReason(str, enum.Enum):
     FAILED_TO_START = "failed-to-start"
     FORCE_TERMINATED = "force-terminated"
     IDLE_TIMEOUT = "idle-timeout"
-    IDLE_SESSION_LIFETIME = "idle-session_lifetime"
+    IDLE_SESSION_LIFETIME = "idle-session-lifetime"
     IDLE_UTILIZATION = "idle-utilization"
     KILLED_BY_EVENT = "killed-by-event"
     NEW_CONTAINER_STARTED = "new-container-started"
@@ -219,15 +219,12 @@ class KernelLifecycleEventReason(str, enum.Enum):
     USER_REQUESTED = "user-requested"
 
     @classmethod
-    def from_value(
-        cls, value: Optional[str], alternative: Optional[KernelLifecycleEventReason] = None
-    ) -> KernelLifecycleEventReason:
+    def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:
         try:
             return cls(value)
         except ValueError:
-            if not alternative:
-                alternative = KernelLifecycleEventReason.UNKNOWN
-        return alternative
+            pass
+        return None
 
 
 @attrs.define(slots=True, frozen=True)

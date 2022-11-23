@@ -188,10 +188,16 @@ class IdleCheckerHost:
                             checker.name,
                             session["id"],
                         )
+                        if isinstance(checker, TimeoutIdleChecker):
+                            terminate_reason = KernelLifecycleEventReason.IDLE_TIMEOUT
+                        elif isinstance(checker, SessionLifetimeChecker):
+                            terminate_reason = KernelLifecycleEventReason.IDLE_SESSION_LIFETIME
+                        elif isinstance(checker, UtilizationIdleChecker):
+                            terminate_reason = KernelLifecycleEventReason.IDLE_UTILIZATION
                         await self._event_producer.produce_event(
                             DoTerminateSessionEvent(
                                 session["id"],
-                                KernelLifecycleEventReason.from_value(f"idle-{checker.name}"),
+                                terminate_reason,
                             ),
                         )
                         # If any one of checkers decided to terminate the session,
