@@ -133,22 +133,25 @@ class WekaVolume(BaseVolume):
         if options is not None and options.quota is not None:
             await self.set_quota(vfid, options.quota)
 
-    async def move_to_trash(self, vfid: UUID) -> VFolderDeletionResult:
-        return await self.delete_vfolder(vfid)
-
-    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
-        assert self._fs_uid is not None
-        vfpath = self.mangle_vfpath(vfid)
+    async def _remove_quota_vfolder(self, vfpath: Path):
         inode_id = await self._get_inode_id(vfpath)
         try:
             await self.api_client.remove_quota(self._fs_uid, inode_id)
         except WekaNotFoundError:
             pass
+
+    async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+        assert self._fs_uid is not None
+        vfpath = self.mangle_vfpath(vfid)
+        await self._remove_quota_vfolder(vfpath)
         await super().delete_vfolder(vfid)
         return VFolderDeletionResult.PURGED
 
-    async def purge_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
-        return await self.delete_vfolder(vfid)
+    async def delete_in_trash(self, vfid: UUID) -> VFolderDeletionResult:
+        vfpath = self.get_vf_trash_path(vfid)
+        await self._remove_quota_vfolder(vfpath)
+        await super().delete_in_trash(vfid)
+        return VFolderDeletionResult.PURGED
 
     async def get_quota(self, vfid: UUID) -> BinarySize:
         assert self._fs_uid is not None

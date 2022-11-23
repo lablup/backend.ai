@@ -66,6 +66,9 @@ class AbstractVolume(metaclass=ABCMeta):
         vfpath = self.mangle_vfpath(vfid).resolve()
         return PurePosixPath(target_path.relative_to(vfpath))
 
+    def get_vf_trash_path(self, vfid: UUID) -> Path:
+        return self.trash_path / self.mangle_rel_path(vfid)
+
     # ------ volume operations -------
 
     @abstractmethod
@@ -96,14 +99,24 @@ class AbstractVolume(metaclass=ABCMeta):
 
     @abstractmethod
     async def move_to_trash(self, vfid: UUID) -> VFolderDeletionResult:
+        """
+        Move the vfolder to designated `trash` directory.
+        """
         pass
 
     @abstractmethod
     async def delete_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+        """
+        Delete the vfolder permanently.
+        This does not move the vfolder to trash dir.
+        """
         pass
 
     @abstractmethod
-    async def purge_vfolder(self, vfid: UUID) -> VFolderDeletionResult:
+    async def delete_in_trash(self, vfid: UUID) -> VFolderDeletionResult:
+        """
+        Delete the vfolder located in trash dir permanently.
+        """
         pass
 
     @abstractmethod
