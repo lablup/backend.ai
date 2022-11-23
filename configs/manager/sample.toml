@@ -73,6 +73,13 @@ heartbeat-timeout = 30.0
 #       you must change this to a directory under your *home* directory.
 # ipc-base-path = "/tmp/backend.ai/ipc"
 
+# Explicitly set allowed plugins in order to load only selected plugin.
+# If use this feature,
+#   1) Replace '# allowed-plugins = []' with 'allowed-plugins = ["example.plugin.what.you.want"]'
+#   2) Add allowlist parameters when plugin_ctx initiate like 'example_plugin_ctx.init(allowlist=local_config["manager"]["allowed-plugins"])
+# Note: If you set allowed-plugins, they could only be loaded. The others would be blocked.
+# allowed-plugins = []
+
 # The list of black-listed manager plugins.
 disabled-plugins = []
 
