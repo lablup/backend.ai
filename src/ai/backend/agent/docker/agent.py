@@ -64,7 +64,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import AsyncFileWriter, current_loop
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
-from ..exception import DockerContainerCreationError, InitializationError, UnsupportedResource
+from ..exception import ContainerCreationError, InitializationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
@@ -781,7 +781,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await container.start()
             except asyncio.CancelledError:
                 if container is not None:
-                    raise DockerContainerCreationError(container_id=cid)
+                    raise ContainerCreationError(container_id=cid)
                 raise
             except Exception:
                 # Oops, we have to restore the allocated resources!
@@ -798,7 +798,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     for dev_name, device_alloc in resource_spec.allocations.items():
                         self.computers[dev_name].alloc_map.free(device_alloc)
                 if container is not None:
-                    raise DockerContainerCreationError(container_id=cid)
+                    raise ContainerCreationError(container_id=cid)
                 raise
 
             additional_network_names: Set[str] = set()

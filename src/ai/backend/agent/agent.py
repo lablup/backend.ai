@@ -112,7 +112,7 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 
 from . import __version__ as VERSION
 from . import resources as resources_mod
-from .exception import AgentError, DockerContainerCreationError, ResourceError
+from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
     AbstractAllocMap,
@@ -1604,7 +1604,7 @@ class AbstractAgent(
                 resource_opts,
                 preopen_ports,
             )
-        except DockerContainerCreationError as e:
+        except ContainerCreationError as e:
             log.warning(
                 "Kernel failed to create container (k:{}). Kernel is going to be destroyed.",
                 ctx.kernel_id,
