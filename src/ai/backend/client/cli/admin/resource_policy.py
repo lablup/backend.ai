@@ -1,3 +1,4 @@
+import json
 import sys
 
 import click
@@ -93,10 +94,27 @@ def list(ctx):
     default=1800,
     help="The maximum period of time allowed for kernels to wait " "further requests.",
 )
-# @click.option('--allowed-vfolder-hosts', type=click.Tuple(str), default=['local'],
-#               help='Locations to create virtual folders.')
 @click.option(
-    "--allowed-vfolder-hosts", default=["local"], help="Locations to create virtual folders."
+    "--allowed-vfolder-hosts",
+    type=str,
+    default=json.dumps(
+        {
+            "local:volume1": [
+                "create-vfolder",
+                "read-vfolder",
+                "update-vfolder",
+                "delete-vfolder",
+                "mount",
+                "update-file",
+                "upload",
+                "download",
+                "invite",
+                "share",
+            ]
+        }
+    ),
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
 )
 def add(
     ctx: CLIContext,
@@ -173,7 +191,12 @@ def add(
     type=int,
     help="The maximum period of time allowed for kernels to wait " "further requests.",
 )
-@click.option("--allowed-vfolder-hosts", help="Locations to create virtual folders.")
+@click.option(
+    "--allowed-vfolder-hosts",
+    type=str,
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
+)
 def update(
     ctx: CLIContext,
     name,

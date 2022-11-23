@@ -20,7 +20,6 @@ from typing import (
     MutableMapping,
     Optional,
     Sequence,
-    Set,
     Tuple,
 )
 
@@ -33,6 +32,7 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap
 
 from ..models import (
     AgentStatus,
@@ -357,7 +357,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     conn, resource_policy, domain_name, user_uuid
                 )
             # TODO: handle legacy host lists assuming that volume names don't overlap?
-            if folder_host not in allowed_hosts:
+            if (
+                folder_host not in allowed_hosts
+                or VFolderHostPermission.CREATE not in allowed_hosts[folder_host]
+            ):
                 raise InvalidAPIParameters("You are not allowed to use this vfolder host.")
 
         # Check resource policy's max_vfolder_count
@@ -629,7 +632,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin() as conn:
-        allowed_hosts: Set[str] = set()
+        allowed_hosts = VFolderHostPermissionMap()
         if "user" in allowed_vfolder_types:
             allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
                 conn, resource_policy, domain_name, request["user"]["uuid"], group_id
@@ -642,7 +645,9 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             allowed_hosts = allowed_hosts | allowed_hosts_by_group
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
     all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
-    allowed_hosts = allowed_hosts & all_hosts
+    allowed_hosts = VFolderHostPermissionMap(
+        {host: perms for host, perms in allowed_hosts.items() if host in all_hosts}
+    )
     default_host = await root_ctx.shared_config.get_raw("volumes/default_host")
     if default_host not in allowed_hosts:
         default_host = None
