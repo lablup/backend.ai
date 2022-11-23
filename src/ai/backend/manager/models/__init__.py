@@ -1,3 +1,4 @@
+from . import acl as _acl
 from . import agent as _agent
 from . import domain as _domain
 from . import dotfile as _dotfile
@@ -18,6 +19,7 @@ from .base import metadata
 
 __all__ = (
     "metadata",
+    *_acl.__all__,
     *_agent.__all__,
     *_domain.__all__,
     *_group.__all__,
@@ -36,6 +38,7 @@ __all__ = (
     *_errorlogs.__all__,
 )
 
+from .acl import *  # noqa
 from .agent import *  # noqa
 from .domain import *  # noqa
 from .dotfile import *  # noqa

@@ -181,6 +181,8 @@ def local_config(
                 "distributed-lock": "filelock",
                 "ipc-base-path": ipc_base_path,
                 "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
+                "allowed-plugins": set(),
+                "disabled-plugins": set(),
             },
             "debug": {
                 "enabled": False,
