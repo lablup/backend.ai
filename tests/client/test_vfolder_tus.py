@@ -1,5 +1,6 @@
 import secrets
 from pathlib import Path
+from time import time
 from unittest import mock
 
 import pytest
@@ -138,6 +139,8 @@ async def test_vfolder_download(mocker):
     mock_reader.next = AsyncMock()
     mock_reader.next.return_value = None
     mock_file = "fake-file1"
+
+    today_timestamp = time()
     with aioresponses() as m:
 
         async with AsyncSession() as session:
@@ -174,7 +177,10 @@ async def test_vfolder_download(mocker):
             # 2. Client to Manager through TusClient. Upload url
             m.get(
                 storage_path + "?token={}".format(payload["token"]),
-                headers={"Content-Length": "527"},
+                headers={
+                    "Content-Length": "527",
+                    "Last-Modified": str(today_timestamp),
+                },
                 status=200,
             )
             await session.VFolder(vfolder_name).download([mock_file])
