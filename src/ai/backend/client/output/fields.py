@@ -293,3 +293,9 @@ vfolder_fields = FieldSet(
         FieldSpec("cloneable"),
     ]
 )
+
+permission_fields = FieldSet(
+    [
+        FieldSpec("vfolder_host_permission_list"),
+    ]
+)

@@ -5,7 +5,7 @@ import os.path
 import uuid
 from datetime import datetime
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Set
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -17,7 +17,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common.types import VFolderMount
+from ai.backend.common.types import VFolderHostPermissionMap, VFolderMount
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
 from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
@@ -463,7 +463,7 @@ async def get_allowed_vfolder_hosts_by_group(
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
     domain_admin: bool = False,
-) -> Set[str]:
+) -> VFolderHostPermissionMap:
     """
     Union `allowed_vfolder_hosts` from domain, group, and keypair_resource_policy.
 
@@ -473,12 +473,12 @@ async def get_allowed_vfolder_hosts_by_group(
     from . import domains, groups
 
     # Domain's allowed_vfolder_hosts.
-    allowed_hosts: set[str] = set()
+    allowed_hosts = VFolderHostPermissionMap()
     query = sa.select([domains.c.allowed_vfolder_hosts]).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
     if values := await conn.scalar(query):
-        allowed_hosts.update(values)
+        allowed_hosts = allowed_hosts | values
     # Group's allowed_vfolder_hosts.
     if group_id is not None:
         query = sa.select([groups.c.allowed_vfolder_hosts]).where(
@@ -487,16 +487,16 @@ async def get_allowed_vfolder_hosts_by_group(
             & (groups.c.is_active),
         )
         if values := await conn.scalar(query):
-            allowed_hosts.update(values)
+            allowed_hosts = allowed_hosts | values
     elif domain_admin:
         query = sa.select([groups.c.allowed_vfolder_hosts]).where(
             (groups.c.domain_name == domain_name) & (groups.c.is_active),
         )
         if rows := (await conn.execute(query)).fetchall():
             for row in rows:
-                allowed_hosts.update(row.allowed_vfolder_hosts)
+                allowed_hosts = allowed_hosts | row.allowed_vfolder_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    allowed_hosts.update(resource_policy["allowed_vfolder_hosts"])
+    allowed_hosts = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
     return allowed_hosts
 
 
@@ -506,7 +506,7 @@ async def get_allowed_vfolder_hosts_by_user(
     domain_name: str,
     user_uuid: uuid.UUID,
     group_id: Optional[uuid.UUID] = None,
-) -> Set[str]:
+) -> VFolderHostPermissionMap:
     """
     Union `allowed_vfolder_hosts` from domain, groups, and keypair_resource_policy.
 
@@ -515,12 +515,12 @@ async def get_allowed_vfolder_hosts_by_user(
     from . import association_groups_users, domains, groups
 
     # Domain's allowed_vfolder_hosts.
-    allowed_hosts: set[str] = set()
+    allowed_hosts = VFolderHostPermissionMap()
     query = sa.select([domains.c.allowed_vfolder_hosts]).where(
         (domains.c.name == domain_name) & (domains.c.is_active),
     )
     if values := await conn.scalar(query):
-        allowed_hosts.update(values)
+        allowed_hosts = allowed_hosts | values
     # User's Groups' allowed_vfolder_hosts.
     if group_id is not None:
         j = groups.join(
@@ -548,9 +548,9 @@ async def get_allowed_vfolder_hosts_by_user(
     )
     if rows := (await conn.execute(query)).fetchall():
         for row in rows:
-            allowed_hosts.update(row.allowed_vfolder_hosts)
+            allowed_hosts = allowed_hosts | row.allowed_vfolder_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
-    allowed_hosts.update(resource_policy["allowed_vfolder_hosts"])
+    allowed_hosts = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
     return allowed_hosts
 
 

@@ -1,10 +1,3 @@
-"""add_detail_delete_statuses
-
-Revision ID: b8b30f7604f3
-Revises: 360af8f33d4e
-Create Date: 2022-10-24 13:35:41.852654
-
-"""
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
@@ -13,11 +6,7 @@ from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import GUID, convention
 
-# revision identifiers, used by Alembic.
-revision = "b8b30f7604f3"
-down_revision = "360af8f33d4e"
-branch_labels = None
-depends_on = None
+###############
 
 DELETING = "deleting"
 enum_name = "vfolderoperationstatus"
