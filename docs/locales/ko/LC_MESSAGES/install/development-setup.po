@@ -110,7 +110,7 @@ msgstr "``PATH`` 에 ``pants.toml`` 에 명시된 파이썬의 구체적인 버�
 msgid ""
 "Depending on your Linux Distribution, you may have to additionally "
 "install a sysmte package that enables Python's `pip` command."
-msgstr "리눅스의 분배에 따라, 파이썬의 `pip` 명령을 할 수 있게 하는 시스템 패키지를 추가로 설치해야할 수 있습니다."
+msgstr "리눅스의 분배에 따라, 파이썬의 ``pip`` 명령을 할 수 있게 하는 시스템 패키지를 추가로 설치해야할 수 있습니다."
 
 #: ../../install/development-setup.rst:120 9a012081cd444a4fb642be8c1938d8dd
 msgid "Ubuntu"
