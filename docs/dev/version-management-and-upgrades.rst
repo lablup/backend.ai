@@ -3,7 +3,7 @@
 
 
 Version Numbering
------------------
+=================
 
 * Version numbering uses ``x.y.z`` format (where ``x``\ , ``y``\ , ``z`` are integers).
 * Mostly, we follow `the calendar versioning scheme <https://calver.org/>`_.
@@ -32,14 +32,15 @@ Version Numbering
 
 * The major/minor (\ ``x.y``\ ) version of Backend.AI subprojects will go together to indicate compatibility.  Currently manager/agent/common versions progress this way, while client SDKs have their own version numbers and the API specification has a different ``vN.yyyymmdd`` version format.
 
-  * ``backend.ai-manager 1.2.p`` is guaranteed to be compatible with ``backend.ai-agent 1.2.q`` (where ``p`` and ``q`` are same or different integers)
+  * Generally ``backend.ai-manager 1.2.p`` is compatible with ``backend.ai-agent 1.2.q`` (where ``p`` and ``q`` are same or different integers)
 
-    * When there are exceptions, it will be noted as breaking changes in the change logs.
+    * As of 22.09, this won't be guaranteed any more.  All server-side core component versions should **exactly match** with others, as we release them at once from the mono-repo, even for those who do not have any code changes.
 
   * The client is guaranteed to be backward-compatible with the server they share the same API specification version.
 
+
 Upgrading
----------
+=========
 
 You can upgrade the installed Python packages using ``pip install -U ...`` command along with dependencies.
 

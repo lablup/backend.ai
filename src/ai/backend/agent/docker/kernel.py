@@ -23,6 +23,7 @@ from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
+from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
@@ -468,8 +469,8 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, S
 
     all_distros = []
     entry_prefix = "backendai_krunner_v10"
-    for entrypoint in pkg_resources.iter_entry_points(entry_prefix):
-        log.debug("loading krunner pkg: {}", entrypoint.module_name)
+    for entrypoint in scan_entrypoints(entry_prefix):
+        log.debug("loading krunner pkg: {}", entrypoint.module)
         plugin = entrypoint.load()
         await plugin.init({})  # currently does nothing
         provided_versions = (
@@ -523,6 +524,7 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
         )
         shutil.copyfile(proxy_worker_binary, "/tmp/backend.ai/linuxkit-metadata-proxy")
         os.chmod("/tmp/backend.ai/linuxkit-metadata-proxy", 0o755)
+        server_port = local_config["agent"]["metadata-server-port"]
         # Prepare proxy worker container
         proxy_worker_container = PersistentServiceContainer(
             "linuxkit-nsenter:latest",
@@ -532,7 +534,7 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
                     "-c",
                     "ctr -n services.linuxkit t kill --exec-id metaproxy docker;"
                     "ctr -n services.linuxkit t exec --exec-id metaproxy docker "
-                    "/host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port 40128",
+                    f"/host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port {server_port}",
                 ],
                 "HostConfig": {
                     "PidMode": "host",

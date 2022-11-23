@@ -202,6 +202,7 @@ class APIConfig:
     _group: str
     _hash_type: str
     _skip_sslcert_validation: bool
+    _version: str
 
     def __init__(
         self,

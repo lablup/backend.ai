@@ -924,7 +924,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await create_metadata_server(self.local_config, self.kernel_registry),
         )
         await metadata_server_runner.setup()
-        site = web.TCPSite(metadata_server_runner, "0.0.0.0", 40128)
+        site = web.TCPSite(
+            metadata_server_runner,
+            "0.0.0.0",
+            self.local_config["agent"]["metadata-server-port"],
+        )
         await site.start()
         self.metadata_server_runner = metadata_server_runner
         # For legacy accelerator plugins
@@ -1074,8 +1078,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         All strings are UTF-8 encoded.
         """
         terminating = False
+        zmq_ctx = zmq.asyncio.Context()
         while True:
-            agent_sock = self.zmq_ctx.socket(zmq.REP)
+            agent_sock = zmq_ctx.socket(zmq.REP)
             try:
                 agent_sock.bind(f"tcp://127.0.0.1:{self.local_config['agent']['agent-sock-port']}")
                 while True:
@@ -1113,10 +1118,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 return
             except zmq.ZMQError:
                 log.exception("handle_agent_socket(): zmq error")
+                raise
             finally:
                 agent_sock.close()
                 if not terminating:
                     log.info("handle_agent_socket(): rebinding the socket")
+                else:
+                    zmq_ctx.destroy()
 
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
         auth_config = None

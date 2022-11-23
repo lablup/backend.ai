@@ -3,11 +3,11 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import List, Mapping, Tuple, Type
 
-import attr
+import attrs
 from yarl import URL
 
 
-@attr.s(auto_attribs=True, frozen=True)
+@attrs.define(auto_attribs=True, frozen=True)
 class LoadBalancerConfig:
     name: str
     args: Tuple[str, ...]

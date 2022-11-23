@@ -280,13 +280,13 @@ while [ $# -gt 0 ]; do
 done
 
 install_brew() {
-    case $DISTRO in
-	Darwin)
-	    if ! type "brew" > /dev/null 2>&1; then
-	        show_info "try to support auto-install on macOS using Homebrew."
-		/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-	    fi
-    esac
+  case $DISTRO in
+  Darwin)
+    if ! type "brew" > /dev/null 2>&1; then
+      show_info "try to support auto-install on macOS using Homebrew."
+      /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+    fi
+  esac
 }
 
 install_script_deps() {
@@ -464,6 +464,18 @@ check_python() {
   pyenv shell --unset
 }
 
+search_pants_python_from_pyenv() {
+  local _PYENV_PYVER=$(pyenv versions --bare | grep '^3\.9\.' | grep -v '/envs/' | sort -t. -k1,1r -k 2,2nr -k 3,3nr | head -n 1)
+  if [ -z "$_PYENV_PYVER" ]; then
+    >&2 echo "No Python 3.9 available via pyenv!"
+    >&2 echo "Please install Python 3.9 using pyenv and try again."
+    exit 1
+  else
+    >&2 echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
+  fi
+  echo "$_PYENV_PYVER"
+}
+
 bootstrap_pants() {
   set -e
   mkdir -p .tmp
@@ -476,21 +488,17 @@ bootstrap_pants() {
     return
   fi
   set +e
+  if [ "$(uname -m)" = "arm64" -a "$DISTRO" = "Darwin" ]; then
+    # In macOS with Apple Silicon, let Pants use Python 3.9 from pyenv
+    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
+    echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
+  fi
   PANTS="./pants"
   ./pants version
-  # Note that Pants requires Python 3.9 (not Python 3.10!) to work properly.
   if [ $? -eq 1 ]; then
+    # If we can't find the prebuilt Pants package, then try the source installation.
     show_info "Downloading and building Pants for the current setup"
-    local _PYENV_PYVER=$(pyenv versions --bare | grep '^3\.9\.' | grep -v '/envs/' | sort -t. -k1,1r -k 2,2nr -k 3,3nr | head -n 1)
-    if [ -z "$_PYENV_PYVER" ]; then
-      echo "No Python 3.9 available via pyenv!"
-      echo "Please install Python 3.9 using pyenv,"
-      echo "or add 'PY=<python-executable-path>' in ./.pants.env to "
-      echo "manually set the Pants-compatible interpreter path."
-      exit 1
-    else
-      echo "Chosen Python $_PYENV_PYVER (from pyenv) as the local Pants interpreter"
-    fi
+    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
     # In most cases, we won't need to modify the source code of pants.
     echo "ENABLE_PANTSD=true" > "$ROOT_PATH/.pants.env"
     echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
@@ -804,9 +812,10 @@ configure_backendai() {
   ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
   mkdir -p scratches
   POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
+  ALL_VFOLDER_HOST_PERM="{\"create-vfolder\",\"modify-vfolder\",\"delete-vfolder\",\"mount-in-session\",\"upload-file\",\"download-file\",\"invite-others\",\"set-user-specific-permission\",}"
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
   $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
 
   # Client backend endpoint configuration shell script

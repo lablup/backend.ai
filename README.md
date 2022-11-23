@@ -107,7 +107,7 @@ in a secure way.
 * SSH
    * All container sessions have intrinsic SSH/SFTP/SCP support with auto-generated per-user SSH keypair.
      PyCharm and other IDEs can use on-demand sessions using SSH remote interpreters.
-* VSCode (coming soon)
+* VSCode
    * Most container sessions have intrinsic web-based VSCode support.
 
 ### Working with Storage
@@ -129,7 +129,7 @@ It also monitors and scales the cluster of multiple agents (a few tens to hundre
 * `src/ai/backend/manager`
   * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/README.md)
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-manager
-  * Availble plugin interfaces
+  * Available plugin interfaces
     - `backendai_scheduler_v10`
     - `backendai_hook_v10`
     - `backendai_webapp_v10`
@@ -178,7 +178,7 @@ and basic administration tasks.
 
 ### Jail
 
-A programmable sandbox implemented using ptrace-based sytem call filtering written in Go.
+A programmable sandbox implemented using ptrace-based system call filtering written in Go.
 
 * https://github.com/lablup/backend.ai-jail
 
