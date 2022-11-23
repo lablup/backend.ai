@@ -59,6 +59,7 @@
 //     "multidict>=6.0",
 //     "namedlist~=1.8",
 //     "netifaces~=0.11.0",
+//     "networkx~=2.8.7",
 //     "packaging>=21.3",
 //     "passlib[bcrypt]>=1.7.4",
 //     "pexpect~=4.8",
@@ -1383,6 +1384,26 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "2ac84b496be68464a2da60da518af3785fff8b7ec0d090a581604bc870bdee41",
+              "url": "https://files.pythonhosted.org/packages/de/4c/2854d9e3dcce78108126aa3634186a64ddbfd06d4d69af74954665529e52/exceptiongroup-1.0.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "affbabf13fb6e98988c38d9c5650e701569fe3c1de3233cfb61c5f33774690ad",
+              "url": "https://files.pythonhosted.org/packages/4f/7e/eca80dbb5c10ec12ffb50884f52ecbff653cb5f443b0529244a748f114da/exceptiongroup-1.0.0.tar.gz"
+            }
+          ],
+          "project_name": "exceptiongroup",
+          "requires_dists": [
+            "pytest>=6; extra == \"test\""
+          ],
+          "requires_python": ">=3.7",
+          "version": "1"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "0122b75e7960cbb1e2bbbf10ef9b8c183377878e38466854953539c6d822e7c0",
               "url": "https://files.pythonhosted.org/packages/5a/65/c0aabfe3343b1699bc7cddcfbfba60177b1ac47bea44f5b5331a15c4d9c9/Faker-13.12.1-py3-none-any.whl"
             },
@@ -2387,6 +2408,45 @@
           "requires_dists": [],
           "requires_python": null,
           "version": "0.11"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "15cdf7f7c157637107ea690cabbc488018f8256fa28242aed0fb24c93c03a06d",
+              "url": "https://files.pythonhosted.org/packages/d0/00/1713dd6735d5a646cabdd99ff750e969795134d7d33f462ad71dfd07fa76/networkx-2.8.7-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "815383fd52ece0a7024b5fd8408cc13a389ea350cd912178b82eed8b96f82cd3",
+              "url": "https://files.pythonhosted.org/packages/9e/89/90846e0da5c412cbffb66d1f976b056cd46c6f2aa7f2f1eb271573b5fefb/networkx-2.8.7.tar.gz"
+            }
+          ],
+          "project_name": "networkx",
+          "requires_dists": [
+            "codecov>=2.1; extra == \"test\"",
+            "lxml>=4.6; extra == \"extra\"",
+            "matplotlib>=3.4; extra == \"default\"",
+            "mypy>=0.981; extra == \"developer\"",
+            "nb2plots>=0.6; extra == \"doc\"",
+            "numpy>=1.19; extra == \"default\"",
+            "numpydoc>=1.4; extra == \"doc\"",
+            "pandas>=1.3; extra == \"default\"",
+            "pillow>=9.1; extra == \"doc\"",
+            "pre-commit>=2.20; extra == \"developer\"",
+            "pydata-sphinx-theme>=0.9; extra == \"doc\"",
+            "pydot>=1.4.2; extra == \"extra\"",
+            "pygraphviz>=1.9; extra == \"extra\"",
+            "pytest-cov>=3.0; extra == \"test\"",
+            "pytest>=7.1; extra == \"test\"",
+            "scipy>=1.8; extra == \"default\"",
+            "sphinx-gallery>=0.10; extra == \"doc\"",
+            "sphinx>=5; extra == \"doc\"",
+            "sympy>=1.10; extra == \"extra\"",
+            "texext>=0.6.6; extra == \"doc\""
+          ],
+          "requires_python": ">=3.8",
+          "version": "2.8.7"
         },
         {
           "artifacts": [
@@ -4410,6 +4470,7 @@
     "multidict>=6.0",
     "namedlist~=1.8",
     "netifaces~=0.11.0",
+    "networkx~=2.8.7",
     "packaging>=21.3",
     "passlib[bcrypt]>=1.7.4",
     "pexpect~=4.8",

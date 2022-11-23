@@ -111,7 +111,8 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import cancel_tasks, current_loop
 
 from . import __version__ as VERSION
-from . import resources as resources_mod
+from . import alloc_map as alloc_map_mod
+from .affinity_map import AffinityHint, AffinityMap
 from .exception import AgentError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
@@ -585,12 +586,15 @@ class AbstractAgent(
         self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
 
-        resources_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
+        alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers, self.slots = await self.detect_resources()
+        all_devices: list[AbstractComputeDevice] = []
         for name, computer in computers.items():
             devices = await computer.list_devices()
+            all_devices.extend(devices)
             alloc_map = await computer.create_alloc_map()
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
+        self.affinity_map = AffinityMap.build(all_devices)
 
         if not self._skip_initial_scan:
             self.images = await self.scan_images()
@@ -1440,27 +1444,44 @@ class AbstractAgent(
 
         # Realize ComputeDevice (including accelerators) allocations.
         slots = resource_spec.slots
-        dev_names: Set[DeviceName] = set()
+        dev_names: set[DeviceName] = set()
         for slot_name in slots.keys():
             dev_name = slot_name.split(".", maxsplit=1)[0]
             dev_names.add(DeviceName(dev_name))
 
         if not restarting:
+            alloc_order = [
+                DeviceName(name) for name in self.local_config["resource"]["allocation-order"]
+            ]
+            ordered_dev_names = sorted(dev_names, key=lambda item: alloc_order.index(item))
+            affinity_hint = AffinityHint(
+                None, self.affinity_map, self.local_config["resource"]["affinity-policy"]
+            )
             async with self.resource_lock:
-                for dev_name in dev_names:
+                for dev_name in ordered_dev_names:
                     computer_set = self.computers[dev_name]
+                    device_id_map = {device.device_id: device for device in computer_set.devices}
                     device_specific_slots = {
                         SlotName(slot_name): Decimal(alloc)
                         for slot_name, alloc in slots.items()
                         if slot_name.startswith(dev_name)
                     }
                     try:
-                        # TODO: support allocate_evenly()
                         resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
-                            device_specific_slots, context_tag=dev_name
+                            device_specific_slots,
+                            affinity_hint=affinity_hint,
+                            context_tag=dev_name,
                         )
                         log.debug(
                             "{} allocations: {}", dev_name, resource_spec.allocations[dev_name]
+                        )
+                        hint_devices: list[AbstractComputeDevice] = []
+                        for slot_name, per_device_alloc in resource_spec.allocations[
+                            dev_name
+                        ].items():
+                            hint_devices.extend(device_id_map[k] for k in per_device_alloc.keys())
+                        affinity_hint = AffinityHint(
+                            hint_devices, self.affinity_map, affinity_hint.policy
                         )
                     except ResourceError as e:
                         log.info(
