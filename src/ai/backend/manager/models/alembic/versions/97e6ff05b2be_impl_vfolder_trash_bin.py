@@ -1,3 +1,10 @@
+"""impl_vfolder_trash_bin
+
+Revision ID: 97e6ff05b2be
+Revises: 5bce905c21e5
+Create Date: 2022-11-23 14:51:26.056482
+
+"""
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql as pgsql
@@ -6,7 +13,11 @@ from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import GUID, convention
 
-###############
+# revision identifiers, used by Alembic.
+revision = "97e6ff05b2be"
+down_revision = "5bce905c21e5"
+branch_labels = None
+depends_on = None
 
 DELETING = "deleting"
 enum_name = "vfolderoperationstatus"
