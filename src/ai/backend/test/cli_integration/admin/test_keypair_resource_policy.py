@@ -68,15 +68,13 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_pol
     assert test_krp.get("allowed_vfolder_hosts") == {
         "local:volume1": [
             "create-vfolder",
-            "read-vfolder",
-            "update-vfolder",
+            "modify-vfolder",
             "delete-vfolder",
-            "mount",
-            "update-file",
-            "upload",
-            "download",
-            "invite",
-            "share",
+            "mount-in-session",
+            "upload-file",
+            "download-file",
+            "invite-others",
+            "set-user-specific-permission",
         ],
     }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
@@ -145,15 +143,13 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_
     assert test_krp.get("allowed_vfolder_hosts") == {
         "local:volume2": [
             "create-vfolder",
-            "read-vfolder",
-            "update-vfolder",
+            "modify-vfolder",
             "delete-vfolder",
-            "mount",
-            "update-file",
-            "upload",
-            "download",
-            "invite",
-            "share",
+            "mount-in-session",
+            "upload-file",
+            "download-file",
+            "invite-others",
+            "set-user-specific-permission",
         ],
     }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
