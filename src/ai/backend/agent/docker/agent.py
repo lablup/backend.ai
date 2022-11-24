@@ -42,6 +42,7 @@ from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
+from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -1372,7 +1373,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.START,
-                "new-container-started",
+                KernelLifecycleEventReason.NEW_CONTAINER_STARTED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
             )
 
@@ -1389,7 +1390,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.CLEAN,
-                reason or "self-terminated",
+                reason or KernelLifecycleEventReason.SELF_TERMINATED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
                 exit_code=exit_code,
             )

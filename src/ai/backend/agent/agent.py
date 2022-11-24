@@ -77,6 +77,7 @@ from ai.backend.common.events import (
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
+    KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
@@ -836,7 +837,9 @@ class AbstractAgent(
                         await self.rescan_resource_usage()
                         if not ev.suppress_events:
                             await self.produce_event(
-                                KernelTerminatedEvent(ev.kernel_id, "already-terminated"),
+                                KernelTerminatedEvent(
+                                    ev.kernel_id, KernelLifecycleEventReason.ALREADY_TERMINATED
+                                ),
                             )
                         if ev.done_future is not None:
                             ev.done_future.set_result(None)
@@ -969,7 +972,7 @@ class AbstractAgent(
         self,
         kernel_id: KernelId,
         event: LifecycleEvent,
-        reason: str,
+        reason: KernelLifecycleEventReason,
         *,
         container_id: ContainerId = None,
         exit_code: int = None,
@@ -1079,7 +1082,7 @@ class AbstractAgent(
                         kernel_id,
                         known_kernels[kernel_id],
                         LifecycleEvent.CLEAN,
-                        "self-terminated",
+                        KernelLifecycleEventReason.SELF_TERMINATED,
                     )
                 for kernel_id, container in await self.enumerate_containers(ACTIVE_STATUS_SET):
                     alive_kernels[kernel_id] = container.id
@@ -1096,7 +1099,7 @@ class AbstractAgent(
                         kernel_id,
                         known_kernels[kernel_id],
                         LifecycleEvent.CLEAN,
-                        "self-terminated",
+                        KernelLifecycleEventReason.SELF_TERMINATED,
                     )
                 # Check if: there are containers not spawned by me.
                 for kernel_id in alive_kernels.keys() - known_kernels.keys():
@@ -1106,7 +1109,7 @@ class AbstractAgent(
                         kernel_id,
                         alive_kernels[kernel_id],
                         LifecycleEvent.DESTROY,
-                        "terminated-unknown-container",
+                        KernelLifecycleEventReason.TERMINATED_UNKNOWN_CONTAINER,
                     )
             finally:
                 # Enqueue the events.
@@ -1124,7 +1127,7 @@ class AbstractAgent(
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.DESTROY,
-                "agent-termination",
+                KernelLifecycleEventReason.AGENT_TERMINATION,
                 done_future=clean_events[kernel_id] if blocking else None,
             )
         if blocking:
@@ -1197,7 +1200,8 @@ class AbstractAgent(
                             KernelId(UUID(body["ID"])),
                             ContainerId(body["CID"]),
                             LifecycleEvent.DESTROY,
-                            body.get("reason", "anomaly-detected"),
+                            KernelLifecycleEventReason.from_value(body.get("reason"))
+                            or KernelLifecycleEventReason.ANOMALY_DETECTED,
                         )
                         await self.loop.run_in_executor(None, _rm, reported_kernel)
                     else:
@@ -1277,7 +1281,7 @@ class AbstractAgent(
                     await self.inject_container_lifecycle_event(
                         kernel_id,
                         LifecycleEvent.START,
-                        "resuming-agent-operation",
+                        KernelLifecycleEventReason.RESUMING_AGENT_OPERATION,
                         container_id=container.id,
                     )
                 elif container.status in DEAD_STATUS_SET:
@@ -1289,7 +1293,7 @@ class AbstractAgent(
                     await self.inject_container_lifecycle_event(
                         kernel_id,
                         LifecycleEvent.CLEAN,
-                        "self-terminated",
+                        KernelLifecycleEventReason.SELF_TERMINATED,
                         container_id=container.id,
                     )
 
@@ -1335,25 +1339,33 @@ class AbstractAgent(
                     )
                 except KeyError:
                     await self.produce_event(
-                        KernelTerminatedEvent(kernel_id, "self-terminated"),
+                        KernelTerminatedEvent(
+                            kernel_id, KernelLifecycleEventReason.SELF_TERMINATED
+                        ),
                     )
                     break
 
                 if result["status"] == "finished":
                     if result["exitCode"] == 0:
                         await self.produce_event(
-                            SessionSuccessEvent(SessionId(kernel_id), "task-done", 0),
+                            SessionSuccessEvent(
+                                SessionId(kernel_id), KernelLifecycleEventReason.TASK_DONE, 0
+                            ),
                         )
                     else:
                         await self.produce_event(
                             SessionFailureEvent(
-                                SessionId(kernel_id), "task-failed", result["exitCode"]
+                                SessionId(kernel_id),
+                                KernelLifecycleEventReason.TASK_FAILED,
+                                result["exitCode"],
                             ),
                         )
                     break
                 if result["status"] == "exec-timeout":
                     await self.produce_event(
-                        SessionFailureEvent(SessionId(kernel_id), "task-timeout", -2),
+                        SessionFailureEvent(
+                            SessionId(kernel_id), KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                        ),
                     )
                     break
                 opts = {
@@ -1362,7 +1374,9 @@ class AbstractAgent(
                 mode = "continue"
         except asyncio.CancelledError:
             await self.produce_event(
-                SessionFailureEvent(SessionId(kernel_id), "task-cancelled", -2),
+                SessionFailureEvent(
+                    SessionId(kernel_id), KernelLifecycleEventReason.TASK_CANCELLED, -2
+                ),
             )
 
     async def create_kernel(
@@ -1830,7 +1844,7 @@ class AbstractAgent(
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.DESTROY,
-                "restarting",
+                KernelLifecycleEventReason.RESTARTING,
             )
             try:
                 with timeout(60):
@@ -1841,7 +1855,7 @@ class AbstractAgent(
                 await self.inject_container_lifecycle_event(
                     kernel_id,
                     LifecycleEvent.CLEAN,
-                    "restart-timeout",
+                    KernelLifecycleEventReason.RESTART_TIMEOUT,
                 )
                 raise
             else:
@@ -1920,7 +1934,7 @@ class AbstractAgent(
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.DESTROY,
-                "exec-timeout",
+                KernelLifecycleEventReason.EXEC_TIMEOUT,
             )
         return {
             **result,

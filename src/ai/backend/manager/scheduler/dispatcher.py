@@ -24,6 +24,7 @@ from ai.backend.common.events import (
     DoScheduleEvent,
     EventDispatcher,
     EventProducer,
+    KernelLifecycleEventReason,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,
@@ -308,7 +309,7 @@ class SchedulerDispatcher(aobject):
                     SessionCancelledEvent(
                         item["session_id"],
                         item["session_creation_id"],
-                        reason="pending timeout",
+                        reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                     ),
                 )
 
@@ -1015,7 +1016,7 @@ class SchedulerDispatcher(aobject):
                     SessionCancelledEvent(
                         session.session_id,
                         session.session_creation_id,
-                        "failed-to-start",
+                        KernelLifecycleEventReason.FAILED_TO_START,
                     ),
                 )
                 async with self.db.begin_readonly() as db_conn:

@@ -55,6 +55,7 @@ from ai.backend.common.docker import ImageRef, get_known_registries, get_registr
 from ai.backend.common.events import (
     AgentStartedEvent,
     KernelCancelledEvent,
+    KernelLifecycleEventReason,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
     SessionCancelledEvent,
@@ -1866,7 +1867,7 @@ class AgentRegistry:
                     rpc_coros.append(
                         rpc.call.destroy_kernel(
                             str(kernel["id"]),
-                            "failed-to-start",
+                            KernelLifecycleEventReason.FAILED_TO_START,
                             suppress_events=True,
                         ),
                     )
@@ -1877,7 +1878,7 @@ class AgentRegistry:
         session_getter: SessionGetter,
         *,
         forced: bool = False,
-        reason: Optional[str] = None,
+        reason: Optional[KernelLifecycleEventReason] = None,
     ) -> Mapping[str, Any]:
         """
         Destroy session kernels. Do not destroy
@@ -1890,7 +1891,11 @@ class AgentRegistry:
         async with self.db.begin_readonly() as conn:
             session = await session_getter(db_connection=conn)
         if not reason:
-            reason = "force-terminated" if forced else "user-requested"
+            reason = (
+                KernelLifecycleEventReason.FORCE_TERMINATED
+                if forced
+                else KernelLifecycleEventReason.USER_REQUESTED
+            )
         hook_result = await self.hook_plugin_ctx.dispatch(
             "PRE_DESTROY_SESSION",
             (session["session_id"], session["session_name"], session["access_key"]),
