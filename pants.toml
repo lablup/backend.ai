@@ -97,7 +97,7 @@ extra_requirements.add = [
     "pytest-mock>=3.8.2",
     "aioresponses>=0.7.3",
 ]
-args = ["-v", "--suppress-no-test-exit-code", "-m", "'not integration'"]
+args = ["-v", "--suppress-no-test-exit-code"]
 lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 

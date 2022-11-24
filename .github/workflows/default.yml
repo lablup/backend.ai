@@ -66,8 +66,7 @@ jobs:
 
   typecheck:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on:
-      labels: ubuntu-latest-8-cores
+    runs-on: ubuntu-latest-8-cores
     steps:
     - uses: actions/checkout@v3
       with:
@@ -122,8 +121,7 @@ jobs:
 
   test:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on:
-      labels: ubuntu-latest-16-cores
+    runs-on: ubuntu-latest-8-cores
     steps:
     - uses: actions/checkout@v3
       with:
