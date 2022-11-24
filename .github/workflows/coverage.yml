@@ -58,7 +58,7 @@ jobs:
         ./pants --no-verify-config version
     - name: Run the full test suite
       run: |
-        ./pants test --use-coverage -- -m 'not integration'
+        ./pants test --use-coverage tests:: -- -m 'not integration'
     - name: Upload coverage report
       uses: codecov/codecov-action@v3
     - name: Upload pants log
