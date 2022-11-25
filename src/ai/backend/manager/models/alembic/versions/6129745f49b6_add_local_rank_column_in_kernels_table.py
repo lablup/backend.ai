@@ -18,7 +18,7 @@ depends_on = None
 def upgrade():
     op.add_column(
         "kernels",
-        sa.Column("local_rank", sa.Integer, nullable=False, default=0),
+        sa.Column("local_rank", sa.Integer, nullable=False, server_default=0),
     )
 
 
