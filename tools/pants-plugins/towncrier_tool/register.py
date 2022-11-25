@@ -84,8 +84,8 @@ class TowncrierSubsystem(PythonToolBase):
 
 
 class TowncrierGoal(Goal):
-    name = "update-changelog"
-    subsystem_cls = TowncrierSubsystem
+    name = "update-changelog"  # type: ignore
+    subsystem_cls = TowncrierSubsystem  # type: ignore
 
 
 class TowncrierLockfileSentinel(GenerateToolLockfileSentinel):

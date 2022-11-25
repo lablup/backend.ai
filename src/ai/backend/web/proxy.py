@@ -147,12 +147,7 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
             bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(initial_vector, encoding="utf8")
         )
         b64p = base64.b64decode(real_payload)
-        dec = unpad(crypt.decrypt(bytes(b64p)), 16)
-        result = dec.decode("UTF-8")
-        if not result:
-            request["payload"] = ""
-        else:
-            request["payload"] = result
+        request["payload"] = unpad(crypt.decrypt(bytes(b64p)), 16)
     else:
         request["payload"] = ""
     return await handler(request)

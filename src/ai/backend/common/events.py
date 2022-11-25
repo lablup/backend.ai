@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import enum
 import hashlib
 import logging
 import secrets
@@ -27,7 +28,7 @@ from typing import (
     cast,
 )
 
-import attr
+import attrs
 from aiomonitor.task import preserve_termination_log
 from aiotools.context import aclosing
 from aiotools.server import process_index
@@ -105,12 +106,12 @@ class DoIdleCheckEvent(EmptyEventArgs, AbstractEvent):
     name = "do_idle_check"
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class DoTerminateSessionEvent(AbstractEvent):
     name = "do_terminate_session"
 
-    session_id: SessionId = attr.ib()
-    reason: str = attr.ib()
+    session_id: SessionId = attrs.field()
+    reason: KernelLifecycleEventReason = attrs.field()
 
     def serialize(self) -> tuple:
         return (
@@ -126,10 +127,10 @@ class DoTerminateSessionEvent(AbstractEvent):
         )
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class GenericAgentEventArgs:
 
-    reason: str = attr.ib(default="")
+    reason: str = attrs.field(default="")
 
     def serialize(self) -> tuple:
         return (self.reason,)
@@ -147,15 +148,15 @@ class AgentTerminatedEvent(GenericAgentEventArgs, AbstractEvent):
     name = "agent_terminated"
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class AgentErrorEvent(AbstractEvent):
     name = "agent_error"
 
-    message: str = attr.ib()
-    traceback: Optional[str] = attr.ib(default=None)
-    user: Optional[Any] = attr.ib(default=None)
-    context_env: Mapping[str, Any] = attr.ib(factory=dict)
-    severity: LogSeverity = attr.ib(default=LogSeverity.ERROR)
+    message: str = attrs.field()
+    traceback: Optional[str] = attrs.field(default=None)
+    user: Optional[Any] = attrs.field(default=None)
+    context_env: Mapping[str, Any] = attrs.field(factory=dict)
+    severity: LogSeverity = attrs.field(default=LogSeverity.ERROR)
 
     def serialize(self) -> tuple:
         return (
@@ -177,11 +178,11 @@ class AgentErrorEvent(AbstractEvent):
         )
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class AgentHeartbeatEvent(AbstractEvent):
     name = "agent_heartbeat"
 
-    agent_info: Mapping[str, Any] = attr.ib()
+    agent_info: Mapping[str, Any] = attrs.field()
 
     def serialize(self) -> tuple:
         return (self.agent_info,)
@@ -191,17 +192,54 @@ class AgentHeartbeatEvent(AbstractEvent):
         return cls(value[0])
 
 
-@attr.s(slots=True, frozen=True)
+class KernelLifecycleEventReason(str, enum.Enum):
+    AGENT_TERMINATION = "agent-termination"
+    ALREADY_TERMINATED = "already-terminated"
+    ANOMALY_DETECTED = "anomaly-detected"
+    EXEC_TIMEOUT = "exec-timeout"
+    FAILED_TO_START = "failed-to-start"
+    FORCE_TERMINATED = "force-terminated"
+    IDLE_TIMEOUT = "idle-timeout"
+    IDLE_SESSION_LIFETIME = "idle-session-lifetime"
+    IDLE_UTILIZATION = "idle-utilization"
+    KILLED_BY_EVENT = "killed-by-event"
+    NEW_CONTAINER_STARTED = "new-container-started"
+    PENDING_TIMEOUT = "pending-timeout"
+    RESTARTING = "restarting"
+    RESTART_TIMEOUT = "restart-timeout"
+    RESUMING_AGENT_OPERATION = "resuming-agent-operation"
+    SELF_TERMINATED = "self-terminated"
+    TASK_DONE = "task-done"
+    TASK_FAILED = "task-failed"
+    TASK_TIMEOUT = "task-timeout"
+    TASK_CANCELLED = "task-cancelled"
+    TASK_FINISHED = "task-finished"
+    TERMINATED_UNKNOWN_CONTAINER = "terminated-unknown-container"
+    UNKNOWN = "unknown"
+    USER_REQUESTED = "user-requested"
+
+    @classmethod
+    def from_value(cls, value: Optional[str]) -> Optional[KernelLifecycleEventReason]:
+        try:
+            return cls(value)
+        except ValueError:
+            pass
+        return None
+
+
+@attrs.define(slots=True, frozen=True)
 class KernelCreationEventArgs:
-    kernel_id: KernelId = attr.ib()
-    creation_id: str = attr.ib()
-    reason: str = attr.ib(default="")
+    kernel_id: KernelId = attrs.field()
+    creation_id: str = attrs.field()
+    reason: str = attrs.field(default="")
+    creation_info: Mapping[str, Any] = attrs.field(factory=dict)
 
     def serialize(self) -> tuple:
         return (
             str(self.kernel_id),
             self.creation_id,
             self.reason,
+            self.creation_info,
         )
 
     @classmethod
@@ -210,6 +248,7 @@ class KernelCreationEventArgs:
             kernel_id=KernelId(uuid.UUID(value[0])),
             creation_id=value[1],
             reason=value[2],
+            creation_info=value[3],
         )
 
 
@@ -225,13 +264,13 @@ class KernelPullingEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_pulling"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KernelPullProgressEvent(AbstractEvent):
     name = "kernel_pull_progress"
-    kernel_id: uuid.UUID = attr.ib()
-    current_progress: float = attr.ib()
-    total_progress: float = attr.ib()
-    message: Optional[str] = attr.ib(default=None)
+    kernel_id: uuid.UUID = attrs.field()
+    current_progress: float = attrs.field()
+    total_progress: float = attrs.field()
+    message: Optional[str] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
@@ -263,11 +302,11 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
     name = "kernel_cancelled"
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class KernelTerminationEventArgs:
-    kernel_id: KernelId = attr.ib()
-    reason: str = attr.ib(default="")
-    exit_code: int = attr.ib(default=-1)
+    kernel_id: KernelId = attrs.field()
+    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
+    exit_code: int = attrs.field(default=-1)
 
     def serialize(self) -> tuple:
         return (
@@ -293,11 +332,11 @@ class KernelTerminatedEvent(KernelTerminationEventArgs, AbstractEvent):
     name = "kernel_terminated"
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class SessionCreationEventArgs:
-    session_id: SessionId = attr.ib()
-    creation_id: str = attr.ib()
-    reason: str = attr.ib(default="")
+    session_id: SessionId = attrs.field()
+    creation_id: str = attrs.field()
+    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
 
     def serialize(self) -> tuple:
         return (
@@ -335,10 +374,10 @@ class SessionStartedEvent(SessionCreationEventArgs, AbstractEvent):
     name = "session_started"
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class SessionTerminationEventArgs:
-    session_id: SessionId = attr.ib()
-    reason: str = attr.ib(default="")
+    session_id: SessionId = attrs.field()
+    reason: str = attrs.field(default="")
 
     def serialize(self) -> tuple:
         return (
@@ -358,11 +397,11 @@ class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
     name = "session_terminated"
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class SessionResultEventArgs:
-    session_id: SessionId = attr.ib()
-    reason: str = attr.ib(default="")
-    exit_code: int = attr.ib(default=-1)
+    session_id: SessionId = attrs.field()
+    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
+    exit_code: int = attrs.field(default=-1)
 
     def serialize(self) -> tuple:
         return (
@@ -388,12 +427,12 @@ class SessionFailureEvent(SessionResultEventArgs, AbstractEvent):
     name = "session_failure"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class DoSyncKernelLogsEvent(AbstractEvent):
     name = "do_sync_kernel_logs"
 
-    kernel_id: KernelId = attr.ib()
-    container_id: str = attr.ib()
+    kernel_id: KernelId = attrs.field()
+    container_id: str = attrs.field()
 
     def serialize(self) -> tuple:
         return (
@@ -409,11 +448,11 @@ class DoSyncKernelLogsEvent(AbstractEvent):
         )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class DoSyncKernelStatsEvent(AbstractEvent):
     name = "do_sync_kernel_stats"
 
-    kernel_ids: Sequence[KernelId] = attr.ib()
+    kernel_ids: Sequence[KernelId] = attrs.field()
 
     def serialize(self) -> tuple:
         return ([*map(str, self.kernel_ids)],)
@@ -425,9 +464,9 @@ class DoSyncKernelStatsEvent(AbstractEvent):
         )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class GenericSessionEventArgs(AbstractEvent):
-    session_id: SessionId = attr.ib()
+    session_id: SessionId = attrs.field()
 
     def serialize(self) -> tuple:
         return (str(self.session_id),)
@@ -455,14 +494,14 @@ class ExecutionCancelledEvent(GenericSessionEventArgs, AbstractEvent):
     name = "execution_cancelled"
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class BgtaskUpdatedEvent(AbstractEvent):
     name = "bgtask_updated"
 
-    task_id: uuid.UUID = attr.ib()
-    current_progress: float = attr.ib()
-    total_progress: float = attr.ib()
-    message: Optional[str] = attr.ib(default=None)
+    task_id: uuid.UUID = attrs.field()
+    current_progress: float = attrs.field()
+    total_progress: float = attrs.field()
+    message: Optional[str] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
@@ -482,10 +521,10 @@ class BgtaskUpdatedEvent(AbstractEvent):
         )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class BgtaskDoneEventArgs:
-    task_id: uuid.UUID = attr.ib()
-    message: Optional[str] = attr.ib(default=None)
+    task_id: uuid.UUID = attrs.field()
+    message: Optional[str] = attrs.field(default=None)
 
     def serialize(self) -> tuple:
         return (
@@ -530,7 +569,7 @@ EventCallback = Union[
 ]
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True, eq=False, order=False)
+@attrs.define(auto_attribs=True, slots=True, frozen=True, eq=False, order=False)
 class EventHandler(Generic[TContext, TEvent]):
     event_cls: Type[TEvent]
     name: str
@@ -545,7 +584,7 @@ class CoalescingOptions(TypedDict):
     max_batch_size: int
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class CoalescingState:
     batch_size: int = 0
     last_added: float = 0.0
