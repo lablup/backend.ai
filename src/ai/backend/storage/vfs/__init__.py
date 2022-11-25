@@ -109,6 +109,8 @@ class BaseVolume(AbstractVolume):
     async def move_to_trash(self, vfid: UUID) -> VFolderDeletionResult:
         vfpath = self.mangle_vfpath(vfid)
         dst = self.get_vf_trash_path(vfid)
+        if vfpath == dst:
+            return VFolderDeletionResult.NO_CHANGE
         loop = asyncio.get_running_loop()
 
         def _move_to_trash():

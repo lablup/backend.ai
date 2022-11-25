@@ -623,7 +623,7 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
                 case VFolderDeletionResult.PURGED:
                     query = sa.delete(vfolders).where(cond)
                     await conn.execute(query)
-                case VFolderDeletionResult.MOVED_TO_TRASH:
+                case VFolderDeletionResult.MOVED_TO_TRASH | VFolderDeletionResult.NO_CHANGE:
                     await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
                 case VFolderDeletionResult.ALREADY_PURGED:
                     pass
@@ -1947,7 +1947,7 @@ async def delete(request: web.Request) -> web.Response:
                 case VFolderDeletionResult.PURGED:
                     query = sa.delete(vfolders).where(cond)
                     await conn.execute(query)
-                case VFolderDeletionResult.MOVED_TO_TRASH:
+                case VFolderDeletionResult.MOVED_TO_TRASH | VFolderDeletionResult.NO_CHANGE:
                     await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
                 case VFolderDeletionResult.ALREADY_PURGED:
                     pass
@@ -2019,7 +2019,7 @@ async def purge(request: web.Request) -> web.Response:
                 case VFolderDeletionResult.PURGED:
                     query = sa.delete(vfolders).where(cond)
                     await conn.execute(query)
-                case VFolderDeletionResult.MOVED_TO_TRASH:
+                case VFolderDeletionResult.MOVED_TO_TRASH | VFolderDeletionResult.NO_CHANGE:
                     await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_COMPLETE)
                 case VFolderDeletionResult.ALREADY_PURGED:
                     pass

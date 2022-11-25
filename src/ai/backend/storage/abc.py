@@ -31,7 +31,8 @@ class AbstractVolume(metaclass=ABCMeta):
         self.local_config = local_config
         self.mount_path = mount_path
         self.fsprefix = fsprefix or PurePath(".")
-        self.trash_path = self.mount_path / (trash_path or PurePath(".trash"))
+        # self.trash_path = self.mount_path / (trash_path or PurePath(".trash"))
+        self.trash_path = self.mount_path if trash_path is None else (self.mount_path / trash_path)
         self.config = options or {}
 
     async def init(self) -> None:
