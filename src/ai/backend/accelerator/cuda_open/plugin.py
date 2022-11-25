@@ -177,7 +177,7 @@ class CUDAPlugin(AbstractComputePlugin):
             else:
                 dev_uuid = "00000000-0000-0000-0000-000000000000"
             dev_info = CUDADevice(
-                device_id=dev_id,
+                device_id=DeviceId(dev_id),
                 hw_location=raw_info["pciBusID_str"],
                 numa_node=node,
                 memory_size=raw_info["totalGlobalMem"],

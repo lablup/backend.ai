@@ -10,6 +10,7 @@ from ai.backend.client.func.keypair_resource_policy import (
     _default_list_fields,
 )
 from ai.backend.client.session import Session
+from ai.backend.common.types import VFolderHostPermission
 
 from ..extensions import pass_ctx_obj
 from ..pretty import print_info
@@ -99,22 +100,11 @@ def list(ctx):
     type=str,
     default=json.dumps(
         {
-            "local:volume1": [
-                "create-vfolder",
-                "read-vfolder",
-                "update-vfolder",
-                "delete-vfolder",
-                "mount",
-                "update-file",
-                "upload",
-                "download",
-                "invite",
-                "share",
-            ]
+            "local:volume1": [perm.value for perm in VFolderHostPermission],
         }
     ),
     help="Allowed virtual folder hosts. "
-    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
 )
 def add(
     ctx: CLIContext,
@@ -195,7 +185,7 @@ def add(
     "--allowed-vfolder-hosts",
     type=str,
     help="Allowed virtual folder hosts. "
-    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
 )
 def update(
     ctx: CLIContext,

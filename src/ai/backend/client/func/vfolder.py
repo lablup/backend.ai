@@ -231,7 +231,7 @@ class VFolder(BaseFunction):
                                         # Retry.
                                         raise ResponseFailed
                                 size = int(raw_resp.headers["Content-Length"])
-                                if_range = raw_resp.headers["Last-Modified"]
+                                if_range = raw_resp.headers.get("Last-Modified")
                                 q: janus.Queue[bytes] = janus.Queue(MAX_INFLIGHT_CHUNKS)
                                 try:
                                     with tqdm(

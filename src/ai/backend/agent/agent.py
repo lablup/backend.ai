@@ -77,6 +77,7 @@ from ai.backend.common.events import (
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
+    KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
@@ -111,7 +112,8 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import cancel_tasks, current_loop
 
 from . import __version__ as VERSION
-from . import resources as resources_mod
+from . import alloc_map as alloc_map_mod
+from .affinity_map import AffinityHint, AffinityMap
 from .exception import AgentError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
@@ -585,12 +587,15 @@ class AbstractAgent(
         self.redis_stream_pool = redis_helper.get_redis_object(self.local_config["redis"], db=4)
         self.redis_stat_pool = redis_helper.get_redis_object(self.local_config["redis"], db=0)
 
-        resources_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
+        alloc_map_mod.log_alloc_map = self.local_config["debug"]["log-alloc-map"]
         computers, self.slots = await self.detect_resources()
+        all_devices: list[AbstractComputeDevice] = []
         for name, computer in computers.items():
             devices = await computer.list_devices()
+            all_devices.extend(devices)
             alloc_map = await computer.create_alloc_map()
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
+        self.affinity_map = AffinityMap.build(all_devices)
 
         if not self._skip_initial_scan:
             self.images = await self.scan_images()
@@ -832,7 +837,9 @@ class AbstractAgent(
                         await self.rescan_resource_usage()
                         if not ev.suppress_events:
                             await self.produce_event(
-                                KernelTerminatedEvent(ev.kernel_id, "already-terminated"),
+                                KernelTerminatedEvent(
+                                    ev.kernel_id, KernelLifecycleEventReason.ALREADY_TERMINATED
+                                ),
                             )
                         if ev.done_future is not None:
                             ev.done_future.set_result(None)
@@ -965,7 +972,7 @@ class AbstractAgent(
         self,
         kernel_id: KernelId,
         event: LifecycleEvent,
-        reason: str,
+        reason: KernelLifecycleEventReason,
         *,
         container_id: ContainerId = None,
         exit_code: int = None,
@@ -1075,7 +1082,7 @@ class AbstractAgent(
                         kernel_id,
                         known_kernels[kernel_id],
                         LifecycleEvent.CLEAN,
-                        "self-terminated",
+                        KernelLifecycleEventReason.SELF_TERMINATED,
                     )
                 for kernel_id, container in await self.enumerate_containers(ACTIVE_STATUS_SET):
                     alive_kernels[kernel_id] = container.id
@@ -1092,7 +1099,7 @@ class AbstractAgent(
                         kernel_id,
                         known_kernels[kernel_id],
                         LifecycleEvent.CLEAN,
-                        "self-terminated",
+                        KernelLifecycleEventReason.SELF_TERMINATED,
                     )
                 # Check if: there are containers not spawned by me.
                 for kernel_id in alive_kernels.keys() - known_kernels.keys():
@@ -1102,7 +1109,7 @@ class AbstractAgent(
                         kernel_id,
                         alive_kernels[kernel_id],
                         LifecycleEvent.DESTROY,
-                        "terminated-unknown-container",
+                        KernelLifecycleEventReason.TERMINATED_UNKNOWN_CONTAINER,
                     )
             finally:
                 # Enqueue the events.
@@ -1120,7 +1127,7 @@ class AbstractAgent(
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.DESTROY,
-                "agent-termination",
+                KernelLifecycleEventReason.AGENT_TERMINATION,
                 done_future=clean_events[kernel_id] if blocking else None,
             )
         if blocking:
@@ -1193,7 +1200,8 @@ class AbstractAgent(
                             KernelId(UUID(body["ID"])),
                             ContainerId(body["CID"]),
                             LifecycleEvent.DESTROY,
-                            body.get("reason", "anomaly-detected"),
+                            KernelLifecycleEventReason.from_value(body.get("reason"))
+                            or KernelLifecycleEventReason.ANOMALY_DETECTED,
                         )
                         await self.loop.run_in_executor(None, _rm, reported_kernel)
                     else:
@@ -1273,7 +1281,7 @@ class AbstractAgent(
                     await self.inject_container_lifecycle_event(
                         kernel_id,
                         LifecycleEvent.START,
-                        "resuming-agent-operation",
+                        KernelLifecycleEventReason.RESUMING_AGENT_OPERATION,
                         container_id=container.id,
                     )
                 elif container.status in DEAD_STATUS_SET:
@@ -1285,7 +1293,7 @@ class AbstractAgent(
                     await self.inject_container_lifecycle_event(
                         kernel_id,
                         LifecycleEvent.CLEAN,
-                        "self-terminated",
+                        KernelLifecycleEventReason.SELF_TERMINATED,
                         container_id=container.id,
                     )
 
@@ -1331,25 +1339,33 @@ class AbstractAgent(
                     )
                 except KeyError:
                     await self.produce_event(
-                        KernelTerminatedEvent(kernel_id, "self-terminated"),
+                        KernelTerminatedEvent(
+                            kernel_id, KernelLifecycleEventReason.SELF_TERMINATED
+                        ),
                     )
                     break
 
                 if result["status"] == "finished":
                     if result["exitCode"] == 0:
                         await self.produce_event(
-                            SessionSuccessEvent(SessionId(kernel_id), "task-done", 0),
+                            SessionSuccessEvent(
+                                SessionId(kernel_id), KernelLifecycleEventReason.TASK_DONE, 0
+                            ),
                         )
                     else:
                         await self.produce_event(
                             SessionFailureEvent(
-                                SessionId(kernel_id), "task-failed", result["exitCode"]
+                                SessionId(kernel_id),
+                                KernelLifecycleEventReason.TASK_FAILED,
+                                result["exitCode"],
                             ),
                         )
                     break
                 if result["status"] == "exec-timeout":
                     await self.produce_event(
-                        SessionFailureEvent(SessionId(kernel_id), "task-timeout", -2),
+                        SessionFailureEvent(
+                            SessionId(kernel_id), KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                        ),
                     )
                     break
                 opts = {
@@ -1358,7 +1374,9 @@ class AbstractAgent(
                 mode = "continue"
         except asyncio.CancelledError:
             await self.produce_event(
-                SessionFailureEvent(SessionId(kernel_id), "task-cancelled", -2),
+                SessionFailureEvent(
+                    SessionId(kernel_id), KernelLifecycleEventReason.TASK_CANCELLED, -2
+                ),
             )
 
     async def create_kernel(
@@ -1440,27 +1458,44 @@ class AbstractAgent(
 
         # Realize ComputeDevice (including accelerators) allocations.
         slots = resource_spec.slots
-        dev_names: Set[DeviceName] = set()
+        dev_names: set[DeviceName] = set()
         for slot_name in slots.keys():
             dev_name = slot_name.split(".", maxsplit=1)[0]
             dev_names.add(DeviceName(dev_name))
 
         if not restarting:
+            alloc_order = [
+                DeviceName(name) for name in self.local_config["resource"]["allocation-order"]
+            ]
+            ordered_dev_names = sorted(dev_names, key=lambda item: alloc_order.index(item))
+            affinity_hint = AffinityHint(
+                None, self.affinity_map, self.local_config["resource"]["affinity-policy"]
+            )
             async with self.resource_lock:
-                for dev_name in dev_names:
+                for dev_name in ordered_dev_names:
                     computer_set = self.computers[dev_name]
+                    device_id_map = {device.device_id: device for device in computer_set.devices}
                     device_specific_slots = {
                         SlotName(slot_name): Decimal(alloc)
                         for slot_name, alloc in slots.items()
                         if slot_name.startswith(dev_name)
                     }
                     try:
-                        # TODO: support allocate_evenly()
                         resource_spec.allocations[dev_name] = computer_set.alloc_map.allocate(
-                            device_specific_slots, context_tag=dev_name
+                            device_specific_slots,
+                            affinity_hint=affinity_hint,
+                            context_tag=dev_name,
                         )
                         log.debug(
                             "{} allocations: {}", dev_name, resource_spec.allocations[dev_name]
+                        )
+                        hint_devices: list[AbstractComputeDevice] = []
+                        for slot_name, per_device_alloc in resource_spec.allocations[
+                            dev_name
+                        ].items():
+                            hint_devices.extend(device_id_map[k] for k in per_device_alloc.keys())
+                        affinity_hint = AffinityHint(
+                            hint_devices, self.affinity_map, affinity_hint.policy
                         )
                     except ResourceError as e:
                         log.info(
@@ -1809,7 +1844,7 @@ class AbstractAgent(
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.DESTROY,
-                "restarting",
+                KernelLifecycleEventReason.RESTARTING,
             )
             try:
                 with timeout(60):
@@ -1820,7 +1855,7 @@ class AbstractAgent(
                 await self.inject_container_lifecycle_event(
                     kernel_id,
                     LifecycleEvent.CLEAN,
-                    "restart-timeout",
+                    KernelLifecycleEventReason.RESTART_TIMEOUT,
                 )
                 raise
             else:
@@ -1899,7 +1934,7 @@ class AbstractAgent(
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.DESTROY,
-                "exec-timeout",
+                KernelLifecycleEventReason.EXEC_TIMEOUT,
             )
         return {
             **result,
