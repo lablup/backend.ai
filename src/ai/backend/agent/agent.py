@@ -1645,7 +1645,7 @@ class AbstractAgent(
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.DESTROY,
-                "unknown",
+                KernelLifecycleEventReason.UNKNOWN,
                 container_id=cid,
             )
             raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
