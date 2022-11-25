@@ -66,7 +66,7 @@ def list(ctx: CLIContext) -> None:
     type=str,
     default="{}",
     help="Allowed virtual folder hosts. "
-    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
 )
 @click.option(
     "--allowed-docker-registries", type=str, multiple=True, help="Allowed docker registries."
@@ -126,7 +126,7 @@ def add(
     "--allowed-vfolder-hosts",
     type=str,
     help="Allowed virtual folder hosts. "
-    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "read-vfolder"]}\')',
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
 )
 @click.option(
     "--allowed-docker-registries", type=str, multiple=True, help="Allowed docker registries."

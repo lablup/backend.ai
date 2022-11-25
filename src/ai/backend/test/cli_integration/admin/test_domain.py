@@ -46,15 +46,13 @@ def test_add_domain(run: ClientRunnerFunc):
     assert test_domain.get("allowed_vfolder_hosts") == {
         "local:volume1": [
             "create-vfolder",
-            "read-vfolder",
-            "update-vfolder",
+            "modify-vfolder",
             "delete-vfolder",
-            "mount",
-            "update-file",
-            "upload",
-            "download",
-            "invite",
-            "share",
+            "mount-in-session",
+            "upload-file",
+            "download-file",
+            "invite-others",
+            "set-user-specific-permission",
         ],
     }, "Domain allowed vfolder hosts mismatch"
     assert test_domain.get("allowed_docker_registries") == [
@@ -107,15 +105,13 @@ def test_update_domain(run: ClientRunnerFunc):
     assert test_domain.get("allowed_vfolder_hosts") == {
         "local:volume2": [
             "create-vfolder",
-            "read-vfolder",
-            "update-vfolder",
+            "modify-vfolder",
             "delete-vfolder",
-            "mount",
-            "update-file",
-            "upload",
-            "download",
-            "invite",
-            "share",
+            "mount-in-session",
+            "upload-file",
+            "download-file",
+            "invite-others",
+            "set-user-specific-permission",
         ],
     }, "Domain allowed vfolder hosts mismatch"
     assert test_domain.get("allowed_docker_registries") == [
