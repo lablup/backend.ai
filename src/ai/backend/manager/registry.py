@@ -2574,7 +2574,7 @@ class AgentRegistry:
         )
         current_addr = agent_info["addr"]
         sgroup = agent_info.get("scaling_group", "default")
-        abuse_report_path = agent_info["agent_info"]
+        abuse_report_path = agent_info["abuse_report_path"]
         auto_terminate = agent_info["abusing_container_auto_terminate"]
         async with self.heartbeat_lock:
 
@@ -3115,15 +3115,6 @@ class AgentRegistry:
             "kernel": kernel["id"],
             "status": commit_status_info.get(str(kernel["id"]), CommitStatus.READY.value),
         }
-        # async with self.handle_kernel_exception("commit_session", kernel["id"], access_key):
-        #     async with RPCContext(
-        #         kernel["agent"],
-        #         kernel["agent_addr"],
-        #         invoke_timeout=None,
-        #         order_key=kernel["id"],
-        #         keepalive_timeout=self.rpc_keepalive_timeout,
-        #     ) as rpc:
-        #         return await rpc.call.get_commit_status(str(kernel["id"]), email)
 
     async def commit_session(
         self,

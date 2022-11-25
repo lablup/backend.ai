@@ -1,16 +1,16 @@
-"""add_agent_abuse_report_path
+"""add_agent_abusing_report_path
 
-Revision ID: 0abd93c5cdc5
-Revises: 360af8f33d4e
-Create Date: 2022-11-07 17:38:41.117548
+Revision ID: 220f2158e847
+Revises: 5bce905c21e5
+Create Date: 2022-11-25 18:10:23.154067
 
 """
 import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "0abd93c5cdc5"
-down_revision = "360af8f33d4e"
+revision = "220f2158e847"
+down_revision = "5bce905c21e5"
 branch_labels = None
 depends_on = None
 

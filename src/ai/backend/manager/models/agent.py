@@ -208,7 +208,7 @@ class Agent(graphene.ObjectType):
             "agent": {
                 "abuse-report-path": str(self.abuse_report_path)
                 if self.abuse_report_path is not None
-                else "",
+                else None,
                 "auto_terminate": self.auto_terminate,
             },
         }
