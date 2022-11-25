@@ -35,7 +35,7 @@ class UnsupportedBaseDistroError(RuntimeError):
 
 
 class ContainerCreationError(Exception):
-    def __init__(self, *args, container_id, **kwargs):
+    def __init__(self, container_id, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.container_id = container_id
 

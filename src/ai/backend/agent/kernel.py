@@ -155,6 +155,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     version: int
     agent_config: Mapping[str, Any]
     kernel_id: KernelId
+    container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
     service_ports: Any
@@ -196,6 +197,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self._tasks = set()
         self.environ = environ
         self.runner = None
+        self.container_id = None
 
     async def init(self) -> None:
         log.debug(
