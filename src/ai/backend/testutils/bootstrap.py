@@ -36,7 +36,7 @@ def wait_health_check(container_id):
         return container_info
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=False)
 def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     etcd_allocated_port = 12379 + get_parallel_slot() * 10
@@ -80,7 +80,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=False)
 def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     redis_allocated_port = 36379 + get_parallel_slot() * 10
@@ -117,7 +117,7 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=False)
 def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     postgres_allocated_port = 15432 + get_parallel_slot() * 10

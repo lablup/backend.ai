@@ -27,7 +27,7 @@ if batch_enabled:
     else:
         # __builtins__ is an alias dict for __builtin__ in modules other than __main__.
         # Thus, we have to explicitly import __builtin__ module in Python 2.
-        import __builtin__
+        import __builtin__  # pants: no-infer-dep
 
         builtins = __builtin__
 

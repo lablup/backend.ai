@@ -6,7 +6,7 @@ Configuration
    Please consult the detailed usage in the help of each command
    (use ``-h`` or ``--help`` argument to display the manual).
 
-Check out :doc:`the client configuration </gsg/config>` for configurations via environment variables.
+Check out :doc:`the client configuration </client/gsg/config>` for configurations via environment variables.
 
 Session Mode
 ------------

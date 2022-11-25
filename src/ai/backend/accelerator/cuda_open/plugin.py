@@ -21,7 +21,7 @@ from typing import (
 
 import aiodocker
 import aiohttp
-import attr
+import attrs
 
 from ai.backend.agent.resources import (
     AbstractAllocMap,
@@ -69,7 +69,7 @@ PREFIX = "cuda"
 log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.cuda"))
 
 
-@attr.s(auto_attribs=True)
+@attrs.define(auto_attribs=True)
 class CUDADevice(AbstractComputeDevice):
     model_name: str
     uuid: str
@@ -177,7 +177,7 @@ class CUDAPlugin(AbstractComputePlugin):
             else:
                 dev_uuid = "00000000-0000-0000-0000-000000000000"
             dev_info = CUDADevice(
-                device_id=dev_id,
+                device_id=DeviceId(dev_id),
                 hw_location=raw_info["pciBusID_str"],
                 numa_node=node,
                 memory_size=raw_info["totalGlobalMem"],

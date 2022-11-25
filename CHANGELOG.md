@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.4 (2022-10-26)
+
+### Features
+* Improve the agent's CPU core detection to use Docker's cgroup cpusets for better compatibility with other frameworks dedicating CPU cores exclusively ([#804](https://github.com/lablup/backend.ai/issues/804))
+
+
 ## 22.09.3 (2022-10-25)
 
 ### Features
@@ -315,7 +321,7 @@ Changes
 
 ### Miscellaneous
 * Migrate to a semi-mono repository that contains all first-party server-side components with automated dependency management via Pants ([#417](https://github.com/lablup/backend.ai/issues/417))
-* Add a Pants plulgin `towncrier_tool` to allow running towncrier for changelog generation ([#427](https://github.com/lablup/backend.ai/issues/427))
+* Add a Pants plugin `towncrier_tool` to allow running towncrier for changelog generation ([#427](https://github.com/lablup/backend.ai/issues/427))
 * Update readthedocs.org build configurations ([#428](https://github.com/lablup/backend.ai/issues/428))
 * Update documentation for daily development workflows using Pants ([#429](https://github.com/lablup/backend.ai/issues/429))
 * Automate creation of the release in GitHub when we commit tags ([#433](https://github.com/lablup/backend.ai/issues/433))
