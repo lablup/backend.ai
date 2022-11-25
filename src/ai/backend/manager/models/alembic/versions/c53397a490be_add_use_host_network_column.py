@@ -1,7 +1,7 @@
 """add use_host_network column
 
 Revision ID: c53397a490be
-Revises: 360af8f33d4e
+Revises: 5bce905c21e5
 Create Date: 2022-10-25 17:02:31.709513
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.sql.expression import false
 
 # revision identifiers, used by Alembic.
 revision = "c53397a490be"
-down_revision = "360af8f33d4e"
+down_revision = "5bce905c21e5"
 branch_labels = None
 depends_on = None
 
