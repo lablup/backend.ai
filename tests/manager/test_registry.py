@@ -61,6 +61,8 @@ async def test_handle_heartbeat(
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
+            "abuse_report_path": "",
+            "abusing_container_auto_terminate": False,
         },
     )
     mock_shared_config.update_resource_slots.assert_awaited_once()
@@ -79,6 +81,8 @@ async def test_handle_heartbeat(
             "available_slots": ResourceSlot({"cpu": _1, "mem": _1g}),
             "version": "19.12.0",
             "compute_plugins": [],
+            "abuse_report_path": "",
+            "abusing_container_auto_terminate": False,
         }
     )
     await registry.handle_heartbeat(
@@ -92,6 +96,8 @@ async def test_handle_heartbeat(
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
+            "abuse_report_path": "",
+            "abusing_container_auto_terminate": False,
         },
     )
     mock_shared_config.update_resource_slots.assert_awaited_once()
@@ -127,6 +133,8 @@ async def test_handle_heartbeat(
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
+            "abuse_report_path": "",
+            "abusing_container_auto_terminate": False,
         },
     )
     mock_shared_config.update_resource_slots.assert_awaited_once()
