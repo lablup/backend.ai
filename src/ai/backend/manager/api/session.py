@@ -2186,8 +2186,7 @@ async def find_dependency_sessions(
     db_connection: SAConnection,
     access_key: AccessKey,
 ):
-    dependency_session_cache: Dict[str, List] = {}
-
+    @aiotools.lru_cache(maxsize=100)
     async def _find_dependency_sessions(session_name_or_id: Union[uuid.UUID, str]):
         session_infos = await match_session_ids(
             session_name_or_id,
@@ -2234,32 +2233,23 @@ async def find_dependency_sessions(
             )
         )
 
-        dependency_session_ids = list(
-            map(lambda x: str(x.get("depends_on")), session_dependency_query_result)
-        )
+        dependency_session_ids = [str(x.get("depends_on")) for x in session_dependency_query_result]
 
         session_info: Dict[str, Union[List, str]] = {
             "session_id": session_id,
             "session_name": session_name,
             "status": str(kernel_query_result[0].get("status")),
             "status_changed": str(kernel_query_result[0].get("status_changed")),
-            "depends_on": [],
+            "depends_on": await asyncio.gather(
+                *map(
+                    lambda dependency_session_id: asyncio.create_task(
+                        _find_dependency_sessions(dependency_session_id)
+                    ),
+                    dependency_session_ids,
+                )
+            ),
         }
 
-        if dependency_session_cache.get(session_id):
-            session_info["depends_on"] = dependency_session_cache[session_id]
-            return session_info
-
-        session_info["depends_on"] = await asyncio.gather(
-            *map(
-                lambda dependency_session_id: asyncio.create_task(
-                    _find_dependency_sessions(dependency_session_id)
-                ),
-                dependency_session_ids,
-            )
-        )
-
-        dependency_session_cache[session_id] = cast(List, session_info["depends_on"])
         return session_info
 
     return await _find_dependency_sessions(root_session_name_or_id)
@@ -2274,7 +2264,7 @@ async def get_dependency_graph(request: web.Request) -> web.Response:
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
 
     log.info(
-        "SHOW_DEPENDENCY_GRAPH (ak:{0}/{1}, s:{2})",
+        "GET_DEPENDENCY_GRAPH (ak:{0}/{1}, s:{2})",
         requester_access_key,
         owner_access_key,
         root_session_name,
