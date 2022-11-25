@@ -386,7 +386,7 @@ class APIConfig:
         return self._announcement_handler
 
 
-def get_config():
+def get_config() -> APIConfig:
     """
     Returns the configuration for the current process.
     If there is no explicitly set :class:`APIConfig` instance,
@@ -399,7 +399,7 @@ def get_config():
     return _config
 
 
-def set_config(conf: APIConfig):
+def set_config(conf: Optional[APIConfig]) -> None:
     """
     Sets the configuration used throughout the current process.
     """

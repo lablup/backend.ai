@@ -31,6 +31,7 @@ from typing import (
     Union,
 )
 
+import aiohttp
 import aiotools
 import pkg_resources
 import zmq
@@ -41,6 +42,7 @@ from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
+from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -872,6 +874,16 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def __ainit__(self) -> None:
         async with closing_async(Docker()) as docker:
+            docker_host = ""
+            match docker.connector:
+                case aiohttp.TCPConnector():
+                    assert docker.docker_host is not None
+                    docker_host = docker.docker_host
+                case aiohttp.NamedPipeConnector() | aiohttp.UnixConnector() as connector:
+                    docker_host = connector.path
+                case _:
+                    docker_host = "(unknown)"
+            log.info("accessing the local Docker daemon via {}", docker_host)
             if not self._skip_initial_scan:
                 docker_version = await docker.version()
                 log.info(
@@ -1375,7 +1387,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.START,
-                "new-container-started",
+                KernelLifecycleEventReason.NEW_CONTAINER_STARTED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
             )
 
@@ -1392,7 +1404,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.CLEAN,
-                reason or "self-terminated",
+                reason or KernelLifecycleEventReason.SELF_TERMINATED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
                 exit_code=exit_code,
             )

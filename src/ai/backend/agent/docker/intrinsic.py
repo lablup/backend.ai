@@ -346,17 +346,17 @@ class MemoryPlugin(AbstractComputePlugin):
         pass
 
     async def list_devices(self) -> Collection[MemoryDevice]:
-        # TODO: support NUMA?
         memory_size = psutil.virtual_memory().total
         overcommit_factor = int(os.environ.get("BACKEND_MEM_OVERCOMMIT_FACTOR", "1"))
         return [
             MemoryDevice(
                 device_id=DeviceId("root"),
+                device_name=self.key,
                 hw_location="root",
-                numa_node=0,
+                numa_node=0,  # the kernel setting will do the job.
                 memory_size=overcommit_factor * memory_size,
                 processing_units=0,
-            )
+            ),
         ]
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:

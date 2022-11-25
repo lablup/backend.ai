@@ -245,7 +245,7 @@ class CUDAPlugin(AbstractComputePlugin):
                 device_id = DeviceId(dev_info["mother_uuid"])
             all_devices.append(
                 CUDADevice(
-                    device_id=device_id,
+                    device_id=DeviceId(device_id),
                     hw_location=f"0000:99:{idx:02d}.0",
                     mother_uuid=dev_info["mother_uuid"],
                     numa_node=dev_info["numa_node"],
