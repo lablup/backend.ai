@@ -762,7 +762,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             for index, port_info in enumerate(service_ports):
                 port_name = port_info["name"]
                 if port_name in ("sshd", "ttyd"):
-                    intrinsic_ports[port_name] = host_ports[index]
+                    intrinsic_ports[port_name] = host_ports[index + 2]
 
             await current_loop().run_in_executor(
                 None,
