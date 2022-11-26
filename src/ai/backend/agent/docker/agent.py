@@ -771,6 +771,19 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 ),
             )
 
+            if self.cluster_ssh_port_mapping:
+                update_nested_dict(
+                    container_config,
+                    {
+                        "HostConfig": {
+                            "ExtraHosts": [
+                                f"{hostname}:{host_port[0]}"
+                                for hostname, host_port in self.cluster_ssh_port_mapping.items()
+                            ]
+                        }
+                    },
+                )
+
         if resource_opts and resource_opts.get("shmem"):
             shmem = int(resource_opts.get("shmem", "0"))
             self.computer_docker_args["HostConfig"]["ShmSize"] = shmem
