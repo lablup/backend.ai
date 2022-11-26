@@ -759,7 +759,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 "replin": host_ports[0],
                 "replout": host_ports[1],
             }
-            for index, port_info in enumerate(service_ports[2:], start=2):
+            for index, port_info in enumerate(service_ports):
                 port_name = port_info["name"]
                 if port_name in ("sshd", "ttyd"):
                     intrinsic_ports[port_name] = host_ports[index]
