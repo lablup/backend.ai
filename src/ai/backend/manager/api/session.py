@@ -2223,15 +2223,8 @@ async def find_dependency_sessions(
             .where(kernels.c.session_id == session_id)
         )
 
-        session_dependency_query_result, kernel_query_result = list(
-            map(
-                lambda result: result.mappings().all(),
-                await asyncio.gather(
-                    db_connection.execute(session_dependency_query),
-                    db_connection.execute(kernel_query),
-                ),
-            )
-        )
+        session_dependency_query_result = await db_connection.execute(session_dependency_query)
+        kernel_query_result = await db_connection.execute(kernel_query)
 
         dependency_session_ids = [str(x.get("depends_on")) for x in session_dependency_query_result]
 
@@ -2240,14 +2233,10 @@ async def find_dependency_sessions(
             "session_name": session_name,
             "status": str(kernel_query_result[0].get("status")),
             "status_changed": str(kernel_query_result[0].get("status_changed")),
-            "depends_on": await asyncio.gather(
-                *map(
-                    lambda dependency_session_id: asyncio.create_task(
-                        _find_dependency_sessions(dependency_session_id)
-                    ),
-                    dependency_session_ids,
-                )
-            ),
+            "depends_on": [
+                await _find_dependency_sessions(dependency_session_id)
+                for dependency_session_id in dependency_session_ids
+            ],
         }
 
         return session_info
