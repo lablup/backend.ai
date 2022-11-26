@@ -1693,6 +1693,10 @@ class AbstractAgent(
             if not self._pending_creation_tasks[kernel_id]:
                 del self._pending_creation_tasks[kernel_id]
 
+        public_service_ports: List[ServicePort] = [
+            port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL
+        ]
+
         kernel_creation_info: KernelCreationResult = {
             "id": KernelId(kernel_id),
             "kernel_host": str(kernel_obj["kernel_host"]),
@@ -1700,7 +1704,7 @@ class AbstractAgent(
             "repl_out_port": kernel_obj["repl_out_port"],
             "stdin_port": kernel_obj["stdin_port"],  # legacy
             "stdout_port": kernel_obj["stdout_port"],  # legacy
-            "service_ports": service_ports,
+            "service_ports": public_service_ports,
             "container_id": kernel_obj["container_id"],
             "resource_spec": attrs.asdict(resource_spec),
             "scaling_group": kernel_config["scaling_group"],
