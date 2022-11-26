@@ -1,10 +1,16 @@
 import abc
 import json
+import logging
+import logging.config
 import sys
 import time
 from typing import Any, Awaitable, Callable, Dict, Iterator, MutableMapping, Optional, Union, cast
 
 from aiohttp import web
+
+from ai.backend.web.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
 
 Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 Middleware = Callable[[web.Request, Handler], Awaitable[web.StreamResponse]]
@@ -130,8 +136,8 @@ class Session(MutableMapping[str, Any]):
         self._created = int(time.time())
 
 
-SESSION_KEY = "aiohttp_session"
-STORAGE_KEY = "aiohttp_session_storage"
+SESSION_KEY = "bai_session"
+STORAGE_KEY = "bai_session_storage"
 
 
 async def get_session(request: web.Request) -> Session:
@@ -212,7 +218,7 @@ class AbstractStorage(metaclass=abc.ABCMeta):
     def __init__(
         self,
         *,
-        cookie_name: str = "AIOHTTP_SESSION",
+        cookie_name: str = "BAI_SESSION",
         domain: Optional[str] = None,
         max_age: Optional[int] = None,
         path: str = "/",
@@ -298,7 +304,7 @@ class SimpleCookieStorage(AbstractStorage):
     def __init__(
         self,
         *,
-        cookie_name: str = "AIOHTTP_SESSION",
+        cookie_name: str = "BAI_SESSION",
         domain: Optional[str] = None,
         max_age: Optional[int] = None,
         path: str = "/",
