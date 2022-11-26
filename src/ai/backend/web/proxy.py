@@ -31,6 +31,7 @@ extra_config_headers = t.Dict(
     {
         t.Key("X-BackendAI-Version", default=None): t.Null | t.String,
         t.Key("X-BackendAI-Encoded", default=None): t.Null | t.ToBool,
+        t.Key("X-BackendAI-SessionID", default=None): t.Null | t.String,
     }
 ).allow_extra("*")
 
@@ -162,7 +163,6 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
         api_session = await asyncio.shield(get_api_session(request))
-
     if first_path == "pipeline":
         pipeline_endpoint = request.app["config"]["pipeline"]["endpoint"]
         api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))
