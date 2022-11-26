@@ -202,6 +202,7 @@ class PendingSession:
     internal_data: Optional[MutableMapping[str, Any]]
     preopen_ports: List[int]
     created_at: datetime
+    use_host_network: bool
 
     @property
     def main_kernel_id(self) -> KernelId:
@@ -237,6 +238,7 @@ class PendingSession:
             kernels.c.startup_command,
             kernels.c.preopen_ports,
             kernels.c.created_at,
+            kernels.c.use_host_network,
         }
 
     @classmethod
@@ -283,6 +285,7 @@ class PendingSession:
             startup_command=row["startup_command"],
             preopen_ports=row["preopen_ports"],
             created_at=row["created_at"],
+            use_host_network=row["use_host_network"],
         )
 
     @classmethod
@@ -370,6 +373,7 @@ class KernelInfo:
 class KernelAgentBinding:
     kernel: KernelInfo
     agent_alloc_ctx: AgentAllocationContext
+    allocated_host_ports: Set[int]
 
 
 @attrs.define(auto_attribs=True, slots=True)
