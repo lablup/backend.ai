@@ -1363,7 +1363,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 async with timeout(max_wait):
                     await _run_events()
             except asyncio.TimeoutError:
-                sys.exit(ExitCode.TIMEOUT)
+                sys.exit(ExitCode.OPERATION_TIMEOUT)
 
         try:
             if max_wait > 0:

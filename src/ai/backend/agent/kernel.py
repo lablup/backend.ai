@@ -36,6 +36,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
+from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import KernelId, aobject
 
@@ -155,12 +156,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     version: int
     agent_config: Mapping[str, Any]
     kernel_id: KernelId
+    container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
     service_ports: Any
     data: Dict[Any, Any]
     last_used: float
-    termination_reason: Optional[str]
+    termination_reason: Optional[KernelLifecycleEventReason]
     clean_event: Optional[asyncio.Future]
     stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
@@ -196,6 +198,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self._tasks = set()
         self.environ = environ
         self.runner = None
+        self.container_id = None
 
     async def init(self) -> None:
         log.debug(
