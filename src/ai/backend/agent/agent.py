@@ -114,7 +114,7 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityHint, AffinityMap
-from .exception import AgentError, ResourceError
+from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
     AbstractAllocMap,
@@ -844,17 +844,6 @@ class AbstractAgent(
                         if ev.done_future is not None:
                             ev.done_future.set_result(None)
                         return
-                    else:
-                        await self.container_lifecycle_queue.put(
-                            ContainerLifecycleEvent(
-                                ev.kernel_id,
-                                ev.container_id,
-                                LifecycleEvent.CLEAN,
-                                ev.reason,
-                                suppress_events=ev.suppress_events,
-                                done_future=ev.done_future,
-                            ),
-                        )
                 else:
                     kernel_obj.stats_enabled = False
                     kernel_obj.termination_reason = ev.reason
@@ -867,6 +856,18 @@ class AbstractAgent(
                     if ev.done_future is not None:
                         ev.done_future.set_exception(e)
                     raise
+                finally:
+                    if ev.container_id is not None:
+                        await self.container_lifecycle_queue.put(
+                            ContainerLifecycleEvent(
+                                ev.kernel_id,
+                                ev.container_id,
+                                LifecycleEvent.CLEAN,
+                                ev.reason,
+                                suppress_events=ev.suppress_events,
+                                done_future=ev.done_future,
+                            ),
+                        )
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -907,13 +908,14 @@ class AbstractAgent(
                         # Exclude out-of-range ports, because when the agent restarts
                         # with a different port range, existing containers' host ports
                         # may not belong to the new port range.
-                        restored_ports = [
-                            *filter(
-                                lambda p: port_range[0] <= p <= port_range[1],
-                                kernel_obj["host_ports"],
-                            )
-                        ]
-                        self.port_pool.update(restored_ports)
+                        if host_ports := kernel_obj.get("host_ports"):
+                            restored_ports = [
+                                *filter(
+                                    lambda p: port_range[0] <= p <= port_range[1],
+                                    host_ports,
+                                )
+                            ]
+                            self.port_pool.update(restored_ports)
                         await kernel_obj.close()
                 finally:
                     self.terminating_kernels.discard(ev.kernel_id)
@@ -1625,12 +1627,28 @@ class AbstractAgent(
         )
         async with self.registry_lock:
             self.kernel_registry[ctx.kernel_id] = kernel_obj
-        container_data = await ctx.start_container(
-            kernel_obj,
-            cmdargs,
-            resource_opts,
-            preopen_ports,
-        )
+        try:
+            container_data = await ctx.start_container(
+                kernel_obj,
+                cmdargs,
+                resource_opts,
+                preopen_ports,
+            )
+        except ContainerCreationError as e:
+            log.warning(
+                "Kernel failed to create container (k:{}). Kernel is going to be destroyed.",
+                ctx.kernel_id,
+            )
+            cid = e.container_id
+            async with self.registry_lock:
+                self.kernel_registry[ctx.kernel_id]["container_id"] = cid
+            await self.inject_container_lifecycle_event(
+                kernel_id,
+                LifecycleEvent.DESTROY,
+                KernelLifecycleEventReason.UNKNOWN,
+                container_id=cid,
+            )
+            raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
         async with self.registry_lock:
             self.kernel_registry[ctx.kernel_id].data.update(container_data)
         await kernel_obj.init()
