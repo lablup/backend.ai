@@ -123,7 +123,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
         self, affinity_hint: Optional[AffinityHint], slot_name: SlotName
     ) -> Sequence[tuple[DeviceId, Decimal]]:
         device_name = DeviceName(slot_name.partition(".")[0])
-        if affinity_hint is None:  # for legacy
+        if affinity_hint is None or not affinity_hint.devices:  # for legacy
             return sorted(
                 self.allocations[slot_name].items(),  # k: slot_name, v: per-device alloc
                 key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
