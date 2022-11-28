@@ -230,8 +230,8 @@ class AbstractComputeDevice:
         hw_location: str,
         memory_size: int,
         processing_units: int,
-        device_name: Optional[DeviceName] = None,
         numa_node: Optional[int] = None,
+        device_name: Optional[DeviceName] = None,
     ) -> None:
         self.device_id = device_id
         self.hw_location = hw_location
