@@ -1,14 +1,16 @@
 from typing import Sequence
 
-import attrs
-
 from ai.backend.agent.affinity_map import AffinityMap
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId, DeviceName
 
 
 class DummyDevice(AbstractComputeDevice):
-    extra_prop1: str = attrs.field(default="zzz")
+    extra_prop1: str
+
+    def __init__(self, *args, extra_prop1: str = "zzz", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.extra_prop1 = extra_prop1
 
     def __str__(self) -> str:
         return self.device_id
@@ -19,7 +21,11 @@ class DummyDevice(AbstractComputeDevice):
 
 
 class CPUDevice(AbstractComputeDevice):
-    extra_prop1: str = attrs.field(default="yyy")
+    extra_prop1: str
+
+    def __init__(self, *args, extra_prop1: str = "yyy", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.extra_prop1 = extra_prop1
 
     def __str__(self) -> str:
         return self.device_id

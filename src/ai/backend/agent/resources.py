@@ -249,6 +249,9 @@ class AbstractComputeDevice:
     def __hash__(self) -> int:
         return hash(f"{self.device_name}-{self.device_id}")
 
+    def __eq__(self, __o: object) -> bool:
+        return hash(self) == hash(__o)
+
 
 class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
