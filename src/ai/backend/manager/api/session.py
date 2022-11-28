@@ -2223,16 +2223,18 @@ async def find_dependency_sessions(
             .where(kernels.c.session_id == session_id)
         )
 
-        session_dependency_query_result = await db_connection.execute(session_dependency_query)
-        kernel_query_result = await db_connection.execute(kernel_query)
+        dependency_session_ids = (await db_connection.execute(session_dependency_query)).first()
 
-        dependency_session_ids = [str(x.get("depends_on")) for x in session_dependency_query_result]
+        if not dependency_session_ids:
+            dependency_session_ids = []
+
+        kernel_query_result = (await db_connection.execute(kernel_query)).first()
 
         session_info: Dict[str, Union[List, str]] = {
             "session_id": session_id,
             "session_name": session_name,
-            "status": str(kernel_query_result[0].get("status")),
-            "status_changed": str(kernel_query_result[0].get("status_changed")),
+            "status": str(kernel_query_result[0]),
+            "status_changed": str(kernel_query_result[1]),
             "depends_on": [
                 await _find_dependency_sessions(dependency_session_id)
                 for dependency_session_id in dependency_session_ids

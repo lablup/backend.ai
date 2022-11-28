@@ -944,8 +944,7 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
         return time_str.split(".")[0]
 
     def get_node_name(session: OrderedDict) -> str:
-        # job_name, task_name, hash_value
-        _, task_name, _ = session["session_name"].split("-")
+        task_name = session["session_name"].split("-")[-3]
         status = session["status"].split("KernelStatus.")[1]
         delta = ""
 
