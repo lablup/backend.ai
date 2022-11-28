@@ -2248,14 +2248,10 @@ async def find_dependent_sessions(
             ]
         )
 
-        recursive_dependent_session_ids_list: List[Set[uuid.UUID | str]] = await asyncio.gather(
-            *map(
-                lambda dependent_session_id: asyncio.create_task(
-                    _find_dependent_sessions(dependent_session_id)
-                ),
-                dependent_session_ids,
-            )
-        )
+        recursive_dependent_session_ids_list: List[Set[uuid.UUID | str]] = [
+            await _find_dependent_sessions(dependent_session_id)
+            for dependent_session_id in dependent_session_ids
+        ]
 
         for recursive_dependent_session_ids in recursive_dependent_session_ids_list:
             dependent_session_ids |= recursive_dependent_session_ids
