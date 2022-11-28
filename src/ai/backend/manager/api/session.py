@@ -125,6 +125,7 @@ from .auth import auth_required
 from .exceptions import (
     AppNotFound,
     BackendError,
+    GenericForbidden,
     ImageNotFound,
     InsufficientPrivilege,
     InternalServerError,
@@ -1903,7 +1904,10 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
             )
 
             # Consider not found sessions already terminated.
-            last_stats = [*filter(lambda x: not isinstance(x, SessionNotFound), last_stats)]
+            # Consider GenericForbidden error occurs with scheduled/preparing/terminating/error status session, and leave them not to be quitted.
+            last_stats = [
+                *filter(lambda x: not isinstance(x, SessionNotFound | GenericForbidden), last_stats)
+            ]
 
             return web.json_response(last_stats, status=200)
     else:
