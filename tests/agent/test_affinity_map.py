@@ -1,15 +1,16 @@
 from typing import Sequence
 
-import attrs
-
 from ai.backend.agent.affinity_map import AffinityMap
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId, DeviceName
 
 
-@attrs.define()
 class DummyDevice(AbstractComputeDevice):
-    extra_prop1: str = attrs.field(default="zzz")
+    extra_prop1: str
+
+    def __init__(self, *args, extra_prop1: str = "zzz", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.extra_prop1 = extra_prop1
 
     def __str__(self) -> str:
         return self.device_id
@@ -19,9 +20,12 @@ class DummyDevice(AbstractComputeDevice):
         return self.device_id
 
 
-@attrs.define()
 class CPUDevice(AbstractComputeDevice):
-    extra_prop1: str = attrs.field(default="yyy")
+    extra_prop1: str
+
+    def __init__(self, *args, extra_prop1: str = "yyy", **kwargs):
+        super().__init__(*args, **kwargs)
+        self.extra_prop1 = extra_prop1
 
     def __str__(self) -> str:
         return self.device_id
@@ -67,7 +71,9 @@ def test_custom_device_class():
 def test_affinity_map_init():
     # only a single device
     devices = [
-        CPUDevice(DeviceId("a0"), "", 0, 0, 1),
+        CPUDevice(
+            device_id=DeviceId("a0"), hw_location="", numa_node=0, memory_size=0, processing_units=1
+        ),
     ]
     m = AffinityMap.build(devices)
     neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
@@ -75,8 +81,20 @@ def test_affinity_map_init():
 
     # numa_node is None
     devices = [
-        CPUDevice(DeviceId("a0"), "", None, 0, 1),
-        CPUDevice(DeviceId("a1"), "", None, 0, 1),
+        CPUDevice(
+            device_id=DeviceId("a0"),
+            hw_location="",
+            numa_node=None,
+            memory_size=0,
+            processing_units=1,
+        ),
+        CPUDevice(
+            device_id=DeviceId("a1"),
+            hw_location="",
+            numa_node=None,
+            memory_size=0,
+            processing_units=1,
+        ),
     ]
     m = AffinityMap.build(devices)
     neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
@@ -84,8 +102,20 @@ def test_affinity_map_init():
 
     # numa_node is -1 (cloud instances)
     devices = [
-        CPUDevice(DeviceId("a0"), "", -1, 0, 1),
-        CPUDevice(DeviceId("a1"), "", -1, 0, 1),
+        CPUDevice(
+            device_id=DeviceId("a0"),
+            hw_location="",
+            numa_node=-1,
+            memory_size=0,
+            processing_units=1,
+        ),
+        CPUDevice(
+            device_id=DeviceId("a1"),
+            hw_location="",
+            numa_node=-1,
+            memory_size=0,
+            processing_units=1,
+        ),
     ]
     m = AffinityMap.build(devices)
     neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
@@ -94,20 +124,20 @@ def test_affinity_map_init():
 
 def test_affinity_map():
     devices = [
-        DummyDevice(DeviceId("a0"), "", 0, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("a1"), "", 0, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("a2"), "", 0, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("b0"), "", 1, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("b1"), "", 1, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("b2"), "", 1, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("c0"), "", 2, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("c1"), "", 2, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("d0"), "", 3, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("d1"), "", 3, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("d2"), "", 3, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("d3"), "", 3, 0, 1, device_name=DeviceName("cpu")),
-        DummyDevice(DeviceId("x0"), "", 0, 0, 1, device_name=DeviceName("cuda")),
-        DummyDevice(DeviceId("x1"), "", 1, 0, 1, device_name=DeviceName("cuda")),
+        DummyDevice(DeviceId("a0"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("a1"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("a2"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b0"), "", 0, 1, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b1"), "", 0, 1, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("b2"), "", 0, 1, numa_node=1, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("c0"), "", 0, 1, numa_node=2, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("c1"), "", 0, 1, numa_node=2, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d0"), "", 0, 1, numa_node=3, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d1"), "", 0, 1, numa_node=3, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d2"), "", 0, 1, numa_node=3, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("d3"), "", 0, 1, numa_node=3, device_name=DeviceName("cpu")),
+        DummyDevice(DeviceId("x0"), "", 0, 1, numa_node=0, device_name=DeviceName("cuda")),
+        DummyDevice(DeviceId("x1"), "", 0, 1, numa_node=1, device_name=DeviceName("cuda")),
     ]
     m = AffinityMap.build(devices)
 
