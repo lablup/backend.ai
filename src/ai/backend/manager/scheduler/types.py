@@ -17,7 +17,7 @@ from typing import (
     Set,
 )
 
-import attr
+import attrs
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.engine.row import Row
@@ -58,14 +58,14 @@ def merge_resource(
             target[k] = update[k]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class AgentAllocationContext:
     agent_id: Optional[AgentId]
     agent_addr: str
     scaling_group: str
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class AgentContext:
     agent_id: AgentId
     agent_addr: str
@@ -75,13 +75,13 @@ class AgentContext:
     occupied_slots: ResourceSlot
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ScheduleDecision:
     agent_id: AgentId
     kernel_id: KernelId
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class SchedulingContext:
     """
     Context for each scheduling decision.
@@ -91,7 +91,7 @@ class SchedulingContext:
     known_slot_types: Mapping[SlotName, SlotTypes]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ExistingSession:
     kernels: List[KernelInfo]
     access_key: AccessKey
@@ -169,7 +169,7 @@ class ExistingSession:
         return list(items.values())
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class PendingSession:
     """
     Context for individual session-related information used during scheduling.
@@ -202,6 +202,7 @@ class PendingSession:
     internal_data: Optional[MutableMapping[str, Any]]
     preopen_ports: List[int]
     created_at: datetime
+    use_host_network: bool
 
     @property
     def main_kernel_id(self) -> KernelId:
@@ -237,6 +238,7 @@ class PendingSession:
             kernels.c.startup_command,
             kernels.c.preopen_ports,
             kernels.c.created_at,
+            kernels.c.use_host_network,
         }
 
     @classmethod
@@ -283,6 +285,7 @@ class PendingSession:
             startup_command=row["startup_command"],
             preopen_ports=row["preopen_ports"],
             created_at=row["created_at"],
+            use_host_network=row["use_host_network"],
         )
 
     @classmethod
@@ -299,7 +302,7 @@ class PendingSession:
         return list(items.values())
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KernelInfo:
     """
     Representing invididual kernel info.
@@ -366,13 +369,14 @@ class KernelInfo:
         )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KernelAgentBinding:
     kernel: KernelInfo
     agent_alloc_ctx: AgentAllocationContext
+    allocated_host_ports: Set[int]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class PredicateResult:
     passed: bool
     message: Optional[str] = None

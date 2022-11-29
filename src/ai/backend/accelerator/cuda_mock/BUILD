@@ -18,7 +18,7 @@ python_distribution(
         license="LGPLv3",
     ),
     entry_points={
-        "backendai_accelerator_v20": {
+        "backendai_accelerator_v21": {
             "cuda_mock": "ai.backend.accelerator.cuda_mock.plugin:CUDAPlugin",
         }
     },

@@ -15,7 +15,7 @@ def get_tag():
     return revision
 
 def get_prev_tag():
-    p = subprocess.run(['git', 'rev-list', '--tags', '--skip=0', '--max-count=1'], capture_output=True)
+    p = subprocess.run(['git', 'rev-list', '--tags', '--skip=1', '--max-count=1'], capture_output=True)
     rev = p.stdout.decode().strip()
 
     p = subprocess.run(['git', 'describe', '--abbrev=0', '--tags', f'{rev}'], capture_output=True)
@@ -49,7 +49,7 @@ def main():
                 % (changelog_url, tag)
             )
             content += (
-                "\n\n### Full Commitlog\n\nCheck out [the full commit logs](%s) between release (%s) and (%s).\n"
+                "\n\n### Full Commit Logs\n\nCheck out [the full commit logs](%s) between release (%s) and (%s).\n"
                 % (commitlog_url, prev_tag, tag)
             )
             if not args.draft:

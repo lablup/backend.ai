@@ -9,7 +9,7 @@ from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
-import attr
+import attrs
 import pytest
 import trafaret as t
 from dateutil.parser import parse as dtparse
@@ -273,7 +273,7 @@ def example_agents_no_valid():
     ]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class SessionKernelIdPair:
     session_id: UUID
     kernel_ids: Sequence[KernelId]
@@ -335,6 +335,7 @@ _common_dummy_for_pending_session: Mapping[str, Any] = dict(
     startup_command=None,
     internal_data=None,
     preopen_ports=[],
+    use_host_network=False,
 )
 
 _common_dummy_for_existing_session: Mapping[str, Any] = dict(

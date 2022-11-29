@@ -48,7 +48,7 @@ from trafaret.dataerror import DataError as TrafaretDataError
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import EventProducer
+from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
@@ -397,6 +397,8 @@ class AgentRPCServer(aobject):
                 "container_id": result["container_id"],
                 "resource_spec": result["resource_spec"],
                 "attached_devices": result["attached_devices"],
+                "agent_addr": result["agent_addr"],
+                "scaling_group": result["scaling_group"],
             }
             for result in results
         ]
@@ -407,7 +409,7 @@ class AgentRPCServer(aobject):
     async def destroy_kernel(
         self,
         kernel_id: str,
-        reason: Optional[str] = None,
+        reason: Optional[KernelLifecycleEventReason] = None,
         suppress_events: bool = False,
     ):
         loop = asyncio.get_running_loop()
@@ -416,7 +418,7 @@ class AgentRPCServer(aobject):
         await self.agent.inject_container_lifecycle_event(
             KernelId(UUID(kernel_id)),
             LifecycleEvent.DESTROY,
-            reason or "user-requested",
+            reason or KernelLifecycleEventReason.USER_REQUESTED,
             done_future=done,
             suppress_events=suppress_events,
         )
@@ -610,6 +612,12 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def download_single(self, kernel_id: str, filepath: str):
+        log.info("rpc::download_single(k:{0}, fn:{1})", kernel_id, filepath)
+        return await self.agent.download_single(KernelId(UUID(kernel_id)), filepath)
+
+    @rpc_function
+    @collect_error
     async def list_files(self, kernel_id: str, path: str):
         log.info("rpc::list_files(k:{0}, fn:{1})", kernel_id, path)
         return await self.agent.list_files(KernelId(UUID(kernel_id)), path)
@@ -659,6 +667,18 @@ class AgentRPCServer(aobject):
                 await self.error_monitor.capture_exception()
                 log.exception("reset: destroying {0}", kernel_id)
         await asyncio.gather(*tasks)
+
+    @rpc_function
+    @collect_error
+    async def assign_port(self):
+        log.debug("rpc::assign_port()")
+        return self.agent.port_pool.pop()
+
+    @rpc_function
+    @collect_error
+    async def release_port(self, port_no: int):
+        log.debug("rpc::release_port(port_no:{})", port_no)
+        self.agent.port_pool.add(port_no)
 
 
 @aiotools.server
