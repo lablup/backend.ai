@@ -1,5 +1,6 @@
 import json
 import logging
+import ssl
 import time
 import urllib.parse
 from dataclasses import dataclass
@@ -100,6 +101,7 @@ class WekaAPIClient:
     username: str
     password: str
     organization: str
+    ssl_context: Optional[ssl.SSLContext | bool]
 
     _access_token: Optional[str]
     _refresh_token: Optional[str]
@@ -111,6 +113,7 @@ class WekaAPIClient:
         username: str,
         password: str,
         organization: str,
+        ssl: Optional[ssl.SSLContext | bool] = None,
     ) -> None:
         self.api_endpoint = endpoint
         self.username = username
@@ -119,6 +122,7 @@ class WekaAPIClient:
 
         self._access_token = None
         self._refresh_token = None
+        self.ssl_context = ssl
 
     @property
     def _is_token_valid(self) -> bool:
@@ -136,6 +140,7 @@ class WekaAPIClient:
             response = await sess.post(
                 "/api/v2/login/refresh",
                 data={"refresh_token": self._refresh_token},
+                ssl=self.ssl_context,
             )
         else:
             response = await sess.post(
@@ -145,6 +150,7 @@ class WekaAPIClient:
                     "password": self.password,
                     "org": self.organization,
                 },
+                ssl=self.ssl_context,
             )
         data = await response.json()
         self._access_token = data["data"]["access_token"]
@@ -177,20 +183,25 @@ class WekaAPIClient:
 
         try:
             if method == "GET" or method == "DELETE":
-                return await func("/api/v2" + path, headers=self._req_header)
+                return await func("/api/v2" + path, headers=self._req_header, ssl=self.ssl_context)
             else:
-                return await func("/api/v2" + path, headers=self._req_header, json=body)
+                return await func(
+                    "/api/v2" + path, headers=self._req_header, json=body, ssl=self.ssl_context
+                )
         except web.HTTPUnauthorized:
             await self._login(sess)
             try:
                 if method == "GET" or method == "DELETE":
-                    return await func("/api/v2" + path, headers=self._req_header)
+                    return await func(
+                        "/api/v2" + path, headers=self._req_header, ssl=self.ssl_context
+                    )
 
                 else:
                     return await func(
                         "/api/v2" + path,
                         headers=self._req_header,
                         json=body,
+                        ssl=self.ssl_context,
                     )
 
             except web.HTTPUnauthorized:
@@ -330,6 +341,7 @@ class WekaAPIClient:
                 self.api_endpoint + "/api/v1",
                 headers=self._req_header,
                 data=json.dumps(body),
+                ssl=self.ssl_context,
             )
 
     @error_handler
