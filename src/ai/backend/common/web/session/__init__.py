@@ -8,7 +8,7 @@ from typing import Any, Awaitable, Callable, Dict, Iterator, MutableMapping, Opt
 
 from aiohttp import web
 
-from ai.backend.web.logging import BraceStyleAdapter
+from ai.backend.common.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
 

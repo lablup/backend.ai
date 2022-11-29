@@ -4,14 +4,22 @@ import logging.config
 import uuid
 from typing import Any, Callable, Optional
 
+import trafaret as t
 from aiohttp import web
 
-from ai.backend.web.logging import BraceStyleAdapter
-from ai.backend.web.proxy import extra_config_headers
+from ai.backend.common.logging import BraceStyleAdapter
 
 from . import AbstractStorage, Session
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
+
+extra_config_headers = t.Dict(
+    {
+        t.Key("X-BackendAI-Version", default=None): t.Null | t.String,
+        t.Key("X-BackendAI-Encoded", default=None): t.Null | t.ToBool,
+        t.Key("X-BackendAI-SessionID", default=None): t.Null | t.String,
+    }
+).allow_extra("*")
 
 try:
     from redis import VERSION
