@@ -8,14 +8,13 @@ import random
 from typing import Optional, Tuple, Union, cast
 
 import aiohttp
-import trafaret as t
 from aiohttp import web
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
-from ai.backend.common.web.session import STORAGE_KEY, get_session
+from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 
 from .auth import get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
@@ -26,14 +25,6 @@ HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",
     "Authorization",
 ]
-
-extra_config_headers = t.Dict(
-    {
-        t.Key("X-BackendAI-Version", default=None): t.Null | t.String,
-        t.Key("X-BackendAI-Encoded", default=None): t.Null | t.ToBool,
-        t.Key("X-BackendAI-SessionID", default=None): t.Null | t.String,
-    }
-).allow_extra("*")
 
 
 class WebSocketProxy:

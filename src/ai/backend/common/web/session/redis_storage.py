@@ -6,10 +6,9 @@ from typing import Any, Callable, Optional
 
 from aiohttp import web
 
-from ai.backend.web.logging import BraceStyleAdapter
-from ai.backend.web.proxy import extra_config_headers
+from ai.backend.common.logging import BraceStyleAdapter
 
-from . import AbstractStorage, Session
+from . import AbstractStorage, Session, extra_config_headers
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
 
