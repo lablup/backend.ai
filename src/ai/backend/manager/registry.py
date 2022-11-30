@@ -1304,7 +1304,7 @@ class AgentRegistry:
                             agent_addr = item.agent_alloc_ctx.agent_addr.replace(
                                 "tcp://", ""
                             ).split(":", maxsplit=1)[0]
-                            cluster_ssh_port_mapping[f"{cluster_role}{index+1}"] = (
+                            cluster_ssh_port_mapping[item.kernel.cluster_hostname] = (
                                 agent_addr,
                                 port,
                             )
