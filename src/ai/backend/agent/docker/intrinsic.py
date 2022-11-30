@@ -12,7 +12,6 @@ import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
-from ai.backend.agent.alloc_map import AllocationStrategy
 from ai.backend.agent.types import MountInfo
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
@@ -26,6 +25,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import current_loop, nmget
 
 from .. import __version__
+from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
