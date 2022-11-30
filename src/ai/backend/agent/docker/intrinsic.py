@@ -12,6 +12,7 @@ import psutil
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 
+from ai.backend.agent.alloc_map import AllocationStrategy
 from ai.backend.agent.types import MountInfo
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
@@ -570,6 +571,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
+            allocation_strategy=AllocationStrategy.FILL,
             device_slots={
                 dev.device_id: DeviceSlotInfo(
                     SlotTypes.BYTES, SlotName("mem"), Decimal(dev.memory_size)
