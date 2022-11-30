@@ -26,7 +26,7 @@ class RedisStorage(AbstractStorage):
         self,
         redis_pool: "aioredis.Redis[bytes]",
         *,
-        cookie_name: str = "BAI_SESSION",
+        cookie_name: str = "AIOHTTP_SESSION",
         domain: Optional[str] = None,
         max_age: Optional[int] = None,
         path: str = "/",
