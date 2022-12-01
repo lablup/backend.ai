@@ -361,7 +361,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                 ]
                 if len(nonzero_devs) == 0:
                     raise InsufficientResource(
-                        "DiscretePropertyAllocMap: insufficient allocatable amount!",
+                        "DiscretePropertyAllocMap: insufficient allocatable candidate devices!",
                         context_tag,
                         slot_name,
                         str(requested_alloc),
