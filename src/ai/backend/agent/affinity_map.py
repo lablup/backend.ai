@@ -38,7 +38,7 @@ class AffinityMap(nx.Graph):
         self,
         device_name: DeviceName,
         src_device: AbstractComputeDevice,
-    ) -> Sequence[AbstractComputeDevice]:
+    ) -> Sequence[Sequence[AbstractComputeDevice]]:
         distance_sets: dict[int, nx.Graph] = defaultdict(nx.Graph)
         for v in self.neighbors(src_device):
             if v.device_name == device_name:
@@ -51,13 +51,15 @@ class AffinityMap(nx.Graph):
                 device_cluster_list.append((distance, component))
         # sort by: low distance first, large component first
         device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
-        largest_component: list[AbstractComputeDevice] = []
-        for distance, device_set in device_cluster_list[:1]:
+        largest_components: list[list[AbstractComputeDevice]] = []
+        for distance, device_set in device_cluster_list:
+            largest_component: list[AbstractComputeDevice] = []
             for device in device_set:
                 if device == src_device:
                     continue
                 largest_component.append(device)
-        return largest_component
+            largest_components.append(largest_component)
+        return largest_components
 
     def get_device_clusters_with_lowest_distance(
         self,
@@ -83,7 +85,7 @@ class AffinityMap(nx.Graph):
         self,
         src_devices: Optional[Sequence[AbstractComputeDevice]],
         device_name: DeviceName,
-    ) -> Sequence[Sequence[AbstractComputeDevice]]:
+    ) -> tuple[AffinityPolicy, Sequence[Sequence[AbstractComputeDevice]]]:
         """
         Get the list of neighbor device clusters and their distance from the given source_devices
         with the same name.
@@ -92,35 +94,47 @@ class AffinityMap(nx.Graph):
             Given a 4-core dual socket system with two GPUs per socket:
 
             If the prior allocator has assigned (gpu0@node0, gpu2@node1),
-            it will return (cpu0-3@node0, cpu4-7@node1).
+            it will return INTERLEAVING, (cpu0-3@node0, cpu4-7@node1).
 
             If the prior allocator has assigned (gpu0@node0, gpu1@node0),
-            it will return (cpu0-3@node0) only.
+            it will return NON-INTERLEAVING, (cpu0-3@node0, cpu4-7@node1).
 
         If source_devices is None, it will return the first largest connected component from the
         device distance matrix sharing the lowest distance values.
         """
         if src_devices:
-            neighbor_components = []
-            zero_distance_components = nx.subgraph_view(
-                self,
-                filter_node=lambda u: u in src_devices or u.device_name == device_name,
-                filter_edge=lambda u, v: self.edges[u, v]["weight"] == 0,
-            )
-            for src_device_component in nx.connected_components(zero_distance_components):
+            assert next(iter(src_devices)).device_name != device_name
+            neighbor_components: list[Sequence[AbstractComputeDevice]] = []
+            zero_distance_src_components = [
+                *nx.connected_components(
+                    nx.subgraph_view(
+                        self,
+                        filter_node=lambda u: u in src_devices,
+                        filter_edge=lambda u, v: self.edges[u, v]["weight"] == 0,
+                    )
+                )
+            ]
+            for src_device_component in zero_distance_src_components:
                 # take the first device in this neighbor group
+                if not src_device_component:
+                    continue
                 src_device = next(iter(src_device_component))
-                largest_component = (
+                largest_components = (
                     self.get_largest_device_cluster_with_lowest_distance_from_src_device(
                         device_name,
                         src_device,
                     )
                 )
-                neighbor_components.append(largest_component)
-            return neighbor_components
+                neighbor_components.extend(largest_components)
+            alloc_policy = (
+                AffinityPolicy.INTERLEAVED
+                if len(zero_distance_src_components) > 1
+                else AffinityPolicy.PREFER_SINGLE_NODE
+            )
+            return alloc_policy, neighbor_components
         else:
             components = self.get_device_clusters_with_lowest_distance(device_name)
-            return components
+            return AffinityPolicy.PREFER_SINGLE_NODE, components
 
     @classmethod
     def build(cls, devices: Sequence[AbstractComputeDevice]) -> AffinityMap:
@@ -133,6 +147,7 @@ class AffinityMap(nx.Graph):
             g.add_edge(device1, device1, weight=0)
             for device2 in devices_copy:
                 weight = abs((max(0, device2.numa_node or 0)) - max(0, (device1.numa_node or 0)))
+                # weight = 0 if device1.numa_node == device2.numa_node else 1
                 if max_weight < weight:
                     max_weight = weight
                 g.add_edge(device1, device2, weight=weight)

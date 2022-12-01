@@ -129,7 +129,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
                 key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
                 reverse=True,
             )
-        neighbor_groups = affinity_hint.affinity_map.get_distance_ordered_neighbors(
+        alloc_policy, neighbor_groups = affinity_hint.affinity_map.get_distance_ordered_neighbors(
             affinity_hint.devices, device_name
         )
         neighbor_sorted_dev_allocs = []
@@ -146,17 +146,18 @@ class AbstractAllocMap(metaclass=ABCMeta):
             )
             neighbor_sorted_dev_allocs.append(neighbor_sorted_dev_alloc)
         iter_func: Callable
-        if affinity_hint.devices is None:
+        if affinity_hint.devices is None:  # first-allocated device
             match affinity_hint.policy:
                 case AffinityPolicy.PREFER_SINGLE_NODE:
                     iter_func = itertools.chain
                 case AffinityPolicy.INTERLEAVED:
                     iter_func = more_itertools.interleave_longest
         else:
-            # After the first device type allocation, we should interleave *ALWAYS*
-            # for when the first device type allocation result has devices from multiple NUMA nodes.
-            # (e.g., even with the PREFER_SINGLE_NODE policy, there may be devices from multiple
-            # NUMA nodes if the requested amount exceeds the device availability of a single node)
+            match alloc_policy:
+                case AffinityPolicy.PREFER_SINGLE_NODE:
+                    iter_func = itertools.chain
+                case AffinityPolicy.INTERLEAVED:
+                    iter_func = more_itertools.interleave_longest
             iter_func = more_itertools.interleave_longest
         sorted_dev_allocs: list[tuple[DeviceId, Decimal]] = [
             (device_id, alloc) for device_id, alloc in iter_func(*neighbor_sorted_dev_allocs)

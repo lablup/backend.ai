@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from ai.backend.agent.affinity_map import AffinityMap
+from ai.backend.agent.affinity_map import AffinityMap, AffinityPolicy
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId, DeviceName
 
@@ -68,7 +68,7 @@ def test_custom_device_class():
     assert g.size() == 6
 
 
-def test_affinity_map_init():
+def test_affinity_map_first_allocation():
     # only a single device
     devices = [
         CPUDevice(
@@ -76,7 +76,7 @@ def test_affinity_map_init():
         ),
     ]
     m = AffinityMap.build(devices)
-    neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
+    policy, neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
     assert _devid(neighbor_groups[0]) == {"a0"}
 
     # numa_node is None
@@ -97,7 +97,8 @@ def test_affinity_map_init():
         ),
     ]
     m = AffinityMap.build(devices)
-    neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
+    policy, neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
+    assert policy == AffinityPolicy.PREFER_SINGLE_NODE
     assert _devid(neighbor_groups[0]) == {"a0", "a1"}
 
     # numa_node is -1 (cloud instances)
@@ -118,11 +119,14 @@ def test_affinity_map_init():
         ),
     ]
     m = AffinityMap.build(devices)
-    neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
+    policy, neighbor_groups = m.get_distance_ordered_neighbors(None, DeviceName("cpu"))
+    assert policy == AffinityPolicy.PREFER_SINGLE_NODE
     assert _devid(neighbor_groups[0]) == {"a0", "a1"}
 
 
-def test_affinity_map():
+def test_affinity_map_secondary_allocation():
+    from pprint import pprint
+
     devices = [
         DummyDevice(DeviceId("a0"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
         DummyDevice(DeviceId("a1"), "", 0, 1, numa_node=0, device_name=DeviceName("cpu")),
@@ -142,59 +146,72 @@ def test_affinity_map():
     m = AffinityMap.build(devices)
 
     # expecting: {d0,d1,d2,d3}
-    neighbor_groups = m.get_distance_ordered_neighbors(
+    policy, neighbor_groups = m.get_distance_ordered_neighbors(
         None,
         DeviceName("cpu"),
     )
+    assert policy == AffinityPolicy.PREFER_SINGLE_NODE
     assert _devid(neighbor_groups[0]) == {"d0", "d1", "d2", "d3"}
 
     # expecting: {x0} or {x1}
-    neighbor_groups = m.get_distance_ordered_neighbors(
+    policy, neighbor_groups = m.get_distance_ordered_neighbors(
         None,
         DeviceName("cuda"),
     )
+    assert policy == AffinityPolicy.PREFER_SINGLE_NODE
     assert _devid(neighbor_groups[0]) == {"x0"} or _devid(neighbor_groups[0]) == {"x1"}
 
     # expecting: {a0,a1,a2}
-    neighbor_groups = m.get_distance_ordered_neighbors(
+    policy, neighbor_groups = m.get_distance_ordered_neighbors(
         [devices[-2]],  # x0
         DeviceName("cpu"),
     )
-    assert _devid(neighbor_groups[0]) == {"a0", "a1", "a2"}
-
-    # expecting: {b0,b1,b2}
-    neighbor_groups = m.get_distance_ordered_neighbors(
-        [devices[-1]],  # x1
-        DeviceName("cpu"),
-    )
-    assert _devid(neighbor_groups[0]) == {"b0", "b1", "b2"}
-
-    # expecting: {a0,a1,a2},{b0,b1,b2}
-    neighbor_groups = m.get_distance_ordered_neighbors(
-        [devices[-2], devices[-1]],  # x0, x1
-        DeviceName("cpu"),
-    )
+    pprint(neighbor_groups)
+    assert policy == AffinityPolicy.PREFER_SINGLE_NODE
     assert _devid(neighbor_groups[0]) == {"a0", "a1", "a2"}
     assert _devid(neighbor_groups[1]) == {"b0", "b1", "b2"}
 
     # expecting: {b0,b1,b2}
-    neighbor_groups = m.get_distance_ordered_neighbors(
+    policy, neighbor_groups = m.get_distance_ordered_neighbors(
         [devices[-1]],  # x1
         DeviceName("cpu"),
     )
+    pprint(neighbor_groups)
+    assert policy == AffinityPolicy.PREFER_SINGLE_NODE
+    assert _devid(neighbor_groups[0]) == {"b0", "b1", "b2"}
+    # assert _devid(neighbor_groups[1]) == {"a0", "a1", "a2"}
+    assert {"a0", "a1", "a2"}.issubset(_devid(neighbor_groups[1]))
+
+    # expecting: {a0,a1,a2},{b0,b1,b2}
+    policy, neighbor_groups = m.get_distance_ordered_neighbors(
+        [devices[-2], devices[-1]],  # x0, x1
+        DeviceName("cpu"),
+    )
+    assert policy == AffinityPolicy.INTERLEAVED
+    assert _devid(neighbor_groups[0]) == {"a0", "a1", "a2"}
+    assert _devid(neighbor_groups[1]) == {"b0", "b1", "b2"}
+
+    # expecting: {b0,b1,b2}
+    policy, neighbor_groups = m.get_distance_ordered_neighbors(
+        [devices[-1]],  # x1
+        DeviceName("cpu"),
+    )
+    assert policy == AffinityPolicy.PREFER_SINGLE_NODE
     assert _devid(neighbor_groups[0]) == {"b0", "b1", "b2"}
 
     # expecting: {x0},{x1}
-    neighbor_groups = m.get_distance_ordered_neighbors(
+    policy, neighbor_groups = m.get_distance_ordered_neighbors(
         [devices[0], devices[1], devices[3], devices[4]],  # a0, a1, b0, b1 (two NUMA nodes)
         DeviceName("cuda"),
     )
+    assert policy == AffinityPolicy.INTERLEAVED
     assert _devid(neighbor_groups[0]) == {"x0"}
     assert _devid(neighbor_groups[1]) == {"x1"}
 
     # expecting: {x0}
-    neighbor_groups = m.get_distance_ordered_neighbors(
+    policy, neighbor_groups = m.get_distance_ordered_neighbors(
         [devices[0], devices[1]],  # a0, a1 (single NUMA node)
         DeviceName("cuda"),
     )
+    assert policy == AffinityPolicy.PREFER_SINGLE_NODE
     assert _devid(neighbor_groups[0]) == {"x0"}
