@@ -359,6 +359,14 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                     for dev_id, current_alloc in sorted_dev_allocs
                     if self.device_slots[dev_id].amount - current_alloc - new_alloc[dev_id] > 0
                 ]
+                if len(nonzero_devs) == 0:
+                    raise InsufficientResource(
+                        "DiscretePropertyAllocMap: insufficient allocatable amount!",
+                        context_tag,
+                        slot_name,
+                        str(requested_alloc),
+                        str(total_allocatable),
+                    )
                 initial_diffs = distribute(remaining_alloc, nonzero_devs)
                 diffs = {
                     dev_id: min(
