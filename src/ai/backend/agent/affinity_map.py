@@ -89,9 +89,9 @@ class AffinityMap(nx.Graph):
         with the same name.
 
         Example:
-            Given a 4-core dual socket system:
+            Given a 4-core dual socket system with two GPUs per socket:
 
-            If the prior allocator has assigned (gpu0@node0, gpu1@node1),
+            If the prior allocator has assigned (gpu0@node0, gpu2@node1),
             it will return (cpu0-3@node0, cpu4-7@node1).
 
             If the prior allocator has assigned (gpu0@node0, gpu1@node0),
@@ -100,11 +100,11 @@ class AffinityMap(nx.Graph):
         If source_devices is None, it will return the first largest connected component from the
         device distance matrix sharing the lowest distance values.
         """
-        if src_devices is not None:
+        if src_devices:
             neighbor_components = []
             zero_distance_components = nx.subgraph_view(
                 self,
-                filter_node=lambda u: u in src_devices,
+                filter_node=lambda u: u in src_devices or u.device_name == device_name,
                 filter_edge=lambda u, v: self.edges[u, v]["weight"] == 0,
             )
             for src_device_component in nx.connected_components(zero_distance_components):
