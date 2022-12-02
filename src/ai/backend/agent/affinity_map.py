@@ -85,7 +85,7 @@ class AffinityMap(nx.Graph):
         self,
         src_devices: Optional[Sequence[AbstractComputeDevice]],
         device_name: DeviceName,
-    ) -> tuple[AffinityPolicy, Sequence[Sequence[AbstractComputeDevice]]]:
+    ) -> tuple[Sequence[Sequence[AbstractComputeDevice]], Sequence[AbstractComputeDevice]]:
         """
         Get the list of neighbor device clusters and their distance from the given source_devices
         with the same name.
@@ -94,47 +94,38 @@ class AffinityMap(nx.Graph):
             Given a 4-core dual socket system with two GPUs per socket:
 
             If the prior allocator has assigned (gpu0@node0, gpu2@node1),
-            it will return INTERLEAVING, (cpu0-3@node0, cpu4-7@node1).
+            it will return:
+               primary: cpu0-3@node0, cpu4-7@node1 [interleaved]
+               secondary: (empty) [fill-up-remaining]
 
             If the prior allocator has assigned (gpu0@node0, gpu1@node0),
-            it will return NON-INTERLEAVING, (cpu0-3@node0, cpu4-7@node1).
+            it will return:
+              primary: cpu0-3@node0 [interleaved]
+              secondary: cpu4-7@node1 [fill-up-remaining]
 
         If source_devices is None, it will return the first largest connected component from the
         device distance matrix sharing the lowest distance values.
         """
         if src_devices:
             assert next(iter(src_devices)).device_name != device_name
-            neighbor_components: list[Sequence[AbstractComputeDevice]] = []
-            zero_distance_src_components = [
-                *nx.connected_components(
-                    nx.subgraph_view(
-                        self,
-                        filter_node=lambda u: u in src_devices,
-                        filter_edge=lambda u, v: self.edges[u, v]["weight"] == 0,
-                    )
-                )
-            ]
-            for src_device_component in zero_distance_src_components:
-                # take the first device in this neighbor group
-                if not src_device_component:
-                    continue
-                src_device = next(iter(src_device_component))
-                largest_components = (
-                    self.get_largest_device_cluster_with_lowest_distance_from_src_device(
-                        device_name,
-                        src_device,
-                    )
-                )
-                neighbor_components.extend(largest_components)
-            alloc_policy = (
-                AffinityPolicy.INTERLEAVED
-                if len(zero_distance_src_components) > 1
-                else AffinityPolicy.PREFER_SINGLE_NODE
-            )
-            return alloc_policy, neighbor_components
+            src_numa_nodes = set(src_device.numa_node for src_device in src_devices)
+            primary_sets = []
+            secondary_set = set()
+            for numa_node in src_numa_nodes:
+                primary_set = set()
+                for u in self.nodes:
+                    if u.device_name == device_name:
+                        if u.numa_node == numa_node:
+                            primary_set.add(u)
+                        else:
+                            secondary_set.add(u)
+                primary_sets.append(primary_set)
+            for primary_set in primary_sets:
+                secondary_set -= primary_set
+            return [*(list(primary_set) for primary_set in primary_sets)], list(secondary_set)
         else:
             components = self.get_device_clusters_with_lowest_distance(device_name)
-            return AffinityPolicy.PREFER_SINGLE_NODE, components
+            return components, []
 
     @classmethod
     def build(cls, devices: Sequence[AbstractComputeDevice]) -> AffinityMap:
@@ -146,8 +137,8 @@ class AffinityMap(nx.Graph):
             device1 = devices_copy.pop(0)
             g.add_edge(device1, device1, weight=0)
             for device2 in devices_copy:
-                weight = abs((max(0, device2.numa_node or 0)) - max(0, (device1.numa_node or 0)))
-                # weight = 0 if device1.numa_node == device2.numa_node else 1
+                # weight = abs((max(0, device2.numa_node or 0)) - max(0, (device1.numa_node or 0)))
+                weight = 0 if device1.numa_node == device2.numa_node else 1
                 if max_weight < weight:
                     max_weight = weight
                 g.add_edge(device1, device2, weight=weight)
