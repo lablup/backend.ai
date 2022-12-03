@@ -96,12 +96,12 @@ class AffinityMap(nx.Graph):
             If the prior allocator has assigned (gpu0@node0, gpu2@node1),
             it will return:
                primary: cpu0-3@node0, cpu4-7@node1 [interleaved]
-               secondary: (empty) [fill-up-remaining]
+               secondary: (empty) [fill-remaining]
 
             If the prior allocator has assigned (gpu0@node0, gpu1@node0),
             it will return:
               primary: cpu0-3@node0 [interleaved]
-              secondary: cpu4-7@node1 [fill-up-remaining]
+              secondary: cpu4-7@node1 [fill-remaining]
 
         If source_devices is None, it will return the first largest connected component from the
         device distance matrix sharing the lowest distance values.
