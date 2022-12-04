@@ -440,7 +440,7 @@ async def query_all_related_vfolders(
 ) -> Sequence[Mapping[str, Any]]:
     # Query own vfolders
     own_vfs = await query_own_vfolders(db_conn, user_uuid, user_role)
-    invited_vfs = await query_user_type_permission_overriden_vfolders(db_conn, user_uuid, user_role)
+    invited_vfs = await query_user_type_permission_overriden_vfolders(db_conn, user_uuid)
 
     # Query project-group vfolders
     group_vfs = await query_project_group_vfolders(db_conn, user_uuid, user_role, domain_name)
@@ -995,6 +995,7 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
+        # return await count_all_related_vfolders()
         from .user import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True)
@@ -1025,6 +1026,11 @@ class VirtualFolder(graphene.ObjectType):
         filter: str = None,
         order: str = None,
     ) -> Sequence[VirtualFolder]:
+        # return [
+        #     obj
+        #     for r in (await query_all_related_vfolders())
+        #     if (obj := cls.from_row(graph_ctx, r)) is not None
+        # ]
         from .group import groups
         from .user import users
 
