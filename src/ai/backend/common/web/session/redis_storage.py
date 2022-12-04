@@ -1,10 +1,16 @@
 import json
+import logging
+import logging.config
 import uuid
 from typing import Any, Callable, Optional
 
 from aiohttp import web
 
-from . import AbstractStorage, Session
+from ai.backend.common.logging import BraceStyleAdapter
+
+from . import AbstractStorage, Session, extra_config_headers
+
+log = BraceStyleAdapter(logging.getLogger("ai.backend.web.server"))
 
 try:
     from redis import VERSION
@@ -54,34 +60,47 @@ class RedisStorage(AbstractStorage):
         self._redis = redis_pool
 
     async def load_session(self, request: web.Request) -> Session:
-        cookie = self.load_cookie(request)
-        if cookie is None:
-            return Session(None, data=None, new=True, max_age=self.max_age)
+        # If X-BackendAI-SessionID exists in request, login will use the value as SessionID,
+        # instead of Cookie value.
+        request_headers = extra_config_headers.check(request.headers)
+        sessionId = request_headers.get("X-BackendAI-SessionID", None)
+        if sessionId is not None:
+            key = str(sessionId)
         else:
-            key = str(cookie)
-            data_bytes = await self._redis.get(self.cookie_name + "_" + key)
-            if data_bytes is None:
+            cookie = self.load_cookie(request)
+            if cookie is None:
                 return Session(None, data=None, new=True, max_age=self.max_age)
-            data_str = data_bytes.decode("utf-8")
-            try:
-                data = self._decoder(data_str)
-            except ValueError:
-                data = None
-            return Session(key, data=data, new=False, max_age=self.max_age)
+            else:
+                key = str(cookie)
+        data_bytes = await self._redis.get(self.cookie_name + "_" + key)
+        if data_bytes is None:
+            return Session(None, data=None, new=True, max_age=self.max_age)
+        data_str = data_bytes.decode("utf-8")
+        try:
+            data = self._decoder(data_str)
+        except ValueError:
+            data = None
+        return Session(key, data=data, new=False, max_age=self.max_age)
 
     async def save_session(
         self, request: web.Request, response: web.StreamResponse, session: Session
     ) -> None:
         key = session.identity
         if key is None:
+            # New login case
             key = self._key_factory()
+            response._headers["X-BackendAI-SessionID"] = key
+            # session.set_new_identity(key)
             self.save_cookie(response, key, max_age=session.max_age)
         else:
             if session.empty:
+                # Logout or refresh
                 self.save_cookie(response, "", max_age=session.max_age)
+                # response.headers.set('X-BackendAI-SessionID', "")
             else:
                 key = str(key)
                 self.save_cookie(response, key, max_age=session.max_age)
+                # response.headers.set('X-BackendAI-SessionID', key)
 
         data_str = self._encoder(self._get_session_data(session))
         await self._redis.set(

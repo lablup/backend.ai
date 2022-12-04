@@ -1,16 +1,21 @@
 from typing import AsyncContextManager, NamedTuple, Protocol, TypeVar
 
-import attr
-
 from ai.backend.agent.resources import AbstractComputeDevice
 from ai.backend.common.types import DeviceId
 
 
-@attr.define()
 class CUDADevice(AbstractComputeDevice):
     model_name: str
     mother_uuid: DeviceId
     is_mig_device: bool
+
+    def __init__(
+        self, model_name: str, mother_uuid: DeviceId, is_mig_device: bool, *args, **kwargs
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.model_name = model_name
+        self.mother_uuid = mother_uuid
+        self.is_mig_device = is_mig_device
 
 
 class DeviceStat(NamedTuple):

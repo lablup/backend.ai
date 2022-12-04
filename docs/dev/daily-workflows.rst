@@ -474,7 +474,7 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 .. code-block:: console
 
    $ pgrep pantsd | xargs kill
-   $ rm -r .tmp .pants.d ~/.cache/pants
+   $ rm -r .tmp/immutable* .pants.d ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and
 all cached data as necessary.

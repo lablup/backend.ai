@@ -9,7 +9,7 @@ from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from decimal import ROUND_DOWN, Decimal
 from typing import (
-    Callable,
+    TYPE_CHECKING,
     FrozenSet,
     Iterable,
     Mapping,
@@ -33,6 +33,9 @@ from .exception import (
     NotMultipleOfQuantum,
     ResourceError,
 )
+
+if TYPE_CHECKING:
+    from .resources import AbstractComputeDevice
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 log_alloc_map: bool = False
@@ -123,45 +126,57 @@ class AbstractAllocMap(metaclass=ABCMeta):
         self, affinity_hint: Optional[AffinityHint], slot_name: SlotName
     ) -> Sequence[tuple[DeviceId, Decimal]]:
         device_name = DeviceName(slot_name.partition(".")[0])
-        if affinity_hint is None:  # for legacy
+        if affinity_hint is None or not affinity_hint.devices:  # for legacy
             return sorted(
                 self.allocations[slot_name].items(),  # k: slot_name, v: per-device alloc
                 key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
                 reverse=True,
             )
-        neighbor_groups = affinity_hint.affinity_map.get_distance_ordered_neighbors(
+        primary_sets, secondary_set = affinity_hint.affinity_map.get_distance_ordered_neighbors(
             affinity_hint.devices, device_name
         )
-        neighbor_sorted_dev_allocs = []
-        for neighbors in neighbor_groups:
-            neighbor_device_ids = {d.device_id for d in neighbors}
-            neighbor_sorted_dev_alloc = sorted(
+
+        def convert_to_sorted_dev_alloc(device_set: Iterable[AbstractComputeDevice]):
+            device_ids = {d.device_id for d in device_set}
+            return sorted(
                 (
                     (device_id, alloc)
                     for device_id, alloc in self.allocations[slot_name].items()
-                    if device_id in neighbor_device_ids
+                    if device_id in device_ids
                 ),
                 key=lambda pair: self.device_slots[pair[0]].amount - pair[1],
                 reverse=True,
             )
-            neighbor_sorted_dev_allocs.append(neighbor_sorted_dev_alloc)
-        iter_func: Callable
-        if affinity_hint.devices is None:
+
+        primary_sorted_dev_allocs = [
+            convert_to_sorted_dev_alloc(primary_set) for primary_set in primary_sets
+        ]
+        secondary_sorted_dev_alloc = convert_to_sorted_dev_alloc(secondary_set)
+
+        if not affinity_hint.devices:  # first-allocated device
             match affinity_hint.policy:
                 case AffinityPolicy.PREFER_SINGLE_NODE:
-                    iter_func = itertools.chain
+                    return [
+                        (device_id, alloc)
+                        for device_id, alloc in itertools.chain(*primary_sorted_dev_allocs)
+                    ]
                 case AffinityPolicy.INTERLEAVED:
-                    iter_func = more_itertools.interleave_longest
+                    return [
+                        (device_id, alloc)
+                        for device_id, alloc in more_itertools.interleave_longest(
+                            *primary_sorted_dev_allocs
+                        )
+                    ]
         else:
-            # After the first device type allocation, we should interleave *ALWAYS*
-            # for when the first device type allocation result has devices from multiple NUMA nodes.
-            # (e.g., even with the PREFER_SINGLE_NODE policy, there may be devices from multiple
-            # NUMA nodes if the requested amount exceeds the device availability of a single node)
-            iter_func = more_itertools.interleave_longest
-        sorted_dev_allocs: list[tuple[DeviceId, Decimal]] = [
-            (device_id, alloc) for device_id, alloc in iter_func(*neighbor_sorted_dev_allocs)
-        ]
-        return sorted_dev_allocs
+            return [
+                *(
+                    (device_id, alloc)
+                    for device_id, alloc in more_itertools.interleave_longest(
+                        *primary_sorted_dev_allocs
+                    )
+                ),
+                *((device_id, alloc) for device_id, alloc in secondary_sorted_dev_alloc),
+            ]
 
     @abstractmethod
     def allocate(
@@ -359,6 +374,14 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
                     for dev_id, current_alloc in sorted_dev_allocs
                     if self.device_slots[dev_id].amount - current_alloc - new_alloc[dev_id] > 0
                 ]
+                if len(nonzero_devs) == 0:
+                    raise InsufficientResource(
+                        "DiscretePropertyAllocMap: insufficient allocatable candidate devices!",
+                        context_tag,
+                        slot_name,
+                        str(requested_alloc),
+                        str(total_allocatable),
+                    )
                 initial_diffs = distribute(remaining_alloc, nonzero_devs)
                 diffs = {
                     dev_id: min(
