@@ -92,6 +92,7 @@ from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
+    ClusterSSHPortMapping,
     ContainerId,
     DeviceId,
     DeviceName,
@@ -103,6 +104,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     Sentinel,
+    ServicePort,
     ServicePortProtocols,
     SessionId,
     SlotName,
@@ -114,7 +116,7 @@ from ai.backend.common.utils import cancel_tasks, current_loop
 from . import __version__ as VERSION
 from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityHint, AffinityMap
-from .exception import AgentError, ResourceError
+from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import AbstractKernel, KernelFeatures, match_distro_data
 from .resources import (
     AbstractAllocMap,
@@ -215,8 +217,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         raise NotImplementedError
 
     @abstractmethod
-    async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
+    async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         """
+        Prepare container to accept SSH connection.
         Install the ssh keypair inside the kernel from cluster_info.
         """
         raise NotImplementedError
@@ -844,17 +847,6 @@ class AbstractAgent(
                         if ev.done_future is not None:
                             ev.done_future.set_result(None)
                         return
-                    else:
-                        await self.container_lifecycle_queue.put(
-                            ContainerLifecycleEvent(
-                                ev.kernel_id,
-                                ev.container_id,
-                                LifecycleEvent.CLEAN,
-                                ev.reason,
-                                suppress_events=ev.suppress_events,
-                                done_future=ev.done_future,
-                            ),
-                        )
                 else:
                     kernel_obj.stats_enabled = False
                     kernel_obj.termination_reason = ev.reason
@@ -867,6 +859,18 @@ class AbstractAgent(
                     if ev.done_future is not None:
                         ev.done_future.set_exception(e)
                     raise
+                finally:
+                    if ev.container_id is not None:
+                        await self.container_lifecycle_queue.put(
+                            ContainerLifecycleEvent(
+                                ev.kernel_id,
+                                ev.container_id,
+                                LifecycleEvent.CLEAN,
+                                ev.reason,
+                                suppress_events=ev.suppress_events,
+                                done_future=ev.done_future,
+                            ),
+                        )
         except asyncio.CancelledError:
             pass
         except Exception:
@@ -907,13 +911,14 @@ class AbstractAgent(
                         # Exclude out-of-range ports, because when the agent restarts
                         # with a different port range, existing containers' host ports
                         # may not belong to the new port range.
-                        restored_ports = [
-                            *filter(
-                                lambda p: port_range[0] <= p <= port_range[1],
-                                kernel_obj["host_ports"],
-                            )
-                        ]
-                        self.port_pool.update(restored_ports)
+                        if host_ports := kernel_obj.get("host_ports"):
+                            restored_ports = [
+                                *filter(
+                                    lambda p: port_range[0] <= p <= port_range[1],
+                                    host_ports,
+                                )
+                            ]
+                            self.port_pool.update(restored_ports)
                         await kernel_obj.close()
                 finally:
                     self.terminating_kernels.discard(ev.kernel_id)
@@ -1308,6 +1313,7 @@ class AbstractAgent(
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
+        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> AbstractKernelCreationContext:
         raise NotImplementedError
 
@@ -1405,6 +1411,7 @@ class AbstractAgent(
             kernel_id,
             kernel_config,
             restarting=restarting,
+            cluster_ssh_port_mapping=cluster_info.get("cluster_ssh_port_mapping"),
         )
         environ: MutableMapping[str, str] = {**kernel_config["environ"]}
 
@@ -1513,7 +1520,7 @@ class AbstractAgent(
 
         # Prepare networking.
         await ctx.apply_network(cluster_info)
-        await ctx.install_ssh_keypair(cluster_info)
+        await ctx.prepare_ssh(cluster_info)
 
         # Mount vfolders and krunner stuffs.
         if not restarting:
@@ -1538,41 +1545,56 @@ class AbstractAgent(
             attached_devices[dev_name] = devices
 
         exposed_ports = [2000, 2001]
-        service_ports = []
-        port_map = {}
+        service_ports: List[ServicePort] = []
+        port_map: Dict[str, ServicePort] = {}
         preopen_ports = ctx.kernel_config.get("preopen_ports")
         if preopen_ports is None:
             preopen_ports = []
 
-        if ctx.kernel_config["cluster_role"] in ("main", "master"):
-            for sport in parse_service_ports(image_labels.get("ai.backend.service-ports", "")):
-                port_map[sport["name"]] = sport
-            port_map["sshd"] = {
+        service_ports.append(
+            {
                 "name": "sshd",
-                "protocol": ServicePortProtocols("tcp"),
+                "protocol": ServicePortProtocols.TCP,
                 "container_ports": (2200,),
                 "host_ports": (None,),
             }
-            port_map["ttyd"] = {
+        )
+        service_ports.append(
+            {
                 "name": "ttyd",
-                "protocol": ServicePortProtocols("http"),
+                "protocol": ServicePortProtocols.HTTP,
                 "container_ports": (7681,),
                 "host_ports": (None,),
             }
+        )
+
+        if ctx.kernel_config["cluster_role"] in ("main", "master"):
+            for sport in parse_service_ports(image_labels.get("ai.backend.service-ports", "")):
+                port_map[sport["name"]] = sport
             for port_no in preopen_ports:
-                sport = {
+                preopen_sport: ServicePort = {
                     "name": str(port_no),
-                    "protocol": ServicePortProtocols("preopen"),
+                    "protocol": ServicePortProtocols.PREOPEN,
                     "container_ports": (port_no,),
                     "host_ports": (None,),
                 }
-                service_ports.append(sport)
-                for cport in sport["container_ports"]:
+                service_ports.append(preopen_sport)
+                for cport in preopen_sport["container_ports"]:
                     exposed_ports.append(cport)
             for sport in port_map.values():
                 service_ports.append(sport)
                 for cport in sport["container_ports"]:
                     exposed_ports.append(cport)
+            for index, port in enumerate(ctx.kernel_config["allocated_host_ports"]):
+                service_ports.append(
+                    {
+                        "name": f"hostport{index+1}",
+                        "protocol": ServicePortProtocols.INTERNAL,
+                        "container_ports": (port,),
+                        "host_ports": (port,),
+                    }
+                )
+                exposed_ports.append(port)
             log.debug("exposed ports: {!r}", exposed_ports)
 
         runtime_type = image_labels.get("ai.backend.runtime-type", "python")
@@ -1625,12 +1647,28 @@ class AbstractAgent(
         )
         async with self.registry_lock:
             self.kernel_registry[ctx.kernel_id] = kernel_obj
-        container_data = await ctx.start_container(
-            kernel_obj,
-            cmdargs,
-            resource_opts,
-            preopen_ports,
-        )
+        try:
+            container_data = await ctx.start_container(
+                kernel_obj,
+                cmdargs,
+                resource_opts,
+                preopen_ports,
+            )
+        except ContainerCreationError as e:
+            log.warning(
+                "Kernel failed to create container (k:{}). Kernel is going to be destroyed.",
+                ctx.kernel_id,
+            )
+            cid = e.container_id
+            async with self.registry_lock:
+                self.kernel_registry[ctx.kernel_id]["container_id"] = cid
+            await self.inject_container_lifecycle_event(
+                kernel_id,
+                LifecycleEvent.DESTROY,
+                KernelLifecycleEventReason.UNKNOWN,
+                container_id=cid,
+            )
+            raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
         async with self.registry_lock:
             self.kernel_registry[ctx.kernel_id].data.update(container_data)
         await kernel_obj.init()
@@ -1673,6 +1711,10 @@ class AbstractAgent(
             if not self._pending_creation_tasks[kernel_id]:
                 del self._pending_creation_tasks[kernel_id]
 
+        public_service_ports: List[ServicePort] = [
+            port for port in service_ports if port["protocol"] != ServicePortProtocols.INTERNAL
+        ]
+
         kernel_creation_info: KernelCreationResult = {
             "id": KernelId(kernel_id),
             "kernel_host": str(kernel_obj["kernel_host"]),
@@ -1680,7 +1722,7 @@ class AbstractAgent(
             "repl_out_port": kernel_obj["repl_out_port"],
             "stdin_port": kernel_obj["stdin_port"],  # legacy
             "stdout_port": kernel_obj["stdout_port"],  # legacy
-            "service_ports": service_ports,
+            "service_ports": public_service_ports,
             "container_id": kernel_obj["container_id"],
             "resource_spec": attrs.asdict(resource_spec),
             "scaling_group": kernel_config["scaling_group"],

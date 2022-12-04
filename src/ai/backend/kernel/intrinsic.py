@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 from collections.abc import Iterable
@@ -79,6 +80,7 @@ async def init_sshd_service(child_env):
         raise RuntimeError(f"sshd init error: {stderr.decode('utf8')}")
 
     cluster_privkey_src_path = Path("/home/config/ssh/id_cluster")
+    cluster_ssh_port_mapping_path = Path("/home/config/ssh/port-mapping.json")
     user_ssh_config_path = Path("/home/work/.ssh/config")
     if cluster_privkey_src_path.is_file():
         replicas = {
@@ -88,18 +90,28 @@ async def init_sshd_service(child_env):
                 os.environ.get("BACKENDAI_CLUSTER_REPLICAS", "main:1").split(","),
             )
         }
-        for role_name, role_replica in replicas.items():
-            try:
-                existing_ssh_config = user_ssh_config_path.read_text()
-                if "\nHost {role_name}*\n" in existing_ssh_config:
-                    continue
-            except FileNotFoundError:
-                pass
+        if cluster_ssh_port_mapping_path.is_file():
+            cluster_ssh_port_mapping = json.loads(cluster_ssh_port_mapping_path.read_text())
             with open(user_ssh_config_path, "a") as f:
-                f.write(f"\nHost {role_name}*\n")
-                f.write("\tPort 2200\n")
-                f.write("\tStrictHostKeyChecking no\n")
-                f.write("\tIdentityFile /home/config/ssh/id_cluster\n")
+                for host, (hostname, port) in cluster_ssh_port_mapping.items():
+                    f.write(f"\nHost {host}\n")
+                    f.write(f"\tHostName {hostname}\n")
+                    f.write(f"\tPort {port}\n")
+                    f.write("\tStrictHostKeyChecking no\n")
+                    f.write("\tIdentityFile /home/config/ssh/id_cluster\n")
+        else:
+            for role_name, role_replica in replicas.items():
+                try:
+                    existing_ssh_config = user_ssh_config_path.read_text()
+                    if "\nHost {role_name}*\n" in existing_ssh_config:
+                        continue
+                except FileNotFoundError:
+                    pass
+                with open(user_ssh_config_path, "a") as f:
+                    f.write(f"\nHost {role_name}*\n")
+                    f.write("\tPort 2200\n")
+                    f.write("\tStrictHostKeyChecking no\n")
+                    f.write("\tIdentityFile /home/config/ssh/id_cluster\n")
     cluster_pubkey_src_path = Path("/home/config/ssh/id_cluster.pub")
     if cluster_pubkey_src_path.is_file():
         pubkey = cluster_pubkey_src_path.read_bytes()
@@ -140,7 +152,7 @@ async def prepare_ttyd_service(service_info):
     elif Path("/bin/ash").exists():
         shell = "ash"
 
-    cmdargs = ["/opt/backend.ai/bin/ttyd", f"/bin/{shell}"]
+    cmdargs = ["/opt/backend.ai/bin/ttyd", "-p", service_info["port"], f"/bin/{shell}"]
     if shell != "ash":  # Currently Alpine-based containers are not supported.
         cmdargs += ["-c", "/opt/kernel/tmux -2 attach"]
     return cmdargs, {}

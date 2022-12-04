@@ -44,7 +44,7 @@ enable_resolves = true
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.10.8"]
 tailor_pex_binary_targets = false
-resolves_to_interpreter_constraints = "{'python-kernel': ['==3.10.*'], 'pants-plugins': ['>=3.7,<3.10']}"
+resolves_to_interpreter_constraints = "{'python-kernel': ['==3.10.*'], 'pants-plugins': ['==3.9.*']}"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
@@ -109,7 +109,7 @@ lockfile = "tools/coverage-py.lock"
 
 [mypy]
 version = "mypy==0.982"
-interpreter_constraints = ["CPython>=3.10,<4"]
+interpreter_constraints = ["CPython>=3.9,<4"]
 extra_requirements.add = [
 ]
 lockfile = "tools/mypy.lock"

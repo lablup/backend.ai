@@ -34,11 +34,13 @@ class WekaVolume(BaseVolume):
         options: Mapping[str, Any] = None,
     ) -> None:
         super().__init__(local_config, mount_path, fsprefix=fsprefix, options=options)
+        ssl_verify = self.config.get("weka_verify_ssl", False)
         self.api_client = WekaAPIClient(
             self.config["weka_endpoint"],
             self.config["weka_username"],
             self.config["weka_password"],
             self.config["weka_organization"],
+            ssl=ssl_verify,
         )
 
     async def init(self) -> None:

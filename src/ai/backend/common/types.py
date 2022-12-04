@@ -266,6 +266,7 @@ class ServicePortProtocols(str, enum.Enum):
     HTTP = "http"
     TCP = "tcp"
     PREOPEN = "preopen"
+    INTERNAL = "internal"
 
 
 class SessionTypes(str, enum.Enum):
@@ -869,12 +870,16 @@ class ServicePort(TypedDict):
     host_ports: Sequence[Optional[int]]
 
 
+ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, Tuple[str, int]])
+
+
 class ClusterInfo(TypedDict):
     mode: ClusterMode
     size: int
     replicas: Mapping[str, int]  # per-role kernel counts
     network_name: Optional[str]
     ssh_keypair: Optional[ClusterSSHKeyPair]
+    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
 
 
 class ClusterSSHKeyPair(TypedDict):
@@ -921,6 +926,7 @@ class KernelCreationConfig(TypedDict):
     startup_command: Optional[str]
     internal_data: Optional[Mapping[str, Any]]
     preopen_ports: List[int]
+    allocated_host_ports: List[int]
     scaling_group: str
     agent_addr: str
 
