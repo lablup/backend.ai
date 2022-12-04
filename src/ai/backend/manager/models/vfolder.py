@@ -4,7 +4,7 @@ import enum
 import os.path
 import uuid
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Set, overload
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -35,8 +35,6 @@ from .minilang.queryfilter import QueryFilterParser
 from .user import UserRole
 
 if TYPE_CHECKING:
-    from sqlalchemy.schema import Column
-
     from .gql import GraphQueryContext
     from .storage import StorageSessionManager
 
