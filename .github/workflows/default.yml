@@ -25,8 +25,13 @@ jobs:
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
@@ -61,7 +66,7 @@ jobs:
 
   typecheck:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     steps:
     - uses: actions/checkout@v3
       with:
@@ -78,8 +83,13 @@ jobs:
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
@@ -111,7 +121,7 @@ jobs:
 
   test:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     steps:
     - uses: actions/checkout@v3
       with:
@@ -139,8 +149,13 @@ jobs:
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
@@ -157,7 +172,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants test --changed-since=$BASE_REF --changed-dependees=transitive
+        ./pants test --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -170,7 +185,7 @@ jobs:
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         submodules: true
     - name: Fetch remote tags
@@ -198,8 +213,13 @@ jobs:
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}

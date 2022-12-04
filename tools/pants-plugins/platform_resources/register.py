@@ -27,7 +27,7 @@ class PlatformResourcesSusbystem(Subsystem):
     help = "The platform-specific resource provider."
     platform = EnumOption(
         "--target",
-        default=Platform.current,
+        default=lambda cls: Platform.current,
         enum_type=Platform,
         advanced=False,
         help="Select only resources compatible with the given platform",
@@ -85,7 +85,7 @@ async def infer_platform_specific_dependencies(
         subsystem.platform.value
     )
     if not platform_resources_unparsed_address:
-        return InferredDependencies()
+        return InferredDependencies(Addresses([]))
     parsed_addresses = await Get(
         Addresses,
         UnparsedAddressInputs(

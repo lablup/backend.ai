@@ -31,6 +31,7 @@ from typing import (
     Union,
 )
 
+import aiohttp
 import aiotools
 import pkg_resources
 import zmq
@@ -41,6 +42,7 @@ from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
+from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -48,6 +50,7 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     BinarySize,
     ClusterInfo,
+    ClusterSSHPortMapping,
     ContainerId,
     DeviceId,
     DeviceName,
@@ -58,13 +61,14 @@ from ai.backend.common.types import (
     MountTypes,
     ResourceSlot,
     Sentinel,
+    ServicePort,
     SlotName,
     current_resource_slots,
 )
 from ai.backend.common.utils import AsyncFileWriter, current_loop
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
-from ..exception import InitializationError, UnsupportedResource
+from ..exception import ContainerCreationError, InitializationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
@@ -137,6 +141,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     port_pool: Set[int]
     agent_sockpath: Path
     resource_lock: asyncio.Lock
+    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
 
     def __init__(
         self,
@@ -148,6 +153,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
         restarting: bool = False,
+        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> None:
         super().__init__(kernel_id, kernel_config, local_config, computers, restarting=restarting)
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
@@ -165,6 +171,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.container_configs = []
         self.domain_socket_proxies = []
         self.computer_docker_args = {}
+
+        self.cluster_ssh_port_mapping = cluster_ssh_port_mapping
 
     def _kernel_resource_spec_read(self, filename):
         with open(filename, "r") as f:
@@ -404,7 +412,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         )
 
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
-        if cluster_info["network_name"] is not None:
+        if cluster_info["network_name"] == "host":
+            self.container_configs.append(
+                {
+                    "HostConfig": {
+                        "NetworkMode": "host",
+                    },
+                }
+            )
+        elif cluster_info["network_name"] is not None:
             self.container_configs.append(
                 {
                     "HostConfig": {
@@ -444,12 +460,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 }
             )
 
-    async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
+    async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
         if sshkey is None:
             return
 
-        def _write_keypair():
+        def _write_config():
             try:
                 priv_key_path = self.config_dir / "ssh" / "id_cluster"
                 pub_key_path = self.config_dir / "ssh" / "id_cluster.pub"
@@ -463,10 +479,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         os.chown(str(priv_key_path), uid, gid)
                         os.chown(str(pub_key_path), uid, gid)
                 priv_key_path.chmod(0o600)
+                if cluster_ssh_port_mapping := cluster_info["cluster_ssh_port_mapping"]:
+                    port_mapping_json_path = self.config_dir / "ssh" / "port-mapping.json"
+                    port_mapping_json_path.write_text(json.dumps(cluster_ssh_port_mapping))
             except Exception:
                 log.exception("error while writing cluster keypair")
 
-        current_loop().run_in_executor(None, _write_keypair)  # ???
+        current_loop().run_in_executor(None, _write_config)  # ???
 
     async def process_mounts(self, mounts: Sequence[Mount]):
         def fix_unsupported_perm(folder_perm: MountPermission) -> MountPermission:
@@ -517,7 +536,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self,
         resource_spec: KernelResourceSpec,
         environ: Mapping[str, str],
-        service_ports,
+        service_ports: List[ServicePort],
     ) -> DockerKernel:
         loop = current_loop()
 
@@ -654,15 +673,26 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         # PHASE 4: Run!
         container_bind_host = self.local_config["container"]["bind-host"]
         advertised_kernel_host = self.local_config["container"].get("advertised-host")
-        exposed_ports = [2000, 2001]
+        repl_ports = [2000, 2001]
+        if len(service_ports) + len(repl_ports) > len(self.port_pool):
+            raise RuntimeError("Container ports are not sufficiently available.")
+        exposed_ports = repl_ports
+        host_ports = [self.port_pool.pop() for _ in repl_ports]
         for sport in service_ports:
             exposed_ports.extend(sport["container_ports"])
-        if len(exposed_ports) > len(self.port_pool):
-            raise RuntimeError("Container ports are not sufficiently available.")
-        host_ports = []
-        for eport in exposed_ports:
-            hport = self.port_pool.pop()
-            host_ports.append(hport)
+            if (
+                sport["name"] == "sshd"
+                and self.cluster_ssh_port_mapping
+                and (
+                    ssh_host_port := self.cluster_ssh_port_mapping.get(
+                        self.kernel_config["cluster_hostname"]
+                    )
+                )
+            ):
+                host_ports.append(ssh_host_port[1])
+            else:
+                hport = self.port_pool.pop()
+                host_ports.append(hport)
 
         container_log_size = self.local_config["agent"]["container-logs"]["max-length"]
         container_log_file_count = 5
@@ -724,6 +754,36 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 },
             )
 
+        if container_config["HostConfig"].get("NetworkMode") == "host":
+            intrinsic_ports = {
+                "replin": host_ports[0],
+                "replout": host_ports[1],
+            }
+            for index, port_info in enumerate(service_ports):
+                port_name = port_info["name"]
+                if port_name in ("sshd", "ttyd"):
+                    intrinsic_ports[port_name] = host_ports[index + 2]
+
+            await current_loop().run_in_executor(
+                None,
+                lambda: (self.config_dir / "intrinsic-ports.json").write_text(
+                    json.dumps(intrinsic_ports)
+                ),
+            )
+
+            if self.cluster_ssh_port_mapping:
+                update_nested_dict(
+                    container_config,
+                    {
+                        "HostConfig": {
+                            "ExtraHosts": [
+                                f"{hostname}:{host_port[0]}"
+                                for hostname, host_port in self.cluster_ssh_port_mapping.items()
+                            ]
+                        }
+                    },
+                )
+
         if resource_opts and resource_opts.get("shmem"):
             shmem = int(resource_opts.get("shmem", "0"))
             self.computer_docker_args["HostConfig"]["ShmSize"] = shmem
@@ -757,12 +817,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
         # We are all set! Create and start the container.
         async with closing_async(Docker()) as docker:
+            container: Optional[DockerContainer] = None
             try:
                 container = await docker.containers.create(
                     config=container_config, name=kernel_name
                 )
+                assert container is not None
                 cid = container._id
-
                 resource_spec.container_id = cid
                 # Write resource.txt again to update the contaienr id.
                 with open(self.config_dir / "resource.txt", "w") as f:
@@ -779,6 +840,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
                 await container.start()
             except asyncio.CancelledError:
+                if container is not None:
+                    raise ContainerCreationError(container_id=cid)
                 raise
             except Exception:
                 # Oops, we have to restore the allocated resources!
@@ -794,6 +857,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 async with self.resource_lock:
                     for dev_name, device_alloc in resource_spec.allocations.items():
                         self.computers[dev_name].alloc_map.free(device_alloc)
+                if container is not None:
+                    raise ContainerCreationError(container_id=cid)
                 raise
 
             additional_network_names: Set[str] = set()
@@ -809,8 +874,11 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             stdin_port = 0
             stdout_port = 0
             for idx, port in enumerate(exposed_ports):
-                host_port = int((await container.port(port))[0]["HostPort"])
-                assert host_port == host_ports[idx]
+                if container_config["HostConfig"].get("NetworkMode") == "host":
+                    host_port = host_ports[idx]
+                else:
+                    host_port = int((await container.port(port))[0]["HostPort"])
+                    assert host_port == host_ports[idx]
                 if port == 2000:  # intrinsic
                     repl_in_port = host_port
                 elif port == 2001:  # intrinsic
@@ -822,9 +890,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 else:
                     ctnr_host_port_map[port] = host_port
             for sport in service_ports:
-                sport["host_ports"] = tuple(
+                created_host_ports: Tuple[int, ...] = tuple(
                     ctnr_host_port_map[cport] for cport in sport["container_ports"]
                 )
+                sport["host_ports"] = created_host_ports
+                if container_config["HostConfig"].get("NetworkMode") == "host":
+                    sport["container_ports"] = created_host_ports
 
         return {
             "container_id": container._id,
@@ -867,6 +938,16 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def __ainit__(self) -> None:
         async with closing_async(Docker()) as docker:
+            docker_host = ""
+            match docker.connector:
+                case aiohttp.TCPConnector():
+                    assert docker.docker_host is not None
+                    docker_host = docker.docker_host
+                case aiohttp.NamedPipeConnector() | aiohttp.UnixConnector() as connector:
+                    docker_host = connector.path
+                case _:
+                    docker_host = "(unknown)"
+            log.info("accessing the local Docker daemon via {}", docker_host)
             if not self._skip_initial_scan:
                 docker_version = await docker.version()
                 log.info(
@@ -913,7 +994,11 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await create_metadata_server(self.local_config, self.kernel_registry),
         )
         await metadata_server_runner.setup()
-        site = web.TCPSite(metadata_server_runner, "0.0.0.0", 40128)
+        site = web.TCPSite(
+            metadata_server_runner,
+            "0.0.0.0",
+            self.local_config["agent"]["metadata-server-port"],
+        )
         await site.start()
         self.metadata_server_runner = metadata_server_runner
         # For legacy accelerator plugins
@@ -1063,8 +1148,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         All strings are UTF-8 encoded.
         """
         terminating = False
+        zmq_ctx = zmq.asyncio.Context()
         while True:
-            agent_sock = self.zmq_ctx.socket(zmq.REP)
+            agent_sock = zmq_ctx.socket(zmq.REP)
             try:
                 agent_sock.bind(f"tcp://127.0.0.1:{self.local_config['agent']['agent-sock-port']}")
                 while True:
@@ -1102,10 +1188,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 return
             except zmq.ZMQError:
                 log.exception("handle_agent_socket(): zmq error")
+                raise
             finally:
                 agent_sock.close()
                 if not terminating:
                     log.info("handle_agent_socket(): rebinding the socket")
+                else:
+                    zmq_ctx.destroy()
 
     async def pull_image(self, image_ref: ImageRef, registry_conf: ImageRegistry) -> None:
         auth_config = None
@@ -1150,6 +1239,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
+        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> DockerKernelCreationContext:
         return DockerKernelCreationContext(
             kernel_id,
@@ -1160,6 +1250,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.agent_sockpath,
             self.resource_lock,
             restarting=restarting,
+            cluster_ssh_port_mapping=cluster_ssh_port_mapping,
         )
 
     async def restart_kernel__load_config(
@@ -1242,6 +1333,15 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 try:
                     with timeout(60):
                         await self.collect_logs(kernel_id, container_id, log_iter())
+                except DockerError as e:
+                    if e.status == 404:
+                        log.warning(
+                            "container is already cleaned or missing (k:{}, cid:{})",
+                            kernel_id,
+                            container_id,
+                        )
+                    else:
+                        raise
                 except asyncio.TimeoutError:
                     log.warning(
                         "timeout for collecting container logs (k:{}, cid:{})",
@@ -1353,7 +1453,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.START,
-                "new-container-started",
+                KernelLifecycleEventReason.NEW_CONTAINER_STARTED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
             )
 
@@ -1370,7 +1470,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await self.inject_container_lifecycle_event(
                 kernel_id,
                 LifecycleEvent.CLEAN,
-                reason or "self-terminated",
+                reason or KernelLifecycleEventReason.SELF_TERMINATED,
                 container_id=ContainerId(evdata["Actor"]["ID"]),
                 exit_code=exit_code,
             )

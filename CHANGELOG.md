@@ -16,6 +16,45 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.5 (2022-11-28)
+
+Ai.Backend.Manager 22.09.5 (2022-11-28)
+
+### Features
+* Make the listening port of the container metadata server configurable ([#447](https://github.com/lablup/backend.ai/issues/447))
+* Add support for NUMA-aware device ordering and affinitization in `AllocMap` classes ([#491](https://github.com/lablup/backend.ai/issues/491))
+* Implement atomic vfolder host permission ([#790](https://github.com/lablup/backend.ai/issues/790))
+* Add option to run containers under host networking mode when enabled on scaling group option ([#838](https://github.com/lablup/backend.ai/issues/838))
+* feat: Group string-literal KernelEvent.reason by KernelLifecycleEventReason class to manage them ([#855](https://github.com/lablup/backend.ai/issues/855))
+* Add new `app_download_url` config for Webserver to control the Backend.AI WebUI app download url ([#861](https://github.com/lablup/backend.ai/issues/861))
+* Load plugins by reading allowlists from manager local configuration ([#866](https://github.com/lablup/backend.ai/issues/866))
+* Now the database connection pool parameters (the default pool size and maximum overflow) is configurable in `manager.toml` ([#871](https://github.com/lablup/backend.ai/issues/871))
+* Support client login with authentication header which takes priority over the legacy cookie ([#899](https://github.com/lablup/backend.ai/issues/899))
+* Upgrade accelerator plugin entrypoint requirement to v21 ([#900](https://github.com/lablup/backend.ai/issues/900))
+
+### Improvements
+* Upgrade the krunner prebuilt runtimes to use Python 3.10 and latest dependency packages ([#873](https://github.com/lablup/backend.ai/issues/873))
+
+### Fixes
+* Fix 400 Bad request error triggered by extra decode string with UTF-8 operation in decrypt_payload() as decrypt logic moved to middleware ([#707](https://github.com/lablup/backend.ai/issues/707))
+* Prevent session statuses from being rolled backed to PREPARING after successful creation or timeout ([#783](https://github.com/lablup/backend.ai/issues/783))
+* Modify `get_time_binned_monthly_stats` logic so that number of sessions and resource usage is calculated appropriately during all session execution times ([#840](https://github.com/lablup/backend.ai/issues/840))
+* Modify `ExitCode` to take `enum.IntEnum` as an argument so that `sys.exit()` does not output a message ([#845](https://github.com/lablup/backend.ai/issues/845))
+* Fix serialization failures when returning kernel creation results with additional accelerator device information ([#849](https://github.com/lablup/backend.ai/issues/849))
+* Fix string parser option to prevent tokenizing WebUI plugin string into characters ([#850](https://github.com/lablup/backend.ai/issues/850))
+* Handle kernel creation failure and destroy failed kernel ([#852](https://github.com/lablup/backend.ai/issues/852))
+* Fix `backend.ai mgr schema oneshot` command not creating `alembic_version` table alfter populating database chema ([#853](https://github.com/lablup/backend.ai/issues/853))
+* Fix `ResourceSlotColumn` to check None type early ([#856](https://github.com/lablup/backend.ai/issues/856))
+* Get mutation name from ResolveInfo.field_name in gql mutation middleware ([#882](https://github.com/lablup/backend.ai/issues/882))
+* Update wrong vfolder_host_permission value for cli and test codes ([#897](https://github.com/lablup/backend.ai/issues/897))
+* Fallback to the legacy logic of getting current allocation if there is no devices in affinity hint which prevented to launch a compute session with CPU and memory only for a single numa node system ([#901](https://github.com/lablup/backend.ai/issues/901))
+
+### Miscellaneous
+* Add `--ipc-base-path` option to `install-dev.sh` to ease setting up multiple development environments in a single node ([#841](https://github.com/lablup/backend.ai/issues/841))
+* Upgrade Pants from 2.13.1rc2 to 2.14.0 -- Normally it will automatically update itself, but you many need to reset your Pants cache if you encounter any strange behavior ([#857](https://github.com/lablup/backend.ai/issues/857))
+* Now `install-dev.sh` and Pants will look for Python versions from `pyenv` only to avoid conflicts/confusion with other Python versions installed together ([#864](https://github.com/lablup/backend.ai/issues/864))
+
+
 ## 22.09.4 (2022-10-26)
 
 ### Features
@@ -321,7 +360,7 @@ Changes
 
 ### Miscellaneous
 * Migrate to a semi-mono repository that contains all first-party server-side components with automated dependency management via Pants ([#417](https://github.com/lablup/backend.ai/issues/417))
-* Add a Pants plulgin `towncrier_tool` to allow running towncrier for changelog generation ([#427](https://github.com/lablup/backend.ai/issues/427))
+* Add a Pants plugin `towncrier_tool` to allow running towncrier for changelog generation ([#427](https://github.com/lablup/backend.ai/issues/427))
 * Update readthedocs.org build configurations ([#428](https://github.com/lablup/backend.ai/issues/428))
 * Update documentation for daily development workflows using Pants ([#429](https://github.com/lablup/backend.ai/issues/429))
 * Automate creation of the release in GitHub when we commit tags ([#433](https://github.com/lablup/backend.ai/issues/433))

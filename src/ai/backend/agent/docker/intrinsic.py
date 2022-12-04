@@ -25,6 +25,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import current_loop, nmget
 
 from .. import __version__
+from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -346,17 +347,17 @@ class MemoryPlugin(AbstractComputePlugin):
         pass
 
     async def list_devices(self) -> Collection[MemoryDevice]:
-        # TODO: support NUMA?
         memory_size = psutil.virtual_memory().total
         overcommit_factor = int(os.environ.get("BACKEND_MEM_OVERCOMMIT_FACTOR", "1"))
         return [
             MemoryDevice(
                 device_id=DeviceId("root"),
+                device_name=self.key,
                 hw_location="root",
-                numa_node=0,
+                numa_node=0,  # the kernel setting will do the job.
                 memory_size=overcommit_factor * memory_size,
                 processing_units=0,
-            )
+            ),
         ]
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
@@ -570,6 +571,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
+            allocation_strategy=AllocationStrategy.FILL,
             device_slots={
                 dev.device_id: DeviceSlotInfo(
                     SlotTypes.BYTES, SlotName("mem"), Decimal(dev.memory_size)

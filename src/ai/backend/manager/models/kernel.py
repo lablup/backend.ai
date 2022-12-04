@@ -73,6 +73,7 @@ if TYPE_CHECKING:
 __all__ = (
     "kernels",
     "session_dependencies",
+    "KERNEL_STATUS_TRANSITION_MAP",
     "KernelStatistics",
     "KernelStatus",
     "ComputeContainer",
@@ -154,6 +155,99 @@ def default_hostname(context) -> str:
     return f"{params['cluster_role']}{params['cluster_idx']}"
 
 
+KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
+    KernelStatus.PENDING: {
+        s for s in KernelStatus if s not in (KernelStatus.PENDING, KernelStatus.TERMINATED)
+    },
+    KernelStatus.SCHEDULED: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.SCHEDULED,
+            KernelStatus.PENDING,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.PREPARING: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.PREPARING,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.BUILDING: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.BUILDING,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.PULLING: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.PULLING,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.RUNNING: {
+        KernelStatus.RESTARTING,
+        KernelStatus.RESIZING,
+        KernelStatus.TERMINATING,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.RESTARTING: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.RESTARTING,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.RESIZING: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.RESIZING,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.SUSPENDED: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.SUSPENDED,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.TERMINATING: {KernelStatus.TERMINATED, KernelStatus.ERROR},
+    KernelStatus.TERMINATED: set(),
+    KernelStatus.ERROR: set(),
+    KernelStatus.CANCELLED: set(),
+}
+
+
 kernels = sa.Table(
     "kernels",
     metadata,
@@ -219,6 +313,7 @@ kernels = sa.Table(
     sa.Column("stdout_port", sa.Integer(), nullable=False),  # legacy for stream_pty
     sa.Column("service_ports", pgsql.JSONB(), nullable=True),
     sa.Column("preopen_ports", sa.ARRAY(sa.Integer), nullable=True),
+    sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False),
     # Lifecycle
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
     sa.Column(

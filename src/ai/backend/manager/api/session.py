@@ -65,6 +65,7 @@ from ai.backend.common.events import (
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
+    KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
@@ -1451,6 +1452,7 @@ async def handle_kernel_creation_lifecycle(
             event.kernel_id, KernelStatus.PREPARING, event.reason
         )
     elif isinstance(event, KernelStartedEvent):
+        await root_ctx.registry.finalize_running(event.creation_info)
         # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
             tracker.set_result(None)
@@ -1522,7 +1524,7 @@ async def handle_destroy_session(
             event.session_id,
         ),
         forced=False,
-        reason=event.reason or "killed-by-event",
+        reason=event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT,
     )
 
 
@@ -1633,7 +1635,7 @@ async def handle_batch_result(
             root_ctx.registry.get_session_by_session_id,
             event.session_id,
         ),
-        reason="task-finished",
+        reason=KernelLifecycleEventReason.TASK_FINISHED,
     )
 
 

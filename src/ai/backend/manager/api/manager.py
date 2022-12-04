@@ -146,7 +146,7 @@ async def fetch_manager_status(request: web.Request) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("status"): tx.Enum(ManagerStatus, use_name=True),
+            t.Key("status"): tx.Enum(ManagerStatus),
             t.Key("force_kill", default=False): t.ToBool,
         }
     )
@@ -159,7 +159,6 @@ async def update_manager_status(request: web.Request, params: Any) -> web.Respon
         params["force_kill"],
     )
     try:
-        params = await request.json()
         status = params["status"]
         force_kill = params["force_kill"]
     except json.JSONDecodeError:
