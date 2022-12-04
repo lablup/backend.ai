@@ -25,6 +25,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import current_loop, nmget
 
 from .. import __version__
+from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
@@ -570,6 +571,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
+            allocation_strategy=AllocationStrategy.FILL,
             device_slots={
                 dev.device_id: DeviceSlotInfo(
                     SlotTypes.BYTES, SlotName("mem"), Decimal(dev.memory_size)

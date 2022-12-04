@@ -836,7 +836,7 @@ class SchedulerDispatcher(aobject):
                     raise
                 else:
                     assert agent_alloc_ctx is not None
-                    kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx))
+                    kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx, set()))
 
         assert len(kernel_agent_bindings) == len(sess_ctx.kernels)
         # Proceed to PREPARING only when all kernels are successfully scheduled.
