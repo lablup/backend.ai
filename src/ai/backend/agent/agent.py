@@ -92,8 +92,8 @@ from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
-    CommitStatus,
     ClusterSSHPortMapping,
+    CommitStatus,
     ContainerId,
     DeviceId,
     DeviceName,
