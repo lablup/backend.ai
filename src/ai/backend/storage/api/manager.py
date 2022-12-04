@@ -204,7 +204,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
             if ctx.local_config["storage-proxy"].get("use-trash-bin", True):
                 result = await volume.move_to_trash(params["vfid"])
             else:
-                result = await volume.delete_vfolder(params["vfid"])
+                result = VFolderDeletionResult.NO_CHANGE
             return web.json_response(
                 {
                     "result": result.value,
@@ -228,7 +228,7 @@ async def purge_vfolder(request: web.Request) -> web.Response:
             if ctx.local_config["storage-proxy"].get("use-trash-bin", True):
                 result = await volume.delete_in_trash(params["vfid"])
             else:
-                result = VFolderDeletionResult.ALREADY_PURGED
+                result = await volume.delete_vfolder(params["vfid"])
             return web.json_response(
                 {
                     "result": result.value,
