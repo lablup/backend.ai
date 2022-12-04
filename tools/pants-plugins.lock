@@ -335,6 +335,11 @@
               "algorithm": "sha256",
               "hash": "87ee4f7b90434e491727b5ac53838627450addebfdbf89e8a1d5adb328ec78fb",
               "url": "https://files.pythonhosted.org/packages/9b/e9/c00b331432f789bfb8c10b5489f19245edaf8ba9c5140cc5584530fded5c/pantsbuild.pants-2.14.0-cp39-cp39-macosx_10_15_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "4c941ac79a5c28ead9995e64a7d904ecb8fb2ac4423ddbe1059bd9701e7d0b45",
+              "url": "https://media.githubusercontent.com/media/lablup/backend.ai-oven/main/pypi/projects/pantsbuild-pants/pantsbuild.pants-2.14.0-cp39-cp39-linux_aarch64.whl"
             }
           ],
           "project_name": "pantsbuild-pants",

@@ -109,7 +109,7 @@ lockfile = "tools/coverage-py.lock"
 
 [mypy]
 version = "mypy==0.982"
-interpreter_constraints = ["CPython>=3.10,<4"]
+interpreter_constraints = ["CPython>=3.9,<4"]
 extra_requirements.add = [
 ]
 lockfile = "tools/mypy.lock"
