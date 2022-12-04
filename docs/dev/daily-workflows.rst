@@ -21,6 +21,12 @@ Key concepts
 
       $ ./pants [GLOBAL_OPTS] GOAL [GOAL_OPTS] [TARGET ...]
 
+  .. warning::
+
+      If your ``scripts/install-dev.sh`` says that you need to use
+      ``./pants-local`` instead of ``./pants``, replace all ``./pants``
+      in the following command examples with ``./pants-local``.
+
 * Goal: an action to execute
 
   - You may think this as the root node of the task graph executed by Pants.
