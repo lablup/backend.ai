@@ -492,6 +492,9 @@ bootstrap_pants() {
     # In macOS with Apple Silicon, let Pants use Python 3.9 from pyenv
     local _PYENV_PYVER=$(search_pants_python_from_pyenv)
     echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
+  elif [ "$(uname -m)" = "aarch64" ]; then
+    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
+    echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
   fi
   PANTS="./pants"
   ./pants version

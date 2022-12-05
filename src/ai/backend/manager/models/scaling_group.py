@@ -99,6 +99,7 @@ scaling_groups = sa.Table(
     sa.Column("driver", sa.String(length=64), nullable=False),
     sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={}),
     sa.Column("scheduler", sa.String(length=64), nullable=False),
+    sa.Column("use_host_network", sa.Boolean, default=False),
     sa.Column(
         "scheduler_opts",
         StructuredJSONObjectColumn(ScalingGroupOpts),

@@ -164,3 +164,4 @@ weka_username = ""  # Weka.IO Username
 weka_password = ""  # Weka.IO Password
 weka_organization = ""  # Weka.IO Organization
 weka_fs_name = ""  # Target filesystem to use as vFolder, must match with the one mounted under `volume.weka.path`
+weka_verify_ssl = false  # If set to true, allow to communicate to server with insecure ssl context

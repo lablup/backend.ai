@@ -54,6 +54,7 @@ from ai.backend.common.docker import ImageRef, get_known_registries, get_registr
 from ai.backend.common.events import (
     AgentStartedEvent,
     KernelCancelledEvent,
+    KernelLifecycleEventReason,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
     SessionCancelledEvent,
@@ -71,6 +72,7 @@ from ai.backend.common.types import (
     ClusterInfo,
     ClusterMode,
     ClusterSSHKeyPair,
+    ClusterSSHPortMapping,
     DeviceId,
     HardwareMetadata,
     KernelEnqueueingConfig,
@@ -130,6 +132,7 @@ from .models import (
     query_allowed_sgroups,
     recalc_agent_resource_occupancy,
     recalc_concurrency_used,
+    scaling_groups,
 )
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -543,6 +546,13 @@ class AgentRegistry:
                     f"falling back to {checked_scaling_group}",
                 )
 
+            use_host_network_query = (
+                sa.select([scaling_groups.c.use_host_network])
+                .select_from(scaling_groups)
+                .where(scaling_groups.c.name == checked_scaling_group)
+            )
+            use_host_network_result = await conn.execute(use_host_network_query)
+            use_host_network = use_host_network_result.scalar()
             # Translate mounts/mount_map into vfolder mounts
             requested_mounts = session_enqueue_configs["creation_config"].get("mounts") or []
             requested_mount_map = session_enqueue_configs["creation_config"].get("mount_map") or {}
@@ -572,11 +582,13 @@ class AgentRegistry:
                     cluster_size,
                 )
                 # the main_kernel_config is repliacted to sub-containers
-                main_kernel_config["cluster_idx"] = 1
+                main_kernel_config["cluster_idx"] = 1  # main1
+                main_kernel_config["local_rank"] = 0  # main1: 0
                 for i in range(cluster_size - 1):
                     sub_kernel_config = cast(KernelEnqueueingConfig, {**main_kernel_config})
                     sub_kernel_config["cluster_role"] = "sub"
-                    sub_kernel_config["cluster_idx"] = i + 1
+                    sub_kernel_config["cluster_idx"] = i + 1  # subN
+                    sub_kernel_config["local_rank"] = i + 1  # sub1: 1, sub2: 2, ...
                     sub_kernel_config["cluster_hostname"] = sub_kernel_config["cluster_role"] + str(
                         sub_kernel_config["cluster_idx"]
                     )
@@ -657,6 +669,8 @@ class AgentRegistry:
             "repl_out_port": 0,
             "stdin_port": 0,
             "stdout_port": 0,
+            "preopen_ports": sa.bindparam("preopen_ports"),
+            "use_host_network": use_host_network,
         }
 
         kernel_data = []
@@ -805,6 +819,7 @@ class AgentRegistry:
                     "agent": mapped_agent,
                     "cluster_role": kernel["cluster_role"],
                     "cluster_idx": kernel["cluster_idx"],
+                    "local_rank": kernel["local_rank"],
                     "cluster_hostname": f"{kernel['cluster_role']}{kernel['cluster_idx']}"
                     if not kernel["cluster_hostname"]
                     else kernel["cluster_hostname"],
@@ -892,6 +907,7 @@ class AgentRegistry:
                     agent_addr=k.agent_addr,
                     scaling_group=scheduled_session.scaling_group,
                 ),
+                allocated_host_ports=set(),
             )
             for k in scheduled_session.kernels
         ]
@@ -949,46 +965,77 @@ class AgentRegistry:
         }
 
         network_name: Optional[str] = None
-        if scheduled_session.cluster_mode == ClusterMode.SINGLE_NODE:
-            if scheduled_session.cluster_size > 1:
-                network_name = f"bai-singlenode-{scheduled_session.id}"
-                assert kernel_agent_bindings[0].agent_alloc_ctx.agent_id is not None
-                assert scheduled_session.id is not None
+        cluster_ssh_port_mapping: Optional[Dict[str, Tuple[str, int]]] = None
+        if not scheduled_session.use_host_network:
+            if scheduled_session.cluster_mode == ClusterMode.SINGLE_NODE:
+                if scheduled_session.cluster_size > 1:
+                    network_name = f"bai-singlenode-{scheduled_session.id}"
+                    assert kernel_agent_bindings[0].agent_alloc_ctx.agent_id is not None
+                    assert scheduled_session.id is not None
+                    try:
+                        async with RPCContext(
+                            kernel_agent_bindings[0].agent_alloc_ctx.agent_id,
+                            kernel_agent_bindings[0].agent_alloc_ctx.agent_addr,
+                            invoke_timeout=None,
+                            order_key=str(scheduled_session.main_kernel.id),
+                            keepalive_timeout=self.rpc_keepalive_timeout,
+                        ) as rpc:
+                            await rpc.call.create_local_network(network_name)
+                    except Exception:
+                        log.exception(f"Failed to create an agent-local network {network_name}")
+                        raise
+                else:
+                    network_name = None
+            elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
+                # Create overlay network for multi-node sessions
+                network_name = f"bai-multinode-{scheduled_session.id}"
+                mtu = await self.shared_config.get_raw("config/network/overlay/mtu")
                 try:
-                    async with RPCContext(
-                        kernel_agent_bindings[0].agent_alloc_ctx.agent_id,
-                        kernel_agent_bindings[0].agent_alloc_ctx.agent_addr,
-                        invoke_timeout=None,
-                        order_key=str(scheduled_session.main_kernel.id),
-                        keepalive_timeout=self.rpc_keepalive_timeout,
-                    ) as rpc:
-                        await rpc.call.create_local_network(network_name)
+                    # Overlay networks can only be created at the Swarm manager.
+                    create_options = {
+                        "Name": network_name,
+                        "Driver": "overlay",
+                        "Attachable": True,
+                        "Labels": {
+                            "ai.backend.cluster-network": "1",
+                        },
+                        "Options": {},
+                    }
+                    if mtu:
+                        create_options["Options"] = {"com.docker.network.driver.mtu": mtu}
+                    await self.docker.networks.create(create_options)
                 except Exception:
-                    log.exception(f"Failed to create an agent-local network {network_name}")
+                    log.exception(f"Failed to create an overlay network {network_name}")
                     raise
-            else:
-                network_name = None
-        elif scheduled_session.cluster_mode == ClusterMode.MULTI_NODE:
-            # Create overlay network for multi-node sessions
-            network_name = f"bai-multinode-{scheduled_session.id}"
-            mtu = await self.shared_config.get_raw("config/network/overlay/mtu")
-            try:
-                # Overlay networks can only be created at the Swarm manager.
-                create_options = {
-                    "Name": network_name,
-                    "Driver": "overlay",
-                    "Attachable": True,
-                    "Labels": {
-                        "ai.backend.cluster-network": "1",
-                    },
-                    "Options": {},
-                }
-                if mtu:
-                    create_options["Options"] = {"com.docker.network.driver.mtu": mtu}
-                await self.docker.networks.create(create_options)
-            except Exception:
-                log.exception(f"Failed to create an overlay network {network_name}")
-                raise
+        else:
+            network_name = "host"
+            if scheduled_session.cluster_size > 1:
+                keyfunc = lambda item: item.kernel.cluster_role
+                cluster_ssh_port_mapping = {}
+                for cluster_role, group_iterator in itertools.groupby(
+                    sorted(kernel_agent_bindings, key=keyfunc),
+                    key=keyfunc,
+                ):
+                    for index, item in enumerate(group_iterator):
+                        assert item.agent_alloc_ctx.agent_id is not None
+                        async with RPCContext(
+                            item.agent_alloc_ctx.agent_id,
+                            item.agent_alloc_ctx.agent_addr,
+                            invoke_timeout=None,
+                            order_key=str(scheduled_session.id),
+                            keepalive_timeout=self.rpc_keepalive_timeout,
+                        ) as rpc:
+                            port = await rpc.call.assign_port()
+                            agent_addr = item.agent_alloc_ctx.agent_addr.replace(
+                                "tcp://", ""
+                            ).split(":", maxsplit=1)[0]
+                            cluster_ssh_port_mapping[item.kernel.cluster_hostname] = (
+                                agent_addr,
+                                port,
+                            )
+                            item.allocated_host_ports.add(port)
+        log.debug("ssh connection info mapping: {}", cluster_ssh_port_mapping)
+
         keyfunc = lambda item: item.kernel.cluster_role
         replicas = {
             cluster_role: len([*group_iterator])
@@ -997,6 +1044,7 @@ class AgentRegistry:
                 key=keyfunc,
             )
         }
+
         cluster_info = ClusterInfo(
             mode=scheduled_session.cluster_mode,
             size=scheduled_session.cluster_size,
@@ -1006,6 +1054,9 @@ class AgentRegistry:
                 await self.create_cluster_ssh_keypair()
                 if scheduled_session.cluster_size > 1
                 else None
+            ),
+            cluster_ssh_port_mapping=cast(
+                Optional[ClusterSSHPortMapping], cluster_ssh_port_mapping
             ),
         )
         scheduled_session.environ.update(
@@ -1283,6 +1334,7 @@ class AgentRegistry:
                             "session_type": scheduled_session.session_type.value,
                             "cluster_role": binding.kernel.cluster_role,
                             "cluster_idx": binding.kernel.cluster_idx,
+                            "local_rank": binding.kernel.local_rank,
                             "cluster_hostname": binding.kernel.cluster_hostname,
                             "idle_timeout": resource_policy.idle_timeout,
                             "mounts": [item.to_json() for item in scheduled_session.vfolder_mounts],
@@ -1294,6 +1346,7 @@ class AgentRegistry:
                                 "BACKENDAI_KERNEL_IMAGE": str(get_image_ref(binding.kernel)),
                                 "BACKENDAI_CLUSTER_ROLE": binding.kernel.cluster_role,
                                 "BACKENDAI_CLUSTER_IDX": str(binding.kernel.cluster_idx),
+                                "BACKENDAI_CLUSTER_LOCAL_RANK": str(binding.kernel.local_rank),
                                 "BACKENDAI_CLUSTER_HOST": str(binding.kernel.cluster_hostname),
                             },
                             "resource_slots": binding.kernel.requested_slots.to_json(),
@@ -1303,6 +1356,7 @@ class AgentRegistry:
                             "internal_data": scheduled_session.main_kernel.internal_data,
                             "auto_pull": auto_pull,
                             "preopen_ports": scheduled_session.main_kernel.preopen_ports,
+                            "allocated_host_ports": list(binding.allocated_host_ports),
                             "agent_addr": binding.agent_alloc_ctx.agent_addr,
                             "scaling_group": binding.agent_alloc_ctx.scaling_group,
                         }
@@ -1617,7 +1671,7 @@ class AgentRegistry:
                     rpc_coros.append(
                         rpc.call.destroy_kernel(
                             str(kernel["id"]),
-                            "failed-to-start",
+                            KernelLifecycleEventReason.FAILED_TO_START,
                             suppress_events=True,
                         ),
                     )
@@ -1628,7 +1682,7 @@ class AgentRegistry:
         session: SessionRow,
         *,
         forced: bool = False,
-        reason: Optional[str] = None,
+        reason: Optional[KernelLifecycleEventReason] = None,
     ) -> Mapping[str, Any]:
         """
         Destroy session kernels. Do not destroy
@@ -1640,7 +1694,11 @@ class AgentRegistry:
         """
         session_id = session.id
         if not reason:
-            reason = "force-terminated" if forced else "user-requested"
+            reason = (
+                KernelLifecycleEventReason.FORCE_TERMINATED
+                if forced
+                else KernelLifecycleEventReason.USER_REQUESTED
+            )
         hook_result = await self.hook_plugin_ctx.dispatch(
             "PRE_DESTROY_SESSION",
             (session_id, session.name, session.access_key),
@@ -1896,6 +1954,7 @@ class AgentRegistry:
                             kernels.c.cluster_size,
                             kernels.c.agent,
                             kernels.c.agent_addr,
+                            kernels.c.use_host_network,
                         ]
                     )
                     .select_from(kernels)
@@ -1910,37 +1969,38 @@ class AgentRegistry:
         session = await execute_with_retry(_fetch)
         if session is None:
             return
-        if session["cluster_mode"] == ClusterMode.SINGLE_NODE and session["cluster_size"] > 1:
-            network_name = f'bai-singlenode-{session["session_id"]}'
-            try:
-                async with RPCContext(
-                    session["agent"],  # the main-container's agent
-                    session["agent_addr"],
-                    invoke_timeout=None,
-                    order_key=session["session_id"],
-                    keepalive_timeout=self.rpc_keepalive_timeout,
-                ) as rpc:
-                    await rpc.call.destroy_local_network(network_name)
-            except Exception:
-                log.exception(f"Failed to destroy the agent-local network {network_name}")
-        elif session["cluster_mode"] == ClusterMode.MULTI_NODE:
-            network_name = f'bai-multinode-{session["session_id"]}'
-            try:
+        if not session["use_host_network"]:
+            if session["cluster_mode"] == ClusterMode.SINGLE_NODE and session["cluster_size"] > 1:
+                network_name = f'bai-singlenode-{session["session_id"]}'
                 try:
-                    # await rpc.call.destroy_overlay_network(network_name)
-                    await asyncio.sleep(2.0)
-                    network = await self.docker.networks.get(network_name)
-                    await network.delete()
-                except aiodocker.DockerError as e:
-                    if e.status == 404:
-                        # It may have been auto-destructed when the last container was detached.
-                        pass
-                    else:
-                        raise
-            except Exception:
-                log.exception(f"Failed to destroy the overlay network {network_name}")
-        else:
-            pass
+                    async with RPCContext(
+                        session["agent"],  # the main-container's agent
+                        session["agent_addr"],
+                        invoke_timeout=None,
+                        order_key=session["session_id"],
+                        keepalive_timeout=self.rpc_keepalive_timeout,
+                    ) as rpc:
+                        await rpc.call.destroy_local_network(network_name)
+                except Exception:
+                    log.exception(f"Failed to destroy the agent-local network {network_name}")
+            elif session["cluster_mode"] == ClusterMode.MULTI_NODE:
+                network_name = f'bai-multinode-{session["session_id"]}'
+                try:
+                    try:
+                        # await rpc.call.destroy_overlay_network(network_name)
+                        await asyncio.sleep(2.0)
+                        network = await self.docker.networks.get(network_name)
+                        await network.delete()
+                    except aiodocker.DockerError as e:
+                        if e.status == 404:
+                            # It may have been auto-destructed when the last container was detached.
+                            pass
+                        else:
+                            raise
+                except Exception:
+                    log.exception(f"Failed to destroy the overlay network {network_name}")
+            else:
+                pass
 
     async def restart_session(
         self,

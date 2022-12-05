@@ -66,7 +66,7 @@ jobs:
 
   typecheck:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     steps:
     - uses: actions/checkout@v3
       with:
@@ -121,7 +121,7 @@ jobs:
 
   test:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     steps:
     - uses: actions/checkout@v3
       with:
@@ -185,7 +185,7 @@ jobs:
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         submodules: true
     - name: Fetch remote tags

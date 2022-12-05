@@ -473,6 +473,7 @@ class SessionRow(Base):
     resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
     environ = sa.Column("environ", pgsql.JSONB(), nullable=True, default={})
     bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
+    use_host_network = sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False)
 
     # Lifecycle
     created_at = sa.Column(
