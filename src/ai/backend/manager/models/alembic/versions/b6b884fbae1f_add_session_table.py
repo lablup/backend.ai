@@ -1,8 +1,8 @@
 """add_session_table
 
-Revision ID: 45d9ec736faf
-Revises: 5bce905c21e5
-Create Date: 2022-11-24 02:07:42.484799
+Revision ID: b6b884fbae1f
+Revises: 213a04e90ecf
+Create Date: 2022-12-05 16:12:53.275671
 
 """
 from collections import defaultdict
@@ -17,8 +17,8 @@ from ai.backend.manager.models import KernelStatus, SessionStatus
 from ai.backend.manager.models.base import GUID, KernelIDColumn, convention
 
 # revision identifiers, used by Alembic.
-revision = "45d9ec736faf"
-down_revision = "5bce905c21e5"
+revision = "b6b884fbae1f"
+down_revision = "213a04e90ecf"
 branch_labels = None
 depends_on = None
 
@@ -85,6 +85,7 @@ def upgrade():
         sa.Column("vfolder_mounts", pgsql.JSONB(), nullable=True),
         sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={}),
         sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True),
+        sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False),
         # Lifecycle
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.Column("terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()),
@@ -164,6 +165,9 @@ def upgrade():
         resource_opts = sa.Column("resource_opts", pgsql.JSONB(), nullable=True, default={})
         environ = sa.Column("environ", pgsql.JSONB(), nullable=True)
         bootstrap_script = sa.Column("bootstrap_script", sa.String(length=16 * 1024), nullable=True)
+        use_host_network = sa.Column(
+            "use_host_network", sa.Boolean(), default=False, nullable=False
+        )
 
         # Lifecycle
         created_at = sa.Column(
@@ -278,6 +282,7 @@ def upgrade():
                 "vfolder_mounts": row["vfolder_mounts"],
                 "resource_opts": row["resource_opts"],
                 "bootstrap_script": row["bootstrap_script"],
+                "use_host_network": row["use_host_network"],
                 "created_at": row["created_at"],
                 "terminated_at": row["terminated_at"],
                 "starts_at": row["starts_at"],
