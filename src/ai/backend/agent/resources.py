@@ -47,7 +47,7 @@ from .alloc_map import AllocationStrategy as AllocationStrategy  # noqa: F401
 from .alloc_map import DeviceSlotInfo as DeviceSlotInfo  # noqa: F401
 from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # noqa: F401
 from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
-from .stats import ContainerMeasurement, NodeMeasurement, StatContext
+from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
 from .types import Container as SessionContainer
 from .types import MountInfo
 
@@ -309,6 +309,15 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
     ) -> Sequence[ContainerMeasurement]:
         """
         Return the container-level statistic metrics.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def gather_process_measures(
+        self, ctx: StatContext, pids: Sequence[int]
+    ) -> Sequence[ProcessMeasurement]:
+        """
+        Return the process statistic metrics in container.
         """
         raise NotImplementedError
 
