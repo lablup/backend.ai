@@ -732,9 +732,16 @@ class AbstractAgent(
 
         async def _set_all_commit_status(r: Redis):
             pipe = r.pipeline()
-            for subdir, kernel_map in status_map.items():
+            for subdir, ongoing_kernel_map in status_map.items():
                 name = f"kernel_commit_status.{subdir}"
-                await pipe.hset(name, mapping=cast(Mapping, kernel_map))
+                kern_statuses = await pipe.hgetall(name)
+                remaining_statuses = {}
+                for kern_id, status in kern_statuses.items():
+                    if kern_id not in ongoing_kernel_map:
+                        remaining_statuses[kern_id] = CommitStatus.READY.value
+                await pipe.hset(
+                    name, mapping=cast(Mapping, {**ongoing_kernel_map, **remaining_statuses})
+                )
             return pipe
 
         await redis_helper.execute(
@@ -772,7 +779,9 @@ class AbstractAgent(
                     msgpack.packb([(repo_tag, digest) for repo_tag, digest in self.images.items()])
                 ),
                 "architecture": get_arch_name(),
-                "abuse_report_path": self.local_config["agent"].get("abuse-report-path"),
+                "abuse_report_path": str(self.local_config["agent"].get("abuse-report-path"))
+                if self.local_config["agent"].get("abuse-report-path") is not None
+                else None,
                 "abusing_container_auto_terminate": self.local_config["agent"].get(
                     "force-terminate-abusing-containers", False
                 ),

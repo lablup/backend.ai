@@ -83,7 +83,7 @@ agents = sa.Table(
     sa.Column("version", sa.String(length=64), nullable=False),
     sa.Column("architecture", sa.String(length=32), nullable=False),
     sa.Column("compute_plugins", pgsql.JSONB(), nullable=False, default={}),
-    sa.Column("abuse_report_path", sa.String(length=64), nullable=True),
+    sa.Column("abuse_report_path", sa.String(length=128), nullable=True),
     sa.Column("auto_terminate", sa.Boolean(), nullable=False, server_default=true(), default=False),
 )
 
