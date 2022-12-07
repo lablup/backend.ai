@@ -80,9 +80,9 @@ def print_pretty(msg, *, status=PrintStatus.NONE, file=None):
         assert "\n" not in msg, "Waiting message must be a single line."
         indicator = style("\u22EF", fg="bright_yellow", reset=False)
     elif status == PrintStatus.DONE:
-        indicator = style("\u2714", fg="bright_green", reset=False)
+        indicator = style("\u2713", fg="bright_green", reset=False)
     elif status == PrintStatus.FAILED:
-        indicator = style("\u2718", fg="bright_red", reset=False)
+        indicator = style("\u2717", fg="bright_red", reset=False)
     elif status == PrintStatus.WARNING:
         indicator = style("\u2219", fg="yellow", reset=False)
     else:
