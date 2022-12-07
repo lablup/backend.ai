@@ -113,23 +113,32 @@ async def ensure_vfolder_status(
     else:
         raise VFolderFilterStatusFailed("either vFolder id nor name not supplied")
 
-    if perm == VFolderAccessStatus.READABLE:
-        # if READABLE access status is requested, all operation status is accepted.
-        vf_status_conds = vfolders.c.status.in_(
-            [
-                VFolderOperationStatus.READY,
-                VFolderOperationStatus.PERFORMING,
-                VFolderOperationStatus.CLONING,
-                VFolderOperationStatus.DELETING,
-                VFolderOperationStatus.MOUNTED,
-            ]
-        )
-    elif perm == VFolderAccessStatus.UPDATABLE:
-        # if UPDATABLE access status is requested, only READY operation status is accepted.
-        vf_status_conds = vfolders.c.status == VFolderOperationStatus.READY
-    else:
-        # Otherwise, raise VFolderFilterStatusNotAvailable()
-        raise VFolderFilterStatusNotAvailable()
+    match perm:
+        case VFolderAccessStatus.READABLE:
+            # if READABLE access status is requested, all operation statuses are accepted.
+            vf_status_conds = vfolders.c.status.in_(
+                [
+                    VFolderOperationStatus.READY,
+                    VFolderOperationStatus.PERFORMING,
+                    VFolderOperationStatus.CLONING,
+                    VFolderOperationStatus.DELETING,
+                    VFolderOperationStatus.MOUNTED,
+                ]
+            )
+        case VFolderAccessStatus.UPDATABLE:
+            # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
+            vf_status_conds = vfolders.c.status.in_(
+                [
+                    VFolderOperationStatus.READY,
+                    VFolderOperationStatus.MOUNTED,
+                ]
+            )
+        case VFolderAccessStatus.DELETABLE:
+            # if DELETABLE access status is requested, only READY operation status is accepted.
+            vf_status_conds = vfolders.c.status == VFolderOperationStatus.READY
+        case _:
+            # Otherwise, raise VFolderFilterStatusNotAvailable()
+            raise VFolderFilterStatusNotAvailable()
     async with root_ctx.db.begin_readonly() as conn:
         entries = await query_accessible_vfolders(
             conn,
@@ -580,7 +589,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def delete_by_id(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_id=params["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, folder_id=params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     log.info("VFOLDER.DELETE_BY_ID (ak:{}, vf:{})", access_key, params["id"])
@@ -1858,7 +1867,7 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
 @server_status_required(ALL_ALLOWED)
 async def delete(request: web.Request) -> web.Response:
     await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+        request, VFolderAccessStatus.DELETABLE, folder_name=request.match_info["name"]
     )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
