@@ -135,7 +135,12 @@ async def ensure_vfolder_status(
             )
         case VFolderAccessStatus.DELETABLE:
             # if DELETABLE access status is requested, only READY operation status is accepted.
-            vf_status_conds = vfolders.c.status == VFolderOperationStatus.READY
+            vf_status_conds = vfolders.c.status.in_(
+                [
+                    VFolderOperationStatus.READY,
+                    VFolderOperationStatus.DELETING,
+                ]
+            )
         case _:
             # Otherwise, raise VFolderFilterStatusNotAvailable()
             raise VFolderFilterStatusNotAvailable()
