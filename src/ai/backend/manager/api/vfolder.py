@@ -1923,7 +1923,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
         query = (
             sa.update(vfolders)
             .values(status=VFolderOperationStatus.DELETING)
-            .where(vfolders.c.name == folder_name)
+            .where(vfolders.c.id == entry["id"])
         )
         await conn.execute(query)
 
