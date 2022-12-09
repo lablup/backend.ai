@@ -21,16 +21,15 @@ import tomli
 import uvloop
 import yarl
 from aiohttp import web
-from aiohttp_session import get_session
-from aiohttp_session import setup as setup_session
-from aiohttp_session.redis_storage import RedisStorage
-from aioredis import Redis as AioRedisLegacy
 from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
+from ai.backend.common.web.session import get_session
+from ai.backend.common.web.session import setup as setup_session
+from ai.backend.common.web.session.redis_storage import RedisStorage
 
 from . import __version__, user_agent
 from .config import config_iv
@@ -471,19 +470,13 @@ async def server_main(
         config["session"]["redis"]["port"]
     ).with_password(config["session"]["redis"]["password"]) / str(config["session"]["redis"]["db"])
     keepalive_options = {}
-    if hasattr(socket, "TCP_KEEPIDLE"):
-        keepalive_options[socket.TCP_KEEPIDLE] = 20
-    if hasattr(socket, "TCP_KEEPINTVL"):
-        keepalive_options[socket.TCP_KEEPINTVL] = 5
-    if hasattr(socket, "TCP_KEEPCNT"):
-        keepalive_options[socket.TCP_KEEPCNT] = 3
+    if (_TCP_KEEPIDLE := getattr(socket, "TCP_KEEPIDLE", None)) is not None:
+        keepalive_options[_TCP_KEEPIDLE] = 20
+    if (_TCP_KEEPINTVL := getattr(socket, "TCP_KEEPINTVL", None)) is not None:
+        keepalive_options[_TCP_KEEPINTVL] = 5
+    if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
+        keepalive_options[_TCP_KEEPCNT] = 3
     app["redis"] = await Redis.from_url(
-        str(redis_url),
-        socket_keepalive=True,
-        socket_keepalive_options=keepalive_options,
-    )
-    # FIXME: remove after aio-libs/aiohttp-session#704 is merged
-    aioredis_legacy_client = await AioRedisLegacy.from_url(
         str(redis_url),
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
@@ -493,8 +486,7 @@ async def server_main(
         await app["redis"].flushdb()
         log.info("flushed session storage.")
     redis_storage = RedisStorage(
-        # FIXME: replace to app['redis'] after aio-libs/aiohttp-session#704 is merged
-        aioredis_legacy_client,
+        app["redis"],
         max_age=config["session"]["max_age"],
     )
 

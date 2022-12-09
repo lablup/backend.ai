@@ -17,7 +17,7 @@ from typing import (
 )
 
 import aiohttp_cors
-import attr
+import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
@@ -388,7 +388,7 @@ async def enqueue_batch_task_result_update(
         q.put_nowait((event.name, row._mapping, event.reason, event.exit_code))
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     session_event_queues: Set[asyncio.Queue[Sentinel | SessionEventInfo]]
 

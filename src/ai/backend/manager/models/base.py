@@ -26,6 +26,7 @@ from typing import (
     TypeVar,
     Union,
     cast,
+    overload,
 )
 
 import graphene
@@ -36,8 +37,8 @@ from aiodataloader import DataLoader
 from aiotools import apartial
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
-from graphql.language import ast
-from sqlalchemy.dialects.postgresql import CIDR, ENUM, JSONB, UUID
+from graphql.language import ast  # pants: no-infer-dep
+from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -48,12 +49,15 @@ from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
+    AbstractPermission,
     BinarySize,
     JSONSerializableMixin,
     KernelId,
     ReadableCIDR,
     ResourceSlot,
     SessionId,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
 )
 from ai.backend.manager.models.utils import execute_with_retry
 
@@ -61,7 +65,7 @@ from .. import models
 from ..api.exceptions import GenericForbidden, InvalidAPIParameters
 
 if TYPE_CHECKING:
-    from graphql.execution.executors.asyncio import AsyncioExecutor
+    from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 
     from .gql import GraphQueryContext
     from .user import UserRole
@@ -174,18 +178,24 @@ class ResourceSlotColumn(TypeDecorator):
     impl = JSONB
     cache_ok = True
 
-    def process_bind_param(self, value: Union[Mapping, ResourceSlot], dialect):
-        if isinstance(value, Mapping) and not isinstance(value, ResourceSlot):
-            return value
-        return value.to_json() if value is not None else None
+    def process_bind_param(
+        self, value: Union[Mapping, ResourceSlot, None], dialect
+    ) -> Optional[Mapping]:
+        if value is None:
+            return None
+        if isinstance(value, ResourceSlot):
+            return value.to_json()
+        return value
 
-    def process_result_value(self, raw_value: Dict[str, str], dialect):
+    def process_result_value(self, raw_value: Dict[str, str], dialect) -> ResourceSlot:
+        if raw_value is None:
+            return ResourceSlot()
         # legacy handling
         interim_value: Dict[str, Any] = raw_value
         mem = raw_value.get("mem")
         if isinstance(mem, str) and not mem.isdigit():
             interim_value["mem"] = BinarySize.from_str(mem)
-        return ResourceSlot.from_json(interim_value) if raw_value is not None else None
+        return ResourceSlot.from_json(interim_value)
 
     def copy(self):
         return ResourceSlotColumn()
@@ -318,6 +328,72 @@ class IPColumn(TypeDecorator):
         if value is None:
             return None
         return ReadableCIDR(value)
+
+
+class PermissionListColumn(TypeDecorator):
+    """
+    A column type to convert Permission values back and forth.
+    """
+
+    impl = ARRAY
+    cache_ok = True
+
+    def __init__(self, perm_type: Type[AbstractPermission]) -> None:
+        super().__init__(sa.String)
+        self._perm_type = perm_type
+
+    @overload
+    def process_bind_param(self, value: Sequence[AbstractPermission], dialect) -> List[str]:
+        ...
+
+    @overload
+    def process_bind_param(self, value: Sequence[str], dialect) -> List[str]:
+        ...
+
+    @overload
+    def process_bind_param(self, value: None, dialect) -> List[str]:
+        ...
+
+    def process_bind_param(
+        self, value: Sequence[AbstractPermission] | Sequence[str] | None, dialect
+    ) -> List[str]:
+        if value is None:
+            return []
+        try:
+            return [self._perm_type(perm).value for perm in value]
+        except ValueError:
+            raise InvalidAPIParameters(f"Invalid value for binding to {self._perm_type}")
+
+    def process_result_value(self, value: Sequence[str] | None, dialect) -> set[AbstractPermission]:
+        if value is None:
+            return set()
+        return set(self._perm_type(perm) for perm in value)
+
+
+class VFolderHostPermissionColumn(TypeDecorator):
+    """
+    A column type to convert vfolder host permission back and forth.
+    """
+
+    impl = JSONB
+    cache_ok = True
+    perm_col = PermissionListColumn(VFolderHostPermission)
+
+    def process_bind_param(self, value: Mapping[str, Any] | None, dialect) -> Mapping[str, Any]:
+        if value is None:
+            return {}
+        return {
+            host: self.perm_col.process_bind_param(perms, None) for host, perms in value.items()
+        }
+
+    def process_result_value(
+        self, value: Mapping[str, Any] | None, dialect
+    ) -> VFolderHostPermissionMap:
+        if value is None:
+            return VFolderHostPermissionMap()
+        return VFolderHostPermissionMap(
+            {host: self.perm_col.process_result_value(perms, None) for host, perms in value.items()}
+        )
 
 
 class CurrencyTypes(enum.Enum):
@@ -764,6 +840,9 @@ async def simple_db_mutate(
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
         return result_cls(False, f"integrity error: {e}")
+    except sa.exc.StatementError as e:
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:
@@ -823,6 +902,9 @@ async def simple_db_mutate_returning_item(
         return await execute_with_retry(_do_mutate)
     except sa.exc.IntegrityError as e:
         return result_cls(False, f"integrity error: {e}", None)
+    except sa.exc.StatementError as e:
+        orig_exc = e.orig
+        return result_cls(False, str(orig_exc), None)
     except (asyncio.CancelledError, asyncio.TimeoutError):
         raise
     except Exception as e:

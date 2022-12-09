@@ -26,4 +26,5 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_index(op.f("ix_kernels_unique_sess_token"), table_name="kernels")
+    # op.drop_index(op.f("ix_kernels_unique_sess_token"), table_name="kernels")
+    pass

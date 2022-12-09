@@ -1,0 +1,45 @@
+name: SBOM report
+
+on: [workflow_dispatch]
+
+jobs:
+  sbom:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+    - name: Apply cache for Pants
+      uses: actions/cache@v3
+      id: cache
+      with:
+        # pants-specific cache
+        path: |
+          ~/.cache/pants/setup
+          ~/.cache/pants/lmdb_store
+          ~/.cache/pants/named_caches
+        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    - uses: CycloneDX/gh-python-generate-sbom@v1.0.1
+    - name: Upload SBOM report
+      uses: actions/upload-artifact@v3
+      with:
+        name: SBOM report
+        path: ./bom.xml
