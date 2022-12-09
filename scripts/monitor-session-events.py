@@ -76,9 +76,9 @@ async def send_notice(event_name, event_data):
                 log.info(
                     f"{event_name} for {session_name} -> skipped due to the missing user email"
                 )
+                return
             else:
                 log.info(f"{event_name} for {session_name} -> notifying to {user_email}")
-                return
             await send_mail(
                 SENDER_EMAIL,
                 [user_email],
