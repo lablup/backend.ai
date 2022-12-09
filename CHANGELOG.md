@@ -16,6 +16,26 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.6 (2022-12-09)
+
+Ai.Backend.Manager 22.09.6 (2022-12-09)
+
+### Features
+* Add the `local_rank` column in the `kernels` table and the `BACKENDAI_CLUSTER_LOCAL_RANK` environment variable in session containers to simplify execution of distributed computing/ML frameworks with one shell command ([#826](https://github.com/lablup/backend.ai/issues/826))
+* Add option to skip verifying SSL certificate of weka endpoint ([#903](https://github.com/lablup/backend.ai/issues/903))
+
+### Fixes
+* Always read `.env` from current working directory in the client ([#806](https://github.com/lablup/backend.ai/issues/806))
+* Fix request failure that cannot freeze manager using CLI command ([#889](https://github.com/lablup/backend.ai/issues/889))
+* Fix invalid cross-reference from `ai.backend.common` to `ai.backend.web` ([#902](https://github.com/lablup/backend.ai/issues/902))
+* Fix the invalid default value of the agent's new `affinity-policy` option ([#905](https://github.com/lablup/backend.ai/issues/905))
+* Fix occasional random mismatch of cluster hostnames and actual container hostnames in cluster sessions under the host networking mode ([#907](https://github.com/lablup/backend.ai/issues/907))
+* Always use the FILL allocation strategy for the main memory to avoid conflicts with NUMA allocator where all the main memory is coerced as a single NUMA node "root" ([#908](https://github.com/lablup/backend.ai/issues/908))
+* Rewrite the NUMA-aware device allocation to support 3 or more NUMA nodes properly, mixing interleaved and best-effort filling allocation strategies for non-first subsequent device types depending on the NUMA nodes used for the allocation of first device type ([#909](https://github.com/lablup/backend.ai/issues/909))
+* Use more consistently appearing unicode symbols in the CLI's pretty output ([#917](https://github.com/lablup/backend.ai/issues/917))
+* Fix spill-over of the DELETING status update to other vfolders with the same name when deleting a vfolder. This did not cause deletion of actual vfolders and their contents whose status is wrongly marked as DELETING, but causes confusion to the users and admins. ([#920](https://github.com/lablup/backend.ai/issues/920))
+
+
 ## 22.09.5 (2022-11-28)
 
 Ai.Backend.Manager 22.09.5 (2022-11-28)
