@@ -1,11 +1,12 @@
 import asyncio
+import os
 from typing import Dict, List
 from uuid import UUID
 
 from ai.backend.common.types import BinarySize
 
 from ..exception import ExecutionError
-from ..types import FSUsage, VFolderCreationOptions
+from ..types import FSUsage, Optional, VFolderCreationOptions
 from ..vfs import BaseVolume
 
 
@@ -14,7 +15,7 @@ async def read_file(loop: asyncio.AbstractEventLoop, filename: str) -> str:
         with open(filename, "r") as fr:
             return fr.read()
 
-    return await loop.run_in_executor(None, lambda: _read())
+    return await loop.run_in_executor(None, _read())
 
 
 async def write_file(loop: asyncio.AbstractEventLoop, filename: str, contents: str, perm="w"):
@@ -22,7 +23,7 @@ async def write_file(loop: asyncio.AbstractEventLoop, filename: str, contents: s
         with open(filename, perm) as fw:
             fw.write(contents)
 
-    await loop.run_in_executor(None, lambda: _write())
+    await loop.run_in_executor(None, _write())
 
 
 async def run(cmd: str) -> str:
@@ -55,10 +56,16 @@ class CephFSVolume(BaseVolume):
         if not available:
             raise RuntimeError("Ceph is not installed. ")
 
-    # ----- volume opeartions -----
-    async def create_vfolder(self, vfid: UUID, options: VFolderCreationOptions = None) -> None:
+    # ----- volume operations -----
+    async def create_vfolder(
+        self, vfid: UUID, options: Optional[VFolderCreationOptions], exist_ok: bool = False
+    ) -> None:
         vfpath = self.mangle_vfpath(vfid)
-        await run(f"mkdir -p {vfpath}")
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: vfpath.mkdir(0o755, parents=True, exist_ok=exist_ok),
+        )
         if not (options is None or options.quota is None or options.quota == 0):
             quota = options.quota
             await self.set_quota(vfpath, quota)
@@ -75,13 +82,21 @@ class CephFSVolume(BaseVolume):
             used_bytes=BinarySize.finite_from_str(used),
         )
 
-    async def get_quota(self, vfpath):
-        report = await run(f"getfattr -n ceph.quota.max_bytes {vfpath}")
+    async def get_quota(self, vfpath) -> int:
+        loop = asyncio.get_running_loop()
+        report = await loop.run_in_executor(
+            None,
+            lambda: os.getxattr(vfpath, "ceph.quota.max_bytes"),
+        )
         if len(report.split()) != 6:
             raise ExecutionError("ceph quota report output is in unexpected format")
         _, quota = report.split("=")
         quota = quota.replace('"', "")
         return int(quota)
 
-    async def set_quota(self, vfpath, size_bytes) -> None:
-        await run(f"setfattr -n ceph.quota.max_bytes -v {int(size_bytes)} {vfpath}")
+    async def set_quota(self, vfpath, size_bytes: BinarySize) -> None:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: os.setxattr(vfpath, "ceph.quota.max_bytes", str(int(size_bytes)).encode()),
+        )
