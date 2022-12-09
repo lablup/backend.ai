@@ -777,6 +777,7 @@ configure_backendai() {
   # configure tester
   echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-admin-api.sh" > ./env-tester-admin.sh
   echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user-api.sh" > ./env-tester-user.sh
+  echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user2-api.sh" > ./env-tester-user2.sh
 
   if [ "${CODESPACES}" = "true" ]; then
     $docker_sudo docker stop $($docker_sudo docker ps -q)
@@ -864,6 +865,14 @@ configure_backendai() {
   echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .secret_key')" >> "${CLIENT_USER_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER_CONF_FOR_API}"
   chmod +x "${CLIENT_USER_CONF_FOR_API}"
+  CLIENT_USER2_CONF_FOR_API="env-local-user2-api.sh"
+  CLIENT_USER2_CONF_FOR_SESSION="env-local-user2-session.sh"
+  echo "# Directly access to the manager using API keypair (user2)" > "${CLIENT_USER2_CONF_FOR_API}"
+  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER2_CONF_FOR_API}"
+  echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user2@lablup.com") | .access_key')" >> "${CLIENT_USER2_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user2@lablup.com") | .secret_key')" >> "${CLIENT_USER2_CONF_FOR_API}"
+  echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER2_CONF_FOR_API}"
+  chmod +x "${CLIENT_USER2_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server a using cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
