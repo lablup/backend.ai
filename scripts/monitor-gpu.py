@@ -14,7 +14,7 @@ SMTP_PORT = 25
 SENDER_EMAIL = "admin@backend.ai"
 NOTIFY_EMAILS = [
     # TODO: update
-    "joongi@lablup.com",
+    "admin@example.com",
 ]
 NOTIFY_INTERVAL = 6 * 3600  # in seconds
 
@@ -27,15 +27,17 @@ def check_lspci():
     gpu_count = 0
     for raw_line in proc.stdout.splitlines():
         line = raw_line.decode()
-        if '3d controller' in line.lower() and 'NVIDIA' in line:
-            if '(rev ff)' in line or '(rev 00)' in line:
-                pci_id, name = line.split(' ', maxsplit=1)
+        if "3d controller" in line.lower() and "NVIDIA" in line:
+            if "(rev ff)" in line or "(rev 00)" in line:
+                pci_id, name = line.split(" ", maxsplit=1)
                 faulty_gpus.append(pci_id)
             gpu_count += 1
     hostname = socket.gethostname()
 
     if gpu_count < NUM_GPU:
-        subject = f"WARNING: {NUM_GPU - gpu_count} GPU(s) have fallen off the bus! (host: {hostname})"
+        subject = (
+            f"WARNING: {NUM_GPU - gpu_count} GPU(s) have fallen off the bus! (host: {hostname})"
+        )
         body = (
             f"Please check the node hardware status!\n\n"
             f"Hostname: {hostname}\n"
@@ -54,8 +56,7 @@ def check_lspci():
         body = (
             f"Please check the node hardware status!\n\n"
             f"Hostname: {hostname}\n"
-            f"The list of faulty PCI device IDs:\n"
-            + '\n'.join(faulty_gpus)
+            f"The list of faulty PCI device IDs:\n" + "\n".join(faulty_gpus)
         )
         if check_interval("faulty", subject + "\x00" + body):
             send_mail(
@@ -81,12 +82,16 @@ def check_interval(event_name, msg):
     now = time.time()
     last_modified = check_path.stat().st_mtime
     if now - last_modified >= NOTIFY_INTERVAL:
-        for old_check_path in Path("/tmp/backend.ai/monitor").glob(f"gpu-check.last-sent.{event_name}.*"):
+        for old_check_path in Path("/tmp/backend.ai/monitor").glob(
+            f"gpu-check.last-sent.{event_name}.*"
+        ):
             old_check_path.unlink()
         check_path.touch()
         return True
     else:
-        log.info(f"skipped notifying abaout {event_name} GPUs until the next notification interval comes")
+        log.info(
+            f"skipped notifying abaout {event_name} GPUs until the next notification interval comes"
+        )
         return False
 
 
