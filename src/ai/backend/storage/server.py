@@ -70,6 +70,7 @@ async def server_main(
         hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
     m.prompt = f"monitor (storage-proxy[{pidx}@{os.getpid()}]) >>> "
+    m.console_locals["local_config"] = local_config
     m.start()
 
     with closing(m):
@@ -90,8 +91,11 @@ async def server_main(
             credentials=etcd_credentials,
         )
         ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd)
+        m.console_locals["ctx"] = ctx
         client_api_app = await init_client_app(ctx)
         manager_api_app = await init_manager_app(ctx)
+        m.console_locals["client_api_app"] = client_api_app
+        m.console_locals["manager_api_app"] = manager_api_app
 
         client_ssl_ctx = None
         manager_ssl_ctx = None

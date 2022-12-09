@@ -256,7 +256,10 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
 
     root_ctx: RootContext = root_app["_root.context"]
     plugin_ctx = WebappPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
-    await plugin_ctx.init()
+    await plugin_ctx.init(
+        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+    )
     root_ctx.webapp_plugin_ctx = plugin_ctx
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
         if root_ctx.pidx == 0:
@@ -384,7 +387,10 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     root_ctx.hook_plugin_ctx = ctx
-    await ctx.init()
+    await ctx.init(
+        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+    )
     hook_result = await ctx.dispatch(
         "ACTIVATE_MANAGER",
         (),
@@ -440,8 +446,11 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     sctx = ManagerStatsPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     init_success = False
     try:
-        await ectx.init(context={"_root.context": root_ctx})
-        await sctx.init()
+        await ectx.init(
+            context={"_root.context": root_ctx},
+            allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        )
+        await sctx.init(allowlist=root_ctx.local_config["manager"]["allowed-plugins"])
     except Exception:
         log.error("Failed to initialize monitoring plugins")
     else:
@@ -651,6 +660,7 @@ async def server_main(
     _args: List[Any],
 ) -> AsyncIterator[None]:
     subapp_pkgs = [
+        ".acl",
         ".etcd",
         ".events",
         ".auth",
@@ -684,6 +694,9 @@ async def server_main(
         hook_task_factory=root_ctx.local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
     m.prompt = f"monitor (manager[{pidx}@{os.getpid()}]) >>> "
+    # Add some useful console_locals for ease of debugging
+    m.console_locals["root_app"] = root_app
+    m.console_locals["root_ctx"] = root_ctx
     m.start()
 
     # Plugin webapps should be loaded before runner.setup(),

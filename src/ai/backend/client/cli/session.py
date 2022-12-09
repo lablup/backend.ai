@@ -975,6 +975,26 @@ def commit(session_id):
             sys.exit(ExitCode.FAILURE)
 
 
+@session.command()
+@click.argument("session_id", metavar="SESSID")
+def abuse_history(session_id):
+    """
+    Get abusing reports of session's sibling kernels.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    """
+
+    with Session() as session:
+        try:
+            session = session.ComputeSession(session_id)
+            report = session.get_abusing_report()
+            print(dict(report))
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
 def _ssh_cmd(docs: str = None):
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.option(
@@ -1343,7 +1363,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 async with timeout(max_wait):
                     await _run_events()
             except asyncio.TimeoutError:
-                sys.exit(ExitCode.TIMEOUT)
+                sys.exit(ExitCode.OPERATION_TIMEOUT)
 
         try:
             if max_wait > 0:

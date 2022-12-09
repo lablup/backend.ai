@@ -270,6 +270,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "FileBrowser",
         "Dotfile",
         "ServerLog",
+        "Permission",
     )
 
     aiohttp_session: aiohttp.ClientSession
@@ -290,6 +291,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self._proxy_mode = proxy_mode
         self.api_version = parse_api_version(self._config.version)
 
+        from .func.acl import Permission
         from .func.admin import Admin
         from .func.agent import Agent, AgentWatcher
         from .func.auth import Auth
@@ -336,6 +338,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.FileBrowser = FileBrowser
         self.Dotfile = Dotfile
         self.ServerLog = ServerLog
+        self.Permission = Permission
 
     @property
     def proxy_mode(self) -> bool:
