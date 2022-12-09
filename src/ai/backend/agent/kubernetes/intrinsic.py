@@ -1,18 +1,28 @@
+import asyncio
 import logging
 import os
 import platform
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, cast
 
 import aiohttp
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
 from kubernetes_asyncio import client as K8sClient
 from kubernetes_asyncio import config as K8sConfig
+from kubernetes_asyncio.client.rest import ApiException as K8sApiException
 
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import DeviceId, DeviceModelInfo, DeviceName, SlotName, SlotTypes
+from ai.backend.common.types import (
+    DeviceId,
+    DeviceModelInfo,
+    DeviceName,
+    MetricKey,
+    SlotName,
+    SlotTypes,
+)
+from ai.backend.common.utils import current_loop
 
 from .. import __version__
 from ..alloc_map import AllocationStrategy
@@ -24,7 +34,7 @@ from ..resources import (
     DiscretePropertyAllocMap,
     MountInfo,
 )
-from ..stats import ContainerMeasurement, NodeMeasurement, StatContext
+from ..stats import ContainerMeasurement, Measurement, MetricTypes, NodeMeasurement, StatContext
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
@@ -133,9 +143,51 @@ class CPUPlugin(AbstractComputePlugin):
         }
 
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
-        # TODO: Create our own k8s metric collector
+        async def get_cpu_stat(core_api, name: str):
+            try:
+                raw_resp = await core_api.connect_get_node_proxy_with_path(
+                    name=name, path="metrics/resource"
+                )
+            except K8sApiException as e:
+                log.warning("kubernetes api error: {}", e)
+                return None
+            resp = [line for line in raw_resp.split("\n") if "#" not in line and "node_cpu" in line]
+            cpu_used = resp.pop().split(" ")[1]
+            return cpu_used
 
-        return []
+        await K8sConfig.load_kube_config()
+        core_api = K8sClient.CoreV1Api()
+        nodes = (await core_api.list_node()).to_dict()["items"]
+        node_names = [node["metadata"]["name"] for node in nodes]
+        tasks = []
+        for name in node_names:
+            tasks.append(asyncio.ensure_future(get_cpu_stat(core_api, name)))
+        total_cpu_used = Decimal(0)
+        q = Decimal(0.000)
+        results = await asyncio.gather(*tasks)
+        for cpu_used in results:
+            if cpu_used is None:
+                continue
+            total_cpu_used += (Decimal(cpu_used) * 1000).quantize(q)
+        now, raw_interval = ctx.update_timestamp("cpu-node")
+        interval = Decimal(raw_interval * 1000).quantize(q)
+        return [
+            NodeMeasurement(
+                MetricKey("cpu_util"),
+                MetricTypes.UTILIZATION,
+                unit_hint="msec",
+                current_hook=lambda metric: metric.stats.diff,
+                per_node=Measurement(total_cpu_used, interval),
+                per_device={
+                    DeviceId(node["metadata"]["uid"]): Measurement(
+                        (Decimal(cpu_used) * 1000).quantize(q),
+                        interval,
+                    )
+                    for node, cpu_used in zip(nodes, results)
+                    if cpu_used
+                },
+            ),
+        ]
 
     async def gather_container_measures(
         self,
@@ -279,8 +331,123 @@ class MemoryPlugin(AbstractComputePlugin):
         return {}
 
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
-        # TODO: Create our own k8s metric collector
-        return []
+        async def get_memory_stat(core_api, name: str):
+            try:
+                raw_resp = await core_api.connect_get_node_proxy_with_path(
+                    name=name, path="metrics/resource"
+                )
+            except K8sApiException as e:
+                log.warning("kubernetes api error: {}", e)
+                return None
+            resp = [line for line in raw_resp.split("\n") if "#" not in line and "node_mem" in line]
+            mem_used = resp.pop().split(" ")[1]
+            return mem_used
+
+        async def get_network_stat(core_api, name: str):
+            try:
+                raw_resp = await core_api.connect_get_node_proxy_with_path(
+                    name=name, path="metrics/cadvisor"
+                )
+            except K8sApiException as e:
+                log.warning("kubernetes api error: {}", e)
+                return None
+            for line in raw_resp.split("\n"):
+                if "#" in line:
+                    continue
+                if "container_network_receive_bytes" in line:
+                    net_rx = line.split(" ")[1]
+                elif "container_network_transmit_bytes" in line:
+                    net_tx = line.split(" ")[1]
+            return net_rx, net_tx
+
+        await K8sConfig.load_kube_config()
+        core_api = K8sClient.CoreV1Api()
+        nodes = (await core_api.list_node()).to_dict()["items"]
+        node_names = [node["metadata"]["name"] for node in nodes]
+        _mem_tasks = []
+        _net_tasks = []
+        q = Decimal(0.000)
+        for name in node_names:
+            _mem_tasks.append(asyncio.ensure_future(get_memory_stat(core_api, name)))
+            _net_tasks.append(asyncio.ensure_future(get_network_stat(core_api, name)))
+        mem_results = await asyncio.gather(*_mem_tasks)
+        net_results = await asyncio.gather(*_net_tasks)
+        total_mem_used_bytes = Decimal(0)
+        net_rx_bytes = Decimal(0)
+        net_tx_bytes = Decimal(0)
+        for mem_used in mem_results:
+            if mem_used is None:
+                continue
+            total_mem_used_bytes += Decimal(mem_used).quantize(q)
+        for result in net_results:
+            if result is None:
+                continue
+            net_rx_bytes += Decimal(result[0]).quantize(q)
+            net_tx_bytes += Decimal(result[1]).quantize(q)
+        total_mem_capacity_bytes = cast(
+            Decimal,
+            sum(
+                (Decimal(node["status"]["capacity"]["memory"][:-2]) * 1024).quantize(q)
+                for node in nodes
+            ),
+        )
+
+        def get_disk_stat(nodes):
+            total_disk_capacity = Decimal(0)
+            total_disk_usage = Decimal(0)
+            per_disk_stat = {}
+            q = Decimal(0.000)
+            for node in nodes:
+                disk_capacity = (
+                    Decimal(node["status"]["capacity"]["ephemeral-storage"][:-2]) * 1024
+                ).quantize(q)
+                disk_usage = disk_capacity - (
+                    Decimal(node["status"]["allocatable"]["ephemeral-storage"][:-2]) * 1024
+                ).quantize(q)
+                per_disk_stat[node["metadata"]["uid"]] = Measurement(disk_usage, disk_capacity)
+                total_disk_capacity += disk_capacity
+                total_disk_usage += disk_usage
+            return total_disk_capacity, total_disk_usage, per_disk_stat
+
+        loop = current_loop()
+        total_disk_usage, total_disk_capacity, per_disk_stat = await loop.run_in_executor(
+            None, get_disk_stat, nodes
+        )
+        return [
+            NodeMeasurement(
+                MetricKey("mem"),
+                MetricTypes.USAGE,
+                unit_hint="bytes",
+                stats_filter=frozenset({"max"}),
+                per_node=Measurement(total_mem_used_bytes, total_mem_capacity_bytes),
+                per_device={
+                    DeviceId("root"): Measurement(total_mem_used_bytes, total_mem_capacity_bytes)
+                },
+            ),
+            NodeMeasurement(
+                MetricKey("disk"),
+                MetricTypes.USAGE,
+                unit_hint="bytes",
+                per_node=Measurement(total_disk_usage, total_disk_capacity),
+                per_device=per_disk_stat,
+            ),
+            NodeMeasurement(
+                MetricKey("net_rx"),
+                MetricTypes.RATE,
+                unit_hint="bps",
+                current_hook=lambda metric: metric.stats.rate,
+                per_node=Measurement(Decimal(net_rx_bytes)),
+                per_device={DeviceId("node"): Measurement(Decimal(net_rx_bytes))},
+            ),
+            NodeMeasurement(
+                MetricKey("net_tx"),
+                MetricTypes.RATE,
+                unit_hint="bps",
+                current_hook=lambda metric: metric.stats.rate,
+                per_node=Measurement(Decimal(net_tx_bytes)),
+                per_device={DeviceId("node"): Measurement(Decimal(net_tx_bytes))},
+            ),
+        ]
 
     async def gather_container_measures(
         self, ctx: StatContext, container_ids: Sequence[str]
