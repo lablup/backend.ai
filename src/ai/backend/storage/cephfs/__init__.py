@@ -88,6 +88,7 @@ class CephFSVolume(BaseVolume):
             None,
             lambda: os.getxattr(vfpath, "ceph.quota.max_bytes"),
         )
+        report = str(report)
         if len(report.split()) != 6:
             raise ExecutionError("ceph quota report output is in unexpected format")
         _, quota = report.split("=")
