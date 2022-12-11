@@ -44,22 +44,16 @@ Upgrading Development Setups
 
 Between the major releases (e.g., 22.03 to 22.09) upon the 6-month release cycle, you need to also peform the following explicit upgrade procedures for existing development setups.
 
-Halfstack Containers
---------------------
+Halfstack Containers and Database
+---------------------------------
 
-First, stop all the services running from the source and the halfstack containers.
+First, simply pull the latest ``main`` branch.
 
-.. code-block:: console
-
-   $ docker compose -f docker-compose.halfstack.current.yml -p <directory-name> down
-
-TODO: how to upgrade postgres, etcd, redis data in-place?
-
-The Source Tree
----------------
-
-You can now simply pull the latest ``main`` branch.
+Run ``./scripts/upgrade-halfstack.sh`` to automatically upgrade your ``docker-compose.halfstack.current.yml`` and the PostgreSQL database.
 
 Then, ensure that your database schema is up-to-date by running ``./py -m alembic upgrade head``.
+
+Configurations
+--------------
 
 Also check if any manual etcd configuration scheme change is required, though we will try to keep it compatible and automatically upgrade when first executed.
