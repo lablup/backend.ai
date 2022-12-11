@@ -127,7 +127,7 @@ function usage() {
 while [ $# -gt 0 ]; do
   case $1 in
     -h | --help)   usage; exit 1 ;;
-    --revert)      revert; shift ;;
+    --revert)      revert ;;
     *)
       echo "Unknown option: $1"
       echo "Run '$0 --help' for usage."
