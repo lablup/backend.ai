@@ -28,6 +28,8 @@ fi
 echo
 
 # NOTE: etcd and redis does not require explicit migration procedures.
+echo "${GREEN}✓ [redis]${WHITE} Redis does not require explicit migration.${NC}"
+echo "${GREEN}✓ [etcd]${WHITE} etcd does not require explicit migration within th 3.x series.${NC}"
 
 POSTGRES_CONTAINER=$(docker compose -f ${DOCKER_COMPOSE_CURRENT} ps -q "backendai-half-db")
 POSTGRES_OLD_VERSION=$(cat "${DOCKER_COMPOSE_CURRENT}" | yq '.services."backendai-half-db".image')
