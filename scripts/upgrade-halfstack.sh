@@ -5,6 +5,7 @@ shopt -s xpg_echo
 # NOTE: this script should be executed from the repository root.
 
 # Color constants
+YELLOW="\033[0;93m"
 GREEN="\033[0;92m"
 CYAN="\033[0;96m"
 WHITE="\033[0;97m"
@@ -39,8 +40,9 @@ if [ "$POSTGRES_OLD_VERSION" == "$POSTGRES_NEW_VERSION" ]; then
 else
   echo "${CYAN}▪ [postgres]${WHITE} Upgrading postgres from ${POSTGRES_OLD_VERSION} ($(echo ${POSTGRES_CONTAINER} | cut -b -12)) to ${POSTGRES_NEW_VERSION}"
 
-  echo "${CYAN}▪ [postgres]${WHITE} Making the database dump at ${HALFSTACK_VOLUME_PATH}/postgres-data.old/upgrade-dump.sql ...${NC}"
-  docker exec -it ${POSTGRES_CONTAINER} sh -c 'pg_dumpall --tablespaces-only -U postgres > /var/lib/postgresql/data/upgrade-dump.sql'
+  echo "${CYAN}▪ [postgres]${WHITE} Making the database dump at ${HALFSTACK_VOLUME_PATH}/postgres-data.old/upgrade-dump.{schema,data}.sql ...${NC}"
+  docker exec -it ${POSTGRES_CONTAINER} sh -c 'pg_dumpall --schema-only -U postgres --database=backend > /var/lib/postgresql/data/upgrade-dump.schema.sql'
+  docker exec -it ${POSTGRES_CONTAINER} sh -c 'pg_dumpall --data-only -U postgres --database=backend > /var/lib/postgresql/data/upgrade-dump.data.sql'
 
   echo "${CYAN}▪ [halfstack]${WHITE} Stopping the current halfstack ...${NC}"
   docker compose -f "${DOCKER_COMPOSE_CURRENT}" down
@@ -60,7 +62,9 @@ else
     if [ $rc -eq 0 ]; then break; fi
     sleep 0.5
   done
-  sudo docker exec -it ${TEMP_CID} sh -c 'psql -U postgres -f /data.old/upgrade-dump.sql >/dev/null'
+  echo "${YELLOW}▪ [postgres]${WHITE} NOTE: It is safe to ignore some 'already exists' errors.${NC}"
+  sudo docker exec -it ${TEMP_CID} sh -c 'psql -U postgres -f /data.old/upgrade-dump.schema.sql >/dev/null'
+  sudo docker exec -it ${TEMP_CID} sh -c 'psql -U postgres -f /data.old/upgrade-dump.data.sql >/dev/null'
   sudo docker stop ${TEMP_CID} && sudo docker rm ${TEMP_CID}
 fi
 
@@ -77,3 +81,11 @@ yq -i '.services."backendai-half-etcd".ports = [''"'"$etcd_ports"'"]' ${DOCKER_C
 docker compose -f "${DOCKER_COMPOSE_CURRENT}" up -d
 
 echo "${GREEN}✓ [halfstack]${WHITE} Completed upgrade.${NC}"
+
+# ref) Reverting the upgrade
+function revert() {
+  docker compose -f docker-compose.halfstack.current.yml down
+  sudo rm -r volumes/postgres-data
+  sudo mv volumes/postgres-data.old volumes/postgres-data
+  docker compose -f docker-compose.halfstack.current.yml up -d
+}
