@@ -788,7 +788,12 @@ async def server_main(
     )
     monitor.prompt = "monitor (agent) >>> "
     monitor.console_locals["local_config"] = local_config
-    monitor.start()
+    aiomon_started = False
+    try:
+        monitor.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     # Start RPC server.
     global agent_instance
@@ -806,7 +811,8 @@ async def server_main(
             stop_signal = yield
             agent.mark_stop_signal(stop_signal)
     finally:
-        monitor.close()
+        if aiomon_started:
+            monitor.close()
 
 
 @click.group(invoke_without_command=True)
