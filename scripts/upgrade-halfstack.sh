@@ -36,16 +36,15 @@ function upgrade() {
   echo "${GREEN}✓ [etcd]${WHITE} etcd does not require explicit migration within th 3.x series.${NC}"
 
   POSTGRES_CONTAINER=$(docker compose -f ${DOCKER_COMPOSE_CURRENT} ps -q "backendai-half-db")
-  POSTGRES_OLD_VERSION=$(cat "${DOCKER_COMPOSE_CURRENT}" | yq '.services."backendai-half-db".image')
-  POSTGRES_NEW_VERSION=$(cat "${DOCKER_COMPOSE_MAIN}" | yq '.services."backendai-half-db".image')
+  POSTGRES_OLD_VERSION=$(yq '.services."backendai-half-db".image' "${DOCKER_COMPOSE_CURRENT}")
+  POSTGRES_NEW_VERSION=$(yq '.services."backendai-half-db".image' "${DOCKER_COMPOSE_MAIN}")
   if [ "$POSTGRES_OLD_VERSION" == "$POSTGRES_NEW_VERSION" ]; then
     echo "${GREEN}✓ [postgres]${WHITE} The postgres container version has not been changed. Skipping upgrade.${NC}"
   else
     echo "${CYAN}▪ [postgres]${WHITE} Upgrading postgres from ${POSTGRES_OLD_VERSION} ($(echo ${POSTGRES_CONTAINER} | cut -b -12)) to ${POSTGRES_NEW_VERSION}"
 
-    echo "${CYAN}▪ [postgres]${WHITE} Making the database dump at ${HALFSTACK_VOLUME_PATH}/postgres-data.old/upgrade-dump.{schema,data}.sql ...${NC}"
-    docker exec -it ${POSTGRES_CONTAINER} sh -c 'pg_dumpall --schema-only -U postgres --database=backend > /var/lib/postgresql/data/upgrade-dump.schema.sql'
-    docker exec -it ${POSTGRES_CONTAINER} sh -c 'pg_dumpall --data-only -U postgres --database=backend > /var/lib/postgresql/data/upgrade-dump.data.sql'
+    echo "${CYAN}▪ [postgres]${WHITE} Making the database dump at ${HALFSTACK_VOLUME_PATH}/postgres-data.old/upgrade-dump.sql ...${NC}"
+    docker exec -it ${POSTGRES_CONTAINER} sh -c 'pg_dumpall -U postgres --clean > /var/lib/postgresql/data/upgrade-dump.sql'
 
     echo "${CYAN}▪ [halfstack]${WHITE} Stopping the current halfstack ...${NC}"
     docker compose -f "${DOCKER_COMPOSE_CURRENT}" down
@@ -53,7 +52,7 @@ function upgrade() {
     sudo mv "${HALFSTACK_VOLUME_PATH}/postgres-data" "${HALFSTACK_VOLUME_PATH}/postgres-data.old"
     sudo mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
     sudo docker pull "${POSTGRES_NEW_VERSION}"
-    local current_db_envs=($(cat ${DOCKER_COMPOSE_CURRENT} | yq '.services."backendai-half-db".environment.[]'))
+    local current_db_envs=($(yq '.services."backendai-half-db".environment.[]' "${DOCKER_COMPOSE_CURRENT}"))
     TEMP_CID=$(sudo docker run -d \
       -v ${HALFSTACK_VOLUME_PATH}/postgres-data.old:/data.old \
       -v ${HALFSTACK_VOLUME_PATH}/postgres-data:/var/lib/postgresql/data \
@@ -66,17 +65,21 @@ function upgrade() {
       sleep 0.5
     done
     echo "${YELLOW}▪ [postgres]${WHITE} NOTE: It is safe to ignore some 'already exists' errors.${NC}"
-    sudo docker exec -it ${TEMP_CID} sh -c 'psql -U postgres -f /data.old/upgrade-dump.schema.sql >/dev/null'
-    sudo docker exec -it ${TEMP_CID} sh -c 'psql -U postgres -f /data.old/upgrade-dump.data.sql >/dev/null'
+    sudo docker exec -it ${TEMP_CID} sh -c 'psql -U postgres -f /data.old/upgrade-dump.sql >/dev/null'
+    local postgres_password=$(yq '.services."backendai-half-db".environment.[] | match("^POSTGRES_PASSWORD=(.*)$").captures[0].string' "${DOCKER_COMPOSE_CURRENT}")
+    echo "ALTER ROLE postgres WITH PASSWORD '${postgres_password}';" > /tmp/set-password.sql
+    sudo cp /tmp/set-password.sql ${HALFSTACK_VOLUME_PATH}/postgres-data.old/
+    sudo docker exec -it ${TEMP_CID} sh -c 'psql -U postgres -f /data.old/set-password.sql >/dev/null';
+    sudo rm -f ${HALFSTACK_VOLUME_PATH}/postgres-data.old/set-password.sql /tmp/set-password.sql
     sudo docker stop ${TEMP_CID} && sudo docker rm ${TEMP_CID}
   fi
 
   echo "${CYAN}▪ [halfstack]${WHITE} Updating ${DOCKER_COMPOSE_CURRENT} ...${NC}"
   cp "${DOCKER_COMPOSE_CURRENT}" "${DOCKER_COMPOSE_CURRENT}.backup"
   # assuming that each port config has only one line...
-  postgres_ports=$(cat "${DOCKER_COMPOSE_CURRENT}" | yq '.services."backendai-half-db".ports.[]')
-  redis_ports=$(cat "${DOCKER_COMPOSE_CURRENT}" | yq '.services."backendai-half-redis".ports.[]')
-  etcd_ports=$(cat "${DOCKER_COMPOSE_CURRENT}" | yq '.services."backendai-half-etcd".ports.[]')
+  postgres_ports=$(yq '.services."backendai-half-db".ports.[]' "${DOCKER_COMPOSE_CURRENT}")
+  redis_ports=$(yq '.services."backendai-half-redis".ports.[]' "${DOCKER_COMPOSE_CURRENT}")
+  etcd_ports=$(yq '.services."backendai-half-etcd".ports.[]' "${DOCKER_COMPOSE_CURRENT}")
   cp "${DOCKER_COMPOSE_MAIN}" "${DOCKER_COMPOSE_CURRENT}"
   yq -i '.services."backendai-half-db".ports = [''"'"$postgres_ports"'"]' ${DOCKER_COMPOSE_CURRENT}
   yq -i '.services."backendai-half-redis".ports = [''"'"$redis_ports"'"]' ${DOCKER_COMPOSE_CURRENT}
