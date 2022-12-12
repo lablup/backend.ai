@@ -703,6 +703,24 @@ async def server_main(
 ) -> AsyncGenerator[None, signal.Signals]:
     local_config = _args[0]
 
+    # Start aiomonitor.
+    # Port is set by config (default=50200).
+    loop.set_debug(local_config["debug"]["asyncio"])
+    monitor = aiomonitor.Monitor(
+        loop,
+        port=local_config["agent"]["aiomonitor-port"],
+        console_enabled=False,
+        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
+    )
+    monitor.prompt = "monitor (agent) >>> "
+    monitor.console_locals["local_config"] = local_config
+    aiomon_started = False
+    try:
+        monitor.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
+
     log.info("Preparing kernel runner environments...")
     kernel_mod = importlib.import_module(
         f"ai.backend.agent.{local_config['agent']['backend'].value}.kernel",
@@ -776,24 +794,6 @@ async def server_main(
 
     # Pre-load compute plugin configurations.
     local_config["plugins"] = await etcd.get_prefix_dict("config/plugins/accelerator")
-
-    # Start aiomonitor.
-    # Port is set by config (default=50200).
-    loop.set_debug(local_config["debug"]["asyncio"])
-    monitor = aiomonitor.Monitor(
-        loop,
-        port=local_config["agent"]["aiomonitor-port"],
-        console_enabled=False,
-        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
-    )
-    monitor.prompt = "monitor (agent) >>> "
-    monitor.console_locals["local_config"] = local_config
-    aiomon_started = False
-    try:
-        monitor.start()
-        aiomon_started = True
-    except Exception as e:
-        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     # Start RPC server.
     global agent_instance
