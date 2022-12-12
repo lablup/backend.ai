@@ -65,13 +65,13 @@ function upgrade() {
       sleep 0.5
     done
     echo "${YELLOW}▪ [postgres]${WHITE} NOTE: It is safe to ignore some 'already exists' errors.${NC}"
-    sudo docker exec -it ${TEMP_CID} sh -c 'psql -U postgres -f /data.old/upgrade-dump.sql >/dev/null'
+    sudo docker exec -it ${TEMP_CID} sh -c 'psql -U postgres -f /data.old/upgrade-dump.sql >/dev/null' || true
     local postgres_password=$(yq '.services."backendai-half-db".environment.[] | match("^POSTGRES_PASSWORD=(.*)$").captures[0].string' "${DOCKER_COMPOSE_CURRENT}")
     echo "ALTER ROLE postgres WITH PASSWORD '${postgres_password}';" > /tmp/set-password.sql
     sudo cp /tmp/set-password.sql ${HALFSTACK_VOLUME_PATH}/postgres-data.old/
-    sudo docker exec -it ${TEMP_CID} sh -c 'psql -U postgres -f /data.old/set-password.sql >/dev/null';
+    sudo docker exec -it ${TEMP_CID} sh -c 'psql -U postgres -f /data.old/set-password.sql >/dev/null' || true
     sudo rm -f ${HALFSTACK_VOLUME_PATH}/postgres-data.old/set-password.sql /tmp/set-password.sql
-    sudo docker stop ${TEMP_CID} && sudo docker rm ${TEMP_CID}
+    sudo docker stop ${TEMP_CID} || true && sudo docker rm ${TEMP_CID} || true
   fi
 
   echo "${CYAN}▪ [halfstack]${WHITE} Updating ${DOCKER_COMPOSE_CURRENT} ...${NC}"
