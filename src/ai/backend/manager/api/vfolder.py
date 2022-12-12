@@ -1880,7 +1880,7 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-async def delete(request: web.Request) -> web.Response:
+async def delete_by_name(request: web.Request) -> web.Response:
     await ensure_vfolder_status(
         request, VFolderAccessStatus.DELETABLE, folder_name=request.match_info["name"]
     )
@@ -2739,7 +2739,7 @@ def create_app(default_cors_options):
     cors.add(root_resource.add_route("DELETE", delete_by_id))
     vfolder_resource = cors.add(app.router.add_resource(r"/{name}"))
     cors.add(vfolder_resource.add_route("GET", get_info))
-    cors.add(vfolder_resource.add_route("DELETE", delete))
+    cors.add(vfolder_resource.add_route("DELETE", delete_by_name))
     cors.add(add_route("GET", r"/_/hosts", list_hosts))
     cors.add(add_route("GET", r"/_/all-hosts", list_all_hosts))
     cors.add(add_route("GET", r"/_/allowed-types", list_allowed_types))
