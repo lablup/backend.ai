@@ -49,8 +49,8 @@ function upgrade() {
     echo "${CYAN}▪ [halfstack]${WHITE} Stopping the current halfstack ...${NC}"
     docker compose -f "${DOCKER_COMPOSE_CURRENT}" down
     echo "${CYAN}▪ [postgres]${WHITE} Migrating the database to the new version of postgres ...${NC}"
-    sudo mv "${HALFSTACK_VOLUME_PATH}/postgres-data" "${HALFSTACK_VOLUME_PATH}/postgres-data.old"
-    sudo mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
+    mv "${HALFSTACK_VOLUME_PATH}/postgres-data" "${HALFSTACK_VOLUME_PATH}/postgres-data.old"
+    mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
     sudo docker pull "${POSTGRES_NEW_VERSION}"
     local current_db_envs=($(yq '.services."backendai-half-db".environment.[]' "${DOCKER_COMPOSE_CURRENT}"))
     TEMP_CID=$(sudo docker run -d \
@@ -105,7 +105,7 @@ function revert() {
   docker compose -f docker-compose.halfstack.current.yml down
   echo "${CYAN}▪ [halfstack]${WHITE} Purging the postgres-data dircetory generated in the newer version ...${NC}"
   sudo rm -r volumes/postgres-data
-  sudo mv volumes/postgres-data.old volumes/postgres-data
+  mv volumes/postgres-data.old volumes/postgres-data
   echo "${CYAN}▪ [halfstack]${WHITE} Restoring ${DOCKER_COMPOSE_CURRENT} from ${DOCKER_COMPOSE_CURRENT}.backup ...${NC}"
   cp docker-compose.halfstack.current.yml.backup docker-compose.halfstack.current.yml
   echo "${CYAN}▪ [halfstack]${WHITE} Recreating the compose stack ...${NC}"
