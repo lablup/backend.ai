@@ -113,10 +113,11 @@ async def ensure_vfolder_status(
     else:
         raise VFolderFilterStatusFailed("either vFolder id nor name not supplied")
 
+    available_vf_statuses = set()
     match perm:
         case VFolderAccessStatus.READABLE:
             # if READABLE access status is requested, all operation statuses are accepted.
-            vf_status_conds = vfolders.c.status.in_(
+            available_vf_statuses = set(
                 [
                     VFolderOperationStatus.READY,
                     VFolderOperationStatus.PERFORMING,
@@ -127,7 +128,7 @@ async def ensure_vfolder_status(
             )
         case VFolderAccessStatus.UPDATABLE:
             # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
-            vf_status_conds = vfolders.c.status.in_(
+            available_vf_statuses = set(
                 [
                     VFolderOperationStatus.READY,
                     VFolderOperationStatus.MOUNTED,
@@ -135,7 +136,7 @@ async def ensure_vfolder_status(
             )
         case VFolderAccessStatus.DELETABLE:
             # if DELETABLE access status is requested, only READY operation status is accepted.
-            vf_status_conds = vfolders.c.status.in_(
+            available_vf_statuses = set(
                 [
                     VFolderOperationStatus.READY,
                     VFolderOperationStatus.DELETING,
@@ -151,11 +152,20 @@ async def ensure_vfolder_status(
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vf_name_conds & vf_status_conds),
+            extra_vf_conds=vf_name_conds,
             allow_privileged_access=True,
         )
         if len(entries) == 0:
-            raise VFolderFilterStatusFailed()
+            raise VFolderFilterStatusFailed(
+                f"Cannot find any folder with the given identity ({folder_id = }, {folder_name = })"
+            )
+        for entry in entries:
+            if entry["status"] in available_vf_statuses:
+                break
+        else:
+            raise VFolderFilterStatusFailed(
+                f"Cannot perform function with given accessible statuses. expect: {list(available_vf_statuses)}, got: {[entry['status'] for entry in entries]}"
+            )
 
 
 def vfolder_permission_required(perm: VFolderPermission):
