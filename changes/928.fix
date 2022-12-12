@@ -1,1 +1,1 @@
-Return request payload for insecure context to let user login with plain POST data.
+Read request payload with insecure context login to allow login with plain payload.
