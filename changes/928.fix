@@ -1,1 +1,1 @@
-Read request payload with insecure context login to allow login with plain payload.
+Fill the request payload with the plain-text request body when the web login handler is called without encryption.  This was a regression after introducing the login payload encryption.
