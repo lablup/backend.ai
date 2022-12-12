@@ -190,7 +190,7 @@ async def login_handler(request: web.Request) -> web.Response:
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     if not secure_context:
         # For non-encrypted requests, just read the body as-is.
-        # Encrypted requests is handled by the `decrypt_payload` middleware.
+        # Encrypted requests are handled by the `decrypt_payload` middleware.
         request["payload"] = await request.text()
     try:
         creds = json.loads(request["payload"])
