@@ -72,13 +72,13 @@ class CephFSVolume(BaseVolume):
 
     async def get_quota(self, vfpath) -> BinarySize:
         loop = asyncio.get_running_loop()
-        report = await loop.run_in_executor(
+        raw_report = await loop.run_in_executor(
             None,
             # without type: ignore mypy will raise error when trying to run on macOS
             # because os.getxattr() is only for linux
             lambda: os.getxattr(vfpath, "ceph.quota.max_bytes"),  # type: ignore[attr-defined]
         )
-        report = str(report)
+        report = str(raw_report)
         if len(report.split()) != 6:
             raise ExecutionError("ceph quota report output is in unexpected format")
         _, quota = report.split("=")
