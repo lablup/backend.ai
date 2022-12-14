@@ -43,7 +43,11 @@ class CephFSVolume(BaseVolume):
 
     # ----- volume operations -----
     async def create_vfolder(
-        self, vfid: UUID, options: Optional[VFolderCreationOptions], exist_ok: bool = False
+        self,
+        vfid: UUID,
+        options: Optional[VFolderCreationOptions] = None,
+        *,
+        exist_ok: bool = False
     ) -> None:
         vfpath = self.mangle_vfpath(vfid)
         loop = asyncio.get_running_loop()
@@ -66,22 +70,26 @@ class CephFSVolume(BaseVolume):
             used_bytes=BinarySize(used),
         )
 
-    async def get_quota(self, vfpath) -> int:
+    async def get_quota(self, vfpath) -> BinarySize:
         loop = asyncio.get_running_loop()
         report = await loop.run_in_executor(
             None,
-            lambda: os.getxattr(vfpath, "ceph.quota.max_bytes"),
+            # without type: ignore mypy will raise error when trying to run on macOS
+            # because os.getxattr() is only for linux
+            lambda: os.getxattr(vfpath, "ceph.quota.max_bytes"),  # type: ignore[attr-defined]
         )
         report = str(report)
         if len(report.split()) != 6:
             raise ExecutionError("ceph quota report output is in unexpected format")
         _, quota = report.split("=")
         quota = quota.replace('"', "")
-        return int(quota)
+        return BinarySize(quota)
 
     async def set_quota(self, vfpath, size_bytes: BinarySize) -> None:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
-            lambda: os.setxattr(vfpath, "ceph.quota.max_bytes", str(int(size_bytes)).encode()),
+            # without type: ignore mypy will raise error when trying to run on macOS
+            # because os.setxattr() is only for linux
+            lambda: os.setxattr(vfpath, "ceph.quota.max_bytes", str(int(size_bytes)).encode()),  # type: ignore[attr-defined]
         )
