@@ -27,7 +27,7 @@ from setproctitle import setproctitle
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
-from ai.backend.common.web.session import get_session
+from ai.backend.common.web.session import extra_config_headers, get_session
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 
@@ -186,6 +186,12 @@ async def login_handler(request: web.Request) -> web.Response:
             ),
             content_type="application/problem+json",
         )
+    request_headers = extra_config_headers.check(request.headers)
+    secure_context = request_headers.get("X-BackendAI-Encoded", None)
+    if not secure_context:
+        # For non-encrypted requests, just read the body as-is.
+        # Encrypted requests are handled by the `decrypt_payload` middleware.
+        request["payload"] = await request.text()
     try:
         creds = json.loads(request["payload"])
     except json.JSONDecodeError as e:
