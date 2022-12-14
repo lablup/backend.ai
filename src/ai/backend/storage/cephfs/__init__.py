@@ -1,5 +1,6 @@
 import asyncio
 import os
+import shutil
 from typing import Dict, List
 from uuid import UUID
 
@@ -8,22 +9,6 @@ from ai.backend.common.types import BinarySize
 from ..exception import ExecutionError
 from ..types import FSUsage, Optional, VFolderCreationOptions
 from ..vfs import BaseVolume
-
-
-async def read_file(loop: asyncio.AbstractEventLoop, filename: str) -> str:
-    def _read():
-        with open(filename, "r") as fr:
-            return fr.read()
-
-    return await loop.run_in_executor(None, _read())
-
-
-async def write_file(loop: asyncio.AbstractEventLoop, filename: str, contents: str, perm="w"):
-    def _write():
-        with open(filename, perm) as fw:
-            fw.write(contents)
-
-    await loop.run_in_executor(None, _write())
 
 
 async def run(cmd: str) -> str:
@@ -71,15 +56,14 @@ class CephFSVolume(BaseVolume):
             await self.set_quota(vfpath, quota)
 
     async def get_fs_usage(self) -> FSUsage:
-        stat = await run(f"df -h {self.mount_path} | grep {self.mount_path}")
-        _, capacity, used, _, _, path = stat.split()
-        if len(stat.split()) == 6:
-            raise ExecutionError("'df -h' stdout is in an unexpected format")
-        if str(self.mount_path) != path:
-            raise ExecutionError("'df -h' stdout is in an unexpected format")
+        (total, used, _) = await asyncio.get_running_loop().run_in_executor(
+            None,
+            shutil.disk_usage,
+            self.mount_path,
+        )
         return FSUsage(
-            capacity_bytes=BinarySize.finite_from_str(capacity),
-            used_bytes=BinarySize.finite_from_str(used),
+            capacity_bytes=BinarySize(total),
+            used_bytes=BinarySize(used),
         )
 
     async def get_quota(self, vfpath) -> int:
