@@ -1,10 +1,11 @@
 import asyncio
 import os
 import shutil
-from typing import Dict, List
+from typing import Dict, FrozenSet, List
 from uuid import UUID
 
 from ai.backend.common.types import BinarySize
+from ai.backend.storage.abc import CAP_QUOTA, CAP_VFOLDER
 
 from ..exception import ExecutionError
 from ..types import FSUsage, Optional, VFolderCreationOptions
@@ -40,6 +41,9 @@ class CephFSVolume(BaseVolume):
 
         if not available:
             raise RuntimeError("Ceph is not installed. ")
+
+    async def get_capabilities(self) -> FrozenSet[str]:
+        return frozenset([CAP_VFOLDER, CAP_QUOTA])
 
     # ----- volume operations -----
     async def create_vfolder(
