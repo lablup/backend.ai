@@ -23,5 +23,19 @@ jobs:
         cache: pip
     - name: Install alembic
       run: pip install alembic
+    - name: Bootstrap Pants
+      run: |
+        mkdir .tmp
+        ./pants export
+        ./pants --no-verify-config version
+    - name: List virtual environments
+      run: ls dist/export/python
     - name: Check for multiple heads
-      run: python scripts/check-multiple-alembic-heads.py
+      run: ./py scripts/check-multiple-alembic-heads.py
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants.lint.log
+        path: .pants.d/pants.log
+      if: always()  # We want the log even on failures.
+
