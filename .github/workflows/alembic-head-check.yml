@@ -39,6 +39,8 @@ jobs:
       run: |
         mkdir .tmp
         ./pants --no-verify-config version
+    - name: List virtual environments
+      run: ls dist/export/python
     - name: Check for multiple heads
       run: ./py scripts/check-multiple-alembic-heads.py
     - name: Upload pants log
