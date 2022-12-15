@@ -12,21 +12,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
-    - name: Apply cache for Pants
-      uses: actions/cache@v3
-      with:
-        # pants-specific cache
-        path: |
-          ~/.cache/pants/setup
-          ~/.cache/pants/lmdb_store
-          ~/.cache/pants/named_caches
-        key: pants-${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
-    - name: Extract Python version from pants.toml
-      run: |
-        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
-        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python for Pants
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: "3.9"
@@ -35,18 +21,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
-    - name: Bootstrap Pants
-      run: |
-        mkdir .tmp
-        ./pants --no-verify-config version
-    - name: List virtual environments
-      run: ls dist/export/python
+    - name: Install alembic
+      run: pip install alembic
     - name: Check for multiple heads
-      run: ./py scripts/check-multiple-alembic-heads.py
-    - name: Upload pants log
-      uses: actions/upload-artifact@v3
-      with:
-        name: pants.lint.log
-        path: .pants.d/pants.log
-      if: always()  # We want the log even on failures.
-
+      run: python scripts/check-multiple-alembic-heads.py
