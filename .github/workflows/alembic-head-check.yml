@@ -26,4 +26,4 @@ jobs:
     - name: Install alembic
       run: pip install $PROJECT_ALEMBIC_VERSION
     - name: Check for multiple heads
-      run: ./py scripts/check-multiple-alembic-heads.py
+      run: python scripts/check-multiple-alembic-heads.py
