@@ -40,6 +40,23 @@ class UnknownImageRegistry(ValueError):
         return f"Unknown image registry: {self.args[0]}"
 
 
+class InvalidImageName(ValueError):
+    """
+    Represents an invalid string for image name.
+    """
+
+
+class InvalidImageTag(ValueError):
+    """
+    Represents an invalid string for image tag.
+    Image tag should be a string of form below
+
+    ```
+    <version-stringA>-<platform-tag-1A>-<platform-tag-2A>-....
+    ```
+    """
+
+
 class AliasResolutionFailed(ValueError):
     """
     Represents an alias resolution failure.

@@ -27,7 +27,7 @@ from packaging import version
 from .etcd import AsyncEtcd
 from .etcd import quote as etcd_quote
 from .etcd import unquote as etcd_unquote
-from .exception import UnknownImageRegistry
+from .exception import InvalidImageName, InvalidImageTag, UnknownImageRegistry
 from .logging import BraceStyleAdapter
 
 __all__ = (
@@ -230,11 +230,11 @@ class PlatformTagSet(Mapping):
         for t in tags:
             match = rx.search(t)
             if match is None:
-                raise ValueError("invalid tag-version string", t)
+                raise InvalidImageTag("invalid tag-version string", t)
             key = match.group("tag")
             value = match.group("version")
             if key in self._data:
-                raise ValueError("duplicate platform tag with different versions", t)
+                raise InvalidImageTag("duplicate platform tag with different versions", t)
             if value is None:
                 value = ""
             self._data[key] = value
@@ -280,13 +280,13 @@ class ImageRef:
         self._arch = arch_name_aliases.get(architecture, architecture)
         rx_slug = type(self)._rx_slug
         if "://" in value or value.startswith("//"):
-            raise ValueError("ImageRef should not contain the protocol scheme.")
+            raise InvalidImageName("ImageRef should not contain the protocol scheme.")
         parts = value.split("/", maxsplit=1)
         if len(parts) == 1:
             self._registry = default_registry
             self._name, self._tag = ImageRef._parse_image_tag(value, True)
             if not rx_slug.search(self._tag):
-                raise ValueError("Invalid image tag")
+                raise InvalidImageTag
         else:
             if is_known_registry(parts[0], known_registries):
                 self._registry = parts[0]
@@ -300,7 +300,7 @@ class ImageRef:
                 self._registry = default_registry
                 self._name, self._tag = ImageRef._parse_image_tag(value, True)
             if not rx_slug.search(self._tag):
-                raise ValueError("Invalid image tag")
+                raise InvalidImageTag
         self._update_tag_set()
 
     @staticmethod
@@ -313,7 +313,7 @@ class ImageRef:
             image = image_tag[0]
             tag = image_tag[1]
         if not image:
-            raise ValueError("Empty image repository/name")
+            raise InvalidImageName("Empty image repository/name")
         if ("/" not in image) and using_default_registry:
             image = default_repository + "/" + image
         return image, tag
