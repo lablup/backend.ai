@@ -12,17 +12,18 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
-    - name: Extract Python version from pants.toml
+    - name: Parse versions from config
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
-        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        ALEMBIC_VERSION=$(grep 'alembic' requirements.txt)
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+        echo "PROJECT_ALEMBIC_VERSION=$ALEMBIC_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
     - name: Install alembic
-      run: pip install $(grep alembic pants.toml)
+      run: pip install $PROJECT_ALEMBIC_VERSION
     - name: Check for multiple heads
       run: ./py scripts/check-multiple-alembic-heads.py
