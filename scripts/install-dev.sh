@@ -691,6 +691,7 @@ setup_environment() {
   sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
   show_info "Pre-pulling frequently used kernel images..."

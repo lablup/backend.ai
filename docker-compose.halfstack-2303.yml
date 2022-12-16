@@ -3,7 +3,7 @@ version: "2.4"
 services:
 
   backendai-half-db:
-    image: postgres:13.7-alpine
+    image: postgres:15.1-alpine
     restart: unless-stopped
     command: postgres -c 'max_connections=256'
     networks:
@@ -14,7 +14,7 @@ services:
       - POSTGRES_PASSWORD=develove
       - POSTGRES_DB=backend
     volumes:
-      - "./tmp/backend.ai-halfstack/${DATADIR_PREFIX:-.}/postgres-data:/var/lib/postgresql/data:rw"
+      - "./volumes/${DATADIR_PREFIX:-.}/postgres-data:/var/lib/postgresql/data:rw"
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "postgres"]
       interval: 5s
@@ -22,23 +22,28 @@ services:
       retries: 10
 
   backendai-half-redis:
-    image: redis:6.2.7-alpine
+    image: redis:7.0.5-alpine
     restart: unless-stopped
     networks:
       - half
     ports:
       - "8110:6379"
+    volumes:
+      - "./volumes/${DATADIR_PREFIX:-.}/redis-data:/data:rw"
+    command: >
+      redis-server
+      --appendonly yes
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
       interval: 5s
       timeout: 3s
       retries: 10
 
   backendai-half-etcd:
-    image: quay.io/coreos/etcd:v3.4.18
+    image: quay.io/coreos/etcd:v3.5.6
     restart: unless-stopped
     volumes:
-      - "./tmp/backend.ai-halfstack/${DATADIR_PREFIX:-.}/etcd-data:/etcd-data:rw"
+      - "./volumes/${DATADIR_PREFIX:-.}/etcd-data:/etcd-data:rw"
     networks:
       - half
     ports:
