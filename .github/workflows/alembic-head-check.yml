@@ -38,7 +38,7 @@ jobs:
     - name: Bootstrap Pants
       run: |
         mkdir .tmp
-        ./pants export
+        ./pants export '::'
         ./pants --no-verify-config version
     - name: Check for multiple heads
       run: ./py scripts/check-multiple-alembic-heads.py
