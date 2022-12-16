@@ -8,7 +8,7 @@ on:
 jobs:
   lint:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v3
       with:
@@ -66,7 +66,7 @@ jobs:
 
   typecheck:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-20.04-8-cores
     steps:
     - uses: actions/checkout@v3
       with:
@@ -121,7 +121,7 @@ jobs:
 
   test:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
-    runs-on: ubuntu-latest-8-cores
+    runs-on: ubuntu-20.04-8-cores
     steps:
     - uses: actions/checkout@v3
       with:
@@ -183,7 +183,7 @@ jobs:
   deploy-to-pypi:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v3
       with:
