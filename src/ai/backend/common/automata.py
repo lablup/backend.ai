@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from typing import (
+    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -15,9 +16,21 @@ from typing import (
     TypeVar,
 )
 
+import attrs
 
+if TYPE_CHECKING:
+    from ai.backend.common.bgtask import BackgroundTaskManager
+    from ai.backend.common.events import EventDispatcher, EventProducer
+
+    # from .models.utils import ExtendedAsyncSAEngine
+
+
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class MachineContext:
-    pass
+    # db: ExtendedAsyncSAEngine
+    event_dispatcher: EventDispatcher
+    event_producer: EventProducer
+    background_task_manager: BackgroundTaskManager
 
 
 class UnregisteredState(Exception):
@@ -92,7 +105,6 @@ class Transition:
     event: TransitionEvent
     guard: Optional[TransitionGuard]
     action: Optional[TransitionAction]
-    ctx: Optional[MachineContext]
 
     def __init__(
         self,
@@ -107,19 +119,9 @@ class Transition:
         self.event = event
         self.guard = guard
         self.action = action
-        self.ctx = None
 
     def __str__(self) -> str:
         return f"src: {self.src}, dst: {self.dst}, event: {self.event}"
-
-    async def trigger(self) -> None:
-        assert self.ctx is not None
-        if self.guard is not None:
-            if not (await self.guard(ctx=self.ctx)):
-                # TODO: log the result of guard
-                return
-        if self.action is not None:
-            await self.action(ctx=self.ctx)
 
 
 class AsyncStateMachine:
@@ -155,7 +157,6 @@ class AsyncStateMachine:
                 raise DuplicateTransitionEvent(
                     f"Event {t.event} is already registered with transition {t}"
                 )
-            t.ctx = self.ctx
         self.transitions.extend(transitions)
         self.transition_map = {t.event: t for t in self.transitions}
 
@@ -166,5 +167,10 @@ class AsyncStateMachine:
         if trsn is None:
             return None
         assert isinstance(trsn, Transition)
-        await trsn.trigger()
+        if trsn.guard is not None:
+            if not (await trsn.guard(ctx=self.ctx)):
+                # TODO: log the result of guard
+                return None
+        if trsn.action is not None:
+            await trsn.action(ctx=self.ctx)
         return trsn.dst
