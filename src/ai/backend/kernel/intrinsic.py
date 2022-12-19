@@ -4,6 +4,7 @@ import logging
 import os
 from collections.abc import Iterable
 from pathlib import Path
+from typing import MutableMapping
 
 from .logging import BraceStyleAdapter
 
@@ -175,13 +176,15 @@ async def prepare_vscode_service(service_info):
     ], {"PWD": "/home/work"}
 
 
-async def prepare_korean_font() -> None:
+async def prepare_korean_font(child_env: MutableMapping[str, str]) -> None:
+    font_path = Path("/usr/share/fonts/nanum_barun_gothic_font.zip")
+    font_path.parent.mkdir(parents=True, exist_ok=True)
     proc = await asyncio.create_subprocess_exec(
         *[
             "unzip",
-            "/usr/share/fonts/nanum_font.zip",
+            "/opt/kernel/nanum_barun_gothic_font.zip",
             "-d",
-            "/usr/share/fonts",
+            str(font_path.parent),
         ],
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -189,3 +192,4 @@ async def prepare_korean_font() -> None:
     _, stderr = await proc.communicate()
     if proc.returncode != 0:
         raise RuntimeError(f"korean font unzip error: {stderr.decode('utf8')}")
+    child_env.update({"KOREAN_FONT_PATH": str(font_path)})

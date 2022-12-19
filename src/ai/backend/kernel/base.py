@@ -274,7 +274,7 @@ class BaseRunner(metaclass=ABCMeta):
                         # Clean up for client and kernel will be done in `shutdown`.
                         log.error("jupyter channel is not active!")
                         self.kernel_mgr = None
-                    await prepare_korean_font()
+                    await prepare_korean_font(self.child_env)
                 break
         else:
             log.debug("jupyter query mode is not available: " "no jupyter kernelspec found")
