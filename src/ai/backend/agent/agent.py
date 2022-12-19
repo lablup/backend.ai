@@ -424,6 +424,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             "runner/DO_NOT_STORE_PERSISTENT_FILES_HERE.md"
         )
         entrypoint_sh_path = self.resolve_krunner_filepath("runner/entrypoint.sh")
+        korean_nanum_font_path = self.resolve_krunner_filepath("runner/nanum_font.zip")
 
         if matched_libc_style == "musl":
             terminfo_path = self.resolve_krunner_filepath("runner/terminfo.alpine3.8")
@@ -446,6 +447,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             persistent_files_warning_doc_path,
             "/home/work/DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
         )
+        _mount(MountTypes.BIND, korean_nanum_font_path, "/usr/share/fonts/nanum_font.zip")
 
         _mount(MountTypes.VOLUME, krunner_volume, "/opt/backend.ai")
         pylib_path = f"/opt/backend.ai/lib/python{krunner_pyver}/site-packages/"

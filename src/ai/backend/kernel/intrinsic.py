@@ -173,3 +173,19 @@ async def prepare_vscode_service(service_info):
         "--extensions-dir",
         str(extension_dir),
     ], {"PWD": "/home/work"}
+
+
+async def prepare_korean_font() -> None:
+    proc = await asyncio.create_subprocess_exec(
+        *[
+            "unzip",
+            "/usr/share/fonts/nanum_font.zip",
+            "-d",
+            "/usr/share/fonts",
+        ],
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(f"korean font unzip error: {stderr.decode('utf8')}")

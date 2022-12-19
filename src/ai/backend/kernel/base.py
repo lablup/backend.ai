@@ -34,6 +34,7 @@ from jupyter_client.kernelspec import KernelSpecManager
 from .compat import current_loop
 from .intrinsic import (
     init_sshd_service,
+    prepare_korean_font,
     prepare_sshd_service,
     prepare_ttyd_service,
     prepare_vscode_service,
@@ -273,6 +274,7 @@ class BaseRunner(metaclass=ABCMeta):
                         # Clean up for client and kernel will be done in `shutdown`.
                         log.error("jupyter channel is not active!")
                         self.kernel_mgr = None
+                    await prepare_korean_font()
                 break
         else:
             log.debug("jupyter query mode is not available: " "no jupyter kernelspec found")
