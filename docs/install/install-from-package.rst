@@ -6,9 +6,10 @@ Install from Packages
 This guide covers how to install Backend.AI from the official release packages.
 You can build a fully-functional Backend.AI cluster with open-source packages.
 
-Backend.AI consists of a variety of components, including open-source core
-components, pluggable extensions, and enterprise modules. Some of the major
-components are:
+Backend.AI consists of a
+`variety of components <https://github.com/lablup/backend.ai#major-components>`_,
+including open-source core components, pluggable extensions, and enterprise
+modules. Some of the major components are:
 
 - Backend.AI Manager : API gateway and resource management. Manager delegates
   workload requests to Agent and storage/file requests to Storage Proxy.
@@ -58,7 +59,6 @@ Setting Up Single Node All-in-one Deployment
 
    - `Use a standalone static build of Python <https://github.com/indygreg/python-build-standalone/releases>`_
 
-   - `Use pyenv to manaully build and select a specific Python version <https://github.com/pyenv/pyenv>`_
 
    .. warning::
 

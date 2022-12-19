@@ -1,19 +1,17 @@
-.. |bai_user| replace:: bai
-
 Setup OS Environment
 ====================
 
-There are common requirements and configurations for all of Backend.AI and its
-related components to work properly. This section describes how to set up the
-base OS environment.
+Backend.AI and its associated components share common requirements and
+configurations for proper operation. This section explains how to configure the
+OS environment.
 
-.. note:: This section assumes installation on Ubuntu 20.04 LTS.
+.. note:: This section assumes the installation on Ubuntu 20.04 LTS.
 
 
 Create a user account for operation
 -----------------------------------
 
-We will create a user account ``|bai_user|`` to install and operate Backend.AI
+We will create a user account ``bai`` to install and operate Backend.AI
 services. Set the ``UID`` and ``GID`` to ``1100`` to prevent conflicts with
 other users or groups.  ``sudo`` privilege is required so add ``bai`` to
 ``sudo`` group.
@@ -22,7 +20,7 @@ other users or groups.  ``sudo`` privilege is required so add ``bai`` to
 
    # If you do not want to expose your password in the shell history, remove the
    # --disabled-password option and interactively enter your password.
-   username="|bai_user|"
+   username="bai"
    password="secure-password"
    sudo adduser --disabled-password --uid 1100 --gecos "" $username
    echo "$username:$password" | sudo chpasswd
@@ -102,3 +100,40 @@ To cleanly separate the configurations, you may follow the steps below.
      net.ipv4.tcp_wmem=4096 12582912 16777216
 
 - Apply the kernel parameters with ``sudo sysctl -p /etc/sysctl.d/99-backendai.conf``.
+
+
+Prepare required version of Python
+----------------------------------
+
+Prepare a Python distribution whose version meets the requirements of the target
+package. Backend.AI 22.09, for example, requires Python 3.10. The latest
+information on the Python version compability can be found at
+`here <https://github.com/lablup/backend.ai#package-installation-guide#python-version-compatibility>`_.
+
+There can be several ways to prepare a specific Python version. Here, we will be
+using pyenv and pyenv-virtualenv.
+
+
+Use pyenv to manually build and select a specific Python version
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Install `pyenv <https://github.com/pyenv/pyenv>`_ and
+`pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_. Then, install
+a Python version that are needed:
+
+.. code-block::
+
+   pyenv install <python-version>
+
+.. note::
+
+   You may need to install
+   `suggested build environment <https://github.com/pyenv/pyenv/wiki#suggested-build-environment>`_
+   to build Python from pyenv.
+
+Then, you can create a virtual environment for any services. To create a virtual
+environment for Backend.AI Manager 22.09.x, for example, you may run:
+
+.. code-block::
+
+   pyenv virtualenv <python-version> bai-22.09-manager
