@@ -45,6 +45,9 @@ more management nodes, although this is not the focus of this guide.
    :caption: Table of Contents
 
    install-from-package/os-preparation
+   install-from-package/prepare-database
+   install-from-package/prepare-cache-service
+   install-from-package/prepare-config-service
 
 
 
@@ -53,16 +56,8 @@ Setting Up Single Node All-in-one Deployment
 --------------------------------------------
 
 
-3. Prepare a Python distribution whose version matches with the package requirements. (e.g., Backend.AI 22.03 and 22.09 requires Python 3.10) Either:
-
-   - Use the Linux distribution's official package
-
-   - `Use a standalone static build of Python <https://github.com/indygreg/python-build-standalone/releases>`_
-
-
    .. warning::
 
-      You also need to make ``pip`` available to the Python installation with the latest ``wheel`` and ``setuptools`` packages, so that any non-binary extension packages can be compiled and installed on your system.
 
 4. Create separate virtualenvs for each service daemons (manager, agent, storage-proxy, and webserver).
 
@@ -72,7 +67,9 @@ Setting Up Single Node All-in-one Deployment
 
    .. tip::
 
-      For details about configuration in the steps 6 to 10, you can just refer `how our development setup script does. <https://github.com/lablup/backend.ai/blob/main/scripts/install-dev.sh>`_
+      For details about configuration in the steps 6 to 10, you can just refer
+      `how our development setup script does.
+      <https://github.com/lablup/backend.ai/blob/main/scripts/install-dev.sh>`_
 
 7. Refer `the configuration examples in our repository <https://github.com/lablup/backend.ai/tree/main/configs>`_: copy them and adjust the values according to the above step.
    Be aware that the hostnames and port numbers used to refer other services.

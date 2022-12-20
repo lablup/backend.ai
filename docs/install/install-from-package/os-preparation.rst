@@ -98,6 +98,7 @@ To cleanly separate the configurations, you may follow the steps below.
      net.core.wmem_max=16777216
      net.ipv4.tcp_rmem=4096 12582912 16777216
      net.ipv4.tcp_wmem=4096 12582912 16777216
+     vm.overcommit_memory=1
 
 - Apply the kernel parameters with ``sudo sysctl -p /etc/sysctl.d/99-backendai.conf``.
 
@@ -123,7 +124,7 @@ a Python version that are needed:
 
 .. code-block::
 
-   pyenv install <python-version>
+   pyenv install $YOUR_PYTHON_VERSION
 
 .. note::
 
@@ -131,9 +132,25 @@ a Python version that are needed:
    `suggested build environment <https://github.com/pyenv/pyenv/wiki#suggested-build-environment>`_
    to build Python from pyenv.
 
-Then, you can create a virtual environment for any services. To create a virtual
-environment for Backend.AI Manager 22.09.x, for example, you may run:
+Then, you can create multiple virtual environments per service. To create a
+virtual environment for Backend.AI Manager 22.09.x and automatically activate it
+under the ``$MANAGER_DIRECTORY``, for example, you may run:
 
 .. code-block::
 
-   pyenv virtualenv <python-version> bai-22.09-manager
+   cd $MANAGER_DIRECTORY
+   pyenv virtualenv $YOUR_PYTHON_VERSION bai-22.09-manager
+   pyenv local bai-22.09-manager
+   pip install pip setuptools wheel
+
+You also need to make ``pip`` available to the Python installation with the
+latest ``wheel`` and ``setuptools`` packages, so that any non-binary extension
+packages can be compiled and installed on your system.
+
+
+Use a standalone static built Python
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+We can `use a standalone static built Python <https://github.com/indygreg/python-build-standalone/releases>`_.
+
+.. warning:: Details will be added later.
