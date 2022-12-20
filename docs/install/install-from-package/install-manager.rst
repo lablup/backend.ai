@@ -136,6 +136,7 @@ needed.  This can be configured via GUI as well.
 
 .. code-block:: console
 
+   $ backend.ai mgr etcd put config/docker/image/auto_pull "tag"
    $ backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
    $ backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
    $ backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable"
@@ -154,11 +155,12 @@ Also, populate the Storage Proxy configuration to the Etcd:
    $ backend.ai mgr etcd put volumes/default_host "bai-m1:local"
    $ # Set the "bai-m1" proxy information.
    $ # User (browser) facing API endpoint of Storage Proxy.
-   $ backend.ai mgr etcd put volumes/proxies/bai-m1/client_api "http://bai-m1:6021"
+   $ # Cannot use host alias here. It should be user-accessible URL.
+   $ backend.ai mgr etcd put volumes/proxies/bai-m1/client_api "http://10.20.30.10:6021"
    $ # Manager facing internal API endpoint of Storage Proxy.
    $ backend.ai mgr etcd put volumes/proxies/bai-m1/manager_api "http://bai-m1:6022"
    $ # Random secret string which is used by Manager to communicate with Storage Proxy.
-   $ backend.ai mgr etcd put volumes/proxies/bai-m1/secret "random-secret-shared-with-storage-proxy"
+   $ backend.ai mgr etcd put volumes/proxies/bai-m1/secret "secure-token-to-authenticate-manager-request"
    $ # Option to disable SSL verification for the Storage Proxy.
    $ backend.ai mgr etcd put volumes/proxies/bai-m1/ssl_verify "false"
 
@@ -175,12 +177,12 @@ parameters can be found from
 
 To enable access to the volumes defined by the Storage Proxy from every user,
 you need to update the ``allowed_vfolder_hosts`` column of the ``domains`` table
-to hold the storage volume reference (e.g., "bai-m1:local"). You can do this by
+to hold the storage volume reference (e.g., ``bai-m1:local``). You can do this by
 issuing SQL statement directly inside the PostgreSQL container:
 
 .. code-block:: console
 
-   $ vfolder_host_val='{"bai-m1": ["create-vfolder", "modify-vfolder", "delete-vfolder", "mount-in-session", "upload-file", "download-file", "invite-others", "set-user-specific-permission"]}'
+   $ vfolder_host_val='{"bai-m1:local": ["create-vfolder", "modify-vfolder", "delete-vfolder", "mount-in-session", "upload-file", "download-file", "invite-others", "set-user-specific-permission"]}'
    $ docker exec -it bai-backendai-pg-active-1 psql -U postgres -d backend \
          -c "UPDATE domains SET allowed_vfolder_hosts = '${vfolder_host_val}' WHERE name = 'default';"
 

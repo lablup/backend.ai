@@ -183,10 +183,18 @@ Mount a shared storage
 
 Having a shared storage volume makes it easy to save and manage data inside a
 Backend.AI compute environment. If you have a dedicated storage, mount it with
-the name of your choice under ``/vfroot/`` directory on each server. Detailed
-mount procedures may vary depending on the storage type or vendor. For a usual
-NFS, adding the configurations to ``/etc/fstab`` and executing ``sudo mount -a``
-will do the job.
+the name of your choice under ``/vfroot/`` directory on each server. You must
+mount it in the same path in all management and compute nodes.
+
+Detailed mount procedures may vary depending on the storage type or vendor. For
+a usual NFS, adding the configurations to ``/etc/fstab`` and executing ``sudo
+mount -a`` will do the job.
+
+.. note::
+
+   It is recommended to unify the UID and GID of the Storage Proxy service, all of
+   the Agent services across nodes, container UID and GID (configurable in
+   ``agent.toml``), and the NFS volume.
 
 If you do not have a dedicated storage or installing on one server, you can use
 a local directory. Just create a directory ``/vfroot/local``.

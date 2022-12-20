@@ -51,25 +51,4 @@ more management nodes, although this is not the focus of this guide.
    install-from-package/install-manager
    install-from-package/install-agent
    install-from-package/install-storage-proxy
-
-
-
-
-Setting Up Single Node All-in-one Deployment
---------------------------------------------
-
-
-
-Setting Up Multiple Nodes Cluster
----------------------------------
-
-Please refer :ref:`multi-node-setup`.
-
-The only difference is that you won't need to configure Pants, but just follow the above instructions to set up Python virtualenvs and install the agent packages for each agent node.
-
-Setting Up Shared Storage
--------------------------
-
-To make vfolders working properly with multiple nodes, you must enable and configure Linux NFS to share a specific directory of the manager node or make a dedicated storage node exposing its volume via NFS (recommended).  You must mount it in the same path in all manager and agent nodes.
-
-It is recommended to unify the UID and GID of the storage-proxy service, all of the agent services across nodes, container UID and GID (configurable in ``agent.toml``), and the NFS volume.
+   install-from-package/install-webserver
