@@ -70,7 +70,7 @@ tqdm>=4.61
 trafaret~=2.1
 typeguard~=2.10
 typing_extensions~=4.3
-uvloop>=0.17
+uvloop>=0.17; sys_platform != "Windows"
 yarl>=1.7
 zipstream-new~=1.1.8
 
