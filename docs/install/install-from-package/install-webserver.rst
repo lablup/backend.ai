@@ -96,7 +96,7 @@ Save the contents to ``${HOME}/.config/backend.ai/webserver.conf``.
 Run Backend.AI Webserver service
 ------------------------------------
 
-You can run the service by specifying the config file path:
+You can run the service by specifying the config file path with ``-f`` option:
 
 .. code-block:: console
 
