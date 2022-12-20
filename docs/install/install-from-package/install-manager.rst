@@ -130,15 +130,15 @@ nodes.
    $ backend.ai mgr etcd put config/redis/addr "bai-m1:8110"
    $ backend.ai mgr etcd put config/redis/password "develove"
 
-Set the container registry (cr.backend.ai). The following is the Lablup's open
-registry. You can set your own registry with username and password if needed.
-This can be configured via GUI as well.
+Set the container registry. The following is the Lablup's open registry
+(cr.backend.ai). You can set your own registry with username and password if
+needed.  This can be configured via GUI as well.
 
 .. code-block:: console
 
    $ backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
    $ backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-   $ backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable,community"
+   $ backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable"
    $ # backend.ai mgr etcd put config/docker/registry/cr.backend.ai/username "bai"
    $ # backend.ai mgr etcd put config/docker/registry/cr.backend.ai/password "secure-password"
 
@@ -210,6 +210,19 @@ your initial superadmin and sample user accounts for security.
    $ backend.ai mgr fixture populate ./resource-presets.json
 
 
+Sync the information of container registry
+------------------------------------------
+
+You need to scan the image catalog and metadata from the container registry to
+the Manager. This is required to display the list of compute environments in the
+user web GUI (Web UI). You can run the following command to sync the
+information with Lablup's public container registry:
+
+.. code-block:: console
+
+   $ backend.ai mgr image rescan cr.backend.ai
+
+
 Run Backend.AI Manager service
 ------------------------------
 
@@ -238,11 +251,13 @@ The service can be registered as a systemd daemon. It is recommended to
 automatically run the service after rebooting the host machine, although this is
 entirely optional.
 
-First, create a runner script under ``${HOME}/bin/run-manager.sh``:
+First, create a runner script at ``${HOME}/bin/run-manager.sh``:
 
 .. code-block:: bash
 
    #! /bin/bash
+   set -e
+
    if [ -z "$HOME" ]; then
       export HOME="/home/bai"
    fi
@@ -267,7 +282,7 @@ Make the script executable:
 
    $ chmod +x "${HOME}/bin/run-manager.sh"
 
-Then, create a systemd service file under
+Then, create a systemd service file at
 ``/etc/systemd/system/backendai-manager.service``:
 
 .. code-block:: dosini
@@ -311,11 +326,3 @@ Finally, enable and start the service:
    $ sudo systemctl stop backendai-manager
    $ # To check the service log and follow
    $ sudo journalctl --output cat -u backendai-manager -f
-
-
-
-.. To enable the image registry so that agents can pull images from it, after
-.. installation, log in to the web UI using the superadmin account and enable
-.. the registry by navigating the "Administration" (side-bar) |rarr| the
-.. "Environments" menu |rarr| the "Registries" view.
-

@@ -195,3 +195,31 @@ a local directory. Just create a directory ``/vfroot/local``.
 
    $ sudo mkdir -p /vfroot/local
    $ sudo chown -R ${UID}.${GID} /vfroot
+
+
+Setup accelerators
+------------------
+
+If there are accelerators (e.g., GPU) on the server, you have to install the
+vendor-specific drivers and libraries to make sure the accelerators are properly
+set up and working. Please refer to the vendor documentation for the details.
+
+- To integrate NVIDIA GPUs,
+
+   - Install the NVIDIA driver and CUDA toolkit.
+   - Install the NVIDIA container toolkit (nvidia-docker2).
+
+
+Pull container images
+---------------------
+
+For compute nodes, you need to pull some container images that are required for
+creating a compute session. Lablup provides a set of open container images and
+you may pull the following starter images:
+
+.. code-block:: bash
+
+   docker pull cr.backend.ai/stable/filebrowser:21.02-ubuntu20.04
+   docker pull cr.backend.ai/stable/python:3.9-ubuntu20.04
+   docker pull cr.backend.ai/stable/python-pytorch:1.11-py38-cuda11.3
+   docker pull cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3
