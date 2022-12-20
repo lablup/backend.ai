@@ -16,36 +16,35 @@ services. Set the ``UID`` and ``GID`` to ``1100`` to prevent conflicts with
 other users or groups.  ``sudo`` privilege is required so add ``bai`` to
 ``sudo`` group.
 
-.. code-block:: bash
+.. code-block:: console
 
-   # If you do not want to expose your password in the shell history, remove the
-   # --disabled-password option and interactively enter your password.
-   username="bai"
-   password="secure-password"
-   sudo adduser --disabled-password --uid 1100 --gecos "" $username
-   echo "$username:$password" | sudo chpasswd
+   $ username="bai"
+   $ password="secure-password"
+   $ sudo adduser --disabled-password --uid 1100 --gecos "" $username
+   $ echo "$username:$password" | sudo chpasswd
+   $ sudo usermod -aG sudo bai
 
-   # Add the user to sudo group.
-   sudo usermod -aG sudo bai
+If you do not want to expose your password in the shell history, remove the
+``--disabled-password`` option and interactively enter your password.
 
 Login as the ``bai`` user and continue the installation.
 
 
-Install Docker engine and Compose
+Install Docker engine
 ---------------------------------
 
 Backend.AI requires Docker Engine to create a compute session with the Docker
 container backend. Also, some service components are deployed as containers. So
 `installing Docker Engine <https://docs.docker.com/engine/install/ubuntu/>`_ is
-required. `Install standalone Compose <https://docs.docker.com/compose/install/other/>`_
-as well.
+required. Ensure ``docker-compose-plugin`` is installed as well to use
+``docker compose`` command.
 
 After the installation, add the ``bai`` user to the ``docker`` group not to
 issue the ``sudo`` prefix command every time interacting with the Docker engine.
 
-.. code-block:: bash
+.. code-block:: console
 
-   sudo usermod -aG docker bai
+   $ sudo usermod -aG docker bai
 
 Logout and login again to apply the group membership change.
 
@@ -103,8 +102,10 @@ To cleanly separate the configurations, you may follow the steps below.
 - Apply the kernel parameters with ``sudo sysctl -p /etc/sysctl.d/99-backendai.conf``.
 
 
-Prepare required version of Python
-----------------------------------
+.. _prepare_python_and_venv:
+
+Prepare required Python versions and virtual environments
+---------------------------------------------------------
 
 Prepare a Python distribution whose version meets the requirements of the target
 package. Backend.AI 22.09, for example, requires Python 3.10. The latest
@@ -122,9 +123,9 @@ Install `pyenv <https://github.com/pyenv/pyenv>`_ and
 `pyenv-virtualenv <https://github.com/pyenv/pyenv-virtualenv>`_. Then, install
 a Python version that are needed:
 
-.. code-block::
+.. code-block:: console
 
-   pyenv install $YOUR_PYTHON_VERSION
+   $ pyenv install "${YOUR_PYTHON_VERSION}"
 
 .. note::
 
@@ -133,15 +134,16 @@ a Python version that are needed:
    to build Python from pyenv.
 
 Then, you can create multiple virtual environments per service. To create a
-virtual environment for Backend.AI Manager 22.09.x and automatically activate it
-under the ``$MANAGER_DIRECTORY``, for example, you may run:
+virtual environment for Backend.AI Manager 22.09.x and automatically activate
+it, for example, you may run:
 
-.. code-block::
+.. code-block:: console
 
-   cd $MANAGER_DIRECTORY
-   pyenv virtualenv $YOUR_PYTHON_VERSION bai-22.09-manager
-   pyenv local bai-22.09-manager
-   pip install pip setuptools wheel
+   $ mkdir "${HOME}/manager"
+   $ cd "${HOME}/manager"
+   $ pyenv virtualenv "${YOUR_PYTHON_VERSION}" bai-22.09-manager
+   $ pyenv local bai-22.09-manager
+   $ pip install -U pip setuptools wheel
 
 You also need to make ``pip`` available to the Python installation with the
 latest ``wheel`` and ``setuptools`` packages, so that any non-binary extension
@@ -175,6 +177,7 @@ aliases.
 Note that the IP addresses should be accessible from other nodes, if you are
 installing on multiple servers.
 
+
 Mount a shared storage
 ----------------------
 
@@ -187,3 +190,8 @@ will do the job.
 
 If you do not have a dedicated storage or installing on one server, you can use
 a local directory. Just create a directory ``/vfroot/local``.
+
+.. code-block:: bash
+
+   $ sudo mkdir -p /vfroot/local
+   $ sudo chown -R ${UID}.${GID} /vfroot

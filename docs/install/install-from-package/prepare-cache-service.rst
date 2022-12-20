@@ -2,7 +2,7 @@ Prepare Cache Service
 =====================
 
 Backend.AI makes use of Redis as its main cache service. Launch the service
-using docker-compose by generating the file
+using docker compose by generating the file
 ``$HOME/halfstack/docker-compose.hs.redis.yaml`` and populating it with the
 following YAML. Feel free to adjust the volume paths and port settings. Please
 refer
@@ -48,11 +48,11 @@ refer
 Execute the following command to start the service container. The project
 ``${USER}`` is added for operational convenience.
 
-.. code-block:: bash
+.. code-block:: console
 
-   cd ${HOME}/halfstack
-   docker-compose -f docker-compose.hs.redis.yaml -p ${USER} up -d
-   # -- To terminate the container:
-   # docker-compose -f docker-compose.hs.redis.yaml -p ${USER} down
-   # -- To see the container logs:
-   # docker-compose -f docker-compose.hs.redis.yaml -p ${USER} logs -f
+   $ cd ${HOME}/halfstack
+   $ docker compose -f docker-compose.hs.redis.yaml -p ${USER} up -d
+   $ # -- To terminate the container:
+   $ # docker compose -f docker-compose.hs.redis.yaml -p ${USER} down
+   $ # -- To see the container logs:
+   $ # docker compose -f docker-compose.hs.redis.yaml -p ${USER} logs -f

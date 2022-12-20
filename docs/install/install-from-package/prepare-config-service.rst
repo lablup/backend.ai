@@ -2,7 +2,7 @@ Prepare Config Service
 ======================
 
 Backend.AI makes use of Etcd as its main config service. Launch the service
-using docker-compose by generating the file
+using docker compose by generating the file
 ``$HOME/halfstack/docker-compose.hs.etcd.yaml`` and populating it with the
 following YAML. Feel free to adjust the volume paths and port settings. Please
 refer
@@ -44,8 +44,8 @@ refer
             timeout: 3s
             retries: 10
          ports:
-            - "8120:6379"
-            # - "8320:6379"  # listen peer (only if required)
+            - "8120:2379"
+            # - "8320:2380"  # listen peer (only if required)
          networks:
             - half_stack
          cpu_count: 1
@@ -57,11 +57,11 @@ refer
 Execute the following command to start the service container. The project
 ``${USER}`` is added for operational convenience.
 
-.. code-block:: bash
+.. code-block:: console
 
-   cd ${HOME}/halfstack
-   docker-compose -f docker-compose.hs.etcd.yaml -p ${USER} up -d
-   # -- To terminate the container:
-   # docker-compose -f docker-compose.hs.etcd.yaml -p ${USER} down
-   # -- To see the container logs:
-   # docker-compose -f docker-compose.hs.etcd.yaml -p ${USER} logs -f
+   $ cd ${HOME}/halfstack
+   $ docker compose -f docker-compose.hs.etcd.yaml -p ${USER} up -d
+   $ # -- To terminate the container:
+   $ # docker compose -f docker-compose.hs.etcd.yaml -p ${USER} down
+   $ # -- To see the container logs:
+   $ # docker compose -f docker-compose.hs.etcd.yaml -p ${USER} logs -f
