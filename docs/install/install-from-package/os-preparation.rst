@@ -154,3 +154,36 @@ Use a standalone static built Python
 We can `use a standalone static built Python <https://github.com/indygreg/python-build-standalone/releases>`_.
 
 .. warning:: Details will be added later.
+
+
+Configure network aliases
+-------------------------
+
+Although not required, using a network aliases instead of IP addresses can make
+setup and operation easier. Edit the ``/etc/hosts`` file for each node and
+append the contents like example below to access each server with network
+aliases.
+
+.. code-block:: bash
+
+   ##### BEGIN for Backend.AI services #####
+   10.20.30.10 bai-m1   # management node 01
+   10.20.30.20 bai-a01  # agent node 01 (GPU 01)
+   10.20.30.22 bai-a02  # agent node 02 (GPU 02)
+   ##### END for Backend.AI services #####
+
+Note that the IP addresses should be accessible from other nodes, if you are
+installing on multiple servers.
+
+Mount a shared storage
+----------------------
+
+Having a shared storage volume makes it easy to save and manage data inside a
+Backend.AI compute environment. If you have a dedicated storage, mount it with
+the name of your choice under ``/vfroot/`` directory on each server. Detailed
+mount procedures may vary depending on the storage type or vendor. For a usual
+NFS, adding the configurations to ``/etc/fstab`` and executing ``sudo mount -a``
+will do the job.
+
+If you do not have a dedicated storage or installing on one server, you can use
+a local directory. Just create a directory ``/vfroot/local``.
