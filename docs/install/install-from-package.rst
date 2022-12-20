@@ -50,6 +50,7 @@ more management nodes, although this is not the focus of this guide.
    install-from-package/prepare-config-service
    install-from-package/install-manager
    install-from-package/install-agent
+   install-from-package/install-storage-proxy
 
 
 

@@ -49,7 +49,7 @@ CUDA accelerator plugin, run:
 Local configuration
 -------------------
 
-Backend.AI agent uses a TOML file (``agent.toml``) to configure local
+Backend.AI Agent uses a TOML file (``agent.toml``) to configure local
 service. Refer to the
 `agent.toml sample file <https://github.com/lablup/backend.ai/blob/main/configs/agent/sample.toml>`_
 for a detailed description of each section and item. A configuration example
