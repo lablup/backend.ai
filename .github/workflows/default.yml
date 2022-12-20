@@ -199,7 +199,7 @@ jobs:
           ~/.cache/pants/setup
           ~/.cache/pants/lmdb_store
           ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
+        key: pants-${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
