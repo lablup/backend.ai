@@ -82,7 +82,9 @@ def list(ctx: CLIContext) -> None:
     default="{}",
     help="Set scheduler options as a JSON string.",
 )
-@click.option("--use-host-network", is_flag=True, help="Set host networking mode")
+@click.option(
+    "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
+)
 def add(
     ctx: CLIContext,
     name,
@@ -147,7 +149,9 @@ def add(
     default=None,
     help="Set scheduler options as a JSON string.",
 )
-@click.option("--use-host-network", is_flag=True, help="Set host networking mode")
+@click.option(
+    "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
+)
 def update(
     ctx: CLIContext,
     name,
