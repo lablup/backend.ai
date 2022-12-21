@@ -311,6 +311,7 @@ class MemoryPlugin(AbstractComputePlugin):
         return [
             MemoryDevice(
                 device_id=DeviceId("root"),
+                device_name=self.key,
                 hw_location="root",
                 numa_node=0,
                 memory_size=mem * overcommit_factor,
@@ -398,16 +399,20 @@ class MemoryPlugin(AbstractComputePlugin):
             per_disk_stat = {}
             q = Decimal(0.000)
             for node in nodes:
-                disk_capacity = (
-                    Decimal(node["status"]["capacity"]["ephemeral-storage"][:-2]) * 1024
-                ).quantize(q)
-                disk_usage = disk_capacity - (
-                    Decimal(node["status"]["allocatable"]["ephemeral-storage"][:-2]) * 1024
-                ).quantize(q)
+                disk_capacity = node["status"]["capacity"]["ephemeral-storage"]
+                disk_allocatable = node["status"]["allocatable"]["ephemeral-storage"]
+                if disk_capacity.isdigit():
+                    disk_capacity = Decimal(disk_capacity).quantize(q)
+                else:
+                    disk_capacity = (Decimal(disk_capacity[:-2]) * 1024).quantize(q)
+                if disk_allocatable.isdigit():
+                    disk_usage = disk_capacity - (Decimal(disk_allocatable)).quantize(q)
+                else:
+                    disk_usage = disk_capacity - (Decimal(disk_allocatable[:-2]) * 1024).quantize(q)
                 per_disk_stat[node["metadata"]["uid"]] = Measurement(disk_usage, disk_capacity)
                 total_disk_capacity += disk_capacity
                 total_disk_usage += disk_usage
-            return total_disk_capacity, total_disk_usage, per_disk_stat
+            return total_disk_usage, total_disk_capacity, per_disk_stat
 
         loop = current_loop()
         total_disk_usage, total_disk_capacity, per_disk_stat = await loop.run_in_executor(
