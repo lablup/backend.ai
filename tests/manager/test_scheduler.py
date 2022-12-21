@@ -346,7 +346,6 @@ _common_dummy_for_pending_session: Mapping[str, Any] = dict(
     environ={},
     bootstrap_script=None,
     startup_command=None,
-    internal_data=None,
     preopen_ports=[],
     use_host_network=False,
 )
