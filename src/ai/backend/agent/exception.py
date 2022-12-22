@@ -2,6 +2,7 @@ class InitializationError(Exception):
     """
     Errors during agent initialization and compute plugin setup
     """
+
     pass
 
 
@@ -33,6 +34,12 @@ class UnsupportedBaseDistroError(RuntimeError):
     pass
 
 
+class ContainerCreationError(Exception):
+    def __init__(self, container_id, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.container_id = container_id
+
+
 class K8sError(Exception):
     def __init__(self, message):
         super().__init__(message)
@@ -40,13 +47,13 @@ class K8sError(Exception):
 
 
 class AgentError(RuntimeError):
-    '''
+    """
     A dummy exception class to distinguish agent-side errors passed via
     aiozmq.rpc calls.
 
     It carrise two args tuple: the exception type and exception arguments from
     the agent.
-    '''
+    """
 
     def __init__(self, *args, exc_repr: str = None):
         super().__init__(*args)

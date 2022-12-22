@@ -5,13 +5,12 @@ Revises: 51dddd79aa21, d2aafa234374
 Create Date: 2020-03-09 12:04:27.013567
 
 """
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = 'd643752544de'
-down_revision = ('51dddd79aa21', 'd2aafa234374')
+revision = "d643752544de"
+down_revision = ("51dddd79aa21", "d2aafa234374")
 branch_labels = None
 depends_on = None
 

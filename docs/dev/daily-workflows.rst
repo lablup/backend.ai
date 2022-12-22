@@ -57,14 +57,14 @@ Inspecting build configurations
 
   .. code-block:: console
 
-      $ ./pants dependencies --transitive src/ai/backend/common:lib
+      $ ./pants dependencies --transitive src/ai/backend/common:src
 
 * Display all dependees of a specific target (i.e., all targets affected when
   this target is changed)
 
   .. code-block:: console
 
-      $ ./pants dependees --transitive src/ai/backend/common:lib
+      $ ./pants dependees --transitive src/ai/backend/common:src
 
 .. note::
 
@@ -98,6 +98,16 @@ smaller target of files that you work on and `use an option to select the
 targets only changed
 <https://www.pantsbuild.org/docs/advanced-target-selection#running-over-changed-files-with---changed-since>`_ (``--changed-since``).
 
+Running formatters
+------------------
+
+If you encounter failure from ``isort``, you may run the formatter to automatically fix the import ordering issues.
+
+.. code-block:: console
+
+   $ ./pants fmt ::
+   $ ./pants fmt src/ai/backend/common::
+
 Running unit tests
 ------------------
 
@@ -108,6 +118,10 @@ Here are various methods to run tests:
     $ ./pants test ::
     $ ./pants test tests/manager/test_scheduler.py::
     $ ./pants test tests/manager/test_scheduler.py:: -- -k test_scheduler_configs
+    $ ./pants test tests/common::            # Run common/**/test_*.py
+    $ ./pants test tests/common:tests        # Run common/test_*.py
+    $ ./pants test tests/common/redis::      # Run common/redis/**/test_*.py
+    $ ./pants test tests/common/redis:tests  # Run common/redis/test_*.py
 
 You may also try ``--changed-since`` option like ``lint`` and ``check``.
 
@@ -170,17 +184,116 @@ Then configure your IDEs/editors to use
 interpreter for your code, where ``VERSION`` is the interpreter version
 specified in ``pants.toml``.
 
-.. tip::
+To make LSP (language server protocol) services like PyLance to detect our source packages correctly,
+you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
+``plugins/*/`` directories if you have added Backend.AI plugin checkouts.
 
-   To activate flake8/mypy checks (in Vim) and get proper intelli-sense support
-   for pytest (in VSCode), just install them in the exported venv as follows.
-   (You need to repeat this when you re-export!)
+For linters and formatters, configure the tool executable paths to indicate
+``dist/export/python/virtualenvs/tools/TOOLNAME/bin/EXECUTABLE``.
+For example, flake8's executable path is
+``dist/export/python/virtualenvs/tools/flake8/bin/flake8``.
 
-   .. code-block:: console
+Currently we have four Python tools to configure in this way:
 
-      $ ./py -m pip install flake8 mypy pytest
+* ``flake8``: Validates PEP-8 coding style
 
-   For Vim, you also need to explicitly activate the exported venv.
+* ``mypy``: Validates the type annotations
+
+* ``black``: Validates and reformats all Python codes by reconstructing it from AST,
+  just like ``gofmt``.
+
+  .. tip::
+
+     For a long list of arguments or list/tuple items, you could explicitly add a
+     trailing comma to force Black to insert line-breaks after every item even when
+     the line length does not exceed the limit (100 characters).
+
+  .. tip::
+
+     You may disable auto-formatting on a specific region of code using ``# fmt: off``
+     and ``# fmt: on`` comments, though this is strongly discouraged except when
+     manual formatting gives better readability, such as numpy matrix declarations.
+
+* ``isort``: Validates and reorders import statements in a fixed order depending on
+  the categories of imported packages (such as bulitins, first-parties, and
+  third-parties), the alphabetical order, and whether it uses ``from`` or not.
+
+VSCode
+~~~~~~
+
+Set the following keys in the workspace settings:
+
+* ``flake8``: ``python.linting.flake8Path``
+
+* ``mypy``: ``python.linting.mypyPath``
+
+* ``black``: ``python.formatting.blackPath``
+
+* ``isort``: ``python.sortImports.path``
+
+.. warning::
+
+   When the target Python version has changed when you pull a new version/branch, you need to re-run ``./pants export ::``
+   and manually update the Python interpreter path and mypy executable path configurations.
+
+Vim/NeoVim
+~~~~~~~~~~
+
+There are a large variety of plugins and usually heavy Vimmers should know what to do.
+
+We recommend using `ALE <https://github.com/dense-analysis/ale>`_ or
+`CoC <https://github.com/neoclide/coc.nvim>`_ plugins to have automatic lint highlights,
+auto-formatting on save, and auto-completion support with code navigation via LSP backends.
+
+.. warning::
+
+   Note that it is recommended to enable only one linter/formatter at a time (either ALE or CoC)
+   with proper configurations, to avoid duplicate suggestions and error reports.
+
+When using ALE, it is recommended to have a directory-local vimrc as follows.
+First, add ``set exrc`` in your user-level vimrc.
+Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build root directory:
+
+.. code-block:: vim
+
+   let s:cwd = getcwd()
+   let g:ale_python_isort_executable = s:cwd . '/dist/export/python/virtualenvs/tools/isort/bin/isort'  " requires absolute path
+   let g:ale_python_black_executable = s:cwd . '/dist/export/python/virtualenvs/tools/black/bin/black'  " requires absolute path
+   let g:ale_python_flake8_executable = s:cwd . '/dist/export/python/virtualenvs/tools/flake8/bin/flake8'
+   let g:ale_python_mypy_executable = s:cwd . '/dist/export/python/virtualenvs/tools/mypy/bin/mypy'
+   let g:ale_fixers = {'python': ['isort', 'black']}
+   let g:ale_fix_on_save = 1
+
+When using CoC, run ``:CocInstall coc-pyright`` and ``:CocLocalConfig`` after opening a file
+in the local working copy to initialize PyRight functionalities.
+In the local configuration file (``.vim/coc-settings.json``), you may put the linter/formatter configurations
+just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_):
+
+.. code-block:: json
+
+   {
+     "coc.preferences.formatOnType": true,
+     "coc.preferences.formatOnSaveFiletypes": ["python"],
+     "coc.preferences.willSaveHandlerTimeout": 5000,
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.8/bin/python",
+     "python.formatting.provider": "black",
+     "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
+     "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
+     "python.linting.mypyEnabled": true,
+     "python.linting.flake8Enabled": true,
+     "python.linting.mypyPath": "dist/export/python/virtualenvs/tools/mypy/bin/mypy",
+     "python.linting.flake8Path": "dist/export/python/virtualenvs/tools/flake8/bin/flake8"
+   }
+
+
+Switching between branches
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When each branch has different external package requirements, you should run ``./pants export ::``
+before running codes after ``git switch``-ing between such branches.
+
+Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
+In that case, run ``pgrep pantsd | xargs kill`` and it will be fine.
 
 Running entrypoints
 -------------------
@@ -285,7 +398,7 @@ Writing documentation
 
   .. code-block:: console
 
-     $ pyenv virtualenv 3.10.4 venv-bai-docs
+     $ pyenv virtualenv 3.10.8 venv-bai-docs
 
 * Activate the virtualenv and run:
 
@@ -334,6 +447,38 @@ Adding new external dependencies
      $ ./pants generate-lockfiles
      $ ./pants export ::
 
+Merging lockfile conflicts
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you work on a branch that adds a new external dependency and the main branch has also
+another external dependency addition, merging the main branch into your branch is likely to
+make a merge conflict on ``python.lock`` file.
+
+In this case, you can just do the followings since we can just *regenerate* the lockfile
+after merging ``requirements.txt`` and ``BUILD`` files.
+
+.. code-block:: console
+
+   $ git merge main
+   ... it says a conflict on python.lock ...
+   $ git checkout --theirs python.lock
+   $ ./pants generate-lockfiles --resolve=python-default
+   $ git add python.lock
+   $ git commit
+
+Resetting Pants
+~~~~~~~~~~~~~~~
+
+If Pants behaves strangely, you could simply reset all its runtime-generated files by:
+
+.. code-block:: console
+
+   $ pgrep pantsd | xargs kill
+   $ rm -r .tmp/immutable* .pants.d ~/.cache/pants
+
+After this, re-running any Pants command will automatically reinitialize itself and
+all cached data as necessary.
+
 .. _debugging-tests:
 
 Debugging test cases (or interactively running test cases)
@@ -350,6 +495,49 @@ This means that you can directly observe the console output and Ctrl+C to
 gracefully shutdown the tests  with fixture cleanup. You can also apply
 additional pytest options such as ``--fulltrace``, ``-s``, etc. by passing them
 after target arguments and ``--`` when executing ``./pants test`` command.
+
+Installing a subset of mono-repo packages in the editable mode for other projects
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Sometimes, you need to editable-install a subset of packages into other project's directories.
+For instance you could mount the client SDK and its internal dependencies for a Docker container for development.
+
+In this case, we recommend to do it as follows:
+
+1. Run the following command to build a wheel from the current mono-repo source:
+
+   .. code-block:: console
+
+      $ ./pants --tag=wheel package src/ai/backend/client:dist
+
+   This will generate ``dist/backend.ai_client-{VERSION}-py3-none-any.whl``.
+
+2. Run ``pip install -U {MONOREPO_PATH}/dist/{WHEEL_FILE}`` in the target environment.
+
+   This will populate the package metadata and install its external dependencies.
+   The target environment may be one of a separate virtualenv or a container being built.
+   For container builds, you need to first ``COPY`` the wheel file and install it.
+
+3. Check the internal dependency directories to link by running the following command:
+
+   .. code-block:: console
+
+      $ ./pants dependencies --transitive src/ai/backend/client:src \
+      >   | grep src/ai/backend | grep -v ':version' | cut -d/ -f4 | uniq
+      cli
+      client
+      plugin
+
+4. Link these directories in the target environment.
+
+   For example, if it is a Docker container, you could add
+   ``-v {MONOREPO_PATH}/src/ai/backend/{COMPONENT}:/usr/local/lib/python3.10/site-packages/ai/backend/{COMPONENT}``
+   to the ``docker create`` or ``docker run`` commands for all the component
+   directories found in the previous step.
+
+   If it is a local checkout with a pyenv-based virtualenv, you could replace
+   ``$(pyenv prefix)/lib/python3.10/site-packages/ai/backend/{COMPONENT}`` directories
+   with symbolic links to the mono-repo's component source directories.
 
 Boosting the performance of Pants commands
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

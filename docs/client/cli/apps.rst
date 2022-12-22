@@ -71,7 +71,7 @@ that proxies the SSH/SFTP traffic to the compute sessions:
 .. code-block:: console
 
   $ backend.ai start -t mysess ...
-  $ backend.ai download mysess id_container
+  $ backend.ai session download mysess id_container
   $ mv id_container ~/.ssh
   $ backend.ai app mysess sshd -b 9922
 

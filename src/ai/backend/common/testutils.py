@@ -1,4 +1,5 @@
 from unittest import mock
+
 try:
     # Since Python 3.8, AsyncMock is now part of the stdlib.
     # Python 3.8 also adds magic-mocking async iterators and async context managers.
@@ -13,8 +14,10 @@ def mock_corofunc(return_value):
 
     Python's default mock module does not support coroutines.
     """
+
     async def _mock_corofunc(*args, **kargs):
         return return_value
+
     return mock.Mock(wraps=_mock_corofunc)
 
 
@@ -37,6 +40,7 @@ class AsyncContextManagerMock:
     Attributes of the awaitable (and self for convenience) can be set by
     passing `kwargs`.
     """
+
     def __init__(self, *args, **kwargs):
         self.context = kwargs
         for k, v in kwargs.items():

@@ -3,20 +3,21 @@ from asyncio import Future
 from pathlib import Path
 from typing import Set, Tuple
 
+import attrs
+
 from ai.backend.common.utils import current_loop
-import attr
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class DomainSocketProxy:
     host_sock_path: Path
     host_proxy_path: Path
     proxy_server: asyncio.AbstractServer
 
 
-async def proxy_connection(upper_sock_path: Path,
-                           down_reader: asyncio.StreamReader,
-                           down_writer: asyncio.StreamWriter) -> None:
+async def proxy_connection(
+    upper_sock_path: Path, down_reader: asyncio.StreamReader, down_writer: asyncio.StreamWriter
+) -> None:
 
     up_reader, up_writer = await asyncio.open_unix_connection(str(upper_sock_path))
 
@@ -61,8 +62,9 @@ async def proxy_connection(upper_sock_path: Path,
     # long-running streaming commands are disconnected by the server first when the server-side
     # processing finishes.
     try:
-        task_results: Tuple[Set[Future], Set[Future]] = \
-            await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        task_results: Tuple[Set[Future], Set[Future]] = await asyncio.wait(
+            tasks, return_when=asyncio.FIRST_COMPLETED
+        )
         done, pending = task_results
     except asyncio.CancelledError:
         pass

@@ -3,6 +3,7 @@ from typing import Any, Mapping, Sequence
 from aiohttp import web
 
 from ai.backend.agent.docker.kernel import DockerKernel
+
 from .plugin import NewWebappPluginResponse, WebappPlugin, WebappPluginRoute
 
 
@@ -22,16 +23,16 @@ class ContainerMetadataPlugin(WebappPlugin):
 
     async def routes(self) -> Sequence[WebappPluginRoute]:
         return [
-            WebappPluginRoute('GET', '/envs', self.get_envs, None),
-            WebappPluginRoute('GET', '/local-ipv4', self.get_local_ipv4, None),
+            WebappPluginRoute("GET", "/envs", self.get_envs, None),
+            WebappPluginRoute("GET", "/local-ipv4", self.get_local_ipv4, None),
         ]
 
     async def get_envs(self, request: web.Request) -> web.Response:
-        kernel: DockerKernel = request['kernel']
+        kernel: DockerKernel = request["kernel"]
         if kernel is None:
             return web.Response(status=404)
         response = dict(kernel.environ)
         return web.json_response(response)
 
     async def get_local_ipv4(self, request: web.Request) -> web.Response:
-        return web.Response(body=request['container-ip'])
+        return web.Response(body=request["container-ip"])

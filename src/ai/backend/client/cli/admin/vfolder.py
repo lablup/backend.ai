@@ -6,8 +6,11 @@ import click
 import humanize
 from tabulate import tabulate
 
-from ai.backend.client.session import Session
+from ai.backend.cli.types import ExitCode
 from ai.backend.client.func.vfolder import _default_list_fields
+from ai.backend.client.session import Session
+
+from ..extensions import pass_ctx_obj
 from ..pretty import print_error
 from ..types import CLIContext
 from ..vfolder import vfolder as user_vfolder
@@ -22,18 +25,12 @@ def vfolder() -> None:
 
 
 def _list_cmd(docs: str = None):
-
-    @click.pass_obj
-    @click.option('-g', '--group', type=str, default=None,
-                help='Filter by group ID.')
-    @click.option('--filter', 'filter_', default=None,
-                help='Set the query filter expression.')
-    @click.option('--order', default=None,
-                help='Set the query ordering expression.')
-    @click.option('--offset', default=0,
-                help='The index of the current page start for pagination.')
-    @click.option('--limit', default=None,
-                help='The page size for pagination.')
+    @pass_ctx_obj
+    @click.option("-g", "--group", type=str, default=None, help="Filter by group ID.")
+    @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
+    @click.option("--order", default=None, help="Set the query ordering expression.")
+    @click.option("--offset", default=0, help="The index of the current page start for pagination.")
+    @click.option("--limit", default=None, help="The page size for pagination.")
     def list(ctx: CLIContext, group, filter_, order, offset, limit) -> None:
         """
         List virtual folders.
@@ -55,7 +52,7 @@ def _list_cmd(docs: str = None):
                 )
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
     if docs is not None:
         list.__doc__ = docs
@@ -75,15 +72,15 @@ def list_hosts():
     with Session() as session:
         try:
             resp = session.VFolder.list_all_hosts()
-            print("Default vfolder host: {}".format(resp['default']))
-            print("Mounted hosts: {}".format(', '.join(resp['allowed'])))
+            print("Default vfolder host: {}".format(resp["default"]))
+            print("Mounted hosts: {}".format(", ".join(resp["allowed"])))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
-@click.argument('vfolder_host')
+@click.argument("vfolder_host")
 def perf_metric(vfolder_host):
     """
     Show the performance statistics of a vfolder host.
@@ -95,19 +92,24 @@ def perf_metric(vfolder_host):
     with Session() as session:
         try:
             resp = session.VFolder.get_performance_metric(vfolder_host)
-            print(tabulate(
-                [(k, humanize.naturalsize(v, binary=True) if 'bytes' in k else f"{v:.2f}")
-                 for k, v in resp['metric'].items()],
-                headers=('Key', 'Value'),
-            ))
+            print(
+                tabulate(
+                    [
+                        (k, humanize.naturalsize(v, binary=True) if "bytes" in k else f"{v:.2f}")
+                        for k, v in resp["metric"].items()
+                    ],
+                    headers=("Key", "Value"),
+                )
+            )
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
-@click.option('-a', '--agent-id', type=str, default=None,
-              help='Target agent to fetch fstab contents.')
+@click.option(
+    "-a", "--agent-id", type=str, default=None, help="Target agent to fetch fstab contents."
+)
 def get_fstab_contents(agent_id):
     """
     Get contents of fstab file from a node.
@@ -120,7 +122,7 @@ def get_fstab_contents(agent_id):
             resp = session.VFolder.get_fstab_contents(agent_id)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         print(resp)
 
 
@@ -135,23 +137,22 @@ def list_mounts():
             resp = session.VFolder.list_mounts()
         except Exception as e:
             print_error(e)
-            sys.exit(1)
-        print('manager')
-        for k, v in resp['manager'].items():
-            print(' ', k, ':', v)
-        print('\nagents')
-        for aid, data in resp['agents'].items():
-            print(' ', aid)
+            sys.exit(ExitCode.FAILURE)
+        print("manager")
+        for k, v in resp["manager"].items():
+            print(" ", k, ":", v)
+        print("\nagents")
+        for aid, data in resp["agents"].items():
+            print(" ", aid)
             for k, v in data.items():
-                print('   ', k, ':', v)
+                print("   ", k, ":", v)
 
 
 @vfolder.command()
-@click.argument('fs-location', type=str)
-@click.argument('name', type=str)
-@click.option('-o', '--options', type=str, default=None, help='Mount options.')
-@click.option('--edit-fstab', is_flag=True,
-              help='Edit fstab file to mount permanently.')
+@click.argument("fs-location", type=str)
+@click.argument("name", type=str)
+@click.option("-o", "--options", type=str, default=None, help="Mount options.")
+@click.option("--edit-fstab", is_flag=True, help="Edit fstab file to mount permanently.")
 def mount_host(fs_location, name, options, edit_fstab):
     """
     Mount a host in virtual folder root.
@@ -166,21 +167,20 @@ def mount_host(fs_location, name, options, edit_fstab):
             resp = session.VFolder.mount_host(name, fs_location, options, edit_fstab)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
-        print('manager')
-        for k, v in resp['manager'].items():
-            print(' ', k, ':', v)
-        print('agents')
-        for aid, data in resp['agents'].items():
-            print(' ', aid)
+            sys.exit(ExitCode.FAILURE)
+        print("manager")
+        for k, v in resp["manager"].items():
+            print(" ", k, ":", v)
+        print("agents")
+        for aid, data in resp["agents"].items():
+            print(" ", aid)
             for k, v in data.items():
-                print('   ', k, ':', v)
+                print("   ", k, ":", v)
 
 
 @vfolder.command()
-@click.argument('name', type=str)
-@click.option('--edit-fstab', is_flag=True,
-              help='Edit fstab file to mount permanently.')
+@click.argument("name", type=str)
+@click.option("--edit-fstab", is_flag=True, help="Edit fstab file to mount permanently.")
 def umount_host(name, edit_fstab):
     """
     Unmount a host from virtual folder root.
@@ -194,12 +194,90 @@ def umount_host(name, edit_fstab):
             resp = session.VFolder.umount_host(name, edit_fstab)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
-        print('manager')
-        for k, v in resp['manager'].items():
-            print(' ', k, ':', v)
-        print('agents')
-        for aid, data in resp['agents'].items():
-            print(' ', aid)
+            sys.exit(ExitCode.FAILURE)
+        print("manager")
+        for k, v in resp["manager"].items():
+            print(" ", k, ":", v)
+        print("agents")
+        for aid, data in resp["agents"].items():
+            print(" ", aid)
             for k, v in data.items():
-                print('   ', k, ':', v)
+                print("   ", k, ":", v)
+
+
+@vfolder.command
+@click.argument("vfolder_id", type=str)
+def shared_vfolder_info(vfolder_id):
+    """Show the vfolder permission information of the given virtual folder.
+
+    \b
+    VFOLDER_ID: ID of a virtual folder.
+    """
+    with Session() as session:
+        try:
+            resp = session.VFolder.shared_vfolder_info(vfolder_id)
+            result = resp.get("shared", [])
+            if result:
+                _result = result[0]
+                print(
+                    'Virtual folder "{0}" (ID: {1})'.format(
+                        _result["vfolder_name"], _result["vfolder_id"]
+                    )
+                )
+                print("- Owner: {0}".format(_result["owner"]))
+                print("- Permission: {0}".format(_result["perm"]))
+                print("- Folder Type: {0}".format(_result["type"]))
+                shared_to = _result.get("shared_to", [])
+                if shared_to:
+                    print("- Shared to:")
+                    for k, v in shared_to.items():
+                        print("\t- {0}: {1}\n".format(k, v))
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=str)
+@click.argument("user_id", type=str)
+@click.option(
+    "-p", "--permission", type=str, metavar="PERMISSION", help="Folder's innate permission."
+)
+def update_shared_vf_permission(vfolder_id, user_id, permission):
+    """
+    Update permission for shared vfolders.
+
+    \b
+    VFOLDER_ID: ID of a virtual folder.
+    USER_ID: ID of user who have been granted access to shared vFolder.
+    PERMISSION: Permission to update. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).
+    """
+    with Session() as session:
+        try:
+            resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, permission)
+            print("Updated.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+        print(resp)
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=str)
+@click.argument("user_id", type=str)
+def remove_shared_vf_permission(vfolder_id, user_id):
+    """
+    Remove permission for shared vfolders.
+
+    \b
+    VFOLDER_ID: ID of a virtual folder.
+    USER_ID: ID of user who have been granted access to shared vFolder.
+    """
+    with Session() as session:
+        try:
+            resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, None)
+            print("Removed.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+        print(resp)

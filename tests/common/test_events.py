@@ -1,11 +1,12 @@
 import asyncio
-from typing import Type
 from types import TracebackType
+from typing import Type
 
 import aiotools
-import attr
+import attrs
 import pytest
 
+from ai.backend.common import redis_helper
 from ai.backend.common.events import (
     AbstractEvent,
     CoalescingOptions,
@@ -13,21 +14,17 @@ from ai.backend.common.events import (
     EventDispatcher,
     EventProducer,
 )
-from ai.backend.common.types import (
-    AgentId,
-    EtcdRedisConfig,
-)
-from ai.backend.common import redis
+from ai.backend.common.types import AgentId, EtcdRedisConfig
 
 
-@attr.s(slots=True, frozen=True)
+@attrs.define(slots=True, frozen=True)
 class DummyEvent(AbstractEvent):
     name = "testing"
 
-    value: int = attr.ib()
+    value: int = attrs.field()
 
     def serialize(self) -> tuple:
-        return (self.value + 1, )
+        return (self.value + 1,)
 
     @classmethod
     def deserialize(cls, value: tuple):
@@ -46,31 +43,31 @@ async def test_dispatch(redis_container) -> None:
 
     async def acb(context: object, source: AgentId, event: DummyEvent) -> None:
         assert context is app
-        assert source == AgentId('i-test')
+        assert source == AgentId("i-test")
         assert isinstance(event, DummyEvent)
         assert event.name == "testing"
         assert event.value == 1001
         await asyncio.sleep(0.01)
-        records.add('async')
+        records.add("async")
 
     def scb(context: object, source: AgentId, event: DummyEvent) -> None:
         assert context is app
-        assert source == AgentId('i-test')
+        assert source == AgentId("i-test")
         assert isinstance(event, DummyEvent)
         assert event.name == "testing"
         assert event.value == 1001
-        records.add('sync')
+        records.add("sync")
 
     dispatcher.subscribe(DummyEvent, app, acb)
     dispatcher.subscribe(DummyEvent, app, scb)
     await asyncio.sleep(0.1)
 
     # Dispatch the event
-    await producer.produce_event(DummyEvent(999), source='i-test')
+    await producer.produce_event(DummyEvent(999), source="i-test")
     await asyncio.sleep(0.2)
-    assert records == {'async', 'sync'}
+    assert records == {"async", "sync"}
 
-    await redis.execute(producer.redis_client, lambda r: r.flushdb())
+    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
     await producer.close()
     await dispatcher.close()
 
@@ -97,13 +94,13 @@ async def test_error_on_dispatch(redis_container) -> None:
 
     async def acb(context: object, source: AgentId, event: DummyEvent) -> None:
         assert context is app
-        assert source == AgentId('i-test')
+        assert source == AgentId("i-test")
         assert isinstance(event, DummyEvent)
         raise ZeroDivisionError
 
     def scb(context: object, source: AgentId, event: DummyEvent) -> None:
         assert context is app
-        assert source == AgentId('i-test')
+        assert source == AgentId("i-test")
         assert isinstance(event, DummyEvent)
         raise OverflowError
 
@@ -111,13 +108,13 @@ async def test_error_on_dispatch(redis_container) -> None:
     dispatcher.subscribe(DummyEvent, app, acb)
     await asyncio.sleep(0.1)
 
-    await producer.produce_event(DummyEvent(0), source='i-test')
+    await producer.produce_event(DummyEvent(0), source="i-test")
     await asyncio.sleep(0.5)
     assert len(exception_log) == 2
-    assert 'ZeroDivisionError' in exception_log
-    assert 'OverflowError' in exception_log
+    assert "ZeroDivisionError" in exception_log
+    assert "OverflowError" in exception_log
 
-    await redis.execute(producer.redis_client, lambda r: r.flushdb())
+    await redis_helper.execute(producer.redis_client, lambda r: r.flushdb())
     await producer.close()
     await dispatcher.close()
 

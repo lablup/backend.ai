@@ -4,8 +4,11 @@ import sys
 
 import click
 
-from ai.backend.client.session import Session
+from ai.backend.cli.types import ExitCode
 from ai.backend.client.output.fields import agent_fields
+from ai.backend.client.session import Session
+
+from ..extensions import pass_ctx_obj
 from ..types import CLIContext
 from . import admin
 
@@ -18,23 +21,24 @@ def agent():
 
 
 @agent.command()
-@click.pass_obj
-@click.argument('agent_id')
+@pass_ctx_obj
+@click.argument("agent_id")
 def info(ctx: CLIContext, agent_id: str) -> None:
     """
     Show the information about the given agent.
     """
     fields = [
-        agent_fields['id'],
-        agent_fields['status'],
-        agent_fields['region'],
-        agent_fields['architecture'],
-        agent_fields['first_contact'],
-        agent_fields['cpu_cur_pct'],
-        agent_fields['available_slots'],
-        agent_fields['occupied_slots'],
-        agent_fields['hardware_metadata'],
-        agent_fields['live_stat'],
+        agent_fields["id"],
+        agent_fields["status"],
+        agent_fields["region"],
+        agent_fields["architecture"],
+        agent_fields["first_contact"],
+        agent_fields["cpu_cur_pct"],
+        agent_fields["available_slots"],
+        agent_fields["occupied_slots"],
+        agent_fields["hardware_metadata"],
+        agent_fields["live_stat"],
+        agent_fields["local_config"],
     ]
     with Session() as session:
         try:
@@ -42,23 +46,25 @@ def info(ctx: CLIContext, agent_id: str) -> None:
             ctx.output.print_item(item, fields)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @agent.command()
-@click.pass_obj
-@click.option('-s', '--status', type=str, default='ALIVE',
-              help='Filter agents by the given status.')
-@click.option('--scaling-group', '--sgroup', type=str, default=None,
-              help='Filter agents by the scaling group.')
-@click.option('--filter', 'filter_', default=None,
-              help='Set the query filter expression.')
-@click.option('--order', default=None,
-              help='Set the query ordering expression.')
-@click.option('--offset', default=0,
-              help='The index of the current page start for pagination.')
-@click.option('--limit', default=None,
-              help='The page size for pagination.')
+@pass_ctx_obj
+@click.option(
+    "-s", "--status", type=str, default="ALIVE", help="Filter agents by the given status."
+)
+@click.option(
+    "--scaling-group",
+    "--sgroup",
+    type=str,
+    default=None,
+    help="Filter agents by the scaling group.",
+)
+@click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
+@click.option("--order", default=None, help="Set the query ordering expression.")
+@click.option("--offset", default=0, help="The index of the current page start for pagination.")
+@click.option("--limit", default=None, help="The page size for pagination.")
 def list(
     ctx: CLIContext,
     status: str,
@@ -73,16 +79,16 @@ def list(
     (super-admin privilege required)
     """
     fields = [
-        agent_fields['id'],
-        agent_fields['status'],
-        agent_fields['architecture'],
-        agent_fields['scaling_group'],
-        agent_fields['region'],
-        agent_fields['first_contact'],
-        agent_fields['cpu_cur_pct'],
-        agent_fields['mem_cur_bytes'],
-        agent_fields['available_slots'],
-        agent_fields['occupied_slots'],
+        agent_fields["id"],
+        agent_fields["status"],
+        agent_fields["architecture"],
+        agent_fields["scaling_group"],
+        agent_fields["region"],
+        agent_fields["first_contact"],
+        agent_fields["cpu_cur_pct"],
+        agent_fields["mem_cur_bytes"],
+        agent_fields["available_slots"],
+        agent_fields["occupied_slots"],
     ]
     try:
         with Session() as session:
@@ -102,7 +108,7 @@ def list(
             )
     except Exception as e:
         ctx.output.print_error(e)
-        sys.exit(1)
+        sys.exit(ExitCode.FAILURE)
 
 
 @admin.group()
@@ -115,8 +121,8 @@ def watcher():
 
 
 @watcher.command()
-@click.pass_obj
-@click.argument('agent', type=str)
+@pass_ctx_obj
+@click.argument("agent", type=str)
 def status(ctx: CLIContext, agent: str) -> None:
     """
     Get agent and watcher status.
@@ -131,12 +137,12 @@ def status(ctx: CLIContext, agent: str) -> None:
             print(status)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @watcher.command()
-@click.pass_obj
-@click.argument('agent', type=str)
+@pass_ctx_obj
+@click.argument("agent", type=str)
 def agent_start(ctx: CLIContext, agent: str) -> None:
     """
     Start agent service.
@@ -151,12 +157,12 @@ def agent_start(ctx: CLIContext, agent: str) -> None:
             print(status)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @watcher.command()
-@click.pass_obj
-@click.argument('agent', type=str)
+@pass_ctx_obj
+@click.argument("agent", type=str)
 def agent_stop(ctx: CLIContext, agent: str) -> None:
     """
     Stop agent service.
@@ -171,12 +177,12 @@ def agent_stop(ctx: CLIContext, agent: str) -> None:
             print(status)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @watcher.command()
-@click.pass_obj
-@click.argument('agent', type=str)
+@pass_ctx_obj
+@click.argument("agent", type=str)
 def agent_restart(ctx: CLIContext, agent: str) -> None:
     """
     Restart agent service.
@@ -191,4 +197,4 @@ def agent_restart(ctx: CLIContext, agent: str) -> None:
             print(status)
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)

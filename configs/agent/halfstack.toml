@@ -13,6 +13,11 @@ agent-sock-port = 6007
 scaling-group = "default"
 pid-file = "./agent.pid"
 event-loop = "uvloop"
+# ipc-base-path = "/tmp/backend.ai/ipc"
+var-base-path = "./var/lib/backend.ai"
+# allow-compute-plugins = []
+# block-compute-plugins = []
+image-commit-path = "./tmp/backend.ai/commit/"
 
 
 [container]
@@ -66,6 +71,8 @@ ssl-verify = false
 reserved-cpu = 1
 reserved-mem = "1G"
 reserved-disk = "8G"
+allocation-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+affinity-policy = "INTERLEAVED"
 
 
 [debug]

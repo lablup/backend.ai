@@ -14,9 +14,9 @@ def test_dealias_image(run: ClientRunnerFunc):
 
 def test_list_image(run: ClientRunnerFunc):
     print("[ List image ]")
-    with closing(run(['--output=json', 'admin', 'image', 'list'])) as p:
+    with closing(run(["--output=json", "admin", "image", "list"])) as p:
         p.expect(EOF)
         decoded = p.before.decode()
         loaded = json.loads(decoded)
-        image_list = loaded.get('items')
-        assert isinstance(image_list, list), 'Image list not printed properly'
+        image_list = loaded.get("items")
+        assert isinstance(image_list, list), "Image list not printed properly"

@@ -1,22 +1,21 @@
-from collections import namedtuple
-from pathlib import Path
-import pkg_resources
 import site
 import subprocess
 import sys
+from collections import namedtuple
+from pathlib import Path
 
-Package = namedtuple('Package', 'name version is_user')
+import pkg_resources
 
-__all__ = (
-    'install',
-)
+Package = namedtuple("Package", "name version is_user")
+
+__all__ = ("install",)
 
 
 def install(pkgname, force_install=False):
-    '''
+    """
     Install a Python package from pypi.org or the given index server.
     The package is installed inside the user site directory.
-    '''
+    """
 
     if not force_install:
         user_path = Path(site.USER_SITE).resolve()
@@ -32,9 +31,9 @@ def install(pkgname, force_install=False):
                 return
 
     sys.stdout.flush()
-    cmdargs = [sys.executable, '-m', 'pip', 'install', '--user']
+    cmdargs = [sys.executable, "-m", "pip", "install", "--user"]
     if force_install:
-        cmdargs.append('-I')
+        cmdargs.append("-I")
     cmdargs.append(pkgname)
     subprocess.call(cmdargs)
     sys.stdout.flush()

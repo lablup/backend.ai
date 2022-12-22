@@ -1,0 +1,51 @@
+[general]
+{% toml_field "apiEndpoint" endpoint_url %}
+{% toml_field "apiEndpointText" config["api"]["text"] %}
+{% toml_field "defaultSessionEnvironment" config["ui"]["default_environment"] %}
+{% toml_field "defaultImportEnvironment" config["ui"]["default_import_environment"] %}
+{% toml_field "siteDescription" config["ui"]["brand"] %}
+connectionMode = "SESSION"
+{% toml_field "signupSupport" config["service"]["enable_signup"] %}
+{% toml_field "allowChangeSigninMode" config["service"]["allow_change_signin_mode"] %}
+{% toml_field "allowAnonymousChangePassword" config["service"]["allow_anonymous_change_password"] %}
+{% toml_field "allowProjectResourceMonitor" config["service"]["allow_project_resource_monitor"] %}
+{% toml_field "allowManualImageNameForSession" config["service"]["allow_manual_image_name_for_session"] %}
+{% toml_field "allowSignupWithoutConfirmation" config["service"]["allow_signup_without_confirmation"] %}
+{% toml_field "alwaysEnqueueComputeSession" config["service"]["always_enqueue_compute_session"] %}
+{% toml_field "autoLogout" config["session"]["auto_logout"] %}
+{% toml_field "debug" config["service"]["webui_debug"] %}
+{% toml_field "debug" config["service"]["webui_debug"] %}
+{% toml_field "maskUserInfo" config["service"]["mask_user_info"] %}
+{% toml_strlist_field "singleSignOnVendors" config["service"]["single_sign_on_vendors"] %}
+{% toml_field "enableContainerCommit" config["service"]["enable_container_commit"] %}
+{% toml_field "hideAgents" config["service"]["hide_agents"] %}
+{% toml_field "appDownloadUrl" config["service"]["app_download_url"] %}
+
+[resources]
+{% toml_field "openPortToPublic" config["resources"]["open_port_to_public"] %}
+{% toml_field "maxCPUCoresPerContainer" config["resources"]["max_cpu_cores_per_container"] %}
+{% toml_field "maxMemoryPerContainer" config["resources"]["max_memory_per_container"] %}
+{% toml_field "maxCUDADevicesPerContainer" config["resources"]["max_cuda_devices_per_container"] %}
+{% toml_field "maxCUDASharesPerContainer" config["resources"]["max_cuda_shares_per_container"] %}
+{% toml_field "maxShmPerContainer" config["resources"]["max_shm_per_container"] %}
+{% toml_field "maxFileUploadSize" config["resources"]["max_file_upload_size"] %}
+
+[environments]
+{% toml_strlist_field "allowlist" config["environments"]["allowlist"] %}
+
+[menu]
+{% toml_strlist_field "blocklist" config["ui"]["menu_blocklist"] %}
+
+[plugin]
+{% toml_strlist_field "page" config["plugin"]["page"] %}
+
+[wsproxy]
+{% toml_field "proxyURL" config["service"]["wsproxy"]["url"] %}
+# proxyBaseURL =
+# proxyListenIP =
+
+[license]
+{% toml_field "edition" config["license"]["edition"] %}
+{% toml_field "validSince" config["license"]["valid_since"] %}
+{% toml_field "validUntil" config["license"]["valid_until"] %}
+

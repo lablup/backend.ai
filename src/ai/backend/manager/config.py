@@ -169,198 +169,241 @@ Alias keys are also URL-quoted in the same way.
        - {instance-id}: 1  # just a membership set
 """
 
-from abc import abstractmethod
-from collections import UserDict
-from contextvars import ContextVar
 import logging
 import os
-from pathlib import Path
-from pprint import pformat
 import secrets
 import socket
 import sys
-from typing import (
-    Any,
-    Awaitable,
-    Callable,
-    Final,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-)
+from abc import abstractmethod
+from collections import UserDict
+from contextvars import ContextVar
+from pathlib import Path
+from pprint import pformat
+from typing import Any, Awaitable, Callable, Final, List, Mapping, Optional, Sequence
 
 import aiotools
 import click
 import trafaret as t
 import yarl
 
-from ai.backend.common import config, validators as tx
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common import config
+from ai.backend.common import validators as tx
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import (
-    SlotName, SlotTypes,
-    HostPortPair,
-    current_resource_slots,
-)
-from ai.backend.common.etcd import ConfigScopes
+from ai.backend.common.types import HostPortPair, SlotName, SlotTypes, current_resource_slots
 
-from .api.exceptions import ServerMisconfiguredError
-from .api.manager import ManagerStatus
 from ..manager.defs import INTRINSIC_SLOTS
+from .api import ManagerStatus
+from .api.exceptions import ServerMisconfiguredError
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 _max_cpu_count = os.cpu_count()
-_file_perm = (Path(__file__).parent / 'server.py').stat()
+_file_perm = (Path(__file__).parent / "server.py").stat()
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 shared_config_defaults = {
-    'volumes/_mount': '/mnt',
-    'volumes/_default_host': 'local',
-    'volumes/_fsprefix': '/',
-    'config/api/allow-origins': '*',
-    'config/docker/image/auto_pull': 'digest',
+    "volumes/_mount": "/mnt",
+    "volumes/_default_host": "local",
+    "volumes/_fsprefix": "/",
+    "config/api/allow-origins": "*",
+    "config/docker/image/auto_pull": "digest",
 }
 
-current_vfolder_types: ContextVar[List[str]] = ContextVar('current_vfolder_types')
+current_vfolder_types: ContextVar[List[str]] = ContextVar("current_vfolder_types")
 
-manager_local_config_iv = t.Dict({
-    t.Key('db'): t.Dict({
-        t.Key('type', default='postgresql'): t.Enum('postgresql'),
-        t.Key('addr'): tx.HostPortPair,
-        t.Key('name'): tx.Slug[2:64],
-        t.Key('user'): t.String,
-        t.Key('password'): t.String,
-    }),
-    t.Key('manager'): t.Dict({
-        t.Key('ipc-base-path', default="/tmp/backend.ai/manager/ipc"):
-            tx.Path(type='dir', auto_create=True),
-        t.Key('num-proc', default=_max_cpu_count): t.Int[1:_max_cpu_count],
-        t.Key('id', default=f"i-{socket.gethostname()}"): t.String,
-        t.Key('user', default=None): tx.UserID(default_uid=_file_perm.st_uid),
-        t.Key('user', default=None): tx.UserID(default_uid=_file_perm.st_uid),
-        t.Key('group', default=None): tx.GroupID(default_gid=_file_perm.st_gid),
-        t.Key('service-addr', default=('0.0.0.0', 8080)): tx.HostPortPair,
-        t.Key('heartbeat-timeout', default=5.0): t.Float[1.0:],  # type: ignore
-        t.Key('secret', default=None): t.Null | t.String,
-        t.Key('ssl-enabled', default=False): t.ToBool,
-        t.Key('ssl-cert', default=None): t.Null | tx.Path(type='file'),
-        t.Key('ssl-privkey', default=None): t.Null | tx.Path(type='file'),
-        t.Key('event-loop', default='asyncio'): t.Enum('asyncio', 'uvloop'),
-        t.Key('distributed-lock', default='pg_advisory'):
-            t.Enum('filelock', 'pg_advisory', 'redlock', 'etcd'),
-        t.Key('pid-file', default=os.devnull): tx.Path(
-            type='file',
-            allow_nonexisting=True,
-            allow_devnull=True,
-        ),
-        t.Key('hide-agents', default=False): t.Bool,
-        t.Key('importer-image', default='lablup/importer:manylinux2010'): t.String,
-        t.Key('max-wsmsg-size', default=16 * (2**20)): t.ToInt,  # default: 16 MiB
-        t.Key('aiomonitor-port', default=50001): t.Int[1:65535],
-    }).allow_extra('*'),
-    t.Key('docker-registry'): t.Dict({  # deprecated in v20.09
-        t.Key('ssl-verify', default=True): t.ToBool,
-    }).allow_extra('*'),
-    t.Key('logging'): t.Any,  # checked in ai.backend.common.logging
-    t.Key('debug'): t.Dict({
-        t.Key('enabled', default=False): t.ToBool,
-        t.Key('log-events', default=False): t.ToBool,
-        t.Key('log-scheduler-ticks', default=False): t.ToBool,
-        t.Key('periodic-sync-stats', default=False): t.ToBool,
-    }).allow_extra('*'),
-}).merge(config.etcd_config_iv).allow_extra('*')
+manager_local_config_iv = (
+    t.Dict(
+        {
+            t.Key("db"): t.Dict(
+                {
+                    t.Key("type", default="postgresql"): t.Enum("postgresql"),
+                    t.Key("addr"): tx.HostPortPair,
+                    t.Key("name"): tx.Slug[2:64],
+                    t.Key("user"): t.String,
+                    t.Key("password"): t.String,
+                    t.Key("pool-size", default=8): t.ToInt[1:],  # type: ignore
+                    t.Key("max-overflow", default=64): t.ToInt[
+                        -1:  # -1 is infinite  # type: ignore
+                    ],
+                }
+            ),
+            t.Key("manager"): t.Dict(
+                {
+                    t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
+                        type="dir", auto_create=True
+                    ),
+                    t.Key("num-proc", default=_max_cpu_count): t.Int[1:_max_cpu_count],
+                    t.Key("id", default=f"i-{socket.gethostname()}"): t.String,
+                    t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
+                    t.Key("user", default=None): tx.UserID(default_uid=_file_perm.st_uid),
+                    t.Key("group", default=None): tx.GroupID(default_gid=_file_perm.st_gid),
+                    t.Key("service-addr", default=("0.0.0.0", 8080)): tx.HostPortPair,
+                    t.Key("heartbeat-timeout", default=5.0): t.Float[1.0:],  # type: ignore
+                    t.Key("secret", default=None): t.Null | t.String,
+                    t.Key("ssl-enabled", default=False): t.ToBool,
+                    t.Key("ssl-cert", default=None): t.Null | tx.Path(type="file"),
+                    t.Key("ssl-privkey", default=None): t.Null | tx.Path(type="file"),
+                    t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
+                    t.Key("distributed-lock", default="pg_advisory"): t.Enum(
+                        "filelock", "pg_advisory", "redlock", "etcd"
+                    ),
+                    t.Key("pid-file", default=os.devnull): tx.Path(
+                        type="file",
+                        allow_nonexisting=True,
+                        allow_devnull=True,
+                    ),
+                    t.Key("allowed-plugins", default=None): t.Null | tx.ToSet,
+                    t.Key("disabled-plugins", default=None): t.Null | tx.ToSet,
+                    t.Key("hide-agents", default=False): t.Bool,
+                    t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
+                    t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
+                    t.Key("aiomonitor-port", default=50100): t.Int[1:65535],
+                }
+            ).allow_extra("*"),
+            t.Key("docker-registry"): t.Dict(
+                {  # deprecated in v20.09
+                    t.Key("ssl-verify", default=True): t.ToBool,
+                }
+            ).allow_extra("*"),
+            t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
+            t.Key("debug"): t.Dict(
+                {
+                    t.Key("enabled", default=False): t.ToBool,
+                    t.Key("asyncio", default=False): t.Bool,
+                    t.Key("enhanced-aiomonitor-task-info", default=False): t.Bool,
+                    t.Key("log-events", default=False): t.ToBool,
+                    t.Key("log-scheduler-ticks", default=False): t.ToBool,
+                    t.Key("periodic-sync-stats", default=False): t.ToBool,
+                }
+            ).allow_extra("*"),
+        }
+    )
+    .merge(config.etcd_config_iv)
+    .allow_extra("*")
+)
 
 _shdefs: Mapping[str, Any] = {
-    'system': {
-        'timezone': 'UTC',
+    "system": {
+        "timezone": "UTC",
     },
-    'api': {
-        'allow-origins': '*',
+    "api": {
+        "allow-origins": "*",
     },
-    'redis': {
-        'addr': '127.0.0.1:6379',
-        'password': None,
+    "redis": {
+        "addr": "127.0.0.1:6379",
+        "password": None,
     },
-    'docker': {
-        'registry': {},
+    "docker": {
+        "registry": {},
     },
-    'network': {
-        'subnet': {
-            'agent': '0.0.0.0/0',
-            'container': '0.0.0.0/0',
+    "network": {
+        "subnet": {
+            "agent": "0.0.0.0/0",
+            "container": "0.0.0.0/0",
         },
     },
-    'plugins': {
-        'accelerator': {},
-        'scheduler': {},
+    "plugins": {
+        "accelerator": {},
+        "scheduler": {},
     },
-    'watcher': {
-        'token': None,
+    "watcher": {
+        "token": None,
     },
 }
 
-container_registry_iv = t.Dict({
-    t.Key(''): tx.URL,
-    t.Key('type', default="docker"): t.String,
-    t.Key('username', default=None): t.Null | t.String,
-    t.Key('password', default=None): t.Null | t.String,
-    t.Key('project', default=None): t.Null | tx.StringList | t.List(t.String),
-    t.Key('ssl-verify', default=True): t.ToBool,
-}).allow_extra('*')
+container_registry_iv = t.Dict(
+    {
+        t.Key(""): tx.URL,
+        t.Key("type", default="docker"): t.String,
+        t.Key("username", default=None): t.Null | t.String,
+        t.Key("password", default=None): t.Null | t.String,
+        t.Key("project", default=None): t.Null | tx.StringList | t.List(t.String),
+        t.Key("ssl-verify", default=True): t.ToBool,
+    }
+).allow_extra("*")
 
-shared_config_iv = t.Dict({
-    t.Key('system', default=_shdefs['system']): t.Dict({
-        t.Key('timezone', default=_shdefs['system']['timezone']): tx.TimeZone,
-    }).allow_extra('*'),
-    t.Key('api', default=_shdefs['api']): t.Dict({
-        t.Key('allow-origins', default=_shdefs['api']['allow-origins']): t.String,
-    }).allow_extra('*'),
-    t.Key('redis', default=_shdefs['redis']): t.Dict({
-        t.Key('addr', default=_shdefs['redis']['addr']): t.Null | tx.HostPortPair,
-        t.Key('sentinel', default=None): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
-        t.Key('service_name', default=None): t.Null | t.String,
-        t.Key('password', default=_shdefs['redis']['password']): t.Null | t.String,
-    }).allow_extra('*'),
-    t.Key('docker', default=_shdefs['docker']): t.Dict({
-        t.Key('registry'): t.Mapping(t.String, container_registry_iv),
-    }).allow_extra('*'),
-    t.Key('plugins', default=_shdefs['plugins']): t.Dict({
-        t.Key('accelerator', default=_shdefs['plugins']['accelerator']):
-            t.Mapping(t.String, t.Mapping(t.String, t.Any)),
-        t.Key('scheduler', default=_shdefs['plugins']['scheduler']):
-            t.Mapping(t.String, t.Mapping(t.String, t.Any)),
-    }).allow_extra('*'),
-    t.Key('network', default=_shdefs['network']): t.Dict({
-        t.Key('subnet', default=_shdefs['network']['subnet']): t.Dict({
-            t.Key('agent', default=_shdefs['network']['subnet']['agent']): tx.IPNetwork,
-            t.Key('container', default=_shdefs['network']['subnet']['container']): tx.IPNetwork,
-        }).allow_extra('*'),
-        t.Key('overlay', default=None): t.Null | t.Dict({
-            t.Key('mtu', default=1500): t.Int[1:],
-        }).allow_extra('*'),
-    }).allow_extra('*'),
-    t.Key('watcher', default=_shdefs['watcher']): t.Dict({
-        t.Key('token', default=_shdefs['watcher']['token']): t.Null | t.String,
-    }).allow_extra('*'),
-}).allow_extra('*')
+shared_config_iv = t.Dict(
+    {
+        t.Key("system", default=_shdefs["system"]): t.Dict(
+            {
+                t.Key("timezone", default=_shdefs["system"]["timezone"]): tx.TimeZone,
+            }
+        ).allow_extra("*"),
+        t.Key("api", default=_shdefs["api"]): t.Dict(
+            {
+                t.Key("allow-origins", default=_shdefs["api"]["allow-origins"]): t.String,
+            }
+        ).allow_extra("*"),
+        t.Key("redis", default=_shdefs["redis"]): t.Dict(
+            {
+                t.Key("addr", default=_shdefs["redis"]["addr"]): t.Null | tx.HostPortPair,
+                t.Key("sentinel", default=None): t.Null
+                | tx.DelimiterSeperatedList(tx.HostPortPair),
+                t.Key("service_name", default=None): t.Null | t.String,
+                t.Key("password", default=_shdefs["redis"]["password"]): t.Null | t.String,
+            }
+        ).allow_extra("*"),
+        t.Key("docker", default=_shdefs["docker"]): t.Dict(
+            {
+                t.Key("registry"): t.Mapping(t.String, container_registry_iv),
+            }
+        ).allow_extra("*"),
+        t.Key("plugins", default=_shdefs["plugins"]): t.Dict(
+            {
+                t.Key("accelerator", default=_shdefs["plugins"]["accelerator"]): t.Mapping(
+                    t.String, t.Mapping(t.String, t.Any)
+                ),
+                t.Key("scheduler", default=_shdefs["plugins"]["scheduler"]): t.Mapping(
+                    t.String, t.Mapping(t.String, t.Any)
+                ),
+            }
+        ).allow_extra("*"),
+        t.Key("network", default=_shdefs["network"]): t.Dict(
+            {
+                t.Key("subnet", default=_shdefs["network"]["subnet"]): t.Dict(
+                    {
+                        t.Key("agent", default=_shdefs["network"]["subnet"]["agent"]): tx.IPNetwork,
+                        t.Key(
+                            "container", default=_shdefs["network"]["subnet"]["container"]
+                        ): tx.IPNetwork,
+                    }
+                ).allow_extra("*"),
+                t.Key("overlay", default=None): t.Null
+                | t.Dict(
+                    {
+                        t.Key("mtu", default=1500): t.Int[1:],
+                    }
+                ).allow_extra("*"),
+            }
+        ).allow_extra("*"),
+        t.Key("watcher", default=_shdefs["watcher"]): t.Dict(
+            {
+                t.Key("token", default=_shdefs["watcher"]["token"]): t.Null | t.String,
+            }
+        ).allow_extra("*"),
+    }
+).allow_extra("*")
 
-volume_config_iv = t.Dict({
-    t.Key('default_host'): t.String,
-    t.Key('proxies'): t.Mapping(
-        tx.Slug,
-        t.Dict({
-            t.Key('client_api'): t.String,
-            t.Key('manager_api'): t.String,
-            t.Key('secret'): t.String,
-            t.Key('ssl_verify'): t.ToBool,
-        }),
-    ),
-}).allow_extra('*')
+volume_config_iv = t.Dict(
+    {
+        t.Key("default_host"): t.String,
+        t.Key("proxies"): t.Mapping(
+            tx.Slug,
+            t.Dict(
+                {
+                    t.Key("client_api"): t.String,
+                    t.Key("manager_api"): t.String,
+                    t.Key("secret"): t.String,
+                    t.Key("ssl_verify"): t.ToBool,
+                }
+            ),
+        ),
+    }
+).allow_extra("*")
 
 
 ConfigWatchCallback = Callable[[Sequence[str]], Awaitable[None]]
@@ -387,7 +430,6 @@ class AbstractConfig(UserDict):
 
 
 class LocalConfig(AbstractConfig):
-
     async def reload(self) -> None:
         raise NotImplementedError
 
@@ -395,49 +437,52 @@ class LocalConfig(AbstractConfig):
 def load(config_path: Path = None, debug: bool = False) -> LocalConfig:
 
     # Determine where to read configuration.
-    raw_cfg, cfg_src_path = config.read_from_file(config_path, 'manager')
+    raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
 
     # Override the read config with environment variables (for legacy).
-    config.override_with_env(raw_cfg, ('etcd', 'namespace'), 'BACKEND_NAMESPACE')
-    config.override_with_env(raw_cfg, ('etcd', 'addr'), 'BACKEND_ETCD_ADDR')
-    config.override_with_env(raw_cfg, ('etcd', 'user'), 'BACKEND_ETCD_USER')
-    config.override_with_env(raw_cfg, ('etcd', 'password'), 'BACKEND_ETCD_PASSWORD')
-    config.override_with_env(raw_cfg, ('db', 'addr'), 'BACKEND_DB_ADDR')
-    config.override_with_env(raw_cfg, ('db', 'name'), 'BACKEND_DB_NAME')
-    config.override_with_env(raw_cfg, ('db', 'user'), 'BACKEND_DB_USER')
-    config.override_with_env(raw_cfg, ('db', 'password'), 'BACKEND_DB_PASSWORD')
-    config.override_with_env(raw_cfg, ('manager', 'num-proc'), 'BACKEND_MANAGER_NPROC')
-    config.override_with_env(raw_cfg, ('manager', 'ssl-cert'), 'BACKEND_SSL_CERT')
-    config.override_with_env(raw_cfg, ('manager', 'ssl-privkey'), 'BACKEND_SSL_KEY')
-    config.override_with_env(raw_cfg, ('manager', 'pid-file'), 'BACKEND_PID_FILE')
-    config.override_with_env(raw_cfg, ('manager', 'api-listen-addr', 'host'),
-                             'BACKEND_SERVICE_IP')
-    config.override_with_env(raw_cfg, ('manager', 'api-listen-addr', 'port'),
-                             'BACKEND_SERVICE_PORT')
-    config.override_with_env(raw_cfg, ('manager', 'event-listen-addr', 'host'),
-                             'BACKEND_ADVERTISED_MANAGER_HOST')
-    config.override_with_env(raw_cfg, ('manager', 'event-listen-addr', 'port'),
-                             'BACKEND_EVENTS_PORT')
-    config.override_with_env(raw_cfg, ('docker-registry', 'ssl-verify'),
-                             'BACKEND_SKIP_SSLCERT_VALIDATION')
+    config.override_with_env(raw_cfg, ("etcd", "namespace"), "BACKEND_NAMESPACE")
+    config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
+    config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
+    config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
+    config.override_with_env(raw_cfg, ("db", "addr"), "BACKEND_DB_ADDR")
+    config.override_with_env(raw_cfg, ("db", "name"), "BACKEND_DB_NAME")
+    config.override_with_env(raw_cfg, ("db", "user"), "BACKEND_DB_USER")
+    config.override_with_env(raw_cfg, ("db", "password"), "BACKEND_DB_PASSWORD")
+    config.override_with_env(raw_cfg, ("manager", "num-proc"), "BACKEND_MANAGER_NPROC")
+    config.override_with_env(raw_cfg, ("manager", "ssl-cert"), "BACKEND_SSL_CERT")
+    config.override_with_env(raw_cfg, ("manager", "ssl-privkey"), "BACKEND_SSL_KEY")
+    config.override_with_env(raw_cfg, ("manager", "pid-file"), "BACKEND_PID_FILE")
+    config.override_with_env(raw_cfg, ("manager", "api-listen-addr", "host"), "BACKEND_SERVICE_IP")
+    config.override_with_env(
+        raw_cfg, ("manager", "api-listen-addr", "port"), "BACKEND_SERVICE_PORT"
+    )
+    config.override_with_env(
+        raw_cfg, ("manager", "event-listen-addr", "host"), "BACKEND_ADVERTISED_MANAGER_HOST"
+    )
+    config.override_with_env(
+        raw_cfg, ("manager", "event-listen-addr", "port"), "BACKEND_EVENTS_PORT"
+    )
+    config.override_with_env(
+        raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
+    )
     if debug:
-        config.override_key(raw_cfg, ('debug', 'enabled'), True)
-        config.override_key(raw_cfg, ('logging', 'level'), 'DEBUG')
-        config.override_key(raw_cfg, ('logging', 'pkg-ns', 'ai.backend'), 'DEBUG')
-        config.override_key(raw_cfg, ('logging', 'pkg-ns', 'aiohttp'), 'DEBUG')
+        config.override_key(raw_cfg, ("debug", "enabled"), True)
+        config.override_key(raw_cfg, ("logging", "level"), "DEBUG")
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), "DEBUG")
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), "DEBUG")
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
     try:
         cfg = config.check(raw_cfg, manager_local_config_iv)
-        if 'debug' in cfg and cfg['debug']['enabled']:
-            print('== Manager configuration ==', file=sys.stderr)
+        if "debug" in cfg and cfg["debug"]["enabled"]:
+            print("== Manager configuration ==", file=sys.stderr)
             print(pformat(cfg), file=sys.stderr)
-        cfg['_src'] = cfg_src_path
-        if cfg['manager']['secret'] is None:
-            cfg['manager']['secret'] = secrets.token_urlsafe(16)
+        cfg["_src"] = cfg_src_path
+        if cfg["manager"]["secret"] is None:
+            cfg["manager"]["secret"] = secrets.token_urlsafe(16)
     except config.ConfigurationError as e:
-        print('Validation of manager configuration has failed:', file=sys.stderr)
+        print("Validation of manager configuration has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
     else:
@@ -445,7 +490,6 @@ def load(config_path: Path = None, debug: bool = False) -> LocalConfig:
 
 
 class SharedConfig(AbstractConfig):
-
     def __init__(
         self,
         etcd_addr: HostPortPair,
@@ -457,12 +501,14 @@ class SharedConfig(AbstractConfig):
         super().__init__()
         credentials = None
         if etcd_user:
+            assert etcd_user is not None
+            assert etcd_password is not None
             credentials = {
-                'user': etcd_user,
-                'password': etcd_password,
+                "user": etcd_user,
+                "password": etcd_password,
             }
         scope_prefix_map = {
-            ConfigScopes.GLOBAL: '',
+            ConfigScopes.GLOBAL: "",
             # TODO: provide a way to specify other scope prefixes
         }
         self.etcd = AsyncEtcd(etcd_addr, namespace, scope_prefix_map, credentials=credentials)
@@ -471,11 +517,11 @@ class SharedConfig(AbstractConfig):
         await self.etcd.close()
 
     async def reload(self) -> None:
-        raw_cfg = await self.etcd.get_prefix('config')
+        raw_cfg = await self.etcd.get_prefix("config")
         try:
             cfg = shared_config_iv.check(raw_cfg)
         except config.ConfigurationError as e:
-            print('Validation of shared etcd configuration has failed:', file=sys.stderr)
+            print("Validation of shared etcd configuration has failed:", file=sys.stderr)
             print(pformat(e.invalid_data), file=sys.stderr)
             raise click.Abort()
         else:
@@ -491,20 +537,19 @@ class SharedConfig(AbstractConfig):
         if value is None:
             value = shared_config_defaults.get(key, None)
         if not allow_null and value is None:
-            raise ServerMisconfiguredError(
-                'A required etcd config is missing.', key)
+            raise ServerMisconfiguredError("A required etcd config is missing.", key)
         return value
 
     async def register_myself(self) -> None:
         instance_id = await get_instance_id()
         manager_info = {
-            f'nodes/manager/{instance_id}': 'up',
+            f"nodes/manager/{instance_id}": "up",
         }
         await self.etcd.put_dict(manager_info)
 
     async def deregister_myself(self) -> None:
         instance_id = await get_instance_id()
-        await self.etcd.delete_prefix(f'nodes/manager/{instance_id}')
+        await self.etcd.delete_prefix(f"nodes/manager/{instance_id}")
 
     async def update_resource_slots(
         self,
@@ -514,20 +559,18 @@ class SharedConfig(AbstractConfig):
         known_slots = await self.get_resource_slots()
         for k, v in slot_key_and_units.items():
             if k not in known_slots or v != known_slots[k]:
-                updates[f'config/resource_slots/{k}'] = v.value
+                updates[f"config/resource_slots/{k}"] = v.value
         if updates:
             await self.etcd.put_dict(updates)
 
     async def update_manager_status(self, status) -> None:
-        await self.etcd.put('manager/status', status.value)
+        await self.etcd.put("manager/status", status.value)
         self.get_manager_status.cache_clear()
 
     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
     async def _get_resource_slots(self):
-        raw_data = await self.etcd.get_prefix_dict('config/resource_slots')
-        return {
-            SlotName(k): SlotTypes(v) for k, v in raw_data.items()
-        }
+        raw_data = await self.etcd.get_prefix_dict("config/resource_slots")
+        return {SlotName(k): SlotTypes(v) for k, v in raw_data.items()}
 
     async def get_resource_slots(self) -> Mapping[SlotName, SlotTypes]:
         """
@@ -543,7 +586,7 @@ class SharedConfig(AbstractConfig):
 
     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
     async def _get_vfolder_types(self):
-        return await self.etcd.get_prefix('volumes/_types')
+        return await self.etcd.get_prefix("volumes/_types")
 
     async def get_vfolder_types(self) -> Sequence[str]:
         """
@@ -555,24 +598,24 @@ class SharedConfig(AbstractConfig):
         except LookupError:
             vf_types = await self._get_vfolder_types()
             if not vf_types:
-                vf_types = {'user': ''}
+                vf_types = {"user": ""}
             ret = list(vf_types.keys())
             current_vfolder_types.set(ret)
         return ret
 
     @aiotools.lru_cache(maxsize=1, expire_after=5.0)
     async def get_manager_nodes_info(self):
-        return await self.etcd.get_prefix_dict('nodes/manager')
+        return await self.etcd.get_prefix_dict("nodes/manager")
 
     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
     async def get_manager_status(self) -> ManagerStatus:
-        status = await self.etcd.get('manager/status')
+        status = await self.etcd.get("manager/status")
         if status is None:
             return ManagerStatus.TERMINATED
         return ManagerStatus(status)
 
     async def watch_manager_status(self):
-        async with aiotools.aclosing(self.etcd.watch('manager/status')) as agen:
+        async with aiotools.aclosing(self.etcd.watch("manager/status")) as agen:
             async for ev in agen:
                 yield ev
 
@@ -580,15 +623,13 @@ class SharedConfig(AbstractConfig):
     #       in a per-request basis.
     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
     async def get_allowed_origins(self):
-        return await self.etcd.get('config/api/allow-origins')
+        return await self.etcd.get("config/api/allow-origins")
 
     def get_redis_url(self, db: int = 0) -> yarl.URL:
         """
         Returns a complete URL composed from the given Redis config.
         """
-        url = (yarl.URL('redis://host')
-               .with_host(str(self.data['redis']['addr'][0]))
-               .with_port(self.data['redis']['addr'][1])
-               .with_password(self.data['redis']['password'])
-               / str(db))
+        url = yarl.URL("redis://host").with_host(str(self.data["redis"]["addr"][0])).with_port(
+            self.data["redis"]["addr"][1]
+        ).with_password(self.data["redis"]["password"]) / str(db)
         return url

@@ -1,14 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import closing
 import socket
-from typing import (
-    Callable,
-    Mapping,
-    TYPE_CHECKING,
-    TypeVar,
-)
+from contextlib import closing
+from typing import TYPE_CHECKING, Callable, Mapping, TypeVar
 
 import aiohttp
 from async_timeout import timeout as _timeout
@@ -17,11 +12,11 @@ if TYPE_CHECKING:
     import yarl
 
 __all__ = (
-    'find_free_port',
-    'curl',
+    "find_free_port",
+    "curl",
 )
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 async def curl(
@@ -48,7 +43,7 @@ async def curl(
         return default_value
 
 
-def find_free_port(bind_addr: str = '127.0.0.1') -> int:
+def find_free_port(bind_addr: str = "127.0.0.1") -> int:
     """
     Find a freely available TCP port in the current host.
     Note that since under certain conditions this may have races.

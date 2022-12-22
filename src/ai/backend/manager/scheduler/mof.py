@@ -1,32 +1,18 @@
 from __future__ import annotations
 
-from typing import (
-    Optional,
-    Sequence,
-)
+from typing import Optional, Sequence
 
 import trafaret as t
 
-from ai.backend.common.types import (
-    AccessKey,
-    AgentId,
-    SessionId,
-    ResourceSlot,
-)
+from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId
 
-from .types import (
-    AbstractScheduler,
-    PendingSession,
-    ExistingSession,
-    AgentContext,
-    KernelInfo,
-)
+from .types import AbstractScheduler, AgentContext, ExistingSession, KernelInfo, PendingSession
 
 
 class MOFScheduler(AbstractScheduler):
     """Minimum Occupied slot First Scheduler"""
 
-    config_iv = t.Dict({}).allow_extra('*')
+    config_iv = t.Dict({}).allow_extra("*")
 
     def pick_session(
         self,
@@ -44,13 +30,22 @@ class MOFScheduler(AbstractScheduler):
         requested_slots: ResourceSlot,
     ) -> Optional[AgentId]:
         # return min occupied slot agent or None
-        return next((one_agent.agent_id for one_agent in (sorted(
-            (agent for agent in agents if (
-                (agent.available_slots - agent.occupied_slots)
-                >= requested_slots
-            )),
-            key=lambda a: a.occupied_slots)
-        )), None)
+        return next(
+            (
+                one_agent.agent_id
+                for one_agent in (
+                    sorted(
+                        (
+                            agent
+                            for agent in agents
+                            if ((agent.available_slots - agent.occupied_slots) >= requested_slots)
+                        ),
+                        key=lambda a: a.occupied_slots,
+                    )
+                )
+            ),
+            None,
+        )
 
     def assign_agent_for_session(
         self,
@@ -58,7 +53,9 @@ class MOFScheduler(AbstractScheduler):
         pending_session: PendingSession,
     ) -> Optional[AgentId]:
         return self._assign_agent(
-            agents, pending_session.access_key, pending_session.requested_slots,
+            agents,
+            pending_session.access_key,
+            pending_session.requested_slots,
         )
 
     def assign_agent_for_kernel(
@@ -67,5 +64,7 @@ class MOFScheduler(AbstractScheduler):
         pending_kernel: KernelInfo,
     ) -> Optional[AgentId]:
         return self._assign_agent(
-            agents, pending_kernel.access_key, pending_kernel.requested_slots,
+            agents,
+            pending_kernel.access_key,
+            pending_kernel.requested_slots,
         )

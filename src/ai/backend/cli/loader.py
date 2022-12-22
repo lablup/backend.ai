@@ -1,13 +1,18 @@
-import click            # noqa: E402
+from typing import Optional
+
+import click  # noqa: E402
 
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from .main import main  # noqa: E402
 
 
-def load_entry_points() -> click.Group:
-    entry_prefix = 'backendai_cli_v10'
-    for entrypoint in scan_entrypoints(entry_prefix):
+def load_entry_points(
+    allowlist: Optional[set[str]] = None,
+    blocklist: Optional[set[str]] = None,
+) -> click.Group:
+    entry_prefix = "backendai_cli_v10"
+    for entrypoint in scan_entrypoints(entry_prefix, allowlist=allowlist, blocklist=blocklist):
         if entrypoint.name == "_":
             cmd_group: click.Group = entrypoint.load()
             for name, cmd in cmd_group.commands.items():

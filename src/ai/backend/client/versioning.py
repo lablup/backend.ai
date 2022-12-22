@@ -1,24 +1,18 @@
 from __future__ import annotations
 
-from typing import (
-    Callable,
-    Sequence,
-    Tuple,
-    Union,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Callable, Sequence, Tuple, Union
 
 if TYPE_CHECKING:
     from .func.session import ComputeSession
 
 
 naming_profile = {
-    'path': ('kernel', 'session'),
-    'session_events_path': ('/stream/kernel/_/events', '/events/session'),
-    'name_arg': ('clientSessionToken', 'name'),
-    'event_name_arg': ('sessionId', 'name'),
-    'name_gql_field': ('sess_id', 'name'),
-    'type_gql_field': ('sess_type', 'type'),
+    "path": ("kernel", "session"),
+    "session_events_path": ("/stream/kernel/_/events", "/events/session"),
+    "name_arg": ("clientSessionToken", "name"),
+    "event_name_arg": ("sessionId", "name"),
+    "name_gql_field": ("sess_id", "name"),
+    "type_gql_field": ("sess_type", "type"),
 }
 
 

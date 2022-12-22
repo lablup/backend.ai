@@ -5,18 +5,17 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-env/
-build/
-develop-eggs/
-dist/
+/build/
+/dist/
 downloads/
+develop-eggs/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -32,7 +31,7 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # Unit test / coverage reports
-htmlcov/
+/htmlcov/
 .tox/
 .coverage
 .coverage.*
@@ -56,14 +55,8 @@ local_settings.py
 instance/
 .webassets-cache
 
-# Scrapy stuff:
-.scrapy
-
 # Sphinx documentation
 docs/_build/
-
-# PyBuilder
-target/
 
 # IPython Notebook
 .ipynb_checkpoints
@@ -83,17 +76,15 @@ venv/
 .venv/
 ENV/
 
-# Spyder project settings
-.spyderproject
-
-# Rope project settings
-.ropeproject
-
 # IDE/vim
 .idea
 *.swp
 *.swo
-.vscode
+.vscode/
+/.vimrc
+/.nvimrc
+/.exrc
+.vim/
 
 # Pants
 /.pants.d/
@@ -110,6 +101,7 @@ ENV/
 /webserver.conf
 /cuda-mock.toml
 /.pants.env
+/.pants.bootstrap
 /docker-compose.halfstack.current.yml
 /alembic.ini
 /dev.etcd.volumes.json
@@ -120,6 +112,14 @@ ENV/
 /tmp/
 /volumes/
 /vfroot/
+/*.pid
+/scratches/
+
+# Additional clones for editable components
+/src/ai/backend/webui/
 
 # Release artifacts
 /CHANGELOG_RELEASE.md
+
+# macOS specific
+.DS_Store

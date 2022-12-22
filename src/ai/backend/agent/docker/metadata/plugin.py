@@ -1,10 +1,6 @@
-from abc import ABCMeta, abstractmethod
 import logging
-from typing import (
-    Any, Callable, Coroutine, Mapping,
-    MutableMapping, NamedTuple, Optional,
-    Sequence,
-)
+from abc import ABCMeta, abstractmethod
+from typing import Any, Callable, Coroutine, Mapping, MutableMapping, NamedTuple, Optional, Sequence
 
 from aiohttp import web
 
@@ -15,24 +11,24 @@ from ai.backend.common.plugin import AbstractPlugin
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 NewWebappPluginResponse = NamedTuple(
-    'NewWebappPluginResponse',
-    [('app', web.Application), ('global_middlewares', Sequence[WebMiddleware])],
+    "NewWebappPluginResponse",
+    [("app", web.Application), ("global_middlewares", Sequence[WebMiddleware])],
 )
 InitWebappPluginResponse = NamedTuple(
-    'InitWebappPluginResponse',
+    "InitWebappPluginResponse",
     [
-        ('app', web.Application),
-        ('global_middlewares', Sequence[WebMiddleware]),
-        ('structure', Mapping[str, Any]),
+        ("app", web.Application),
+        ("global_middlewares", Sequence[WebMiddleware]),
+        ("structure", Mapping[str, Any]),
     ],
 )
 WebappPluginRoute = NamedTuple(
-    'WebappPluginRoute',
+    "WebappPluginRoute",
     [
-        ('method', str),
-        ('route', str),
-        ('route_handler', Callable[[web.Request], Coroutine[Any, Any, web.Response]]),
-        ('route_name', Optional[str]),
+        ("method", str),
+        ("route", str),
+        ("route_handler", Callable[[web.Request], Coroutine[Any, Any, web.Response]]),
+        ("route_name", Optional[str]),
     ],
 )
 
@@ -46,6 +42,7 @@ class WebappPlugin(AbstractPlugin, metaclass=ABCMeta):
     The init/cleanup methods of the plugin are ignored and the manager uses the standard aiohttp's
     application lifecycle handlers attached to the returned app instance.
     """
+
     route_prefix: Optional[str]
 
     @abstractmethod
@@ -84,22 +81,22 @@ class WebappPlugin(AbstractPlugin, metaclass=ABCMeta):
             # See for loop below for usage.
             structure_pointer = structure
             _path = path
-            if not _path.startswith('/'):
-                _path = '/' + _path
+            if not _path.startswith("/"):
+                _path = "/" + _path
 
-            raw_splitted = _path.split('/')
+            raw_splitted = _path.split("/")
             splitted = []
 
             chunks = []
             for i in range(len(raw_splitted)):
                 s = raw_splitted[i]
                 chunks.append(s)
-                if not (s.startswith('{') and s.endswith('}')):
-                    splitted.append('/'.join(chunks))
+                if not (s.startswith("{") and s.endswith("}")):
+                    splitted.append("/".join(chunks))
                     chunks = []
 
             if len(chunks) > 0:
-                splitted.append('/'.join(chunks))
+                splitted.append("/".join(chunks))
 
             # e.g. if route is /a/b/c/d:
             # components will be ['a', 'b', 'c']
@@ -111,12 +108,12 @@ class WebappPlugin(AbstractPlugin, metaclass=ABCMeta):
                 if structure_pointer.get(component) is None:
                     structure_pointer[component] = {}
                 elif not isinstance(structure_pointer.get(component), dict):
-                    structure_pointer[component] = {'_': structure_pointer[component]}
+                    structure_pointer[component] = {"_": structure_pointer[component]}
                 structure_pointer = structure_pointer[component]
 
             if isinstance(structure_pointer.get(resource_name), dict):
-                structure_pointer[resource_name]['_'] = resource_name
-                app.router.add_route(method, path + '/_', handler, name=name)
+                structure_pointer[resource_name]["_"] = resource_name
+                app.router.add_route(method, path + "/_", handler, name=name)
             else:
                 structure_pointer[resource_name] = resource_name
                 app.router.add_route(method, path, handler, name=name)

@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
 import contextlib
-from typing import (
-    AsyncIterator,
-    Sequence,
-    Tuple,
-)
+from abc import ABCMeta, abstractmethod
+from typing import AsyncIterator, Sequence, Tuple
+
 import attr
 
 
@@ -19,7 +16,6 @@ class RedisClusterInfo:
 
 
 class AbstractRedisSentinelCluster(metaclass=ABCMeta):
-
     def __init__(self, test_ns: str, test_case_ns: str, password: str, service_name: str) -> None:
         self.test_ns = test_ns
         self.test_case_ns = test_case_ns
@@ -34,7 +30,6 @@ class AbstractRedisSentinelCluster(metaclass=ABCMeta):
 
 
 class AbstractRedisNode(metaclass=ABCMeta):
-
     @property
     @abstractmethod
     def addr(self) -> Tuple[str, int]:

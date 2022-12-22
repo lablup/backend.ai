@@ -2,11 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import (
-    Callable,
-    Final,
-    TYPE_CHECKING,
-)
+from typing import TYPE_CHECKING, Callable, Final
 
 from .logging import BraceStyleAdapter
 
@@ -57,7 +53,7 @@ class GlobalTimer:
                             return
                         await asyncio.sleep(self.interval)
                 except asyncio.TimeoutError:  # timeout raised from etcd lock
-                    log.warn('timeout raised while trying to acquire lock. retrying...')
+                    log.warn("timeout raised while trying to acquire lock. retrying...")
         except asyncio.CancelledError:
             pass
 

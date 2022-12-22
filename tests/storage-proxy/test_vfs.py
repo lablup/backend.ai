@@ -109,9 +109,7 @@ async def test_vfs_operation(vfs, empty_vfolder):
     await vfs.move_tree(empty_vfolder, Path("test2"), Path("test0/inner/test2/test3"))
     assert (vfpath / "test0" / "inner").is_dir()
     assert (vfpath / "test0" / "inner" / "test2" / "test3").is_dir()
-    assert (
-        vfpath / "test0" / "inner" / "test2" / "test3" / "test.txt"
-    ).read_bytes() == b"12345"
+    assert (vfpath / "test0" / "inner" / "test2" / "test3" / "test.txt").read_bytes() == b"12345"
 
     # move directory into another directory that already exists
     await vfs.move_tree(empty_vfolder, Path("test0/inner/test2/"), Path("test0/"))
