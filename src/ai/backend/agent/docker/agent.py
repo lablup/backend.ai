@@ -1157,7 +1157,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             container_pid = await host_pid_to_container_pid(
                                 container_id,
                                 host_pid,
-                                verbose=self.local_config["debug"]["log-pidmap"],
                             )
                             reply = [
                                 struct.pack("i", 0),
