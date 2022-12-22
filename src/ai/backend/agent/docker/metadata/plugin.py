@@ -10,20 +10,20 @@ from ai.backend.common.plugin import AbstractPlugin
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
-NewWebappPluginResponse = NamedTuple(
-    "NewWebappPluginResponse",
+NewMetadataPluginResponse = NamedTuple(
+    "NewMetadataPluginResponse",
     [("app", web.Application), ("global_middlewares", Sequence[WebMiddleware])],
 )
-InitWebappPluginResponse = NamedTuple(
-    "InitWebappPluginResponse",
+InitMetadataPluginResponse = NamedTuple(
+    "InitMetadataPluginResponse",
     [
         ("app", web.Application),
         ("global_middlewares", Sequence[WebMiddleware]),
         ("structure", Mapping[str, Any]),
     ],
 )
-WebappPluginRoute = NamedTuple(
-    "WebappPluginRoute",
+MetadataPluginRoute = NamedTuple(
+    "MetadataPluginRoute",
     [
         ("method", str),
         ("route", str),
@@ -33,7 +33,7 @@ WebappPluginRoute = NamedTuple(
 )
 
 
-class WebappPlugin(AbstractPlugin, metaclass=ABCMeta):
+class MetadataPlugin(AbstractPlugin, metaclass=ABCMeta):
     """
     Webapp plugins should create a valid aiohttp.web.Application instance.  The returned app
     instance will be a subapp of the root app defined by the manager, and additional user-properties
@@ -46,14 +46,14 @@ class WebappPlugin(AbstractPlugin, metaclass=ABCMeta):
     route_prefix: Optional[str]
 
     @abstractmethod
-    async def prepare_app(self) -> NewWebappPluginResponse:
+    async def prepare_app(self) -> NewMetadataPluginResponse:
         pass
 
     @abstractmethod
-    async def routes(self) -> Sequence[WebappPluginRoute]:
+    async def routes(self) -> Sequence[MetadataPluginRoute]:
         pass
 
-    async def create_app(self) -> InitWebappPluginResponse:
+    async def create_app(self) -> InitMetadataPluginResponse:
 
         app, global_middlewares = await self.prepare_app()
         routes = await self.routes()
@@ -117,4 +117,4 @@ class WebappPlugin(AbstractPlugin, metaclass=ABCMeta):
             else:
                 structure_pointer[resource_name] = resource_name
                 app.router.add_route(method, path, handler, name=name)
-        return InitWebappPluginResponse(app, global_middlewares, structure)
+        return InitMetadataPluginResponse(app, global_middlewares, structure)

@@ -4,10 +4,10 @@ from aiohttp import web
 
 from ai.backend.agent.docker.kernel import DockerKernel
 
-from .plugin import NewWebappPluginResponse, WebappPlugin, WebappPluginRoute
+from .plugin import MetadataPlugin, MetadataPluginRoute, NewMetadataPluginResponse
 
 
-class ContainerMetadataPlugin(WebappPlugin):
+class ContainerMetadataPlugin(MetadataPlugin):
     async def init(self, context):
         pass
 
@@ -17,14 +17,14 @@ class ContainerMetadataPlugin(WebappPlugin):
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         pass
 
-    async def prepare_app(self) -> NewWebappPluginResponse:
+    async def prepare_app(self) -> NewMetadataPluginResponse:
         app = web.Application()
-        return NewWebappPluginResponse(app, [])
+        return NewMetadataPluginResponse(app, [])
 
-    async def routes(self) -> Sequence[WebappPluginRoute]:
+    async def routes(self) -> Sequence[MetadataPluginRoute]:
         return [
-            WebappPluginRoute("GET", "/envs", self.get_envs, None),
-            WebappPluginRoute("GET", "/local-ipv4", self.get_local_ipv4, None),
+            MetadataPluginRoute("GET", "/envs", self.get_envs, None),
+            MetadataPluginRoute("GET", "/local-ipv4", self.get_local_ipv4, None),
         ]
 
     async def get_envs(self, request: web.Request) -> web.Response:

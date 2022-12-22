@@ -16,13 +16,13 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin import BasePluginContext
 from ai.backend.common.types import KernelId, aobject
 
-from .plugin import WebappPlugin
+from .plugin import MetadataPlugin
 from .root import ContainerMetadataPlugin
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-class WebappPluginContext(BasePluginContext[WebappPlugin]):
+class MetadataPluginContext(BasePluginContext[MetadataPlugin]):
     plugin_group = "backendai_metadata_app_v20"
 
 
@@ -34,7 +34,7 @@ class BaseContext:
 class RootContext(BaseContext):
     local_config: Mapping[str, Any]
     etcd: AsyncEtcd
-    webapp_plugin_ctx: WebappPluginContext
+    webapp_plugin_ctx: MetadataPluginContext
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
@@ -185,7 +185,7 @@ class MetadataServer(aobject):
 
     async def load_webapp_plugins(self):
         root_ctx = self.app["_root.context"]
-        plugin_ctx = WebappPluginContext(root_ctx.etcd, root_ctx.local_config)
+        plugin_ctx = MetadataPluginContext(root_ctx.etcd, root_ctx.local_config)
         await plugin_ctx.init()
         root_ctx.webapp_plugin_ctx = plugin_ctx
         log.debug("Available plugins: {}", plugin_ctx.plugins)
