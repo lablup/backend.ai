@@ -34,7 +34,7 @@ class BaseContext:
 class RootContext(BaseContext):
     local_config: Mapping[str, Any]
     etcd: AsyncEtcd
-    webapp_plugin_ctx: MetadataPluginContext
+    metadata_plugin_ctx: MetadataPluginContext
 
 
 async def on_prepare(request: web.Request, response: web.StreamResponse) -> None:
@@ -111,7 +111,7 @@ class MetadataServer(aobject):
         local_config = self.app["_root.context"].local_config
         await prepare_kernel_metadata_uri_handling(local_config)
         self.app["docker-mode"] = local_config["agent"]["docker-mode"]
-        log.info("Loading webapp plugin: meta-data")
+        log.info("Loading metadata plugin: meta-data")
         metadata_plugin = ContainerMetadataPlugin({}, local_config)
         await metadata_plugin.init(None)
         metadata_app, global_middlewares, route_structures = await metadata_plugin.create_app()
@@ -183,19 +183,19 @@ class MetadataServer(aobject):
         root_app.middlewares.extend(global_middlewares)
         self.loaded_apps.append(prefix)
 
-    async def load_webapp_plugins(self):
+    async def load_metadata_plugins(self):
         root_ctx = self.app["_root.context"]
         plugin_ctx = MetadataPluginContext(root_ctx.etcd, root_ctx.local_config)
         await plugin_ctx.init()
-        root_ctx.webapp_plugin_ctx = plugin_ctx
+        root_ctx.metadata_plugin_ctx = plugin_ctx
         log.debug("Available plugins: {}", plugin_ctx.plugins)
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
-            log.info("Loading webapp plugin: {0}", plugin_name)
+            log.info("Loading metadata plugin: {0}", plugin_name)
             subapp, global_middlewares, route_structure = await plugin_instance.create_app()
             self._init_subapp(plugin_name, self.app, subapp, global_middlewares, route_structure)
 
     async def start_server(self):
-        await self.load_webapp_plugins()
+        await self.load_metadata_plugins()
         metadata_server_runner = web.AppRunner(self.app)
         await metadata_server_runner.setup()
         site = web.TCPSite(metadata_server_runner, "0.0.0.0", 40128)
@@ -203,7 +203,7 @@ class MetadataServer(aobject):
         await site.start()
 
     async def cleanup(self):
-        plugin_context = self.app["_root.context"].webapp_plugin_ctx
+        plugin_context = self.app["_root.context"].metadata_plugin_ctx
         await self.runner.cleanup()
         await self.app.shutdown()
         await plugin_context.cleanup()

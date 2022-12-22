@@ -35,7 +35,7 @@ MetadataPluginRoute = NamedTuple(
 
 class MetadataPlugin(AbstractPlugin, metaclass=ABCMeta):
     """
-    Webapp plugins should create a valid aiohttp.web.Application instance.  The returned app
+    Metadata plugins should create a valid aiohttp.web.Application instance.  The returned app
     instance will be a subapp of the root app defined by the manager, and additional user-properties
     will be set as defined in ``ai.backend.gateway.server.PUBLIC_INTERFACES``.
 
