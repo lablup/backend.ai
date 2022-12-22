@@ -352,13 +352,16 @@ class MemoryPlugin(AbstractComputePlugin):
             except K8sApiException as e:
                 log.warning("kubernetes api error: {}", e)
                 return None
+            net_rx = Decimal(0)
+            net_tx = Decimal(0)
+            q = Decimal(0.000)
             for line in raw_resp.split("\n"):
                 if "#" in line:
                     continue
                 if "container_network_receive_bytes" in line:
-                    net_rx = line.split(" ")[1]
+                    net_rx += Decimal(line.split(" ")[1]).quantize(q)
                 elif "container_network_transmit_bytes" in line:
-                    net_tx = line.split(" ")[1]
+                    net_tx += Decimal(line.split(" ")[1]).quantize(q)
             return net_rx, net_tx
 
         await K8sConfig.load_kube_config()
@@ -383,8 +386,8 @@ class MemoryPlugin(AbstractComputePlugin):
         for result in net_results:
             if result is None:
                 continue
-            net_rx_bytes += Decimal(result[0]).quantize(q)
-            net_tx_bytes += Decimal(result[1]).quantize(q)
+            net_rx_bytes += result[0]
+            net_tx_bytes += result[1]
         total_mem_capacity_bytes = cast(
             Decimal,
             sum(
