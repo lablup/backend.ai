@@ -253,13 +253,15 @@ def verify_vfolder_name(folder: str) -> bool:
     return True
 
 
-def _build_query_own_folders(selectors, user_role, user_uuid) -> sa.sql.Select:
+def _build_query_own_folders(selectors, user_role, user_uuid, extra_vf_conds=None) -> sa.sql.Select:
     from ai.backend.manager.models import users
 
     j = sa.join(vfolders, users, vfolders.c.user == users.c.uuid)
     query = sa.select(selectors).select_from(j)
     if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
         query = query.where(vfolders.c.user == user_uuid)
+    if extra_vf_conds is not None:
+        query = query.where(extra_vf_conds)
     return query
 
 
@@ -267,6 +269,7 @@ async def query_own_vfolders(
     db_conn: SAConnection,
     user_uuid: uuid.UUID,
     user_role: UserRole,
+    extra_vf_conds=None,
 ) -> Sequence[Mapping[str, Any]]:
     """
     Query all vfolders user created.
@@ -274,7 +277,7 @@ async def query_own_vfolders(
     from ai.backend.manager.models import users
 
     selectors = [vfolders, users.c.email]
-    query = _build_query_own_folders(selectors, user_role, user_uuid)
+    query = _build_query_own_folders(selectors, user_role, user_uuid, extra_vf_conds)
     return [row async for row in (await db_conn.stream(query)) if row is not None]
 
 
@@ -292,7 +295,9 @@ async def count_own_vfolders(
     return await db_conn.scalar(query)
 
 
-def _build_query_user_type_permission_overriden_vfolders(selectors, user_uuid) -> sa.sql.Select:
+def _build_query_user_type_permission_overriden_vfolders(
+    selectors, user_uuid, extra_vf_conds=None
+) -> sa.sql.Select:
     from ai.backend.manager.models import users
 
     j = sa.join(
@@ -306,12 +311,15 @@ def _build_query_user_type_permission_overriden_vfolders(selectors, user_uuid) -
             & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
         )
     )
+    if extra_vf_conds is not None:
+        query = query.where(extra_vf_conds)
     return query
 
 
 async def query_user_type_permission_overriden_vfolders(
     db_conn: SAConnection,
     user_uuid: uuid.UUID,
+    extra_vf_conds=None,
 ) -> Sequence[Mapping[str, Any]]:
     """
     Query all vfolders which have USER ownership type and overriden permissions,
@@ -320,7 +328,9 @@ async def query_user_type_permission_overriden_vfolders(
     from ai.backend.manager.models import users
 
     selectors = [vfolders, vfolder_permissions.c.permission, users.c.email]
-    query = _build_query_user_type_permission_overriden_vfolders(selectors, user_uuid)
+    query = _build_query_user_type_permission_overriden_vfolders(
+        selectors, user_uuid, extra_vf_conds
+    )
     return [row async for row in (await db_conn.stream(query)) if row is not None]
 
 
@@ -337,7 +347,7 @@ async def count_user_type_permission_overriden_vfolders(
     return await db_conn.scalar(query)
 
 
-def _build_query_project_group_vfolders(selectors, group_ids) -> sa.sql.Select:
+def _build_query_project_group_vfolders(selectors, group_ids, extra_vf_conds=None) -> sa.sql.Select:
     from ai.backend.manager.models import groups
 
     j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
@@ -347,6 +357,8 @@ def _build_query_project_group_vfolders(selectors, group_ids) -> sa.sql.Select:
     # .where(vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
     if group_ids is not None:
         query = query.where(vfolders.c.group.in_(group_ids))
+    if extra_vf_conds is not None:
+        query = query.where(extra_vf_conds)
     return query
 
 
@@ -355,6 +367,7 @@ async def query_project_group_vfolders(
     user_uuid: uuid.UUID,
     user_role: UserRole,
     domain_name: str,
+    extra_vf_conds=None,
 ) -> Sequence[Mapping[str, Any]]:
     """
     Query vfolders of project groups.
@@ -372,7 +385,7 @@ async def query_project_group_vfolders(
             group_ids = await query_user_accessible_groups(db_conn, user_uuid)
 
     selectors = [vfolders, groups.c.name]
-    query = _build_query_project_group_vfolders(selectors, group_ids)
+    query = _build_query_project_group_vfolders(selectors, group_ids, extra_vf_conds)
 
     vfolder_query_result = [row async for row in (await db_conn.stream(query)) if row is not None]
 
@@ -437,13 +450,18 @@ async def query_all_related_vfolders(
     *,
     user_role: UserRole,
     domain_name: str,
+    extra_vf_conds=None,
 ) -> Sequence[Mapping[str, Any]]:
     # Query own vfolders
-    own_vfs = await query_own_vfolders(db_conn, user_uuid, user_role)
-    invited_vfs = await query_user_type_permission_overriden_vfolders(db_conn, user_uuid)
+    own_vfs = await query_own_vfolders(db_conn, user_uuid, user_role, extra_vf_conds)
+    invited_vfs = await query_user_type_permission_overriden_vfolders(
+        db_conn, user_uuid, extra_vf_conds
+    )
 
     # Query project-group vfolders
-    group_vfs = await query_project_group_vfolders(db_conn, user_uuid, user_role, domain_name)
+    group_vfs = await query_project_group_vfolders(
+        db_conn, user_uuid, user_role, domain_name, extra_vf_conds
+    )
     return [*own_vfs, *invited_vfs, *group_vfs]
 
 
@@ -461,6 +479,40 @@ async def count_all_related_vfolders(
     # Query project-group vfolders
     num_group = await count_project_group_vfolders(db_conn, user_uuid, user_role, domain_name)
     return num_own + num_invited + num_group
+
+
+async def query_accessible_vfolders_by_name(
+    db_conn: SAConnection,
+    user_uuid: uuid.UUID,
+    *,
+    user_role: UserRole,
+    domain_name: str,
+    vf_name: str,
+) -> Sequence[Mapping[str, Any]]:
+    return await query_all_related_vfolders(
+        db_conn,
+        user_uuid,
+        user_role=user_role,
+        domain_name=domain_name,
+        extra_vf_conds=(vfolders.c.name == vf_name),
+    )
+
+
+async def query_accessible_vfolders_by_id(
+    db_conn: SAConnection,
+    user_uuid: uuid.UUID,
+    *,
+    user_role: UserRole,
+    domain_name: str,
+    vf_id: uuid.UUID,
+) -> Sequence[Mapping[str, Any]]:
+    return await query_all_related_vfolders(
+        db_conn,
+        user_uuid,
+        user_role=user_role,
+        domain_name=domain_name,
+        extra_vf_conds=(vfolders.c.id == vf_id),
+    )
 
 
 async def query_accessible_vfolders(
