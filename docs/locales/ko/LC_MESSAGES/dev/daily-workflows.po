@@ -104,7 +104,7 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:62 7290fc47869b40c5b30e645ebd4c4bfb
 msgid ""
-"Display all dependencies of a specific target (i.e., all targets affected "
+"Display all dependees of a specific target (i.e., all targets affected "
 "when this target is changed)"
 msgstr ""
 

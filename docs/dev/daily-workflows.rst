@@ -52,12 +52,12 @@ Inspecting build configurations
     by collective targets (e.g., ``python_sources()`` generates multiple
     ``python_source()`` targets by globbing the ``sources`` pattern)
 
-* Display all dependencies of a specific target (i.e., all targets required to
+* Display all dependees of a specific target (i.e., all targets required to
   build this target)
 
   .. code-block:: console
 
-      $ ./pants dependencies --transitive src/ai/backend/common:src
+      $ ./pants dependees --transitive src/ai/backend/common:src
 
 * Display all dependencies of a specific target (i.e., all targets affected when
   this target is changed)
