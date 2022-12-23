@@ -211,7 +211,7 @@ open-source edition. You can instead use the GUI desktop client to fully use the
 GUI features.
 
 You can download the GUI desktop client from the web GUI in the Summary page.
-Plase use the "Download Backend.AI Web UI App" at the bottom of the page.
+Please use the "Download Backend.AI Web UI App" at the bottom of the page.
 
 .. image:: ./images/webserver-dashboard-download-desktop-app.png
    :width: 450px

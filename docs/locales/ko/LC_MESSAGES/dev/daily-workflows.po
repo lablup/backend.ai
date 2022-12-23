@@ -104,7 +104,7 @@ msgstr ""
 
 #: ../../dev/daily-workflows.rst:62 7290fc47869b40c5b30e645ebd4c4bfb
 msgid ""
-"Display all dependees of a specific target (i.e., all targets affected "
+"Display all dependencies of a specific target (i.e., all targets affected "
 "when this target is changed)"
 msgstr ""
 
@@ -729,7 +729,7 @@ msgstr ""
 #: ../../dev/daily-workflows.rst:576 4cbc0303af454f91a84aadf7cf1ab64b
 msgid ""
 "You may append ``--draft`` to see a preview of the changelog update "
-"without actually modifying the filesytem."
+"without actually modifying the filesystem."
 msgstr ""
 
 #: ../../dev/daily-workflows.rst:579 c337102e9763462996c74c7c4ed17793

@@ -645,7 +645,7 @@ Virtual Folder Item Object
      - The date and time when the folder is created.
    * - ``last_used``
      - ``datetime``
-     - The date adn time when the folder is last used.
+     - The date and time when the folder is last used.
    * - ``user``
      - ``UUID``
      - The user ID if the owner of this item is a user. Otherwise, ``null``.

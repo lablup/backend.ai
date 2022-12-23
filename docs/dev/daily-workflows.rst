@@ -59,12 +59,12 @@ Inspecting build configurations
 
       $ ./pants dependencies --transitive src/ai/backend/common:src
 
-* Display all dependees of a specific target (i.e., all targets affected when
+* Display all dependencies of a specific target (i.e., all targets affected when
   this target is changed)
 
   .. code-block:: console
 
-      $ ./pants dependees --transitive src/ai/backend/common:src
+      $ ./pants dependencies --transitive src/ai/backend/common:src
 
 .. note::
 
@@ -574,7 +574,7 @@ Making a new release
 * Run ``LOCKSET=tools/towncrier ./py -m towncrier`` to auto-generate the changelog.
 
   - You may append ``--draft`` to see a preview of the changelog update without
-    actually modifying the filesytem.
+    actually modifying the filesystem.
 
   - (WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
 
