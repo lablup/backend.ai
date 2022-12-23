@@ -92,7 +92,7 @@ will automatically recognize the location. Adjust each field to conform to your
 system.
 
 
-Global configuraiton
+Global configuration
 --------------------
 
 Etcd (cluster) stores globally shared configurations for all nodes. Some of them
@@ -235,7 +235,7 @@ You can run the service:
    $ cd "${HOME}/manager"
    $ python -m ai.backend.manager.server
 
-Check if the service is runnning. The default Manager API port is 8081, but it
+Check if the service is running. The default Manager API port is 8081, but it
 can be configured from ``manager.toml``:
 
 .. code-block:: console

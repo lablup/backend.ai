@@ -729,7 +729,7 @@ msgstr ""
 #: ../../dev/daily-workflows.rst:576 4cbc0303af454f91a84aadf7cf1ab64b
 msgid ""
 "You may append ``--draft`` to see a preview of the changelog update "
-"without actually modifying the filesytem."
+"without actually modifying the filesystem."
 msgstr ""
 
 #: ../../dev/daily-workflows.rst:579 c337102e9763462996c74c7c4ed17793

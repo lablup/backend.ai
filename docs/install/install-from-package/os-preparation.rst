@@ -109,7 +109,7 @@ Prepare required Python versions and virtual environments
 
 Prepare a Python distribution whose version meets the requirements of the target
 package. Backend.AI 22.09, for example, requires Python 3.10. The latest
-information on the Python version compability can be found at
+information on the Python version compatibility can be found at
 `here <https://github.com/lablup/backend.ai#package-installation-guide#python-version-compatibility>`_.
 
 There can be several ways to prepare a specific Python version. Here, we will be

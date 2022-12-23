@@ -71,7 +71,7 @@ We are looking for people to help with a short guide for building PDF document b
 
 ## Advanced Settings
 
-### Managing the hierachy of toctree (Table of Contents) of documentation
+### Managing the hierarchy of toctree (Table of Contents) of documentation
 
 When documentation of each file gets too big to contain all things in one topic,
 It should be branched with proper sub-topics.

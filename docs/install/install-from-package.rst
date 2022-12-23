@@ -41,7 +41,7 @@ It is also possible to configure a high-availability (HA) setup with three or
 more management nodes, although this is not the focus of this guide.
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Table of Contents
 
    install-from-package/os-preparation

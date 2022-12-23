@@ -211,7 +211,7 @@ open-source edition. You can instead use the GUI desktop client to fully use the
 GUI features.
 
 You can download the GUI desktop client from the web GUI in the Summary page.
-Plase use the "Download Backend.AI Web UI App" at the bottom of the page.
+Please use the "Download Backend.AI Web UI App" at the bottom of the page.
 
 .. image:: ./images/webserver-dashboard-download-desktop-app.png
    :width: 450px
@@ -220,4 +220,4 @@ Plase use the "Download Backend.AI Web UI App" at the bottom of the page.
 Or, you can download from the following release page:
 https://github.com/lablup/backend.ai-webui/releases
 
-Web UI (user GUI) guide can be found at https://docs.webui.backend.ai/.
+Web UI (user GUI) guide can be found at https://webui.docs.backend.ai/.
