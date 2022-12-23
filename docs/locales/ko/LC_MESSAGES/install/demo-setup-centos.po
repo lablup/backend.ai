@@ -60,11 +60,11 @@ msgid "install pre-requirement package"
 msgstr "선행 필수 패키지 설치"
 
 #: ../../install/demo-setup-centos.rst:27 dc9b41b25c6a4bb3b75aa3ff002870f2
-msgid "install pyenv that support enviroment for Python"
+msgid "install pyenv that support environment for Python"
 msgstr "Python 환경을 위한 pyenv 설치"
 
 #: ../../install/demo-setup-centos.rst:37 f5c6cfaf52db411e9e2574ca1e15fae0
-msgid "install pyenv that support virtual enviroment for Python"
+msgid "install pyenv that support virtual environment for Python"
 msgstr "Python 가상환경을 위한 pyenv 설치"
 
 #: ../../install/demo-setup-centos.rst:45 85a6b9ec738148aa95b3c93b7874d9fe

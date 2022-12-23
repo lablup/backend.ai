@@ -56,7 +56,7 @@ msgstr ""
 
 #: ../../install/install-from-package.rst:19 0d04e98547d34d2e81ea476497526ab2
 msgid ""
-"`Use pyenv to manaully build and select a specific Python version "
+"`Use pyenv to manually build and select a specific Python version "
 "<https://github.com/pyenv/pyenv>`_"
 msgstr ""
 
