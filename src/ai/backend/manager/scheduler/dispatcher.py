@@ -328,6 +328,13 @@ class SchedulerDispatcher(aobject):
             async with self.db.begin_readonly() as conn:
                 candidate_agents = await _list_agents_by_sgroup(conn, sgroup_name)
                 total_capacity = sum((ag.available_slots for ag in candidate_agents), zero)
+            if not candidate_agents:
+                raise InstanceNotAvailable(
+                    extra_msg=(
+                        f"No agents is available or has ALIVE status "
+                        f"(scaling_group: {sgroup_name}."
+                    ),
+                )
 
             picked_session_id = scheduler.pick_session(
                 total_capacity,
