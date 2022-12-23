@@ -33,9 +33,8 @@ if limit > 0 and count >= limit then
     result[2] = count
     return result
 end
-redis.call('INCR', key)
 result[1] = 1
-result[2] = count + 1
+result[2] = count
 return result
 """
 
@@ -91,7 +90,7 @@ async def check_concurrency(
             "You cannot run more than " f"{max_concurrent_sessions} concurrent sessions",
         )
     log.debug(
-        "number of concurrent sessions of ak:{0} = {1} / {2}",
+        "Current number of concurrent sessions of ak:{0} = {1} / {2}",
         sess_ctx.access_key,
         concurrency_used,
         max_concurrent_sessions,

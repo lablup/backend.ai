@@ -16,6 +16,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.sql.expression import true
 
+from ai.backend.common import redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -498,6 +499,13 @@ class SchedulerDispatcher(aobject):
                 raise RuntimeError(
                     f"should not reach here; unknown cluster_mode: {sess_ctx.cluster_mode}",
                 )
+            await redis_helper.execute(
+                sched_ctx.registry.redis_stat,
+                lambda r: r.incrby(
+                    f"keypair.concurrency_used.{sess_ctx.access_key}",
+                    1,
+                ),
+            )
             num_scheduled += 1
         if num_scheduled > 0:
             await self.event_producer.produce_event(DoPrepareEvent())
