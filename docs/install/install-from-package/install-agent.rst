@@ -55,9 +55,6 @@ service. Refer to the
 for a detailed description of each section and item. A configuration example
 would be:
 
-You may need to configure ``[agent].allow-compute-plugins`` with the full
-package path (e.g., ``ai.backend.accelerator.cuda_open``) to activate them.
-
 .. code-block:: toml
 
    [etcd]
@@ -139,6 +136,9 @@ package path (e.g., ``ai.backend.accelerator.cuda_open``) to activate them.
    backup-count = 10
    size-limit = "64M"
 
+You may need to configure ``[agent].allow-compute-plugins`` with the full
+package path (e.g., ``ai.backend.accelerator.cuda_open``) to activate them.
+
 Save the contents to ``${HOME}/.config/backend.ai/agent.toml``. Backend.AI
 will automatically recognize the location. Adjust each field to conform to your
 system.
@@ -156,7 +156,7 @@ You can run the service:
 
 You should see a log message like ``started handling RPC requests at ...``
 
-There is an add-on service, Agent Wathcer, that can be used to monitor and manage
+There is an add-on service, Agent Watcher, that can be used to monitor and manage
 the Agent service. It is not required to run the Agent service, but it is
 recommended to use it for production environments.
 
