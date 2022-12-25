@@ -4,7 +4,7 @@ import enum
 import os.path
 import uuid
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Union
 
 import graphene
 import sqlalchemy as sa
@@ -14,7 +14,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common.types import VFolderHostPermissionMap, VFolderMount
+from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderMount
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
 from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
@@ -54,6 +54,7 @@ __all__: Sequence[str] = (
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
+    "check_vfolder_host_perm",
 )
 
 
@@ -472,7 +473,7 @@ async def get_allowed_vfolder_hosts_by_group(
 
 async def get_allowed_vfolder_hosts_by_user(
     conn: SAConnection,
-    resource_policy,
+    resource_policy: Mapping[str, Any],
     domain_name: str,
     user_uuid: uuid.UUID,
     group_id: Optional[uuid.UUID] = None,
@@ -529,6 +530,7 @@ async def prepare_vfolder_mounts(
     storage_manager: StorageSessionManager,
     allowed_vfolder_types: Sequence[str],
     user_scope: UserScope,
+    resource_policy: Mapping[str, Any],
     requested_mounts: Sequence[str],
     requested_mount_map: Mapping[str, str],
 ) -> Sequence[VFolderMount]:
@@ -602,6 +604,15 @@ async def prepare_vfolder_mounts(
     for key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
+        await check_vfolder_host_perm(
+            conn,
+            user_scope.user_uuid,
+            vfolder["host"],
+            resource_policy,
+            user_scope.group_id,
+            user_scope.domain_name,
+            perm=VFolderHostPermission.MOUNT_IN_SESSION,
+        )
         if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
             # User's accessible group vfolders should not be mounted
             # if not belong to the execution kernel.
@@ -672,6 +683,45 @@ async def prepare_vfolder_mounts(
                 )
 
     return matched_vfolder_mounts
+
+
+async def check_vfolder_host_perm(
+    db_conn,
+    user_uuid: uuid.UUID,
+    folder_host: str,
+    resource_policy: Mapping[str, Any],
+    group_id_or_name: Union[str, uuid.UUID],
+    domain_name: str,
+    *,
+    perm: VFolderHostPermission,
+    skip_rule: bool = False,
+) -> None:
+    from .group import groups
+
+    if skip_rule:
+        return
+    if isinstance(group_id_or_name, str):
+        query = (
+            sa.select([groups.c.id])
+            .select_from(groups)
+            .where(groups.c.domain_name == domain_name)
+            .where(groups.c.name == group_id_or_name)
+        )
+        group_id = await db_conn.scalar(query)
+    else:
+        group_id = group_id_or_name
+    # Check resource policy's allowed_vfolder_hosts
+    if group_id is not None:
+        allowed_hosts = await get_allowed_vfolder_hosts_by_group(
+            db_conn, resource_policy, domain_name, group_id
+        )
+    else:
+        allowed_hosts = await get_allowed_vfolder_hosts_by_user(
+            db_conn, resource_policy, domain_name, user_uuid
+        )
+    # TODO: handle legacy host lists assuming that volume names don't overlap?
+    if folder_host not in allowed_hosts or perm not in allowed_hosts[folder_host]:
+        raise InvalidAPIParameters("You are not allowed to use this vfolder host.")
 
 
 class VirtualFolder(graphene.ObjectType):

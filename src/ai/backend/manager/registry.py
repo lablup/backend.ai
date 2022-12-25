@@ -860,6 +860,7 @@ class AgentRegistry:
                 self.storage_manager,
                 allowed_vfolder_types,
                 user_scope,
+                resource_policy,
                 requested_mounts,
                 requested_mount_map,
             )
