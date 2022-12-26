@@ -10,7 +10,6 @@ import logging
 import sys
 import time
 from decimal import Decimal
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -25,6 +24,7 @@ from typing import (
     Tuple,
 )
 
+import aiodocker
 import attrs
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
@@ -484,31 +484,18 @@ class StatContext:
 
         Intended to be used by the agent.
         """
-
-        def is_root_user(pid: PID) -> bool:
-            _root_uid = "0"
-            proc_status_path = Path(f"/proc/{pid}/status")
-            proc_status = {
-                k: v
-                for k, v in map(lambda l: l.split(":\t"), proc_status_path.read_text().splitlines())
-            }
-            if proc_status["Uid"].split("\t")[0] == _root_uid:
-                return True
-            return False
-
         async with self._lock:
             pid_map = {}
+            total_pids = []
             pids = []
-            filtered_proc_pids = []
             for cid in container_ids:
-                container_pids_path = Path(f"/sys/fs/cgroup/pids/docker/{cid}/cgroup.procs")
                 try:
-                    raw_pids = [PID(int(p)) for p in container_pids_path.read_text().splitlines()]
-                    filtered_proc_pids = [pid for pid in raw_pids if not is_root_user(pid)]
-                    unused_pids = set(self.process_metrics[cid].keys()) - set(filtered_proc_pids)
-                except FileNotFoundError:
-                    log.warning("no process for container {}", cid)
-                except KeyError:
+                    docker = aiodocker.Docker()
+                    result = await docker._query_json(f"containers/{cid}/top", method="GET")
+                    procs = result["Processes"]
+                    pids = [PID(int(proc[1])) for proc in procs if proc[0] != "root"]
+                    unused_pids = set(self.process_metrics[cid].keys()) - set(pids)
+                except (KeyError, aiodocker.exceptions.DockerError):
                     log.warning(
                         "collect_per_container_process_stat(): cannot found container {}", cid
                     )
@@ -516,9 +503,11 @@ class StatContext:
                     for unused_pid in unused_pids:
                         log.debug("removing pid_metric for {}: {}", cid, unused_pid)
                         self.process_metrics[cid].pop(unused_pid, None)
-                for pid in filtered_proc_pids:
+                finally:
+                    await docker.close()
+                for pid in pids:
                     pid_map[pid] = cid
-                pids.extend(filtered_proc_pids)
+                total_pids.extend(pids)
 
             # Here we use asyncio.gather() instead of aiotools.TaskGroup
             # to keep methods of other plugins running when a plugin raises an error
@@ -527,7 +516,7 @@ class StatContext:
             for computer in self.agent.computers.values():
                 _tasks.append(
                     asyncio.create_task(
-                        computer.instance.gather_process_measures(self, pids),
+                        computer.instance.gather_process_measures(self, total_pids),
                     )
                 )
             results = await asyncio.gather(*_tasks, return_exceptions=True)
