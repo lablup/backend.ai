@@ -554,8 +554,7 @@ async def server_main(
 
     async def on_prepare(request, response):
         # Remove "Server" header for a security reason.
-        if "Server" in response.headers:
-            del response.headers["Server"]
+        response.headers.popall("Server", None)
 
     app.on_response_prepare.append(on_prepare)
 
