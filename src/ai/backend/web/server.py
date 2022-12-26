@@ -552,6 +552,13 @@ async def server_main(
     app.on_shutdown.append(server_shutdown)
     app.on_cleanup.append(server_cleanup)
 
+    async def on_prepare(request, response):
+        # Remove "Server" header for a security reason.
+        if "Server" in response.headers:
+            del response.headers["Server"]
+
+    app.on_response_prepare.append(on_prepare)
+
     ssl_ctx = None
     if config["service"]["ssl_enabled"]:
         ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
