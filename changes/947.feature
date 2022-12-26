@@ -1,1 +1,1 @@
-Remove the Server response header from Webserver, which could potentially provide attackers with the detailed server software version.
+Remove the `Server` HTTP response header from the web server since it could potentially expose more attack surfaces to crackers
