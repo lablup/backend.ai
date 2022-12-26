@@ -336,7 +336,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
     async with root_ctx.db.begin() as conn:
-        # Convert group name to uuid if group name is given.
         if isinstance(group_id_or_name, str):
             query = (
                 sa.select([groups.c.id])
@@ -347,22 +346,16 @@ async def create(request: web.Request, params: Any) -> web.Response:
             group_id = await conn.scalar(query)
         else:
             group_id = group_id_or_name
-        if not unmanaged_path:
-            # Check resource policy's allowed_vfolder_hosts
-            if group_id is not None:
-                allowed_hosts = await get_allowed_vfolder_hosts_by_group(
-                    conn, resource_policy, domain_name, group_id
-                )
-            else:
-                allowed_hosts = await get_allowed_vfolder_hosts_by_user(
-                    conn, resource_policy, domain_name, user_uuid
-                )
-            # TODO: handle legacy host lists assuming that volume names don't overlap?
-            if (
-                folder_host not in allowed_hosts
-                or VFolderHostPermission.CREATE not in allowed_hosts[folder_host]
-            ):
-                raise InvalidAPIParameters("You are not allowed to use this vfolder host.")
+        await check_vfolder_host_perm(
+            conn,
+            user_uuid,
+            folder_host,
+            resource_policy,
+            domain_name,
+            group_id,
+            perm=VFolderHostPermission.CREATE,
+            skip_rule=bool(unmanaged_path),
+        )
 
         # Check resource policy's max_vfolder_count
         if resource_policy["max_vfolder_count"] > 0:
@@ -587,7 +580,6 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
-    group_id_or_name = params["group"]
     log.info("VFOLDER.DELETE_BY_ID (ak:{}, vf:{})", access_key, params["id"])
     async with root_ctx.db.begin() as conn:
         query = (
@@ -599,7 +591,6 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             user_uuid,
             folder_host,
             resource_policy,
-            group_id_or_name,
             domain_name,
             perm=VFolderHostPermission.DELETE,
         )
@@ -862,7 +853,6 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
-    group_id_or_name = params["group"]
 
     if user_role == UserRole.SUPERADMIN:
         pass
@@ -874,7 +864,6 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
                 user_uuid,
                 folder_host,
                 resource_policy,
-                group_id_or_name,
                 domain_name,
                 perm=VFolderHostPermission.MODIFY,
             )
@@ -1019,7 +1008,6 @@ async def update_vfolder_options(
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
-    group_id_or_name = params["group"]
     async with root_ctx.db.begin_readonly() as conn:
         query = sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == row["id"])
         folder_host = await conn.scalar(query)
@@ -1028,7 +1016,6 @@ async def update_vfolder_options(
             user_uuid,
             folder_host,
             resource_policy,
-            group_id_or_name,
             domain_name,
             perm=VFolderHostPermission.MODIFY,
         )
@@ -1113,14 +1100,12 @@ async def create_download_session(
     folder_host = row["host"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
-    group_id_or_name = params["group"]
     async with root_ctx.db.begin_readonly() as conn:
         await check_vfolder_host_perm(
             conn,
             user_uuid,
             folder_host,
             resource_policy,
-            group_id_or_name,
             domain_name,
             perm=VFolderHostPermission.DOWNLOAD_FILE,
         )
@@ -1170,14 +1155,12 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
     domain_name = request["user"]["domain_name"]
     folder_host = row["host"]
     resource_policy = request["keypair"]["resource_policy"]
-    group_id_or_name = params["group"]
     async with root_ctx.db.begin_readonly() as conn:
         await check_vfolder_host_perm(
             conn,
             user_uuid,
             folder_host,
             resource_policy,
-            group_id_or_name,
             domain_name,
             perm=VFolderHostPermission.UPLOAD_FILE,
         )
@@ -1224,14 +1207,12 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
     domain_name = request["user"]["domain_name"]
     folder_host = row["host"]
     resource_policy = request["keypair"]["resource_policy"]
-    group_id_or_name = params["group"]
     async with root_ctx.db.begin_readonly() as conn:
         await check_vfolder_host_perm(
             conn,
             user_uuid,
             folder_host,
             resource_policy,
-            group_id_or_name,
             domain_name,
             perm=VFolderHostPermission.MODIFY,
         )
@@ -1498,7 +1479,6 @@ async def invite(request: web.Request, params: Any) -> web.Response:
     )
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
-    group_id_or_name = params["group"]
     if folder_name.startswith("."):
         raise GenericForbidden("Cannot share private dot-prefixed vfolders.")
     async with root_ctx.db.begin_readonly() as conn:
@@ -1521,7 +1501,6 @@ async def invite(request: web.Request, params: Any) -> web.Response:
             user_uuid,
             folder_host,
             resource_policy,
-            group_id_or_name,
             domain_name,
             perm=VFolderHostPermission.INVITE_OTHERS,
         )
@@ -1815,7 +1794,6 @@ async def share(request: web.Request, params: Any) -> web.Response:
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
-    group_id_or_name = params["group"]
     async with root_ctx.db.begin() as conn:
         from ..models import association_groups_users as agus
 
@@ -1840,7 +1818,6 @@ async def share(request: web.Request, params: Any) -> web.Response:
             user_uuid,
             vf_info["host"],
             resource_policy,
-            group_id_or_name,
             domain_name,
             perm=VFolderHostPermission.SET_USER_PERM,
         )
@@ -1935,7 +1912,6 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
-    group_id_or_name = params["group"]
     async with root_ctx.db.begin() as conn:
         # Get the group-type virtual folder.
         query = (
@@ -1958,7 +1934,6 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
             user_uuid,
             vf_info["host"],
             resource_policy,
-            group_id_or_name,
             domain_name,
             perm=VFolderHostPermission.SET_USER_PERM,
         )
@@ -1997,7 +1972,6 @@ async def delete(request: web.Request) -> web.Response:
     log.info("VFOLDER.DELETE (ak:{}, vf:{})", access_key, folder_name)
     folder_host = request["folder_host"]
     resource_policy = request["keypair"]["resource_policy"]
-    group_id_or_name = request["group"]
 
     async with root_ctx.db.begin() as conn:
         entries = await query_accessible_vfolders(
@@ -2039,7 +2013,6 @@ async def delete(request: web.Request) -> web.Response:
             user_uuid,
             entry["host"],
             resource_policy,
-            group_id_or_name,
             domain_name,
             perm=VFolderHostPermission.DELETE,
         )

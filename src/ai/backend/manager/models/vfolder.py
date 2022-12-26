@@ -4,7 +4,7 @@ import enum
 import os.path
 import uuid
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -609,8 +609,8 @@ async def prepare_vfolder_mounts(
             user_scope.user_uuid,
             vfolder["host"],
             resource_policy,
-            user_scope.group_id,
             user_scope.domain_name,
+            user_scope.group_id,
             perm=VFolderHostPermission.MOUNT_IN_SESSION,
         )
         if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
@@ -690,26 +690,14 @@ async def check_vfolder_host_perm(
     user_uuid: uuid.UUID,
     folder_host: str,
     resource_policy: Mapping[str, Any],
-    group_id_or_name: Union[str, uuid.UUID],
     domain_name: str,
+    group_id: Optional[uuid.UUID] = None,
     *,
     perm: VFolderHostPermission,
     skip_rule: bool = False,
 ) -> None:
-    from .group import groups
-
     if skip_rule:
         return
-    if isinstance(group_id_or_name, str):
-        query = (
-            sa.select([groups.c.id])
-            .select_from(groups)
-            .where(groups.c.domain_name == domain_name)
-            .where(groups.c.name == group_id_or_name)
-        )
-        group_id = await db_conn.scalar(query)
-    else:
-        group_id = group_id_or_name
     # Check resource policy's allowed_vfolder_hosts
     if group_id is not None:
         allowed_hosts = await get_allowed_vfolder_hosts_by_group(
