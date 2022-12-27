@@ -46,7 +46,7 @@ from ..models import (
     VFolderPermissionValidator,
     VFolderUsageMode,
     agents,
-    check_vfolder_host_perm,
+    filter_allowed_perm_host,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
     groups,
@@ -348,9 +348,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
         else:
             group_id = group_id_or_name
         if not unmanaged_path:
-            await check_vfolder_host_perm(
+            await filter_allowed_perm_host(
                 conn,
                 folder_host,
+                allowed_vfolder_types=allowed_vfolder_types,
                 user_uuid=user_uuid,
                 resource_policy=resource_policy,
                 domain_name=domain_name,
@@ -581,15 +582,17 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info("VFOLDER.DELETE_BY_ID (ak:{}, vf:{})", access_key, params["id"])
     async with root_ctx.db.begin() as conn:
         query = (
             sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == params["id"])
         )
         folder_host = await conn.scalar(query)
-        await check_vfolder_host_perm(
+        await filter_allowed_perm_host(
             conn,
             folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
             domain_name=domain_name,
@@ -860,9 +863,10 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     else:
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         async with root_ctx.db.begin_readonly() as conn:
-            await check_vfolder_host_perm(
+            await filter_allowed_perm_host(
                 conn,
                 folder_host,
+                allowed_vfolder_types=allowed_vfolder_types,
                 user_uuid=user_uuid,
                 resource_policy=resource_policy,
                 domain_name=domain_name,
@@ -1009,12 +1013,14 @@ async def update_vfolder_options(
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
         query = sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == row["id"])
         folder_host = await conn.scalar(query)
-        await check_vfolder_host_perm(
+        await filter_allowed_perm_host(
             conn,
             folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
             domain_name=domain_name,
@@ -1101,10 +1107,12 @@ async def create_download_session(
     folder_host = row["host"]
     domain_name = request["user"]["domain_name"]
     resource_policy = request["keypair"]["resource_policy"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
-        await check_vfolder_host_perm(
+        await filter_allowed_perm_host(
             conn,
             folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
             domain_name=domain_name,
@@ -1156,10 +1164,12 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
     domain_name = request["user"]["domain_name"]
     folder_host = row["host"]
     resource_policy = request["keypair"]["resource_policy"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
-        await check_vfolder_host_perm(
+        await filter_allowed_perm_host(
             conn,
             folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
             domain_name=domain_name,
@@ -1208,10 +1218,12 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
     domain_name = request["user"]["domain_name"]
     folder_host = row["host"]
     resource_policy = request["keypair"]["resource_policy"]
+    allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
-        await check_vfolder_host_perm(
+        await filter_allowed_perm_host(
             conn,
             folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
             domain_name=domain_name,
@@ -1497,9 +1509,11 @@ async def invite(request: web.Request, params: Any) -> web.Response:
         if vf is None:
             raise VFolderNotFound()
         folder_host = vf.host
-        await check_vfolder_host_perm(
+        allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+        await filter_allowed_perm_host(
             conn,
             folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
             domain_name=domain_name,
@@ -1814,9 +1828,11 @@ async def share(request: web.Request, params: Any) -> web.Response:
         if len(vf_infos) > 1:
             raise InternalServerError(f"Multiple project folders found: {folder_name}")
         vf_info = vf_infos[0]
-        await check_vfolder_host_perm(
+        allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+        await filter_allowed_perm_host(
             conn,
             vf_info["host"],
+            allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
             domain_name=domain_name,
@@ -1930,9 +1946,11 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
         if len(vf_infos) > 1:
             raise InternalServerError(f"Multiple project folders found: {folder_name}")
         vf_info = vf_infos[0]
-        await check_vfolder_host_perm(
+        allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
+        await filter_allowed_perm_host(
             conn,
             vf_info["host"],
+            allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
             domain_name=domain_name,
@@ -2009,9 +2027,10 @@ async def delete(request: web.Request) -> web.Response:
         # query_accesible_vfolders returns list
         entry = entries[0]
         folder_host = entry["host"]
-        await check_vfolder_host_perm(
+        await filter_allowed_perm_host(
             conn,
             folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
             domain_name=domain_name,
@@ -2165,11 +2184,14 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         raise InvalidAPIParameters("proxy name of source and target vfolders must be equal.")
 
     async with root_ctx.db.begin() as conn:
-        allowed_hosts = await get_allowed_vfolder_hosts_by_user(
+        allowed_hosts = await filter_allowed_perm_host(
             conn,
-            resource_policy,
-            domain_name,
-            user_uuid,
+            target_folder_host,
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
+            perm=VFolderHostPermission.CREATE,
         )
         # TODO: handle legacy host lists assuming that volume names don't overlap?
         if target_folder_host not in allowed_hosts:

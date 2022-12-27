@@ -54,7 +54,7 @@ __all__: Sequence[str] = (
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
-    "check_vfolder_host_perm",
+    "filter_allowed_perm_host",
 )
 
 
@@ -604,9 +604,10 @@ async def prepare_vfolder_mounts(
     for key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
-        await check_vfolder_host_perm(
+        await filter_allowed_perm_host(
             conn,
             vfolder["host"],
+            allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_scope.user_uuid,
             resource_policy=resource_policy,
             domain_name=user_scope.domain_name,
@@ -685,28 +686,35 @@ async def prepare_vfolder_mounts(
     return matched_vfolder_mounts
 
 
-async def check_vfolder_host_perm(
+async def filter_allowed_perm_host(
     db_conn,
     folder_host: str,
     *,
     perm: VFolderHostPermission,
+    allowed_vfolder_types: Sequence[str],
     user_uuid: uuid.UUID,
     resource_policy: Mapping[str, Any],
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
-) -> None:
-    # Check resource policy's allowed_vfolder_hosts
-    if group_id is not None:
-        allowed_hosts = await get_allowed_vfolder_hosts_by_group(
-            db_conn, resource_policy, domain_name, group_id
-        )
-    else:
-        allowed_hosts = await get_allowed_vfolder_hosts_by_user(
+) -> VFolderHostPermissionMap:
+    allowed_hosts = VFolderHostPermissionMap()
+    if "user" in allowed_vfolder_types:
+        allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
             db_conn, resource_policy, domain_name, user_uuid
         )
+        allowed_hosts = allowed_hosts | allowed_hosts_by_user
+    if "group" in allowed_vfolder_types and group_id is not None:
+        allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
+            db_conn, resource_policy, domain_name, group_id
+        )
+        allowed_hosts = allowed_hosts | allowed_hosts_by_group
     # TODO: handle legacy host lists assuming that volume names don't overlap?
     if folder_host not in allowed_hosts or perm not in allowed_hosts[folder_host]:
-        raise InvalidAPIParameters("You are not allowed to use this vfolder host.")
+        raise InvalidAPIParameters(
+            f"Not allowed to use this vfolder host. "
+            f"Required permission(`{perm}`) is not found in `{allowed_hosts.get(folder_host, VFolderHostPermissionMap())}`."
+        )
+    return allowed_hosts
 
 
 class VirtualFolder(graphene.ObjectType):
