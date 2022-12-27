@@ -254,7 +254,7 @@ def verify_vfolder_name(folder: str) -> bool:
 
 
 Selectable = TypeVar(
-    "Selectable", bound=Union[sa.schema.Table, sa.schema.Column, sa.sql.GenericFunction]
+    "Selectable", bound=Union[sa.schema.Table, sa.schema.Column, sa.sql.functions.GenericFunction]
 )
 
 
@@ -262,7 +262,7 @@ def _build_query_own_folders(
     selectors: Sequence[Selectable],
     user_role: UserRole,
     user_uuid: uuid.UUID,
-    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
+    extra_vf_conds: Optional[sa.sql.OperatorExpression] = None,
 ) -> sa.sql.Select:
     from ai.backend.manager.models import users
 
@@ -279,7 +279,7 @@ async def query_own_vfolders(
     db_conn: SAConnection,
     user_uuid: uuid.UUID,
     user_role: UserRole,
-    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
+    extra_vf_conds: Optional[sa.sql.OperatorExpression] = None,
 ) -> Sequence[Mapping[str, Any]]:
     """
     Query all vfolders user created.
@@ -308,7 +308,7 @@ async def count_own_vfolders(
 def _build_query_user_type_permission_overriden_vfolders(
     selectors: Sequence[Selectable],
     user_uuid: uuid.UUID,
-    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
+    extra_vf_conds: Optional[sa.sql.OperatorExpression] = None,
 ) -> sa.sql.Select:
     from ai.backend.manager.models import users
 
@@ -331,7 +331,7 @@ def _build_query_user_type_permission_overriden_vfolders(
 async def query_user_type_permission_overriden_vfolders(
     db_conn: SAConnection,
     user_uuid: uuid.UUID,
-    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
+    extra_vf_conds: Optional[sa.sql.OperatorExpression] = None,
 ) -> Sequence[Mapping[str, Any]]:
     """
     Query all vfolders which have USER ownership type and overriden permissions,
@@ -362,7 +362,7 @@ async def count_user_type_permission_overriden_vfolders(
 def _build_query_project_group_vfolders(
     selectors: Sequence[Selectable],
     group_ids: Optional[Iterable[uuid.UUID]],
-    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
+    extra_vf_conds: Optional[sa.sql.OperatorExpression] = None,
 ) -> sa.sql.Select:
     from ai.backend.manager.models import groups
 
@@ -383,7 +383,7 @@ async def query_project_group_vfolders(
     user_uuid: uuid.UUID,
     user_role: UserRole,
     domain_name: str,
-    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
+    extra_vf_conds: Optional[sa.sql.OperatorExpression] = None,
 ) -> Sequence[Mapping[str, Any]]:
     """
     Query vfolders of project groups.
@@ -466,7 +466,7 @@ async def query_all_related_vfolders(
     *,
     user_role: UserRole,
     domain_name: str,
-    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
+    extra_vf_conds: Optional[sa.sql.OperatorExpression] = None,
 ) -> Sequence[Mapping[str, Any]]:
     # Query own vfolders
     own_vfs = await query_own_vfolders(db_conn, user_uuid, user_role, extra_vf_conds)
@@ -481,7 +481,7 @@ async def query_all_related_vfolders(
     return [*own_vfs, *invited_vfs, *group_vfs]
 
 
-async def count_all_related_vfolders(
+async def count_accessible_vfolders(
     db_conn: SAConnection,
     user_uuid: uuid.UUID,
     *,
@@ -499,11 +499,11 @@ async def count_all_related_vfolders(
 
 async def query_accessible_vfolders_by_name(
     db_conn: SAConnection,
-    user_uuid: uuid.UUID,
+    vf_name: str,
     *,
+    user_uuid: uuid.UUID,
     user_role: UserRole,
     domain_name: str,
-    vf_name: str,
 ) -> Sequence[Mapping[str, Any]]:
     return await query_all_related_vfolders(
         db_conn,
@@ -516,11 +516,11 @@ async def query_accessible_vfolders_by_name(
 
 async def query_accessible_vfolders_by_id(
     db_conn: SAConnection,
-    user_uuid: uuid.UUID,
+    vf_id: uuid.UUID,
     *,
+    user_uuid: uuid.UUID,
     user_role: UserRole,
     domain_name: str,
-    vf_id: uuid.UUID,
 ) -> Sequence[Mapping[str, Any]]:
     return await query_all_related_vfolders(
         db_conn,
@@ -1063,8 +1063,16 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
-        # return await count_all_related_vfolders()
         from .user import users
+
+        # async with graph_ctx.db.begin_readonly() as db_conn:
+        #     user_role = await db_conn.scalar(sa.select([users.c.role]).where(users.c.uuid == user_id))
+        #     return await count_accessible_vfolders(
+        #         db_conn,
+        #         user_id,
+        #         user_role=user_role,
+        #         domain_name=domain_name,
+        #     )
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True)
         query = sa.select([sa.func.count()]).select_from(j)
@@ -1094,11 +1102,19 @@ class VirtualFolder(graphene.ObjectType):
         filter: str = None,
         order: str = None,
     ) -> Sequence[VirtualFolder]:
-        # return [
-        #     obj
-        #     for r in (await query_all_related_vfolders())
-        #     if (obj := cls.from_row(graph_ctx, r)) is not None
-        # ]
+        # from .user import users
+        # async with graph_ctx.db.begin_readonly() as db_conn:
+        #     user_role = await db_conn.scalar(sa.select([users.c.role]).where(users.c.uuid == user_id))
+        #     return [
+        #         obj
+        #         for r in (await query_all_related_vfolders(
+        #             db_conn,
+        #             user_id,
+        #             user_role=user_role,
+        #             domain_name=domain_name,
+        #         ))
+        #         if (obj := cls.from_row(graph_ctx, r)) is not None
+        #     ]
         from .group import groups
         from .user import users
 
