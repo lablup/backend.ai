@@ -325,6 +325,7 @@ async def get_container_stats_for_period(
                     kernels.c.status_history,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
+                    kernels.c.cluster_mode,
                     groups.c.name,
                     users.c.email,
                 ]
@@ -430,6 +431,7 @@ async def get_container_stats_for_period(
             "status": row["status"].name,
             "status_changed": str(row["status_changed"]),
             "status_history": row["status_history"] or {},
+            "cluster_mode": row["cluster_mode"],
         }
         if group_id not in objs_per_group:
             objs_per_group[group_id] = {
