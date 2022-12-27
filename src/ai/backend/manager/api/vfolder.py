@@ -962,6 +962,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     user_uuid = request["user"]["uuid"]
+    resource_policy = request["keypair"]["resource_policy"]
     new_name = params["new_name"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info("VFOLDER.RENAME (ak:{}, vf.old:{}, vf.new:{})", access_key, old_name, new_name)
@@ -984,6 +985,15 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
                     raise InvalidAPIParameters(
                         "Cannot change the name of a vfolder " "that is not owned by myself."
                     )
+                await filter_allowed_perm_host(
+                    conn,
+                    entry["host"],
+                    allowed_vfolder_types=allowed_vfolder_types,
+                    user_uuid=user_uuid,
+                    resource_policy=resource_policy,
+                    domain_name=domain_name,
+                    perm=VFolderHostPermission.MODIFY,
+                )
                 query = (
                     sa.update(vfolders).values(name=new_name).where(vfolders.c.id == entry["id"])
                 )
