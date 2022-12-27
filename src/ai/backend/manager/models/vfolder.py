@@ -710,10 +710,7 @@ async def filter_allowed_perm_host(
         allowed_hosts = allowed_hosts | allowed_hosts_by_group
     # TODO: handle legacy host lists assuming that volume names don't overlap?
     if folder_host not in allowed_hosts or perm not in allowed_hosts[folder_host]:
-        raise InvalidAPIParameters(
-            f"Not allowed to use this vfolder host. "
-            f"Required permission(`{perm}`) is not found in `{allowed_hosts.get(folder_host, VFolderHostPermissionMap())}`."
-        )
+        raise InvalidAPIParameters(f"`{perm}` Not allowed in vfolder host(`{folder_host}`)")
     return allowed_hosts
 
 
