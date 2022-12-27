@@ -1,9 +1,9 @@
 import asyncio
-import functools
 import logging
 import os
 import platform
 from decimal import Decimal
+from functools import partial
 from pathlib import Path
 from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, cast
 
@@ -206,11 +206,11 @@ class CPUPlugin(AbstractComputePlugin):
                 return cpu_used
 
         if ctx.mode == StatModes.CGROUPFS:
-            impl = functools.partial(sysfs_impl, mode=StatModes.CGROUPFS)
+            impl = partial(sysfs_impl, mode=StatModes.CGROUPFS)
         elif ctx.mode == StatModes.SYSTEMD:
-            impl = functools.partial(sysfs_impl, mode=StatModes.SYSTEMD)
+            impl = partial(sysfs_impl, mode=StatModes.SYSTEMD)
         elif ctx.mode == StatModes.DOCKER:
-            impl = api_impl
+            impl = cast(partial[Any], api_impl)
         else:
             raise RuntimeError("should not reach here")
 
@@ -526,11 +526,11 @@ class MemoryPlugin(AbstractComputePlugin):
                 return mem_cur_bytes, io_read_bytes, io_write_bytes, scratch_sz
 
         if ctx.mode == StatModes.CGROUPFS:
-            impl = functools.partial(sysfs_impl, mode=StatModes.CGROUPFS)
+            impl = partial(sysfs_impl, mode=StatModes.CGROUPFS)
         elif ctx.mode == StatModes.SYSTEMD:
-            impl = functools.partial(sysfs_impl, mode=StatModes.SYSTEMD)
+            impl = partial(sysfs_impl, mode=StatModes.SYSTEMD)
         elif ctx.mode == StatModes.DOCKER:
-            impl = api_impl
+            impl = cast(partial[Any], api_impl)
         else:
             raise RuntimeError("should not reach here")
 
