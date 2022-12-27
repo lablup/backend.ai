@@ -336,6 +336,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
 
     async with root_ctx.db.begin() as conn:
+        # Convert group name to uuid if group name is given.
         if isinstance(group_id_or_name, str):
             query = (
                 sa.select([groups.c.id])
@@ -346,16 +347,16 @@ async def create(request: web.Request, params: Any) -> web.Response:
             group_id = await conn.scalar(query)
         else:
             group_id = group_id_or_name
-        await check_vfolder_host_perm(
-            conn,
-            user_uuid,
-            folder_host,
-            resource_policy,
-            domain_name,
-            group_id,
-            perm=VFolderHostPermission.CREATE,
-            skip_rule=bool(unmanaged_path),
-        )
+        if not unmanaged_path:
+            await check_vfolder_host_perm(
+                conn,
+                folder_host,
+                user_uuid=user_uuid,
+                resource_policy=resource_policy,
+                domain_name=domain_name,
+                group_id=group_id,
+                perm=VFolderHostPermission.CREATE,
+            )
 
         # Check resource policy's max_vfolder_count
         if resource_policy["max_vfolder_count"] > 0:
@@ -588,10 +589,10 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         folder_host = await conn.scalar(query)
         await check_vfolder_host_perm(
             conn,
-            user_uuid,
             folder_host,
-            resource_policy,
-            domain_name,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
             perm=VFolderHostPermission.DELETE,
         )
         folder_id = uuid.UUID(params["id"])
@@ -861,10 +862,10 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
         async with root_ctx.db.begin_readonly() as conn:
             await check_vfolder_host_perm(
                 conn,
-                user_uuid,
                 folder_host,
-                resource_policy,
-                domain_name,
+                user_uuid=user_uuid,
+                resource_policy=resource_policy,
+                domain_name=domain_name,
                 perm=VFolderHostPermission.MODIFY,
             )
             extra_vf_conds = [vfolders.c.id == params["id"]]
@@ -1013,10 +1014,10 @@ async def update_vfolder_options(
         folder_host = await conn.scalar(query)
         await check_vfolder_host_perm(
             conn,
-            user_uuid,
             folder_host,
-            resource_policy,
-            domain_name,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
             perm=VFolderHostPermission.MODIFY,
         )
 
@@ -1103,10 +1104,10 @@ async def create_download_session(
     async with root_ctx.db.begin_readonly() as conn:
         await check_vfolder_host_perm(
             conn,
-            user_uuid,
             folder_host,
-            resource_policy,
-            domain_name,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
             perm=VFolderHostPermission.DOWNLOAD_FILE,
         )
     proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
@@ -1158,10 +1159,10 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
     async with root_ctx.db.begin_readonly() as conn:
         await check_vfolder_host_perm(
             conn,
-            user_uuid,
             folder_host,
-            resource_policy,
-            domain_name,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
             perm=VFolderHostPermission.UPLOAD_FILE,
         )
     proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
@@ -1210,10 +1211,10 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
     async with root_ctx.db.begin_readonly() as conn:
         await check_vfolder_host_perm(
             conn,
-            user_uuid,
             folder_host,
-            resource_policy,
-            domain_name,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
             perm=VFolderHostPermission.MODIFY,
         )
     log.info(
@@ -1498,10 +1499,10 @@ async def invite(request: web.Request, params: Any) -> web.Response:
         folder_host = vf.host
         await check_vfolder_host_perm(
             conn,
-            user_uuid,
             folder_host,
-            resource_policy,
-            domain_name,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
             perm=VFolderHostPermission.INVITE_OTHERS,
         )
     async with root_ctx.db.begin() as conn:
@@ -1815,10 +1816,10 @@ async def share(request: web.Request, params: Any) -> web.Response:
         vf_info = vf_infos[0]
         await check_vfolder_host_perm(
             conn,
-            user_uuid,
             vf_info["host"],
-            resource_policy,
-            domain_name,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
             perm=VFolderHostPermission.SET_USER_PERM,
         )
 
@@ -1931,10 +1932,10 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
         vf_info = vf_infos[0]
         await check_vfolder_host_perm(
             conn,
-            user_uuid,
             vf_info["host"],
-            resource_policy,
-            domain_name,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
             perm=VFolderHostPermission.SET_USER_PERM,
         )
 
@@ -2010,10 +2011,10 @@ async def delete(request: web.Request) -> web.Response:
         entry = entries[0]
         await check_vfolder_host_perm(
             conn,
-            user_uuid,
             entry["host"],
-            resource_policy,
-            domain_name,
+            user_uuid=user_uuid,
+            resource_policy=resource_policy,
+            domain_name=domain_name,
             perm=VFolderHostPermission.DELETE,
         )
         # Folder owner OR user who have DELETE permission can delete folder.

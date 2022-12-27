@@ -606,11 +606,11 @@ async def prepare_vfolder_mounts(
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         await check_vfolder_host_perm(
             conn,
-            user_scope.user_uuid,
             vfolder["host"],
-            resource_policy,
-            user_scope.domain_name,
-            user_scope.group_id,
+            user_uuid=user_scope.user_uuid,
+            resource_policy=resource_policy,
+            domain_name=user_scope.domain_name,
+            group_id=user_scope.group_id,
             perm=VFolderHostPermission.MOUNT_IN_SESSION,
         )
         if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
@@ -687,17 +687,14 @@ async def prepare_vfolder_mounts(
 
 async def check_vfolder_host_perm(
     db_conn,
-    user_uuid: uuid.UUID,
     folder_host: str,
+    *,
+    perm: VFolderHostPermission,
+    user_uuid: uuid.UUID,
     resource_policy: Mapping[str, Any],
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
-    *,
-    perm: VFolderHostPermission,
-    skip_rule: bool = False,
 ) -> None:
-    if skip_rule:
-        return
     # Check resource policy's allowed_vfolder_hosts
     if group_id is not None:
         allowed_hosts = await get_allowed_vfolder_hosts_by_group(
