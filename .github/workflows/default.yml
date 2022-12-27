@@ -39,7 +39,7 @@ jobs:
       # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
       with:
         pants-python-version: "3.9"
-        gha-cache-key: pants-linux-py39
+        gha-cache-key: pants-cache0-py${{ env.PROJECT_PYTHON_VERSION }}
         named-caches-hash: ${{ hashFiles('*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Check BUILD files
@@ -95,7 +95,7 @@ jobs:
       # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
       with:
         pants-python-version: "3.9"
-        gha-cache-key: pants-linux-py39
+        gha-cache-key: pants-cache0-py${{ env.PROJECT_PYTHON_VERSION }}
         named-caches-hash: ${{ hashFiles('*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Typecheck
@@ -159,7 +159,7 @@ jobs:
       # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
       with:
         pants-python-version: "3.9"
-        gha-cache-key: pants-linux-py39
+        gha-cache-key: pants-cache0-py${{ env.PROJECT_PYTHON_VERSION }}
         named-caches-hash: ${{ hashFiles('*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
@@ -220,7 +220,7 @@ jobs:
       # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
       with:
         pants-python-version: "3.9"
-        gha-cache-key: pants-linux-py39
+        gha-cache-key: pants-cache0-py${{ env.PROJECT_PYTHON_VERSION }}
         named-caches-hash: ${{ hashFiles('*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Install local dependencies for packaging and publishing

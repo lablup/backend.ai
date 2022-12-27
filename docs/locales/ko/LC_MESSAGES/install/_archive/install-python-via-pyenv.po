@@ -72,7 +72,7 @@ msgstr ""
 #: ../../install/_archive/install-python-via-pyenv.md:25
 #: 6fa839c3871b4295a94082c8810dbed1
 msgid ""
-"**NOTE:** Change `~/.profile` accroding to your shell/system (e.g., `~/."
+"**NOTE:** Change `~/.profile` according to your shell/system (e.g., `~/."
 "bashrc`, `~/.bash_profile`, `~/.zshrc`, ...) -- whichever loaded at startup "
 "of your shell!"
 msgstr ""

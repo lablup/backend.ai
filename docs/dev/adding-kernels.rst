@@ -26,13 +26,13 @@ Every Backend.AI kernel should run a small daemon called "kernel runner".
 It communicates with the Backend.AI Agent running in the host via ZeroMQ, and manages user code execution and in-container service processes.
 
 The kernel runner provides runtime-specific implementations for various code execution modes such as the query mode and the batch mode, compatible with a number of well-known programming languages.
-It also manages the process lifecycles of service-port processess.
+It also manages the process lifecycles of service-port processes.
 
 To decouple the development and update cycles for Docker images and the Backend.AI Agent, we don't install the kernel runner inside images.
 Instead, Backend.AI Agent mounts a special "krunner" volume as ``/opt/backend.ai`` inside containers.
 This volume includes a customized static build of Python.
 The kernel runner daemon package is mounted as one of the site packages of this Python distribution as well.
-The agent also uses ``/opt/kernel`` as the directory for mounting other self-contained single-binary utilties.
+The agent also uses ``/opt/kernel`` as the directory for mounting other self-contained single-binary utilities.
 This way, image authors do not have to bother with installing Python and Backend.AI specific software.
 All dirty jobs like volume deployment, its content updates, and mounting for new containers are automatically managed by Backend.AI Agent.
 
