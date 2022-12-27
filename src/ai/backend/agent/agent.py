@@ -605,6 +605,9 @@ class AbstractAgent(
             self.timer_tasks.append(aiotools.create_timer(self._scan_images_wrapper, 20.0))
             await self.scan_running_kernels()
 
+        if self.stat_ctx.mode == StatModes.CGROUP:
+            self.stat_ctx.mode = await StatModes.check_docker_cgroup_driver()
+
         # Prepare stat collector tasks.
         self.timer_tasks.append(aiotools.create_timer(self.collect_node_stat, 5.0))
         self.timer_tasks.append(aiotools.create_timer(self.collect_container_stat, 5.0))

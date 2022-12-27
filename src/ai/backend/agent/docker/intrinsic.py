@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import logging
 import os
 import platform
@@ -175,8 +176,11 @@ class CPUPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        async def sysfs_impl(container_id):
-            cpu_prefix = f"/sys/fs/cgroup/cpuacct/docker/{container_id}/"
+        async def sysfs_impl(container_id, mode):
+            if mode == StatModes.CGROUPFS:
+                cpu_prefix = f"/sys/fs/cgroup/cpuacct/docker/{container_id}/"
+            else:
+                cpu_prefix = f"/sys/fs/cgroup/cpuacct/system.slice/docker-{container_id}.scope/"
             try:
                 cpu_used = read_sysfs(cpu_prefix + "cpuacct.usage", int) / 1e6
             except IOError as e:
@@ -201,8 +205,10 @@ class CPUPlugin(AbstractComputePlugin):
                 cpu_used = nmget(ret, "cpu_stats.cpu_usage.total_usage", 0) / 1e6
                 return cpu_used
 
-        if ctx.mode == StatModes.CGROUP:
-            impl = sysfs_impl
+        if ctx.mode == StatModes.CGROUPFS:
+            impl = functools.partial(sysfs_impl, mode=StatModes.CGROUPFS)
+        elif ctx.mode == StatModes.SYSTEMD:
+            impl = functools.partial(sysfs_impl, mode=StatModes.SYSTEMD)
         elif ctx.mode == StatModes.DOCKER:
             impl = api_impl
         else:
@@ -459,9 +465,13 @@ class MemoryPlugin(AbstractComputePlugin):
             #         total_size += path.stat().st_size
             # return total_size
 
-        async def sysfs_impl(container_id):
-            mem_prefix = f"/sys/fs/cgroup/memory/docker/{container_id}/"
-            io_prefix = f"/sys/fs/cgroup/blkio/docker/{container_id}/"
+        async def sysfs_impl(container_id, mode):
+            if mode == StatModes.CGROUPFS:
+                mem_prefix = f"/sys/fs/cgroup/memory/docker/{container_id}/"
+                io_prefix = f"/sys/fs/cgroup/blkio/docker/{container_id}/"
+            else:
+                mem_prefix = f"/sys/fs/cgroup/memory/system.slice/docker-{container_id}.scope/"
+                io_prefix = f"/sys/fs/cgroup/blkio/system.slice/docker-{container_id}.scope/"
             try:
                 mem_cur_bytes = read_sysfs(mem_prefix + "memory.usage_in_bytes", int)
                 io_stats = Path(io_prefix + "blkio.throttle.io_service_bytes").read_text()
@@ -515,8 +525,10 @@ class MemoryPlugin(AbstractComputePlugin):
                 scratch_sz = await loop.run_in_executor(None, get_scratch_size, container_id)
                 return mem_cur_bytes, io_read_bytes, io_write_bytes, scratch_sz
 
-        if ctx.mode == StatModes.CGROUP:
-            impl = sysfs_impl
+        if ctx.mode == StatModes.CGROUPFS:
+            impl = functools.partial(sysfs_impl, mode=StatModes.CGROUPFS)
+        elif ctx.mode == StatModes.SYSTEMD:
+            impl = functools.partial(sysfs_impl, mode=StatModes.SYSTEMD)
         elif ctx.mode == StatModes.DOCKER:
             impl = api_impl
         else:

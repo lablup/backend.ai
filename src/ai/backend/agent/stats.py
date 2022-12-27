@@ -25,6 +25,8 @@ from typing import (
 )
 
 import attrs
+from aiodocker.docker import Docker
+from aiodocker.exceptions import DockerError
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 
@@ -66,7 +68,9 @@ def check_cgroup_available():
 
 class StatModes(enum.Enum):
     CGROUP = "cgroup"
+    CGROUPFS = "cgroupfs"
     DOCKER = "docker"
+    SYSTEMD = "systemd"
 
     @staticmethod
     def get_preferred_mode():
@@ -76,6 +80,17 @@ class StatModes(enum.Enum):
         if check_cgroup_available():
             return StatModes.CGROUP
         return StatModes.DOCKER
+
+    @classmethod
+    async def check_docker_cgroup_driver(cls):
+        try:
+            docker = Docker()
+            result = await docker._query_json("info", method="GET")
+        except DockerError:
+            return None
+        finally:
+            await docker.close()
+        return cls(result["CgroupDriver"])
 
 
 class MetricTypes(enum.Enum):
@@ -266,7 +281,7 @@ class StatContext:
         self, agent: "AbstractAgent", mode: StatModes = None, *, cache_lifespan: int = 120
     ) -> None:
         self.agent = agent
-        self.mode = mode if mode is not None else StatModes.get_preferred_mode()
+        self.mode = mode if mode == StatModes.DOCKER else StatModes.get_preferred_mode()
         self.cache_lifespan = cache_lifespan
 
         self.node_metrics = {}
