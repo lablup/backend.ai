@@ -4,7 +4,7 @@ import enum
 import os.path
 import uuid
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, TypeVar, Union
 
 import graphene
 import sqlalchemy as sa
@@ -253,7 +253,17 @@ def verify_vfolder_name(folder: str) -> bool:
     return True
 
 
-def _build_query_own_folders(selectors, user_role, user_uuid, extra_vf_conds=None) -> sa.sql.Select:
+Selectable = TypeVar(
+    "Selectable", bound=Union[sa.schema.Table, sa.schema.Column, sa.sql.GenericFunction]
+)
+
+
+def _build_query_own_folders(
+    selectors: Sequence[Selectable],
+    user_role: UserRole,
+    user_uuid: uuid.UUID,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
+) -> sa.sql.Select:
     from ai.backend.manager.models import users
 
     j = sa.join(vfolders, users, vfolders.c.user == users.c.uuid)
@@ -269,7 +279,7 @@ async def query_own_vfolders(
     db_conn: SAConnection,
     user_uuid: uuid.UUID,
     user_role: UserRole,
-    extra_vf_conds=None,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
 ) -> Sequence[Mapping[str, Any]]:
     """
     Query all vfolders user created.
@@ -296,7 +306,9 @@ async def count_own_vfolders(
 
 
 def _build_query_user_type_permission_overriden_vfolders(
-    selectors, user_uuid, extra_vf_conds=None
+    selectors: Sequence[Selectable],
+    user_uuid: uuid.UUID,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
 ) -> sa.sql.Select:
     from ai.backend.manager.models import users
 
@@ -319,7 +331,7 @@ def _build_query_user_type_permission_overriden_vfolders(
 async def query_user_type_permission_overriden_vfolders(
     db_conn: SAConnection,
     user_uuid: uuid.UUID,
-    extra_vf_conds=None,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
 ) -> Sequence[Mapping[str, Any]]:
     """
     Query all vfolders which have USER ownership type and overriden permissions,
@@ -347,7 +359,11 @@ async def count_user_type_permission_overriden_vfolders(
     return await db_conn.scalar(query)
 
 
-def _build_query_project_group_vfolders(selectors, group_ids, extra_vf_conds=None) -> sa.sql.Select:
+def _build_query_project_group_vfolders(
+    selectors: Sequence[Selectable],
+    group_ids: Optional[Iterable[uuid.UUID]],
+    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
+) -> sa.sql.Select:
     from ai.backend.manager.models import groups
 
     j = sa.join(vfolders, groups, vfolders.c.group == groups.c.id)
@@ -367,7 +383,7 @@ async def query_project_group_vfolders(
     user_uuid: uuid.UUID,
     user_role: UserRole,
     domain_name: str,
-    extra_vf_conds=None,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
 ) -> Sequence[Mapping[str, Any]]:
     """
     Query vfolders of project groups.
@@ -450,7 +466,7 @@ async def query_all_related_vfolders(
     *,
     user_role: UserRole,
     domain_name: str,
-    extra_vf_conds=None,
+    extra_vf_conds: Optional[sa.sql.BinaryExpression] = None,
 ) -> Sequence[Mapping[str, Any]]:
     # Query own vfolders
     own_vfs = await query_own_vfolders(db_conn, user_uuid, user_role, extra_vf_conds)
