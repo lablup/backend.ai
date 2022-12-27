@@ -1971,7 +1971,6 @@ async def delete(request: web.Request) -> web.Response:
     user_uuid = request["user"]["uuid"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info("VFOLDER.DELETE (ak:{}, vf:{})", access_key, folder_name)
-    folder_host = request["folder_host"]
     resource_policy = request["keypair"]["resource_policy"]
 
     async with root_ctx.db.begin() as conn:
@@ -2009,9 +2008,10 @@ async def delete(request: web.Request) -> web.Response:
             raise InvalidAPIParameters("No such vfolder.")
         # query_accesible_vfolders returns list
         entry = entries[0]
+        folder_host = entry["host"]
         await check_vfolder_host_perm(
             conn,
-            entry["host"],
+            folder_host,
             user_uuid=user_uuid,
             resource_policy=resource_policy,
             domain_name=domain_name,
@@ -2027,7 +2027,6 @@ async def delete(request: web.Request) -> web.Response:
         )
         await conn.execute(query)
 
-        folder_host = entry["host"]
         folder_id = entry["id"]
         query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
         await conn.execute(query)
