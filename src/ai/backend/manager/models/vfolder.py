@@ -403,6 +403,7 @@ async def query_all_related_vfolders(
     *,
     user_role: UserRole,
     domain_name: str,
+    allowed_vfolder_types: Optional[Sequence[str]] = None,
     order: Optional[tuple[str, Mapping[str, str]]] = None,
     query_filter: Optional[tuple[str, Mapping[str, Any]]] = None,
     extra_vf_conds: Optional[sa.sql.OperatorExpression] = None,
@@ -410,55 +411,63 @@ async def query_all_related_vfolders(
     from .group import groups
     from .user import users
 
+    if allowed_vfolder_types is None:
+        allowed_vfolder_types = ("user",)
+
     queries: list[tuple[sa.sql.Select, Optional[Callable]]] = []
 
-    # Query own vfolders
-    queries.append(
-        (
-            _build_query_own_folders(
-                [vfolders, users.c.email],
-                user_role,
-                user_uuid,
-                query_filter=query_filter,
-                extra_vf_conds=extra_vf_conds,
-            ),
-            None,
+    if "user" in allowed_vfolder_types:
+        # Query own vfolders
+        queries.append(
+            (
+                _build_query_own_folders(
+                    [vfolders, users.c.email],
+                    user_role,
+                    user_uuid,
+                    order=order,
+                    query_filter=query_filter,
+                    extra_vf_conds=extra_vf_conds,
+                ),
+                None,
+            )
         )
-    )
-    queries.append(
-        (
-            _build_query_user_type_permission_overriden_vfolders(
-                [vfolders, vfolder_permissions.c.permission, users.c.email],
-                user_uuid,
-                query_filter=query_filter,
-                extra_vf_conds=extra_vf_conds,
-            ),
-            None,
+        queries.append(
+            (
+                _build_query_user_type_permission_overriden_vfolders(
+                    [vfolders, vfolder_permissions.c.permission, users.c.email],
+                    user_uuid,
+                    order=order,
+                    query_filter=query_filter,
+                    extra_vf_conds=extra_vf_conds,
+                ),
+                None,
+            )
         )
-    )
 
-    # Query project-group vfolders
-    match user_role:
-        case UserRole.SUPERADMIN:
-            group_ids = None
-        case UserRole.ADMIN:
-            group_ids = await query_admin_accessible_groups(db_conn, domain_name)
-        case UserRole.USER:
-            group_ids = await query_user_accessible_groups(db_conn, user_uuid)
-        case _:
-            group_ids = await query_user_accessible_groups(db_conn, user_uuid)
+    if "group" in allowed_vfolder_types:
+        # Query project-group vfolders
+        match user_role:
+            case UserRole.SUPERADMIN:
+                group_ids = None
+            case UserRole.ADMIN:
+                group_ids = await query_admin_accessible_groups(db_conn, domain_name)
+            case UserRole.USER:
+                group_ids = await query_user_accessible_groups(db_conn, user_uuid)
+            case _:
+                group_ids = await query_user_accessible_groups(db_conn, user_uuid)
 
-    queries.append(
-        (
-            _build_query_project_group_vfolders(
-                [vfolders, groups.c.name],
-                group_ids,
-                query_filter=query_filter,
-                extra_vf_conds=extra_vf_conds,
-            ),
-            _override_vfolder_permission,
+        queries.append(
+            (
+                _build_query_project_group_vfolders(
+                    [vfolders, groups.c.name],
+                    group_ids,
+                    order=order,
+                    query_filter=query_filter,
+                    extra_vf_conds=extra_vf_conds,
+                ),
+                _override_vfolder_permission,
+            )
         )
-    )
 
     vfolder_results = []
     for query, post_func in queries:
@@ -1081,12 +1090,15 @@ class VirtualFolder(graphene.ObjectType):
         from .user import users
 
         # async with graph_ctx.db.begin_readonly() as db_conn:
-        #     user_role = await db_conn.scalar(sa.select([users.c.role]).where(users.c.uuid == user_id))
+        #     user_role = await db_conn.scalar(
+        #         sa.select([users.c.role]).where(users.c.uuid == user_id)
+        #     )
         #     return await count_accessible_vfolders(
         #         db_conn,
         #         user_id,
         #         user_role=user_role,
         #         domain_name=domain_name,
+        #         query_filter=(filter, cls._queryfilter_fieldspec),
         #     )
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True)
