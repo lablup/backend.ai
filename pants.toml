@@ -44,7 +44,7 @@ enable_resolves = true
 #   - Update their local IDE/editor's interpreter path configurations
 interpreter_constraints = ["CPython==3.10.8"]
 tailor_pex_binary_targets = false
-resolves_to_interpreter_constraints = "{'python-kernel': ['==3.10.*'], 'pants-plugins': ['>=3.7,<3.10']}"
+resolves_to_interpreter_constraints = "{'python-kernel': ['==3.10.*'], 'pants-plugins': ['==3.9.*']}"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
@@ -92,11 +92,12 @@ version = "pytest>=7.1.2"
 extra_requirements.add = [
     "pytest-asyncio>=0.19",
     "pytest-aiohttp>=1.0.4",
+    "pytest-custom_exit_code>=0.3.0",
     "pytest-dependency>=0.5.1",
     "pytest-mock>=3.8.2",
     "aioresponses>=0.7.3",
 ]
-args = ["-v", "-m", "'not integration'"]
+args = ["-v", "--suppress-no-test-exit-code"]
 lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 

@@ -65,6 +65,7 @@ from ai.backend.common.events import (
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
+    KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
@@ -571,6 +572,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                             "image_ref": requested_image_ref,
                             "cluster_role": DEFAULT_ROLE,
                             "cluster_idx": 1,
+                            "local_rank": 0,
                             "cluster_hostname": f"{DEFAULT_ROLE}1",
                             "creation_config": params["config"],
                             "bootstrap_script": params["bootstrap_script"],
@@ -1523,7 +1525,7 @@ async def handle_destroy_session(
             event.session_id,
         ),
         forced=False,
-        reason=event.reason or "killed-by-event",
+        reason=event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT,
     )
 
 
@@ -1634,7 +1636,7 @@ async def handle_batch_result(
             root_ctx.registry.get_session_by_session_id,
             event.session_id,
         ),
-        reason="task-finished",
+        reason=KernelLifecycleEventReason.TASK_FINISHED,
     )
 
 

@@ -35,6 +35,7 @@ from ..api.exceptions import (
     ObjectNotFound,
     TooManyKernelsFound,
 )
+from .acl import PredefinedAtomicPermission
 from .agent import Agent, AgentList, AgentSummary, AgentSummaryList, ModifyAgent
 from .base import DataLoaderManager, privileged_query, scoped_query
 from .domain import CreateDomain, DeleteDomain, Domain, ModifyDomain, PurgeDomain
@@ -484,6 +485,10 @@ class Queries(graphene.ObjectType):
         sess_id=graphene.String(required=True),
         domain_name=graphene.String(),
         access_key=graphene.String(),
+    )
+
+    vfolder_host_permissions = graphene.Field(
+        PredefinedAtomicPermission,
     )
 
     @staticmethod
@@ -1407,12 +1412,20 @@ class Queries(graphene.ObjectType):
         else:
             raise TooManyKernelsFound
 
+    @staticmethod
+    async def resolve_vfolder_host_permissions(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+    ) -> PredefinedAtomicPermission:
+        graph_ctx: GraphQueryContext = info.context
+        return await PredefinedAtomicPermission.load_all(graph_ctx)
+
 
 class GQLMutationPrivilegeCheckMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if info.operation.operation == "mutation" and len(info.path) == 1:
-            mutation_cls = getattr(Mutations, info.path[0]).type
+            mutation_cls = getattr(Mutations, info.field_name).type
             # default is allow nobody.
             allowed_roles = getattr(mutation_cls, "allowed_roles", [])
             if graph_ctx.user["role"] not in allowed_roles:
