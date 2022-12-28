@@ -254,7 +254,7 @@ class ComputeSession(BaseFunction):
             assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
         else:
             fake = Faker()
-            name = f"{fake.first_name()}_{fake.last_name()}".lower()
+            name = f"pysdk-{fake.last_name().lower()}"
         if mounts is None:
             mounts = []
         if mount_map is None:

@@ -258,7 +258,7 @@ def _create_cmd(docs: str = None):
         """
         if name is None:
             fake = Faker()
-            name = f"{fake.first_name()}_{fake.last_name()}".lower()
+            name = f"pysdk-{fake.last_name().lower()}"
         else:
             name = name
 
