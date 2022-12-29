@@ -37,7 +37,7 @@ To list up storage hosts that you are allowed to use:
 
   $ backend.ai vfolder list-hosts
 
-To delete the vfolder completey:
+To delete the vfolder completely:
 
 .. code-block:: console
 
@@ -97,7 +97,7 @@ a normal directory.  If you want to mount vfolders in other path, add '/'
 as prefix at the forefont of the vfolder path.
 
 By reusing the same vfolder in subsequent sessions, you do not have to
-donwload the result and upload it as the input for next sessions, just
+download the result and upload it as the input for next sessions, just
 keeping them in the storage.
 
 

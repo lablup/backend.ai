@@ -136,7 +136,7 @@ purity_fs_name = "FB-NFS1"  # the name of filesystem used by the filesystem API
 # An extended version for CephFS, which supports extended inode attributes
 # for per-directory quota and fast metadata queries.
 backend = "cephfs"
-path = "/vfroot/ceph-fuse"
+path = "/mnt/vfroot/ceph-fuse"
 
 [volume.netapp]
 backend = "netapp"
