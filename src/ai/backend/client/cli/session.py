@@ -257,8 +257,8 @@ def _create_cmd(docs: str = None):
                runtime or programming language.
         """
         if name is None:
-            fake = Faker()
-            name = f"pysdk-{fake.last_name().lower()}"
+            faker = Faker()
+            name = f"pysdk-{faker.user_name()}"
         else:
             name = name
 
