@@ -363,6 +363,7 @@ function bootstrap_pants {
   else
     maybe_find_links="--find-links=$(find_links_url "${pants_version}" "${pants_sha}")"
    fi
+  maybe_find_links="--find-links=https://dist.backend.ai/pypi/simple/pantsbuild-pants/index.html $maybe_find_links"
   local python_major_minor_version
   python_major_minor_version="$(get_python_major_minor_version "${python}")"
   local target_folder_name="${pants_version}_py${python_major_minor_version}"

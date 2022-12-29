@@ -280,6 +280,7 @@ kernels = sa.Table(
         "cluster_role", sa.String(length=16), nullable=False, default=DEFAULT_ROLE, index=True
     ),
     sa.Column("cluster_idx", sa.Integer, nullable=False, default=0),
+    sa.Column("local_rank", sa.Integer, nullable=False, default=0),
     sa.Column("cluster_hostname", sa.String(length=64), nullable=False, default=default_hostname),
     # Resource ownership
     sa.Column("scaling_group", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True),
@@ -313,6 +314,7 @@ kernels = sa.Table(
     sa.Column("stdout_port", sa.Integer(), nullable=False),  # legacy for stream_pty
     sa.Column("service_ports", pgsql.JSONB(), nullable=True),
     sa.Column("preopen_ports", sa.ARRAY(sa.Integer), nullable=True),
+    sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False),
     # Lifecycle
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
     sa.Column(
@@ -671,6 +673,7 @@ class ComputeContainer(graphene.ObjectType):
     role = graphene.String()  # legacy
     hostname = graphene.String()  # legacy
     cluster_idx = graphene.Int()
+    local_rank = graphene.Int()
     cluster_role = graphene.String()
     cluster_hostname = graphene.String()
     session_id = graphene.UUID()  # owner session
@@ -715,6 +718,7 @@ class ComputeContainer(graphene.ObjectType):
             "role": row["cluster_role"],
             "hostname": row["cluster_hostname"],
             "cluster_idx": row["cluster_idx"],
+            "local_rank": row["local_rank"],
             "cluster_role": row["cluster_role"],
             "cluster_hostname": row["cluster_hostname"],
             "session_id": row["session_id"],
@@ -772,6 +776,7 @@ class ComputeContainer(graphene.ObjectType):
         "architecture": ("architecture", None),
         "agent": ("agent", None),
         "cluster_idx": ("cluster_idx", None),
+        "local_rank": ("local_rank", None),
         "cluster_role": ("cluster_role", None),
         "cluster_hostname": ("cluster_hostname", None),
         "status": ("status", lambda s: KernelStatus[s]),
@@ -786,6 +791,7 @@ class ComputeContainer(graphene.ObjectType):
         "architecture": "architecture",
         "agent": "agent",
         "cluster_idx": "cluster_idx",
+        "local_rank": "local_rank",
         "cluster_role": "cluster_role",
         "cluster_hostname": "cluster_hostname",
         "status": "status",

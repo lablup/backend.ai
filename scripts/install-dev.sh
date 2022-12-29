@@ -492,6 +492,9 @@ bootstrap_pants() {
     # In macOS with Apple Silicon, let Pants use Python 3.9 from pyenv
     local _PYENV_PYVER=$(search_pants_python_from_pyenv)
     echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
+  elif [ "$(uname -m)" = "aarch64" ]; then
+    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
+    echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
   fi
   PANTS="./pants"
   ./pants version
@@ -688,6 +691,7 @@ setup_environment() {
   sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
   show_info "Pre-pulling frequently used kernel images..."
@@ -812,9 +816,10 @@ configure_backendai() {
   ./backend.ai mgr etcd put-json volumes "./dev.etcd.volumes.json"
   mkdir -p scratches
   POSTGRES_CONTAINER_ID=$($docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps | grep "[-_]backendai-half-db[-_]1" | awk '{print $1}')
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
-  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}}';"
+  ALL_VFOLDER_HOST_PERM='["create-vfolder","modify-vfolder","delete-vfolder","mount-in-session","upload-file","download-file","invite-others","set-user-specific-permission"]'
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update domains set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update groups set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
+  $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update keypair_resource_policies set allowed_vfolder_hosts = '{\"${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}\": ${ALL_VFOLDER_HOST_PERM}}';"
   $docker_sudo docker exec -it $POSTGRES_CONTAINER_ID psql postgres://postgres:develove@localhost:5432/backend database -c "update vfolders set host = '${LOCAL_STORAGE_PROXY}:${LOCAL_STORAGE_VOLUME}' where host='${LOCAL_STORAGE_VOLUME}';"
 
   # Client backend endpoint configuration shell script

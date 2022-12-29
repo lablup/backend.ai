@@ -49,7 +49,7 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import EventProducer
+from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
@@ -411,7 +411,7 @@ class AgentRPCServer(aobject):
     async def destroy_kernel(
         self,
         kernel_id: str,
-        reason: Optional[str] = None,
+        reason: Optional[KernelLifecycleEventReason] = None,
         suppress_events: bool = False,
     ):
         loop = asyncio.get_running_loop()
@@ -420,7 +420,7 @@ class AgentRPCServer(aobject):
         await self.agent.inject_container_lifecycle_event(
             KernelId(UUID(kernel_id)),
             LifecycleEvent.DESTROY,
-            reason or "user-requested",
+            reason or KernelLifecycleEventReason.USER_REQUESTED,
             done_future=done,
             suppress_events=suppress_events,
         )
@@ -670,6 +670,18 @@ class AgentRPCServer(aobject):
                 log.exception("reset: destroying {0}", kernel_id)
         await asyncio.gather(*tasks)
 
+    @rpc_function
+    @collect_error
+    async def assign_port(self):
+        log.debug("rpc::assign_port()")
+        return self.agent.port_pool.pop()
+
+    @rpc_function
+    @collect_error
+    async def release_port(self, port_no: int):
+        log.debug("rpc::release_port(port_no:{})", port_no)
+        self.agent.port_pool.add(port_no)
+
 
 @aiotools.server
 async def server_main_logwrapper(
@@ -692,6 +704,24 @@ async def server_main(
     _args: Tuple[Any, ...],
 ) -> AsyncGenerator[None, signal.Signals]:
     local_config = _args[0]
+
+    # Start aiomonitor.
+    # Port is set by config (default=50200).
+    loop.set_debug(local_config["debug"]["asyncio"])
+    monitor = aiomonitor.Monitor(
+        loop,
+        port=local_config["agent"]["aiomonitor-port"],
+        console_enabled=False,
+        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
+    )
+    monitor.prompt = "monitor (agent) >>> "
+    monitor.console_locals["local_config"] = local_config
+    aiomon_started = False
+    try:
+        monitor.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     log.info("Preparing kernel runner environments...")
     kernel_mod = importlib.import_module(
@@ -767,19 +797,6 @@ async def server_main(
     # Pre-load compute plugin configurations.
     local_config["plugins"] = await etcd.get_prefix_dict("config/plugins/accelerator")
 
-    # Start aiomonitor.
-    # Port is set by config (default=50200).
-    loop.set_debug(local_config["debug"]["asyncio"])
-    monitor = aiomonitor.Monitor(
-        loop,
-        port=local_config["agent"]["aiomonitor-port"],
-        console_enabled=False,
-        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
-    )
-    monitor.prompt = "monitor (agent) >>> "
-    monitor.console_locals["local_config"] = local_config
-    monitor.start()
-
     # Start RPC server.
     global agent_instance
     agent = await AgentRPCServer.new(
@@ -796,7 +813,8 @@ async def server_main(
             stop_signal = yield
             agent.mark_stop_signal(stop_signal)
     finally:
-        monitor.close()
+        if aiomon_started:
+            monitor.close()
 
 
 @click.group(invoke_without_command=True)

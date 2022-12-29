@@ -10,25 +10,30 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
-    - name: Apply cache for Pants
-      uses: actions/cache@v3
-      id: cache
-      with:
-        # pants-specific cache
-        path: |
-          ~/.cache/pants/setup
-          ~/.cache/pants/lmdb_store
-          ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
+    - name: Prepare cache dir for Pants
+      run: mkdir -p .tmp
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v2
+      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
+      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      with:
+        pants-python-version: "3.9"
+        gha-cache-key: pants-cache0-py${{ env.PROJECT_PYTHON_VERSION }}
+        named-caches-hash: ${{ hashFiles('*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
       with:

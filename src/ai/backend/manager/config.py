@@ -256,10 +256,12 @@ manager_local_config_iv = (
                         allow_nonexisting=True,
                         allow_devnull=True,
                     ),
+                    t.Key("allowed-plugins", default=None): t.Null | tx.ToSet,
+                    t.Key("disabled-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("hide-agents", default=False): t.Bool,
                     t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
                     t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
-                    t.Key("aiomonitor-port", default=50100): t.Int[1:65535],
+                    t.Key("aiomonitor-port", default=48100): t.Int[1:65535],
                 }
             ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(
