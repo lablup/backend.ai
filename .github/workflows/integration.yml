@@ -4,8 +4,8 @@ on:
   schedule:
     - cron: '0 0 * * 6'
   workflow_dispatch:
-  
-  
+
+
 jobs:
   integration:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
@@ -15,16 +15,6 @@ jobs:
       with:
         fetch-depth: 2
         submodules: true
-    - name: Apply cache for Pants
-      uses: actions/cache@v3
-      id: cache
-      with:
-        # pants-specific cache
-        path: |
-          ~/.cache/pants/setup
-          ~/.cache/pants/lmdb_store
-          ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -38,16 +28,28 @@ jobs:
     - name: Extract Python version from pants.toml
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Set up Python
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
+    - name: Prepare cache dir for Pants
+      run: mkdir -p .tmp
     - name: Bootstrap Pants
-      run: |
-        mkdir .tmp
-        ./pants --no-verify-config version
+      uses: pantsbuild/actions/init-pants@v2
+      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
+      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      with:
+        pants-python-version: "3.9"
+        gha-cache-key: pants-cache0-py${{ env.PROJECT_PYTHON_VERSION }}
+        named-caches-hash: ${{ hashFiles('*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
     - name: Test
       shell: 'script -q -e -c "bash {0}"'
       run: |
