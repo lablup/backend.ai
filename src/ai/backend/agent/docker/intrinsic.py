@@ -256,18 +256,6 @@ class CPUPlugin(AbstractComputePlugin):
     async def gather_process_measures(
         self, ctx: StatContext, pids: Sequence[int]
     ) -> Sequence[ProcessMeasurement]:
-        async def proc_impl(pid: int):
-            try:
-                proc_path = Path(f"/proc/{pid}/stat")
-                cpu_user, cpu_kernel = map(int, proc_path.read_text().split(" ")[13:15])
-            except FileNotFoundError:
-                log.warning("cannot read stats: file not found for Process {0}", pid)
-            else:
-                clk_per_sec = os.sysconf("SC_CLK_TCK")
-                cpu_used = Decimal(cpu_user + cpu_kernel) / clk_per_sec * 1000
-                return cpu_used
-            return None
-
         async def psutil_impl(pid: int):
             try:
                 p = psutil.Process(pid)
@@ -279,16 +267,12 @@ class CPUPlugin(AbstractComputePlugin):
                 return cpu_used
             return None
 
-        if ctx.mode == StatModes.CGROUP:
-            impl = proc_impl
-        else:
-            impl = psutil_impl
         per_process_cpu_util = {}
         per_process_cpu_used = {}
         tasks = []
         q = Decimal("0.000")
         for pid in pids:
-            tasks.append(asyncio.ensure_future(impl(pid)))
+            tasks.append(asyncio.ensure_future(psutil_impl(pid)))
         results = await asyncio.gather(*tasks)
         for pid, cpu_used in zip(pids, results):
             if cpu_used is None:
@@ -662,27 +646,6 @@ class MemoryPlugin(AbstractComputePlugin):
     async def gather_process_measures(
         self, ctx: StatContext, pids: Sequence[int]
     ) -> Sequence[ProcessMeasurement]:
-        async def procfs_impl(pid):
-            proc_prefix = f"/proc/{pid}/"
-            proc_path = Path(proc_prefix + "status")
-            io_path = Path(proc_prefix + "io")
-            try:
-                proc_status = {
-                    k: v
-                    for k, v in map(lambda l: l.split(":\t"), proc_path.read_text().splitlines())
-                }
-                io_status = {
-                    k: v for k, v in map(lambda l: l.split(":"), io_path.read_text().splitlines())
-                }
-            except FileNotFoundError:
-                log.warning("cannot read stats: file not found for Process {0}", pid)
-            else:
-                mem_cur_bytes = int(proc_status["VmHWM"].lstrip().split(" ")[0]) * 1024
-                io_read_bytes = int(io_status["read_bytes"])
-                io_write_bytes = int(io_status["write_bytes"])
-                return mem_cur_bytes, io_read_bytes, io_write_bytes
-            return None
-
         async def psutil_impl(pid):
             try:
                 p = psutil.Process(pid)
@@ -696,16 +659,12 @@ class MemoryPlugin(AbstractComputePlugin):
                 return mem_cur_bytes, io_read_bytes, io_write_bytes
             return None
 
-        if ctx.mode == StatModes.CGROUP:
-            impl = procfs_impl
-        else:
-            impl = psutil_impl
         per_process_mem_used_bytes = {}
         per_process_io_read_bytes = {}
         per_process_io_write_bytes = {}
         tasks = []
         for pid in pids:
-            tasks.append(asyncio.ensure_future(impl(pid)))
+            tasks.append(asyncio.ensure_future(psutil_impl(pid)))
         results = await asyncio.gather(*tasks)
         for pid, result in zip(pids, results):
             if result is None:

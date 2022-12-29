@@ -7,6 +7,7 @@ Reference: https://www.datadoghq.com/blog/how-to-collect-docker-metrics/
 import asyncio
 import enum
 import logging
+import os
 import sys
 import time
 from decimal import Decimal
@@ -494,6 +495,8 @@ class StatContext:
                     result = await docker._query_json(f"containers/{cid}/top", method="GET")
                     procs = result["Processes"]
                     pids = [PID(int(proc[1])) for proc in procs if proc[0] != "root"]
+                    if os.getuid() == 0:
+                        pids.extend([PID(int(proc[1])) for proc in procs if proc[0] == "root"])
                     unused_pids = set(self.process_metrics[cid].keys()) - set(pids)
                 except (KeyError, aiodocker.exceptions.DockerError):
                     log.warning(
