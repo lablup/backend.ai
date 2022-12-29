@@ -12,11 +12,10 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ..models import (
     MAXIMUM_DOTFILE_SIZE,
     keypairs,
-    query_accessible_vfolders,
+    query_accessible_vfolders_by_name,
     query_bootstrap_script,
     query_owned_dotfiles,
     verify_dotfile_name,
-    vfolders,
 )
 from .auth import auth_required
 from .exceptions import (
@@ -56,6 +55,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
     )
     root_ctx: RootContext = request.app["_root.context"]
     user_uuid = request["user"]["uuid"]
+    user_role = request["user"]["role"]
+    domain_name = request["user"]["domain_name"]
     async with root_ctx.db.begin() as conn:
         path: str = params["path"]
         dotfiles, leftover_space = await query_owned_dotfiles(conn, owner_access_key)
@@ -65,8 +66,12 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise DotfileCreationFailed("Dotfile creation limit reached")
         if not verify_dotfile_name(path):
             raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
-        duplicate_vfolder = await query_accessible_vfolders(
-            conn, user_uuid, extra_vf_conds=(vfolders.c.name == path)
+        duplicate_vfolder = await query_accessible_vfolders_by_name(
+            conn,
+            path,
+            user_uuid=user_uuid,
+            user_role=user_role,
+            domain_name=domain_name,
         )
         if len(duplicate_vfolder) > 0:
             raise InvalidAPIParameters("dotfile path conflicts with your dot-prefixed vFolder")

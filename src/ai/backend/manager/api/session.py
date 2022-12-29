@@ -110,13 +110,12 @@ from ..models import (
     kernels,
     keypair_resource_policies,
     keypairs,
-    query_accessible_vfolders,
+    query_accessible_vfolders_by_name,
     query_bootstrap_script,
     scaling_groups,
     session_templates,
     users,
     verify_vfolder_name,
-    vfolders,
 )
 from ..models.kernel import match_session_ids
 from ..models.utils import execute_with_retry
@@ -2418,13 +2417,12 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     user_uuid = request["user"]["uuid"]
     kernel_id_str = params["kernel_id"].hex
     async with root_ctx.db.begin_readonly() as conn:
-        matched_vfolders = await query_accessible_vfolders(
+        matched_vfolders = await query_accessible_vfolders_by_name(
             conn,
-            user_uuid,
+            ".logs",
+            user_uuid=user_uuid,
             user_role=user_role,
             domain_name=domain_name,
-            allowed_vfolder_types=["user"],
-            extra_vf_conds=(vfolders.c.name == ".logs"),
         )
         if not matched_vfolders:
             raise ObjectNotFound(

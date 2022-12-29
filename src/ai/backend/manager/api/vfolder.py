@@ -52,6 +52,8 @@ from ..models import (
     kernels,
     keypairs,
     query_accessible_vfolders,
+    query_accessible_vfolders_by_id,
+    query_accessible_vfolders_by_name,
     query_owned_dotfiles,
     users,
     verify_vfolder_name,
@@ -138,7 +140,6 @@ async def ensure_vfolder_status(
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
             extra_vf_conds=(vf_name_conds & vf_status_conds),
-            allow_privileged_access=True,
         )
         if len(entries) == 0:
             raise VFolderFilterStatusFailed()
@@ -164,61 +165,41 @@ def vfolder_permission_required(perm: VFolderPermission):
             user_uuid = request["user"]["uuid"]
             folder_name = request.match_info["name"]
             allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-            vf_user_cond = None
-            vf_group_cond = None
-            if perm == VFolderPermission.READ_ONLY:
-                # if READ_ONLY is requested, any permission accepts.
-                invited_perm_cond = vfolder_permissions.c.permission.in_(
-                    [
-                        VFolderPermission.READ_ONLY,
-                        VFolderPermission.READ_WRITE,
-                        VFolderPermission.RW_DELETE,
-                    ]
-                )
-                if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission.in_(
-                        [
+
+            allowed_perm = set()
+            match perm:
+                case VFolderPermission.READ_ONLY:
+                    # if READ_ONLY is requested, any permission accepts.
+                    allowed_perm = set(
+                        (
                             VFolderPermission.READ_ONLY,
                             VFolderPermission.READ_WRITE,
                             VFolderPermission.RW_DELETE,
-                        ]
+                        )
                     )
-            elif perm == VFolderPermission.READ_WRITE:
-                invited_perm_cond = vfolder_permissions.c.permission.in_(
-                    [
-                        VFolderPermission.READ_WRITE,
-                        VFolderPermission.RW_DELETE,
-                    ]
-                )
-                if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission.in_(
-                        [
+                case VFolderPermission.READ_WRITE:
+                    allowed_perm = set(
+                        (
                             VFolderPermission.READ_WRITE,
                             VFolderPermission.RW_DELETE,
-                        ]
+                        )
                     )
-            elif perm == VFolderPermission.RW_DELETE:
-                # If RW_DELETE is requested, only RW_DELETE accepts.
-                invited_perm_cond = vfolder_permissions.c.permission == VFolderPermission.RW_DELETE
-                if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission == VFolderPermission.RW_DELETE
-            else:
-                # Otherwise, just compare it as-is (for future compatibility).
-                invited_perm_cond = vfolder_permissions.c.permission == perm
-                if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission == perm
+                case VFolderPermission.RW_DELETE:
+                    # If RW_DELETE is requested, only RW_DELETE accepts.
+                    allowed_perm = set((VFolderPermission.RW_DELETE,))
+                case _:
+                    # Otherwise, just compare it as-is (for future compatibility).
+                    allowed_perm = set((perm,))
             async with root_ctx.db.begin() as conn:
-                entries = await query_accessible_vfolders(
+                entries = await query_accessible_vfolders_by_name(
                     conn,
-                    user_uuid,
+                    folder_name,
+                    user_uuid=user_uuid,
                     user_role=user_role,
                     domain_name=domain_name,
                     allowed_vfolder_types=allowed_vfolder_types,
-                    extra_vf_conds=(vfolders.c.name == folder_name),
-                    extra_invited_vf_conds=invited_perm_cond,
-                    extra_vf_user_conds=vf_user_cond,
-                    extra_vf_group_conds=vf_group_cond,
                 )
+                entries = [vfolder for vfolder in entries if vfolder["permission"] in allowed_perm]
                 if len(entries) == 0:
                     raise VFolderNotFound("Your operation may be permission denied.")
             return await handler(request, entries[0], *args, **kwargs)
@@ -378,17 +359,16 @@ async def create(request: web.Request, params: Any) -> web.Response:
             params["quota"] = max_vfolder_size
 
         # Prevent creation of vfolder with duplicated name.
-        extra_vf_conds = [vfolders.c.name == params["name"]]
-        if not unmanaged_path:
-            extra_vf_conds.append(vfolders.c.host == folder_host)
-        entries = await query_accessible_vfolders(
+        entries = await query_accessible_vfolders_by_name(
             conn,
-            user_uuid,
+            params["name"],
+            user_uuid=user_uuid,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(sa.and_(*extra_vf_conds)),
         )
+        if not unmanaged_path:
+            entries = [vfolder for vfolder in entries if vfolder["host"] == folder_host]
         if len(entries) > 0:
             raise VFolderAlreadyExists
 
@@ -797,16 +777,15 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
     else:
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         async with root_ctx.db.begin_readonly() as conn:
-            extra_vf_conds = [vfolders.c.id == params["id"]]
-            entries = await query_accessible_vfolders(
+            entries = await query_accessible_vfolders_by_id(
                 conn,
-                user_uuid,
+                params["id"],
+                user_uuid=user_uuid,
                 user_role=user_role,
                 domain_name=domain_name,
                 allowed_vfolder_types=allowed_vfolder_types,
-                extra_vf_conds=(sa.and_(*extra_vf_conds)),
             )
-        if len(entries) < 0:
+        if not entries:
             raise VFolderNotFound("no such accessible vfolder")
 
     async with root_ctx.storage_manager.request(
@@ -851,16 +830,15 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     else:
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         async with root_ctx.db.begin_readonly() as conn:
-            extra_vf_conds = [vfolders.c.id == params["id"]]
-            entries = await query_accessible_vfolders(
+            entries = await query_accessible_vfolders_by_id(
                 conn,
-                user_uuid,
+                params["id"],
+                user_uuid=user_uuid,
                 user_role=user_role,
                 domain_name=domain_name,
                 allowed_vfolder_types=allowed_vfolder_types,
-                extra_vf_conds=(sa.and_(*extra_vf_conds)),
             )
-        if len(entries) < 0:
+        if not entries:
             raise VFolderNotFound("no such accessible vfolder")
 
     # Limit vfolder size quota if it is larger than max_vfolder_size of the resource policy.
@@ -952,17 +930,18 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
+            extra_vf_conds=((vfolders.c.name == old_name) | (vfolders.c.name == new_name)),
         )
         for entry in entries:
             if entry["name"] == new_name:
                 raise InvalidAPIParameters(
-                    "One of your accessible vfolders already has " "the name you requested."
+                    "One of your accessible vfolders already has the name you requested."
                 )
         for entry in entries:
             if entry["name"] == old_name:
                 if not entry["is_owner"]:
                     raise InvalidAPIParameters(
-                        "Cannot change the name of a vfolder " "that is not owned by myself."
+                        "Cannot change the name of a vfolder that is not owned by myself."
                     )
                 query = (
                     sa.update(vfolders).values(name=new_name).where(vfolders.c.id == entry["id"])
@@ -1869,13 +1848,13 @@ async def delete(request: web.Request) -> web.Response:
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     log.info("VFOLDER.DELETE (ak:{}, vf:{})", access_key, folder_name)
     async with root_ctx.db.begin() as conn:
-        entries = await query_accessible_vfolders(
+        entries = await query_accessible_vfolders_by_name(
             conn,
-            user_uuid,
+            folder_name,
+            user_uuid=user_uuid,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vfolders.c.name == folder_name),
         )
         # for entry in entries:
         #     if entry['name'] == folder_name:
@@ -2070,16 +2049,15 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
                 raise InvalidAPIParameters("You cannot create more vfolders.")
 
         # Prevent creation of vfolder with duplicated name.
-        extra_vf_conds = [vfolders.c.name == params["target_name"]]
-        extra_vf_conds.append(vfolders.c.host == target_folder_host)
-        entries = await query_accessible_vfolders(
+        entries = await query_accessible_vfolders_by_name(
             conn,
-            user_uuid,
+            params["target_name"],
+            user_uuid=user_uuid,
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(sa.and_(*extra_vf_conds)),
         )
+        entries = [vfolder for vfolder in entries if vfolder["host"] == target_folder_host]
         if len(entries) > 0:
             raise VFolderAlreadyExists
         if params["target_name"].startswith("."):
