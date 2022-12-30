@@ -735,13 +735,11 @@ class AbstractAgent(
             for subdir, ongoing_kernel_map in status_map.items():
                 name = f"kernel_commit_status.{subdir}"
                 kern_statuses = await pipe.hgetall(name)
-                remaining_statuses = {}
-                for kern_id, status in kern_statuses.items():
-                    if kern_id not in ongoing_kernel_map:
-                        remaining_statuses[kern_id] = CommitStatus.READY.value
-                await pipe.hset(
-                    name, mapping=cast(Mapping, {**ongoing_kernel_map, **remaining_statuses})
-                )
+                remaining_statuses = [
+                    kern_id for kern_id in kern_statuses if kern_id not in ongoing_kernel_map
+                ]
+                await pipe.hdel(name, *remaining_statuses)
+                await pipe.hset(name, mapping=cast(Mapping, ongoing_kernel_map))
             return pipe
 
         await redis_helper.execute(
