@@ -23,6 +23,7 @@ from uuid import UUID
 
 import aiohttp
 from aiohttp import hdrs
+from faker import Faker
 from tqdm import tqdm
 
 from ai.backend.client.output.fields import session_fields
@@ -252,7 +253,8 @@ class ComputeSession(BaseFunction):
         if name is not None:
             assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
         else:
-            name = f"pysdk-{secrets.token_hex(5)}"
+            faker = Faker()
+            name = f"pysdk-{faker.user_name()}"
         if mounts is None:
             mounts = []
         if mount_map is None:
