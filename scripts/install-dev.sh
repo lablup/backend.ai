@@ -391,7 +391,7 @@ set_brew_python_build_flags() {
 
 install_python() {
   if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-    PANTS_PYTHON_VERSION=$(pyenv latest 3.9)
+    PANTS_PYTHON_VERSION=$(pyenv latest 3.9 || '3.9.12')
     show_info "Installing python ${PANTS_PYTHON_VERSION} for pants to run"
     pyenv install --skip-existing "${PANTS_PYTHON_VERSION}"
   fi
