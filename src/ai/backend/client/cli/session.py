@@ -15,6 +15,7 @@ import inquirer
 from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from faker import Faker
 from humanize import naturalsize
 from tabulate import tabulate
 
@@ -256,7 +257,8 @@ def _create_cmd(docs: str = None):
                runtime or programming language.
         """
         if name is None:
-            name = f"pysdk-{secrets.token_hex(5)}"
+            faker = Faker()
+            name = f"pysdk-{faker.user_name()}"
         else:
             name = name
 
@@ -1180,7 +1182,11 @@ def _events_cmd(docs: str = None):
                     compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
                 async with compute_session.listen_events(scope=scope) as response:
                     async for ev in response:
-                        print(click.style(ev.event, fg="cyan", bold=True), json.loads(ev.data))
+                        click.echo(
+                            click.style(ev.event, fg="cyan", bold=True)
+                            + " "
+                            + json.dumps(json.loads(ev.data), indent=None)  # as single-line
+                        )
 
         try:
             asyncio_run(_run_events())

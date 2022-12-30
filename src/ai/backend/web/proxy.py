@@ -124,7 +124,7 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     request_headers = extra_config_headers.check(request.headers)
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     if secure_context:
-        if not request.content:
+        if not request.can_read_body:  # designated as encrypted but has an empty payload
             request["payload"] = ""
             return await handler(request)
         config = request.app["config"]
@@ -141,6 +141,8 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
         b64p = base64.b64decode(real_payload)
         request["payload"] = unpad(crypt.decrypt(bytes(b64p)), 16)
     else:
+        # For all other requests without explicit encryption,
+        # let the handler decide how to read the body.
         request["payload"] = ""
     return await handler(request)
 
