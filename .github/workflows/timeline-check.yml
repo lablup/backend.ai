@@ -28,13 +28,13 @@ jobs:
     - name: Check existence of news fragment
       run: |
         # Check if the PR has a news fragment
-        git fetch --no-tags origin +refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}
         for change in git diff --name-only origin/${BASE_BRANCH}...HEAD -- changes/; do
           if basename $change != $PR_NUMBER; then
             echo "The news fragment file name must be $PR_NUMBER"
             exit 1
           fi
         done
+        git fetch --no-tags origin +refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}
         python -m towncrier.check --compare-with=origin/${BASE_BRANCH}
       env:
         BASE_BRANCH: ${{ github.base_ref }}
