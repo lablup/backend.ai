@@ -28,7 +28,7 @@ jobs:
     - name: Check existence of news fragment
       run: |
         # Check if the PR has a news fragment
-        $NEWS_FRAGMENTS = git diff --name-only origin/${BASE_BRANCH}...HEAD -- changes/
+        $NEWS_FRAGMENTS=git diff --name-only origin/${BASE_BRANCH}...HEAD -- changes/
         for change in $NEWS_FRAGMENTS; do
           if [ basename $change != $PR_NUMBER ]; then
             echo "$change is not valid news fragment file name"
