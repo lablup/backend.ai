@@ -517,9 +517,10 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/server/login-check", login_check_handler))
     cors.add(app.router.add_route("POST", "/server/logout", logout_handler))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
-    cors.add(app.router.add_route("GET", "/func/{path:hanati/user}", anon_web_plugin_handler))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
+    cors.add(app.router.add_route("POST", "/func/{path:custom-auth/.*$}", anon_web_plugin_handler))
+    cors.add(app.router.add_route("GET", "/func/{path:custom-auth/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:saml/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", web_handler))
@@ -550,6 +551,12 @@ async def server_main(
 
     app.on_shutdown.append(server_shutdown)
     app.on_cleanup.append(server_cleanup)
+
+    async def on_prepare(request, response):
+        # Remove "Server" header for a security reason.
+        response.headers.popall("Server", None)
+
+    app.on_response_prepare.append(on_prepare)
 
     ssl_ctx = None
     if config["service"]["ssl_enabled"]:

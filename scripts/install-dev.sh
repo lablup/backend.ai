@@ -390,6 +390,12 @@ set_brew_python_build_flags() {
 }
 
 install_python() {
+  if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
+    PYTHON_39_LATEST_MINOR=$(pyenv install -l | grep -i -E '^\s+3\.9\..+' | awk -F. '{print $3}' | sort -nr | head -n 1)
+    PANTS_PYTHON_VERSION="3.9.${PYTHON_39_LATEST_MINOR}"
+    show_info "Installing python ${PANTS_PYTHON_VERSION} for pants to run"
+    pyenv install --skip-existing "${PANTS_PYTHON_VERSION}"
+  fi
   if [ -z "$(pyenv versions | grep -E "^\\*?[[:space:]]+${PYTHON_VERSION//./\\.}([[:blank:]]+.*)?$")" ]; then
     if [ "$DISTRO" = "Darwin" ]; then
       export PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcl-tk"
