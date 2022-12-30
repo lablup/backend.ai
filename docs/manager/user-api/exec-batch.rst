@@ -55,7 +55,7 @@ Response
    * - 204 OK
      - Success.
    * - 400 Bad Request
-     - Returned when one of the uploaded file exeeds the size limit or there are too many files.
+     - Returned when one of the uploaded file exceeds the size limit or there are too many files.
 
 
 Executing with Build Step

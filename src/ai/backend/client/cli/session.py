@@ -1180,7 +1180,11 @@ def _events_cmd(docs: str = None):
                     compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
                 async with compute_session.listen_events(scope=scope) as response:
                     async for ev in response:
-                        print(click.style(ev.event, fg="cyan", bold=True), json.loads(ev.data))
+                        click.echo(
+                            click.style(ev.event, fg="cyan", bold=True)
+                            + " "
+                            + json.dumps(json.loads(ev.data), indent=None)  # as single-line
+                        )
 
         try:
             asyncio_run(_run_events())
