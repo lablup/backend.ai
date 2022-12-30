@@ -27,8 +27,9 @@ jobs:
         python -m pip install -U towncrier~=21.9
     - name: Check existence of news fragment
       run: |
+        # Check if the PR has a news fragment
         git fetch --no-tags origin +refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}
-        for change in ls -1 changes; do
+        for change in git diff --name-only origin/${BASE_BRANCH}...HEAD -- changes/; do
           if basename $change != $PR_NUMBER; then
             echo "The news fragment file name must be $PR_NUMBER"
             exit 1
