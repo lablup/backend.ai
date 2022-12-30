@@ -35,7 +35,7 @@ from urllib.parse import urlparse
 import aiohttp
 import aiohttp_cors
 import aiotools
-import attr
+import attrs
 import multidict
 import sqlalchemy as sa
 import sqlalchemy.exc
@@ -65,6 +65,7 @@ from ai.backend.common.events import (
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
+    KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
@@ -571,6 +572,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                             "image_ref": requested_image_ref,
                             "cluster_role": DEFAULT_ROLE,
                             "cluster_idx": 1,
+                            "local_rank": 0,
                             "cluster_hostname": f"{DEFAULT_ROLE}1",
                             "creation_config": params["config"],
                             "bootstrap_script": params["bootstrap_script"],
@@ -1315,6 +1317,101 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
             )
 
 
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("login_session_token", default=None): t.Null | t.String,
+        }
+    ),
+    loads=_json_loads,
+)
+async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name: str = request.match_info["session_name"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    myself = asyncio.current_task()
+    assert myself is not None
+
+    log.info(
+        "GET_COMMIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+    )
+    try:
+        status_info = await root_ctx.registry.get_commit_status(session_name, owner_access_key)
+    except BackendError:
+        log.exception("GET_COMMIT_STATUS: exception")
+        raise
+    resp = {"status": status_info["status"], "kernel": status_info["kernel"]}
+    return web.json_response(resp, status=200)
+
+
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("login_session_token", default=None): t.Null | t.String,
+        }
+    ),
+    loads=_json_loads,
+)
+async def get_abusing_report(request: web.Request, params: Mapping[str, Any]) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name: str = request.match_info["session_name"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+
+    log.info(
+        "GET_ABUSING_REPORT (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+    )
+    try:
+        report = await root_ctx.registry.get_abusing_report(session_name, owner_access_key)
+    except BackendError:
+        log.exception("GET_ABUSING_REPORT: exception")
+        raise
+    if report is None:
+        report = {}
+    return web.json_response(report, status=200)
+
+
+@server_status_required(ALL_ALLOWED)
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("login_session_token", default=None): t.Null | t.String,
+            # if `dst` is None, it will be agent's default destination.
+            tx.AliasedKey(["filename", "fname"], default=None): t.Null | t.String,
+        }
+    ),
+    loads=_json_loads,
+)
+async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
+    session_name: str = request.match_info["session_name"]
+    app_ctx: PrivateContext = request.app["session.context"]
+    requester_access_key, owner_access_key = await get_access_key_scopes(request)
+    filename: str | None = params["filename"]
+
+    myself = asyncio.current_task()
+    assert myself is not None
+
+    log.info(
+        "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
+    )
+    try:
+        resp: Mapping[str, Any] = await asyncio.shield(
+            app_ctx.rpc_ptask_group.create_task(
+                root_ctx.registry.commit_session(session_name, owner_access_key, filename),
+            ),
+        )
+    except BackendError:
+        log.exception("COMMIT_SESSION: exception")
+        raise
+    return web.json_response(resp, status=201)
+
+
 async def handle_kernel_creation_lifecycle(
     app: web.Application,
     source: AgentId,
@@ -1356,6 +1453,7 @@ async def handle_kernel_creation_lifecycle(
             event.kernel_id, KernelStatus.PREPARING, event.reason
         )
     elif isinstance(event, KernelStartedEvent):
+        await root_ctx.registry.finalize_running(event.creation_info)
         # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
             tracker.set_result(None)
@@ -1427,7 +1525,7 @@ async def handle_destroy_session(
             event.session_id,
         ),
         forced=False,
-        reason=event.reason or "killed-by-event",
+        reason=event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT,
     )
 
 
@@ -1538,7 +1636,7 @@ async def handle_batch_result(
             root_ctx.registry.get_session_by_session_id,
             event.session_id,
         ),
-        reason="task-finished",
+        reason=KernelLifecycleEventReason.TASK_FINISHED,
     )
 
 
@@ -2203,7 +2301,7 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
     )
     try:
         await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
-        result = await root_ctx.registry.download_file(session_name, owner_access_key, file)
+        result = await root_ctx.registry.download_single(session_name, owner_access_key, file)
     except asyncio.CancelledError:
         raise
     except BackendError:
@@ -2372,7 +2470,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     return response
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     session_creation_tracker: Dict[str, asyncio.Event]
     pending_waits: Set[asyncio.Task[None]]
@@ -2517,4 +2615,7 @@ def create_app(
     cors.add(app.router.add_route("GET", "/{session_name}/download_single", download_single))
     cors.add(app.router.add_route("GET", "/{session_name}/files", list_files))
     cors.add(app.router.add_route("POST", "/{session_name}/start-service", start_service))
+    cors.add(app.router.add_route("POST", "/{session_name}/commit", commit_session))
+    cors.add(app.router.add_route("GET", "/{session_name}/commit", get_commit_status))
+    cors.add(app.router.add_route("GET", "/{session_name}/abusing-report", get_abusing_report))
     return app, []

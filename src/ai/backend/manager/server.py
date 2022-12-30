@@ -11,7 +11,6 @@ import ssl
 import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
-from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 from typing import (
@@ -44,6 +43,7 @@ from ai.backend.common.plugin.monitor import INCREMENT
 from ai.backend.common.utils import env_info
 
 from . import __version__
+from .api import ManagerStatus
 from .api.context import RootContext
 from .api.exceptions import (
     BackendError,
@@ -53,20 +53,12 @@ from .api.exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
-from .api.manager import ManagerStatus
 from .api.types import AppCreator, CleanupContext, WebMiddleware, WebRequestHandler
 from .config import LocalConfig, SharedConfig
 from .config import load as load_config
 from .config import volume_config_iv
 from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
-from .idle import init_idle_checkers
-from .models.storage import StorageSessionManager
-from .models.utils import connect_database
-from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
-from .plugin.webapp import WebappPluginContext
-from .registry import AgentRegistry
-from .scheduler.dispatcher import SchedulerDispatcher
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset(
@@ -259,9 +251,14 @@ async def shared_config_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
+    from .plugin.webapp import WebappPluginContext
+
     root_ctx: RootContext = root_app["_root.context"]
     plugin_ctx = WebappPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
-    await plugin_ctx.init()
+    await plugin_ctx.init(
+        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+    )
     root_ctx.webapp_plugin_ctx = plugin_ctx
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
         if root_ctx.pidx == 0:
@@ -327,6 +324,8 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .models.utils import connect_database
+
     async with connect_database(root_ctx.local_config) as db:
         root_ctx.db = db
         yield
@@ -358,6 +357,8 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .idle import init_idle_checkers
+
     root_ctx.idle_checker_host = await init_idle_checkers(
         root_ctx.db,
         root_ctx.shared_config,
@@ -372,6 +373,8 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .models.storage import StorageSessionManager
+
     raw_vol_config = await root_ctx.shared_config.etcd.get_prefix("volumes")
     config = volume_config_iv.check(raw_vol_config)
     root_ctx.storage_manager = StorageSessionManager(config)
@@ -383,7 +386,10 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ctx = HookPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     root_ctx.hook_plugin_ctx = ctx
-    await ctx.init()
+    await ctx.init(
+        allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        blocklist=root_ctx.local_config["manager"]["disabled-plugins"],
+    )
     hook_result = await ctx.dispatch(
         "ACTIVATE_MANAGER",
         (),
@@ -397,6 +403,8 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .registry import AgentRegistry
+
     root_ctx.registry = AgentRegistry(
         root_ctx.shared_config,
         root_ctx.db,
@@ -415,6 +423,8 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .scheduler.dispatcher import SchedulerDispatcher
+
     sched_dispatcher = await SchedulerDispatcher.new(
         root_ctx.local_config,
         root_ctx.shared_config,
@@ -429,12 +439,17 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
+
     ectx = ManagerErrorPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     sctx = ManagerStatsPluginContext(root_ctx.shared_config.etcd, root_ctx.local_config)
     init_success = False
     try:
-        await ectx.init(context={"_root.context": root_ctx})
-        await sctx.init()
+        await ectx.init(
+            context={"_root.context": root_ctx},
+            allowlist=root_ctx.local_config["manager"]["allowed-plugins"],
+        )
+        await sctx.init(allowlist=root_ctx.local_config["manager"]["allowed-plugins"])
     except Exception:
         log.error("Failed to initialize monitoring plugins")
     else:
@@ -644,6 +659,7 @@ async def server_main(
     _args: List[Any],
 ) -> AsyncIterator[None]:
     subapp_pkgs = [
+        ".acl",
         ".etcd",
         ".events",
         ".auth",
@@ -667,18 +683,28 @@ async def server_main(
     root_ctx: RootContext = root_app["_root.context"]
 
     # Start aiomonitor.
-    # Port is set by config (default=50001).
+    # Port is set by config (default=50100 + pidx).
+    loop.set_debug(root_ctx.local_config["debug"]["asyncio"])
     m = aiomonitor.Monitor(
         loop,
         port=root_ctx.local_config["manager"]["aiomonitor-port"] + pidx,
         console_enabled=False,
+        hook_task_factory=root_ctx.local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
     m.prompt = f"monitor (manager[{pidx}@{os.getpid()}]) >>> "
-    m.start()
+    # Add some useful console_locals for ease of debugging
+    m.console_locals["root_app"] = root_app
+    m.console_locals["root_ctx"] = root_ctx
+    aiomon_started = False
+    try:
+        m.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     # Plugin webapps should be loaded before runner.setup(),
     # which freezes on_startup event.
-    with closing(m):
+    try:
         async with (
             shared_config_ctx(root_ctx),
             webapp_plugin_ctx(root_app),
@@ -720,6 +746,9 @@ async def server_main(
             finally:
                 log.info("shutting down...")
                 await runner.cleanup()
+    finally:
+        if aiomon_started:
+            m.close()
 
 
 @actxmgr

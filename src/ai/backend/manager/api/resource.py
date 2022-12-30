@@ -322,6 +322,7 @@ async def get_container_stats_for_period(
                     kernels.c.status,
                     kernels.c.status_changed,
                     kernels.c.last_stat,
+                    kernels.c.status_history,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
                     groups.c.name,
@@ -428,6 +429,7 @@ async def get_container_stats_for_period(
             "terminated_at": str(row["terminated_at"]),
             "status": row["status"].name,
             "status_changed": str(row["status_changed"]),
+            "status_history": row["status_history"] or {},
         }
         if group_id not in objs_per_group:
             objs_per_group[group_id] = {
@@ -583,11 +585,9 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
         rows = result.fetchall()
 
     # Build time-series of time-binned stats.
-    rowcount = len(rows)
     now_ts = now.timestamp()
     start_date_ts = start_date.timestamp()
     ts = start_date_ts
-    idx = 0
     tseries = []
     # Iterate over each time window.
     while ts < now_ts:
@@ -600,13 +600,12 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
         io_write_bytes = 0
         disk_used = 0
         # Accumulate stats for containers overlapping with this time window.
-        while (
-            idx < rowcount
-            and ts + time_window > rows[idx].created_at.timestamp()
-            and ts < rows[idx].terminated_at.timestamp()
-        ):
-            # Accumulate stats for overlapping containers in this time window.
-            row = rows[idx]
+        for row in rows:
+            if (
+                ts + time_window <= row.created_at.timestamp()
+                or ts >= row.terminated_at.timestamp()
+            ):
+                continue
             num_sessions += 1
             cpu_allocated += int(row.occupied_slots.get("cpu", 0))
             mem_allocated += int(row.occupied_slots.get("mem", 0))
@@ -622,7 +621,6 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
                 io_read_bytes += int(nmget(last_stat, "io_read.current", 0))
                 io_write_bytes += int(nmget(last_stat, "io_write.current", 0))
                 disk_used += int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/"))
-            idx += 1
         stat = {
             "date": ts,
             "num_sessions": {

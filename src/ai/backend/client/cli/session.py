@@ -15,9 +15,11 @@ import inquirer
 from async_timeout import timeout
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from faker import Faker
 from humanize import naturalsize
 from tabulate import tabulate
 
+from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 
 from ..compat import asyncio_run
@@ -28,7 +30,6 @@ from ..output.types import FieldSpec
 from ..session import AsyncSession, Session
 from ..types import Undefined, undefined
 from . import events
-from .main import main
 from .params import CommaSeparatedListType
 from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 from .run import format_stats, prepare_env_arg, prepare_mount_arg, prepare_resource_arg
@@ -256,7 +257,8 @@ def _create_cmd(docs: str = None):
                runtime or programming language.
         """
         if name is None:
-            name = f"pysdk-{secrets.token_hex(5)}"
+            faker = Faker()
+            name = f"pysdk-{faker.user_name()}"
         else:
             name = name
 
@@ -955,6 +957,46 @@ def rename(session_id, new_id):
             sys.exit(ExitCode.FAILURE)
 
 
+@session.command()
+@click.argument("session_id", metavar="SESSID")
+def commit(session_id):
+    """
+    Commit a running session to tar file.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    """
+
+    with Session() as session:
+        try:
+            kernel = session.ComputeSession(session_id)
+            kernel.commit()
+            print_info(f"Request to commit Session(name or id: {session_id})")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@session.command()
+@click.argument("session_id", metavar="SESSID")
+def abuse_history(session_id):
+    """
+    Get abusing reports of session's sibling kernels.
+
+    \b
+    SESSID: Session ID or its alias given when creating the session.
+    """
+
+    with Session() as session:
+        try:
+            session = session.ComputeSession(session_id)
+            report = session.get_abusing_report()
+            print(dict(report))
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
 def _ssh_cmd(docs: str = None):
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.option(
@@ -1140,7 +1182,11 @@ def _events_cmd(docs: str = None):
                     compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
                 async with compute_session.listen_events(scope=scope) as response:
                     async for ev in response:
-                        print(click.style(ev.event, fg="cyan", bold=True), json.loads(ev.data))
+                        click.echo(
+                            click.style(ev.event, fg="cyan", bold=True)
+                            + " "
+                            + json.dumps(json.loads(ev.data), indent=None)  # as single-line
+                        )
 
         try:
             asyncio_run(_run_events())
@@ -1323,7 +1369,7 @@ def _watch_cmd(docs: Optional[str] = None):
                 async with timeout(max_wait):
                     await _run_events()
             except asyncio.TimeoutError:
-                sys.exit(ExitCode.TIMEOUT)
+                sys.exit(ExitCode.OPERATION_TIMEOUT)
 
         try:
             if max_wait > 0:

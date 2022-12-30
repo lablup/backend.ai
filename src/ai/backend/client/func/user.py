@@ -12,7 +12,7 @@ from ai.backend.client.pagination import generate_paginated_results
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
 
-from .base import BaseFunction, api_function
+from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = (
     "User",
@@ -30,6 +30,7 @@ _default_list_fields = (
     user_fields["created_at"],
     user_fields["domain_name"],
     user_fields["groups"],
+    user_fields["allowed_client_ip"],
 )
 
 _default_detail_fields = (
@@ -43,6 +44,7 @@ _default_detail_fields = (
     user_fields["domain_name"],
     user_fields["role"],
     user_fields["groups"],
+    user_fields["allowed_client_ip"],
 )
 
 
@@ -252,15 +254,14 @@ class User(BaseFunction):
         status: UserStatus | str = UserStatus.ACTIVE,
         need_password_change: bool = False,
         description: str = "",
+        allowed_client_ip: Iterable[str] = None,
         group_ids: Iterable[str] = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new user with the given options.
         You need an admin privilege for this operation.
         """
-        if fields is None:
-            fields = ("domain_name", "email", "username", "uuid")
         query = textwrap.dedent(
             """\
             mutation($email: String!, $input: UserInput!) {
@@ -270,7 +271,14 @@ class User(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        default_fields = (
+            user_fields["domain_name"],
+            user_fields["email"],
+            user_fields["username"],
+            user_fields["uuid"],
+        )
+        resolved_fields = resolve_fields(fields, user_fields, default_fields)
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "email": email,
             "input": {
@@ -283,6 +291,7 @@ class User(BaseFunction):
                 "description": description,
                 "domain_name": domain_name,
                 "group_ids": group_ids,
+                "allowed_client_ip": allowed_client_ip,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
@@ -297,12 +306,13 @@ class User(BaseFunction):
         username: str = None,
         full_name: str = None,
         domain_name: str = None,
-        role: UserRole | str = UserRole.USER,
-        status: UserStatus | str = UserStatus.ACTIVE,
+        role: UserRole | str | None = None,
+        status: UserStatus | str | None = None,
         need_password_change: bool = None,
         description: str = None,
+        allowed_client_ip: Iterable[str] = None,
         group_ids: Iterable[str] = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Update existing user.
@@ -328,6 +338,7 @@ class User(BaseFunction):
                 "status": status.value if isinstance(status, UserStatus) else status,
                 "need_password_change": need_password_change,
                 "description": description,
+                "allowed_client_ip": allowed_client_ip,
                 "group_ids": group_ids,
             },
         }

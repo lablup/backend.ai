@@ -68,34 +68,36 @@ class ErrorStatusInfo(TypedDict):
 
 
 def convert_to_status_data(e: Exception, is_debug: bool = False) -> ErrorStatusInfo:
-    if isinstance(e, MultiAgentError):
-        data = ErrorStatusInfo(
-            error={
-                "src": "agent",
-                "name": "MultiAgentError",
-                "repr": f"MultiAgentError({len(e.__errors__)})",
-                "collection": [
-                    convert_to_status_data(sub_error, is_debug)["error"]
-                    for sub_error in e.__errors__
-                ],
-            },
-        )
-        return data
-    elif isinstance(e, AgentError):
-        data = ErrorStatusInfo(
-            error={
-                "src": "agent",
-                "name": e.exc_name,
-                "repr": e.exc_repr,
-            },
-        )
-        if is_debug:
-            data["error"]["agent_id"] = e.agent_id
-        return data
-    return ErrorStatusInfo(
-        error={
-            "src": "other",
-            "name": e.__class__.__name__,
-            "repr": repr(e),
-        },
-    )
+    data: ErrorStatusInfo
+    match e:
+        case MultiAgentError():
+            return {
+                "error": {
+                    "src": "agent",
+                    "name": "MultiAgentError",
+                    "repr": f"MultiAgentError({len(e.__errors__)})",
+                    "collection": [
+                        convert_to_status_data(sub_error, is_debug)["error"]
+                        for sub_error in e.__errors__
+                    ],
+                },
+            }
+        case AgentError():
+            data = {
+                "error": {
+                    "src": "agent",
+                    "name": e.exc_name,
+                    "repr": e.exc_repr,
+                },
+            }
+            if is_debug:
+                data["error"]["agent_id"] = e.agent_id
+            return data
+        case _:
+            return {
+                "error": {
+                    "src": "other",
+                    "name": e.__class__.__name__,
+                    "repr": repr(e),
+                },
+            }

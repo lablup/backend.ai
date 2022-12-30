@@ -4,6 +4,7 @@ import asyncio
 import logging
 from contextvars import ContextVar
 from datetime import datetime, timedelta
+from functools import partial
 from typing import TYPE_CHECKING, Any, Awaitable, Final, List, Optional, Sequence, Tuple, Union
 
 import aiotools
@@ -23,6 +24,7 @@ from ai.backend.common.events import (
     DoScheduleEvent,
     EventDispatcher,
     EventProducer,
+    KernelLifecycleEventReason,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,
@@ -218,9 +220,13 @@ class SchedulerDispatcher(aobject):
                             sched_ctx,
                             sgroup_name,
                         )
-                    except InstanceNotAvailable:
+                    except InstanceNotAvailable as e:
                         # Proceed to the next scaling group and come back later.
-                        log.debug("schedule({}): instance not available", sgroup_name)
+                        log.debug(
+                            "schedule({}): instance not available ({})",
+                            sgroup_name,
+                            e.extra_msg,
+                        )
                     except Exception as e:
                         log.exception("schedule({}): scheduling error!\n{}", sgroup_name, repr(e))
         except DBAPIError as e:
@@ -303,7 +309,7 @@ class SchedulerDispatcher(aobject):
                     SessionCancelledEvent(
                         item["session_id"],
                         item["session_creation_id"],
-                        reason="pending timeout",
+                        reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                     ),
                 )
 
@@ -338,14 +344,6 @@ class SchedulerDispatcher(aobject):
                 # no matching entry for picked session?
                 raise RuntimeError("should not reach here")
             sess_ctx = pending_sessions.pop(picked_idx)
-            requested_architectures = set([x.image_ref.architecture for x in sess_ctx.kernels])
-            candidate_agents = list(
-                filter(
-                    lambda x: x.architecture in requested_architectures,
-                    candidate_agents,
-                ),
-            )
-
             log_fmt = "schedule(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
             log_args = (
                 sess_ctx.session_id,
@@ -479,19 +477,6 @@ class SchedulerDispatcher(aobject):
                 await execute_with_retry(_update)
 
             if sess_ctx.cluster_mode == ClusterMode.SINGLE_NODE:
-                # Single node session can't have multiple containers with different arch
-                if len(requested_architectures) > 1:
-                    raise GenericBadRequest(
-                        "Cannot assign multiple kernels with different architecture"
-                        "on single node session",
-                    )
-                requested_architecture = requested_architectures.pop()
-                candidate_agents = list(
-                    filter(
-                        lambda x: x.architecture == requested_architecture,
-                        candidate_agents,
-                    ),
-                )
                 await self._schedule_single_node_session(
                     sched_ctx,
                     scheduler,
@@ -526,34 +511,74 @@ class SchedulerDispatcher(aobject):
         sess_ctx: PendingSession,
         check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
-        # Assign agent resource per session.
+        """
+        Finds and assigns an agent having resources enough to host the entire session.
+        """
         log_fmt = _log_fmt.get("")
         log_args = _log_args.get(tuple())
+        requested_architectures = set(x.image_ref.architecture for x in sess_ctx.kernels)
+        if len(requested_architectures) > 1:
+            raise GenericBadRequest(
+                "Cannot assign multiple kernels with different architecture"
+                "on single node session",
+            )
+        requested_architecture = requested_architectures.pop()
+        compatible_candidate_agents = [
+            *filter(
+                lambda x: x.architecture == requested_architecture,
+                candidate_agents,
+            ),
+        ]
+        if not compatible_candidate_agents:
+            raise InstanceNotAvailable(
+                extra_msg=(
+                    f"No agents found to be compatible with the image acrhitecture "
+                    f"(image[0]: {sess_ctx.kernels[0].image_ref}, "
+                    f"arch: {requested_architecture})"
+                ),
+            )
         try:
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
             agent_id = None
-            if sess_ctx.agent_id is not None:
-                agent_id = sess_ctx.agent_id
-            else:
-                agent_id = scheduler.assign_agent_for_session(candidate_agents, sess_ctx)
             async with self.db.begin() as agent_db_conn:
-                query = (
-                    sa.select([agents.c.available_slots])
-                    .select_from(agents)
-                    .where(agents.c.id == agent_id)
-                )
-                available_agent_slots = (await agent_db_conn.execute(query)).scalar()
-                # if pass the available test
-                if available_agent_slots is None:
-                    raise InstanceNotAvailable("There is no such agent.")
-                for key in available_agent_slots:
-                    if available_agent_slots[key] >= sess_ctx.requested_slots[key]:
-                        continue
-                    else:
+                if sess_ctx.agent_id is not None:
+                    # Check the resource availability of the manually designated agent
+                    agent_id = sess_ctx.agent_id
+                    query = (
+                        sa.select([agents.c.available_slots])
+                        .select_from(agents)
+                        .where(agents.c.id == agent_id)
+                    )
+                    available_agent_slots = (await agent_db_conn.execute(query)).scalar()
+                    if available_agent_slots is None:
+                        raise GenericBadRequest(f"No such agent: {agent_id}")
+                    for key in available_agent_slots:
+                        if available_agent_slots[key] >= sess_ctx.requested_slots[key]:
+                            continue
+                        else:
+                            raise InstanceNotAvailable(
+                                extra_msg=(
+                                    f"The designated agent ({agent_id}) does not have "
+                                    f"the enough remaining capacity ({key}, "
+                                    f"requested: {sess_ctx.requested_slots[key]}, "
+                                    f"available: {available_agent_slots[key]})."
+                                ),
+                            )
+                else:
+                    # Let the scheduler check the resource availability and decide the target agent
+                    agent_id = scheduler.assign_agent_for_session(
+                        compatible_candidate_agents, sess_ctx
+                    )
+                    if agent_id is None:
                         raise InstanceNotAvailable(
-                            "The resource slot does not have the enough remaining capacity.",
+                            extra_msg=(
+                                f"Could not find a contiguous resource region in any agent "
+                                f"big enough to host the session "
+                                f"({sess_ctx.session_id})"
+                            ),
                         )
+                assert agent_id is not None
                 agent_alloc_ctx = await _reserve_agent(
                     sched_ctx,
                     agent_db_conn,
@@ -561,10 +586,10 @@ class SchedulerDispatcher(aobject):
                     agent_id,
                     sess_ctx.requested_slots,
                 )
-        except InstanceNotAvailable:
+        except InstanceNotAvailable as sched_failure:
             log.debug(log_fmt + "no-available-instances", *log_args)
 
-            async def _update() -> None:
+            async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
                 async with self.db.begin() as kernel_db_conn:
                     await _rollback_predicate_mutations(
                         kernel_db_conn,
@@ -581,6 +606,7 @@ class SchedulerDispatcher(aobject):
                                     ("scheduler", "retries"),
                                     parent_updates={
                                         "last_try": datetime.now(tzutc()).isoformat(),
+                                        "msg": exc.extra_msg,
                                     },
                                 ),
                             }
@@ -589,7 +615,7 @@ class SchedulerDispatcher(aobject):
                     )
                     await kernel_db_conn.execute(query)
 
-            await execute_with_retry(_update)
+            await execute_with_retry(partial(_update_sched_failure, sched_failure))
             raise
         except Exception as e:
             log.exception(
@@ -598,7 +624,7 @@ class SchedulerDispatcher(aobject):
             )
             exc_data = convert_to_status_data(e)
 
-            async def _update() -> None:
+            async def _update_generic_failure() -> None:
                 async with self.db.begin() as kernel_db_conn:
                     await _rollback_predicate_mutations(
                         kernel_db_conn,
@@ -617,7 +643,7 @@ class SchedulerDispatcher(aobject):
                     )
                     await kernel_db_conn.execute(query)
 
-            await execute_with_retry(_update)
+            await execute_with_retry(_update_generic_failure)
             raise
 
         async def _finalize_scheduled() -> None:
@@ -661,7 +687,9 @@ class SchedulerDispatcher(aobject):
         sess_ctx: PendingSession,
         check_results: List[Tuple[str, Union[Exception, PredicateResult]]],
     ) -> None:
-        # Assign agent resource per kernel in the session.
+        """
+        Finds and assigns agents having resources enough to host each kernel in the session.
+        """
         log_fmt = _log_fmt.get()
         log_args = _log_args.get()
         agent_query_extra_conds = None
@@ -676,58 +704,81 @@ class SchedulerDispatcher(aobject):
                 try:
                     agent_id: AgentId | None
                     if kernel.agent_id is not None:
+                        # Check the resource availability of the manually designated agent
                         agent_id = kernel.agent_id
+                        query = (
+                            sa.select([agents.c.available_slots])
+                            .select_from(agents)
+                            .where(agents.c.id == agent_id)
+                        )
+                        available_agent_slots = (await agent_db_conn.execute(query)).scalar()
+                        if available_agent_slots is None:
+                            raise GenericBadRequest(f"No such agent: {agent_id}")
+                        for key in available_agent_slots:
+                            if available_agent_slots[key] >= kernel.requested_slots[key]:
+                                continue
+                            else:
+                                raise InstanceNotAvailable(
+                                    extra_msg=(
+                                        f"The designated agent ({agent_id}) does not have "
+                                        f"the enough remaining capacity ({key}, "
+                                        f"requested: {sess_ctx.requested_slots[key]}, "
+                                        f"available: {available_agent_slots[key]})."
+                                    ),
+                                )
                     else:
-                        # limit agent candidates with requested image architecture
-                        candidate_agents = list(
-                            filter(
+                        # Each kernel may have different images and different architectures
+                        compatible_candidate_agents = [
+                            *filter(
                                 lambda x: x.architecture == kernel.image_ref.architecture,
                                 candidate_agents,
                             ),
+                        ]
+                        if not compatible_candidate_agents:
+                            raise InstanceNotAvailable(
+                                extra_msg=(
+                                    f"No agents found to be compatible with the image acrhitecture "
+                                    f"(image: {kernel.image_ref}, "
+                                    f"arch: {kernel.image_ref.architecture})"
+                                ),
+                            )
+                        # Let the scheduler check the resource availability and decide the target agent
+                        agent_id = scheduler.assign_agent_for_kernel(
+                            compatible_candidate_agents, kernel
                         )
-                        agent_id = scheduler.assign_agent_for_kernel(candidate_agents, kernel)
+                        if agent_id is None:
+                            raise InstanceNotAvailable(
+                                extra_msg=(
+                                    f"Could not find a contiguous resource region in any agent "
+                                    f"big enough to host a kernel in the session "
+                                    f"({sess_ctx.session_id})"
+                                ),
+                            )
                     assert agent_id is not None
 
-                    query = (
-                        sa.select([agents.c.available_slots])
-                        .select_from(agents)
-                        .where(agents.c.id == agent_id)
-                    )
-                    available_agent_slots = (await agent_db_conn.execute(query)).scalar()
-                    if available_agent_slots is None:
-                        raise InstanceNotAvailable("There is no such agent.")
-                    available_test_pass = False
-                    for key in available_agent_slots:
-                        if available_agent_slots[key] >= kernel.requested_slots[key]:
-                            available_test_pass = True
-                            continue
-                        else:
-                            raise InstanceNotAvailable(
-                                "The resource slot does not have the enough remaining capacity.",
+                    async def _reserve() -> None:
+                        nonlocal agent_alloc_ctx, candidate_agents
+                        async with agent_db_conn.begin_nested():
+                            agent_alloc_ctx = await _reserve_agent(
+                                sched_ctx,
+                                agent_db_conn,
+                                sgroup_name,
+                                agent_id,
+                                kernel.requested_slots,
+                                extra_conds=agent_query_extra_conds,
                             )
-                    if available_test_pass:
+                            # Update the agent data to schedule the next kernel in the session
+                            candidate_agents = await _list_agents_by_sgroup(
+                                agent_db_conn,
+                                sgroup_name,
+                            )
 
-                        async def _reserve() -> None:
-                            nonlocal agent_alloc_ctx, candidate_agents
-                            async with agent_db_conn.begin_nested():
-                                agent_alloc_ctx = await _reserve_agent(
-                                    sched_ctx,
-                                    agent_db_conn,
-                                    sgroup_name,
-                                    agent_id,
-                                    kernel.requested_slots,
-                                    extra_conds=agent_query_extra_conds,
-                                )
-                                candidate_agents = await _list_agents_by_sgroup(
-                                    agent_db_conn,
-                                    sgroup_name,
-                                )
+                    await execute_with_retry(_reserve)
 
-                        await execute_with_retry(_reserve)
-                except InstanceNotAvailable:
+                except InstanceNotAvailable as sched_failure:
                     log.debug(log_fmt + "no-available-instances", *log_args)
 
-                    async def _update() -> None:
+                    async def _update_sched_failure(exc: InstanceNotAvailable) -> None:
                         async with self.db.begin() as kernel_db_conn:
                             await _rollback_predicate_mutations(
                                 kernel_db_conn,
@@ -744,6 +795,7 @@ class SchedulerDispatcher(aobject):
                                             ("scheduler", "retries"),
                                             parent_updates={
                                                 "last_try": datetime.now(tzutc()).isoformat(),
+                                                "msg": exc.extra_msg,
                                             },
                                         ),
                                     }
@@ -752,7 +804,7 @@ class SchedulerDispatcher(aobject):
                             )
                             await kernel_db_conn.execute(query)
 
-                    await execute_with_retry(_update)
+                    await execute_with_retry(partial(_update_sched_failure, sched_failure))
                     raise
                 except Exception as e:
                     log.exception(
@@ -761,7 +813,7 @@ class SchedulerDispatcher(aobject):
                     )
                     exc_data = convert_to_status_data(e)
 
-                    async def _update() -> None:
+                    async def _update_generic_failure() -> None:
                         async with self.db.begin() as kernel_db_conn:
                             await _rollback_predicate_mutations(
                                 kernel_db_conn,
@@ -780,11 +832,11 @@ class SchedulerDispatcher(aobject):
                             )
                             await kernel_db_conn.execute(query)
 
-                    await execute_with_retry(_update)
+                    await execute_with_retry(_update_generic_failure)
                     raise
                 else:
                     assert agent_alloc_ctx is not None
-                    kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx))
+                    kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx, set()))
 
         assert len(kernel_agent_bindings) == len(sess_ctx.kernels)
         # Proceed to PREPARING only when all kernels are successfully scheduled.
@@ -964,7 +1016,7 @@ class SchedulerDispatcher(aobject):
                     SessionCancelledEvent(
                         session.session_id,
                         session.session_creation_id,
-                        "failed-to-start",
+                        KernelLifecycleEventReason.FAILED_TO_START,
                     ),
                 )
                 async with self.db.begin_readonly() as db_conn:
