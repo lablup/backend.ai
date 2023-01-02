@@ -1,7 +1,7 @@
 import json
 import logging
 from pathlib import Path, PurePath
-from typing import Any, FrozenSet, Mapping, Optional, Set
+from typing import Any, FrozenSet, Mapping, Optional
 from uuid import UUID
 
 from ai.backend.common.logging import BraceStyleAdapter
@@ -11,10 +11,7 @@ from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptio
 from ai.backend.storage.vfs import BaseVolume
 
 from ..exception import VFolderCreationError
-from .exceptions import (
-    GPFSJobFailedError,
-    GPFSNoMetricError,
-)
+from .exceptions import GPFSJobFailedError, GPFSNoMetricError
 from .gpfs_client import GPFSAPIClient
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -171,7 +168,7 @@ class GPFSVolume(BaseVolume):
 
     async def get_quota(self, vfid: UUID) -> BinarySize:
         quotas = await self.api_client.list_fileset_quotas(self.fs, str(vfid))
-        custom_defined_quotas = [q for q in quotas if q.defaultQuota == False]
+        custom_defined_quotas = [q for q in quotas if not q.defaultQuota]
         if len(custom_defined_quotas) == 0:
             return BinarySize(-1)
         assert custom_defined_quotas[0].blockLimit is not None

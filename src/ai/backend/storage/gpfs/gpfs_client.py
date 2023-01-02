@@ -282,7 +282,7 @@ class GPFSAPIClient:
             response = await self._build_request(
                 sess, "DELETE", f"/filesystems/{fs_name}/filesets/{fileset_name}"
             )
-            data = await response.json()
+            await response.json()
 
     @error_handler
     async def copy_folder(
