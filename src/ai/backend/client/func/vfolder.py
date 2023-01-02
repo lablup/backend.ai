@@ -218,7 +218,7 @@ class VFolder(BaseFunction):
                                         # Retry.
                                         raise ResponseFailed
                                 size = int(raw_resp.headers["Content-Length"])
-                                if_range = raw_resp.headers["Last-Modified"]
+                                if_range = raw_resp.headers.get("Last-Modified")
                                 q: janus.Queue[bytes] = janus.Queue(MAX_INFLIGHT_CHUNKS)
                                 try:
                                     with tqdm(
@@ -552,8 +552,9 @@ class VFolder(BaseFunction):
             return await resp.json()
 
     @api_function
-    async def leave(self):
+    async def leave(self, shared_user_uuid=None):
         rqst = Request("POST", "/folders/{}/leave".format(self.name))
+        rqst.set_json({"shared_user_uuid": shared_user_uuid})
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -588,3 +589,25 @@ class VFolder(BaseFunction):
         )
         async with rqst.fetch() as resp:
             return await resp.text()
+
+    @api_function
+    @classmethod
+    async def shared_vfolder_info(cls, vfolder_id: str):
+        rqst = Request("GET", "folders/_/shared")
+        rqst.set_json({"vfolder_id": vfolder_id})
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    @classmethod
+    async def update_shared_vfolder(cls, vfolder: str, user: str, perm: str = None):
+        rqst = Request("POST", "/folders/_/shared")
+        rqst.set_json(
+            {
+                "vfolder": vfolder,
+                "user": user,
+                "perm": perm,
+            }
+        )
+        async with rqst.fetch() as resp:
+            return await resp.json()

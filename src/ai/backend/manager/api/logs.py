@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, MutableMapping, Tuple
 
 import aiohttp_cors
-import attr
+import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
@@ -236,7 +236,7 @@ async def log_cleanup_task(app: web.Application, src: AgentId, event: DoLogClean
             log.info("Cleaned up {} log(s) filed before {}", result.rowcount, boundary)
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     log_cleanup_timer: GlobalTimer
     log_cleanup_timer_redis: RedisConnectionInfo

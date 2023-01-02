@@ -509,7 +509,7 @@ def invite(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).invite(perm, emails)
             invited_ids = result.get("invited_ids", [])
-            if len(invited_ids) > 0:
+            if invited_ids:
                 print("Invitation sent to:")
                 for invitee in invited_ids:
                     print("\t- " + invitee)
@@ -594,7 +594,7 @@ def share(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).share(perm, emails)
             shared_emails = result.get("shared_emails", [])
-            if len(shared_emails) > 0:
+            if shared_emails:
                 print("Shared with {} permission to:".format(perm))
                 for _email in shared_emails:
                     print("\t- " + _email)
@@ -619,7 +619,7 @@ def unshare(name, emails):
         try:
             result = session.VFolder(name).unshare(emails)
             unshared_emails = result.get("unshared_emails", [])
-            if len(unshared_emails) > 0:
+            if unshared_emails:
                 print("Unshared from:")
                 for _email in unshared_emails:
                     print("\t- " + _email)
@@ -632,7 +632,15 @@ def unshare(name, emails):
 
 @vfolder.command()
 @click.argument("name", type=str)
-def leave(name):
+@click.option(
+    "-s",
+    "--shared-user-uuid",
+    metavar="SHARED_USER_UUID",
+    type=str,
+    default=None,
+    help="The ID of the person who wants to leave (the person who shared the vfolder).",
+)
+def leave(name, shared_user_uuid):
     """Leave the shared virutal folder.
 
     NAME: Name of a virtual folder
@@ -646,7 +654,7 @@ def leave(name):
             if vfolder_info["is_owner"]:
                 print("You cannot leave a virtual folder you own. Consider using delete instead.")
                 return
-            session.VFolder(name).leave()
+            session.VFolder(name).leave(shared_user_uuid)
             print('Left the shared virtual folder "{}".'.format(name))
 
         except Exception as e:

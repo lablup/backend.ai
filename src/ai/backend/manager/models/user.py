@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from passlib.hash import bcrypt
+from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -26,6 +27,7 @@ from ..api.exceptions import VFolderOperationFailed
 from .base import (
     EnumValueType,
     IDColumn,
+    IPColumn,
     Item,
     PaginatedList,
     batch_multiresult,
@@ -123,6 +125,7 @@ users = sa.Table(
     sa.Column("integration_id", sa.String(length=512)),
     sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), index=True),
     sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
+    sa.Column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True),
 )
 
 
@@ -178,6 +181,7 @@ class User(graphene.ObjectType):
     modified_at = GQLDateTime()
     domain_name = graphene.String()
     role = graphene.String()
+    allowed_client_ip = graphene.List(lambda: graphene.String)
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -211,6 +215,7 @@ class User(graphene.ObjectType):
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
             role=row["role"],
+            allowed_client_ip=row["allowed_client_ip"],
         )
 
     @classmethod
@@ -262,6 +267,7 @@ class User(graphene.ObjectType):
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
         "role": ("role", lambda s: UserRole[s]),
+        "allowed_client_ip": ("allowed_client_ip", None),
     }
 
     _queryorder_colmap = {
@@ -452,6 +458,7 @@ class UserInput(graphene.InputObjectType):
     domain_name = graphene.String(required=True, default="default")
     role = graphene.String(required=False, default=UserRole.USER)
     group_ids = graphene.List(lambda: graphene.String, required=False)
+    allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
 
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
@@ -468,6 +475,7 @@ class ModifyUserInput(graphene.InputObjectType):
     domain_name = graphene.String(required=False)
     role = graphene.String(required=False)
     group_ids = graphene.List(lambda: graphene.String, required=False)
+    allowed_client_ip = graphene.List(lambda: graphene.String, required=False)
 
 
 class PurgeUserInput(graphene.InputObjectType):
@@ -511,6 +519,7 @@ class CreateUser(graphene.Mutation):
             "status_info": "admin-requested",  # user mutation is only for admin
             "domain_name": props.domain_name,
             "role": UserRole(props.role),
+            "allowed_client_ip": props.allowed_client_ip,
         }
         user_insert_query = sa.insert(users).values(user_data)
 
@@ -598,6 +607,7 @@ class ModifyUser(graphene.Mutation):
         set_if_set(props, data, "status", clean_func=UserStatus)
         set_if_set(props, data, "domain_name")
         set_if_set(props, data, "role", clean_func=UserRole)
+        set_if_set(props, data, "allowed_client_ip")
         if not data and not props.group_ids:
             return cls(ok=False, msg="nothing to update", user=None)
         if data.get("status") is None and props.is_active is not None:
@@ -610,13 +620,7 @@ class ModifyUser(graphene.Mutation):
         async def _pre_func(conn: SAConnection) -> None:
             nonlocal user_update_data, prev_domain_name, prev_role
             result = await conn.execute(
-                sa.select(
-                    [
-                        users.c.domain_name,
-                        users.c.role,
-                        users.c.status,
-                    ]
-                )
+                sa.select([users.c.domain_name, users.c.role, users.c.status])
                 .select_from(users)
                 .where(users.c.email == email),
             )

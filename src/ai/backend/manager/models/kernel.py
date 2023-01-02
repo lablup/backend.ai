@@ -73,6 +73,7 @@ if TYPE_CHECKING:
 __all__ = (
     "kernels",
     "session_dependencies",
+    "KERNEL_STATUS_TRANSITION_MAP",
     "KernelStatistics",
     "KernelStatus",
     "ComputeContainer",
@@ -154,6 +155,99 @@ def default_hostname(context) -> str:
     return f"{params['cluster_role']}{params['cluster_idx']}"
 
 
+KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
+    KernelStatus.PENDING: {
+        s for s in KernelStatus if s not in (KernelStatus.PENDING, KernelStatus.TERMINATED)
+    },
+    KernelStatus.SCHEDULED: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.SCHEDULED,
+            KernelStatus.PENDING,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.PREPARING: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.PREPARING,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.BUILDING: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.BUILDING,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.PULLING: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.PULLING,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.RUNNING: {
+        KernelStatus.RESTARTING,
+        KernelStatus.RESIZING,
+        KernelStatus.TERMINATING,
+        KernelStatus.ERROR,
+    },
+    KernelStatus.RESTARTING: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.RESTARTING,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.RESIZING: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.RESIZING,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.SUSPENDED: {
+        s
+        for s in KernelStatus
+        if s
+        not in (
+            KernelStatus.SUSPENDED,
+            KernelStatus.PENDING,
+            KernelStatus.SCHEDULED,
+            KernelStatus.TERMINATED,
+        )
+    },
+    KernelStatus.TERMINATING: {KernelStatus.TERMINATED, KernelStatus.ERROR},
+    KernelStatus.TERMINATED: set(),
+    KernelStatus.ERROR: set(),
+    KernelStatus.CANCELLED: set(),
+}
+
+
 kernels = sa.Table(
     "kernels",
     metadata,
@@ -186,6 +280,7 @@ kernels = sa.Table(
         "cluster_role", sa.String(length=16), nullable=False, default=DEFAULT_ROLE, index=True
     ),
     sa.Column("cluster_idx", sa.Integer, nullable=False, default=0),
+    sa.Column("local_rank", sa.Integer, nullable=False, default=0),
     sa.Column("cluster_hostname", sa.String(length=64), nullable=False, default=default_hostname),
     # Resource ownership
     sa.Column("scaling_group", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True),
@@ -219,6 +314,7 @@ kernels = sa.Table(
     sa.Column("stdout_port", sa.Integer(), nullable=False),  # legacy for stream_pty
     sa.Column("service_ports", pgsql.JSONB(), nullable=True),
     sa.Column("preopen_ports", sa.ARRAY(sa.Integer), nullable=True),
+    sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False),
     # Lifecycle
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
     sa.Column(
@@ -577,6 +673,7 @@ class ComputeContainer(graphene.ObjectType):
     role = graphene.String()  # legacy
     hostname = graphene.String()  # legacy
     cluster_idx = graphene.Int()
+    local_rank = graphene.Int()
     cluster_role = graphene.String()
     cluster_hostname = graphene.String()
     session_id = graphene.UUID()  # owner session
@@ -594,6 +691,7 @@ class ComputeContainer(graphene.ObjectType):
     created_at = GQLDateTime()
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
+    abusing_report = graphene.JSONString()
 
     # resources
     agent = graphene.String()
@@ -620,6 +718,7 @@ class ComputeContainer(graphene.ObjectType):
             "role": row["cluster_role"],
             "hostname": row["cluster_hostname"],
             "cluster_idx": row["cluster_idx"],
+            "local_rank": row["local_rank"],
             "cluster_role": row["cluster_role"],
             "cluster_hostname": row["cluster_hostname"],
             "session_id": row["session_id"],
@@ -662,11 +761,22 @@ class ComputeContainer(graphene.ObjectType):
     async def resolve_last_stat(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
         return await self.resolve_live_stat(info)
 
+    async def resolve_abusing_report(
+        self,
+        info: graphene.ResolveInfo,
+        access_key: AccessKey | None,
+    ) -> Optional[Mapping[str, Any]]:
+        graph_ctx: GraphQueryContext = info.context
+        if access_key is None:
+            return None
+        return await graph_ctx.registry.get_abusing_report(self.id, access_key)
+
     _queryfilter_fieldspec = {
         "image": ("image", None),
         "architecture": ("architecture", None),
         "agent": ("agent", None),
         "cluster_idx": ("cluster_idx", None),
+        "local_rank": ("local_rank", None),
         "cluster_role": ("cluster_role", None),
         "cluster_hostname": ("cluster_hostname", None),
         "status": ("status", lambda s: KernelStatus[s]),
@@ -681,6 +791,7 @@ class ComputeContainer(graphene.ObjectType):
         "architecture": "architecture",
         "agent": "agent",
         "cluster_idx": "cluster_idx",
+        "local_rank": "local_rank",
         "cluster_role": "cluster_role",
         "cluster_hostname": "cluster_hostname",
         "status": "status",
@@ -858,6 +969,7 @@ class ComputeSession(graphene.ObjectType):
     startup_command = graphene.String()
     result = graphene.String()
     commit_status = graphene.String()
+    abusing_reports = graphene.List(lambda: graphene.JSONString)
 
     # resources
     resource_opts = graphene.JSONString()
@@ -961,14 +1073,23 @@ class ComputeSession(graphene.ObjectType):
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeSession.by_dependency")
         return await loader.load(self.id)
 
-    async def resolve_commit_status(self, info: graphene.ResolveInfo) -> Optional[str]:
+    async def resolve_commit_status(self, info: graphene.ResolveInfo) -> str:
         graph_ctx: GraphQueryContext = info.context
-        if self.status != "RUNNING":
-            return None
         commit_status = await graph_ctx.registry.get_commit_status(self.id, self.access_key)
         return commit_status["status"]
 
+    async def resolve_abusing_reports(
+        self, info: graphene.ResolveInfo
+    ) -> Iterable[Optional[Mapping[str, Any]]]:
+        containers = self.containers
+        if containers is None:
+            containers = await self.resolve_containers(info)
+        if containers is None:
+            return []
+        return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
+
     _queryfilter_fieldspec = {
+        "id": ("kernels_id", None),
         "type": ("kernels_session_type", lambda s: SessionTypes[s]),
         "name": ("kernels_session_name", None),
         "image": ("kernels_image", None),
