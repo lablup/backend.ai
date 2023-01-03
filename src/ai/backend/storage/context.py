@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager as actxmgr
+from distutils.util import strtobool
 from pathlib import Path, PurePosixPath
 from typing import Any, AsyncIterator, Mapping, Type
 
+import aiotools
+
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.types import use_trash_bin
 from ai.backend.storage.weka import WekaVolume
 
 from .abc import AbstractVolume
@@ -65,3 +69,18 @@ class Context:
             yield volume_obj
         finally:
             await volume_obj.shutdown()
+
+    @aiotools.lru_cache(maxsize=1, expire_after=2.0)
+    async def _get_use_trash_bin(self) -> bool:
+        val = await self.etcd.get("config/use_trash_bin")
+        if val is None:
+            return False
+        return bool(strtobool(val))
+
+    async def get_use_trash_bin(self) -> bool:
+        try:
+            val = use_trash_bin.get()
+        except LookupError:
+            val = await self._get_use_trash_bin()
+            use_trash_bin.set(val)
+        return val

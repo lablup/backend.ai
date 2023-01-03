@@ -201,7 +201,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            if ctx.local_config["storage-proxy"].get("use-trash-bin", True):
+            if await ctx.get_use_trash_bin():
                 result = await volume.move_to_trash(params["vfid"])
             else:
                 result = VFolderDeletionResult.NO_CHANGE
@@ -225,7 +225,7 @@ async def purge_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "purge_vfolder", params)
         ctx: Context = request.app["ctx"]
         async with ctx.get_volume(params["volume"]) as volume:
-            if ctx.local_config["storage-proxy"].get("use-trash-bin", True):
+            if await ctx.get_use_trash_bin():
                 result = await volume.delete_in_trash(params["vfid"])
             else:
                 result = await volume.delete_vfolder(params["vfid"])

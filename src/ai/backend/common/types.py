@@ -88,6 +88,8 @@ current_resource_slots: ContextVar[Mapping[SlotName, SlotTypes]] = ContextVar(
     "current_resource_slots"
 )
 
+use_trash_bin: ContextVar[bool] = ContextVar("use_trash_bin")
+
 
 class aobject(object):
     """

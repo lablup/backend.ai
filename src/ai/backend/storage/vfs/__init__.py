@@ -146,8 +146,6 @@ class BaseVolume(AbstractVolume):
         return VFolderDeletionResult.PURGED
 
     async def recover_vfolder(self, vfid: UUID) -> None:
-        if not self.local_config["storage-proxy"].get("use-trash-bin", True):
-            raise ExecutionError("This storage has no trash bin")
         src = self.get_vf_trash_path(vfid)
         dst = self.mangle_vfpath(vfid)
         loop = asyncio.get_running_loop()

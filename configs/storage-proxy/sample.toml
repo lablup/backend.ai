@@ -39,8 +39,6 @@ session-expire = "1d"
 # via the port number of this base port number + pidx.
 # aiomonitor-port = 48300
 
-# The deleted folders move to trash-bin path if it is true, else it is deleted.
-use-trash-bin = true
 
 [api.client]
 # Client-facing API
