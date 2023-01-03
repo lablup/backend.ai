@@ -124,7 +124,7 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
             select_query = select_query.offset((params["page_no"] - 1) * params["page_size"])
         if request["is_superadmin"]:
             pass
-        elif user_role == UserRole.ADMIN or user_role == "admin":
+        elif user_role == UserRole.DOMAIN_ADMIN or user_role == "admin":
             j = groups.join(agus, groups.c.id == agus.c.group_id)
             usr_query = (
                 sa.select([agus.c.user_id])
@@ -189,7 +189,7 @@ async def mark_cleared(request: web.Request) -> web.Response:
         update_query = sa.update(error_logs).values(is_cleared=True)
         if request["is_superadmin"]:
             update_query = update_query.where(error_logs.c.id == log_id)
-        elif user_role == UserRole.ADMIN or user_role == "admin":
+        elif user_role == UserRole.DOMAIN_ADMIN or user_role == "admin":
             j = groups.join(agus, groups.c.id == agus.c.group_id)
             usr_query = (
                 sa.select([agus.c.user_id])

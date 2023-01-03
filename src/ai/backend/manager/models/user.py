@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Iterable, Optional, Sequence
 from uuid import UUID, uuid4
 
 import aiohttp
@@ -77,7 +78,8 @@ class UserRole(str, enum.Enum):
     """
 
     SUPERADMIN = "superadmin"
-    ADMIN = "admin"
+    DOMAIN_ADMIN = "domain-admin"  # legacy value is "admin"
+    PROJECT_ADMIN = "project-admin"  # group admin
     USER = "user"
     MONITOR = "monitor"
 
@@ -100,6 +102,35 @@ INACTIVE_USER_STATUSES = (
     UserStatus.DELETED,
     UserStatus.BEFORE_VERIFICATION,
 )
+
+ALL_REAL_USER_ROLES = tuple(role for role in UserRole if role != UserRole.MONITOR)
+
+
+@dataclass
+class BaseActionPermittedRole:
+    # create: FrozenSet[UserRole] = field(default_factory=frozenset)
+    create: FrozenSet[UserRole] = frozenset()
+    read: FrozenSet[UserRole] = frozenset()
+    update: FrozenSet[UserRole] = frozenset()
+    delete: FrozenSet[UserRole] = frozenset()
+
+    def all_real_user_role_set(self) -> FrozenSet:
+        return frozenset(ALL_REAL_USER_ROLES)
+
+
+@dataclass
+class UserActionPermittedRole(BaseActionPermittedRole):
+    create: FrozenSet[UserRole] = frozenset(
+        [UserRole.SUPERADMIN, UserRole.DOMAIN_ADMIN, UserRole.PROJECT_ADMIN]
+    )
+    read: FrozenSet[UserRole] = frozenset(
+        [UserRole.SUPERADMIN, UserRole.DOMAIN_ADMIN, UserRole.PROJECT_ADMIN]
+    )
+    update: FrozenSet[UserRole] = frozenset(
+        [UserRole.SUPERADMIN, UserRole.DOMAIN_ADMIN, UserRole.PROJECT_ADMIN]
+    )
+    update_personal_info: FrozenSet[UserRole] = frozenset()
+    delete: FrozenSet[UserRole] = frozenset()
 
 
 users = sa.Table(
@@ -536,7 +567,9 @@ class CreateUser(graphene.Mutation):
                 graph_ctx.schema.get_type("KeyPairInput").create_container(
                     {
                         "is_active": (_status == UserStatus.ACTIVE),
-                        "is_admin": (user_data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN]),
+                        "is_admin": (
+                            user_data["role"] in [UserRole.SUPERADMIN, UserRole.DOMAIN_ADMIN]
+                        ),
                         "resource_policy": "default",
                         "rate_limit": 10000,
                     }
@@ -657,7 +690,7 @@ class ModifyUser(graphene.Mutation):
                     .order_by(sa.desc(keypairs.c.is_admin))
                     .order_by(sa.desc(keypairs.c.is_active)),
                 )
-                if data["role"] in [UserRole.SUPERADMIN, UserRole.ADMIN]:
+                if data["role"] in [UserRole.SUPERADMIN, UserRole.DOMAIN_ADMIN]:
                     # User's becomes admin. Set the keypair as active admin.
                     # TODO: Should we update the role of all users related to keypair?
                     kp = result.first()

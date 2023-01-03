@@ -309,7 +309,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     # Check if user is trying to created unmanaged vFolder
     if unmanaged_path:
         # Approve only if user is Admin or Superadmin
-        if user_role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+        if user_role not in (UserRole.DOMAIN_ADMIN, UserRole.SUPERADMIN):
             raise GenericForbidden("Insufficient permission")
     else:
         # Resolve host for the new virtual folder.
@@ -628,7 +628,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     log.info("VFOLDER.LIST_HOSTS (ak:{})", access_key)
     domain_name = request["user"]["domain_name"]
     group_id = params["group_id"]
-    domain_admin = request["user"]["role"] == UserRole.ADMIN
+    domain_admin = request["user"]["role"] == UserRole.DOMAIN_ADMIN
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin() as conn:

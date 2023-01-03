@@ -693,7 +693,7 @@ class UnloadImage(graphene.Mutation):
 
 class RescanImages(graphene.Mutation):
 
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
+    allowed_roles = (UserRole.DOMAIN_ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         registry = graphene.String()

@@ -702,7 +702,7 @@ def scoped_query(
                 if autofill_user:
                     if user_id is None:
                         user_id = client_user_id
-            elif client_role == UserRole.ADMIN:
+            elif client_role == UserRole.DOMAIN_ADMIN:
                 if domain_name is not None and domain_name != client_domain:
                     raise GenericForbidden
                 domain_name = client_domain
@@ -748,7 +748,7 @@ def privileged_mutation(required_role, target_func=None):
             if required_role == UserRole.SUPERADMIN:
                 if ctx.user["role"] == required_role:
                     permitted = True
-            elif required_role == UserRole.ADMIN:
+            elif required_role == UserRole.DOMAIN_ADMIN:
                 if ctx.user["role"] == UserRole.SUPERADMIN:
                     permitted = True
                 elif ctx.user["role"] == UserRole.USER:

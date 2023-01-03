@@ -9,6 +9,7 @@ from typing import (
     Any,
     Dict,
     Iterable,
+    Mapping,
     Optional,
     Sequence,
     TypedDict,
@@ -67,6 +68,7 @@ __all__: Sequence[str] = (
     "MAXIMUM_DOTFILE_SIZE",
     "query_group_dotfiles",
     "query_group_domain",
+    "query_user_associated_groups",
     "verify_dotfile_name",
 )
 
@@ -196,6 +198,19 @@ async def resolve_groups(
     return_val = [row["id"] for row in rows]
 
     return return_val
+
+
+async def query_user_associated_groups(
+    db_conn: SAConnection, user_uuid: uuid.UUID
+) -> Sequence[Mapping[str, Any]]:
+    j = sa.join(
+        groups, association_groups_users, groups.c.id == association_groups_users.c.group_id
+    )
+    query = (
+        sa.select([groups]).select_from(j).where(association_groups_users.c.user_id == user_uuid)
+    )
+    result = await db_conn.execute(query)
+    return result.fetchall()
 
 
 class Group(graphene.ObjectType):
@@ -371,7 +386,7 @@ class ModifyGroupInput(graphene.InputObjectType):
 
 class CreateGroup(graphene.Mutation):
 
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
+    allowed_roles = (UserRole.DOMAIN_ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         name = graphene.String(required=True)
@@ -383,7 +398,7 @@ class CreateGroup(graphene.Mutation):
 
     @classmethod
     @privileged_mutation(
-        UserRole.ADMIN,
+        UserRole.DOMAIN_ADMIN,
         lambda name, props, **kwargs: (props.domain_name, None),
     )
     async def mutate(
@@ -411,7 +426,7 @@ class CreateGroup(graphene.Mutation):
 
 class ModifyGroup(graphene.Mutation):
 
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
+    allowed_roles = (UserRole.DOMAIN_ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         gid = graphene.UUID(required=True)
@@ -423,7 +438,7 @@ class ModifyGroup(graphene.Mutation):
 
     @classmethod
     @privileged_mutation(
-        UserRole.ADMIN,
+        UserRole.DOMAIN_ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
     async def mutate(
@@ -499,7 +514,7 @@ class DeleteGroup(graphene.Mutation):
     Instead of deleting the group, just mark it as inactive.
     """
 
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
+    allowed_roles = (UserRole.DOMAIN_ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         gid = graphene.UUID(required=True)
@@ -509,7 +524,7 @@ class DeleteGroup(graphene.Mutation):
 
     @classmethod
     @privileged_mutation(
-        UserRole.ADMIN,
+        UserRole.DOMAIN_ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
     async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> DeleteGroup:
@@ -534,7 +549,7 @@ class PurgeGroup(graphene.Mutation):
     There is no migration of the ownership for group folders.
     """
 
-    allowed_roles = (UserRole.ADMIN, UserRole.SUPERADMIN)
+    allowed_roles = (UserRole.DOMAIN_ADMIN, UserRole.SUPERADMIN)
 
     class Arguments:
         gid = graphene.UUID(required=True)
@@ -544,7 +559,7 @@ class PurgeGroup(graphene.Mutation):
 
     @classmethod
     @privileged_mutation(
-        UserRole.ADMIN,
+        UserRole.DOMAIN_ADMIN,
         lambda gid, **kwargs: (None, gid),
     )
     async def mutate(cls, root, info: graphene.ResolveInfo, gid: uuid.UUID) -> PurgeGroup:

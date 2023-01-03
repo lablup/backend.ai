@@ -112,6 +112,7 @@ from ..models import (
     keypairs,
     query_accessible_vfolders,
     query_bootstrap_script,
+    query_user_associated_groups,
     scaling_groups,
     session_templates,
     users,
@@ -392,7 +393,7 @@ async def _query_userinfo(
         )
         qresult = await conn.execute(query)
         group_id = qresult.scalar()
-    elif owner_role == UserRole.ADMIN:
+    elif owner_role == UserRole.DOMAIN_ADMIN:
         # domain-admin can spawn container in any group in the same domain.
         if params["domain"] != owner_domain:
             raise InvalidAPIParameters("You can only set the domain to the owner's domain.")
@@ -407,6 +408,22 @@ async def _query_userinfo(
         )
         qresult = await conn.execute(query)
         group_id = qresult.scalar()
+    elif owner_role == UserRole.PROJECT_ADMIN:
+        if params["domain"] != owner_domain:
+            raise InvalidAPIParameters("You can only set the domain to the owner's domain.")
+        user_groups = await query_user_associated_groups(conn, owner_uuid)
+        if params["group"] not in [grp["name"] for grp in user_groups]:
+            raise InvalidAPIParameters("You can only set the group to the owner's group.")
+        group_ids = [
+            grp["id"]
+            for grp in user_groups
+            if (
+                (params["group"] == grp["name"])
+                and (params["domain"] == owner_domain)
+                and grp["is_active"]
+            )
+        ]
+        group_id = group_ids[0] if group_ids else None
     else:
         # normal users can spawn containers in their group and domain.
         if params["domain"] != owner_domain:
@@ -1861,7 +1878,7 @@ async def destroy(request: web.Request, params: Any) -> web.Response:
     session_name = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     if requester_access_key != owner_access_key and request["user"]["role"] not in (
-        UserRole.ADMIN,
+        UserRole.DOMAIN_ADMIN,
         UserRole.SUPERADMIN,
     ):
         raise InsufficientPrivilege("You are not allowed to force-terminate others's sessions")
