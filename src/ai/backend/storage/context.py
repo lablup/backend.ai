@@ -8,6 +8,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.storage.weka import WekaVolume
 
 from .abc import AbstractVolume
+from .cephfs import CephFSVolume
 from .exception import InvalidVolumeError
 from .netapp import NetAppVolume
 from .purestorage import FlashBladeVolume
@@ -21,6 +22,7 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     "xfs": XfsVolume,
     "netapp": NetAppVolume,
     "weka": WekaVolume,
+    "cephfs": CephFSVolume,
 }
 
 

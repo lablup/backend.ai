@@ -1930,7 +1930,7 @@ async def delete(request: web.Request) -> web.Response:
     # fs-level mv may fail or take longer time
     # but let's complete the db transaction to reflect that it's deleted.
     async with root_ctx.db.begin() as conn:
-        cond = vfolders.c.name == folder_name
+        cond = vfolders.c.id == entry["id"]
         await update_vfolder_status(conn, cond, VFolderOperationStatus.DELETE_ONGOING)
         async with root_ctx.storage_manager.request(
             folder_host,

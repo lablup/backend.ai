@@ -37,7 +37,7 @@ session-expire = "1d"
 # The starting port number for aiomonitor.
 # Since the storage-proxy is composed of multiple processes, each process will be exposed
 # via the port number of this base port number + pidx.
-# aiomonitor-port = 50300
+# aiomonitor-port = 48300
 
 # The deleted folders move to trash-bin path if it is true, else it is deleted.
 use-trash-bin = true
@@ -138,7 +138,7 @@ purity_fs_name = "FB-NFS1"  # the name of filesystem used by the filesystem API
 # An extended version for CephFS, which supports extended inode attributes
 # for per-directory quota and fast metadata queries.
 backend = "cephfs"
-path = "/vfroot/ceph-fuse"
+path = "/mnt/vfroot/ceph-fuse"
 
 [volume.netapp]
 backend = "netapp"

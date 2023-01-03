@@ -8,7 +8,7 @@ Users may define commonly used set of session creation parameters as
 reusable templates.
 
 A session template includes common session parameters such as resource
-slots, vfolder mounts, the kernel iamge to use, and etc.
+slots, vfolder mounts, the kernel image to use, and etc.
 It also support an extra feature that automatically clones a Git repository
 upon startup as a bootstrap command.
 
