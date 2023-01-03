@@ -167,7 +167,7 @@ weka_fs_name = ""  # Target filesystem to use as vFolder, must match with the on
 weka_verify_ssl = false  # If set to true, allow to communicate to server with insecure ssl context
 
 [volume.gpfs]
-backend = "specturmscale"
+backend = "spectrumscale"
 path = "/gpfs/example_fs"
 
 [volume.gpfs.options]

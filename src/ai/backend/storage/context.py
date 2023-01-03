@@ -23,7 +23,7 @@ BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     "xfs": XfsVolume,
     "netapp": NetAppVolume,
     "weka": WekaVolume,
-    "specturmscale": GPFSVolume,
+    "spectrumscale": GPFSVolume,
     "cephfs": CephFSVolume,
 }
 
