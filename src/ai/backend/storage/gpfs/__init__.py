@@ -135,7 +135,7 @@ class GPFSVolume(BaseVolume):
         )
         if options is not None and options.quota is not None:
             try:
-                await self.api_client.set_quota(self.fs, str(vfid), options.quota)
+                await self.set_quota(vfid, options.quota)
             except GPFSJobFailedError:
                 await self.api_client.remove_fileset(self.fs, str(vfid))
                 raise VFolderCreationError("Failed to set quota")
@@ -173,3 +173,6 @@ class GPFSVolume(BaseVolume):
             return BinarySize(-1)
         assert custom_defined_quotas[0].blockLimit is not None
         return BinarySize(custom_defined_quotas[0].blockLimit)
+
+    async def set_quota(self, vfid: UUID, size_bytes: BinarySize) -> None:
+        await self.api_client.set_quota(self.fs, str(vfid), size_bytes)
