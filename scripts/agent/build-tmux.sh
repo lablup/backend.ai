@@ -5,7 +5,7 @@ arch=$(uname -m)
 distros=("glibc" "musl")
 
 glibc_builder_dockerfile=$(cat <<'EOF'
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update
 RUN apt-get install -y make gcc g++ bison flex
@@ -30,7 +30,7 @@ cd libevent-2.0.22-stable
 ./configure --prefix=$TARGETDIR --disable-openssl --enable-shared=no --enable-static=yes --with-pic && make && make install
 make clean
 cd ..
-cd ncurses-6.0
+cd ncurses-6.4
 
 CPPFLAGS="-P" ./configure --prefix $TARGETDIR \
             --with-default-terminfo-dir=/usr/share/terminfo \
@@ -71,8 +71,8 @@ cd "$temp_dir"
 
 curl -LO https://github.com/libevent/libevent/releases/download/release-2.0.22-stable/libevent-2.0.22-stable.tar.gz
 tar -zxvf libevent-2.0.22-stable.tar.gz
-curl -LO https://mirror.yongbok.net/gnu/ncurses/ncurses-6.0.tar.gz
-tar zxvf ncurses-6.0.tar.gz
+curl -LO https://ftp.kaist.ac.kr/gnu/ncurses/ncurses-6.4.tar.gz
+tar zxvf ncurses-6.4.tar.gz
 curl -LO https://github.com/tmux/tmux/releases/download/3.0a/tmux-3.0a.tar.gz
 tar zxvf tmux-3.0a.tar.gz
 
@@ -87,6 +87,6 @@ for distro in "${distros[@]}"; do
 done
 
 ls -l .
-cp tmux.*.bin        $SCRIPT_DIR/../src/ai/backend/runner
+cp tmux.*.bin        $SCRIPT_DIR/../../src/ai/backend/runner
 
 rm -rf "$temp_dir"
