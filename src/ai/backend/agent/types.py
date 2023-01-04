@@ -1,9 +1,11 @@
 import asyncio
 import enum
 from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
 
 import attrs
+from aiohttp import web
+from aiohttp.typedefs import Handler
 
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.types import ContainerId, KernelId, MountTypes
@@ -83,3 +85,9 @@ class ContainerLifecycleEvent:
             f"c:{cid}, "
             f"reason:{self.reason!r})"
         )
+
+
+WebMiddleware = Callable[
+    [web.Request, Handler],
+    Awaitable[web.StreamResponse],
+]
