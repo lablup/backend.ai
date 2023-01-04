@@ -220,6 +220,26 @@ class AbstractPermission(str, enum.Enum):
     """
 
 
+class UserActionPermission(AbstractPermission):
+    CREATE = "create-user"
+    UPDATE = "update-user"
+    DELETE = "delete-user"
+    LIST = "list-user"
+    READ_PERSONAL_INFO = "read-personal-info"
+    UPDATE_PERSONAL_INFO = "update-personal-info"
+
+
+class VFolderActionPermission(AbstractPermission):
+    CREATE = "create-vfolder"
+    MODIFY = "modify-vfolder"  # rename, update-options
+    DELETE = "delete-vfolder"
+    MOUNT_IN_SESSION = "mount-in-session"
+    UPLOAD_FILE = "upload-file"
+    DOWNLOAD_FILE = "download-file"
+    INVITE_OTHERS = "invite-others"  # invite other user to user-type vfolder
+    SET_USER_PERM = "set-user-specific-permission"  # override permission of group-type vfolder
+
+
 class VFolderHostPermission(AbstractPermission):
     """
     Atomic permissions for a virtual folder under a host given to a specific access key.
