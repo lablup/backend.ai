@@ -321,8 +321,92 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
 
 
 async def container_pid_to_host_pid(container_id: str, container_pid: ContainerPID) -> HostPID:
-    # TODO: implement
-    return NotHostPID
+    log.debug("Container ID: {}", container_id)
+    kernel_ver = Path("/proc/version").read_text()
+    if m := re.match(r"Linux version (\d+)\.(\d+)\..*", kernel_ver):  # noqa
+        kernel_ver_tuple: Tuple[str, str] = m.groups()  # type: ignore
+        if kernel_ver_tuple < ("4", "1"):
+            # Vice versa implementation of host_pid_to_container_pid().
+            docker = aiodocker.Docker()
+            try:
+
+                # Get process table from inside container (execute 'ps -aux' command from container).
+                # Filter processes which have exactly the same COMMAND like above.
+                result = await docker._query_json(
+                    f"containers/{container_id}/exec",
+                    method="POST",
+                    data={
+                        "AttachStdin": False,
+                        "AttachStdout": True,
+                        "AttachStderr": True,
+                        "Cmd": ["ps", "-aux"],
+                    },
+                )
+                exec_id = result["Id"]
+                async with docker._query(
+                    f"exec/{exec_id}/start",
+                    method="POST",
+                    headers={"content-type": "application/json"},
+                    data=json.dumps(
+                        {
+                            "Stream": False,  # get response immediately
+                            "Detach": False,
+                            "Tty": False,
+                        }
+                    ),
+                ) as resp:
+                    result = await resp.read()
+                    result = result.decode("latin-1").split("\n")
+                result = list(map(lambda x: x.split(), result))
+                head = result[0]
+                procs = result[1:]
+                pid_idx, cmd_idx = head.index("PID"), head.index("COMMAND")
+                cmd = list(filter(lambda x: str(container_pid) == x[cmd_idx], procs))[0][cmd_idx]
+                container_table = list(
+                    filter(lambda x: cmd == " ".join(x[cmd_idx:]) if x else False, procs),
+                )
+
+                # Get process table from host (docker top information). Filter processes which have
+                # exactly the same COMMAND as with target host process.
+                result = await docker._query_json(f"containers/{container_id}/top", method="GET")
+                procs = result["Processes"]
+                host_table = list(filter(lambda x: cmd == x[7], procs))
+
+                # When there are multiple processes which have the same COMMAND, just get the index of
+                # the target host process and apply it with the container table. Since ps and docker top
+                # both displays processes ordered by PID, we can expect those two tables have same
+                # order of processes.
+                process_idx = None
+                for idx, p in enumerate(container_table):
+                    if str(container_pid) == p[pid_idx]:
+                        process_idx = idx
+                        break
+                else:
+                    raise IndexError
+                host_pid = HostPID(host_table[process_idx][1])
+                log.debug("container pid {} is mapped to host pid {}", container_pid, host_pid)
+                return HostPID(PID(int(host_pid)))
+            except asyncio.CancelledError:
+                raise
+            except (IndexError, KeyError, aiodocker.exceptions.DockerError):
+                return NotHostPID
+            finally:
+                await docker.close()
+
+    try:
+        tasks_path = Path(f"/sys/fs/cgroup/pids/docker/{container_id}/tasks")
+        cgtasks = [*map(int, tasks_path.read_text().splitlines())]
+        for pid in cgtasks:
+            proc_path = Path(f"/proc/{pid}/status")
+            proc_status = {
+                k: v for k, v in map(lambda l: l.split(":\t"), proc_path.read_text().splitlines())
+            }
+            nspids = proc_status["NSpid"].split()
+            if nspids[1] == str(container_pid):
+                return HostPID(PID(pid))
+        return NotHostPID
+    except (ValueError, KeyError, IOError):
+        return NotHostPID
 
 
 def fetch_local_ipaddrs(cidr: IPNetwork) -> Iterable[IPAddress]:
