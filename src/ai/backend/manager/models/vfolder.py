@@ -14,7 +14,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common.types import VFolderActionPermission, VFolderHostPermissionMap, VFolderMount
+from ai.backend.common.types import VFolderHostPermissionMap, VFolderMount
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
 from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
@@ -31,7 +31,7 @@ from .base import (
 )
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
-from .user import BaseActionAuth, UserResourceAuth, UserRole
+from .user import UserRole
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -130,39 +130,6 @@ class VFolderAccessStatus(str, enum.Enum):
 
     READABLE = "readable"
     UPDATABLE = "updatable"
-
-
-class VFolderActionAuth(BaseActionAuth[VFolderActionPermission]):
-    _data = {
-        VFolderActionPermission.CREATE: frozenset(
-            (
-                UserResourceAuth.OWNER,
-                UserResourceAuth.ADMIN,
-            )
-        ),
-        VFolderActionPermission.MODIFY: frozenset(
-            (
-                UserResourceAuth.OWNER,
-                UserResourceAuth.ADMIN,
-            )
-        ),
-        VFolderActionPermission.DELETE: frozenset(
-            (
-                UserResourceAuth.OWNER,
-                UserResourceAuth.ADMIN,
-            )
-        ),
-        VFolderActionPermission.MOUNT_IN_SESSION: frozenset((UserResourceAuth.OWNER,)),
-        VFolderActionPermission.UPLOAD_FILE: frozenset((UserResourceAuth.OWNER,)),
-        VFolderActionPermission.DOWNLOAD_FILE: frozenset((UserResourceAuth.OWNER,)),
-        VFolderActionPermission.INVITE_OTHERS: frozenset((UserResourceAuth.OWNER,)),
-        VFolderActionPermission.SET_USER_PERM: frozenset(
-            (
-                UserResourceAuth.OWNER,
-                UserResourceAuth.ADMIN,
-            )
-        ),
-    }
 
 
 vfolders = sa.Table(

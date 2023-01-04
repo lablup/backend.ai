@@ -2,19 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from abc import ABCMeta
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    FrozenSet,
-    Generic,
-    Iterable,
-    Mapping,
-    Optional,
-    Sequence,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
 from uuid import UUID, uuid4
 
 import aiohttp
@@ -33,7 +21,7 @@ from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import AbstractPermission, RedisConnectionInfo, UserActionPermission
+from ai.backend.common.types import RedisConnectionInfo
 
 from ..api.exceptions import VFolderOperationFailed
 from .base import (
@@ -65,7 +53,6 @@ __all__: Sequence[str] = (
     "UserList",
     "UserGroup",
     "UserRole",
-    "UserResourceAuth",
     "AuthFailed",
     "UserInput",
     "ModifyUserInput",
@@ -75,7 +62,6 @@ __all__: Sequence[str] = (
     "UserStatus",
     "ACTIVE_USER_STATUSES",
     "INACTIVE_USER_STATUSES",
-    "BaseActionAuth",
 )
 
 
@@ -96,11 +82,6 @@ class UserRole(str, enum.Enum):
     PROJECT_ADMIN = "project-admin"  # group admin
     USER = "user"
     MONITOR = "monitor"
-
-
-class UserResourceAuth(enum.Enum):
-    OWNER = "owner"
-    ADMIN = "admin"
 
 
 class UserStatus(str, enum.Enum):
@@ -125,71 +106,6 @@ INACTIVE_USER_STATUSES = (
     UserStatus.DELETED,
     UserStatus.BEFORE_VERIFICATION,
 )
-
-ALL_REAL_USER_ROLES = tuple(role for role in UserRole if role != UserRole.MONITOR)
-
-
-AbstractPermissionType = TypeVar("AbstractPermissionType", bound=AbstractPermission)
-
-
-class BaseActionAuth(Generic[AbstractPermissionType], metaclass=ABCMeta):
-    _data: Mapping[AbstractPermissionType, FrozenSet[UserResourceAuth]]
-
-    def auth(
-        self,
-        action: AbstractPermissionType,
-        user: Mapping[str, Any],
-        resource: Mapping[str, Any],
-    ) -> None:
-        acq_auth = self._get_user_auth(user, resource)
-        required_auth = self._data[action]
-        for auth in required_auth:
-            if auth not in acq_auth:
-                raise AuthFailed(f"{auth = } not found.")
-
-    @staticmethod
-    def _get_user_auth(
-        user: Mapping[str, Any],
-        resource: Mapping[str, Any],
-    ) -> set[UserResourceAuth]:
-        auth = set()
-        if user["id"] == resource["user_uuid"]:
-            auth.add(UserResourceAuth.OWNER)
-        if (
-            user["role"] == UserRole.SUPERADMIN
-            or (
-                user["role"] == UserRole.DOMAIN_ADMIN
-                and resource["domain_name"] == user["domain_name"]
-            )
-            or (
-                user["role"] == UserRole.PROJECT_ADMIN
-                and resource["group_id"] in user["groups"]
-                # TODO: Must fix and elaborate group admin
-            )
-        ):
-            auth.add(UserResourceAuth.ADMIN)
-        return auth
-
-
-class UserActionAuth(BaseActionAuth[UserActionPermission]):
-    _data = {
-        UserActionPermission.CREATE: frozenset((UserResourceAuth.ADMIN,)),
-        UserActionPermission.UPDATE: frozenset(
-            (
-                UserResourceAuth.OWNER,
-                UserResourceAuth.ADMIN,
-            )
-        ),
-        UserActionPermission.DELETE: frozenset((UserResourceAuth.OWNER,)),
-        UserActionPermission.LIST: frozenset(
-            (
-                UserResourceAuth.OWNER,
-                UserResourceAuth.ADMIN,
-            )
-        ),
-        UserActionPermission.UPDATE_PERSONAL_INFO: frozenset((UserResourceAuth.OWNER,)),
-        UserActionPermission.READ_PERSONAL_INFO: frozenset((UserResourceAuth.OWNER,)),
-    }
 
 
 users = sa.Table(
