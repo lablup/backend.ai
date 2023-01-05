@@ -72,3 +72,7 @@ src/ai/backend/runner/dropbearconvert.alpine3.8.aarch64.bin filter=lfs diff=lfs 
 src/ai/backend/runner/dropbearkey.alpine3.8.aarch64.bin filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/dropbearkey.alpine3.8.x86_64.bin filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/dropbearkey.ubuntu20.04.x86_64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/dropbearkey.ubuntu22.04.arm64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/tmux.ubuntu22.04.arm64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/dropbear.ubuntu22.04.arm64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/dropbearconvert.ubuntu22.04.arm64.bin filter=lfs diff=lfs merge=lfs -text
