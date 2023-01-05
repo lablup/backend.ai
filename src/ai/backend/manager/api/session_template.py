@@ -83,7 +83,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             result = await conn.execute(query)
             resp = {
                 "id": template_id,
-                "user": user_uuid,
+                "user": user_uuid if isinstance(user_uuid, str) else user_uuid.hex,
             }
             assert result.rowcount == 1
     return web.json_response(resp)
