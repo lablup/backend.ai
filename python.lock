@@ -1274,6 +1274,37 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "bc285b5f892094c3a53d558858a88553dd6a61a11ab1a8128a0e554385dcc5dd",
+              "url": "https://files.pythonhosted.org/packages/58/7e/2042610dfc8121e8119ad8b94db496d8697e4b0ef7a6e378018a2bd84435/dataclasses_json-0.5.7-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "c2c11bc8214fbf709ffc369d11446ff6945254a7f09128154a7620613d8fda90",
+              "url": "https://files.pythonhosted.org/packages/85/94/1b30216f84c48b9e0646833f6f2dd75f1169cc04dc45c48fe39e644c89d5/dataclasses-json-0.5.7.tar.gz"
+            }
+          ],
+          "project_name": "dataclasses-json",
+          "requires_dists": [
+            "dataclasses; python_version == \"3.6\"",
+            "flake8; extra == \"dev\"",
+            "hypothesis; extra == \"dev\"",
+            "ipython; extra == \"dev\"",
+            "marshmallow-enum<2.0.0,>=1.5.1",
+            "marshmallow<4.0.0,>=3.3.0",
+            "mypy>=0.710; extra == \"dev\"",
+            "portray; extra == \"dev\"",
+            "pytest>=6.2.3; extra == \"dev\"",
+            "simplejson; extra == \"dev\"",
+            "types-dataclasses; python_version == \"3.6\" and extra == \"dev\"",
+            "typing-inspect>=0.4.0"
+          ],
+          "requires_python": ">=3.6",
+          "version": "0.5.7"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "f174b5ff827504fd3cd97cc3f8649f3693f51538c7e4bdf3ef002c8429d42f9f",
               "url": "https://files.pythonhosted.org/packages/35/a8/365059bbcd4572cbc41de17fd5b682be5868b218c3c5479071865cab9078/entrypoints-0.4-py3-none-any.whl"
             },
@@ -2367,6 +2398,26 @@
           "requires_dists": [],
           "requires_python": ">=3.7",
           "version": "6.0.4"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "090fedd75945a69ae91ce1303b5824f428daf5a028d2f6ab8a299250a846f15d",
+              "url": "https://files.pythonhosted.org/packages/5c/eb/975c7c080f3223a5cdaff09612f3a5221e4ba534f7039db34c35d95fa6a5/mypy_extensions-0.4.3-py2.py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "2d82818f5bb3e369420cb3c4060a7970edba416647068eb4c5343488a6c604a8",
+              "url": "https://files.pythonhosted.org/packages/63/60/0582ce2eaced55f65a4406fc97beba256de4b7a95a0034c6576458c6519f/mypy_extensions-0.4.3.tar.gz"
+            }
+          ],
+          "project_name": "mypy-extensions",
+          "requires_dists": [
+            "typing>=3.5.3; python_version < \"3.5\""
+          ],
+          "requires_python": null,
+          "version": "0.4.3"
         },
         {
           "artifacts": [
@@ -4127,6 +4178,28 @@
           "requires_dists": [],
           "requires_python": ">=3.7",
           "version": "4.4"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "5fbf9c1e65d4fa01e701fe12a5bca6c6e08a4ffd5bc60bfac028253a447c5188",
+              "url": "https://files.pythonhosted.org/packages/be/01/59b743dca816c4b6ca891b9e0f84d20513cd61bdbbaa8615de8f5aab68c1/typing_inspect-0.8.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "8b1ff0c400943b6145df8119c41c244ca8207f1f10c9c057aeed1560e4806e3d",
+              "url": "https://files.pythonhosted.org/packages/72/23/bed3ea644bcd77ffe9a7f591eb058c00739747e33ab94d80cc4319ddee8e/typing_inspect-0.8.0.tar.gz"
+            }
+          ],
+          "project_name": "typing-inspect",
+          "requires_dists": [
+            "mypy-extensions>=0.3.0",
+            "typing-extensions>=3.7.4",
+            "typing>=3.7.4; python_version < \"3.5\""
+          ],
+          "requires_python": null,
+          "version": "0.8"
         },
         {
           "artifacts": [
