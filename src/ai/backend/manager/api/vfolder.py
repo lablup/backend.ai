@@ -170,26 +170,22 @@ def vfolder_permission_required(perm: VFolderPermission):
             match perm:
                 case VFolderPermission.READ_ONLY:
                     # if READ_ONLY is requested, any permission accepts.
-                    allowed_perm = set(
-                        (
-                            VFolderPermission.READ_ONLY,
-                            VFolderPermission.READ_WRITE,
-                            VFolderPermission.RW_DELETE,
-                        )
-                    )
+                    allowed_perm = {
+                        VFolderPermission.READ_ONLY,
+                        VFolderPermission.READ_WRITE,
+                        VFolderPermission.RW_DELETE,
+                    }
                 case VFolderPermission.READ_WRITE:
-                    allowed_perm = set(
-                        (
-                            VFolderPermission.READ_WRITE,
-                            VFolderPermission.RW_DELETE,
-                        )
-                    )
+                    allowed_perm = {
+                        VFolderPermission.READ_WRITE,
+                        VFolderPermission.RW_DELETE,
+                    }
                 case VFolderPermission.RW_DELETE:
                     # If RW_DELETE is requested, only RW_DELETE accepts.
-                    allowed_perm = set((VFolderPermission.RW_DELETE,))
+                    allowed_perm = {VFolderPermission.RW_DELETE}
                 case _:
                     # Otherwise, just compare it as-is (for future compatibility).
-                    allowed_perm = set((perm,))
+                    allowed_perm = {perm}
             async with root_ctx.db.begin() as conn:
                 entries = await query_accessible_vfolders_by_name(
                     conn,
