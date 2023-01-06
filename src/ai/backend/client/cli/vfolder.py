@@ -264,7 +264,7 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     "--base-dir",
     type=Path,
     default=None,
-    help="The local parent directory which contains the file to be downloaded.  "
+    help="The local parent directory which will contain the file to be downloaded.  "
     "[default: current working directry]",
 )
 @click.option(
