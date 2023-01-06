@@ -11,7 +11,6 @@ import ssl
 import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
-from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 from typing import (
@@ -696,11 +695,16 @@ async def server_main(
     # Add some useful console_locals for ease of debugging
     m.console_locals["root_app"] = root_app
     m.console_locals["root_ctx"] = root_ctx
-    m.start()
+    aiomon_started = False
+    try:
+        m.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     # Plugin webapps should be loaded before runner.setup(),
     # which freezes on_startup event.
-    with closing(m):
+    try:
         async with (
             shared_config_ctx(root_ctx),
             webapp_plugin_ctx(root_app),
@@ -742,6 +746,9 @@ async def server_main(
             finally:
                 log.info("shutting down...")
                 await runner.cleanup()
+    finally:
+        if aiomon_started:
+            m.close()
 
 
 @actxmgr

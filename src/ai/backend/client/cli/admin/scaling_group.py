@@ -82,8 +82,19 @@ def list(ctx: CLIContext) -> None:
     default="{}",
     help="Set scheduler options as a JSON string.",
 )
+@click.option(
+    "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
+)
 def add(
-    ctx: CLIContext, name, description, inactive, driver, driver_opts, scheduler, scheduler_opts
+    ctx: CLIContext,
+    name,
+    description,
+    inactive,
+    driver,
+    driver_opts,
+    scheduler,
+    scheduler_opts,
+    use_host_network,
 ):
     """
     Add a new scaling group.
@@ -100,6 +111,7 @@ def add(
                 driver_opts=driver_opts,
                 scheduler=scheduler,
                 scheduler_opts=scheduler_opts,
+                use_host_network=use_host_network,
             )
         except Exception as e:
             ctx.output.print_mutation_error(
@@ -137,8 +149,19 @@ def add(
     default=None,
     help="Set scheduler options as a JSON string.",
 )
+@click.option(
+    "--use-host-network", is_flag=True, help="If true, run containers on host networking mode."
+)
 def update(
-    ctx: CLIContext, name, description, inactive, driver, driver_opts, scheduler, scheduler_opts
+    ctx: CLIContext,
+    name,
+    description,
+    inactive,
+    driver,
+    driver_opts,
+    scheduler,
+    scheduler_opts,
+    use_host_network,
 ):
     """
     Update existing scaling group.
@@ -155,6 +178,7 @@ def update(
                 driver_opts=driver_opts,
                 scheduler=scheduler,
                 scheduler_opts=scheduler_opts,
+                use_host_network=use_host_network,
             )
         except Exception as e:
             ctx.output.print_mutation_error(

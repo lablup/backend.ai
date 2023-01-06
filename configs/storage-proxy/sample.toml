@@ -37,7 +37,7 @@ session-expire = "1d"
 # The starting port number for aiomonitor.
 # Since the storage-proxy is composed of multiple processes, each process will be exposed
 # via the port number of this base port number + pidx.
-# aiomonitor-port = 50300
+# aiomonitor-port = 48300
 
 
 [api.client]
@@ -165,3 +165,15 @@ weka_password = ""  # Weka.IO Password
 weka_organization = ""  # Weka.IO Organization
 weka_fs_name = ""  # Target filesystem to use as vFolder, must match with the one mounted under `volume.weka.path`
 weka_verify_ssl = false  # If set to true, allow to communicate to server with insecure ssl context
+
+[volume.gpfs]
+backend = "spectrumscale"
+path = "/gpfs/example_fs"
+
+[volume.gpfs.options]
+gpfs_endpoint = "https://gpfs.example.com"  # Endpoint to Spectrum Scale API
+gpfs_username = "admin"  # Spectrum Scale GUI Username
+gpfs_password = "admin"  # Spectrum Scale GUI Password
+gpfs_fs_name = "example_fs"  # Target filesystem to use as vFolder, must match with the one mounted under `volume.gpfs.path`
+verify_ssl = false  # Skips GPFS API's SSL Certificate validation if set to true. Defaults to false.
+owner = "1000:1000"  # Default ownership to created fileset
