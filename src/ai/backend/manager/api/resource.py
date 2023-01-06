@@ -308,6 +308,7 @@ async def get_container_stats_for_period(
                 [
                     kernels.c.id,
                     kernels.c.container_id,
+                    kernels.c.session_id,
                     kernels.c.session_name,
                     kernels.c.access_key,
                     kernels.c.agent,
@@ -325,6 +326,7 @@ async def get_container_stats_for_period(
                     kernels.c.status_history,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
+                    kernels.c.cluster_mode,
                     groups.c.name,
                     users.c.email,
                 ]
@@ -399,6 +401,7 @@ async def get_container_stats_for_period(
             gpu_allocated = row.occupied_slots["cuda.shares"]
         c_info = {
             "id": str(row["id"]),
+            "session_id": str(row["session_id"]),
             "container_id": row["container_id"],
             "domain_name": row["domain_name"],
             "group_id": str(row["group_id"]),
@@ -430,6 +433,7 @@ async def get_container_stats_for_period(
             "status": row["status"].name,
             "status_changed": str(row["status_changed"]),
             "status_history": row["status_history"] or {},
+            "cluster_mode": row["cluster_mode"],
         }
         if group_id not in objs_per_group:
             objs_per_group[group_id] = {
