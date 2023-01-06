@@ -104,7 +104,6 @@ class GPFSVolume(BaseVolume):
             "last 1 "
             "bucket_size 10"
         )
-        log.debug("querying {}", query)
         try:
             metrics = await self.api_client.get_metric(query)
             latest_metric = metrics["performanceData"]["rows"][-1]["values"]

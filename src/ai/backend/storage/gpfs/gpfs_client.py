@@ -93,10 +93,8 @@ class GPFSAPIClient:
                 raise GPFSAPIError(f"Unsupported request method {method}")
         try:
             if method == "GET" or method == "DELETE":
-                log.debug("{} /scalemgmt/v2{}", method, path)
                 return await func("/scalemgmt/v2" + path, headers=self._req_header, ssl=self.ssl)
             else:
-                log.debug("{} /scalemgmt/v2{} {}", method, path, body)
                 return await func(
                     "/scalemgmt/v2" + path, headers=self._req_header, json=body, ssl=self.ssl
                 )
@@ -238,7 +236,6 @@ class GPFSAPIClient:
                 body,
             )
             data = await response.json()
-            log.debug("quota set response: {}", data)
             await self._wait_for_job_done([GPFSJob.from_dict(x) for x in data["jobs"]])
 
     @error_handler
