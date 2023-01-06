@@ -532,8 +532,6 @@ async def count_accessible_vfolders(
             group_ids = await query_admin_accessible_groups(db_conn, domain_name)
         case UserRole.USER:
             group_ids = await query_user_accessible_groups(db_conn, user_uuid)
-        case _:
-            group_ids = await query_user_accessible_groups(db_conn, user_uuid)
 
     queries.append(
         _build_query_project_group_vfolders([sa.func.count()], group_ids, query_filter=query_filter)
