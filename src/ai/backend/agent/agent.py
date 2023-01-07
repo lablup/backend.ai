@@ -401,7 +401,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         jail_path: Optional[Path]
         if self.local_config["container"]["sandbox-type"] == "jail":
-            jail_candidates = find_artifacts(f"jail.*.{arch}.bin")
+            jail_candidates = find_artifacts(
+                f"jail.*.{arch}.bin"
+            )  # architecture check is already done when starting agent
             _, jail_candidate = match_distro_data(jail_candidates, distro)
             jail_path = self.resolve_krunner_filepath("runner/" + jail_candidate)
         else:
@@ -1604,11 +1606,13 @@ class AbstractAgent(
         if self.local_config["container"]["sandbox-type"] == "jail":
             cmdargs += [
                 "/opt/kernel/jail",
-                "-policy",
-                "/etc/backend.ai/jail/policy.yml",
+                # "--policy",
+                # "/etc/backend.ai/jail/policy.yml",
+                # TODO: Update default Jail policy in images
             ]
             if self.local_config["container"]["jail-args"]:
                 cmdargs += map(lambda s: s.strip(), self.local_config["container"]["jail-args"])
+            cmdargs += ["--"]
         if self.local_config["debug"]["kernel-runner"]:
             krunner_opts.append("--debug")
         cmdargs += [
