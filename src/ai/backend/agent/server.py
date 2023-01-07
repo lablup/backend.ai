@@ -73,7 +73,7 @@ from .config import (
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import AgentBackend, LifecycleEvent, VolumeInfo
-from .utils import get_subnet_ip
+from .utils import get_arch_name, get_subnet_ip
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
@@ -879,6 +879,12 @@ def main(
     except config.ConfigurationError as e:
         print("ConfigurationError: Validation of agent configuration has failed:", file=sys.stderr)
         print(pformat(e.invalid_data), file=sys.stderr)
+        raise click.Abort()
+
+    # FIXME: Remove this after ARM64 support lands on Jail
+    current_arch = get_arch_name()
+    if cfg["container"]["sandbox-type"] == "jail" and current_arch != "x86_64":
+        print(f"ConfigurationError: Jail sandbox is not supported on architecture {current_arch}")
         raise click.Abort()
 
     rpc_host = cfg["agent"]["rpc-listen-addr"].host
