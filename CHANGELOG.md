@@ -16,6 +16,26 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.7 (2023-01-09)
+
+Ai.Backend.Manager 22.09.7 (2023-01-09)
+
+### Features
+* Support IBM Spectrum Scale storage ([#744](https://github.com/lablup/backend.ai/issues/744))
+* Add support for Ceph file system in Storage Proxy. ([#760](https://github.com/lablup/backend.ai/issues/760))
+* Add `custom-auth` endpoint in Webserver to support custom authentication logic withv Manager plugin. ([#936](https://github.com/lablup/backend.ai/issues/936))
+* Remove the `Server` HTTP response header from the web server since it could potentially expose more attack surfaces to crackers ([#947](https://github.com/lablup/backend.ai/issues/947))
+
+### Fixes
+* Add missing `await` for a jupyter-client API when shutting down the kernel runner, as a follow-up fix to #873 ([#915](https://github.com/lablup/backend.ai/issues/915))
+* Improve scriptability of the `session events` CLI command by ensuring stdout flush and providing well-formatted JSON outputs of event data ([#925](https://github.com/lablup/backend.ai/issues/925))
+* Continue the server operation with a warning even when the aiomonitor thread could not be started and adjust the default aiomonitor ports out of the ephemeral port range ([#928](https://github.com/lablup/backend.ai/issues/928))
+* Fill the request payload with the plain-text request body when the web login handler is called without encryption.  This was a regression after introducing the login payload encryption. ([#929](https://github.com/lablup/backend.ai/issues/929))
+
+### Documentation Updates
+* Guide to install Backend.AI with package (wheel). ([#939](https://github.com/lablup/backend.ai/issues/939))
+
+
 ## 22.09.6 (2022-12-09)
 
 Ai.Backend.Manager 22.09.6 (2022-12-09)
