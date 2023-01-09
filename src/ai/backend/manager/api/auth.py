@@ -5,7 +5,7 @@ import logging
 import secrets
 from collections import ChainMap
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple, cast
+from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Optional, Tuple, cast
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -23,12 +23,14 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 
-from ..models import keypair_resource_policies, keypairs, users
+from ..models import keypair_resource_policies as resource_pols
+from ..models import keypairs, users
 from ..models.group import association_groups_users, groups
 from ..models.keypair import generate_keypair as _gen_keypair
 from ..models.keypair import generate_ssh_keypair
 from ..models.user import INACTIVE_USER_STATUSES, UserRole, UserStatus, check_credential
 from ..models.utils import execute_with_retry
+from .context import AuthData
 from .exceptions import (
     AuthorizationFailed,
     GenericBadRequest,
@@ -378,8 +380,7 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         raise InvalidAuthParameters(e.args[0])
 
 
-def validate_ip(request: web.Request, user: Mapping[str, Any]):
-    allowed_client_ip = user.get("allowed_client_ip", None)
+def validate_ip(request: web.Request, allowed_client_ip: Optional[ReadableCIDR]):
     if not allowed_client_ip or allowed_client_ip is None:
         # allowed_client_ip is None or [] - empty list
         return
@@ -424,41 +425,67 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     row = None
     if hook_result.status != PASSED:
         raise RejectedByHook.from_hook_result(hook_result)
-    elif hook_result.result:
+
+    user_cols = (
+        users.c.uuid,
+        users.c.username,
+        users.c.role,
+        users.c.email,
+        users.c.status,
+        users.c.domain_name,
+        users.c.allowed_client_ip,
+    )
+    keypair_cols = (keypairs.c.is_active, keypairs.c.last_used, keypairs.c.rate_limit)
+    resource_policy_cols = (
+        resource_pols.c.name,
+        resource_pols.c.total_resource_slots,
+        resource_pols.c.max_session_lifetime,
+        resource_pols.c.max_concurrent_sessions,
+        resource_pols.c.max_containers_per_session,
+        resource_pols.c.max_vfolder_count,
+        resource_pols.c.max_vfolder_size,
+        resource_pols.c.idle_timeout,
+    )
+
+    async def _query_cred(access_key) -> Optional[Mapping[str, Any]]:
+        async def _query():
+            async with root_ctx.db.begin_readonly() as conn:
+                j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid).join(
+                    resource_pols,
+                    keypairs.c.resource_policy == resource_pols.c.name,
+                )
+                query = (
+                    sa.select([*user_cols, *keypair_cols, *resource_policy_cols], use_labels=True)
+                    .select_from(j)
+                    .where(
+                        (keypairs.c.access_key == access_key) & (keypairs.c.is_active.is_(True)),
+                    )
+                )
+                result = await conn.execute(query)
+            return result.first()
+
+        return await execute_with_retry(_query)
+
+    async def _incr_num_query(access_key) -> None:
+        async def _pipe_builder(r: Redis) -> RedisPipeline:
+            pipe = r.pipeline()
+            num_queries_key = f"kp:{access_key}:num_queries"
+            await pipe.incr(num_queries_key)
+            await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
+            return pipe
+
+        await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+
+    if hook_result.result:
         # Passed one of the hook.
         # The "None" access_key means that the hook has allowed anonymous access.
         access_key = hook_result.result
         if access_key is not None:
-
-            async def _query_cred():
-                async with root_ctx.db.begin_readonly() as conn:
-                    j = keypairs.join(users, keypairs.c.user == users.c.uuid).join(
-                        keypair_resource_policies,
-                        keypairs.c.resource_policy == keypair_resource_policies.c.name,
-                    )
-                    query = (
-                        sa.select([users, keypairs, keypair_resource_policies], use_labels=True)
-                        .select_from(j)
-                        .where(
-                            (keypairs.c.access_key == access_key)
-                            & (keypairs.c.is_active.is_(True)),
-                        )
-                    )
-                    result = await conn.execute(query)
-                return result.first()
-
-            row = await execute_with_retry(_query_cred)
+            row = await _query_cred(access_key)
             if row is None:
                 raise AuthorizationFailed("Access key not found")
 
-            async def _pipe_builder(r: Redis) -> RedisPipeline:
-                pipe = r.pipeline()
-                num_queries_key = f"kp:{access_key}:num_queries"
-                await pipe.incr(num_queries_key)
-                await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
-                return pipe
-
-            await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+            await _incr_num_query(access_key)
         else:
             # unsigned requests may be still accepted for public APIs
             pass
@@ -468,68 +495,51 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         params = _extract_auth_params(request)
         if params:
             sign_method, access_key, signature = params
-
-            async def _query_cred():
-                async with root_ctx.db.begin_readonly() as conn:
-                    j = keypairs.join(users, keypairs.c.user == users.c.uuid).join(
-                        keypair_resource_policies,
-                        keypairs.c.resource_policy == keypair_resource_policies.c.name,
-                    )
-                    query = (
-                        sa.select([users, keypairs, keypair_resource_policies], use_labels=True)
-                        .select_from(j)
-                        .where(
-                            (keypairs.c.access_key == access_key)
-                            & (keypairs.c.is_active.is_(True)),
-                        )
-                    )
-                    result = await conn.execute(query)
-                    return result.first()
-
-            row = await execute_with_retry(_query_cred)
+            row = await _query_cred(access_key)
             if row is None:
                 raise AuthorizationFailed("Access key not found")
             my_signature = await sign_request(sign_method, request, row["keypairs_secret_key"])
             if not secrets.compare_digest(my_signature, signature):
                 raise AuthorizationFailed("Signature mismatch")
 
-            async def _pipe_builder(r: Redis) -> RedisPipeline:
-                pipe = r.pipeline()
-                num_queries_key = f"kp:{access_key}:num_queries"
-                await pipe.incr(num_queries_key)
-                await pipe.expire(num_queries_key, 86400 * 30)  # retention: 1 month
-                return pipe
-
-            await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+            await _incr_num_query(access_key)
         else:
             # unsigned requests may be still accepted for public APIs
             pass
 
+    auth_data = AuthData()
+    if access_key is not None:
+        auth_data.access_key = access_key
     if row is not None:
-        auth_result = {
-            "is_authorized": True,
-            "keypair": {
-                col.name: row[f"keypairs_{col.name}"]
-                for col in keypairs.c
-                if col.name != "secret_key"
-            },
-            "user": {
-                col.name: row[f"users_{col.name}"]
-                for col in users.c
-                if col.name not in ("password", "description", "created_at")
-            },
-            "is_admin": row["keypairs_is_admin"],
-        }
+        validate_ip(request, row.get("users_allowed_client_ip"))
+        auth_data.is_authorized = True
+        auth_data.user_id = row["users_uuid"]
 
-        validate_ip(request, auth_result["user"])
-        auth_result["keypair"]["resource_policy"] = {
-            col.name: row[f"keypair_resource_policies_{col.name}"]
-            for col in keypair_resource_policies.c
-        }
-        auth_result["user"]["id"] = row["keypairs_user_id"]  # legacy
-        auth_result["is_superadmin"] = auth_result["user"]["role"] == "superadmin"
-        # Populate the result to the per-request state dict.
-        request.update(auth_result)
+        # keypairs
+        auth_data.is_active = row["keypairs_is_active"]
+        auth_data.last_used = row["keypairs_last_used"]
+        auth_data.rate_limit = row["keypairs_rate_limit"]
+
+        # keypair_resource_policies
+        auth_data.resource_policy_name = row["keypair_resource_policies_name"]
+        auth_data.total_resource_slots = row["keypair_resource_policies_total_resource_slots"]
+        auth_data.max_session_lifetime = row["keypair_resource_policies_max_session_lifetime"]
+        auth_data.max_concurrent_sessions = row["keypair_resource_policies_max_concurrent_sessions"]
+        auth_data.max_containers_per_session = row[
+            "keypair_resource_policies_max_containers_per_session"
+        ]
+        auth_data.max_vfolder_count = row["keypair_resource_policies_max_vfolder_count"]
+        auth_data.max_vfolder_size = row["keypair_resource_policies_max_vfolder_size"]
+        auth_data.idle_timeout = row["keypair_resource_policies_idle_timeout"]
+
+        # users
+        auth_data.user_role = row["users_uuid"]
+        auth_data.username = row["users_username"]
+        auth_data.email = row["users_email"]
+        auth_data.user_status = row["users_status"]
+        auth_data.domain_name = row["users_domain_name"]
+
+        request.update({"auth_data": auth_data})
 
     # No matter if authenticated or not, pass-through to the handler.
     # (if it's required, auth_required decorator will handle the situation.)

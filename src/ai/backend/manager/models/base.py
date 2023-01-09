@@ -50,12 +50,16 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AbstractPermission,
+    BasePermission,
     BinarySize,
+    DomainPermission,
     JSONSerializableMixin,
     KernelId,
+    ProjectPermission,
     ReadableCIDR,
     ResourceSlot,
     SessionId,
+    UserPermission,
     VFolderHostPermission,
     VFolderHostPermissionMap,
 )
@@ -94,6 +98,14 @@ pgsql_connect_opts = {
         "lock_timeout": "60000",  # 60 secs
         "idle_in_transaction_session_timeout": "60000",  # 60 secs
     },
+}
+
+PERMISSION_TYPE_MAP: Mapping[str, Type[AbstractPermission]] = {
+    BasePermission.__name__: BasePermission,
+    VFolderHostPermission.__name__: VFolderHostPermission,
+    ProjectPermission.__name__: ProjectPermission,
+    DomainPermission.__name__: DomainPermission,
+    UserPermission.__name__: UserPermission,
 }
 
 
@@ -328,6 +340,42 @@ class IPColumn(TypeDecorator):
         if value is None:
             return None
         return ReadableCIDR(value)
+
+
+class EnumValueString(TypeDecorator):
+
+    impl = sa.String
+    cache_ok = True
+
+    def __init__(self, enum: Type[enum.Enum]) -> None:
+        super().__init__(sa.String)
+        self._enum = enum
+
+    def process_bind_param(self, value: enum.Enum, dialect) -> str:
+        try:
+            return self._enum(value).value
+        except ValueError:
+            raise InvalidAPIParameters(f"Invalid value for binding to {self._enum}")
+
+    def process_result_value(self, value: str, dialect) -> enum.Enum:
+        return self._enum(value)
+
+
+class PermissionTypeColumn(TypeDecorator):
+
+    impl = sa.String
+    cache_ok = True
+
+    def process_bind_param(self, value: Type[AbstractPermission], dialect) -> str:
+        if value.__name__ not in PERMISSION_TYPE_MAP:
+            raise InvalidAPIParameters(
+                f"Invalid value for permission type. "
+                f"The value `{value}` should be a key of `PERMISSION_TYPE_MAP`"
+            )
+        return value.__name__
+
+    def process_result_value(self, value: str, dialect) -> Type[AbstractPermission]:
+        return PERMISSION_TYPE_MAP[value]
 
 
 class PermissionListColumn(TypeDecorator):

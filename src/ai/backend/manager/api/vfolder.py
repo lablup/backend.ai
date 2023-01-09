@@ -228,47 +228,6 @@ def vfolder_permission_required(perm: VFolderPermission):
     return _wrapper
 
 
-# FIXME: replace ... with [web.Request, VFolderRow, Any...] in the future mypy
-def vfolder_check_exists(handler: Callable[..., Awaitable[web.Response]]):
-    """
-    Checks if the target vfolder exists and is owned by the current user.
-
-    The decorated handler should accept an extra "row" argument
-    which contains the matched VirtualFolder table row.
-    """
-
-    @functools.wraps(handler)
-    async def _wrapped(request: web.Request, *args, **kwargs) -> web.Response:
-        root_ctx: RootContext = request.app["_root.context"]
-        user_uuid = request["user"]["uuid"]
-        folder_name = request.match_info["name"]
-        async with root_ctx.db.begin() as conn:
-            j = sa.join(
-                vfolders,
-                vfolder_permissions,
-                vfolders.c.id == vfolder_permissions.c.vfolder,
-                isouter=True,
-            )
-            query = (
-                sa.select("*")
-                .select_from(j)
-                .where(
-                    ((vfolders.c.user == user_uuid) | (vfolder_permissions.c.user == user_uuid))
-                    & (vfolders.c.name == folder_name)
-                )
-            )
-            try:
-                result = await conn.execute(query)
-            except sa.exc.DataError:
-                raise InvalidAPIParameters
-            row = result.first()
-            if row is None:
-                raise VFolderNotFound()
-        return await handler(request, row, *args, **kwargs)
-
-    return _wrapped
-
-
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @check_api_params(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequence
 from uuid import UUID, uuid4
 
 import aiohttp
@@ -21,9 +21,16 @@ from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.common import redis_helper
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.common.types import (
+    AbstractPermission,
+    DomainPermission,
+    ProjectPermission,
+    RedisConnectionInfo,
+)
 
+from ..api.context import RootContext
 from ..api.exceptions import VFolderOperationFailed
+from .acl import AccessControlLists, AccessibleItem
 from .base import (
     EnumValueType,
     IDColumn,
@@ -127,6 +134,63 @@ users = sa.Table(
     sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
     sa.Column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True),
 )
+
+
+async def get_user_role(ctx: RootContext, user_uuid: UUID, target_id: UUID) -> UserRole:
+    # Get superadmin, domain admin permission
+    async with ctx.db.begin_readonly() as db_conn:
+        role = await db_conn.scalar(sa.select([users.c.role]).where(users.c.uuid == user_uuid))
+        if role in (UserRole.SUPERADMIN, UserRole.ADMIN):
+            return role
+
+    # Get group admin permission
+    perm_map = await AccessControlLists.get_multi_trg_actions(
+        ctx, AccessibleItem.USER, user_uuid, [(AccessibleItem.PROJECT, target_id)]
+    )
+    if ProjectPermission.ADMIN in perm_map.get(target_id, frozenset()):
+        return UserRole.ADMIN
+    return UserRole.USER
+
+
+async def check_user_perm(
+    ctx: RootContext, user_uuid: UUID, target_id: UUID, action: AbstractPermission
+) -> bool:
+    return await AccessControlLists.check_acl(
+        ctx, AccessibleItem.USER, user_uuid, AccessibleItem.ANY, target_id, action
+    )
+
+
+async def get_users_accessible_resources(
+    ctx: RootContext, user_uuid: UUID, resource_type: AccessibleItem
+) -> Sequence[Mapping[str, Any]]:
+    async with ctx.db.begin_readonly() as db_conn:
+        # Check user's admin role
+        # This will be changed if default project is adopted and implemented
+        query = sa.select(AccessControlLists).where(
+            (AccessControlLists.subject_id == user_uuid)
+            & (AccessControlLists.subject_type == AccessibleItem.USER)
+            & (
+                (AccessControlLists.subject_type == AccessibleItem.DOMAIN)
+                | (AccessControlLists.subject_type == AccessibleItem.PROJECT)
+            )
+        )
+        result = await db_conn.execute(query)
+        rows = result.fetchall()
+        sub_ids = [user_uuid]
+        for row in rows:
+            if (
+                ProjectPermission.ADMIN in row["allowed_actions"]
+                or DomainPermission.ADMIN in row["allowed_actions"]
+            ):
+                sub_ids.append(row["target_id"])
+
+        # Get resources
+        query = sa.select(AccessControlLists).where(
+            AccessControlLists.subject_id.in_(sub_ids)
+            & (AccessControlLists.target_type == resource_type)
+        )
+        result = await db_conn.execute(query)
+        return result.fetchall()
 
 
 class UserGroup(graphene.ObjectType):

@@ -220,6 +220,46 @@ class AbstractPermission(str, enum.Enum):
     """
 
 
+class BasePermission(AbstractPermission):
+    CREATE = "create"
+    READ = "read"
+    UPDATE = "update"
+    DELETE = "delete"
+
+
+class ProjectPermission(AbstractPermission):
+    CREATE_PROJECT = "create-project"
+    READ_PROJECT = "read-project"
+    MODIFY_PROJECT = "modify-project"
+    DELETE_PROJECT = "delete-project"
+
+    # Able to access all users under the project
+    ADMIN = "admin"
+
+    # Normal users belong to the project have the permission below
+    USE = "use"
+
+
+class DomainPermission(AbstractPermission):
+    CREATE_DOMAIN = "create-domain"
+    READ_DOMAIN = "read-domain"
+    MODIFY_DOMAIN = "modify-domain"
+    DELETE_DOMAIN = "delete-domain"
+
+    # Able to access all projects, users under the domain
+    ADMIN = "admin"
+
+    # Normal users belong to the domain have the permission below
+    USE = "use"
+
+
+class UserPermission(AbstractPermission):
+    CREATE_USER = "create-user"
+    READ_USER = "read-user"
+    MODIFY_USER = "modify-user"
+    DELETE_USER = "delete-user"
+
+
 class VFolderHostPermission(AbstractPermission):
     """
     Atomic permissions for a virtual folder under a host given to a specific access key.
