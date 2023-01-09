@@ -37,7 +37,7 @@ session_templates = sa.Table(
     sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), index=True),
     sa.Column("is_active", sa.Boolean, default=True),
     sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False),
-    sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=True),
+    sa.Column("project_id", GUID, sa.ForeignKey("projects.id"), nullable=True),
     sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), index=True, nullable=False),
     sa.Column("type", EnumType(TemplateType), nullable=False, server_default="TASK", index=True),
     sa.Column("name", sa.String(length=128), nullable=True),

@@ -287,7 +287,7 @@ kernels = sa.Table(
     sa.Column("agent", sa.String(length=64), sa.ForeignKey("agents.id"), nullable=True),
     sa.Column("agent_addr", sa.String(length=128), nullable=True),
     sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False),
-    sa.Column("group_id", GUID, sa.ForeignKey("groups.id"), nullable=False),
+    sa.Column("project_id", GUID, sa.ForeignKey("projects.id"), nullable=False),
     sa.Column("user_uuid", GUID, sa.ForeignKey("users.uuid"), nullable=False),
     sa.Column("access_key", sa.String(length=20), sa.ForeignKey("keypairs.access_key")),
     sa.Column("image", sa.String(length=512)),

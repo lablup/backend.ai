@@ -74,7 +74,7 @@ MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
 association_groups_users = sa.Table(
-    "association_groups_users",
+    "association_projects_users",
     metadata,
     sa.Column(
         "user_id",
@@ -83,17 +83,17 @@ association_groups_users = sa.Table(
         nullable=False,
     ),
     sa.Column(
-        "group_id",
+        "project_id",
         GUID,
-        sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
+        sa.ForeignKey("projects.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     ),
-    sa.UniqueConstraint("user_id", "group_id", name="uq_association_user_id_group_id"),
+    sa.UniqueConstraint("user_id", "project_id", name="uq_association_user_id_project_id"),
 )
 
 
 groups = sa.Table(
-    "groups",
+    "projects",
     metadata,
     IDColumn("id"),
     sa.Column("name", sa.String(length=64), nullable=False),
@@ -123,7 +123,7 @@ groups = sa.Table(
         nullable=False,
         default={},
     ),
-    sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
+    sa.UniqueConstraint("name", "domain_name", name="uq_projects_name_domain_name"),
     # dotfiles column, \x90 means empty list in msgpack
     sa.Column(
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"

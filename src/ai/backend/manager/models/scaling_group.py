@@ -139,12 +139,12 @@ sgroups_for_groups = sa.Table(
         nullable=False,
     ),
     sa.Column(
-        "group",
-        sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
+        "project",
+        sa.ForeignKey("projects.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
     ),
-    sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
+    sa.UniqueConstraint("scaling_group", "project", name="uq_sgroup_project"),
 )
 
 

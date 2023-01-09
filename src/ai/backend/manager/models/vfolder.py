@@ -163,7 +163,9 @@ vfolders = sa.Table(
         nullable=False,
     ),
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
-    sa.Column("group", GUID, sa.ForeignKey("groups.id"), nullable=True),  # owner if project vfolder
+    sa.Column(
+        "project", GUID, sa.ForeignKey("projects.id"), nullable=True
+    ),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
     sa.Column(
         "status",
@@ -174,12 +176,12 @@ vfolders = sa.Table(
     ),
     sa.CheckConstraint(
         "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-        "(ownership_type = 'group' AND \"group\" IS NOT NULL)",
-        name="ownership_type_match_with_user_or_group",
+        "(ownership_type = 'project' AND \"project\" IS NOT NULL)",
+        name="ownership_type_match_with_user_or_project",
     ),
     sa.CheckConstraint(
-        '("user" IS NULL AND "group" IS NOT NULL) OR ("user" IS NOT NULL AND "group" IS NULL)',
-        name="either_one_of_user_or_group",
+        '("user" IS NULL AND "project" IS NOT NULL) OR ("user" IS NOT NULL AND "project" IS NULL)',
+        name="either_one_of_user_or_project",
     ),
 )
 
