@@ -295,6 +295,317 @@ async def recalculate_usage(request: web.Request) -> web.Response:
     return web.json_response({}, status=200)
 
 
+async def get_stats_for_period(request: web.Request, start_date, end_date, group_ids=None):
+    """
+    Returns the usage statistics of sessions used within a given time period, group_ids, aggregated by group.
+    """
+    objs_per_group = {}
+    s_infos = await get_session_stats_for_period(request, start_date, end_date, group_ids)
+
+    for s_info in s_infos:
+        group_id = str(s_info["group_id"])
+        if group_id not in objs_per_group:
+            objs_per_group[group_id] = {
+                "domain_name": s_info["domain_name"],
+                "g_id": str(group_id),
+                "g_group_name": s_info["group_name"],
+                "g_cpu_allocated": s_info["cpu_allocated"],
+                "g_cpu_used": s_info["cpu_used"],
+                "g_mem_allocated": s_info["mem_allocated"],
+                "g_mem_used": s_info["mem_used"],
+                "g_shared_memory": s_info["shared_memory"],
+                "g_disk_allocated": s_info["disk_allocated"],
+                "g_disk_used": s_info["disk_used"],
+                "g_io_read": s_info["io_read"],
+                "g_io_write": s_info["io_write"],
+                "g_device_type": copy.deepcopy(s_info["device_type"]),
+                "g_smp": s_info["smp"],
+                "g_gpu_mem_allocated": s_info["gpu_mem_allocated"],
+                "g_gpu_allocated": s_info["gpu_allocated"],
+                "s_infos": [s_info],
+            }
+        else:
+            objs_per_group[group_id]["g_cpu_allocated"] += s_info["cpu_allocated"]
+            objs_per_group[group_id]["g_cpu_used"] += s_info["cpu_used"]
+            objs_per_group[group_id]["g_mem_allocated"] += s_info["mem_allocated"]
+            objs_per_group[group_id]["g_mem_used"] += s_info["mem_used"]
+            objs_per_group[group_id]["g_shared_memory"] += s_info["shared_memory"]
+            objs_per_group[group_id]["g_disk_allocated"] += s_info["disk_allocated"]
+            objs_per_group[group_id]["g_disk_used"] += s_info["disk_used"]
+            objs_per_group[group_id]["g_io_read"] += s_info["io_read"]
+            objs_per_group[group_id]["g_io_write"] += s_info["io_write"]
+            for device in s_info["device_type"]:
+                if device not in objs_per_group[group_id]["g_device_type"]:
+                    g_dev_type = objs_per_group[group_id]["g_device_type"]
+                    g_dev_type.append(device)
+                    objs_per_group[group_id]["g_device_type"] = list(set(g_dev_type))
+            objs_per_group[group_id]["g_smp"] += s_info["smp"]
+            objs_per_group[group_id]["g_gpu_mem_allocated"] += s_info["gpu_mem_allocated"]
+            objs_per_group[group_id]["g_gpu_allocated"] += s_info["gpu_allocated"]
+            objs_per_group[group_id]["s_infos"].append(s_info)
+    return list(objs_per_group.values())
+
+
+async def get_session_stats_for_period(request: web.Request, start_date, end_date, group_ids=None):
+    """
+    Returns usage statistics for sessions used within a given time period, group_ids.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    async with root_ctx.db.begin_readonly() as conn:
+        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
+            users, users.c.uuid == kernels.c.user_uuid
+        )
+        query = (
+            sa.select(
+                [
+                    kernels.c.id,
+                    kernels.c.session_id,
+                    kernels.c.session_name,
+                    kernels.c.access_key,
+                    kernels.c.domain_name,
+                    kernels.c.group_id,
+                    kernels.c.attached_devices,
+                    kernels.c.vfolder_mounts,
+                    kernels.c.mounts,
+                    kernels.c.image,
+                    kernels.c.status,
+                    kernels.c.status_changed,
+                    kernels.c.status_history,
+                    kernels.c.created_at,
+                    kernels.c.terminated_at,
+                    groups.c.name,
+                    users.c.email,
+                ]
+            )
+            .select_from(j)
+            .where(
+                # Filter sessions which existence period overlaps with requested period
+                (
+                    (kernels.c.terminated_at >= start_date)
+                    & (kernels.c.created_at < end_date)
+                    & (kernels.c.status.in_(RESOURCE_USAGE_KERNEL_STATUSES))
+                )
+                |
+                # Or, filter running sessions which created before requested end_date
+                ((kernels.c.created_at < end_date) & (kernels.c.status.in_(LIVE_STATUS))),
+            )
+            .order_by(sa.asc(kernels.c.terminated_at))
+        )
+        if group_ids:
+            query = query.where(kernels.c.group_id.in_(group_ids))
+        result = await conn.execute(query)
+        rows = result.fetchall()
+
+    objs_per_session = {}
+    local_tz = root_ctx.shared_config["system"]["timezone"]
+
+    for row in rows:
+        session_id = str(row["session_id"])
+        nfs = None
+        if row["vfolder_mounts"]:
+            # For >=22.03, return used host directories instead of volume host, which is not so useful.
+            nfs = list(set([str(mount.host_path) for mount in row["vfolder_mounts"]]))
+        elif row["mounts"] and isinstance(row["mounts"][0], list):
+            # For the kernel records that have legacy contents of `mounts`.
+            nfs = list(set([mount[2] for mount in row["mounts"]]))
+        if row["terminated_at"] is None:
+            used_time = used_days = None
+        else:
+            used_time = str(row["terminated_at"] - row["created_at"])
+            used_days = (
+                row["terminated_at"].astimezone(local_tz).toordinal()
+                - row["created_at"].astimezone(local_tz).toordinal()
+                + 1
+            )
+        c_infos = await get_container_stats_by_session_id(request, str(row["session_id"]))
+        s_info = {
+            "id": str(row["id"]),
+            "session_id": session_id,
+            "domain_name": row["domain_name"],
+            "group_id": str(row["group_id"]),
+            "group_name": row["name"],
+            "session_name": row["session_name"],
+            "access_key": row["access_key"],
+            "email": row["email"],
+            "agent": [],
+            "cpu_allocated": 0,
+            "cpu_used": 0,
+            "mem_allocated": 0,
+            "mem_used": 0,
+            "shared_memory": 0,
+            "disk_allocated": 0,
+            "disk_used": 0,
+            "io_read": 0,
+            "io_write": 0,
+            "used_time": used_time,
+            "used_days": used_days,
+            "device_type": [],
+            "smp": 0,
+            "gpu_mem_allocated": 0,
+            "gpu_allocated": 0,
+            "nfs": nfs,
+            "image_id": row["image"],  # TODO: image id
+            "image_name": row["image"],
+            "created_at": str(row["created_at"]),
+            "terminated_at": str(row["terminated_at"]),
+            "status": row["status"].name,
+            "status_changed": str(row["status_changed"]),
+            "status_history": row["status_history"] or {},
+            "c_infos": c_infos,
+        }
+        for c_info in c_infos:
+            s_info["agent"].append(c_info["agent"])
+            s_info["cpu_allocated"] += c_info["cpu_allocated"]
+            s_info["cpu_used"] += c_info["cpu_used"]
+            s_info["mem_allocated"] += c_info["mem_allocated"]
+            s_info["mem_used"] += c_info["mem_used"]
+            s_info["shared_memory"] += c_info["shared_memory"]
+            s_info["disk_allocated"] += c_info["disk_allocated"]
+            s_info["disk_used"] += c_info["disk_used"]
+            s_info["io_read"] += c_info["io_read"]
+            s_info["io_write"] += c_info["io_write"]
+            for device in c_info["device_type"]:
+                if device not in s_info["device_type"]:
+                    s_info["device_type"].append(device)
+            s_info["smp"] += c_info["smp"]
+            s_info["gpu_mem_allocated"] += c_info["gpu_mem_allocated"]
+            s_info["gpu_allocated"] += c_info["gpu_allocated"]
+        s_info["agent"] = ",".join(s_info["agent"])
+        s_info["device_type"] = list(set(s_info["device_type"]))
+
+        objs_per_session[session_id] = s_info
+    return list(objs_per_session.values())
+
+
+async def get_container_stats_by_session_id(request: web.Request, session_id):
+    """
+    Returns usage statistics for containers within a specific session.
+    """
+    root_ctx: RootContext = request.app["_root.context"]
+    async with root_ctx.db.begin_readonly() as conn:
+        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
+            users, users.c.uuid == kernels.c.user_uuid
+        )
+        query = (
+            sa.select(
+                [
+                    kernels.c.id,
+                    kernels.c.container_id,
+                    kernels.c.session_name,
+                    kernels.c.access_key,
+                    kernels.c.agent,
+                    kernels.c.domain_name,
+                    kernels.c.group_id,
+                    kernels.c.attached_devices,
+                    kernels.c.occupied_slots,
+                    kernels.c.resource_opts,
+                    kernels.c.vfolder_mounts,
+                    kernels.c.mounts,
+                    kernels.c.image,
+                    kernels.c.status,
+                    kernels.c.status_changed,
+                    kernels.c.last_stat,
+                    kernels.c.status_history,
+                    kernels.c.created_at,
+                    kernels.c.terminated_at,
+                    groups.c.name,
+                    users.c.email,
+                ]
+            )
+            .select_from(j)
+            .where(kernels.c.session_id.in_([session_id]))
+            .order_by(sa.asc(kernels.c.terminated_at))
+        )
+        result = await conn.execute(query)
+        rows = result.fetchall()
+
+    async def _pipe_builder(r: Redis) -> RedisPipeline:
+        pipe = r.pipeline()
+        for row in rows:
+            await pipe.get(str(row["id"]))
+        return pipe
+
+    raw_stats = await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+
+    objs_per_container = {}
+    local_tz = root_ctx.shared_config["system"]["timezone"]
+
+    for row, raw_stat in zip(rows, raw_stats):
+        container_id = row["container_id"]
+        last_stat = row["last_stat"]
+        nfs = None
+        if row["vfolder_mounts"]:
+            # For >=22.03, return used host directories instead of volume host, which is not so useful.
+            nfs = list(set([str(mount.host_path) for mount in row["vfolder_mounts"]]))
+        elif row["mounts"] and isinstance(row["mounts"][0], list):
+            # For the kernel records that have legacy contents of `mounts`.
+            nfs = list(set([mount[2] for mount in row["mounts"]]))
+        if not last_stat:
+            if raw_stat is None:
+                log.warn("stat object for {} not found on redis, skipping", str(row["id"]))
+                continue
+            last_stat = msgpack.unpackb(raw_stat)
+        if row["terminated_at"] is None:
+            used_time = used_days = None
+        else:
+            used_time = str(row["terminated_at"] - row["created_at"])
+            used_days = (
+                row["terminated_at"].astimezone(local_tz).toordinal()
+                - row["created_at"].astimezone(local_tz).toordinal()
+                + 1
+            )
+        device_type = set()
+        smp = 0
+        gpu_mem_allocated = 0
+        if row.attached_devices and row.attached_devices.get("cuda"):
+            for dev_info in row.attached_devices["cuda"]:
+                if dev_info.get("model_name"):
+                    device_type.add(dev_info["model_name"])
+                smp += int(nmget(dev_info, "data.smp", 0))
+                gpu_mem_allocated += int(nmget(dev_info, "data.mem", 0))
+        gpu_allocated = 0
+        if "cuda.devices" in row.occupied_slots:
+            gpu_allocated = row.occupied_slots["cuda.devices"]
+        if "cuda.shares" in row.occupied_slots:
+            gpu_allocated = row.occupied_slots["cuda.shares"]
+        c_info = {
+            "id": str(row["id"]),
+            "container_id": row["container_id"],
+            "domain_name": row["domain_name"],
+            "group_id": str(row["group_id"]),
+            "group_name": row["name"],
+            "session_name": row["session_name"],
+            "access_key": row["access_key"],
+            "email": row["email"],
+            "agent": row["agent"],
+            "cpu_allocated": float(row.occupied_slots.get("cpu", 0)),
+            "cpu_used": float(nmget(last_stat, "cpu_used.current", 0)),
+            "mem_allocated": int(row.occupied_slots.get("mem", 0)),
+            "mem_used": int(nmget(last_stat, "mem.capacity", 0)),
+            "shared_memory": int(nmget(row.resource_opts, "shmem", 0)),
+            "disk_allocated": 0,  # TODO: disk quota limit
+            "disk_used": (int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/"))),
+            "io_read": int(nmget(last_stat, "io_read.current", 0)),
+            "io_write": int(nmget(last_stat, "io_write.current", 0)),
+            "used_time": used_time,
+            "used_days": used_days,
+            "device_type": list(device_type),
+            "smp": float(smp),
+            "gpu_mem_allocated": float(gpu_mem_allocated),
+            "gpu_allocated": float(gpu_allocated),  # devices or shares
+            "nfs": nfs,
+            "image_id": row["image"],  # TODO: image id
+            "image_name": row["image"],
+            "created_at": str(row["created_at"]),
+            "terminated_at": str(row["terminated_at"]),
+            "status": row["status"].name,
+            "status_changed": str(row["status_changed"]),
+            "status_history": row["status_history"] or {},
+        }
+        objs_per_container[container_id] = c_info
+    return list(objs_per_container.values())
+
+
 async def get_container_stats_for_period(
     request: web.Request, start_date, end_date, group_ids=None
 ):
@@ -542,7 +853,7 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
         raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
     log.info("USAGE_PER_MONTH (g:{}, start_date:{}, end_date:{})", group_id, start_date, end_date)
     group_ids = [group_id] if group_id is not None else None
-    resp = await get_container_stats_for_period(request, start_date, end_date, group_ids=group_ids)
+    resp = await get_stats_for_period(request, start_date, end_date, group_ids=group_ids)
     log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
     return web.json_response(resp, status=200)
 
