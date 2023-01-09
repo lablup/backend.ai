@@ -27,7 +27,7 @@ from redis.asyncio.client import Pipeline as RedisPipeline
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.common.types import ClusterMode, DefaultForUnspecified, ResourceSlot
 from ai.backend.common.utils import nmget
 
 from ..models import (
@@ -373,6 +373,7 @@ async def get_session_stats_for_period(request: web.Request, start_date, end_dat
                     kernels.c.status_history,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
+                    kernels.c.cluster_mode,
                     groups.c.name,
                     users.c.email,
                 ]
@@ -451,10 +452,14 @@ async def get_session_stats_for_period(request: web.Request, start_date, end_dat
             "status": row["status"].name,
             "status_changed": str(row["status_changed"]),
             "status_history": row["status_history"] or {},
+            "cluster_mode": row["cluster_mode"],
             "c_infos": c_infos,
         }
         for c_info in c_infos:
-            s_info["agent"].append(c_info["agent"])
+            if s_info["cluster_mode"] == ClusterMode.SINGLE_NODE:
+                s_info["agent"] = [c_info["agent"]]
+            else:
+                s_info["agent"].append(c_info["agent"])
             s_info["cpu_allocated"] += c_info["cpu_allocated"]
             s_info["cpu_used"] += c_info["cpu_used"]
             s_info["mem_allocated"] += c_info["mem_allocated"]
