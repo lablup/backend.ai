@@ -101,7 +101,7 @@ class ExistingSession:
     cluster_mode: ClusterMode
     cluster_size: int
     domain_name: str
-    group_id: uuid.UUID
+    project_id: uuid.UUID
     scaling_group: str
     occupying_slots: ResourceSlot
 
@@ -118,7 +118,7 @@ class ExistingSession:
             kernels.c.cluster_size,
             kernels.c.cluster_role,
             kernels.c.domain_name,
-            kernels.c.group_id,
+            kernels.c.project_id,
             kernels.c.scaling_group,
             kernels.c.occupied_slots,
         }
@@ -144,7 +144,7 @@ class ExistingSession:
             cluster_mode=row["cluster_mode"],
             cluster_size=row["cluster_size"],
             domain_name=row["domain_name"],
-            group_id=row["group_id"],
+            project_id=row["project_id"],
             scaling_group=row["scaling_group"],
             occupying_slots=ResourceSlot(),
         )
