@@ -798,8 +798,8 @@ async def session_info(database_engine):
     user_uuid = str(uuid.uuid4()).replace("-", "")
     postfix = str(uuid.uuid4()).split("-")[1]
     domain_name = str(uuid.uuid4()).split("-")[0]
-    group_id = str(uuid.uuid4()).replace("-", "")
-    group_name = str(uuid.uuid4()).split("-")[0]
+    project_id = str(uuid.uuid4()).replace("-", "")
+    project_name = str(uuid.uuid4()).split("-")[0]
     session_id = str(uuid.uuid4()).replace("-", "")
 
     async with database_engine.begin() as conn:
@@ -823,8 +823,8 @@ async def session_info(database_engine):
         await conn.execute(
             projects.insert().values(
                 {
-                    "id": group_id,
-                    "name": group_name,
+                    "id": project_id,
+                    "name": project_name,
                     "domain_name": domain_name,
                     "total_resource_slots": {},
                 }
@@ -835,7 +835,7 @@ async def session_info(database_engine):
                 {
                     "session_id": session_id,
                     "domain_name": domain_name,
-                    "group_id": group_id,
+                    "project_id": project_id,
                     "user_uuid": user_uuid,
                     "occupied_slots": {},
                     "repl_in_port": 0,
@@ -849,6 +849,6 @@ async def session_info(database_engine):
         yield session_id, conn
 
         await conn.execute(kernels.delete().where(kernels.c.session_id == session_id))
-        await conn.execute(projects.delete().where(projects.c.id == group_id))
+        await conn.execute(projects.delete().where(projects.c.id == project_id))
         await conn.execute(domains.delete().where(domains.c.name == domain_name))
         await conn.execute(users.delete().where(users.c.uuid == user_uuid))

@@ -72,7 +72,7 @@ def test_scheduler_configs():
         scheduler = load_scheduler("fifo", example_sgroup_opts, example_sgroup_opts.config)
 
 
-example_group_id = uuid4()
+example_project_id = uuid4()
 
 example_total_capacity = ResourceSlot({"cpu": "4.0", "mem": "4096"})
 
@@ -326,7 +326,7 @@ common_image_ref = ImageRef("lablup/python:3.6-ubunt18.04")
 
 _common_dummy_for_pending_session: Mapping[str, Any] = dict(
     domain_name="default",
-    group_id=example_group_id,
+    project_id=example_project_id,
     resource_policy={},
     resource_opts={},
     vfolder_mounts=[],
@@ -340,7 +340,7 @@ _common_dummy_for_pending_session: Mapping[str, Any] = dict(
 
 _common_dummy_for_existing_session: Mapping[str, Any] = dict(
     domain_name="default",
-    group_id=example_group_id,
+    project_id=example_project_id,
 )
 
 
