@@ -669,7 +669,7 @@ def scoped_query(
     user_key: str = "access_key",
 ):
     """
-    Prepends checks for domain/group/user access rights depending
+    Prepends checks for domain/project/user access rights depending
     on the client's user and keypair information.
 
     :param autofill_user: When the *user_key* is not specified,
@@ -696,7 +696,7 @@ def scoped_query(
                 client_user_id = ctx.user["uuid"]
             client_domain = ctx.user["domain_name"]
             domain_name = kwargs.get("domain_name", None)
-            group_id = kwargs.get("group_id", None)
+            project_id = kwargs.get("project_id", None) or kwargs.get("group_id", None)
             user_id = kwargs.get(user_key, None)
             if client_role == UserRole.SUPERADMIN:
                 if autofill_user:
@@ -706,8 +706,8 @@ def scoped_query(
                 if domain_name is not None and domain_name != client_domain:
                     raise GenericForbidden
                 domain_name = client_domain
-                if group_id is not None:
-                    # TODO: check if the group is a member of the domain
+                if project_id is not None:
+                    # TODO: check if the project is a member of the domain
                     pass
                 if autofill_user:
                     if user_id is None:
@@ -716,9 +716,9 @@ def scoped_query(
                 if domain_name is not None and domain_name != client_domain:
                     raise GenericForbidden
                 domain_name = client_domain
-                if group_id is not None:
-                    # TODO: check if the group is a member of the domain
-                    # TODO: check if the client is a member of the group
+                if project_id is not None:
+                    # TODO: check if the project is a member of the domain
+                    # TODO: check if the client is a member of the project
                     pass
                 if user_id is not None and user_id != client_user_id:
                     raise GenericForbidden
@@ -726,8 +726,9 @@ def scoped_query(
             else:
                 raise InvalidAPIParameters("Unknown client role")
             kwargs["domain_name"] = domain_name
-            if group_id is not None:
-                kwargs["group_id"] = group_id
+            if project_id is not None:
+                kwargs["project_id"] = project_id
+                kwargs["group_id"] = project_id  # legacy
             kwargs[user_key] = user_id
             return await resolve_func(executor, info, *args, **kwargs)
 
@@ -740,7 +741,7 @@ def privileged_mutation(required_role, target_func=None):
     def wrap(func):
         @functools.wraps(func)
         async def wrapped(cls, root, info: graphene.ResolveInfo, *args, **kwargs) -> Any:
-            from .group import groups  # , association_groups_users
+            from .project import projects  # , association_projects_users
             from .user import UserRole
 
             ctx: GraphQueryContext = info.context
@@ -756,32 +757,32 @@ def privileged_mutation(required_role, target_func=None):
                 else:
                     if target_func is None:
                         return cls(False, "misconfigured privileged mutation: no target_func", None)
-                    target_domain, target_group = target_func(*args, **kwargs)
-                    if target_domain is None and target_group is None:
+                    target_domain, target_project = target_func(*args, **kwargs)
+                    if target_domain is None and target_project is None:
                         return cls(
                             False,
                             "misconfigured privileged mutation: "
-                            "both target_domain and target_group missing",
+                            "both target_domain and target_project missing",
                             None,
                         )
                     permit_chains = []
                     if target_domain is not None:
                         if ctx.user["domain_name"] == target_domain:
                             permit_chains.append(True)
-                    if target_group is not None:
+                    if target_project is not None:
                         async with ctx.db.begin() as conn:
-                            # check if the group is part of the requester's domain.
-                            query = groups.select().where(
-                                (groups.c.id == target_group)
-                                & (groups.c.domain_name == ctx.user["domain_name"]),
+                            # check if the project is part of the requester's domain.
+                            query = projects.select().where(
+                                (projects.c.id == target_project)
+                                & (projects.c.domain_name == ctx.user["domain_name"]),
                             )
                             result = await conn.execute(query)
                             if result.rowcount > 0:
                                 permit_chains.append(True)
-                            # TODO: check the group permission if implemented
+                            # TODO: check the project permission if implemented
                             # query = (
-                            #     association_groups_users.select()
-                            #     .where(association_groups_users.c.group_id == target_group)
+                            #     association_projects_users.select()
+                            #     .where(association_projects_users.c.project_id == target_project)
                             # )
                             # result = await conn.execute(query)
                             # if result.rowcount > 0:

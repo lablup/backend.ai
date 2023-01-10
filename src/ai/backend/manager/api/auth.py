@@ -24,9 +24,9 @@ from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
 
 from ..models import keypair_resource_policies, keypairs, users
-from ..models.group import association_groups_users, groups
 from ..models.keypair import generate_keypair as _gen_keypair
 from ..models.keypair import generate_ssh_keypair
+from ..models.project import association_projects_users, projects
 from ..models.user import INACTIVE_USER_STATUSES, UserRole, UserStatus, check_credential
 from ..models.utils import execute_with_retry
 from .exceptions import (
@@ -594,22 +594,22 @@ async def test(request: web.Request, params: Any) -> web.Response:
     )
 )
 async def get_role(request: web.Request, params: Any) -> web.Response:
-    group_role = None
+    project_role = None
     root_ctx: RootContext = request.app["_root.context"]
     log.info(
-        "AUTH.ROLES(ak:{}, d:{}, g:{})",
+        "AUTH.ROLES(ak:{}, d:{}, p:{})",
         request["keypair"]["access_key"],
         request["user"]["domain_name"],
         params["group"],
     )
     if params["group"] is not None:
         query = (
-            # TODO: per-group role is not yet implemented.
-            sa.select([association_groups_users.c.group_id])
-            .select_from(association_groups_users)
+            # TODO: per-project role is not yet implemented.
+            sa.select([association_projects_users.c.project_id])
+            .select_from(association_projects_users)
             .where(
-                (association_groups_users.c.group_id == params["group"])
-                & (association_groups_users.c.user_id == request["user"]["uuid"]),
+                (association_projects_users.c.project_id == params["group"])
+                & (association_projects_users.c.user_id == request["user"]["uuid"]),
             )
         )
         async with root_ctx.db.begin() as conn:
@@ -618,13 +618,13 @@ async def get_role(request: web.Request, params: Any) -> web.Response:
             if row is None:
                 raise ObjectNotFound(
                     extra_msg="No such project or you are not the member of it.",
-                    object_name="project (user group)",
+                    object_name="project (user project)",
                 )
-        group_role = "user"
+        project_role = "user"
     resp_data = {
         "global_role": "superadmin" if request["is_superadmin"] else "user",
         "domain_role": "admin" if request["is_admin"] else "user",
-        "group_role": group_role,
+        "group_role": project_role,
     }
     return web.json_response(resp_data)
 
@@ -725,7 +725,7 @@ async def signup(request: web.Request, params: Any) -> web.Response:
     # The hook handlers should accept the whole ``params`` dict.
     # They should return a dict to override the user information,
     # where the keys must be a valid field name of the users table,
-    # with two exceptions: "resource_policy" (name) and "group" (name).
+    # with two exceptions: "resource_policy" (name) and "project" (name).
     # A plugin may return an empty dict if it has nothing to override.
     hook_result = await root_ctx.hook_plugin_ctx.dispatch(
         "PRE_SIGNUP",
@@ -787,19 +787,19 @@ async def signup(request: web.Request, params: Any) -> web.Response:
             query = keypairs.insert().values(kp_data)
             await conn.execute(query)
 
-            # Add user to the default group.
-            group_name = user_data_overriden.get("group", "default")
+            # Add user to the default project.
+            project_name = user_data_overriden.get("project", "default")
             query = (
-                sa.select([groups.c.id])
-                .select_from(groups)
-                .where(groups.c.domain_name == params["domain"])
-                .where(groups.c.name == group_name)
+                sa.select([projects.c.id])
+                .select_from(projects)
+                .where(projects.c.domain_name == params["domain"])
+                .where(projects.c.name == project_name)
             )
             result = await conn.execute(query)
             grp = result.first()
             if grp is not None:
-                values = [{"user_id": user.uuid, "group_id": grp.id}]
-                query = association_groups_users.insert().values(values)
+                values = [{"user_id": user.uuid, "project_id": grp.id}]
+                query = association_projects_users.insert().values(values)
                 await conn.execute(query)
         else:
             raise InternalServerError("Error creating user account")

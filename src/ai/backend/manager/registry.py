@@ -833,7 +833,7 @@ class AgentRegistry:
                 session_type,
                 access_key,
                 user_scope.domain_name,
-                user_scope.group_id,
+                user_scope.project_id,
             )
             if scaling_group is None:
                 log.warning(
@@ -937,7 +937,7 @@ class AgentRegistry:
                 "cluster_hostname": sa.bindparam("cluster_hostname"),
                 "scaling_group": checked_scaling_group,
                 "domain_name": user_scope.domain_name,
-                "group_id": user_scope.group_id,
+                "project_id": user_scope.project_id,
                 "user_uuid": user_scope.user_uuid,
                 "access_key": access_key,
                 "image": sa.bindparam("image"),
@@ -1366,7 +1366,7 @@ class AgentRegistry:
             key=keyfunc,
         ):
             items = [*group_iterator]
-            # Within a group, agent_alloc_ctx are same.
+            # Within a project, agent_alloc_ctx are same.
             agent_alloc_ctx = items[0].agent_alloc_ctx
             per_agent_tasks.append(
                 (
@@ -1730,14 +1730,14 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def get_group_occupancy(self, group_id, *, conn=None):
+    async def get_project_occupancy(self, project_id, *, conn=None):
         # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.shared_config.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn(self.db, conn) as _conn:
                 query = sa.select([kernels.c.occupied_slots]).where(
-                    (kernels.c.group_id == group_id)
+                    (kernels.c.project_id == project_id)
                     & (kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES)),
                 )
                 zero = ResourceSlot()
@@ -3234,7 +3234,7 @@ async def check_scaling_group(
     session_type: SessionTypes,
     access_key: AccessKey,
     domain_name: str,
-    group_id: Union[uuid.UUID, str],
+    project_id: Union[uuid.UUID, str],
 ) -> str:
     # Check scaling group availability if scaling_group parameter is given.
     # If scaling_group is not provided, it will be selected as the first one among
@@ -3242,7 +3242,7 @@ async def check_scaling_group(
     candidates = await query_allowed_sgroups(
         conn,
         domain_name,
-        group_id,
+        project_id,
         access_key,
     )
     if not candidates:

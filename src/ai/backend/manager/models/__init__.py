@@ -3,10 +3,10 @@ from . import agent as _agent
 from . import domain as _domain
 from . import dotfile as _dotfile
 from . import error_logs as _errorlogs
-from . import group as _group
 from . import image as _image
 from . import kernel as _kernel
 from . import keypair as _keypair
+from . import project as _group
 from . import resource_policy as _rpolicy
 from . import resource_preset as _rpreset
 from . import scaling_group as _sgroup
@@ -41,10 +41,10 @@ from .agent import *  # noqa
 from .domain import *  # noqa
 from .dotfile import *  # noqa
 from .error_logs import *  # noqa
-from .group import *  # noqa
 from .image import *  # noqa
 from .kernel import *  # noqa
 from .keypair import *  # noqa
+from .project import *  # noqa
 from .resource_policy import *  # noqa
 from .resource_preset import *  # noqa
 from .scaling_group import *  # noqa

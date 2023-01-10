@@ -21,8 +21,8 @@ from ai.backend.common.types import AgentId, LogSeverity, RedisConnectionInfo
 
 from ..defs import REDIS_LIVE_DB, LockID
 from ..models import UserRole
-from ..models import association_groups_users as agus
-from ..models import error_logs, groups
+from ..models import association_projects_users as apus
+from ..models import error_logs, projects
 from .auth import auth_required
 from .manager import READ_ALLOWED, server_status_required
 from .types import CORSOptions, Iterable, WebMiddleware
@@ -125,11 +125,11 @@ async def list_logs(request: web.Request, params: Any) -> web.Response:
         if request["is_superadmin"]:
             pass
         elif user_role == UserRole.ADMIN or user_role == "admin":
-            j = groups.join(agus, groups.c.id == agus.c.group_id)
+            j = projects.join(apus, projects.c.id == apus.c.project_id)
             usr_query = (
-                sa.select([agus.c.user_id])
+                sa.select([apus.c.user_id])
                 .select_from(j)
-                .where(groups.c.domain_name == domain_name)
+                .where(projects.c.domain_name == domain_name)
             )
             result = await conn.execute(usr_query)
             usrs = result.fetchall()
@@ -190,11 +190,11 @@ async def mark_cleared(request: web.Request) -> web.Response:
         if request["is_superadmin"]:
             update_query = update_query.where(error_logs.c.id == log_id)
         elif user_role == UserRole.ADMIN or user_role == "admin":
-            j = groups.join(agus, groups.c.id == agus.c.group_id)
+            j = projects.join(apus, projects.c.id == apus.c.project_id)
             usr_query = (
-                sa.select([agus.c.user_id])
+                sa.select([apus.c.user_id])
                 .select_from(j)
-                .where(groups.c.domain_name == domain_name)
+                .where(projects.c.domain_name == domain_name)
             )
             result = await conn.execute(usr_query)
             usrs = result.fetchall()

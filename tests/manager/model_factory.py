@@ -119,11 +119,11 @@ class DomainFactory(ModelFactory):
 
 class GroupFactory(ModelFactory):
 
-    model = models.groups
+    model = models.projects
 
     def get_creation_defaults(self, **kwargs):
         return {
-            "name": f"test-group-{get_random_string()}",
+            "name": f"test-project-{get_random_string()}",
             "domain_name": "default",
             "total_resource_slots": {},
         }
@@ -131,15 +131,15 @@ class GroupFactory(ModelFactory):
 
 class AssociationGroupsUsersFactory(ModelFactory):
 
-    model = models.association_groups_users
+    model = models.association_projects_users
 
     def get_creation_defaults(self, **kwargs):
         return {}
 
     async def before_creation(self):
         assert (
-            "user_id" in self.defaults and "group_id" in self.defaults
-        ), "user_id and group_id should be provided to associate a group and a user"
+            "user_id" in self.defaults and "project_id" in self.defaults
+        ), "user_id and project_id should be provided to associate a project and a user"
 
 
 class VFolderFactory(ModelFactory):
@@ -153,7 +153,7 @@ class VFolderFactory(ModelFactory):
         }
 
     async def before_creation(self):
-        if "user" not in self.defaults and "group" not in self.defaults:
+        if "user" not in self.defaults and "project" not in self.defaults:
             user = await UserFactory(self.app).create()
             self.defaults["user"] = user["uuid"]
 

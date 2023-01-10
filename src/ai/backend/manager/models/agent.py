@@ -27,11 +27,11 @@ from .base import (
     set_if_set,
     simple_db_mutate,
 )
-from .group import association_groups_users
 from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from .keypair import keypairs
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
+from .project import association_projects_users
 from .scaling_group import query_allowed_sgroups
 from .user import UserRole, users
 
@@ -340,7 +340,7 @@ class AgentList(graphene.ObjectType):
     items = graphene.List(Agent, required=True)
 
 
-async def _query_domain_groups_by_ak(
+async def _query_domain_projects_by_ak(
     db_conn: SAConnection,
     access_key: str,
     domain_name: str | None,
@@ -355,21 +355,23 @@ async def _query_domain_groups_by_ak(
         row = (await db_conn.execute(domain_query)).first()
         user_domain = row.domain_name
         user_id = row.uuid
-        group_join = association_groups_users
-        group_cond = association_groups_users.c.user_id == user_id
+        project_join = association_projects_users
+        project_cond = association_projects_users.c.user_id == user_id
     else:
         user_domain = domain_name
-        group_join = kp_user_join.join(
-            association_groups_users,
-            association_groups_users.c.user_id == users.c.uuid,
+        project_join = kp_user_join.join(
+            association_projects_users,
+            association_projects_users.c.user_id == users.c.uuid,
         )
-        group_cond = keypairs.c.access_key == access_key
+        project_cond = keypairs.c.access_key == access_key
     query = (
-        sa.select([association_groups_users.c.group_id]).select_from(group_join).where(group_cond)
+        sa.select([association_projects_users.c.project_id])
+        .select_from(project_join)
+        .where(project_cond)
     )
     rows = (await db_conn.execute(query)).fetchall()
-    group_ids = [row.group_id for row in rows]
-    return user_domain, group_ids
+    project_ids = [row.project_id for row in rows]
+    return user_domain, project_ids
 
 
 async def _append_sgroup_from_clause(
@@ -383,8 +385,10 @@ async def _append_sgroup_from_clause(
         query = query.where(agents.c.scaling_group == scaling_group)
     else:
         async with graph_ctx.db.begin_readonly() as conn:
-            domain_name, group_ids = await _query_domain_groups_by_ak(conn, access_key, domain_name)
-            sgroups = await query_allowed_sgroups(conn, domain_name, group_ids, access_key)
+            domain_name, project_ids = await _query_domain_projects_by_ak(
+                conn, access_key, domain_name
+            )
+            sgroups = await query_allowed_sgroups(conn, domain_name, project_ids, access_key)
             names = [sgroup["name"] for sgroup in sgroups]
         query = query.where(agents.c.scaling_group.in_(names))
     return query

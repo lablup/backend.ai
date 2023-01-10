@@ -188,7 +188,7 @@ class PendingSession:
     cluster_mode: ClusterMode
     cluster_size: int
     domain_name: str
-    group_id: uuid.UUID
+    project_id: uuid.UUID
     status_data: Mapping[str, Any]
     scaling_group: str
     resource_policy: str
@@ -225,7 +225,7 @@ class PendingSession:
             kernels.c.cluster_mode,
             kernels.c.cluster_size,
             kernels.c.domain_name,
-            kernels.c.group_id,
+            kernels.c.project_id,
             kernels.c.status_data,
             kernels.c.scaling_group,
             keypairs.c.resource_policy,
@@ -271,7 +271,7 @@ class PendingSession:
             cluster_mode=row["cluster_mode"],
             cluster_size=row["cluster_size"],
             domain_name=row["domain_name"],
-            group_id=row["group_id"],
+            project_id=row["project_id"],
             status_data=row["status_data"],
             scaling_group=row["scaling_group"],
             resource_policy=row["resource_policy"],

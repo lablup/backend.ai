@@ -275,7 +275,7 @@ class PurgeDomain(graphene.Mutation):
     Completely delete domain from DB.
 
     Domain-bound kernels will also be all deleted.
-    To purge domain, there should be no users and groups in the target domain.
+    To purge domain, there should be no users and projects in the target domain.
     """
 
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -288,7 +288,7 @@ class PurgeDomain(graphene.Mutation):
 
     @classmethod
     async def mutate(cls, root, info: graphene.ResolveInfo, name: str) -> PurgeDomain:
-        from . import groups, users
+        from . import projects, users
 
         ctx: GraphQueryContext = info.context
 
@@ -299,10 +299,10 @@ class PurgeDomain(graphene.Mutation):
             user_count = await conn.scalar(query)
             if user_count > 0:
                 raise RuntimeError("There are users bound to the domain. Remove users first.")
-            query = sa.select([sa.func.count()]).where(groups.c.domain_name == name)
-            group_count = await conn.scalar(query)
-            if group_count > 0:
-                raise RuntimeError("There are groups bound to the domain. Remove groups first.")
+            query = sa.select([sa.func.count()]).where(projects.c.domain_name == name)
+            project_count = await conn.scalar(query)
+            if project_count > 0:
+                raise RuntimeError("There are projects bound to the domain. Remove projects first.")
 
             await cls.delete_kernels(conn, name)
 

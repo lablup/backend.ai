@@ -13,7 +13,7 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
-from ..models import TemplateType, groups, session_templates, users
+from ..models import TemplateType, projects, session_templates, users
 from ..models.session_template import check_task_template
 from .auth import auth_required
 from .exceptions import InvalidAPIParameters, TaskTemplateNotFound
@@ -51,7 +51,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     )
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
-        user_uuid, group_id, _ = await _query_userinfo(request, params, conn)
+        user_uuid, project_id, _ = await _query_userinfo(request, params, conn)
         log.debug("Params: {0}", params)
         try:
             body = json.loads(params["payload"])
@@ -65,7 +65,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             template_id = uuid.uuid4().hex
             name = st["name"] if "name" in st else template_data["metadata"]["name"]
             if "group_id" in st:
-                group_id = st["group_id"]
+                project_id = st["group_id"]
             if "user_uuid" in st:
                 user_uuid = st["user_uuid"]
             query = session_templates.insert().values(
@@ -73,7 +73,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     "id": template_id,
                     "created_at": datetime.datetime.now(),
                     "domain_name": params["domain"],
-                    "group_id": group_id,
+                    "project_id": project_id,
                     "user_uuid": user_uuid,
                     "name": name,
                     "template": template_data,
@@ -110,9 +110,9 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
         entries: List[Mapping[str, Any]]
         j = session_templates.join(
             users, session_templates.c.user_uuid == users.c.uuid, isouter=True
-        ).join(groups, session_templates.c.group_id == groups.c.id, isouter=True)
+        ).join(projects, session_templates.c.project_id == projects.c.id, isouter=True)
         query = (
-            sa.select([session_templates, users.c.email, groups.c.name], use_labels=True)
+            sa.select([session_templates, users.c.email, projects.c.name], use_labels=True)
             .select_from(j)
             .where(
                 (session_templates.c.is_active) & (session_templates.c.type == TemplateType.TASK),
@@ -133,13 +133,13 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
                         if row.session_templates_user_uuid
                         else None
                     ),
-                    "group": (
-                        str(row.session_templates_group_id)
-                        if row.session_templates_group_id
+                    "project": (
+                        str(row.session_templates_project_id)
+                        if row.session_templates_project_id
                         else None
                     ),
                     "user_email": row.users_email,
-                    "group_name": row.groups_name,
+                    "project_name": row.projects_name,
                     "domain_name": domain_name,
                     "type": row.session_templates_type,
                     "template": row.session_templates_template,
@@ -153,9 +153,9 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
                     "created_at": str(entry["created_at"]),
                     "is_owner": entry["is_owner"],
                     "user": str(entry["user"]),
-                    "group": str(entry["group"]),
+                    "group": str(entry["project"]),
                     "user_email": entry["user_email"],
-                    "group_name": entry["group_name"],
+                    "group_name": entry["project_name"],
                     "domain_name": domain_name,
                     "type": entry["type"],
                     "template": entry["template"],
@@ -194,7 +194,7 @@ async def get(request: web.Request, params: Any) -> web.Response:
                     session_templates.c.template,
                     session_templates.c.name,
                     session_templates.c.user_uuid,
-                    session_templates.c.group_id,
+                    session_templates.c.project_id,
                 ]
             )
             .select_from(session_templates)
@@ -211,7 +211,7 @@ async def get(request: web.Request, params: Any) -> web.Response:
                     "template": row.template,
                     "name": row.name,
                     "user_uuid": str(row.user_uuid),
-                    "group_id": str(row.group_id),
+                    "group_id": str(row.project_id),
                     "domain_name": domain_name,
                 }
             )
@@ -247,7 +247,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
     )
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
-        user_uuid, group_id, _ = await _query_userinfo(request, params, conn)
+        user_uuid, project_id, _ = await _query_userinfo(request, params, conn)
         query = (
             sa.select([session_templates.c.id])
             .select_from(session_templates)
@@ -270,14 +270,14 @@ async def put(request: web.Request, params: Any) -> web.Response:
             template_data = check_task_template(st["template"])
             name = st["name"] if "name" in st else template_data["metadata"]["name"]
             if "group_id" in st:
-                group_id = st["group_id"]
+                project_id = st["group_id"]
             if "user_uuid" in st:
                 user_uuid = st["user_uuid"]
             query = (
                 sa.update(session_templates)
                 .values(
                     {
-                        "group_id": group_id,
+                        "project_id": project_id,
                         "user_uuid": user_uuid,
                         "name": name,
                         "template": template_data,

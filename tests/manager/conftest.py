@@ -48,9 +48,9 @@ from ai.backend.manager.config import load as load_config
 from ai.backend.manager.models import (
     agents,
     domains,
-    groups,
     kernels,
     keypairs,
+    projects,
     scaling_groups,
     users,
     vfolders,
@@ -821,7 +821,7 @@ async def session_info(database_engine):
             )
         )
         await conn.execute(
-            groups.insert().values(
+            projects.insert().values(
                 {
                     "id": group_id,
                     "name": group_name,
@@ -849,6 +849,6 @@ async def session_info(database_engine):
         yield session_id, conn
 
         await conn.execute(kernels.delete().where(kernels.c.session_id == session_id))
-        await conn.execute(groups.delete().where(groups.c.id == group_id))
+        await conn.execute(projects.delete().where(projects.c.id == group_id))
         await conn.execute(domains.delete().where(domains.c.name == domain_name))
         await conn.execute(users.delete().where(users.c.uuid == user_uuid))

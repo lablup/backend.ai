@@ -195,8 +195,8 @@ class DomainNotFound(ObjectNotFound):
     object_name = "domain"
 
 
-class GroupNotFound(ObjectNotFound):
-    object_name = "user group (or project)"
+class ProjectNotFound(ObjectNotFound):
+    object_name = "user project (or group)"
 
 
 class ScalingGroupNotFound(ObjectNotFound):

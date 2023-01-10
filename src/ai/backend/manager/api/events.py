@@ -49,11 +49,11 @@ from ai.backend.common.events import (
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AgentId
 
-from ..models import UserRole, groups, kernels
+from ..models import UserRole, kernels, projects
 from ..models.utils import execute_with_retry
 from ..types import Sentinel
 from .auth import auth_required
-from .exceptions import GenericForbidden, GroupNotFound, ObjectNotFound
+from .exceptions import GenericForbidden, ObjectNotFound, ProjectNotFound
 from .manager import READ_ALLOWED, server_status_required
 from .utils import check_api_params
 
@@ -102,19 +102,23 @@ async def push_session_events(
     if user_role == UserRole.USER:
         if access_key != request["keypair"]["access_key"]:
             raise GenericForbidden
-    group_name = params["group_name"]
+    project_name = params["group_name"]
     my_queue: asyncio.Queue[Sentinel | SessionEventInfo] = asyncio.Queue()
-    log.info("PUSH_SESSION_EVENTS (ak:{}, s:{}, g:{})", access_key, session_name, group_name)
-    if group_name == "*":
-        group_id = "*"
+    log.info("PUSH_SESSION_EVENTS (ak:{}, s:{}, g:{})", access_key, session_name, project_name)
+    if project_name == "*":
+        project_id = "*"
     else:
         async with root_ctx.db.begin_readonly() as conn:
-            query = sa.select([groups.c.id]).select_from(groups).where(groups.c.name == group_name)
+            query = (
+                sa.select([projects.c.id])
+                .select_from(projects)
+                .where(projects.c.name == project_name)
+            )
             result = await conn.execute(query)
             row = result.first()
             if row is None:
-                raise GroupNotFound
-            group_id = row["id"]
+                raise ProjectNotFound
+            project_id = row["id"]
     app_ctx.session_event_queues.add(my_queue)
     defer(lambda: app_ctx.session_event_queues.remove(my_queue))
     async with sse_response(request) as resp:
@@ -131,7 +135,7 @@ async def push_session_events(
                     if user_role == UserRole.USER:
                         if row["user_uuid"] != user_uuid:
                             continue
-                    if group_id != "*" and row["group_id"] != group_id:
+                    if project_id != "*" and row["project_id"] != project_id:
                         continue
                     if scope == "session" and not event_name.startswith("session_"):
                         continue
@@ -209,7 +213,7 @@ async def enqueue_kernel_creation_status_update(
                         kernels.c.cluster_role,
                         kernels.c.cluster_idx,
                         kernels.c.domain_name,
-                        kernels.c.group_id,
+                        kernels.c.project_id,
                         kernels.c.user_uuid,
                     ]
                 )
@@ -248,7 +252,7 @@ async def enqueue_kernel_termination_status_update(
                         kernels.c.cluster_role,
                         kernels.c.cluster_idx,
                         kernels.c.domain_name,
-                        kernels.c.group_id,
+                        kernels.c.project_id,
                         kernels.c.user_uuid,
                     ]
                 )
@@ -293,7 +297,7 @@ async def enqueue_session_creation_status_update(
                         kernels.c.session_name,
                         kernels.c.access_key,
                         kernels.c.domain_name,
-                        kernels.c.group_id,
+                        kernels.c.project_id,
                         kernels.c.user_uuid,
                     ]
                 )
@@ -331,7 +335,7 @@ async def enqueue_session_termination_status_update(
                         kernels.c.session_name,
                         kernels.c.access_key,
                         kernels.c.domain_name,
-                        kernels.c.group_id,
+                        kernels.c.project_id,
                         kernels.c.user_uuid,
                     ]
                 )
@@ -369,7 +373,7 @@ async def enqueue_batch_task_result_update(
                         kernels.c.session_name,
                         kernels.c.access_key,
                         kernels.c.domain_name,
-                        kernels.c.group_id,
+                        kernels.c.project_id,
                         kernels.c.user_uuid,
                     ]
                 )

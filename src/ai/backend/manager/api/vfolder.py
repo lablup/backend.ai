@@ -46,11 +46,11 @@ from ..models import (
     VFolderPermissionValidator,
     VFolderUsageMode,
     agents,
-    get_allowed_vfolder_hosts_by_group,
+    get_allowed_vfolder_hosts_by_project,
     get_allowed_vfolder_hosts_by_user,
-    groups,
     kernels,
     keypairs,
+    projects,
     query_accessible_vfolders,
     query_owned_dotfiles,
     users,
@@ -63,11 +63,11 @@ from .auth import admin_required, auth_required, superadmin_required
 from .exceptions import (
     BackendAgentError,
     GenericForbidden,
-    GroupNotFound,
     InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
+    ProjectNotFound,
     ServerMisconfiguredError,
     TooManyVFoldersFound,
     VFolderAlreadyExists,
@@ -165,7 +165,7 @@ def vfolder_permission_required(perm: VFolderPermission):
             folder_name = request.match_info["name"]
             allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
             vf_user_cond = None
-            vf_group_cond = None
+            vf_project_cond = None
             if perm == VFolderPermission.READ_ONLY:
                 # if READ_ONLY is requested, any permission accepts.
                 invited_perm_cond = vfolder_permissions.c.permission.in_(
@@ -176,7 +176,7 @@ def vfolder_permission_required(perm: VFolderPermission):
                     ]
                 )
                 if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission.in_(
+                    vf_project_cond = vfolders.c.permission.in_(
                         [
                             VFolderPermission.READ_ONLY,
                             VFolderPermission.READ_WRITE,
@@ -191,7 +191,7 @@ def vfolder_permission_required(perm: VFolderPermission):
                     ]
                 )
                 if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission.in_(
+                    vf_project_cond = vfolders.c.permission.in_(
                         [
                             VFolderPermission.READ_WRITE,
                             VFolderPermission.RW_DELETE,
@@ -201,12 +201,12 @@ def vfolder_permission_required(perm: VFolderPermission):
                 # If RW_DELETE is requested, only RW_DELETE accepts.
                 invited_perm_cond = vfolder_permissions.c.permission == VFolderPermission.RW_DELETE
                 if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission == VFolderPermission.RW_DELETE
+                    vf_project_cond = vfolders.c.permission == VFolderPermission.RW_DELETE
             else:
                 # Otherwise, just compare it as-is (for future compatibility).
                 invited_perm_cond = vfolder_permissions.c.permission == perm
                 if not request["is_admin"]:
-                    vf_group_cond = vfolders.c.permission == perm
+                    vf_project_cond = vfolders.c.permission == perm
             async with root_ctx.db.begin() as conn:
                 entries = await query_accessible_vfolders(
                     conn,
@@ -217,7 +217,7 @@ def vfolder_permission_required(perm: VFolderPermission):
                     extra_vf_conds=(vfolders.c.name == folder_name),
                     extra_invited_vf_conds=invited_perm_cond,
                     extra_vf_user_conds=vf_user_cond,
-                    extra_vf_group_conds=vf_group_cond,
+                    extra_vf_project_conds=vf_project_cond,
                 )
                 if len(entries) == 0:
                     raise VFolderNotFound("Your operation may be permission denied.")
@@ -295,7 +295,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     user_uuid = request["user"]["uuid"]
     resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
-    group_id_or_name = params["group"]
+    project_id_or_name = params["group"]
     log.info(
         "VFOLDER.CREATE (ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         access_key,
@@ -322,35 +322,35 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 )
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     for vf_type in allowed_vfolder_types:
-        if vf_type not in ("user", "group"):
+        if vf_type not in ("user", "project"):
             raise ServerMisconfiguredError(
                 f"Invalid vfolder type(s): {str(allowed_vfolder_types)}."
-                ' Only "user" or "group" is allowed.'
+                ' Only "user" or "project" is allowed.'
             )
 
     if not verify_vfolder_name(params["name"]):
         raise InvalidAPIParameters(f'{params["name"]} is reserved for internal operations.')
     if params["name"].startswith(".") and params["name"] != ".local":
         if params["group"] is not None:
-            raise InvalidAPIParameters("dot-prefixed vfolders cannot be a group folder.")
+            raise InvalidAPIParameters("dot-prefixed vfolders cannot be a project folder.")
 
     async with root_ctx.db.begin() as conn:
-        # Convert group name to uuid if group name is given.
-        if isinstance(group_id_or_name, str):
+        # Convert project name to uuid if project name is given.
+        if isinstance(project_id_or_name, str):
             query = (
-                sa.select([groups.c.id])
-                .select_from(groups)
-                .where(groups.c.domain_name == domain_name)
-                .where(groups.c.name == group_id_or_name)
+                sa.select([projects.c.id])
+                .select_from(projects)
+                .where(projects.c.domain_name == domain_name)
+                .where(projects.c.name == project_id_or_name)
             )
-            group_id = await conn.scalar(query)
+            project_id = await conn.scalar(query)
         else:
-            group_id = group_id_or_name
+            project_id = project_id_or_name
         if not unmanaged_path:
             # Check resource policy's allowed_vfolder_hosts
-            if group_id is not None:
-                allowed_hosts = await get_allowed_vfolder_hosts_by_group(
-                    conn, resource_policy, domain_name, group_id
+            if project_id is not None:
+                allowed_hosts = await get_allowed_vfolder_hosts_by_project(
+                    conn, resource_policy, domain_name, project_id
                 )
             else:
                 allowed_hosts = await get_allowed_vfolder_hosts_by_user(
@@ -392,23 +392,23 @@ async def create(request: web.Request, params: Any) -> web.Response:
         if len(entries) > 0:
             raise VFolderAlreadyExists
 
-        # Check if group exists.
-        if group_id_or_name and group_id is None:
-            raise GroupNotFound
-        if group_id is not None:
-            if "group" not in allowed_vfolder_types:
-                raise InvalidAPIParameters("group vfolder cannot be created in this host")
+        # Check if project exists.
+        if project_id_or_name and project_id is None:
+            raise ProjectNotFound
+        if project_id is not None:
+            if "project" not in allowed_vfolder_types:
+                raise InvalidAPIParameters("project vfolder cannot be created in this host")
             if not request["is_admin"]:
                 raise GenericForbidden("no permission")
             query = (
-                sa.select([groups.c.id])
-                .select_from(groups)
-                .where(groups.c.domain_name == domain_name)
-                .where(groups.c.id == group_id)
+                sa.select([projects.c.id])
+                .select_from(projects)
+                .where(projects.c.domain_name == domain_name)
+                .where(projects.c.id == project_id)
             )
             _gid = await conn.scalar(query)
-            if str(_gid) != str(group_id):
-                raise InvalidAPIParameters("No such group.")
+            if str(_gid) != str(project_id):
+                raise InvalidAPIParameters("No such project.")
         else:
             if "user" not in allowed_vfolder_types:
                 raise InvalidAPIParameters("user vfolder cannot be created in this host")
@@ -429,9 +429,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     pass
         except aiohttp.ClientResponseError:
             raise VFolderCreationFailed
-        user_uuid = str(user_uuid) if group_id is None else None
-        group_uuid = str(group_id) if group_id is not None else None
-        ownership_type = "group" if group_uuid is not None else "user"
+        user_uuid = str(user_uuid) if project_id is None else None
+        project_uuid = str(project_id) if project_id is not None else None
+        ownership_type = "project" if project_uuid is not None else "user"
         insert_values = {
             "id": folder_id.hex,
             "name": params["name"],
@@ -443,7 +443,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "creator": request["user"]["email"],
             "ownership_type": VFolderOwnershipType(ownership_type),
             "user": user_uuid,
-            "group": group_uuid,
+            "project": project_uuid,
             "unmanaged_path": "",
             "cloneable": params["cloneable"],
             "status": VFolderOperationStatus.READY,
@@ -458,7 +458,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "creator": request["user"]["email"],
             "ownership_type": ownership_type,
             "user": user_uuid,
-            "group": group_uuid,
+            "group": project_uuid,
             "cloneable": params["cloneable"],
             "status": VFolderOperationStatus.READY,
         }
@@ -509,10 +509,10 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                     "is_owner": (row.vfolders_user == user_uuid),
                     "permission": row.vfolders_permission,
                     "user": str(row.vfolders_user) if row.vfolders_user else None,
-                    "group": str(row.vfolders_group) if row.vfolders_group else None,
+                    "project": str(row.vfolders_project) if row.vfolders_project else None,
                     "creator": row.vfolders_creator,
                     "user_email": row.users_email,
-                    "group_name": row.groups_name,
+                    "project_name": row.projects_name,
                     "ownership_type": row.vfolders_ownership_type,
                     "type": row.vfolders_ownership_type,  # legacy
                     "unmanaged_path": row.vfolders_unmanaged_path,
@@ -534,7 +534,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
             extra_vf_conds = None
             if params["group_id"] is not None:
                 # Note: user folders should be returned even when group_id is specified.
-                extra_vf_conds = (vfolders.c.group == params["group_id"]) | (
+                extra_vf_conds = (vfolders.c.project == params["group_id"]) | (
                     vfolders.c.user.isnot(None)
                 )
             entries = await query_accessible_vfolders(
@@ -556,10 +556,10 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                     "is_owner": entry["is_owner"],
                     "permission": entry["permission"].value,
                     "user": str(entry["user"]) if entry["user"] else None,
-                    "group": str(entry["group"]) if entry["group"] else None,
+                    "group": str(entry["project"]) if entry["project"] else None,
                     "creator": entry["creator"],
                     "user_email": entry["user_email"],
-                    "group_name": entry["group_name"],
+                    "group_name": entry["project_name"],
                     "ownership_type": entry["ownership_type"].value,
                     "type": entry["ownership_type"].value,  # legacy
                     "cloneable": entry["cloneable"],
@@ -627,7 +627,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
     log.info("VFOLDER.LIST_HOSTS (ak:{})", access_key)
     domain_name = request["user"]["domain_name"]
-    group_id = params["group_id"]
+    project_id = params["group_id"]
     domain_admin = request["user"]["role"] == UserRole.ADMIN
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
@@ -635,14 +635,14 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
         allowed_hosts = VFolderHostPermissionMap()
         if "user" in allowed_vfolder_types:
             allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
-                conn, resource_policy, domain_name, request["user"]["uuid"], group_id
+                conn, resource_policy, domain_name, request["user"]["uuid"], project_id
             )
             allowed_hosts = allowed_hosts | allowed_hosts_by_user
-        if "group" in allowed_vfolder_types:
-            allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
-                conn, resource_policy, domain_name, group_id, domain_admin=domain_admin
+        if "project" in allowed_vfolder_types:
+            allowed_hosts_by_project = await get_allowed_vfolder_hosts_by_project(
+                conn, resource_policy, domain_name, project_id, domain_admin=domain_admin
             )
-            allowed_hosts = allowed_hosts | allowed_hosts_by_group
+            allowed_hosts = allowed_hosts | allowed_hosts_by_project
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
     all_hosts = {f"{proxy_name}:{volume_data['name']}" for proxy_name, volume_data in all_volumes}
     allowed_hosts = VFolderHostPermissionMap(
@@ -761,8 +761,8 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "created_at": str(row["created_at"]),
         "last_used": str(row["created_at"]),
         "user": str(row["user"]),
-        "group": str(row["group"]),
-        "type": "user" if row["user"] is not None else "group",
+        "group": str(row["project"]),
+        "type": "user" if row["user"] is not None else "project",
         "is_owner": is_owner,
         "permission": permission,
         "usage_mode": row["usage_mode"],
@@ -1550,7 +1550,7 @@ async def accept_invitation(request: web.Request, params: Any) -> web.Response:
     """Accept invitation by invitee.
 
     * `inv_ak` parameter is removed from 19.06 since virtual folder's ownership is
-    moved from keypair to a user or a group.
+    moved from keypair to a user or a project.
 
     :param inv_id: ID of vfolder_invitations row.
     """
@@ -1695,10 +1695,10 @@ async def share(request: web.Request, params: Any) -> web.Response:
         request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
     )
     """
-    Share a group folder to users with overriding permission.
+    Share a project folder to users with overriding permission.
 
     This will create vfolder_permission(s) relation directly without
-    creating invitation(s). Only group-type vfolders are allowed to
+    creating invitation(s). Only project-type vfolders are allowed to
     be shared directly.
     """
     root_ctx: RootContext = request.app["_root.context"]
@@ -1712,14 +1712,14 @@ async def share(request: web.Request, params: Any) -> web.Response:
         ",".join(params["emails"]),
     )
     async with root_ctx.db.begin() as conn:
-        from ..models import association_groups_users as agus
+        from ..models import association_projects_users as apus
 
-        # Get the group-type virtual folder.
+        # Get the project-type virtual folder.
         query = (
-            sa.select([vfolders.c.id, vfolders.c.ownership_type, vfolders.c.group])
+            sa.select([vfolders.c.id, vfolders.c.ownership_type, vfolders.c.project])
             .select_from(vfolders)
             .where(
-                (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+                (vfolders.c.ownership_type == VFolderOwnershipType.PROJECT)
                 & (vfolders.c.name == folder_name),
             )
         )
@@ -1731,15 +1731,15 @@ async def share(request: web.Request, params: Any) -> web.Response:
             raise InternalServerError(f"Multiple project folders found: {folder_name}")
         vf_info = vf_infos[0]
 
-        # Convert users' emails to uuids and check if user belong to the group of vfolder.
-        j = users.join(agus, users.c.uuid == agus.c.user_id)
+        # Convert users' emails to uuids and check if user belong to the project of vfolder.
+        j = users.join(apus, users.c.uuid == apus.c.user_id)
         query = (
             sa.select([users.c.uuid, users.c.email])
             .select_from(j)
             .where(
                 (users.c.email.in_(params["emails"]))
                 & (users.c.email != request["user"]["email"])
-                & (agus.c.group_id == vf_info["group"]),
+                & (apus.c.project_id == vf_info["project"]),
             )
         )
         result = await conn.execute(query)
@@ -1749,10 +1749,10 @@ async def share(request: web.Request, params: Any) -> web.Response:
         if len(user_info) < 1:
             raise ObjectNotFound(object_name="user")
         if len(user_info) < len(params["emails"]):
-            users_not_in_vfolder_group = list(set(params["emails"]) - set(emails_to_share))
+            users_not_in_vfolder_project = list(set(params["emails"]) - set(emails_to_share))
             raise ObjectNotFound(
-                "Some user does not belong to folder's group: "
-                ",".join(users_not_in_vfolder_group),
+                "Some user does not belong to folder's project: "
+                ",".join(users_not_in_vfolder_project),
                 object_name="user",
             )
 
@@ -1804,7 +1804,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
 )
 async def unshare(request: web.Request, params: Any) -> web.Response:
     """
-    Unshare a group folder from users.
+    Unshare a project folder from users.
     """
     await ensure_vfolder_status(
         request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
@@ -1819,12 +1819,12 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
         ",".join(params["emails"]),
     )
     async with root_ctx.db.begin() as conn:
-        # Get the group-type virtual folder.
+        # Get the project-type virtual folder.
         query = (
             sa.select([vfolders.c.id])
             .select_from(vfolders)
             .where(
-                (vfolders.c.ownership_type == VFolderOwnershipType.GROUP)
+                (vfolders.c.ownership_type == VFolderOwnershipType.PROJECT)
                 & (vfolders.c.name == folder_name),
             )
         )
@@ -1947,13 +1947,13 @@ async def leave(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
     """
     Leave a shared vfolder.
 
-    Cannot leave a group vfolder or a vfolder that the requesting user owns.
+    Cannot leave a project vfolder or a vfolder that the requesting user owns.
     """
     await ensure_vfolder_status(
         request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
     )
-    if row["ownership_type"] == VFolderOwnershipType.GROUP:
-        raise InvalidAPIParameters("Cannot leave a group vfolder.")
+    if row["ownership_type"] == VFolderOwnershipType.PROJECT:
+        raise InvalidAPIParameters("Cannot leave a project vfolder.")
 
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -2039,10 +2039,10 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     for vf_type in allowed_vfolder_types:
-        if vf_type not in ("user", "group"):
+        if vf_type not in ("user", "project"):
             raise ServerMisconfiguredError(
                 f"Invalid vfolder type(s): {str(allowed_vfolder_types)}."
-                ' Only "user" or "group" is allowed.'
+                ' Only "user" or "project" is allowed.'
             )
 
     if not verify_vfolder_name(params["target_name"]):
@@ -2122,7 +2122,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 
         # Insert the row for the destination vfolder.
         user_uuid = str(user_uuid)
-        group_uuid = None
+        project_uuid = None
         ownership_type = "user"
         insert_values = {
             "id": folder_id,
@@ -2134,7 +2134,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             "creator": request["user"]["email"],
             "ownership_type": VFolderOwnershipType(ownership_type),
             "user": user_uuid,
-            "group": group_uuid,
+            "project": project_uuid,
             "unmanaged_path": "",
             "cloneable": params["cloneable"],
         }
@@ -2178,7 +2178,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         "creator": request["user"]["email"],
         "ownership_type": ownership_type,
         "user": user_uuid,
-        "group": group_uuid,
+        "group": project_uuid,
         "cloneable": params["cloneable"],
         "bgtask_id": str(task_id),
     }
@@ -2198,7 +2198,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
     """
     List shared vfolders.
 
-    Not available for group vfolders.
+    Not available for project vfolders.
     """
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
@@ -2213,7 +2213,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
                 vfolder_permissions,
                 vfolders.c.id,
                 vfolders.c.name,
-                vfolders.c.group,
+                vfolders.c.project,
                 vfolders.c.user.label("vfolder_user"),
                 users.c.email,
             ]
@@ -2224,8 +2224,8 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
         shared_list = result.fetchall()
     shared_info = []
     for shared in shared_list:
-        owner = shared.group if shared.group else shared.vfolder_user
-        folder_type = "project" if shared.group else "user"
+        owner = shared.project if shared.project else shared.vfolder_user
+        folder_type = "project" if shared.project else "user"
         shared_info.append(
             {
                 "vfolder_id": str(shared.id),

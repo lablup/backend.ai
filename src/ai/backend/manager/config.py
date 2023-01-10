@@ -45,7 +45,7 @@ Alias keys are also URL-quoted in the same way.
      + api
        - allow-origins: "*"
        + resources
-         - group_resource_visibility: "true"  # return group resource status in check-presets
+         - project_resource_visibility: "true"  # return project resource status in check-presets
                                               # (default: false)
      + docker
        + image
@@ -590,7 +590,7 @@ class SharedConfig(AbstractConfig):
 
     async def get_vfolder_types(self) -> Sequence[str]:
         """
-        Returns the vfolder types currently set. One of "user" and/or "group".
+        Returns the vfolder types currently set. One of "user" and/or "project".
         If none is specified, "user" type is implicitly assumed.
         """
         try:
@@ -599,6 +599,10 @@ class SharedConfig(AbstractConfig):
             vf_types = await self._get_vfolder_types()
             if not vf_types:
                 vf_types = {"user": ""}
+
+            # "group" key is legacy.
+            if "group" in vf_types:
+                vf_types["project"] = vf_types["group"]
             ret = list(vf_types.keys())
             current_vfolder_types.set(ret)
         return ret

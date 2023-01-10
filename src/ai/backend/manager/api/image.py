@@ -14,8 +14,8 @@ from ai.backend.common.etcd import quote as etcd_quote
 from ai.backend.common.types import SessionTypes
 
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
-from ..models import association_groups_users as agus
-from ..models import domains, groups, query_allowed_sgroups
+from ..models import association_projects_users as agus
+from ..models import domains, projects, query_allowed_sgroups
 from ..types import UserScope
 from .auth import admin_required
 from .exceptions import InvalidAPIParameters
@@ -87,23 +87,23 @@ async def get_import_image_form(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
         query = (
-            sa.select([groups.c.name])
+            sa.select([projects.c.name])
             .select_from(
                 sa.join(
-                    groups,
+                    projects,
                     domains,
-                    groups.c.domain_name == domains.c.name,
+                    projects.c.domain_name == domains.c.name,
                 ),
             )
             .where(
                 (domains.c.name == request["user"]["domain_name"])
                 & (domains.c.is_active)
-                & (groups.c.is_active),
+                & (projects.c.is_active),
             )
         )
         result = await conn.execute(query)
         rows = result.fetchall()
-        accessible_groups = [row["name"] for row in rows]
+        accessible_projects = [row["name"] for row in rows]
 
         # FIXME: Currently this only consider domain-level scaling group associations,
         #        thus ignoring the group name query.
@@ -245,9 +245,9 @@ async def get_import_image_form(request: web.Request) -> web.Response:
                         {
                             "name": "group",
                             "type": "choice",
-                            "choices": accessible_groups,
+                            "choices": accessible_projects,
                             "label": "Group to build image",
-                            "help": "The user group where the import task will be executed.",
+                            "help": "The user project where the import task will be executed.",
                         },
                         {
                             "name": "scalingGroup",
@@ -307,8 +307,8 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
     NGC images) which has its own Python version installed.
 
     Internally, it launches a temporary kernel in an arbitrary agent within
-    the client's domain, the "default" group, and the "default" scaling group.
-    (The client may change the group and scaling group using *launchOptions.*
+    the client's domain, the "default" project, and the "default" scaling group.
+    (The client may change the project and scaling group using *launchOptions.*
     If the client is a super-admin, it uses the "default" domain.)
 
     This temporary kernel occupies only 1 CPU core and 1 GiB memory.
@@ -361,37 +361,37 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
 
     async with root_ctx.db.begin() as conn:
         query = (
-            sa.select([groups.c.id])
+            sa.select([projects.c.id])
             .select_from(
                 sa.join(
-                    groups,
+                    projects,
                     domains,
-                    groups.c.domain_name == domains.c.name,
+                    projects.c.domain_name == domains.c.name,
                 ),
             )
             .where(
                 (domains.c.name == request["user"]["domain_name"])
-                & (groups.c.name == params["launchOptions"]["group"])
+                & (projects.c.name == params["launchOptions"]["group"])
                 & (domains.c.is_active)
-                & (groups.c.is_active),
+                & (projects.c.is_active),
             )
         )
         result = await conn.execute(query)
-        group_id = result.scalar()
-        if group_id is None:
-            raise InvalidAPIParameters("Invalid domain or group.")
+        project_id = result.scalar()
+        if project_id is None:
+            raise InvalidAPIParameters("Invalid domain or project.")
 
         query = (
             sa.select([agus])
             .select_from(agus)
             .where(
-                (agus.c.user_id == request["user"]["uuid"]) & (agus.c.group_id == group_id),
+                (agus.c.user_id == request["user"]["uuid"]) & (agus.c.project_id == project_id),
             )
         )
         result = await conn.execute(query)
         row = result.first()
         if row is None:
-            raise InvalidAPIParameters("You do not belong to the given group.")
+            raise InvalidAPIParameters("You do not belong to the given project.")
 
     importer_image = ImageRef(
         root_ctx.local_config["manager"]["importer-image"],
@@ -441,7 +441,7 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
         resource_policy,
         user_scope=UserScope(
             domain_name=request["user"]["domain_name"],
-            group_id=group_id,
+            project_id=project_id,
             user_uuid=request["user"]["uuid"],
             user_role=request["user"]["role"],
         ),

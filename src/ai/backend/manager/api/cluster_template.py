@@ -13,11 +13,11 @@ from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
 
 from ..models import TemplateType, UserRole
-from ..models import association_groups_users as agus
+from ..models import association_projects_users as apus
 from ..models import (
     domains,
-    groups,
     keypairs,
+    projects,
     query_accessible_session_templates,
     session_templates,
     users,
@@ -94,51 +94,51 @@ async def create(request: web.Request, params: Any) -> web.Response:
             raise InvalidAPIParameters("Invalid domain")
 
         if owner_role == UserRole.SUPERADMIN:
-            # superadmin can spawn container in any designated domain/group.
+            # superadmin can spawn container in any designated domain/project.
             query = (
-                sa.select([groups.c.id])
-                .select_from(groups)
+                sa.select([projects.c.id])
+                .select_from(projects)
                 .where(
-                    (groups.c.domain_name == params["domain"])
-                    & (groups.c.name == params["group"])
-                    & (groups.c.is_active),
+                    (projects.c.domain_name == params["domain"])
+                    & (projects.c.name == params["group"])
+                    & (projects.c.is_active),
                 )
             )
             qresult = await conn.execute(query)
-            group_id = qresult.scalar()
+            project_id = qresult.scalar()
         elif owner_role == UserRole.ADMIN:
-            # domain-admin can spawn container in any group in the same domain.
+            # domain-admin can spawn container in any project in the same domain.
             if params["domain"] != owner_domain:
                 raise InvalidAPIParameters("You can only set the domain to the owner's domain.")
             query = (
-                sa.select([groups.c.id])
-                .select_from(groups)
+                sa.select([projects.c.id])
+                .select_from(projects)
                 .where(
-                    (groups.c.domain_name == owner_domain)
-                    & (groups.c.name == params["group"])
-                    & (groups.c.is_active),
+                    (projects.c.domain_name == owner_domain)
+                    & (projects.c.name == params["group"])
+                    & (projects.c.is_active),
                 )
             )
             qresult = await conn.execute(query)
-            group_id = qresult.scalar()
+            project_id = qresult.scalar()
         else:
-            # normal users can spawn containers in their group and domain.
+            # normal users can spawn containers in their project and domain.
             if params["domain"] != owner_domain:
                 raise InvalidAPIParameters("You can only set the domain to your domain.")
             query = (
-                sa.select([agus.c.group_id])
-                .select_from(agus.join(groups, agus.c.group_id == groups.c.id))
+                sa.select([apus.c.project_id])
+                .select_from(apus.join(projects, apus.c.project_id == projects.c.id))
                 .where(
-                    (agus.c.user_id == owner_uuid)
-                    & (groups.c.domain_name == owner_domain)
-                    & (groups.c.name == params["group"])
-                    & (groups.c.is_active),
+                    (apus.c.user_id == owner_uuid)
+                    & (projects.c.domain_name == owner_domain)
+                    & (projects.c.name == params["group"])
+                    & (projects.c.is_active),
                 )
             )
             qresult = await conn.execute(query)
-            group_id = qresult.scalar()
-        if group_id is None:
-            raise InvalidAPIParameters("Invalid group")
+            project_id = qresult.scalar()
+        if project_id is None:
+            raise InvalidAPIParameters("Invalid project")
 
         log.debug("Params: {0}", params)
         try:
@@ -158,7 +158,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             {
                 "id": template_id,
                 "domain_name": params["domain"],
-                "group_id": group_id,
+                "project_id": project_id,
                 "user_uuid": user_uuid,
                 "name": template_data["metadata"]["name"],
                 "template": template_data,
@@ -194,9 +194,9 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
         if request["is_superadmin"] and params["all"]:
             j = session_templates.join(
                 users, session_templates.c.user_uuid == users.c.uuid, isouter=True
-            ).join(groups, session_templates.c.group_id == groups.c.id, isouter=True)
+            ).join(projects, session_templates.c.project_id == projects.c.id, isouter=True)
             query = (
-                sa.select([session_templates, users.c.email, groups.c.name], use_labels=True)
+                sa.select([session_templates, users.c.email, projects.c.name], use_labels=True)
                 .select_from(j)
                 .where(
                     (session_templates.c.is_active)
@@ -218,26 +218,26 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
                             if row.session_templates_user_uuid
                             else None
                         ),
-                        "group": (
-                            str(row.session_templates_group_id)
-                            if row.session_templates_group_id
+                        "project": (
+                            str(row.session_templates_project_id)
+                            if row.session_templates_project_id
                             else None
                         ),
                         "user_email": row.users_email,
-                        "group_name": row.groups_name,
+                        "project_name": row.projects_name,
                     }
                 )
         else:
             extra_conds = None
             if params["group_id"] is not None:
-                extra_conds = session_templates.c.group_id == params["group_id"]
+                extra_conds = session_templates.c.project_id == params["group_id"]
             entries = await query_accessible_session_templates(
                 conn,
                 user_uuid,
                 TemplateType.CLUSTER,
                 user_role=user_role,
                 domain_name=domain_name,
-                allowed_types=["user", "group"],
+                allowed_types=["user", "project"],
                 extra_conds=extra_conds,
             )
 
@@ -249,9 +249,9 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
                     "created_at": str(entry["created_at"]),
                     "is_owner": entry["is_owner"],
                     "user": str(entry["user"]),
-                    "group": str(entry["group"]),
+                    "project": str(entry["project"]),
                     "user_email": entry["user_email"],
-                    "group_name": entry["group_name"],
+                    "group_name": entry["project_name"],
                     "type": "user" if entry["user"] is not None else "group",
                 }
             )

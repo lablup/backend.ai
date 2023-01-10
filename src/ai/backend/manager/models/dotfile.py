@@ -16,8 +16,8 @@ from ai.backend.common.types import VFolderMount
 from ..api.exceptions import BackendError
 from ..types import UserScope
 from .domain import query_domain_dotfiles
-from .group import query_group_dotfiles
 from .keypair import keypairs
+from .project import query_project_dotfiles
 
 __all__ = ("prepare_dotfiles",)
 
@@ -50,12 +50,12 @@ async def prepare_dotfiles(
             "public_key": row["ssh_public_key"],
             "private_key": row["ssh_private_key"],
         }
-    # use dotfiles in the priority of keypair > group > domain
+    # use dotfiles in the priority of keypair > project > domain
     dotfile_paths = set(map(lambda x: x["path"], dotfiles))
     # add keypair dotfiles
     internal_data.update({"dotfiles": list(dotfiles)})
-    # add group dotfiles
-    dotfiles, _ = await query_group_dotfiles(conn, user_scope.group_id)
+    # add project dotfiles
+    dotfiles, _ = await query_project_dotfiles(conn, user_scope.project_id)
     for dotfile in dotfiles:
         if dotfile["path"] not in dotfile_paths:
             internal_data["dotfiles"].append(dotfile)

@@ -12,9 +12,9 @@ from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 from ..models import (
     DefaultForUnspecified,
     domains,
-    groups,
     kernels,
     keypair_resource_policies,
+    projects,
     session_dependencies,
 )
 from ..models.utils import execute_with_retry
@@ -170,30 +170,34 @@ async def check_keypair_resource_limit(
     return PredicateResult(True)
 
 
-async def check_group_resource_limit(
+async def check_project_resource_limit(
     db_conn: SAConnection,
     sched_ctx: SchedulingContext,
     sess_ctx: PendingSession,
 ) -> PredicateResult:
-    query = sa.select([groups.c.total_resource_slots]).where(groups.c.id == sess_ctx.group_id)
-    group_resource_slots = await db_conn.scalar(query)
-    group_resource_policy = {
-        "total_resource_slots": group_resource_slots,
+    query = sa.select([projects.c.total_resource_slots]).where(projects.c.id == sess_ctx.project_id)
+    project_resource_slots = await db_conn.scalar(query)
+    project_resource_policy = {
+        "total_resource_slots": project_resource_slots,
         "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
     }
-    total_group_allowed = ResourceSlot.from_policy(
-        group_resource_policy, sched_ctx.known_slot_types
+    total_project_allowed = ResourceSlot.from_policy(
+        project_resource_policy, sched_ctx.known_slot_types
     )
-    group_occupied = await sched_ctx.registry.get_group_occupancy(sess_ctx.group_id, conn=db_conn)
-    log.debug("group:{} current-occupancy: {}", sess_ctx.group_id, group_occupied)
-    log.debug("group:{} total-allowed: {}", sess_ctx.group_id, total_group_allowed)
-    if not (group_occupied + sess_ctx.requested_slots <= total_group_allowed):
+    project_occupied = await sched_ctx.registry.get_project_occupancy(
+        sess_ctx.project_id, conn=db_conn
+    )
+    log.debug("project:{} current-occupancy: {}", sess_ctx.project_id, project_occupied)
+    log.debug("project:{} total-allowed: {}", sess_ctx.project_id, total_project_allowed)
+    if not (project_occupied + sess_ctx.requested_slots <= total_project_allowed):
         return PredicateResult(
             False,
-            "Your group resource quota is exceeded. ({})".format(
+            "Your project resource quota is exceeded. ({})".format(
                 " ".join(
                     f"{k}={v}"
-                    for k, v in total_group_allowed.to_humanized(sched_ctx.known_slot_types).items()
+                    for k, v in total_project_allowed.to_humanized(
+                        sched_ctx.known_slot_types
+                    ).items()
                 )
             ),
         )

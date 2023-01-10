@@ -36,10 +36,10 @@ from ..models import (
     RESOURCE_USAGE_KERNEL_STATUSES,
     AgentStatus,
     agents,
-    association_groups_users,
+    association_projects_users,
     domains,
-    groups,
     kernels,
+    projects,
     query_allowed_sgroups,
     resource_presets,
     users,
@@ -133,34 +133,34 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         keypair_occupied = await root_ctx.registry.get_keypair_occupancy(access_key, conn=conn)
         keypair_remaining = keypair_limits - keypair_occupied
 
-        # Check group resource limit and get group_id.
+        # Check project resource limit and get project_id.
         j = sa.join(
-            groups,
-            association_groups_users,
-            association_groups_users.c.group_id == groups.c.id,
+            projects,
+            association_projects_users,
+            association_projects_users.c.project_id == projects.c.id,
         )
         query = (
-            sa.select([groups.c.id, groups.c.total_resource_slots])
+            sa.select([projects.c.id, projects.c.total_resource_slots])
             .select_from(j)
             .where(
-                (association_groups_users.c.user_id == request["user"]["uuid"])
-                & (groups.c.name == params["group"])
+                (association_projects_users.c.user_id == request["user"]["uuid"])
+                & (projects.c.name == params["group"])
                 & (domains.c.name == domain_name),
             )
         )
         result = await conn.execute(query)
         row = result.first()
-        group_id = row["id"]
-        group_resource_slots = row["total_resource_slots"]
-        if group_id is None:
-            raise InvalidAPIParameters("Unknown user group")
-        group_resource_policy = {
-            "total_resource_slots": group_resource_slots,
+        project_id = row["id"]
+        project_resource_slots = row["total_resource_slots"]
+        if project_id is None:
+            raise InvalidAPIParameters("Unknown user project")
+        project_resource_policy = {
+            "total_resource_slots": project_resource_slots,
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
-        group_limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
-        group_occupied = await root_ctx.registry.get_group_occupancy(group_id, conn=conn)
-        group_remaining = group_limits - group_occupied
+        project_limits = ResourceSlot.from_policy(project_resource_policy, known_slot_types)
+        project_occupied = await root_ctx.registry.get_project_occupancy(project_id, conn=conn)
+        project_remaining = project_limits - project_occupied
 
         # Check domain resource limit.
         query = sa.select([domains.c.total_resource_slots]).where(domains.c.name == domain_name)
@@ -178,12 +178,12 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         for slot in known_slot_types:
             keypair_remaining[slot] = min(
                 keypair_remaining[slot],
-                group_remaining[slot],
+                project_remaining[slot],
                 domain_remaining[slot],
             )
 
         # Prepare per scaling group resource.
-        sgroups = await query_allowed_sgroups(conn, domain_name, group_id, access_key)
+        sgroups = await query_allowed_sgroups(conn, domain_name, project_id, access_key)
         sgroup_names = [sg.name for sg in sgroups]
         if params["scaling_group"] is not None:
             if params["scaling_group"] not in sgroup_names:
@@ -259,22 +259,22 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                 }
             )
 
-        # Return group resource status as NaN if not allowed.
-        group_resource_visibility = await root_ctx.shared_config.get_raw(
-            "config/api/resources/group_resource_visibility"
+        # Return project resource status as NaN if not allowed.
+        project_resource_visibility = await root_ctx.shared_config.get_raw(
+            "config/api/resources/project_resource_visibility"
         )
-        group_resource_visibility = t.ToBool().check(group_resource_visibility)
-        if not group_resource_visibility:
-            group_limits = ResourceSlot({k: Decimal("NaN") for k in known_slot_types.keys()})
-            group_occupied = ResourceSlot({k: Decimal("NaN") for k in known_slot_types.keys()})
-            group_remaining = ResourceSlot({k: Decimal("NaN") for k in known_slot_types.keys()})
+        project_resource_visibility = t.ToBool().check(project_resource_visibility)
+        if not project_resource_visibility:
+            project_limits = ResourceSlot({k: Decimal("NaN") for k in known_slot_types.keys()})
+            project_occupied = ResourceSlot({k: Decimal("NaN") for k in known_slot_types.keys()})
+            project_remaining = ResourceSlot({k: Decimal("NaN") for k in known_slot_types.keys()})
 
         resp["keypair_limits"] = keypair_limits.to_json()
         resp["keypair_using"] = keypair_occupied.to_json()
         resp["keypair_remaining"] = keypair_remaining.to_json()
-        resp["group_limits"] = group_limits.to_json()
-        resp["group_using"] = group_occupied.to_json()
-        resp["group_remaining"] = group_remaining.to_json()
+        resp["group_limits"] = project_limits.to_json()
+        resp["group_using"] = project_occupied.to_json()
+        resp["group_remaining"] = project_remaining.to_json()
         resp["scaling_group_remaining"] = sgroup_remaining.to_json()
         resp["scaling_groups"] = per_sgroup
     return web.json_response(resp, status=200)
@@ -296,11 +296,11 @@ async def recalculate_usage(request: web.Request) -> web.Response:
 
 
 async def get_container_stats_for_period(
-    request: web.Request, start_date, end_date, group_ids=None
+    request: web.Request, start_date, end_date, project_ids=None
 ):
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin_readonly() as conn:
-        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
+        j = kernels.join(projects, projects.c.id == kernels.c.project_id).join(
             users, users.c.uuid == kernels.c.user_uuid
         )
         query = (
@@ -313,7 +313,7 @@ async def get_container_stats_for_period(
                     kernels.c.access_key,
                     kernels.c.agent,
                     kernels.c.domain_name,
-                    kernels.c.group_id,
+                    kernels.c.project_id,
                     kernels.c.attached_devices,
                     kernels.c.occupied_slots,
                     kernels.c.resource_opts,
@@ -327,7 +327,7 @@ async def get_container_stats_for_period(
                     kernels.c.created_at,
                     kernels.c.terminated_at,
                     kernels.c.cluster_mode,
-                    groups.c.name,
+                    projects.c.name,
                     users.c.email,
                 ]
             )
@@ -345,8 +345,8 @@ async def get_container_stats_for_period(
             )
             .order_by(sa.asc(kernels.c.terminated_at))
         )
-        if group_ids:
-            query = query.where(kernels.c.group_id.in_(group_ids))
+        if project_ids:
+            query = query.where(kernels.c.project_id.in_(project_ids))
         result = await conn.execute(query)
         rows = result.fetchall()
 
@@ -358,11 +358,11 @@ async def get_container_stats_for_period(
 
     raw_stats = await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
 
-    objs_per_group = {}
+    objs_per_project = {}
     local_tz = root_ctx.shared_config["system"]["timezone"]
 
     for row, raw_stat in zip(rows, raw_stats):
-        group_id = str(row["group_id"])
+        project_id = str(row["project_id"])
         last_stat = row["last_stat"]
         if not last_stat:
             if raw_stat is None:
@@ -404,8 +404,8 @@ async def get_container_stats_for_period(
             "session_id": str(row["session_id"]),
             "container_id": row["container_id"],
             "domain_name": row["domain_name"],
-            "group_id": str(row["group_id"]),
-            "group_name": row["name"],
+            "project_id": str(row["project_id"]),
+            "project_name": row["name"],
             "name": row["session_name"],
             "access_key": row["access_key"],
             "email": row["email"],
@@ -435,11 +435,11 @@ async def get_container_stats_for_period(
             "status_history": row["status_history"] or {},
             "cluster_mode": row["cluster_mode"],
         }
-        if group_id not in objs_per_group:
-            objs_per_group[group_id] = {
+        if project_id not in objs_per_project:
+            objs_per_project[project_id] = {
                 "domain_name": row["domain_name"],
-                "g_id": group_id,
-                "g_name": row["name"],  # this is group's name
+                "g_id": project_id,
+                "g_name": row["name"],  # this is project's name
                 "g_cpu_allocated": c_info["cpu_allocated"],
                 "g_cpu_used": c_info["cpu_used"],
                 "g_mem_allocated": c_info["mem_allocated"],
@@ -456,25 +456,25 @@ async def get_container_stats_for_period(
                 "c_infos": [c_info],
             }
         else:
-            objs_per_group[group_id]["g_cpu_allocated"] += c_info["cpu_allocated"]
-            objs_per_group[group_id]["g_cpu_used"] += c_info["cpu_used"]
-            objs_per_group[group_id]["g_mem_allocated"] += c_info["mem_allocated"]
-            objs_per_group[group_id]["g_mem_used"] += c_info["mem_used"]
-            objs_per_group[group_id]["g_shared_memory"] += c_info["shared_memory"]
-            objs_per_group[group_id]["g_disk_allocated"] += c_info["disk_allocated"]
-            objs_per_group[group_id]["g_disk_used"] += c_info["disk_used"]
-            objs_per_group[group_id]["g_io_read"] += c_info["io_read"]
-            objs_per_group[group_id]["g_io_write"] += c_info["io_write"]
+            objs_per_project[project_id]["g_cpu_allocated"] += c_info["cpu_allocated"]
+            objs_per_project[project_id]["g_cpu_used"] += c_info["cpu_used"]
+            objs_per_project[project_id]["g_mem_allocated"] += c_info["mem_allocated"]
+            objs_per_project[project_id]["g_mem_used"] += c_info["mem_used"]
+            objs_per_project[project_id]["g_shared_memory"] += c_info["shared_memory"]
+            objs_per_project[project_id]["g_disk_allocated"] += c_info["disk_allocated"]
+            objs_per_project[project_id]["g_disk_used"] += c_info["disk_used"]
+            objs_per_project[project_id]["g_io_read"] += c_info["io_read"]
+            objs_per_project[project_id]["g_io_write"] += c_info["io_write"]
             for device in c_info["device_type"]:
-                if device not in objs_per_group[group_id]["g_device_type"]:
-                    g_dev_type = objs_per_group[group_id]["g_device_type"]
+                if device not in objs_per_project[project_id]["g_device_type"]:
+                    g_dev_type = objs_per_project[project_id]["g_device_type"]
                     g_dev_type.append(device)
-                    objs_per_group[group_id]["g_device_type"] = list(set(g_dev_type))
-            objs_per_group[group_id]["g_smp"] += c_info["smp"]
-            objs_per_group[group_id]["g_gpu_mem_allocated"] += c_info["gpu_mem_allocated"]
-            objs_per_group[group_id]["g_gpu_allocated"] += c_info["gpu_allocated"]
-            objs_per_group[group_id]["c_infos"].append(c_info)
-    return list(objs_per_group.values())
+                    objs_per_project[project_id]["g_device_type"] = list(set(g_dev_type))
+            objs_per_project[project_id]["g_smp"] += c_info["smp"]
+            objs_per_project[project_id]["g_gpu_mem_allocated"] += c_info["gpu_mem_allocated"]
+            objs_per_project[project_id]["g_gpu_allocated"] += c_info["gpu_allocated"]
+            objs_per_project[project_id]["c_infos"].append(c_info)
+    return list(objs_per_project.values())
 
 
 @server_status_required(READ_ALLOWED)
@@ -532,7 +532,7 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     :param end_date str: "yyyymmdd" format.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    group_id = params["group_id"]
+    project_id = params["group_id"]
     local_tz = root_ctx.shared_config["system"]["timezone"]
     try:
         start_date = datetime.strptime(params["start_date"], "%Y%m%d").replace(tzinfo=local_tz)
@@ -544,9 +544,11 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
         raise InvalidAPIParameters(extra_msg="Invalid date values")
     if end_date <= start_date:
         raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
-    log.info("USAGE_PER_MONTH (g:{}, start_date:{}, end_date:{})", group_id, start_date, end_date)
-    group_ids = [group_id] if group_id is not None else None
-    resp = await get_container_stats_for_period(request, start_date, end_date, group_ids=group_ids)
+    log.info("USAGE_PER_MONTH (g:{}, start_date:{}, end_date:{})", project_id, start_date, end_date)
+    project_ids = [project_id] if project_id is not None else None
+    resp = await get_container_stats_for_period(
+        request, start_date, end_date, project_ids=project_ids
+    )
     log.debug("container list are retrieved from {0} to {1}", start_date, end_date)
     return web.json_response(resp, status=200)
 
