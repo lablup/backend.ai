@@ -766,6 +766,7 @@ configure_backendai() {
   sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
   sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
   sed_inplace "s/^weka_/# weka_/" ./storage-proxy.toml
+  sed_inplace "s/^gpfs_/# gpfs_/" ./storage-proxy.toml
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
