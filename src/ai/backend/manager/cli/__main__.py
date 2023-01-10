@@ -23,7 +23,6 @@ from .context import CLIContext, init_logger, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
-
 @click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
     "-f",
@@ -34,12 +33,12 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
     help="The config file path. (default: ./manager.conf and /etc/backend.ai/manager.conf)",
 )
 @click.option(
-    "--debug",
-    is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    "--log-level",
+    default="info",
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx, config_path, debug):
+def main(ctx, config_path, log_level):
     """
     Manager Administration CLI
     """
@@ -49,6 +48,7 @@ def main(ctx, config_path, debug):
         logger=init_logger(local_config),
         local_config=local_config,
     )
+
 
 
 @main.command(
