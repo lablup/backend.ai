@@ -16,6 +16,14 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.8 (2023-01-10)
+
+Ai.Backend.Manager 22.09.8 (2023-01-10)
+
+### Features
+* Support setting the `use_host_network` option of scaling group in the client-py. ([#941](https://github.com/lablup/backend.ai/issues/941))
+
+
 ## 22.09.7 (2023-01-09)
 
 Ai.Backend.Manager 22.09.7 (2023-01-09)
