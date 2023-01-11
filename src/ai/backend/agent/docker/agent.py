@@ -1502,6 +1502,22 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 exit_code=exit_code,
             )
 
+        async def handle_action_pause(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
+            await self.inject_container_lifecycle_event(
+                kernel_id,
+                LifecycleEvent.PAUSE,
+                KernelLifecycleEventReason.UNKNOWN,
+                container_id=ContainerId(evdata["Actor"]["ID"]),
+            )
+
+        async def handle_action_unpause(kernel_id: KernelId, evdata: Mapping[str, Any]) -> None:
+            await self.inject_container_lifecycle_event(
+                kernel_id,
+                LifecycleEvent.UNPAUSE,
+                KernelLifecycleEventReason.UNKNOWN,
+                container_id=ContainerId(evdata["Actor"]["ID"]),
+            )
+
         while True:
             async with closing_async(Docker()) as docker:
                 subscriber = docker.events.subscribe(create_task=True)
@@ -1532,18 +1548,35 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                     evdata["Action"],
                                     evdata["Actor"],
                                 )
-                            if evdata["Action"] == "start":
-                                await asyncio.shield(
-                                    self.docker_ptask_group.create_task(
-                                        handle_action_start(kernel_id, evdata),
+                            match evdata["Action"]:
+                                case "start":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_start(kernel_id, evdata),
+                                        )
                                     )
-                                )
-                            elif evdata["Action"] == "die":
-                                await asyncio.shield(
-                                    self.docker_ptask_group.create_task(
-                                        handle_action_die(kernel_id, evdata),
+                                    break
+                                case "die":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_die(kernel_id, evdata),
+                                        )
                                     )
-                                )
+                                    break
+                                case "pause":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_pause(kernel_id, evdata),
+                                        )
+                                    )
+                                    break
+                                case "unpause":
+                                    await asyncio.shield(
+                                        self.docker_ptask_group.create_task(
+                                            handle_action_unpause(kernel_id, evdata),
+                                        )
+                                    )
+                                    break
                         except asyncio.CancelledError:
                             # We are shutting down...
                             return

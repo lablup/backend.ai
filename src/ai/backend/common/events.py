@@ -336,6 +336,10 @@ class KernelPausedEvent(KernelTerminationEventArgs, AbstractEvent):
     name = "kernel_paused"
 
 
+class KernelUnpausedEvent(KernelTerminationEventArgs, AbstractEvent):
+    name = "kernel_unpaused"
+
+
 @attrs.define(slots=True, frozen=True)
 class SessionCreationEventArgs:
     session_id: SessionId = attrs.field()
