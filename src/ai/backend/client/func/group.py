@@ -1,11 +1,11 @@
 import textwrap
-from typing import Iterable, Sequence
+from typing import Iterable, Optional, Sequence
 
 from ai.backend.client.output.fields import group_fields
 from ai.backend.client.output.types import FieldSpec
 
 from ..session import api_session
-from .base import BaseFunction, api_function
+from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("Group",)
 
@@ -46,7 +46,7 @@ class Group(BaseFunction):
         cls,
         name: str,
         *,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec | str] = None,
         domain_name: str = None,
     ) -> Sequence[dict]:
         """
@@ -58,8 +58,6 @@ class Group(BaseFunction):
         :param domain_name: Name of domain to get groups from.
         :param fields: Per-group query fields to fetch.
         """
-        if fields is None:
-            fields = _default_detail_fields
         query = textwrap.dedent(
             """\
             query($name: String!, $domain_name: String) {
@@ -67,7 +65,8 @@ class Group(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        resolved_fields = resolve_fields(fields, group_fields, _default_detail_fields)
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "domain_name": domain_name,
@@ -137,17 +136,15 @@ class Group(BaseFunction):
         name: str,
         description: str = "",
         is_active: bool = True,
-        total_resource_slots: str = None,
-        allowed_vfolder_hosts: Iterable[str] = None,
+        total_resource_slots: Optional[str] = None,
+        allowed_vfolder_hosts: Optional[str] = None,
         integration_id: str = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new group with the given options.
         You need an admin privilege for this operation.
         """
-        if fields is None:
-            fields = ("id", "domain_name", "name")
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: GroupInput!) {
@@ -157,7 +154,12 @@ class Group(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        resolved_fields = resolve_fields(
+            fields,
+            group_fields,
+            (group_fields["id"], group_fields["domain_name"], group_fields["name"]),
+        )
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "input": {
@@ -180,10 +182,10 @@ class Group(BaseFunction):
         name: str = None,
         description: str = None,
         is_active: bool = None,
-        total_resource_slots: str = None,
-        allowed_vfolder_hosts: Iterable[str] = None,
+        total_resource_slots: Optional[str] = None,
+        allowed_vfolder_hosts: Optional[str] = None,
         integration_id: str = None,
-        fields: Iterable[str] = None,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Update existing group.
@@ -253,7 +255,7 @@ class Group(BaseFunction):
     @api_function
     @classmethod
     async def add_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[str] = None
+        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
     ) -> dict:
         """
         Add users to a group.
@@ -281,7 +283,7 @@ class Group(BaseFunction):
     @api_function
     @classmethod
     async def remove_users(
-        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[str] = None
+        cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
     ) -> dict:
         """
         Remove users from a group.

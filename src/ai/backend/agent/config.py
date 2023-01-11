@@ -5,6 +5,7 @@ import trafaret as t
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 
+from .affinity_map import AffinityPolicy
 from .stats import StatModes
 from .types import AgentBackend
 
@@ -24,7 +25,7 @@ agent_local_config_iv = (
                     t.Key("rpc-listen-addr", default=("", 6001)): tx.HostPortPair(
                         allow_blank_host=True
                     ),
-                    t.Key("agent-sock-port", default=6007): t.Int[1024:65535],
+                    t.Key("agent-sock-port", default=6007): t.ToInt[1024:65535],
                     t.Key("id", default=None): t.Null | t.String,
                     t.Key("ipc-base-path", default="/tmp/backend.ai/ipc"): tx.Path(
                         type="dir", auto_create=True
@@ -40,13 +41,16 @@ agent_local_config_iv = (
                     ),
                     t.Key("event-loop", default="asyncio"): t.Enum("asyncio", "uvloop"),
                     t.Key("skip-manager-detection", default=False): t.ToBool,
-                    t.Key("aiomonitor-port", default=50002): t.Int[1:65535],
+                    t.Key("aiomonitor-port", default=48200): t.ToInt[1:65535],
+                    t.Key("metadata-server-port", default=40128): t.ToInt[1:65535],
                     t.Key("allow-compute-plugins", default=None): t.Null | tx.ToSet,
+                    t.Key("block-compute-plugins", default=None): t.Null | tx.ToSet,
                     t.Key("image-commit-path", default="./tmp/backend.ai/commit"): tx.Path(
                         type="dir", auto_create=True
                     ),
                     t.Key("abuse-report-path", default=None): t.Null
                     | tx.Path(type="dir", allow_nonexisting=True),
+                    t.Key("force-terminate-abusing-containers", default=False): t.ToBool,
                 }
             ).allow_extra("*"),
             t.Key("container"): t.Dict(
@@ -67,6 +71,7 @@ agent_local_config_iv = (
                     t.Key("scratch-size", default="0"): tx.BinarySize,
                     t.Key("scratch-nfs-address", default=None): t.Null | t.String,
                     t.Key("scratch-nfs-options", default=None): t.Null | t.String,
+                    t.Key("alternative-bridge", default=None): t.Null | t.String,
                 }
             ).allow_extra("*"),
             t.Key("logging"): t.Any,  # checked in ai.backend.common.logging
@@ -75,21 +80,31 @@ agent_local_config_iv = (
                     t.Key("reserved-cpu", default=1): t.Int,
                     t.Key("reserved-mem", default="1G"): tx.BinarySize,
                     t.Key("reserved-disk", default="8G"): tx.BinarySize,
+                    t.Key(
+                        "allocation-order", default=["cuda", "rocm", "tpu", "cpu", "mem"]
+                    ): t.List(t.String),
+                    t.Key("affinity-policy", default=AffinityPolicy.INTERLEAVED.name): tx.Enum(
+                        AffinityPolicy,
+                        use_name=True,
+                    ),
                 }
             ).allow_extra("*"),
             t.Key("debug"): t.Dict(
                 {
-                    t.Key("enabled", default=False): t.Bool,
-                    t.Key("skip-container-deletion", default=False): t.Bool,
-                    t.Key("log-stats", default=False): t.Bool,
-                    t.Key("log-kernel-config", default=False): t.Bool,
-                    t.Key("log-alloc-map", default=False): t.Bool,
-                    t.Key("log-events", default=False): t.Bool,
-                    t.Key("log-heartbeats", default=False): t.Bool,
-                    t.Key("log-docker-events", default=False): t.Bool,
+                    t.Key("enabled", default=False): t.ToBool,
+                    t.Key("asyncio", default=False): t.ToBool,
+                    t.Key("kernel-runner", default=False): t.ToBool,
+                    t.Key("enhanced-aiomonitor-task-info", default=False): t.ToBool,
+                    t.Key("skip-container-deletion", default=False): t.ToBool,
+                    t.Key("log-stats", default=False): t.ToBool,
+                    t.Key("log-kernel-config", default=False): t.ToBool,
+                    t.Key("log-alloc-map", default=False): t.ToBool,
+                    t.Key("log-events", default=False): t.ToBool,
+                    t.Key("log-heartbeats", default=False): t.ToBool,
+                    t.Key("log-docker-events", default=False): t.ToBool,
                     t.Key("coredump", default=coredump_defaults): t.Dict(
                         {
-                            t.Key("enabled", default=coredump_defaults["enabled"]): t.Bool,
+                            t.Key("enabled", default=coredump_defaults["enabled"]): t.ToBool,
                             t.Key("path", default=coredump_defaults["path"]): tx.Path(
                                 type="dir", auto_create=True
                             ),
@@ -113,7 +128,7 @@ docker_extra_config_iv = t.Dict(
     {
         t.Key("container"): t.Dict(
             {
-                t.Key("swarm-enabled", default=False): t.Bool,
+                t.Key("swarm-enabled", default=False): t.ToBool,
             }
         ).allow_extra("*"),
     }

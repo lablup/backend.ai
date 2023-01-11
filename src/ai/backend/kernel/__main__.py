@@ -42,6 +42,7 @@ def main(args) -> None:
         runner._init(args),
         runner._shutdown(),
         stop_signals={signal.SIGINT, signal.SIGTERM},
+        debug=args.debug,
     )
 
 

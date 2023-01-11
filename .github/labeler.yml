@@ -1,0 +1,55 @@
+require:db-migration:
+- any: ['src/ai/backend/manager/alembic/versions/*.py']
+
+docs:
+- any: ['docs/**/*']
+
+storage-proxy:
+- any: ['src/ai/backend/storage/**/*.py']
+
+agent:
+- any: [
+    'src/ai/backend/agent/**/*.py',
+    'src/ai/backend/kernel/**/*.py',
+    'src/ai/backend/runner/**/*.py',
+    'src/ai/backend/helpers/**/*.py',
+  ]
+
+manager:
+- any: ['src/ai/backend/manager/**/*.py']
+
+common:
+- any: [
+    'src/ai/backend/common/**/*.py',
+    'src/ai/backend/plugin/**/*.py',
+  ]
+
+client:
+- any: [
+    'src/ai/backend/client/**/*.py',
+  ]
+
+cli:
+- any: [
+    'src/ai/backend/cli/**/*.py',
+    'src/ai/backend/client/cli/**/*.py',
+    'src/ai/backend/manager/cli/**/*.py',
+    'src/ai/backend/agent/cli/**/*.py',
+  ]
+
+webserver:
+- any: [
+    'src/ai/backend/web/**/*.py',
+  ]
+
+webui:
+- any: [
+    'src/ai/backend/web/static',
+  ]
+
+installer:
+- any: [
+    'scripts/install-dev.sh',
+    'scripts/delete-dev.sh',
+    'tools/pants-plugins/**/*',
+  ]

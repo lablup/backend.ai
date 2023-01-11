@@ -12,22 +12,12 @@ on:
 jobs:
   test-coverage:
     if: ${{ contains(fromJson('["schedule", "workflow_dispatch"]'), github.event_name) || (!contains(github.event.pull_request.labels.*.name, 'skip:ci') && github.event.pull_request.merged == true) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
         submodules: true
-    - name: Apply cache for Pants
-      uses: actions/cache@v3
-      id: cache
-      with:
-        # pants-specific cache
-        path: |
-          ~/.cache/pants/setup
-          ~/.cache/pants/lmdb_store
-          ~/.cache/pants/named_caches
-        key: ${{ runner.os }}-${{ hashFiles('pants*.toml', '**/*.lock') }}-
     - name: Create LFS file hash list
       run: git lfs ls-files -l | cut -d ' ' -f1 | sort > .lfs-assets-id
     - name: Restore LFS cache
@@ -38,18 +28,34 @@ jobs:
           key: lfs-${{ hashFiles('.lfs-assets-id') }}
     - name: Git LFS Pull
       run: git lfs pull
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: "3.10.5"
-        cache: pip
-    - name: Bootstrap Pants
+    - name: Extract Python version from pants.toml
       run: |
-        mkdir .tmp
-        ./pants --no-verify-config version
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python for Pants
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
+    - name: Prepare cache dir for Pants
+      run: mkdir -p .tmp
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v2
+      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
+      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
+      with:
+        pants-python-version: "3.9"
+        gha-cache-key: pants-cache0-py${{ env.PROJECT_PYTHON_VERSION }}
+        named-caches-hash: ${{ hashFiles('*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
     - name: Run the full test suite
       run: |
-        ./pants test --use-coverage tests::
+        ./pants test --use-coverage tests:: -- -m 'not integration'
     - name: Upload coverage report
       uses: codecov/codecov-action@v3
     - name: Upload pants log

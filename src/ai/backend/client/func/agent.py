@@ -35,6 +35,7 @@ _default_detail_fields = (
     agent_fields["mem_cur_bytes"],
     agent_fields["available_slots"],
     agent_fields["occupied_slots"],
+    agent_fields["local_config"],
 )
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import importlib
+import json
 import logging
 import logging.config
 import os
@@ -24,6 +25,7 @@ from typing import (
     Dict,
     Literal,
     Mapping,
+    Optional,
     Sequence,
     Set,
     Tuple,
@@ -46,7 +48,7 @@ from trafaret.dataerror import DataError as TrafaretDataError
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events import EventProducer
+from ai.backend.common.events import EventProducer, KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.types import (
     ClusterInfo,
@@ -395,6 +397,8 @@ class AgentRPCServer(aobject):
                 "container_id": result["container_id"],
                 "resource_spec": result["resource_spec"],
                 "attached_devices": result["attached_devices"],
+                "agent_addr": result["agent_addr"],
+                "scaling_group": result["scaling_group"],
             }
             for result in results
         ]
@@ -405,7 +409,7 @@ class AgentRPCServer(aobject):
     async def destroy_kernel(
         self,
         kernel_id: str,
-        reason: str = None,
+        reason: Optional[KernelLifecycleEventReason] = None,
         suppress_events: bool = False,
     ):
         loop = asyncio.get_running_loop()
@@ -414,7 +418,7 @@ class AgentRPCServer(aobject):
         await self.agent.inject_container_lifecycle_event(
             KernelId(UUID(kernel_id)),
             LifecycleEvent.DESTROY,
-            reason or "user-requested",
+            reason or KernelLifecycleEventReason.USER_REQUESTED,
             done_future=done,
             suppress_events=suppress_events,
         )
@@ -515,25 +519,18 @@ class AgentRPCServer(aobject):
         log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
         return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts)
 
-    def _get_commit_path(self, kernel_id: str, additional_path: str) -> Tuple[Path, Path]:
-        image_commit_path: Path = self.local_config["agent"]["image-commit-path"]
-        commit_path = image_commit_path / additional_path
-        lock_path = commit_path / "lock" / kernel_id
-        return commit_path, lock_path
-
     @rpc_function
     @collect_error
     async def get_commit_status(
         self,
         kernel_id,  # type: str
-        email,  # type: str
+        subdir,  # type: str
     ):
         # Only this function logs debug since web sends request at short intervals
         log.debug("rpc::get_commit_status(k:{})", kernel_id)
-        _, lock_path = self._get_commit_path(kernel_id, email)
         status: CommitStatus = await self.agent.get_commit_status(
             KernelId(UUID(kernel_id)),
-            lock_path,
+            subdir,
         )
         return {
             "kernel": kernel_id,
@@ -545,24 +542,51 @@ class AgentRPCServer(aobject):
     async def commit(
         self,
         kernel_id,  # type: str
-        email,  # type: str
+        subdir,  # type: str
         filename,  # type: str
     ):
-        commit_path, lock_path = self._get_commit_path(kernel_id, email)
         log.info("rpc::commit(k:{})", kernel_id)
         bgtask_mgr = self.local_config["background_task_manager"]
         task_id = await bgtask_mgr.start(
             self.agent.commit,
             kernel_id=KernelId(UUID(kernel_id)),
-            path=commit_path,
-            lock_path=lock_path,
+            subdir=subdir,
             filename=filename,
         )
         return {
             "bgtask_id": str(task_id),
             "kernel": kernel_id,
-            "path": str(commit_path / filename),
+            "path": str(Path(subdir, filename)),
         }
+
+    @rpc_function
+    @collect_error
+    async def get_local_config(self) -> Mapping[str, Any]:
+        agent_config: Mapping[str, Any] = self.local_config["agent"]
+        report_path: Path | None = agent_config.get("abuse-report-path")
+        return {
+            "agent": {
+                "abuse-report-path": str(report_path) if report_path is not None else "",
+            },
+            "watcher": self.local_config["watcher"],
+        }
+
+    @rpc_function
+    @collect_error
+    async def get_abusing_report(
+        self,
+        kernel_id,  # type: str
+    ) -> Mapping[str, str] | None:
+        if (abuse_path := self.local_config["agent"].get("abuse-report-path")) is not None:
+            report_path = Path(abuse_path, f"report.{kernel_id}.json")
+            if report_path.is_file():
+
+                def _read_file():
+                    with open(report_path, "r") as file:
+                        return json.load(file)
+
+                return await self.loop.run_in_executor(None, _read_file)
+        return None
 
     @rpc_function
     @collect_error
@@ -585,6 +609,12 @@ class AgentRPCServer(aobject):
     async def download_file(self, kernel_id: str, filepath: str):
         log.info("rpc::download_file(k:{0}, fn:{1})", kernel_id, filepath)
         return await self.agent.download_file(KernelId(UUID(kernel_id)), filepath)
+
+    @rpc_function
+    @collect_error
+    async def download_single(self, kernel_id: str, filepath: str):
+        log.info("rpc::download_single(k:{0}, fn:{1})", kernel_id, filepath)
+        return await self.agent.download_single(KernelId(UUID(kernel_id)), filepath)
 
     @rpc_function
     @collect_error
@@ -638,6 +668,18 @@ class AgentRPCServer(aobject):
                 log.exception("reset: destroying {0}", kernel_id)
         await asyncio.gather(*tasks)
 
+    @rpc_function
+    @collect_error
+    async def assign_port(self):
+        log.debug("rpc::assign_port()")
+        return self.agent.port_pool.pop()
+
+    @rpc_function
+    @collect_error
+    async def release_port(self, port_no: int):
+        log.debug("rpc::release_port(port_no:{})", port_no)
+        self.agent.port_pool.add(port_no)
+
 
 @aiotools.server
 async def server_main_logwrapper(
@@ -660,6 +702,24 @@ async def server_main(
     _args: Tuple[Any, ...],
 ) -> AsyncGenerator[None, signal.Signals]:
     local_config = _args[0]
+
+    # Start aiomonitor.
+    # Port is set by config (default=50200).
+    loop.set_debug(local_config["debug"]["asyncio"])
+    monitor = aiomonitor.Monitor(
+        loop,
+        port=local_config["agent"]["aiomonitor-port"],
+        console_enabled=False,
+        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
+    )
+    monitor.prompt = "monitor (agent) >>> "
+    monitor.console_locals["local_config"] = local_config
+    aiomon_started = False
+    try:
+        monitor.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     log.info("Preparing kernel runner environments...")
     kernel_mod = importlib.import_module(
@@ -735,16 +795,6 @@ async def server_main(
     # Pre-load compute plugin configurations.
     local_config["plugins"] = await etcd.get_prefix_dict("config/plugins/accelerator")
 
-    # Start aiomonitor.
-    # Port is set by config (default=50002).
-    monitor = aiomonitor.Monitor(
-        loop,
-        port=local_config["agent"]["aiomonitor-port"],
-        console_enabled=False,
-    )
-    monitor.prompt = "monitor (agent) >>> "
-    monitor.start()
-
     # Start RPC server.
     global agent_instance
     agent = await AgentRPCServer.new(
@@ -753,6 +803,7 @@ async def server_main(
         skip_detect_manager=local_config["agent"]["skip-manager-detection"],
     )
     agent_instance = agent
+    monitor.console_locals["agent"] = agent
 
     # Run!
     try:
@@ -760,7 +811,8 @@ async def server_main(
             stop_signal = yield
             agent.mark_stop_signal(stop_signal)
     finally:
-        monitor.close()
+        if aiomon_started:
+            monitor.close()
 
 
 @click.group(invoke_without_command=True)

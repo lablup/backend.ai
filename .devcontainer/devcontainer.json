@@ -1,7 +1,40 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.187.0/containers/ubuntu
 {
-	"name": "Ubuntu",
-	"postCreateCommand": "bash /workspaces/backend.ai/.devcontainer/bootstrap.sh",
-	"forwardPorts": [6022, 8090, 8091]
+  "name": "Ubuntu",
+  "onCreateCommand": "cd /workspaces/backend.ai && bash /workspaces/backend.ai/scripts/install-dev.sh --codespaces-on-create",
+  "postCreateCommand": "cd /workspaces/backend.ai && bash /workspaces/backend.ai/scripts/install-dev.sh --codespaces-post-create",
+  "forwardPorts": [
+    6022, // storage-proxy
+    8090, // webserver
+    8091, // manager API
+    // wsproxy ports
+    10200,
+    10201,
+    10202,
+    10203,
+    10204,
+    10205,
+    10206,
+    10207,
+    10208,
+    10209
+  ],
+  "customizations": {
+    "codespaces": {
+      "repositories": {
+        "lablup/backend.ai-webui": {
+          "permissions": {
+            "actions": "read",
+            "checks": "read",
+            "contents": "write",
+            "packages": "read",
+            "pull_requests": "write",
+            "statuses": "read",
+            "issues": "read"
+          }
+        }
+      }
+    }
+  }
 }

@@ -33,7 +33,7 @@ from typing import (
 from urllib.parse import quote as _quote
 from urllib.parse import unquote
 
-import grpc
+import grpc  # pants: no-infer-dep (etcetra)
 import trafaret as t
 from etcetra import EtcdCommunicator, WatchEvent
 from etcetra.client import EtcdClient, EtcdTransactionAction

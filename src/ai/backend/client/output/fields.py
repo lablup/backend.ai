@@ -58,6 +58,7 @@ agent_fields = FieldSet(
         FieldSpec(
             "compute_containers", subfields=container_fields, formatter=ContainerListFormatter()
         ),
+        FieldSpec("local_config", formatter=nested_dict_formatter),
         # legacy fields
         FieldSpec("cpu_cur_pct", "CPU Usage (%)"),
         FieldSpec("mem_cur_bytes", "Used Memory (MiB)", formatter=mibytes_output_formatter),
@@ -157,6 +158,7 @@ scaling_group_fields = FieldSet(
         FieldSpec("driver_opts", formatter=nested_dict_formatter),
         FieldSpec("scheduler"),
         FieldSpec("scheduler_opts", formatter=nested_dict_formatter),
+        FieldSpec("use_host_network"),
     ]
 )
 
@@ -204,6 +206,7 @@ session_fields = FieldSet(
             "dependencies { name id }",
             formatter=DependencyListFormatter(),
         ),
+        FieldSpec("abusing_reports"),
     ]
 )
 
@@ -264,6 +267,7 @@ user_fields = FieldSet(
         FieldSpec("domain_name"),
         FieldSpec("role"),
         FieldSpec("groups { id name }", formatter=GroupListFormatter()),
+        FieldSpec("allowed_client_ip"),
     ]
 )
 
@@ -287,5 +291,11 @@ vfolder_fields = FieldSet(
         FieldSpec("num_files"),
         FieldSpec("cur_size"),
         FieldSpec("cloneable"),
+    ]
+)
+
+permission_fields = FieldSet(
+    [
+        FieldSpec("vfolder_host_permission_list"),
     ]
 )
