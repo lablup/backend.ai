@@ -778,17 +778,17 @@ async def server_main_logwrapper(
     help="The config file path. (default: ./manager.toml and /etc/backend.ai/manager.toml)",
 )
 @click.option(
-    "--debug",
-    is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    "--log-level",
+    default="info",
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, debug: bool) -> None:
+def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
     """
     Start the manager service as a foreground process.
     """
 
-    cfg = load_config(config_path, debug)
+    cfg = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))
