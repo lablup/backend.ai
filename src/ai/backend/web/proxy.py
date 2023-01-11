@@ -8,14 +8,13 @@ import random
 from typing import Optional, Tuple, Union, cast
 
 import aiohttp
-import trafaret as t
 from aiohttp import web
-from aiohttp_session import STORAGE_KEY, get_session
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
+from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 
 from .auth import get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
@@ -26,13 +25,6 @@ HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",
     "Authorization",
 ]
-
-extra_config_headers = t.Dict(
-    {
-        t.Key("X-BackendAI-Version", default=None): t.Null | t.String,
-        t.Key("X-BackendAI-Encoded", default=None): t.Null | t.ToBool,
-    }
-).allow_extra("*")
 
 
 class WebSocketProxy:
@@ -132,7 +124,7 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     request_headers = extra_config_headers.check(request.headers)
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     if secure_context:
-        if not request.content:
+        if not request.can_read_body:  # designated as encrypted but has an empty payload
             request["payload"] = ""
             return await handler(request)
         config = request.app["config"]
@@ -147,13 +139,10 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
             bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(initial_vector, encoding="utf8")
         )
         b64p = base64.b64decode(real_payload)
-        dec = unpad(crypt.decrypt(bytes(b64p)), 16)
-        result = dec.decode("UTF-8")
-        if not result:
-            request["payload"] = ""
-        else:
-            request["payload"] = result
+        request["payload"] = unpad(crypt.decrypt(bytes(b64p)), 16)
     else:
+        # For all other requests without explicit encryption,
+        # let the handler decide how to read the body.
         request["payload"] = ""
     return await handler(request)
 
@@ -167,7 +156,6 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
         api_session = await asyncio.shield(get_api_session(request))
-
     if first_path == "pipeline":
         pipeline_endpoint = request.app["config"]["pipeline"]["endpoint"]
         api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))

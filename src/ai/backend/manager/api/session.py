@@ -35,7 +35,7 @@ from urllib.parse import urlparse
 import aiohttp
 import aiohttp_cors
 import aiotools
-import attr
+import attrs
 import multidict
 import sqlalchemy as sa
 import sqlalchemy.exc
@@ -65,6 +65,7 @@ from ai.backend.common.events import (
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
+    KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
@@ -571,6 +572,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
                             "image_ref": requested_image_ref,
                             "cluster_role": DEFAULT_ROLE,
                             "cluster_idx": 1,
+                            "local_rank": 0,
                             "cluster_hostname": f"{DEFAULT_ROLE}1",
                             "creation_config": params["config"],
                             "bootstrap_script": params["bootstrap_script"],
@@ -1341,7 +1343,7 @@ async def get_commit_status(request: web.Request, params: Mapping[str, Any]) -> 
     except BackendError:
         log.exception("GET_COMMIT_STATUS: exception")
         raise
-    resp = {"stats": status_info["status"], "kernel": status_info["kernel"]}
+    resp = {"status": status_info["status"], "kernel": status_info["kernel"]}
     return web.json_response(resp, status=200)
 
 
@@ -1451,6 +1453,7 @@ async def handle_kernel_creation_lifecycle(
             event.kernel_id, KernelStatus.PREPARING, event.reason
         )
     elif isinstance(event, KernelStartedEvent):
+        await root_ctx.registry.finalize_running(event.creation_info)
         # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
             tracker.set_result(None)
@@ -1522,7 +1525,7 @@ async def handle_destroy_session(
             event.session_id,
         ),
         forced=False,
-        reason=event.reason or "killed-by-event",
+        reason=event.reason or KernelLifecycleEventReason.KILLED_BY_EVENT,
     )
 
 
@@ -1633,7 +1636,7 @@ async def handle_batch_result(
             root_ctx.registry.get_session_by_session_id,
             event.session_id,
         ),
-        reason="task-finished",
+        reason=KernelLifecycleEventReason.TASK_FINISHED,
     )
 
 
@@ -2298,7 +2301,7 @@ async def download_single(request: web.Request, params: Any) -> web.Response:
     )
     try:
         await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
-        result = await root_ctx.registry.download_file(session_name, owner_access_key, file)
+        result = await root_ctx.registry.download_single(session_name, owner_access_key, file)
     except asyncio.CancelledError:
         raise
     except BackendError:
@@ -2467,7 +2470,7 @@ async def get_task_logs(request: web.Request, params: Any) -> web.StreamResponse
     return response
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     session_creation_tracker: Dict[str, asyncio.Event]
     pending_waits: Set[asyncio.Task[None]]

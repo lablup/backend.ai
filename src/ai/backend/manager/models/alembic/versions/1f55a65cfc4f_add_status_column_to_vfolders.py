@@ -18,10 +18,8 @@ down_revision = "35923972eddb"
 branch_labels = None
 depends_on = None
 
-
-vfolderstatus = postgresql.ENUM(
-    "READY", "PERFORMING", "CLONING", "DELETING", "MOUNTED", name="vfolderstatus"
-)
+vfolderstatus_choices = [v.value for v in VFolderOperationStatus]
+vfolderstatus = postgresql.ENUM(*vfolderstatus_choices, name="vfolderstatus")
 
 
 def upgrade():
@@ -30,8 +28,9 @@ def upgrade():
         "vfolders",
         sa.Column(
             "status",
-            EnumValueType(VFolderOperationStatus),
-            default=VFolderOperationStatus.READY,
+            sa.Enum(*vfolderstatus_choices, name="vfolderstatus"),
+            default="ready",
+            server_default="ready",
             nullable=False,
         ),
     )

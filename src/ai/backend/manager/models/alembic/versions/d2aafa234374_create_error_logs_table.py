@@ -8,6 +8,7 @@ Create Date: 2020-02-12 13:55:12.450743
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql import text
 
 from ai.backend.manager.models.base import GUID, IDColumn
 
@@ -45,4 +46,4 @@ def upgrade():
 
 def downgrade():
     op.drop_table("error_logs")
-    op.execute("DROP TYPE errorlog_severity")
+    op.execute(text("DROP TYPE errorlog_severity"))

@@ -9,89 +9,121 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-11 22:50-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
-#: ../../install/install-on-clouds.rst:3 39341191c84642b5bda521c78794138a
+#: ../../install/install-on-clouds.rst:2 eb48e2c81f154b3a86ed4e2d8dca7dd7
 msgid "Install on Clouds"
 msgstr ""
 
-#: ../../install/install-on-clouds.rst:6 b7f998fcbd25403293e6129b4e57a822
-msgid "Prepare the instances and databases."
+#: ../../install/install-on-clouds.rst:4 5d1b878f05384913b0ba113716a17f95
+msgid "The minimal instance configuration:"
 msgstr ""
 
-#: ../../install/install-on-clouds.rst:9 78ac590873244b059a99370921767098
+#: ../../install/install-on-clouds.rst:6 c13f339d30a4435daeee0a605009c78e
+msgid "1x SSL certificate with a private key for your own domain (for production)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:7 a1d4477b990c45828d3a897f611c59f7
+msgid "1x manager instance (e.g., t3.xlarge on AWS)"
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:9 be570e61d2754b0980161181f0396329
 msgid ""
-"1x SSL certificate with a private key for your own domain (for production)"
+"For HA setup, you many replicate multiple manager instances running in "
+"different availability zones and put a load balancer in front of them."
 msgstr ""
 
-#: ../../install/install-on-clouds.rst:10 8f6ea6fda5bd4a3f810fc2a0d32be45f
-msgid "1x gateway instance (e.g., t2.xlarge on AWS)"
-msgstr ""
-
-#: ../../install/install-on-clouds.rst:11 9d1c202dbb6f4c0b9fac571ebab5be8f
+#: ../../install/install-on-clouds.rst:11 82af9b3871644914abe3ed762475be05
 msgid ""
-"1x agent instances (e.g., t2.medium / p2.xlarge on AWS -- for minimal "
+"Nx agent instances (e.g., t3.medium / p2.xlarge on AWS -- for minimal "
 "testing)"
 msgstr ""
 
-#: ../../install/install-on-clouds.rst:12 faad5ef4cc794082a51713c0bd7a4730
+#: ../../install/install-on-clouds.rst:13 c54b224cc38a4a50a78fb3f4d6645a8c
+msgid ""
+"If you spawn multiple agents, it is recommended to use a placement group "
+"to improve locality for each availability zone."
+msgstr ""
+
+#: ../../install/install-on-clouds.rst:15 5cf4d492a0e648f098b137648571bde3
 msgid "1x PostgreSQL instance (e.g., AWS RDS)"
 msgstr ""
 
-#: ../../install/install-on-clouds.rst:13 997cea863eac4b1ea245eeebacde8d0b
+#: ../../install/install-on-clouds.rst:16 0154aa7d23304237ab6db0d22e6511df
 msgid "1x Redis instance (e.g., AWS ElasticCache)"
 msgstr ""
 
-#: ../../install/install-on-clouds.rst:14 5522e9310a3449269cbb16f1f77f2103
+#: ../../install/install-on-clouds.rst:17 44e7ddc3520a49fd80321eeb3db81894
 msgid "1x etcd cluster"
 msgstr ""
 
-#: ../../install/install-on-clouds.rst:16 28804e67be6b4a25a9a73d22497218e9
+#: ../../install/install-on-clouds.rst:19 059f3b987430462288e952603a647c08
 msgid ""
-"It is up to you whether to setup a HA-enabled multi-instance cluster or a "
-"single-instance cluster with storage backups."
+"For HA setup, it should consist of 5 separate instances distributed "
+"across availability zones."
 msgstr ""
 
-#: ../../install/install-on-clouds.rst:17 e9983ef5a4ad4f4d9245931b24ee40ce
-msgid ""
-"Check out [[this page|Install etcd]] for details. If you install etcd on the "
-"same instance where the manager runs, you could try using docker-compose "
-"configuration in this meta-repository's code."
-msgstr ""
-
-#: ../../install/install-on-clouds.rst:19 7bff63c554704e138e6126e58c324493
+#: ../../install/install-on-clouds.rst:21 d0e66baef8904a1eb073fe0bcd0f0803
 msgid "1x cloud file system (e.g., AWS EFS, Azure FileShare)"
 msgstr ""
 
-#: ../../install/install-on-clouds.rst:20 3ea039e3f17f4f5db56bd6a7d809c1da
-msgid "All should be in the same virtual private network."
+#: ../../install/install-on-clouds.rst:22 3c62d36456544fc8b8f3ca4449625680
+msgid "All should be in the same virtual private network (e.g., AWS VPC)."
 msgstr ""
 
-#: ../../install/install-on-clouds.rst:22 b4a2c593336640d6b672317f3112798e
-msgid ":doc:`Install Manager </install/install-manager>`"
-msgstr ""
+#~ msgid "Prepare the instances and databases."
+#~ msgstr ""
 
-#: ../../install/install-on-clouds.rst:24 1b20e5f42c5c4ee799cf0617bc9ea2ab
-msgid "After done, create an image of this instance as a backup."
-msgstr ""
+#~ msgid "1x gateway instance (e.g., t2.xlarge on AWS)"
+#~ msgstr ""
 
-#: ../../install/install-on-clouds.rst:26 04d68253ceda4b419a29e229f1f27629
-msgid ":doc:`Install Agent </install/install-agent>`"
-msgstr ""
+#~ msgid ""
+#~ "1x agent instances (e.g., t2.medium /"
+#~ " p2.xlarge on AWS -- for minimal "
+#~ "testing)"
+#~ msgstr ""
 
-#: ../../install/install-on-clouds.rst:29 f8e2ace744864feb9648d76ccf17d52f
-msgid ""
-"After done, create an image of this instance for ease of manual/autoamtic "
-"scaling."
-msgstr ""
+#~ msgid ""
+#~ "It is up to you whether to "
+#~ "setup a HA-enabled multi-instance "
+#~ "cluster or a single-instance cluster "
+#~ "with storage backups."
+#~ msgstr ""
 
-#: ../../install/install-on-clouds.rst:31 1e18bcea507a4b63aa27409ed7b3a434
-msgid ":doc:`Configure Autoscaling </install/configure-autoscaling>`"
-msgstr ""
+#~ msgid ""
+#~ "Check out [[this page|Install etcd]] for"
+#~ " details. If you install etcd on "
+#~ "the same instance where the manager "
+#~ "runs, you could try using docker-"
+#~ "compose configuration in this meta-"
+#~ "repository's code."
+#~ msgstr ""
+
+#~ msgid "All should be in the same virtual private network."
+#~ msgstr ""
+
+#~ msgid ":doc:`Install Manager </install/install-manager>`"
+#~ msgstr ""
+
+#~ msgid "After done, create an image of this instance as a backup."
+#~ msgstr ""
+
+#~ msgid ":doc:`Install Agent </install/install-agent>`"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "After done, create an image of "
+#~ "this instance for ease of "
+#~ "manual/autoamtic scaling."
+#~ msgstr ""
+
+#~ msgid ":doc:`Configure Autoscaling </install/configure-autoscaling>`"
+#~ msgstr ""
+
