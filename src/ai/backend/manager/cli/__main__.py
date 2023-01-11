@@ -24,7 +24,7 @@ from .context import CLIContext, init_logger, redis_ctx
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
 
-@click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
+@click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
     "-f",
     "--config-path",
