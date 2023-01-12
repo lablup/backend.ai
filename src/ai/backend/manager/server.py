@@ -466,7 +466,7 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def session_hangtime_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from contextlib import suppress
     from datetime import timedelta
-    from typing import Optional, Tuple
+    from uuid import UUID
 
     import sqlalchemy as sa
     from dateutil.tz import tzutc
@@ -477,9 +477,9 @@ async def session_hangtime_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     async def _fetch_kernels_with_status_and_hangtime(
         db: ExtendedAsyncSAEngine,
-        status: Optional[KernelStatus] = None,
-        hangtime: Optional[timedelta] = None,
-    ) -> Tuple[Tuple[str, str, str], ...]:
+        status: KernelStatus | None = None,
+        hangtime: timedelta | None = None,
+    ) -> tuple[UUID, ...]:
         async with db.begin_readonly() as conn:
             query = sa.select(kernels)
             if status:
@@ -502,7 +502,7 @@ async def session_hangtime_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         status: KernelStatus,
         hangtime: timedelta,
         reason: KernelLifecycleEventReason = KernelLifecycleEventReason.HANGTIME_EXCEEDED,
-    ):
+    ) -> None:
         while True:
             session_ids = await _fetch_kernels_with_status_and_hangtime(
                 root_ctx.db, status=status, hangtime=hangtime
