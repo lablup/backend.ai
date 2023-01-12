@@ -36,7 +36,7 @@ from setproctitle import setproctitle
 from ai.backend.common import redis_helper
 from ai.backend.common.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
-from ai.backend.common.events import EventDispatcher, EventProducer
+from ai.backend.common.events import EventDispatcher, EventProducer, KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
@@ -499,7 +499,9 @@ async def session_hangtime_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             return tuple(kernel.session_id for kernel in result.fetchall())
 
     async def _terminate_hanging_sessions(
-        status: KernelStatus, hangtime: timedelta, reason: str = "force-terminated-due-to-hanging"
+        status: KernelStatus,
+        hangtime: timedelta,
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.HANGTIME_EXCEEDED,
     ):
         while True:
             session_ids = await _fetch_kernels_with_status_and_hangtime(
