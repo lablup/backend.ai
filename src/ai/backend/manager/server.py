@@ -455,7 +455,7 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
-async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+async def session_hangtime_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from contextlib import suppress
     from datetime import timedelta
     from typing import Optional, Tuple
@@ -517,9 +517,8 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
 
             await asyncio.sleep(hangtime.seconds)
 
-    force_termination_tasks = []
-    managed_sessions = root_ctx.local_config["manager"]["enabled-session-managing-contexts"]
-    for status, hangtime_fmt in managed_sessions.items():
+    session_force_termination_taks = []
+    for status, hangtime_fmt in root_ctx.local_config["manager"]["max-session-hangtime"].items():
         try:
             kernel_status = KernelStatus[status]
         except KeyError:
@@ -538,7 +537,7 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
                 )
                 continue
 
-        force_termination_tasks.append(
+        session_force_termination_taks.append(
             asyncio.create_task(
                 _terminate_hanging_sessions(status=kernel_status, hangtime=hangtime)
             )
@@ -546,7 +545,7 @@ async def hanging_session_managing_ctx(root_ctx: RootContext) -> AsyncIterator[N
 
     yield
 
-    for task in force_termination_tasks:
+    for task in session_force_termination_taks:
         if not task.done():
             if not task.cancelled():
                 task.cancel()
@@ -703,7 +702,7 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
-            hanging_session_managing_ctx,
+            session_hangtime_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
