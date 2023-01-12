@@ -24,6 +24,7 @@ from ai.backend.common.events import (
     DoScheduleEvent,
     EventDispatcher,
     EventProducer,
+    KernelLifecycleEventReason,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
     SessionPreparingEvent,
@@ -308,7 +309,7 @@ class SchedulerDispatcher(aobject):
                     SessionCancelledEvent(
                         item["session_id"],
                         item["session_creation_id"],
-                        reason="pending timeout",
+                        reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                     ),
                 )
 
@@ -835,7 +836,7 @@ class SchedulerDispatcher(aobject):
                     raise
                 else:
                     assert agent_alloc_ctx is not None
-                    kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx))
+                    kernel_agent_bindings.append(KernelAgentBinding(kernel, agent_alloc_ctx, set()))
 
         assert len(kernel_agent_bindings) == len(sess_ctx.kernels)
         # Proceed to PREPARING only when all kernels are successfully scheduled.
@@ -1015,7 +1016,7 @@ class SchedulerDispatcher(aobject):
                     SessionCancelledEvent(
                         session.session_id,
                         session.session_creation_id,
-                        "failed-to-start",
+                        KernelLifecycleEventReason.FAILED_TO_START,
                     ),
                 )
                 async with self.db.begin_readonly() as db_conn:

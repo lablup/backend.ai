@@ -18,7 +18,7 @@ from typing import (
 )
 
 import appdirs
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from yarl import URL
 
 __all__ = [
@@ -83,7 +83,7 @@ def get_env(
 
     :returns: The value processed by the *clean* function.
     """
-    load_dotenv(override=True)
+    load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
     key = key.upper()
     raw = os.environ.get("BACKEND_" + key)
     if raw is None:
@@ -386,7 +386,7 @@ class APIConfig:
         return self._announcement_handler
 
 
-def get_config():
+def get_config() -> APIConfig:
     """
     Returns the configuration for the current process.
     If there is no explicitly set :class:`APIConfig` instance,
@@ -399,7 +399,7 @@ def get_config():
     return _config
 
 
-def set_config(conf: APIConfig):
+def set_config(conf: Optional[APIConfig]) -> None:
     """
     Sets the configuration used throughout the current process.
     """

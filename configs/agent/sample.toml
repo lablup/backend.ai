@@ -58,7 +58,7 @@ scaling-group = "default"
 metadata-server-port = 40128
 
 # The port number for aiomonitor.
-# aiomonitor-port = 50200
+# aiomonitor-port = 48200
 
 # Explicitly set allowed(or blocked) compute plugins to avoid conflicts of mock &
 # open-source CUDA plugins in the mono-repo source installation.
@@ -246,6 +246,13 @@ reserved-mem = "1G"
 # The amount of disk space reserved for the agent and the OS.
 # This will be subtracted from the resource capacity reported to the manager.
 reserved-disk = "8G"
+
+# The order of device allocation.
+allocation-order = ["cuda", "rocm", "tpu", "cpu", "mem"]
+
+# How we mix up devices from multiple different NUMA nodes?
+# Options: PREFER_SINGLE_NODE, INTERLEAVED
+affinity-policy = "INTERLEAVED"
 
 
 [debug]

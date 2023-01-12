@@ -87,6 +87,38 @@ def test_delete_vfolder(run: ClientRunnerFunc):
         assert "Deleted" in p.before.decode(), "Test folder 3 not deleted successfully."
 
 
+def test_delete_vfolder_the_same_vfolder_name(run: ClientRunnerFunc):
+    """
+    Test delete vfolder function.
+    Delete two vfolders that have the same name.
+    """
+    print("[ Delete vfolder same name ]")
+    vfolder_name = "test_folder_name"
+    with closing(run(["source", "env-tester-user2.sh"])) as p:
+        p.expect(EOF)
+    with closing(run(["vfolder", "create", vfolder_name, "local:volume1"])) as p:
+        p.expect(EOF)
+
+    with closing(run(["source", "env-tester-user.sh"])) as p:
+        p.expect(EOF)
+    with closing(run(["vfolder", "create", vfolder_name, "local:volume1"])) as p:
+        p.expect(EOF)
+
+    with closing(run(["vfolder", "delete", vfolder_name])) as p:
+        p.expect(EOF)
+        assert (
+            "Deleted" in p.before.decode()
+        ), "Test folder created by user not deleted successfully."
+
+    with closing(run(["source", "env-tester-user2.sh"])) as p:
+        p.expect(EOF)
+    with closing(run(["vfolder", "delete", vfolder_name])) as p:
+        p.expect(EOF)
+        assert (
+            "Deleted" in p.before.decode()
+        ), "Test folder created by user2 not deleted successfully."
+
+
 def test_list_vfolder(run: ClientRunnerFunc):
     """
     Test list vfolder function.

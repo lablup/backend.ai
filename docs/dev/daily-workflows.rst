@@ -474,7 +474,7 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 .. code-block:: console
 
    $ pgrep pantsd | xargs kill
-   $ rm -r .tmp .pants.d ~/.cache/pants
+   $ rm -r .tmp/immutable* .pants.d ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and
 all cached data as necessary.
@@ -574,7 +574,7 @@ Making a new release
 * Run ``LOCKSET=tools/towncrier ./py -m towncrier`` to auto-generate the changelog.
 
   - You may append ``--draft`` to see a preview of the changelog update without
-    actually modifying the filesytem.
+    actually modifying the filesystem.
 
   - (WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
 

@@ -1,3 +1,4 @@
+import json
 import sys
 
 import click
@@ -9,6 +10,7 @@ from ai.backend.client.func.keypair_resource_policy import (
     _default_list_fields,
 )
 from ai.backend.client.session import Session
+from ai.backend.common.types import VFolderHostPermission
 
 from ..extensions import pass_ctx_obj
 from ..pretty import print_info
@@ -93,10 +95,16 @@ def list(ctx):
     default=1800,
     help="The maximum period of time allowed for kernels to wait " "further requests.",
 )
-# @click.option('--allowed-vfolder-hosts', type=click.Tuple(str), default=['local'],
-#               help='Locations to create virtual folders.')
 @click.option(
-    "--allowed-vfolder-hosts", default=["local"], help="Locations to create virtual folders."
+    "--allowed-vfolder-hosts",
+    type=str,
+    default=json.dumps(
+        {
+            "local:volume1": [perm.value for perm in VFolderHostPermission],
+        }
+    ),
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
 )
 def add(
     ctx: CLIContext,
@@ -173,7 +181,12 @@ def add(
     type=int,
     help="The maximum period of time allowed for kernels to wait " "further requests.",
 )
-@click.option("--allowed-vfolder-hosts", help="Locations to create virtual folders.")
+@click.option(
+    "--allowed-vfolder-hosts",
+    type=str,
+    help="Allowed virtual folder hosts. "
+    'It must be JSON string (e.g: --allowed-vfolder-hosts=\'{"HOST_NAME": ["create-vfolder", "modify-vfolder"]}\')',
+)
 def update(
     ctx: CLIContext,
     name,
