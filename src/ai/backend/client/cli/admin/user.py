@@ -10,9 +10,12 @@ from ai.backend.client.output.fields import user_fields
 from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
+from ..params import CommaSeparatedListType
 from ..pretty import print_info
 from ..types import CLIContext
 from . import admin
+
+list_expr = CommaSeparatedListType()
 
 
 @admin.group()
@@ -42,6 +45,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["created_at"],
         user_fields["domain_name"],
         user_fields["groups"],
+        user_fields["allowed_client_ip"],
     ]
     with Session() as session:
         try:
@@ -83,6 +87,7 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         user_fields["created_at"],
         user_fields["domain_name"],
         user_fields["groups"],
+        user_fields["allowed_client_ip"],
     ]
     try:
         with Session() as session:
@@ -132,6 +137,13 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
     help="Flag indicate that user needs to change password. "
     "Useful when admin manually create password.",
 )
+@click.option(
+    "--allowed-ip",
+    type=list_expr,
+    default=None,
+    help="Allowed client IP. IPv4 and IPv6 are allowed. CIDR type is recommended. "
+    '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)',
+)
 @click.option("--description", type=str, default="", help="Description of the user.")
 def add(
     ctx: CLIContext,
@@ -143,6 +155,7 @@ def add(
     role,
     status,
     need_password_change,
+    allowed_ip,
     description,
 ):
     """
@@ -164,6 +177,7 @@ def add(
                 role=role,
                 status=status,
                 need_password_change=need_password_change,
+                allowed_client_ip=allowed_ip,
                 description=description,
             )
         except Exception as e:
@@ -197,7 +211,6 @@ def add(
     "-r",
     "--role",
     type=str,
-    default="user",
     help="Role of the user. One of (admin, user, monitor).",
 )
 @click.option(
@@ -212,6 +225,13 @@ def add(
     help="Flag indicate that user needs to change password. "
     "Useful when admin manually create password.",
 )
+@click.option(
+    "--allowed-ip",
+    type=list_expr,
+    default=None,
+    help="Allowed client IP. IPv4 and IPv6 are allowed. CIDR type is recommended. "
+    '(e.g., --allowed-ip "127.0.0.1","127.0.0.2",...)',
+)
 @click.option("--description", type=str, default="", help="Description of the user.")
 def update(
     ctx: CLIContext,
@@ -223,6 +243,7 @@ def update(
     role,
     status,
     need_password_change,
+    allowed_ip,
     description,
 ):
     """
@@ -241,6 +262,7 @@ def update(
                 role=role,
                 status=status,
                 need_password_change=need_password_change,
+                allowed_client_ip=allowed_ip,
                 description=description,
             )
         except Exception as e:

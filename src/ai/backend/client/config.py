@@ -18,7 +18,7 @@ from typing import (
 )
 
 import appdirs
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from yarl import URL
 
 __all__ = [
@@ -59,7 +59,7 @@ def parse_api_version(value: str) -> Tuple[int, str]:
 T = TypeVar("T")
 
 
-def default_clean(v: Union[str, Mapping]) -> T:
+def default_clean(v: T | Any) -> T:
     return cast(T, v)
 
 
@@ -83,7 +83,7 @@ def get_env(
 
     :returns: The value processed by the *clean* function.
     """
-    load_dotenv(override=True)
+    load_dotenv(dotenv_path=find_dotenv(usecwd=True), override=True)
     key = key.upper()
     raw = os.environ.get("BACKEND_" + key)
     if raw is None:
@@ -202,6 +202,7 @@ class APIConfig:
     _group: str
     _hash_type: str
     _skip_sslcert_validation: bool
+    _version: str
 
     def __init__(
         self,
@@ -385,7 +386,7 @@ class APIConfig:
         return self._announcement_handler
 
 
-def get_config():
+def get_config() -> APIConfig:
     """
     Returns the configuration for the current process.
     If there is no explicitly set :class:`APIConfig` instance,
@@ -398,7 +399,7 @@ def get_config():
     return _config
 
 
-def set_config(conf: APIConfig):
+def set_config(conf: Optional[APIConfig]) -> None:
     """
     Sets the configuration used throughout the current process.
     """

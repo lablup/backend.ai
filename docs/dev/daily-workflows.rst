@@ -275,7 +275,7 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
      "coc.preferences.willSaveHandlerTimeout": 5000,
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.7/bin/python",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.8/bin/python",
      "python.formatting.provider": "black",
      "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
      "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
@@ -293,7 +293,7 @@ When each branch has different external package requirements, you should run ``.
 before running codes after ``git switch``-ing between such branches.
 
 Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
-In that case, run ``killall -r pantsd`` (``killall pantsd`` in macOS) and it will be fine.
+In that case, run ``pgrep pantsd | xargs kill`` and it will be fine.
 
 Running entrypoints
 -------------------
@@ -398,7 +398,7 @@ Writing documentation
 
   .. code-block:: console
 
-     $ pyenv virtualenv 3.10.4 venv-bai-docs
+     $ pyenv virtualenv 3.10.8 venv-bai-docs
 
 * Activate the virtualenv and run:
 
@@ -473,8 +473,8 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 
 .. code-block:: console
 
-   $ killall -r pantsd   # just `killall pantsd` in macOS
-   $ rm -r .tmp .pants.d ~/.cache/pants
+   $ pgrep pantsd | xargs kill
+   $ rm -r .tmp/immutable* .pants.d ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and
 all cached data as necessary.
@@ -574,7 +574,7 @@ Making a new release
 * Run ``LOCKSET=tools/towncrier ./py -m towncrier`` to auto-generate the changelog.
 
   - You may append ``--draft`` to see a preview of the changelog update without
-    actually modifying the filesytem.
+    actually modifying the filesystem.
 
   - (WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
 

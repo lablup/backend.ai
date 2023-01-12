@@ -9,52 +9,53 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI Documentation 22.06\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-13 16:57+0900\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
-#: ../../client/func/session.rst:2 36de2f05510443449762cd06f65486c7
+#: ../../client/func/session.rst:2 286e06b39c3a4eb28dcb97fad4ddcad9
 msgid "ComputeSession Functions"
 msgstr ""
 
-#: 9c7ea9d2751b42928f7cb571f16bd0b4
-#: ai.backend.client.func.session.ComputeSession:1 of
+#: ai.backend.client.func.session.ComputeSession:1
+#: f7172366d6a54f7bbddad23e0aad6998 of
 msgid "Provides various interactions with compute sessions in Backend.AI."
 msgstr ""
 
 #: ai.backend.client.func.session.ComputeSession:3
-#: b42ea2ce841d43a598c36af7ae45d8d6 of
+#: b30dda12e88e4e45911689e9012ce30b of
 msgid ""
 "The term 'kernel' is now deprecated and we prefer 'compute sessions'. "
-"However, for historical reasons and to avoid confusion with client sessions, "
-"we keep the backward compatibility with the naming of this API function "
-"class."
+"However, for historical reasons and to avoid confusion with client "
+"sessions, we keep the backward compatibility with the naming of this API "
+"function class."
 msgstr ""
 
-#: ai.backend.client.func.session.ComputeSession:7
-#: bbaa3699a729431f995175bc971c54c5 of
+#: 916d4af9e3644796ab9b2b1458da8e8e
+#: ai.backend.client.func.session.ComputeSession:7 of
 msgid ""
 "For multi-container sessions, all methods take effects to the master "
-"container only, except :func:`~ComputeSession.destroy` and :func:"
-"`~ComputeSession.restart` methods. So it is the user's responsibility to "
-"distribute uploaded files to multiple containers using explicit copies or "
-"virtual folders which are commonly mounted to all containers belonging to "
-"the same compute session."
+"container only, except :func:`~ComputeSession.destroy` and "
+":func:`~ComputeSession.restart` methods. So it is the user's "
+"responsibility to distribute uploaded files to multiple containers using "
+"explicit copies or virtual folders which are commonly mounted to all "
+"containers belonging to the same compute session."
 msgstr ""
 
-#: 1b7b7a1d6da14215be10b25ac1ebb76d
+#: 95c4287f54e84db8bf9cd4a400129e32
 #: ai.backend.client.func.session.ComputeSession.paginated_list:1 of
 msgid "Fetches the list of users. Domain admins can only get domain users."
 msgstr ""
 
-#: 330baf72e38e4bb0be0c0666bd40701b 55b6fe69a86f4c6c930add8e0400c973
-#: 5e67f708baab4b0d8378a4657a8e6c46 800050757e5a43dd84edda8a5321a5dc
-#: 996da72c5aff4feeb8931b5ff05c8cd6
+#: 280f997ed70d437ea1252605343e52b6 69719034f03f49e582084f8feb1625ab
+#: 6c052fda87e54b8c9448b6a7b168f276 6d8fb0210ac8450ab20f71c271d9864d
+#: 8ae553891a854c71a1c3bc3bfc116bdb 928645e09b524147a0993387ccf65b61
+#: 92ed343737484894b870bee0328b8773
 #: ai.backend.client.func.session.ComputeSession.complete
 #: ai.backend.client.func.session.ComputeSession.create_from_template
 #: ai.backend.client.func.session.ComputeSession.download
@@ -63,24 +64,23 @@ msgstr ""
 #: ai.backend.client.func.session.ComputeSession.list_files
 #: ai.backend.client.func.session.ComputeSession.paginated_list
 #: ai.backend.client.func.session.ComputeSession.upload
-#: c0dc7a20cbac4c1baca273497d7b90a4 e78e891ed18a491f8cf681337464c278
-#: f915e90318bd4c82a1eb96ad88842f04 of
+#: d8ef207a10554a22a69b88f76dbb5c1b of
 msgid "Parameters"
 msgstr ""
 
-#: 313430cc1290410ea3f9fc0df3da29cb
+#: 9095c173aff54dc3800300698eaa6089
 #: ai.backend.client.func.session.ComputeSession.paginated_list:3 of
 msgid "Fetches active or inactive users only if not None."
 msgstr ""
 
-#: 404d693cb83c4d4f94dfca43fc68eba8
+#: 02091343ff404133b099ff86afff8b20
 #: ai.backend.client.func.session.ComputeSession.paginated_list:5 of
 msgid "Additional per-user query fields to fetch."
 msgstr ""
 
-#: 0427915ea6114e70aadf4cd6e8e588a2 1b15365ea25946718e9477944bc5de57
-#: 388dc634903b418192ab852190b1fcbb 566ca1aea71b4e42958a5d25c6f5e6e4
-#: 6fd0e5584aef460d9c3c3109c10d56e1
+#: 1e591e051ec741f48423108aa930a335 37fb5243163a47078fbae91fb5bcc0ad
+#: 6b220f47dfbc4316bcfcb15b0690f059 77c8a189b6d64e75901891aad7df4480
+#: 8643efe73b2442ec807920640556e232 9047171217ab43c5ad295f64bb0d6c8b
 #: ai.backend.client.func.session.ComputeSession.complete
 #: ai.backend.client.func.session.ComputeSession.create_from_template
 #: ai.backend.client.func.session.ComputeSession.get_or_create
@@ -88,510 +88,1003 @@ msgstr ""
 #: ai.backend.client.func.session.ComputeSession.paginated_list
 #: ai.backend.client.func.session.ComputeSession.stream_execute
 #: ai.backend.client.func.session.ComputeSession.stream_pty
-#: bd99cdadf9b448a8a574df9940f3ad8a d847d95807c44416b6c60cde7352f74d
-#: f83f930edaa2458f8386f6ec7ab13e52 of
+#: cd16cfa62c9148bfadb2ba49f1e62c83 fe843df320974e08aa0b8a8f9bc103d8 of
 msgid "Return type"
 msgstr ""
 
-#: ai.backend.client.func.session.ComputeSession.paginated_list:8
-#: e196e4e88ac942a5bfacdbb0861a249e of
-msgid ""
-":py:class:`~ai.backend.client.output.types.PaginatedResult`\\[:py:class:"
-"`dict`]"
+#: 6354c96e1b134682a32c8e9135796912
+#: ai.backend.client.func.session.ComputeSession.paginated_list:8 of
+msgid ":py:class:`~ai.backend.client.output.types.PaginatedResult`\\[:py:class:`dict`]"
 msgstr ""
 
-#: 459aef3b644a4ede847ac5406cd9ea8a
-#: ai.backend.client.func.session.ComputeSession.get_or_create:1 of
+#: ai.backend.client.func.session.ComputeSession.get_or_create:1
+#: dbcc1761be8d4730b30f642907e3548d of
 msgid ""
-"Get-or-creates a compute session. If *name* is ``None``, it creates a new "
-"compute session as long as the server has enough resources and your API key "
-"has remaining quota. If *name* is a valid string and there is an existing "
-"compute session with the same token and the same *image*, then it returns "
-"the :class:`ComputeSession` instance representing the existing session."
+"Get-or-creates a compute session. If *name* is ``None``, it creates a new"
+" compute session as long as the server has enough resources and your API "
+"key has remaining quota. If *name* is a valid string and there is an "
+"existing compute session with the same token and the same *image*, then "
+"it returns the :class:`ComputeSession` instance representing the existing"
+" session."
 msgstr ""
 
-#: 4aedf56de82e458e9b901673a47ef1fb 4c56e82f685e4b65b1a700da33c78385
+#: 6b59ac08d9f644b3be2fb5109ee5c420 7987f110f9f348198019571b5201c573
 #: ai.backend.client.func.session.ComputeSession.create_from_template:13
 #: ai.backend.client.func.session.ComputeSession.get_or_create:9 of
 msgid ""
-"The image name and tag for the compute session. Example: ``python:3.6-"
-"ubuntu``. Check out the full list of available images in your server using "
-"(TODO: new API)."
+"The image name and tag for the compute session. Example: "
+"``python:3.6-ubuntu``. Check out the full list of available images in "
+"your server using (TODO: new API)."
 msgstr ""
 
+#: 7ae257d788ee46588a15d0080933d8e2
 #: ai.backend.client.func.session.ComputeSession.create_from_template:18
 #: ai.backend.client.func.session.ComputeSession.get_or_create:14
-#: ba320357d0444bf79edc00a0a4f4ac4f bb0e0a63dfff400589abf94a96d0709b of
+#: c80351d230054b1592ae89ea102079ae of
 msgid ""
 "A client-side (user-defined) identifier to distinguish the session among "
-"currently running sessions. It may be used to seamlessly reuse the session "
-"already created.  .. versionchanged:: 19.12.0     Renamed from "
+"currently running sessions. It may be used to seamlessly reuse the "
+"session already created.  .. versionchanged:: 19.12.0     Renamed from "
 "``clientSessionToken``."
 msgstr ""
 
-#: 02956d96cb75450ba53d3bc0a2f24156 217923ad9e65459f95ea9c71ee4bc3ad
+#: 04d542ad0d91466eb3768f71db950b67 119f3a62b3dc45d8a1718d530291b49e
 #: ai.backend.client.func.session.ComputeSession.create_from_template:18
 #: ai.backend.client.func.session.ComputeSession.get_or_create:14 of
 msgid ""
 "A client-side (user-defined) identifier to distinguish the session among "
-"currently running sessions. It may be used to seamlessly reuse the session "
-"already created."
+"currently running sessions. It may be used to seamlessly reuse the "
+"session already created."
 msgstr ""
 
-#: 11475c0ea0c04ad7b7c4475c250e6467 70f24031df6a4b1fb9d3c77d2b9c0b51
+#: 15f9ff9248a44341b5205377b5a7b7d6 8a59133ce04e4dda8b003fae2e526754
 #: ai.backend.client.func.session.ComputeSession.create_from_template:24
 #: ai.backend.client.func.session.ComputeSession.get_or_create:20 of
 msgid "Renamed from ``clientSessionToken``."
 msgstr ""
 
-#: 7b4f10f1ff414b26b9a12f3af0761705
+#: 676478f3aeaf4f59955014c8c4c28153
 #: ai.backend.client.func.session.ComputeSession.create_from_template:25
 #: ai.backend.client.func.session.ComputeSession.get_or_create:21
-#: d0919c0a516c4066b10a9c5b50541483 of
+#: da132f67bbb04be9834670cad3ac2b18 of
 msgid ""
-"Either ``\"interactive\"`` (default) or ``\"batch\"``.  .. versionadded:: "
-"19.09.0"
+"Either ``\"interactive\"`` (default) or ``\"batch\"``.  .. versionadded::"
+" 19.09.0"
 msgstr ""
 
-#: 271fa74a048a4c82b86a7b7623313cbd
+#: 7b28fc499e7f4ac4bf0e44c2ff4a100e a71cc52fbbe44bbaa3f1e2d7e02790d4
 #: ai.backend.client.func.session.ComputeSession.create_from_template:25
-#: ai.backend.client.func.session.ComputeSession.get_or_create:21
-#: c05f2868e3e6465a8b8a9494210246c0 of
+#: ai.backend.client.func.session.ComputeSession.get_or_create:21 of
 msgid "Either ``\"interactive\"`` (default) or ``\"batch\"``."
 msgstr ""
 
-#: 36d06e3f80e54646bd274f145bef14c1
+#: 61c54e44d8f04f9889dae4545d593a9c 6d9b885e5fd049739e666ced3341d79e
 #: ai.backend.client.func.session.ComputeSession.create_from_template:29
-#: ai.backend.client.func.session.ComputeSession.get_or_create:25
-#: db28f711f4514d4eb3b3fe201f1f7119 of
+#: ai.backend.client.func.session.ComputeSession.get_or_create:25 of
 msgid ""
-"Just enqueue the session creation request and return immediately, without "
-"waiting for its startup. (default: ``false`` to preserve the legacy "
+"Just enqueue the session creation request and return immediately, without"
+" waiting for its startup. (default: ``false`` to preserve the legacy "
 "behavior)  .. versionadded:: 19.09.0"
 msgstr ""
 
-#: 15e2e474712e482ab2b4460686c54858
+#: 5880360940e14d1ba6f1b8d13fa49c49 93a67be4308f42609ac30ccfc03519a7
 #: ai.backend.client.func.session.ComputeSession.create_from_template:29
-#: ai.backend.client.func.session.ComputeSession.get_or_create:25
-#: d3ead2e047c9497d9d76d2df4f6dff65 of
+#: ai.backend.client.func.session.ComputeSession.get_or_create:25 of
 msgid ""
-"Just enqueue the session creation request and return immediately, without "
-"waiting for its startup. (default: ``false`` to preserve the legacy behavior)"
+"Just enqueue the session creation request and return immediately, without"
+" waiting for its startup. (default: ``false`` to preserve the legacy "
+"behavior)"
 msgstr ""
 
-#: 96413a10f80a4a38b9c87bf52bb21ea1
-#: ai.backend.client.func.session.ComputeSession.create_from_template:35
-#: ai.backend.client.func.session.ComputeSession.get_or_create:31
-#: cff7a0fad4cb408a8b9deeffe6d171dd of
-msgid ""
-"The time to wait for session startup. If the cluster resource is being fully "
-"utilized, this waiting time can be arbitrarily long due to job queueing.  If "
-"the timeout reaches, the returned *status* field becomes ``\"TIMEOUT\"``.  "
-"Still in this case, the session may start in the future.  .. versionadded:: "
-"19.09.0"
-msgstr ""
-
-#: 13eb4e22311649d2b8986c532ba09c5f 4f4f032d6388416eb2cf8ba2f57c11e5
+#: 43dfcdfc138a4f9ba4460db92940ce4a 9795aa0c683b4646807b783be1cefd23
 #: ai.backend.client.func.session.ComputeSession.create_from_template:35
 #: ai.backend.client.func.session.ComputeSession.get_or_create:31 of
 msgid ""
-"The time to wait for session startup. If the cluster resource is being fully "
-"utilized, this waiting time can be arbitrarily long due to job queueing.  If "
-"the timeout reaches, the returned *status* field becomes ``\"TIMEOUT\"``.  "
-"Still in this case, the session may start in the future."
+"The time to wait for session startup. If the cluster resource is being "
+"fully utilized, this waiting time can be arbitrarily long due to job "
+"queueing.  If the timeout reaches, the returned *status* field becomes "
+"``\"TIMEOUT\"``.  Still in this case, the session may start in the "
+"future.  .. versionadded:: 19.09.0"
 msgstr ""
 
-#: a9c891e2075248eaaf12f589f13f478b
+#: 01c18df37a1d49bb9c05dc1c0011cd3e 2a8fc33278434200a8337d22bd1b86e7
+#: ai.backend.client.func.session.ComputeSession.create_from_template:35
+#: ai.backend.client.func.session.ComputeSession.get_or_create:31 of
+msgid ""
+"The time to wait for session startup. If the cluster resource is being "
+"fully utilized, this waiting time can be arbitrarily long due to job "
+"queueing.  If the timeout reaches, the returned *status* field becomes "
+"``\"TIMEOUT\"``.  Still in this case, the session may start in the "
+"future."
+msgstr ""
+
+#: 0834736936414aab9903874b64b82dfb
 #: ai.backend.client.func.session.ComputeSession.create_from_template:42
 #: ai.backend.client.func.session.ComputeSession.get_or_create:38
-#: fba31a856f7e48e3bfd9a3510e93ae78 of
+#: e93ea42b1f284ff48b1e462f2f2c1908 of
 msgid ""
 "Raises an explicit error if a session with the same *image* and the same "
 "*name* already exists instead of returning the information of it.  .. "
 "versionadded:: 19.09.0"
 msgstr ""
 
-#: 9f1c0e07892d4a3f877544c283fdaef1
+#: 09c4ffc81b2148b196b1298692e30d84 62fbfe05cd284d739d048af7d164e4e9
 #: ai.backend.client.func.session.ComputeSession.create_from_template:42
-#: ai.backend.client.func.session.ComputeSession.get_or_create:38
-#: bdbcffea9ca9495088baa64c8b9fbb64 of
+#: ai.backend.client.func.session.ComputeSession.get_or_create:38 of
 msgid ""
 "Raises an explicit error if a session with the same *image* and the same "
 "*name* already exists instead of returning the information of it."
 msgstr ""
 
-#: 09bb1b83e9df4bd58f2efafd72928146
+#: 788d1134f5bf417ea843a7bc4f3d6995 97cda7892e5a4261b5548bb2bbf2d1fe
 #: ai.backend.client.func.session.ComputeSession.create_from_template:48
-#: ai.backend.client.func.session.ComputeSession.get_or_create:44
-#: e51e213d0e8641789da6437c2438b866 of
-msgid "The list of vfolder names that belongs to the currrent API access key."
+#: ai.backend.client.func.session.ComputeSession.get_or_create:44 of
+msgid "The list of vfolder names that belongs to the current API access key."
 msgstr ""
 
-#: 4abbdb4a90fb4650b976a4c84b6f4b78
+#: 42a898247c9a4c618938c1895d5d8367 a5055659b0b241c392bc4e3a555a7ea8
 #: ai.backend.client.func.session.ComputeSession.create_from_template:51
-#: ai.backend.client.func.session.ComputeSession.get_or_create:47
-#: f78eb2d1d0264601bae6b450efd36881 of
+#: ai.backend.client.func.session.ComputeSession.get_or_create:47 of
 msgid ""
-"Mapping which contains custom path to mount vfolder. Key and value of this "
-"map should be vfolder name and custom path. Defalut mounts or relative paths "
-"are under /home/work. If you want different paths, names should be absolute "
-"paths. The target mount path of vFolders should not overlap with the linux "
-"system folders. vFolders which has a dot(.) prefix in its name are not "
-"affected."
+"Mapping which contains custom path to mount vfolder. Key and value of "
+"this map should be vfolder name and custom path. Default mounts or "
+"relative paths are under /home/work. If you want different paths, names "
+"should be absolute paths. The target mount path of vFolders should not "
+"overlap with the linux system folders. vFolders which has a dot(.) prefix"
+" in its name are not affected."
 msgstr ""
 
-#: 9b5e7f2b4dc5414bba0cfd98b4de2a46
+#: 6e24f04f4f844b7b82199613cc56b082
 #: ai.backend.client.func.session.ComputeSession.create_from_template:58
 #: ai.backend.client.func.session.ComputeSession.get_or_create:54
-#: def857908508489ea381ae655182f93e of
+#: e4581a4dc9b44b5ca83f79d414b85eae of
 msgid "The environment variables which always bypasses the jail policy."
 msgstr ""
 
-#: 41c7098aff094d34ad68065d12a0cfe3 43cf21e7125a4a35b1deb8d5dc5f6d2f
+#: 3864490b7fbd427eb5fe3954573f6383
 #: ai.backend.client.func.session.ComputeSession.create_from_template:60
-#: ai.backend.client.func.session.ComputeSession.get_or_create:56 of
+#: ai.backend.client.func.session.ComputeSession.get_or_create:56
+#: d40745c2034144038d3c0a2a69167a60 of
 msgid "The resource specification. (TODO: details)"
 msgstr ""
 
-#: 41de697403674e01ad18c12dfe27c459 6abaeba912264f62bd8759da4685ad33
+#: 4ac35c8a8e784ee2b953c47837779ac3
 #: ai.backend.client.func.session.ComputeSession.create_from_template:62
-#: ai.backend.client.func.session.ComputeSession.get_or_create:58 of
+#: ai.backend.client.func.session.ComputeSession.get_or_create:58
+#: f1040dcd1af548cf8982ad1a09fc48d3 of
 msgid ""
-"The number of containers in this compute session. Must be at least 1.  .. "
-"versionadded:: 19.09.0 .. versionchanged:: 20.09.0"
+"The number of containers in this compute session. Must be at least 1.  .."
+" versionadded:: 19.09.0 .. versionchanged:: 20.09.0"
 msgstr ""
 
-#: 7194d485e7ce4ba0980238402fa1ffc6 76f64477429341aead75e98179631202
+#: 6009129760eb4753909b5f2a420380ab
 #: ai.backend.client.func.session.ComputeSession.create_from_template:62
-#: ai.backend.client.func.session.ComputeSession.get_or_create:58 of
+#: ai.backend.client.func.session.ComputeSession.get_or_create:58
+#: e1fb815e609d45119c94eacf8b7340d6 of
 msgid "The number of containers in this compute session. Must be at least 1."
 msgstr ""
 
-#: 4d18772446c141dd9caaaa7ed11cfa83 a629a35641084495818d2459ea6cc639
+#: 25c50b7dfcf148909768188322b0a2f6
+#: ai.backend.client.func.session.ComputeSession.create_from_template:68
+#: ai.backend.client.func.session.ComputeSession.get_or_create:64
+#: eed55c820a1e45ecacf33f717d5258d3 of
+msgid ""
+"Set the clustering mode whether to use distributed nodes or a single node"
+" to spawn multiple containers for the new session.  .. versionadded:: "
+"20.09.0"
+msgstr ""
+
+#: 14a1b4e4e5fb4b05ac708b2a29e58543 1ec38a2590c44f78a6280f06f15e665f
 #: ai.backend.client.func.session.ComputeSession.create_from_template:68
 #: ai.backend.client.func.session.ComputeSession.get_or_create:64 of
 msgid ""
-"Set the clustering mode whether to use distributed nodes or a single node to "
-"spawn multiple containers for the new session.  .. versionadded:: 20.09.0"
+"Set the clustering mode whether to use distributed nodes or a single node"
+" to spawn multiple containers for the new session."
 msgstr ""
 
-#: 77ff9ba24dc34218a4c080f9e562c184 9b5f6fc81e7a4ea08a3c9709dc921d60
-#: ai.backend.client.func.session.ComputeSession.create_from_template:68
-#: ai.backend.client.func.session.ComputeSession.get_or_create:64 of
-msgid ""
-"Set the clustering mode whether to use distributed nodes or a single node to "
-"spawn multiple containers for the new session."
-msgstr ""
-
-#: 0043128896284ffe858752df230dc572 2535a42ccfb24249bcce00fc7a42dbf0
+#: 180fab46f3a74a11986eadfe7e839a09 23060d66b69249328dba635e793d676c
 #: ai.backend.client.func.session.ComputeSession.create_from_template:73
 #: ai.backend.client.func.session.ComputeSession.get_or_create:69 of
 msgid "An optional string to annotate extra information."
 msgstr ""
 
-#: 0369cf96a39543c98f1e1cf840b7ace3 5da298ca4d834ee4945272b779dbf64e
+#: 0b15c25a3eec4e42b924b7fa4e8b43ab
 #: ai.backend.client.func.session.ComputeSession.create_from_template:74
-#: ai.backend.client.func.session.ComputeSession.get_or_create:70 of
+#: ai.backend.client.func.session.ComputeSession.get_or_create:70
+#: ef33d2e77484444e800ab6967ae717a7 of
 msgid ""
 "An optional access key that owns the created session. (Only available to "
 "administrators)"
 msgstr ""
 
-#: 7bb5bf12cfb94034a884273d13d03bba
+#: afd663d1ff634017a0f1e1c64d115c90
 #: ai.backend.client.func.session.ComputeSession.create_from_template:77
 #: ai.backend.client.func.session.ComputeSession.get_or_create:73
-#: b9ecffe53e364e39bd1659e95c56019f of
+#: c77715aeec2b47f995ff9a5930f4e2e8 of
 msgid ":py:class:`~ai.backend.client.func.session.ComputeSession`"
 msgstr ""
 
-#: 05b8ec44a4a94396b8bb5affd4e1ab72 090a8ed799924c969304b6c204322ae1
-#: 53cbc6d3a714468a888c3680283940d7 6d9ec0cbb7fa450682237f9deb48e09f
-#: 7f92ff68b8de4c85a2492c71b4c25f60 810eb43b7e34405bbee70d627cba3c1e
+#: 0c8fa4474c2b4245afc8ca4a1f51c710 4f26804e1d214c38aea175632b671490
+#: 5b83f00b366645bc913faeedaf045784 78af1f855ce54317ba9472eb2601c73f
+#: 79a0006c34e745439c75664f93e695a6
 #: ai.backend.client.func.session.ComputeSession.complete
 #: ai.backend.client.func.session.ComputeSession.create_from_template
 #: ai.backend.client.func.session.ComputeSession.execute
 #: ai.backend.client.func.session.ComputeSession.get_or_create
 #: ai.backend.client.func.session.ComputeSession.listen_events
 #: ai.backend.client.func.session.ComputeSession.stream_pty
-#: ef23bb16609747e4b09320d0ae88f882 of
+#: f361a03dcbe04117905295f40420edf8 fb5e6e5e6bb440cdbe7f6839df6f3319 of
 msgid "Returns"
 msgstr ""
 
-#: 0e76b16dd5ee4ea696a0032f3a374072 2961290734d04d7b840fdfaa683cbbbf
+#: 496bbc0eb288490b899e95002d2d7635
 #: ai.backend.client.func.session.ComputeSession.create_from_template:78
-#: ai.backend.client.func.session.ComputeSession.get_or_create:74 of
+#: ai.backend.client.func.session.ComputeSession.get_or_create:74
+#: f982300c0b4a42c0a913f9337c0ab3ad of
 msgid "The :class:`ComputeSession` instance."
 msgstr ""
 
-#: ai.backend.client.func.session.ComputeSession.create_from_template:1
-#: dbb2f3fd59ab4a42b3bb24b05bd95ab8 of
+#: 2b55f4165e4c4d9a88b828b0e00716bb
+#: ai.backend.client.func.session.ComputeSession.create_from_template:1 of
 msgid ""
 "Get-or-creates a compute session from template. All other parameters "
 "provided  will be overwritten to template, including vfolder mounts (not "
-"appended!). If *name* is ``None``, it creates a new compute session as long "
-"as the server has enough resources and your API key has remaining quota. If "
-"*name* is a valid string and there is an existing compute session with the "
-"same token and the same *image*, then it returns the :class:`ComputeSession` "
-"instance representing the existing session."
+"appended!). If *name* is ``None``, it creates a new compute session as "
+"long as the server has enough resources and your API key has remaining "
+"quota. If *name* is a valid string and there is an existing compute "
+"session with the same token and the same *image*, then it returns the "
+":class:`ComputeSession` instance representing the existing session."
 msgstr ""
 
-#: 6aac0dbb515140f0a17e793ad47ef2fd
+#: 9ad64b7a7f8a498a9c6e50808e2923d2
 #: ai.backend.client.func.session.ComputeSession.create_from_template:11 of
 msgid "Task template to apply to compute session."
 msgstr ""
 
-#: 6fcb5d4b84114890aa868fef1d7738d4
+#: aa0b41ed2031455294acef9e468524a7
 #: ai.backend.client.func.session.ComputeSession.destroy:1 of
 msgid ""
 "Destroys the compute session. Since the server literally kills the "
 "container(s), all ongoing executions are forcibly interrupted."
 msgstr ""
 
-#: 02273acae4064abfb645996323dd7306
+#: 5d41f5f5741344a2a3e1febbf97f84d6
 #: ai.backend.client.func.session.ComputeSession.restart:1 of
 msgid ""
-"Restarts the compute session. The server force-destroys the current running "
-"container(s), but keeps their temporary scratch directories intact."
+"Restarts the compute session. The server force-destroys the current "
+"running container(s), but keeps their temporary scratch directories "
+"intact."
 msgstr ""
 
-#: a46c4b43568842d6a5dedda3cc6af8b5
-#: ai.backend.client.func.session.ComputeSession.rename:1 of
+#: ai.backend.client.func.session.ComputeSession.rename:1
+#: fadb9f0de0ab46dabb654c56df243d9b of
 msgid "Renames Session ID of running compute session."
 msgstr ""
 
-#: ai.backend.client.func.session.ComputeSession.interrupt:1
-#: e063b4dff9444eb8ad87e7c61b3fe44b of
+#: 5bb5dff0a1f9469aa7c074afec470048
+#: ai.backend.client.func.session.ComputeSession.commit:1 of
+msgid "Commit a running session to a tar file in the agent host."
+msgstr ""
+
+#: 9e88948b5ac0454c9f00d35906023ceb
+#: ai.backend.client.func.session.ComputeSession.interrupt:1 of
 msgid ""
-"Tries to interrupt the current ongoing code execution. This may fail without "
-"any explicit errors depending on the code being executed."
+"Tries to interrupt the current ongoing code execution. This may fail "
+"without any explicit errors depending on the code being executed."
 msgstr ""
 
 #: ai.backend.client.func.session.ComputeSession.complete:1
-#: d6f3333cc1944b1d81e8a8094fdb5749 of
+#: ca5f9f8e18fd437aa0a78f2e769a4496 of
 msgid ""
-"Gets the auto-completion candidates from the given code string, as if a user "
-"has pressed the tab key just after the code in IDEs."
+"Gets the auto-completion candidates from the given code string, as if a "
+"user has pressed the tab key just after the code in IDEs."
 msgstr ""
 
-#: ai.backend.client.func.session.ComputeSession.complete:5
-#: e09c0da04dcf4b5abf4934482be23a90 of
+#: 5a41838ab41746ab8783a57533d5e6dc
+#: ai.backend.client.func.session.ComputeSession.complete:5 of
 msgid ""
-"Depending on the language of the compute session, this feature may not be "
-"supported.  Unsupported sessions returns an empty list."
+"Depending on the language of the compute session, this feature may not be"
+" supported.  Unsupported sessions returns an empty list."
 msgstr ""
 
-#: ai.backend.client.func.session.ComputeSession.complete:9
-#: c30419c0a293419282af59db2d2d6be8 of
+#: 1cf7073142384084b2ab7137f26cf58e
+#: ai.backend.client.func.session.ComputeSession.complete:9 of
 msgid "An (incomplete) code text."
 msgstr ""
 
-#: 5c6003c839f34a83b39ea0952d186b4d
-#: ai.backend.client.func.session.ComputeSession.complete:11 of
+#: ai.backend.client.func.session.ComputeSession.complete:11
+#: d746f691a109405d98019634850359bb of
 msgid ""
-"Additional information about the current cursor position, such as row, col, "
-"line and the remainder text."
+"Additional information about the current cursor position, such as row, "
+"col, line and the remainder text."
 msgstr ""
 
-#: 2110d2a806404950beb599152f6d4b23
+#: aea7c6171ce54d0d890903d307c4e74e
 #: ai.backend.client.func.session.ComputeSession.complete:14 of
 msgid ":py:class:`~typing.Iterable`\\[:py:class:`str`]"
 msgstr ""
 
-#: 40828c5117bb4477afbefa7d4b526c79
+#: 70df50586dbc4014bfa57c8a520012c7
 #: ai.backend.client.func.session.ComputeSession.complete:15 of
 msgid "An ordered list of strings."
 msgstr ""
 
 #: ai.backend.client.func.session.ComputeSession.get_info:1
-#: f0c5d7fd3a974ab382dbae32b87ffec9 of
+#: d372a46d0c79408da16b26f29e2fbf22 of
 msgid "Retrieves a brief information about the compute session."
 msgstr ""
 
-#: 394041e2d707428ca5ec1840a5e1396b
+#: 41bdf2f7e5394db297d358d44bc4cc04
 #: ai.backend.client.func.session.ComputeSession.get_logs:1 of
 msgid "Retrieves the console log of the compute session container."
 msgstr ""
 
-#: 82efa928282f4ebb9d2fb774d78e74bb
-#: ai.backend.client.func.session.ComputeSession.execute:1 of
-msgid ""
-"Executes a code snippet directly in the compute session or sends a set of "
-"build/clean/execute commands to the compute session."
+#: ai.backend.client.func.session.ComputeSession.get_status_history:1
+#: c98197e5957c464696f0149a0dbe363b of
+msgid "Retrieves the status transition history of the compute session."
 msgstr ""
 
-#: 290d3bd85a334c48ae4623592fc8655b
+#: 9cf1de5e7d5843fbbcc173dc5ee3d935
+#: ai.backend.client.func.session.ComputeSession.execute:1 of
+msgid ""
+"Executes a code snippet directly in the compute session or sends a set of"
+" build/clean/execute commands to the compute session."
+msgstr ""
+
+#: 0f67397d6d65460da2138696b1852f1f
 #: ai.backend.client.func.session.ComputeSession.execute:4 of
 msgid ""
-"For more details about using this API, please refer :doc:`the official API "
-"documentation <user-api/intro>`."
+"For more details about using this API, please refer :doc:`the official "
+"API documentation <user-api/intro>`."
 msgstr ""
 
 #: ai.backend.client.func.session.ComputeSession.execute:8
-#: e408355d1f89408786079295a1d9edce of
+#: c2b17e4287f04b0c956a70784cf4f179 of
 msgid ""
-"A unique identifier for a particular run loop.  In the first call, it may be "
-"``None`` so that the server auto-assigns one. Subsequent calls must use the "
-"returned ``runId`` value to request continuation or to send user inputs."
+"A unique identifier for a particular run loop.  In the first call, it may"
+" be ``None`` so that the server auto-assigns one. Subsequent calls must "
+"use the returned ``runId`` value to request continuation or to send user "
+"inputs."
 msgstr ""
 
-#: 68656568e5b743759ff579ccc9666068
+#: 3f8e3bf96def419188c07396bd7bd065
 #: ai.backend.client.func.session.ComputeSession.execute:13 of
 msgid ""
-"A code snippet as string.  In the continuation requests, it must be an empty "
-"string.  When sending user inputs, this is where the user input string is "
-"stored."
+"A code snippet as string.  In the continuation requests, it must be an "
+"empty string.  When sending user inputs, this is where the user input "
+"string is stored."
 msgstr ""
 
-#: 58768ecce0884b3fa9affdb36cf0e8e8
+#: 9175af4617b146ccbb2a2b74ad525b3a
 #: ai.backend.client.func.session.ComputeSession.execute:17 of
 msgid ""
-"A constant string which is one of ``\"query\"``, ``\"batch\"``, ``\"continue"
-"\"``, and ``\"user-input\"``."
+"A constant string which is one of ``\"query\"``, ``\"batch\"``, "
+"``\"continue\"``, and ``\"user-input\"``."
 msgstr ""
 
-#: 2f4310551ea548bea7eba8046d62abb7
-#: ai.backend.client.func.session.ComputeSession.execute:20 of
+#: ai.backend.client.func.session.ComputeSession.execute:20
+#: f3d7d81db2da487489f407806feef77c of
 msgid ""
-"A dict for specifying additional options. Mainly used in the batch mode to "
-"specify build/clean/execution commands. See :ref:`the API object reference "
-"<batch-execution-query-object>` for details."
+"A dict for specifying additional options. Mainly used in the batch mode "
+"to specify build/clean/execution commands. See :ref:`the API object "
+"reference <batch-execution-query-object>` for details."
 msgstr ""
 
-#: 591a350fd24a4760957571e75578fe69
+#: a12388a4d0f447b8a302ef0193040b50
 #: ai.backend.client.func.session.ComputeSession.execute:25 of
 msgid ":ref:`An execution result object <execution-result-object>`"
 msgstr ""
 
-#: ai.backend.client.func.session.ComputeSession.upload:1
-#: df7e422bc5304567a8b2c94d79d13e23 of
+#: 4c4a3b28dcf34cbea82098ff4aa063a7
+#: ai.backend.client.func.session.ComputeSession.upload:1 of
 msgid ""
-"Uploads the given list of files to the compute session. You may refer them "
-"in the batch-mode execution or from the code executed in the server "
+"Uploads the given list of files to the compute session. You may refer "
+"them in the batch-mode execution or from the code executed in the server "
 "afterwards."
 msgstr ""
 
-#: 7bc286691aa849be9bbc6ae7d35f7ee4
+#: 08f31eb4a0474d47b2522cb288e62278
 #: ai.backend.client.func.session.ComputeSession.upload:6 of
 msgid ""
-"The list of file paths in the client-side. If the paths include directories, "
-"the location of them in the compute session is calculated from the relative "
-"path to *basedir* and all intermediate parent directories are automatically "
-"created if not exists.  For example, if a file path is ``/home/user/test/"
-"data.txt`` (or ``test/data.txt``) where *basedir* is ``/home/user`` (or the "
-"current working directory is ``/home/user``), the uploaded file is located "
-"at ``/home/work/test/data.txt`` in the compute session container."
+"The list of file paths in the client-side. If the paths include "
+"directories, the location of them in the compute session is calculated "
+"from the relative path to *basedir* and all intermediate parent "
+"directories are automatically created if not exists.  For example, if a "
+"file path is ``/home/user/test/data.txt`` (or ``test/data.txt``) where "
+"*basedir* is ``/home/user`` (or the current working directory is "
+"``/home/user``), the uploaded file is located at "
+"``/home/work/test/data.txt`` in the compute session container."
 msgstr ""
 
-#: ai.backend.client.func.session.ComputeSession.upload:6
-#: e05138cfc7dc4100a826ca6f0adcedaf of
+#: 2b57cf61a4e243ee89a5ca41270180b0
+#: ai.backend.client.func.session.ComputeSession.upload:6 of
 msgid ""
-"The list of file paths in the client-side. If the paths include directories, "
-"the location of them in the compute session is calculated from the relative "
-"path to *basedir* and all intermediate parent directories are automatically "
-"created if not exists."
+"The list of file paths in the client-side. If the paths include "
+"directories, the location of them in the compute session is calculated "
+"from the relative path to *basedir* and all intermediate parent "
+"directories are automatically created if not exists."
 msgstr ""
 
-#: 62dade77b3d948e6a22956df3fa03d69
+#: 6370312ad23e4cd48ebce5b3b796ee4a
 #: ai.backend.client.func.session.ComputeSession.upload:11 of
 msgid ""
-"For example, if a file path is ``/home/user/test/data.txt`` (or ``test/data."
-"txt``) where *basedir* is ``/home/user`` (or the current working directory "
-"is ``/home/user``), the uploaded file is located at ``/home/work/test/data."
-"txt`` in the compute session container."
+"For example, if a file path is ``/home/user/test/data.txt`` (or "
+"``test/data.txt``) where *basedir* is ``/home/user`` (or the current "
+"working directory is ``/home/user``), the uploaded file is located at "
+"``/home/work/test/data.txt`` in the compute session container."
 msgstr ""
 
-#: 6f0b1207d53f41708bcd93769a7ff7ec
+#: 0af8aa7eebe9473c905598842c458d84
 #: ai.backend.client.func.session.ComputeSession.upload:16 of
 msgid ""
 "The directory prefix where the files reside. The default value is the "
 "current working directory."
 msgstr ""
 
-#: 2312e90069ad4d8187e663f3f34ac6c9
-#: ai.backend.client.func.session.ComputeSession.upload:19 of
+#: ai.backend.client.func.session.ComputeSession.upload:19
+#: cf886daae2bf4cfb8b9a29beac5d4750 of
 msgid "Displays a progress bar during uploads."
 msgstr ""
 
-#: 062afda2c7124f86a45a4f2a2d3c7d14
+#: 6b631eb024f94925a16a075055d97395
 #: ai.backend.client.func.session.ComputeSession.download:1 of
 msgid "Downloads the given list of files from the compute session."
 msgstr ""
 
-#: 67d07c0c5c6248d793e11c125a797c3f
+#: 74c714a031f44bad84f89d84b337ba2d
 #: ai.backend.client.func.session.ComputeSession.download:4 of
 msgid ""
-"The list of file paths in the compute session. If they are relative paths, "
-"the path is calculated from ``/home/work`` in the compute session container."
+"The list of file paths in the compute session. If they are relative "
+"paths, the path is calculated from ``/home/work`` in the compute session "
+"container."
 msgstr ""
 
-#: 9cb56326dc974d8d8cccae48575bda47
+#: 1d41b6934ba14d18b4523253af5a3cdf
 #: ai.backend.client.func.session.ComputeSession.download:8 of
 msgid "The destination directory in the client-side."
 msgstr ""
 
-#: 8b7b454e491a45e9a6a71b2bba0e6321
+#: 13660dd4cce84da28d2a191e2e846b96
 #: ai.backend.client.func.session.ComputeSession.download:10 of
 msgid "Displays a progress bar during downloads."
 msgstr ""
 
-#: 0993826224684379876a408c261ead13
+#: 568d33439e144a40aed0edca9138b980
 #: ai.backend.client.func.session.ComputeSession.list_files:1 of
 msgid ""
 "Gets the list of files in the given path inside the compute session "
 "container."
 msgstr ""
 
-#: ai.backend.client.func.session.ComputeSession.list_files:5
-#: e9c500b14a0744ccad954a2b9a93248b of
+#: 4e173a19e76f496c94630dcc06176c36
+#: ai.backend.client.func.session.ComputeSession.list_files:5 of
 msgid "The directory path in the compute session."
 msgstr ""
 
-#: 108cc1d5e3394de6b8b2da09ffa45238
-#: ai.backend.client.func.session.ComputeSession.listen_events:1
-#: fcc83633a8d04d97b7dc9a0573717bb8 of
-msgid ""
-"Opens the stream of the kernel lifecycle events. Only the master kernel of "
-"each session is monitored."
+#: ai.backend.client.func.session.ComputeSession.get_abusing_report:1
+#: f41ddf2f9c2e43d2b22c55ed13bb8f32 of
+msgid "Retrieves abusing reports of session's sibling kernels."
 msgstr ""
 
-#: 46e0167ade3e4d319675fd91d56b0d2a
+#: 520324d23fa743cebc98c1611c387a0c a6bf511959854069ac5fd572bad03a71
+#: ai.backend.client.func.session.ComputeSession.listen_events:1 of
+msgid ""
+"Opens the stream of the kernel lifecycle events. Only the master kernel "
+"of each session is monitored."
+msgstr ""
+
+#: 1a18f5aea1af448fa47123c9d69cf042
 #: ai.backend.client.func.session.ComputeSession.listen_events:4
-#: baf3e8df5e1c408fab6cb17fb86706da of
+#: db95a53980f8424bbfe68c63554b0820 of
 msgid ":py:class:`~ai.backend.client.request.SSEContextManager`"
 msgstr ""
 
-#: 4976c021df4e4d679c8b625a783dd83f 75f86e2f4d58413b9e8ac2b7896d3706
+#: 06fa793434c146eda263ddc3230ccd4f 2b169dfbf30b415d8483551c7d61f9ce
 #: ai.backend.client.func.session.ComputeSession.listen_events:5 of
 msgid "a :class:`StreamEvents` object."
 msgstr ""
 
-#: 26f677a44c5f4401a9be6883c7c2d14c
+#: 7368a2ef17ad43109887e786ed434c5d
 #: ai.backend.client.func.session.ComputeSession.stream_pty:1 of
 msgid ""
-"Opens a pseudo-terminal of the kernel (if supported) streamed via websockets."
+"Opens a pseudo-terminal of the kernel (if supported) streamed via "
+"websockets."
 msgstr ""
 
-#: 2d8148d02d5a49aeb355daa600db9a9a 40a893e5c0c94fb4a0ecc141d53ac7d6
+#: 646768f4f96c43c3afff982cd60d80e2
 #: ai.backend.client.func.session.ComputeSession.stream_execute:6
-#: ai.backend.client.func.session.ComputeSession.stream_pty:4 of
+#: ai.backend.client.func.session.ComputeSession.stream_pty:4
+#: e6314a0f10d444b1b99b764a3f50ef5b of
 msgid ":py:class:`~ai.backend.client.request.WebSocketContextManager`"
 msgstr ""
 
 #: ai.backend.client.func.session.ComputeSession.stream_pty:5
-#: becaa9ea9d8145f4b14a91afba5623dd of
+#: b53b48fe439843318c93c9bf93e01adc of
 msgid "a :class:`StreamPty` object."
 msgstr ""
 
-#: 5e28da3ec60d42a98664911f1726c4d8
-#: ai.backend.client.func.session.ComputeSession.stream_execute:1 of
+#: ai.backend.client.func.session.ComputeSession.stream_execute:1
+#: d60a7ea9d06242069421f53e7dfd8092 of
 msgid ""
-"Executes a code snippet in the streaming mode. Since the returned websocket "
-"represents a run loop, there is no need to specify *run_id* explicitly."
+"Executes a code snippet in the streaming mode. Since the returned "
+"websocket represents a run loop, there is no need to specify *run_id* "
+"explicitly."
 msgstr ""
 
-#: ai.backend.client.func.session.StreamPty:1 f701a6ae17fa4ac787ff9ab7f8e8a534
+#: 7defbcce274541eab825b18e23470af5 ai.backend.client.func.session.StreamPty:1
 #: of
 msgid ""
-"A derivative class of :class:`~ai.backend.client.request.WebSocketResponse` "
-"which provides additional functions to control the terminal."
+"A derivative class of "
+":class:`~ai.backend.client.request.WebSocketResponse` which provides "
+"additional functions to control the terminal."
 msgstr ""
+
+#~ msgid "Provides various interactions with compute sessions in Backend.AI."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The term 'kernel' is now deprecated "
+#~ "and we prefer 'compute sessions'. "
+#~ "However, for historical reasons and to"
+#~ " avoid confusion with client sessions, "
+#~ "we keep the backward compatibility with"
+#~ " the naming of this API function "
+#~ "class."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For multi-container sessions, all "
+#~ "methods take effects to the master "
+#~ "container only, except "
+#~ ":func:`~ComputeSession.destroy` and "
+#~ ":func:`~ComputeSession.restart` methods. So it "
+#~ "is the user's responsibility to "
+#~ "distribute uploaded files to multiple "
+#~ "containers using explicit copies or "
+#~ "virtual folders which are commonly "
+#~ "mounted to all containers belonging to"
+#~ " the same compute session."
+#~ msgstr ""
+
+#~ msgid "Fetches the list of users. Domain admins can only get domain users."
+#~ msgstr ""
+
+#~ msgid "Parameters"
+#~ msgstr ""
+
+#~ msgid "Fetches active or inactive users only if not None."
+#~ msgstr ""
+
+#~ msgid "Additional per-user query fields to fetch."
+#~ msgstr ""
+
+#~ msgid "Return type"
+#~ msgstr ""
+
+#~ msgid ":py:class:`~ai.backend.client.output.types.PaginatedResult`\\[:py:class:`dict`]"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Get-or-creates a compute session. "
+#~ "If *name* is ``None``, it creates "
+#~ "a new compute session as long as"
+#~ " the server has enough resources and"
+#~ " your API key has remaining quota."
+#~ " If *name* is a valid string "
+#~ "and there is an existing compute "
+#~ "session with the same token and "
+#~ "the same *image*, then it returns "
+#~ "the :class:`ComputeSession` instance representing"
+#~ " the existing session."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The image name and tag for the "
+#~ "compute session. Example: ``python:3.6-ubuntu``. "
+#~ "Check out the full list of "
+#~ "available images in your server using"
+#~ " (TODO: new API)."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A client-side (user-defined) identifier"
+#~ " to distinguish the session among "
+#~ "currently running sessions. It may be"
+#~ " used to seamlessly reuse the session"
+#~ " already created.  .. versionchanged:: "
+#~ "19.12.0     Renamed from ``clientSessionToken``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A client-side (user-defined) identifier"
+#~ " to distinguish the session among "
+#~ "currently running sessions. It may be"
+#~ " used to seamlessly reuse the session"
+#~ " already created."
+#~ msgstr ""
+
+#~ msgid "Renamed from ``clientSessionToken``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Either ``\"interactive\"`` (default) or "
+#~ "``\"batch\"``.  .. versionadded:: 19.09.0"
+#~ msgstr ""
+
+#~ msgid "Either ``\"interactive\"`` (default) or ``\"batch\"``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Just enqueue the session creation "
+#~ "request and return immediately, without "
+#~ "waiting for its startup. (default: "
+#~ "``false`` to preserve the legacy "
+#~ "behavior)  .. versionadded:: 19.09.0"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Just enqueue the session creation "
+#~ "request and return immediately, without "
+#~ "waiting for its startup. (default: "
+#~ "``false`` to preserve the legacy "
+#~ "behavior)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The time to wait for session "
+#~ "startup. If the cluster resource is "
+#~ "being fully utilized, this waiting time"
+#~ " can be arbitrarily long due to "
+#~ "job queueing.  If the timeout reaches,"
+#~ " the returned *status* field becomes "
+#~ "``\"TIMEOUT\"``.  Still in this case, "
+#~ "the session may start in the "
+#~ "future.  .. versionadded:: 19.09.0"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The time to wait for session "
+#~ "startup. If the cluster resource is "
+#~ "being fully utilized, this waiting time"
+#~ " can be arbitrarily long due to "
+#~ "job queueing.  If the timeout reaches,"
+#~ " the returned *status* field becomes "
+#~ "``\"TIMEOUT\"``.  Still in this case, "
+#~ "the session may start in the "
+#~ "future."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Raises an explicit error if a "
+#~ "session with the same *image* and "
+#~ "the same *name* already exists instead"
+#~ " of returning the information of it."
+#~ "  .. versionadded:: 19.09.0"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Raises an explicit error if a "
+#~ "session with the same *image* and "
+#~ "the same *name* already exists instead"
+#~ " of returning the information of it."
+#~ msgstr ""
+
+#~ msgid "The list of vfolder names that belongs to the current API access key."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Mapping which contains custom path to"
+#~ " mount vfolder. Key and value of "
+#~ "this map should be vfolder name "
+#~ "and custom path. Default mounts or "
+#~ "relative paths are under /home/work. If"
+#~ " you want different paths, names "
+#~ "should be absolute paths. The target "
+#~ "mount path of vFolders should not "
+#~ "overlap with the linux system folders."
+#~ " vFolders which has a dot(.) prefix"
+#~ " in its name are not affected."
+#~ msgstr ""
+
+#~ msgid "The environment variables which always bypasses the jail policy."
+#~ msgstr ""
+
+#~ msgid "The resource specification. (TODO: details)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The number of containers in this "
+#~ "compute session. Must be at least "
+#~ "1.  .. versionadded:: 19.09.0 .. "
+#~ "versionchanged:: 20.09.0"
+#~ msgstr ""
+
+#~ msgid "The number of containers in this compute session. Must be at least 1."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Set the clustering mode whether to "
+#~ "use distributed nodes or a single "
+#~ "node to spawn multiple containers for"
+#~ " the new session.  .. versionadded:: "
+#~ "20.09.0"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Set the clustering mode whether to "
+#~ "use distributed nodes or a single "
+#~ "node to spawn multiple containers for"
+#~ " the new session."
+#~ msgstr ""
+
+#~ msgid "An optional string to annotate extra information."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "An optional access key that owns "
+#~ "the created session. (Only available to"
+#~ " administrators)"
+#~ msgstr ""
+
+#~ msgid ":py:class:`~ai.backend.client.func.session.ComputeSession`"
+#~ msgstr ""
+
+#~ msgid "Returns"
+#~ msgstr ""
+
+#~ msgid "The :class:`ComputeSession` instance."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Get-or-creates a compute session "
+#~ "from template. All other parameters "
+#~ "provided  will be overwritten to "
+#~ "template, including vfolder mounts (not "
+#~ "appended!). If *name* is ``None``, it"
+#~ " creates a new compute session as "
+#~ "long as the server has enough "
+#~ "resources and your API key has "
+#~ "remaining quota. If *name* is a "
+#~ "valid string and there is an "
+#~ "existing compute session with the same"
+#~ " token and the same *image*, then "
+#~ "it returns the :class:`ComputeSession` "
+#~ "instance representing the existing session."
+#~ msgstr ""
+
+#~ msgid "Task template to apply to compute session."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Destroys the compute session. Since the"
+#~ " server literally kills the container(s),"
+#~ " all ongoing executions are forcibly "
+#~ "interrupted."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Restarts the compute session. The server"
+#~ " force-destroys the current running "
+#~ "container(s), but keeps their temporary "
+#~ "scratch directories intact."
+#~ msgstr ""
+
+#~ msgid "Renames Session ID of running compute session."
+#~ msgstr ""
+
+#~ msgid "Commit a running session to a tar file in the agent host."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Tries to interrupt the current ongoing"
+#~ " code execution. This may fail "
+#~ "without any explicit errors depending on"
+#~ " the code being executed."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Gets the auto-completion candidates from"
+#~ " the given code string, as if a"
+#~ " user has pressed the tab key "
+#~ "just after the code in IDEs."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Depending on the language of the "
+#~ "compute session, this feature may not"
+#~ " be supported.  Unsupported sessions "
+#~ "returns an empty list."
+#~ msgstr ""
+
+#~ msgid "An (incomplete) code text."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Additional information about the current "
+#~ "cursor position, such as row, col, "
+#~ "line and the remainder text."
+#~ msgstr ""
+
+#~ msgid ":py:class:`~typing.Iterable`\\[:py:class:`str`]"
+#~ msgstr ""
+
+#~ msgid "An ordered list of strings."
+#~ msgstr ""
+
+#~ msgid "Retrieves a brief information about the compute session."
+#~ msgstr ""
+
+#~ msgid "Retrieves the console log of the compute session container."
+#~ msgstr ""
+
+#~ msgid "Retrieves the status transition history of the compute session."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Executes a code snippet directly in "
+#~ "the compute session or sends a set"
+#~ " of build/clean/execute commands to the "
+#~ "compute session."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For more details about using this "
+#~ "API, please refer :doc:`the official API"
+#~ " documentation <user-api/intro>`."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A unique identifier for a particular "
+#~ "run loop.  In the first call, it"
+#~ " may be ``None`` so that the "
+#~ "server auto-assigns one. Subsequent "
+#~ "calls must use the returned ``runId``"
+#~ " value to request continuation or to"
+#~ " send user inputs."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A code snippet as string.  In the"
+#~ " continuation requests, it must be an"
+#~ " empty string.  When sending user "
+#~ "inputs, this is where the user "
+#~ "input string is stored."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A constant string which is one of"
+#~ " ``\"query\"``, ``\"batch\"``, ``\"continue\"``, "
+#~ "and ``\"user-input\"``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A dict for specifying additional "
+#~ "options. Mainly used in the batch "
+#~ "mode to specify build/clean/execution "
+#~ "commands. See :ref:`the API object "
+#~ "reference <batch-execution-query-object>` "
+#~ "for details."
+#~ msgstr ""
+
+#~ msgid ":ref:`An execution result object <execution-result-object>`"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Uploads the given list of files to"
+#~ " the compute session. You may refer"
+#~ " them in the batch-mode execution "
+#~ "or from the code executed in the"
+#~ " server afterwards."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The list of file paths in the "
+#~ "client-side. If the paths include "
+#~ "directories, the location of them in "
+#~ "the compute session is calculated from"
+#~ " the relative path to *basedir* and"
+#~ " all intermediate parent directories are"
+#~ " automatically created if not exists.  "
+#~ "For example, if a file path is "
+#~ "``/home/user/test/data.txt`` (or ``test/data.txt``) "
+#~ "where *basedir* is ``/home/user`` (or "
+#~ "the current working directory is "
+#~ "``/home/user``), the uploaded file is "
+#~ "located at ``/home/work/test/data.txt`` in the"
+#~ " compute session container."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The list of file paths in the "
+#~ "client-side. If the paths include "
+#~ "directories, the location of them in "
+#~ "the compute session is calculated from"
+#~ " the relative path to *basedir* and"
+#~ " all intermediate parent directories are"
+#~ " automatically created if not exists."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For example, if a file path is "
+#~ "``/home/user/test/data.txt`` (or ``test/data.txt``) "
+#~ "where *basedir* is ``/home/user`` (or "
+#~ "the current working directory is "
+#~ "``/home/user``), the uploaded file is "
+#~ "located at ``/home/work/test/data.txt`` in the"
+#~ " compute session container."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The directory prefix where the files "
+#~ "reside. The default value is the "
+#~ "current working directory."
+#~ msgstr ""
+
+#~ msgid "Displays a progress bar during uploads."
+#~ msgstr ""
+
+#~ msgid "Downloads the given list of files from the compute session."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The list of file paths in the "
+#~ "compute session. If they are relative"
+#~ " paths, the path is calculated from"
+#~ " ``/home/work`` in the compute session "
+#~ "container."
+#~ msgstr ""
+
+#~ msgid "The destination directory in the client-side."
+#~ msgstr ""
+
+#~ msgid "Displays a progress bar during downloads."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Gets the list of files in the "
+#~ "given path inside the compute session"
+#~ " container."
+#~ msgstr ""
+
+#~ msgid "The directory path in the compute session."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Opens the stream of the kernel "
+#~ "lifecycle events. Only the master kernel"
+#~ " of each session is monitored."
+#~ msgstr ""
+
+#~ msgid ":py:class:`~ai.backend.client.request.SSEContextManager`"
+#~ msgstr ""
+
+#~ msgid "a :class:`StreamEvents` object."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Opens a pseudo-terminal of the "
+#~ "kernel (if supported) streamed via "
+#~ "websockets."
+#~ msgstr ""
+
+#~ msgid ":py:class:`~ai.backend.client.request.WebSocketContextManager`"
+#~ msgstr ""
+
+#~ msgid "a :class:`StreamPty` object."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Executes a code snippet in the "
+#~ "streaming mode. Since the returned "
+#~ "websocket represents a run loop, there"
+#~ " is no need to specify *run_id* "
+#~ "explicitly."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A derivative class of "
+#~ ":class:`~ai.backend.client.request.WebSocketResponse` which "
+#~ "provides additional functions to control "
+#~ "the terminal."
+#~ msgstr ""
+

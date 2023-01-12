@@ -5,7 +5,7 @@ import time
 from decimal import Decimal
 from typing import Final, Iterable, Tuple
 
-import attr
+import attrs
 from aiohttp import web
 from aiotools import apartial
 
@@ -84,7 +84,7 @@ async def rlim_middleware(
         return response
 
 
-@attr.s(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     redis_rlim: RedisConnectionInfo
     redis_rlim_script: str

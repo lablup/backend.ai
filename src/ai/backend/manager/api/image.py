@@ -418,6 +418,7 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
                 "image_ref": importer_image,
                 "cluster_role": DEFAULT_ROLE,
                 "cluster_idx": 1,
+                "local_rank": 0,
                 "cluster_hostname": f"{DEFAULT_ROLE}1",
                 "creation_config": {
                     "resources": {"cpu": "1", "mem": "2g"},

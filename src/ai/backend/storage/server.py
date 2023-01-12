@@ -6,7 +6,6 @@ import os
 import pwd
 import ssl
 import sys
-from contextlib import closing
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import Any, AsyncIterator, Sequence
@@ -60,9 +59,15 @@ async def server_main(
         hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
     )
     m.prompt = f"monitor (storage-proxy[{pidx}@{os.getpid()}]) >>> "
-    m.start()
+    m.console_locals["local_config"] = local_config
+    aiomon_started = False
+    try:
+        m.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
-    with closing(m):
+    try:
         etcd_credentials = None
         if local_config["etcd"]["user"]:
             etcd_credentials = {
@@ -80,8 +85,11 @@ async def server_main(
             credentials=etcd_credentials,
         )
         ctx = Context(pid=os.getpid(), local_config=local_config, etcd=etcd)
+        m.console_locals["ctx"] = ctx
         client_api_app = await init_client_app(ctx)
         manager_api_app = await init_manager_app(ctx)
+        m.console_locals["client_api_app"] = client_api_app
+        m.console_locals["manager_api_app"] = manager_api_app
 
         client_ssl_ctx = None
         manager_ssl_ctx = None
@@ -137,6 +145,9 @@ async def server_main(
             log.info("Shutting down...")
             await manager_api_runner.cleanup()
             await client_api_runner.cleanup()
+    finally:
+        if aiomon_started:
+            m.close()
 
 
 @click.group(invoke_without_command=True)
