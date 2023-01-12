@@ -724,11 +724,18 @@ class AbstractAgent(
             str(subdir2): ...,
         }
         """
+        loop = current_loop()
         base_commit_path: Path = self.local_config["agent"]["image-commit-path"]
         status_map = {}
-        for subdir in base_commit_path.iterdir():
-            ongoing_list = [commit_path.name for commit_path in subdir.glob("./**/lock/*")]
-            status_map[str(subdir)] = {kern: CommitStatus.ONGOING.value for kern in ongoing_list}
+
+        def _map_commit_status() -> None:
+            for subdir in base_commit_path.iterdir():
+                ongoing_list = [commit_path.name for commit_path in subdir.glob("./**/lock/*")]
+                status_map[str(subdir)] = {
+                    kern: CommitStatus.ONGOING.value for kern in ongoing_list
+                }
+
+        await loop.run_in_executor(None, _map_commit_status)
 
         async def _set_all_commit_status(r: Redis):
             pipe = r.pipeline()
