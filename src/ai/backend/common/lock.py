@@ -91,7 +91,7 @@ class FileLock(AbstractDistributedLock):
         if self._file is not None:
             self._debug = False
             self.release()
-            log.debug(f"{self.__class__.__name__} implicitly released: {self._path}")
+            log.debug("{} implicitly released: {}", self.__class__.__name__, self._path)
 
     async def acquire(self) -> None:
         assert self._file is None
@@ -112,7 +112,7 @@ class FileLock(AbstractDistributedLock):
                     if lifetime := self._lifetime:
                         self.register_watchdog_task(ttl=lifetime)
                     if self._debug:
-                        log.debug(f"{self.__class__.__name__} acquired: {self._path}")
+                        log.debug("{} acquired: {}", self.__class__.__name__, self._path)
         except RetryError:
             raise asyncio.TimeoutError(f"failed to lock file: {self._path}")
 
@@ -123,7 +123,7 @@ class FileLock(AbstractDistributedLock):
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
-                log.debug(f"{self.__class__.__name__} explicitly released: {self._path}")
+                log.debug("{} explicitly released: {}", self.__class__.__name__, self._path)
         self._file.close()
         if self._locked and self._remove_when_unlock:
             self._path.unlink()
@@ -145,7 +145,7 @@ class FileLock(AbstractDistributedLock):
             self._locked = False
             if self._debug:
                 log.debug(
-                    f"{self.__class__.__name__} implicitly released by watchdog: {self._path}"
+                    "{} implicitly released by watchdog: {}", self.__class__.__name__, self._path
                 )
 
     @property
