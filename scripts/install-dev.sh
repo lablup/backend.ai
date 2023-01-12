@@ -567,43 +567,13 @@ echo "${LGREEN}Backend.AI one-line installer for developers${NC}"
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
 
-# Install pyenv
-read -r -d '' pyenv_init_script <<"EOS"
-export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)"
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
-EOS
-if ! type "pyenv" >/dev/null 2>&1; then
-  # TODO: ask if install pyenv
-  show_info "Installing pyenv..."
-  set -e
-  curl https://pyenv.run | sh
-  for PROFILE_FILE in "zshrc" "bashrc" "profile" "bash_profile"
-  do
-    if [ -e "${HOME}/.${PROFILE_FILE}" ]
-    then
-      echo "$pyenv_init_script" >> "${HOME}/.${PROFILE_FILE}"
-    fi
-  done
-  set +e
-  eval "$pyenv_init_script"
-  pyenv
-else
-  eval "$pyenv_init_script"
+# Check python version
+PY_VERSION=$(python -V 2>&1 | cut -d\  -f 2) # python 2 prints version to stderr
+PY_VERSION=(${PY_VERSION//./ }) # make an version parts array
+if [[ ${PY_VERSION[0]} -lt 3 ]] || [[ ${PY_VERSION[0]} -eq 3 && ${PY_VERSION[1]} -lt 7 ]] ; then
+    echo "Python 3.7 and greater needed!" 1>&2
+    exit 1
 fi
-
-# Install Python and pyenv virtualenvs
-show_info "Checking and installing Python dependencies..."
-install_pybuild_deps
-
-show_info "Installing Python..."
-install_python
-
-show_info "Checking Python features..."
-check_python
-pyenv shell "${PYTHON_VERSION}"
 
 $bpython -m pip --disable-pip-version-check install -q requests requests-unixsocket
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
