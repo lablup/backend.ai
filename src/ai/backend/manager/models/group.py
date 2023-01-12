@@ -58,7 +58,7 @@ __all__: Sequence[str] = (
     "association_groups_users",
     "resolve_group_name_or_id",
     "query_suadmin_accessible_groups",
-    "query_admin_accessible_groups",
+    "query_domain_admin_accessible_groups",
     "query_user_accessible_groups",
     "Group",
     "GroupInput",
@@ -212,35 +212,35 @@ async def query_suadmin_accessible_groups(
     return None
 
 
-async def query_admin_accessible_groups(
+async def query_domain_admin_accessible_groups(
     db_conn: SAConnection,
     domain_name: str,
-) -> Iterable[uuid.UUID]:
+) -> Sequence[sa.engine.Row]:
     """
-    Query all groups of the domain the admin belongs to.
+    Query all groups of the domain.
     """
-    query = sa.select([groups.c.id]).select_from(groups).where(groups.c.domain_name == domain_name)
+
+    query = sa.select([groups]).select_from(groups).where(groups.c.domain_name == domain_name)
     result = await db_conn.execute(query)
-    return [grp.id for grp in result.fetchall()]
+    return result.fetchall()
 
 
 async def query_user_accessible_groups(
     db_conn: SAConnection,
     user_uuid: uuid.UUID,
-) -> Iterable[uuid.UUID]:
+) -> Sequence[sa.engine.Row]:
     """
     Query all groups the user belongs to.
     """
-    from .user import users
 
-    j = sa.join(association_groups_users, users, association_groups_users.c.user_id == users.c.uuid)
+    j = sa.join(
+        association_groups_users, groups, association_groups_users.c.group_id == groups.c.id
+    )
     query = (
-        sa.select([association_groups_users.c.group_id])
-        .select_from(j)
-        .where(association_groups_users.c.user_id == user_uuid)
+        sa.select([groups]).select_from(j).where(association_groups_users.c.user_id == user_uuid)
     )
     result = await db_conn.execute(query)
-    return [grp.group_id for grp in result.fetchall()]
+    return result.fetchall()
 
 
 class Group(graphene.ObjectType):

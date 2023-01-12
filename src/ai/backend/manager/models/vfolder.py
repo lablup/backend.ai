@@ -786,30 +786,26 @@ class VirtualFolder(graphene.ObjectType):
         user_id: uuid.UUID = None,
         filter: str = None,
     ) -> int:
-        from .group import groups, query_user_accessible_groups
+        from .group import query_user_accessible_groups
         from .user import users
 
-        j = (
-            sa.join(
-                vfolders,
-                vfolder_permissions,
-                vfolders.c.id == vfolder_permissions.c.vfolder,
-                isouter=True,
-            )
-            .join(users, vfolders.c.user == users.c.uuid, isouter=True)
-            .join(groups, vfolders.c.group == groups.c.id, isouter=True)
+        j = sa.join(
+            vfolders,
+            vfolder_permissions,
+            vfolders.c.id == vfolder_permissions.c.vfolder,
+            isouter=True,
         )
         query = sa.select([sa.func.count()]).select_from(j)
         if domain_name is not None:
-            query = query.where(
-                (users.c.domain_name == domain_name) | (groups.c.domain_name == domain_name)
-            )
+            query = query.where(users.c.domain_name == domain_name)
         if user_id is not None:
             async with graph_ctx.db.begin_readonly() as conn:
-                group_ids = await query_user_accessible_groups(conn, user_id)
+                group_rows = await query_user_accessible_groups(conn, user_id)
+            if domain_name is not None:
+                group_rows = [grp for grp in group_rows if grp.domain_name == domain_name]
             query = query.where(
                 (vfolders.c.user == user_id)
-                | vfolders.c.group.in_(group_ids)
+                | vfolders.c.group.in_([grp.id for grp in group_rows])
                 | (vfolder_permissions.c.user == user_id)
             )
         if group_id is not None:
@@ -851,7 +847,7 @@ class VirtualFolder(graphene.ObjectType):
                 [
                     vfolders,
                     users.c.email,
-                    groups.c.name.label("groups_name"),
+                    groups.c.name,
                     vfolder_permissions.c.permission.label(OVERRIDEN_PERMISSION),
                 ]
             )
@@ -860,15 +856,15 @@ class VirtualFolder(graphene.ObjectType):
             .offset(offset)
         )
         if domain_name is not None:
-            query = query.where(
-                (users.c.domain_name == domain_name) | (groups.c.domain_name == domain_name)
-            )
+            query = query.where(users.c.domain_name == domain_name)
         if user_id is not None:
             async with graph_ctx.db.begin_readonly() as conn:
-                group_ids = await query_user_accessible_groups(conn, user_id)
+                group_rows = await query_user_accessible_groups(conn, user_id)
+            if domain_name is not None:
+                group_rows = [grp for grp in group_rows if grp.domain_name == domain_name]
             query = query.where(
                 (vfolders.c.user == user_id)
-                | vfolders.c.group.in_(group_ids)
+                | vfolders.c.group.in_([grp.id for grp in group_rows])
                 | (vfolder_permissions.c.user == user_id)
             )
         if group_id is not None:
@@ -882,11 +878,11 @@ class VirtualFolder(graphene.ObjectType):
         else:
             query = query.order_by(vfolders.c.created_at.desc())
         async with graph_ctx.db.begin_readonly() as conn:
-            return [
-                obj
-                for row in [r async for r in (await conn.stream(query))]
-                if (obj := cls.from_row(graph_ctx, row)) is not None
-            ]
+            return_val = []
+            async for row in (await conn.stream(query)):
+                if (obj := cls.from_row(graph_ctx, row)) is not None:
+                    return_val.append(obj)
+            return return_val
 
     @classmethod
     async def batch_load_by_user(
