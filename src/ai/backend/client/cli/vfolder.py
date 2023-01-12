@@ -9,12 +9,13 @@ from tabulate import tabulate
 from tqdm import tqdm
 
 from ai.backend.cli.interaction import ask_yn
+from ai.backend.cli.main import main
+from ai.backend.cli.types import ExitCode
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
 from ai.backend.client.session import Session
 
 from ..compat import asyncio_run
 from ..session import AsyncSession
-from .main import main
 from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
 from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
 
@@ -34,7 +35,7 @@ def list_hosts():
             print("Usable hosts: {}".format(", ".join(resp["allowed"])))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -46,7 +47,7 @@ def list_allowed_types():
             print(resp)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -137,7 +138,7 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
             print('Virtual folder "{0}" is created.'.format(result["name"]))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -153,7 +154,7 @@ def delete(name):
             print_done("Deleted.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -174,7 +175,7 @@ def rename(old_name, new_name):
             print_done("Renamed.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -199,7 +200,7 @@ def info(name):
             print("- Clone Allowed: {0}".format(result["cloneable"]))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command(context_settings={"show_default": True})  # bug: pallets/click#1565 (fixed in 8.0)
@@ -210,7 +211,7 @@ def info(name):
     "--base-dir",
     type=Path,
     default=None,
-    help="Set the parent directory from where the file is uploaded.  "
+    help="The local parent directory which contains the file to be uploaded.  "
     "[default: current working directry]",
 )
 @click.option(
@@ -252,7 +253,7 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
             print_done("Done.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command(context_settings={"show_default": True})  # bug: pallets/click#1565 (fixed in 8.0)
@@ -263,7 +264,7 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     "--base-dir",
     type=Path,
     default=None,
-    help="Set the parent directory from where the file is uploaded.  "
+    help="The local parent directory which will contain the downloaded file.  "
     "[default: current working directry]",
 )
 @click.option(
@@ -283,7 +284,13 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     "Each Yn address must at least include the IP address "
     "or the hostname and may include the protocol part and the port number to replace.",
 )
-def download(name, filenames, base_dir, chunk_size, override_storage_proxy):
+@click.option(
+    "--max-retries",
+    type=int,
+    default=20,
+    help="Maximum retry attempt when any failure occurs.",
+)
+def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_retries):
     """
     Download a file from the virtual folder to the current working directory.
     The files with the same names will be overwirtten.
@@ -301,11 +308,12 @@ def download(name, filenames, base_dir, chunk_size, override_storage_proxy):
                 show_progress=True,
                 address_map=override_storage_proxy
                 or APIConfig.DEFAULTS["storage_proxy_address_map"],
+                max_retries=max_retries,
             )
             print_done("Done.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -325,7 +333,7 @@ def request_download(name, filename):
             print_done(f'Download token: {response["token"]}')
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -368,7 +376,7 @@ def mkdir(name, path, parents, exist_ok):
             print_done("Done.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -390,7 +398,7 @@ def rename_file(name, target_path, new_name):
             print_done("Renamed.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -415,7 +423,7 @@ def mv(name, src, dst):
             print_done("Moved.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command(aliases=["delete-file"])
@@ -438,12 +446,12 @@ def rm(name, filenames, recursive):
         try:
             if not ask_yn():
                 print_info("Cancelled")
-                sys.exit(1)
+                sys.exit(ExitCode.FAILURE)
             session.VFolder(name).delete_files(filenames, recursive=recursive)
             print_done("Done.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -501,7 +509,7 @@ def invite(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).invite(perm, emails)
             invited_ids = result.get("invited_ids", [])
-            if len(invited_ids) > 0:
+            if invited_ids:
                 print("Invitation sent to:")
                 for invitee in invited_ids:
                     print("\t- " + invitee)
@@ -509,7 +517,7 @@ def invite(name, emails, perm):
                 print("No users found. Invitation was not sent.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -560,7 +568,7 @@ def invitations():
                         break
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -586,7 +594,7 @@ def share(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).share(perm, emails)
             shared_emails = result.get("shared_emails", [])
-            if len(shared_emails) > 0:
+            if shared_emails:
                 print("Shared with {} permission to:".format(perm))
                 for _email in shared_emails:
                     print("\t- " + _email)
@@ -594,7 +602,7 @@ def share(name, emails, perm):
                 print("No users found. Folder is not shared.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -611,7 +619,7 @@ def unshare(name, emails):
         try:
             result = session.VFolder(name).unshare(emails)
             unshared_emails = result.get("unshared_emails", [])
-            if len(unshared_emails) > 0:
+            if unshared_emails:
                 print("Unshared from:")
                 for _email in unshared_emails:
                     print("\t- " + _email)
@@ -619,12 +627,20 @@ def unshare(name, emails):
                 print("No users found. Folder is not unshared.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
 @click.argument("name", type=str)
-def leave(name):
+@click.option(
+    "-s",
+    "--shared-user-uuid",
+    metavar="SHARED_USER_UUID",
+    type=str,
+    default=None,
+    help="The ID of the person who wants to leave (the person who shared the vfolder).",
+)
+def leave(name, shared_user_uuid):
     """Leave the shared virutal folder.
 
     NAME: Name of a virtual folder
@@ -638,12 +654,12 @@ def leave(name):
             if vfolder_info["is_owner"]:
                 print("You cannot leave a virtual folder you own. Consider using delete instead.")
                 return
-            session.VFolder(name).leave()
+            session.VFolder(name).leave(shared_user_uuid)
             print('Left the shared virtual folder "{}".'.format(name))
 
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -692,7 +708,7 @@ def clone(name, target_name, target_host, usage_mode, permission):
             bgtask_id = result.get("bgtask_id")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
     async def clone_vfolder_tracker(bgtask_id):
         print_wait(
@@ -763,4 +779,4 @@ def update_options(name, permission, set_cloneable):
             print_done("Updated.")
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)

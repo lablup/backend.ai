@@ -35,7 +35,7 @@ from ai.backend.agent.resources import (
     DiscretePropertyAllocMap,
     FractionAllocMap,
 )
-from ai.backend.agent.types import Container
+from ai.backend.agent.types import Container, MountInfo
 
 try:
     from ai.backend.agent.resources import get_resource_spec_from_container  # type: ignore
@@ -245,7 +245,7 @@ class CUDAPlugin(AbstractComputePlugin):
                 device_id = DeviceId(dev_info["mother_uuid"])
             all_devices.append(
                 CUDADevice(
-                    device_id=device_id,
+                    device_id=DeviceId(device_id),
                     hw_location=f"0000:99:{idx:02d}.0",
                     mother_uuid=dev_info["mother_uuid"],
                     numa_node=dev_info["numa_node"],
@@ -689,3 +689,13 @@ class CUDAPlugin(AbstractComputePlugin):
                 "last_updated": datetime.now(timezone.utc).isoformat(),
             },
         }
+
+    async def get_docker_networks(
+        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[str]:
+        return []
+
+    async def generate_mounts(
+        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[MountInfo]:
+        return []

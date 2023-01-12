@@ -16,7 +16,7 @@ Developer guide for Backend.AI documentation
 Then, follow the instructions below:
 
 ```console
-$ pyenv virtualenv 3.10.4 venv-bai-docs
+$ pyenv virtualenv 3.10.8 venv-bai-docs
 $ git clone https://github.com/lablup/backend.ai backend.ai
 $ cd ~/backend.ai/docs
 $ pyenv local venv-bai-docs
@@ -71,7 +71,7 @@ We are looking for people to help with a short guide for building PDF document b
 
 ## Advanced Settings
 
-### Managing the hierachy of toctree (Table of Contents) of documentation
+### Managing the hierarchy of toctree (Table of Contents) of documentation
 
 When documentation of each file gets too big to contain all things in one topic,
 It should be branched with proper sub-topics.

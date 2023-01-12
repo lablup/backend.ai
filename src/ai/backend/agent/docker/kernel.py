@@ -1,4 +1,6 @@
 import asyncio
+import functools
+import gzip
 import logging
 import lzma
 import os
@@ -7,8 +9,9 @@ import shutil
 import subprocess
 import textwrap
 from pathlib import Path, PurePosixPath
-from typing import Any, Dict, FrozenSet, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Final, FrozenSet, Mapping, Optional, Sequence, Tuple
 
+import janus
 import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
 from aiodocker.exceptions import DockerError
@@ -16,15 +19,20 @@ from aiotools import TaskGroup
 
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import CommitStatus, KernelId, Sentinel
 from ai.backend.common.utils import current_loop
+from ai.backend.plugin.entrypoint import scan_entrypoints
 
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 from ..utils import closing_async, get_arch_name
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
+DEFAULT_INFLIGHT_CHUNKS: Final = 8
 
 
 class DockerKernel(AbstractKernel):
@@ -127,6 +135,80 @@ class DockerKernel(AbstractKernel):
         result = await self.runner.feed_service_apps()
         return result
 
+    def _get_commit_path(self, kernel_id: KernelId, subdir: str) -> Tuple[Path, Path]:
+        base_commit_path: Path = self.agent_config["agent"]["image-commit-path"]
+        commit_path = base_commit_path / subdir
+        lock_path = commit_path / "lock" / str(kernel_id)
+        return commit_path, lock_path
+
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str):
+        _, lock_path = self._get_commit_path(kernel_id, subdir)
+        if lock_path.exists():
+            return CommitStatus.ONGOING
+        return CommitStatus.READY
+
+    async def commit(self, kernel_id: KernelId, subdir: str, filename: str):
+        assert self.runner is not None
+
+        loop = asyncio.get_running_loop()
+        path, lock_path = self._get_commit_path(kernel_id, subdir)
+        container_id: str = str(self.data["container_id"])
+        filepath = path / filename
+        try:
+            Path(path).mkdir(exist_ok=True, parents=True)
+            Path(lock_path).parent.mkdir(exist_ok=True, parents=True)
+        except ValueError:  # parent_path does not start with work_dir!
+            raise ValueError("malformed committed path.")
+
+        def _write_chunks(
+            fileobj: gzip.GzipFile,
+            q: janus._SyncQueueProxy[bytes | Sentinel],
+        ) -> None:
+            while True:
+                chunk = q.get()
+                if chunk is Sentinel.TOKEN:
+                    return
+                fileobj.write(chunk)
+                q.task_done()
+
+        try:
+            async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
+                log.info("Container is being committed to {}", filepath)
+                docker = Docker()
+                container = docker.containers.container(container_id)
+                try:
+                    response: Mapping[str, Any] = await container.commit()
+                    image_id = response["Id"]
+                    try:
+                        q: janus.Queue[bytes | Sentinel] = janus.Queue(
+                            maxsize=DEFAULT_INFLIGHT_CHUNKS
+                        )
+                        async with docker._query(f"images/{image_id}/get") as tb_resp:
+                            with gzip.open(filepath, "wb") as fileobj:
+                                write_task = loop.run_in_executor(
+                                    None,
+                                    functools.partial(
+                                        _write_chunks,
+                                        fileobj,
+                                        q.sync_q,
+                                    ),
+                                )
+                                try:
+                                    await asyncio.sleep(0)  # let write_task get started
+                                    async for chunk in tb_resp.content.iter_chunked(
+                                        DEFAULT_CHUNK_SIZE
+                                    ):
+                                        await q.async_q.put(chunk)
+                                finally:
+                                    await q.async_q.put(Sentinel.TOKEN)
+                                    await write_task
+                    finally:
+                        await docker.images.delete(image_id)
+                finally:
+                    await docker.close()
+        except asyncio.TimeoutError:
+            log.warning("Session is already being committed.")
+
     async def accept_file(self, filename: str, filedata: bytes):
         loop = current_loop()
         work_dir = self.agent_config["container"]["scratch-root"] / str(self.kernel_id) / "work"
@@ -165,6 +247,34 @@ class DockerKernel(AbstractKernel):
                     if fsize > 1048576:
                         raise ValueError("too large file")
                     tarbytes = tarobj.fileobj.getvalue()
+            except DockerError:
+                log.warning("Could not found the file: {0}", abspath)
+                raise FileNotFoundError(f"Could not found the file: {abspath}")
+        return tarbytes
+
+    async def download_single(self, filepath: str):
+        container_id = self.data["container_id"]
+        async with closing_async(Docker()) as docker:
+            container = docker.containers.container(container_id)
+            home_path = PurePosixPath("/home/work")
+            try:
+                abspath = home_path / filepath
+                abspath.relative_to(home_path)
+            except ValueError:
+                raise PermissionError("You cannot download files outside /home/work")
+            try:
+                with await container.get_archive(str(abspath)) as tarobj:
+                    tarobj.fileobj.seek(0, 2)
+                    fsize = tarobj.fileobj.tell()
+                    if fsize > 1048576:
+                        raise ValueError("too large file")
+                    tarobj.fileobj.seek(0)
+                    inner_file = tarobj.extractfile(tarobj.getnames()[0])
+                    if inner_file:
+                        tarbytes = inner_file.read()
+                    else:
+                        log.warning("Could not found the file: {0}", abspath)
+                        raise FileNotFoundError(f"Could not found the file: {abspath}")
             except DockerError:
                 log.warning("Could not found the file: {0}", abspath)
                 raise FileNotFoundError(f"Could not found the file: {abspath}")
@@ -359,8 +469,8 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, S
 
     all_distros = []
     entry_prefix = "backendai_krunner_v10"
-    for entrypoint in pkg_resources.iter_entry_points(entry_prefix):
-        log.debug("loading krunner pkg: {}", entrypoint.module_name)
+    for entrypoint in scan_entrypoints(entry_prefix):
+        log.debug("loading krunner pkg: {}", entrypoint.module)
         plugin = entrypoint.load()
         await plugin.init({})  # currently does nothing
         provided_versions = (
@@ -414,6 +524,7 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
         )
         shutil.copyfile(proxy_worker_binary, "/tmp/backend.ai/linuxkit-metadata-proxy")
         os.chmod("/tmp/backend.ai/linuxkit-metadata-proxy", 0o755)
+        server_port = local_config["agent"]["metadata-server-port"]
         # Prepare proxy worker container
         proxy_worker_container = PersistentServiceContainer(
             "linuxkit-nsenter:latest",
@@ -423,7 +534,7 @@ async def prepare_kernel_metadata_uri_handling(local_config: Mapping[str, Any]) 
                     "-c",
                     "ctr -n services.linuxkit t kill --exec-id metaproxy docker;"
                     "ctr -n services.linuxkit t exec --exec-id metaproxy docker "
-                    "/host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port 40128",
+                    f"/host_mnt/tmp/backend.ai/linuxkit-metadata-proxy -remote-port {server_port}",
                 ],
                 "HostConfig": {
                     "PidMode": "host",

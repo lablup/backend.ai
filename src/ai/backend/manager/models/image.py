@@ -22,7 +22,7 @@ import graphene
 import sqlalchemy as sa
 import trafaret as t
 import yaml
-from graphql.execution.executors.asyncio import AsyncioExecutor
+from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 
@@ -326,7 +326,7 @@ class ImageRow(Base):
                     return row
             except UnknownImageReference:
                 continue
-        raise ImageNotFound("Unkown image references: " + ", ".join(searched_refs))
+        raise ImageNotFound("Unknown image references: " + ", ".join(searched_refs))
 
     @classmethod
     async def list(cls, session: AsyncSession, load_aliases=False) -> List[ImageRow]:

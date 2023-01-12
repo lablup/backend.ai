@@ -28,7 +28,7 @@ from typing import (
 import aiohttp
 import aiohttp.web
 import appdirs
-import attr
+import attrs
 from aiohttp.client import _RequestContextManager, _WSRequestContextManager
 from dateutil.tz import tzutc
 from multidict import CIMultiDict
@@ -348,6 +348,7 @@ class Request:
                 data=self._pack_content(),
                 timeout=timeout_config,
                 headers=self.headers,
+                allow_redirects=False,
             )
 
         return FetchContextManager(self.session, _rqst_ctx_builder, **kwargs)
@@ -580,7 +581,7 @@ class FetchContextManager:
                 self._rqst_ctx = self.rqst_ctx_builder()
                 assert self._rqst_ctx is not None
                 raw_resp = await self._rqst_ctx.__aenter__()
-                if self.check_status and raw_resp.status // 100 != 2:
+                if self.check_status and raw_resp.status // 100 not in [2, 3]:
                     msg = await raw_resp.text()
                     await raw_resp.__aexit__(None, None, None)
                     raise BackendAPIError(raw_resp.status, raw_resp.reason or "", msg)
@@ -757,7 +758,7 @@ class WebSocketContextManager:
         return None
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(auto_attribs=True, slots=True, frozen=True)
 class SSEMessage:
     event: str
     data: str

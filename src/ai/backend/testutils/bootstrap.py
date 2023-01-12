@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 import time
 from typing import Iterator
@@ -9,6 +10,8 @@ import pytest
 
 from ai.backend.common.types import HostPortPair
 from ai.backend.testutils.pants import get_parallel_slot
+
+log = logging.getLogger(__name__)
 
 
 def wait_health_check(container_id):
@@ -22,18 +25,22 @@ def wait_health_check(container_id):
             capture_output=True,
         )
         container_info = json.loads(proc.stdout)
-        if container_info[0]["State"]["Health"]["Status"].lower() != "healthy":
+        health_info = container_info[0]["State"].get("Health")
+        if health_info is not None and health_info["Status"].lower() != "healthy":
             time.sleep(0.2)
             continue
+        if health_info is None and (err_info := container_info[0]["State"].get("Error")):
+            raise RuntimeError(f"Container spawn failed: {err_info}")
         # Give extra grace period to avoid intermittent connection failure.
         time.sleep(0.1)
         return container_info
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=False)
 def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     etcd_allocated_port = 12379 + get_parallel_slot() * 10
+    log.info("spawning etcd container on port %d", etcd_allocated_port)
     proc = subprocess.run(
         [
             "docker",
@@ -73,11 +80,11 @@ def etcd_container() -> Iterator[tuple[str, HostPortPair]]:
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=False)
 def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     redis_allocated_port = 36379 + get_parallel_slot() * 10
-    print("spawning redis container on port", redis_allocated_port)
+    log.info("spawning redis container on port %d", redis_allocated_port)
     proc = subprocess.run(
         [
             "docker",
@@ -110,10 +117,11 @@ def redis_container() -> Iterator[tuple[str, HostPortPair]]:
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=False)
 def postgres_container() -> Iterator[tuple[str, HostPortPair]]:
     # Spawn a single-node etcd container for a testing session.
     postgres_allocated_port = 15432 + get_parallel_slot() * 10
+    log.info("spawning postgres container on port %d", postgres_allocated_port)
     proc = subprocess.run(
         [
             "docker",

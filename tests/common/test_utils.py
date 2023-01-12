@@ -15,7 +15,6 @@ from ai.backend.common.asyncio import AsyncBarrier, run_through
 from ai.backend.common.enum_extension import StringSetFlag
 from ai.backend.common.files import AsyncFileWriter
 from ai.backend.common.networking import curl
-from ai.backend.common.testutils import AsyncContextManagerMock, mock_awaitable, mock_corofunc
 from ai.backend.common.utils import (
     dict2kvlist,
     generate_uuid,
@@ -25,6 +24,7 @@ from ai.backend.common.utils import (
     readable_size_to_bytes,
     str_to_timedelta,
 )
+from ai.backend.testutils.mock import AsyncContextManagerMock, mock_awaitable, mock_corofunc
 
 
 def test_odict() -> None:

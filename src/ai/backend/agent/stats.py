@@ -24,8 +24,9 @@ from typing import (
     Tuple,
 )
 
-import attr
+import attrs
 from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.identity import is_containerized
@@ -86,13 +87,13 @@ class MetricTypes(enum.Enum):
     ACCUMULATED = 3  # for accumulated value (e.g., total number of events)
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class Measurement:
     value: Decimal
     capacity: Optional[Decimal] = None
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class NodeMeasurement:
     """
     Collection of per-node and per-agent statistics for a specific metric.
@@ -103,13 +104,13 @@ class NodeMeasurement:
     key: str
     type: MetricTypes
     per_node: Measurement
-    per_device: Mapping[DeviceId, Measurement] = attr.Factory(dict)
+    per_device: Mapping[DeviceId, Measurement] = attrs.Factory(dict)
     unit_hint: Optional[str] = None
-    stats_filter: FrozenSet[str] = attr.Factory(frozenset)
+    stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ContainerMeasurement:
     """
     Collection of per-container statistics for a specific metric.
@@ -117,9 +118,9 @@ class ContainerMeasurement:
 
     key: str
     type: MetricTypes
-    per_container: Mapping[str, Measurement] = attr.Factory(dict)
+    per_container: Mapping[str, Measurement] = attrs.Factory(dict)
     unit_hint: Optional[str] = None
-    stats_filter: FrozenSet[str] = attr.Factory(frozenset)
+    stats_filter: FrozenSet[str] = attrs.Factory(frozenset)
     current_hook: Optional[Callable[["Metric"], Decimal]] = None
 
 
@@ -206,7 +207,7 @@ class MovingStatistics:
         }
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class Metric:
     key: str
     type: MetricTypes
@@ -439,18 +440,17 @@ class StatContext:
                         else:
                             self.kernel_metrics[kernel_id][metric_key].update(measure)
 
-        async def _pipe_builder(r: Redis):
-            async with r.pipeline() as pipe:
-                for kernel_id in updated_kernel_ids:
-                    metrics = self.kernel_metrics[kernel_id]
-                    serializable_metrics = {
-                        key: obj.to_serializable_dict() for key, obj in metrics.items()
-                    }
-                    if self.agent.local_config["debug"]["log-stats"]:
-                        log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
-                    serialized_metrics = msgpack.packb(serializable_metrics)
-
-                    await pipe.set(str(kernel_id), serialized_metrics)
-                    return pipe
+        async def _pipe_builder(r: Redis) -> Pipeline:
+            pipe = r.pipeline(transaction=False)
+            for kernel_id in updated_kernel_ids:
+                metrics = self.kernel_metrics[kernel_id]
+                serializable_metrics = {
+                    key: obj.to_serializable_dict() for key, obj in metrics.items()
+                }
+                if self.agent.local_config["debug"]["log-stats"]:
+                    log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
+                serialized_metrics = msgpack.packb(serializable_metrics)
+                pipe.set(str(kernel_id), serialized_metrics)
+            return pipe
 
         await redis_helper.execute(self.agent.redis_stat_pool, _pipe_builder)

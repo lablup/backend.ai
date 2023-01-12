@@ -8,14 +8,13 @@ import random
 from typing import Optional, Tuple, Union, cast
 
 import aiohttp
-import trafaret as t
 from aiohttp import web
-from aiohttp_session import STORAGE_KEY, get_session
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
+from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 
 from .auth import get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
@@ -26,13 +25,6 @@ HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",
     "Authorization",
 ]
-
-extra_config_headers = t.Dict(
-    {
-        t.Key("X-BackendAI-Version", default=None): t.Null | t.String,
-        t.Key("X-BackendAI-Encoded", default=None): t.Null | t.ToBool,
-    }
-).allow_extra("*")
 
 
 class WebSocketProxy:
@@ -127,22 +119,32 @@ class WebSocketProxy:
             await self.up_conn.close()
 
 
-async def decrypt_payload(request: web.Request) -> str:
-    if not request.content:
-        return ""
-    config = request.app["config"]
-    scheme = config["service"]["force_endpoint_protocol"]
-    if scheme is None:
-        scheme = request.scheme
-    api_endpoint = f"{scheme}://{request.host}"
-    payload = await request.text()
-    iv, real_payload = payload.split(":")  # Extract initial vector and actual payload
-    key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + iv + iv)[0:32]
-    crypt = AES.new(bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(iv, encoding="utf8"))
-    b64p = base64.b64decode(real_payload)
-    dec = unpad(crypt.decrypt(bytes(b64p)), 16)
-    result = dec.decode("UTF-8")
-    return result
+@web.middleware
+async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
+    request_headers = extra_config_headers.check(request.headers)
+    secure_context = request_headers.get("X-BackendAI-Encoded", None)
+    if secure_context:
+        if not request.can_read_body:  # designated as encrypted but has an empty payload
+            request["payload"] = ""
+            return await handler(request)
+        config = request.app["config"]
+        scheme = config["service"]["force_endpoint_protocol"]
+        if scheme is None:
+            scheme = request.scheme
+        api_endpoint = f"{scheme}://{request.host}"
+        payload = await request.text()
+        initial_vector, real_payload = payload.split(":")
+        key = (base64.b64encode(api_endpoint.encode("ascii")).decode() + initial_vector * 2)[0:32]
+        crypt = AES.new(
+            bytes(key, encoding="utf8"), AES.MODE_CBC, bytes(initial_vector, encoding="utf8")
+        )
+        b64p = base64.b64decode(real_payload)
+        request["payload"] = unpad(crypt.decrypt(bytes(b64p)), 16)
+    else:
+        # For all other requests without explicit encryption,
+        # let the handler decide how to read the body.
+        request["payload"] = ""
+    return await handler(request)
 
 
 async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
@@ -154,7 +156,6 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
         api_session = await asyncio.shield(get_anonymous_session(request))
     else:
         api_session = await asyncio.shield(get_api_session(request))
-
     if first_path == "pipeline":
         pipeline_endpoint = request.app["config"]["pipeline"]["endpoint"]
         api_session = await asyncio.shield(get_anonymous_session(request, pipeline_endpoint))
@@ -168,7 +169,7 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
             secure_context = request_headers.get("X-BackendAI-Encoded", None)
             decrypted_payload_length = 0
             if secure_context:
-                payload = await decrypt_payload(request)
+                payload = request["payload"]
                 decrypted_payload_length = len(payload)
             else:
                 payload = request.content

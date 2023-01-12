@@ -36,8 +36,9 @@ from ai.backend.common import msgpack
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.enum_extension import StringSetFlag
+from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import KernelId, aobject
+from ai.backend.common.types import KernelId, ServicePort, aobject
 
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
@@ -155,12 +156,13 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
     version: int
     agent_config: Mapping[str, Any]
     kernel_id: KernelId
+    container_id: Optional[str]
     image: ImageRef
     resource_spec: KernelResourceSpec
-    service_ports: Any
+    service_ports: List[ServicePort]
     data: Dict[Any, Any]
     last_used: float
-    termination_reason: Optional[str]
+    termination_reason: Optional[KernelLifecycleEventReason]
     clean_event: Optional[asyncio.Future]
     stats_enabled: bool
     # FIXME: apply TypedDict to data in Python 3.8
@@ -196,6 +198,7 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         self._tasks = set()
         self.environ = environ
         self.runner = None
+        self.container_id = None
 
     async def init(self) -> None:
         log.debug(
@@ -277,6 +280,14 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    async def check_duplicate_commit(self, kernel_id, subdir):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def commit(self, kernel_id, subdir, filename):
+        raise NotImplementedError
+
+    @abstractmethod
     async def get_service_apps(self):
         raise NotImplementedError
 
@@ -286,6 +297,10 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
 
     @abstractmethod
     async def download_file(self, filepath):
+        raise NotImplementedError
+
+    @abstractmethod
+    async def download_single(self, filepath):
         raise NotImplementedError
 
     @abstractmethod

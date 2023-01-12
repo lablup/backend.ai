@@ -2,14 +2,11 @@
 set -e
 
 arch=$(uname -m)
-distros=("ubuntu16.04" "ubuntu18.04" "ubuntu20.04" "centos7.6" "alpine3.8")
+distros=("ubuntu18.04" "ubuntu20.04" "centos7.6" "alpine3.8")
 
-ubuntu1604_builder_dockerfile=$(cat <<'EOF'
-FROM ubuntu:16.04
-RUN apt-get update
-RUN apt-get install -y make gcc
-EOF
-)
+if [ $arch = "arm64" ]; then
+  arch="aarch64"
+fi
 
 ubuntu1804_builder_dockerfile=$(cat <<'EOF'
 FROM ubuntu:18.04
@@ -52,7 +49,6 @@ temp_dir=$(mktemp -d -t suexec-build.XXXXX)
 echo "Using temp directory: $temp_dir"
 echo "$build_script" > "$temp_dir/build.sh"
 chmod +x $temp_dir/*.sh
-echo "$ubuntu1604_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.ubuntu16.04.dockerfile"
 echo "$ubuntu1804_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.ubuntu18.04.dockerfile"
 echo "$ubuntu2004_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.ubuntu20.04.dockerfile"
 echo "$centos_builder_dockerfile" > "$SCRIPT_DIR/suexec-builder.centos7.6.dockerfile"
@@ -65,6 +61,7 @@ done
 
 cd "$temp_dir"
 git clone -c advice.detachedHead=false https://github.com/ncopa/su-exec su-exec
+cp $SCRIPT_DIR/su-exec.c su-exec
 
 for distro in "${distros[@]}"; do
   docker run --rm -it \
@@ -78,6 +75,6 @@ for distro in "${distros[@]}"; do
 done
 
 ls -l .
-cp su-exec.*.bin $SCRIPT_DIR/../src/ai/backend/runner
+cp su-exec.*.bin $SCRIPT_DIR/../../src/ai/backend/runner
 
 rm -rf "$temp_dir"

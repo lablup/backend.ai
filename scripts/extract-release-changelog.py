@@ -14,6 +14,13 @@ def get_tag():
     revision = p.stdout.decode().strip()
     return revision
 
+def get_prev_tag():
+    p = subprocess.run(['git', 'rev-list', '--tags', '--skip=1', '--max-count=1'], capture_output=True)
+    rev = p.stdout.decode().strip()
+
+    p = subprocess.run(['git', 'describe', '--abbrev=0', '--tags', f'{rev}'], capture_output=True)
+    tag = p.stdout.decode().strip()
+    return tag
 
 def main():
     parser = argparse.ArgumentParser()
@@ -23,8 +30,10 @@ def main():
     )
     args = parser.parse_args()
 
-    tag = get_tag()
-    url = f"https://github.com/lablup/backend.ai/blob/{tag}/CHANGELOG.md"
+    prev_tag, tag = get_prev_tag(), get_tag()
+    commitlog_url = f"https://github.com/lablup/backend.ai/compare/{prev_tag}...{tag}"
+    changelog_url = f"https://github.com/lablup/backend.ai/blob/{tag}/CHANGELOG.md"
+
     print(f"Making release notes for {tag} ...", file=sys.stderr)
 
     input_path = Path('./CHANGELOG.md')
@@ -37,7 +46,11 @@ def main():
             content = m.group(1).strip()
             content += (
                 "\n\n### Full Changelog\n\nCheck out [the full changelog](%s) until this release (%s).\n"
-                % (url, tag)
+                % (changelog_url, tag)
+            )
+            content += (
+                "\n\n### Full Commit Logs\n\nCheck out [the full commit logs](%s) between release (%s) and (%s).\n"
+                % (commitlog_url, prev_tag, tag)
             )
             if not args.draft:
                 output_path.write_text(content)

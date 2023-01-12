@@ -6,12 +6,13 @@ from typing import Any, Dict, List
 
 import click
 
+from ai.backend.cli.main import main
+from ai.backend.cli.types import ExitCode
 from ai.backend.client.output.fields import session_fields, session_fields_v5
 from ai.backend.client.output.types import FieldSpec
 from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
-from ..main import main
 from ..pretty import print_fail
 from ..session import session as user_session
 from ..types import CLIContext
@@ -80,6 +81,13 @@ def _list_cmd(name: str = "list", docs: str = None):
         "--offset", default=0, type=int, help="The index of the current page start for pagination."
     )
     @click.option("--limit", default=None, type=int, help="The page size for pagination.")
+    @click.option(
+        "-a",
+        "--all",
+        is_flag=True,
+        default=False,
+        help='Alias of "backend.ai ps --status=ALL" listing all sessions regardless of status. Ignores --status option.',
+    )
     def list(
         ctx: CLIContext,
         status: str | None,
@@ -94,6 +102,7 @@ def _list_cmd(name: str = "list", docs: str = None):
         order: str | None,
         offset: int,
         limit: int | None,
+        all: bool,
     ) -> None:
         """
         List and manage compute sessions.
@@ -107,7 +116,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                     fields.append(session_fields["access_key"])
             except Exception as e:
                 ctx.output.print_error(e)
-                sys.exit(1)
+                sys.exit(ExitCode.FAILURE)
             if name_only:
                 pass
             elif format is not None:
@@ -115,7 +124,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 for opt in options:
                     if opt not in session_fields:
                         ctx.output.print_fail(f"There is no such format option: {opt}")
-                        sys.exit(1)
+                        sys.exit(ExitCode.INVALID_ARGUMENT)
                 fields = [session_fields[opt] for opt in options]
             else:
                 if session.api_version[0] >= 6:
@@ -175,7 +184,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 ]
             )
             no_match_name = "dead"
-        if status == "ALL":
+        if status == "ALL" or all:
             status = ",".join(
                 [
                     "PENDING",
@@ -214,7 +223,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 )
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
     list.__name__ = name
     if docs is not None:
@@ -266,20 +275,20 @@ def _info_cmd(docs: str = None):
                 uuid.UUID(session_id)
             except ValueError:
                 print_fail("In API v5 or later, the session ID must be given in the UUID format.")
-                sys.exit(1)
+                sys.exit(ExitCode.FAILURE)
             v = {"id": session_id}
             q = q.replace("$fields", " ".join(f.field_ref for f in fields))
             try:
                 resp = session_.Admin.query(q, v)
             except Exception as e:
                 ctx.output.print_error(e)
-                sys.exit(1)
+                sys.exit(ExitCode.FAILURE)
             if resp["compute_session"] is None:
                 if session_.api_version[0] < 5:
                     ctx.output.print_fail("There is no such running compute session.")
                 else:
                     ctx.output.print_fail("There is no such compute session.")
-                sys.exit(1)
+                sys.exit(ExitCode.FAILURE)
             ctx.output.print_item(resp["compute_session"], fields)
 
     if docs is not None:

@@ -15,12 +15,14 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import DeviceId, DeviceModelInfo, DeviceName, SlotName, SlotTypes
 
 from .. import __version__
+from ..alloc_map import AllocationStrategy
 from ..resources import (
     AbstractAllocMap,
     AbstractComputeDevice,
     AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
+    MountInfo,
 )
 from ..stats import ContainerMeasurement, NodeMeasurement, StatContext
 from .agent import Container
@@ -203,6 +205,16 @@ class CPUPlugin(AbstractComputePlugin):
                 )
         return attached_devices
 
+    async def generate_mounts(
+        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[MountInfo]:
+        return []
+
+    async def get_docker_networks(
+        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[str]:
+        return []
+
 
 class MemoryDevice(AbstractComputeDevice):
     pass
@@ -279,6 +291,7 @@ class MemoryPlugin(AbstractComputePlugin):
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
+            allocation_strategy=AllocationStrategy.FILL,
             device_slots={
                 dev.device_id: DeviceSlotInfo(
                     SlotTypes.BYTES, SlotName("mem"), Decimal(dev.memory_size)
@@ -329,3 +342,13 @@ class MemoryPlugin(AbstractComputePlugin):
                     }
                 )
         return attached_devices
+
+    async def generate_mounts(
+        self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[MountInfo]:
+        return []
+
+    async def get_docker_networks(
+        self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
+    ) -> List[str]:
+        return []

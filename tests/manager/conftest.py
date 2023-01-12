@@ -34,6 +34,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.config import ConfigurationError, etcd_config_iv, redis_config_iv
+from ai.backend.common.logging import LocalLogger
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair
 from ai.backend.manager.api.context import RootContext
@@ -108,8 +109,30 @@ def vfolder_host():
 
 
 @pytest.fixture(scope="session")
+def logging_config():
+    config = {
+        "drivers": ["console"],
+        "console": {"colored": None, "format": "verbose"},
+        "level": "DEBUG",
+        "pkg-ns": {
+            "": "INFO",
+            "ai.backend": "DEBUG",
+            "tests": "DEBUG",
+            "alembic": "INFO",
+            "aiotools": "INFO",
+            "aiohttp": "INFO",
+            "sqlalchemy": "WARNING",
+        },
+    }
+    logger = LocalLogger(config)
+    with logger:
+        yield config
+
+
+@pytest.fixture(scope="session")
 def local_config(
     test_id,
+    logging_config,
     etcd_container,  # noqa: F811
     redis_container,  # noqa: F811
     postgres_container,  # noqa: F811
@@ -142,6 +165,8 @@ def local_config(
                 "name": test_db,
                 "user": "postgres",
                 "password": "develove",
+                "pool-size": 8,
+                "max-overflow": 64,
             },
             "manager": {
                 "id": f"i-{test_id}",
@@ -149,6 +174,8 @@ def local_config(
                 "distributed-lock": "filelock",
                 "ipc-base-path": ipc_base_path,
                 "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
+                "allowed-plugins": set(),
+                "disabled-plugins": set(),
             },
             "debug": {
                 "enabled": False,
@@ -156,10 +183,7 @@ def local_config(
                 "log-scheduler-ticks": False,
                 "periodic-sync-stats": False,
             },
-            "logging": {
-                "drivers": ["console"],
-                "console": {"colored": False, "format": "verbose"},
-            },
+            "logging": logging_config,
         }
     )
 
@@ -271,7 +295,7 @@ def database(request, local_config, test_db):
     db_user = local_config["db"]["user"]
     db_pass = local_config["db"]["password"]
 
-    # Create database using low-level psycopg2 API.
+    # Create database using low-level core API.
     # Temporarily use "testing" dbname until we create our own db.
     if db_pass:
         db_url = f"postgresql+asyncpg://{urlquote(db_user)}:{urlquote(db_pass)}@{db_addr}/testing"
@@ -352,7 +376,7 @@ def database(request, local_config, test_db):
         logger=init_logger(local_config, nested=True),
         local_config=local_config,
     )
-    sqlalchemy_url = f"postgresql://{db_user}:{db_pass}@{db_addr}/{test_db}"
+    sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf8") as alembic_cfg:
         alembic_cfg_data = alembic_config_template.format(
             sqlalchemy_url=sqlalchemy_url,
@@ -612,6 +636,7 @@ def get_headers(app, default_keypair):
         method,
         url,
         req_bytes,
+        allowed_ip="10.10.10.10",  # Same with fixture
         ctype="application/json",
         hash_type="sha256",
         api_version="v5.20191215",
@@ -625,6 +650,7 @@ def get_headers(app, default_keypair):
             "Content-Type": ctype,
             "Content-Length": str(len(req_bytes)),
             "X-BackendAI-Version": api_version,
+            "X-Forwarded-For": allowed_ip,
         }
         if api_version >= "v4.20181215":
             req_bytes = b""

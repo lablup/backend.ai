@@ -2,10 +2,10 @@ import json
 from typing import Optional
 
 from aiohttp import web
-from aiohttp_session import get_session
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession as APISession
+from ai.backend.common.web.session import get_session
 
 from . import user_agent
 
@@ -54,6 +54,7 @@ async def get_api_session(
     api_config = APIConfig(
         domain=config["api"]["domain"],
         endpoint=api_endpoint,
+        endpoint_type="api",
         access_key=ak,
         secret_key=sk,
         user_agent=user_agent,
@@ -73,6 +74,7 @@ async def get_anonymous_session(
     api_config = APIConfig(
         domain=config["api"]["domain"],
         endpoint=api_endpoint,
+        endpoint_type="api",
         access_key="",
         secret_key="",
         user_agent=user_agent,

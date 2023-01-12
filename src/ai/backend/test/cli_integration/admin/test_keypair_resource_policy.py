@@ -4,7 +4,7 @@ from contextlib import closing
 from ...utils.cli import EOF, ClientRunnerFunc
 
 
-def test_add_keypair_resource_policy(run: ClientRunnerFunc):
+def test_add_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
     print("[ Add keypair resource policy ]")
 
     # Add keypair resource policy
@@ -29,7 +29,7 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc):
         "local:volume1",
         "--idle-timeout",
         "1200",
-        "test_krp",
+        keypair_resource_policy,
     ]
     with closing(run(add_arguments)) as p:
         p.expect(EOF)
@@ -44,7 +44,7 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc):
         krp_list = loaded.get("items")
         assert isinstance(krp_list, list), "Keypair resource policy list not printed properly"
 
-    test_krp = get_keypair_resource_policy_from_list(krp_list, "test_krp")
+    test_krp = get_keypair_resource_policy_from_list(krp_list, keypair_resource_policy)
 
     assert bool(test_krp), "Test keypair resource policy doesn't exist"
     assert (
@@ -65,12 +65,21 @@ def test_add_keypair_resource_policy(run: ClientRunnerFunc):
     assert (
         test_krp.get("max_containers_per_session") == 2
     ), "Test keypair resouce policy max containers per session mismatch"
-    assert test_krp.get("allowed_vfolder_hosts") == [
-        "local:volume1"
-    ], "Test keypair resource policy allowed vfolder hosts mismatch"
+    assert test_krp.get("allowed_vfolder_hosts") == {
+        "local:volume1": [
+            "create-vfolder",
+            "modify-vfolder",
+            "delete-vfolder",
+            "mount-in-session",
+            "upload-file",
+            "download-file",
+            "invite-others",
+            "set-user-specific-permission",
+        ],
+    }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
-def test_update_keypair_resource_policy(run: ClientRunnerFunc):
+def test_update_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
     print("[ Update keypair resource policy ]")
 
     # Update keypair resource policy
@@ -95,7 +104,7 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc):
         "local:volume2",
         "--idle-timeout",
         "1800",
-        "test_krp",
+        keypair_resource_policy,
     ]
     with closing(run(add_arguments)) as p:
         p.expect(EOF)
@@ -110,7 +119,7 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc):
         krp_list = loaded.get("items")
         assert isinstance(krp_list, list), "Keypair resource policy list not printed properly"
 
-    test_krp = get_keypair_resource_policy_from_list(krp_list, "test_krp")
+    test_krp = get_keypair_resource_policy_from_list(krp_list, keypair_resource_policy)
 
     assert bool(test_krp), "Test keypair resource policy doesn't exist"
     assert (
@@ -131,17 +140,28 @@ def test_update_keypair_resource_policy(run: ClientRunnerFunc):
     assert (
         test_krp.get("max_containers_per_session") == 1
     ), "Test keypair resouce policy max containers per session mismatch"
-    assert test_krp.get("allowed_vfolder_hosts") == [
-        "local:volume2"
-    ], "Test keypair resource policy allowed vfolder hosts mismatch"
+    assert test_krp.get("allowed_vfolder_hosts") == {
+        "local:volume2": [
+            "create-vfolder",
+            "modify-vfolder",
+            "delete-vfolder",
+            "mount-in-session",
+            "upload-file",
+            "download-file",
+            "invite-others",
+            "set-user-specific-permission",
+        ],
+    }, "Test keypair resource policy allowed vfolder hosts mismatch"
 
 
-def test_delete_keypair_resource_policy(run: ClientRunnerFunc):
+def test_delete_keypair_resource_policy(run: ClientRunnerFunc, keypair_resource_policy: str):
     print("[ Delete keypair resource policy ]")
 
     # Delete keypair resource policy
     with closing(
-        run(["--output=json", "admin", "keypair-resource-policy", "delete", "test_krp"])
+        run(
+            ["--output=json", "admin", "keypair-resource-policy", "delete", keypair_resource_policy]
+        )
     ) as p:
         p.sendline("y")
         p.expect(EOF)

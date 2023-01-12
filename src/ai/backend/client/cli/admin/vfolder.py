@@ -6,6 +6,7 @@ import click
 import humanize
 from tabulate import tabulate
 
+from ai.backend.cli.types import ExitCode
 from ai.backend.client.func.vfolder import _default_list_fields
 from ai.backend.client.session import Session
 
@@ -51,7 +52,7 @@ def _list_cmd(docs: str = None):
                 )
         except Exception as e:
             ctx.output.print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
     if docs is not None:
         list.__doc__ = docs
@@ -75,7 +76,7 @@ def list_hosts():
             print("Mounted hosts: {}".format(", ".join(resp["allowed"])))
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -102,7 +103,7 @@ def perf_metric(vfolder_host):
             )
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
 
 
 @vfolder.command()
@@ -121,7 +122,7 @@ def get_fstab_contents(agent_id):
             resp = session.VFolder.get_fstab_contents(agent_id)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         print(resp)
 
 
@@ -136,7 +137,7 @@ def list_mounts():
             resp = session.VFolder.list_mounts()
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         print("manager")
         for k, v in resp["manager"].items():
             print(" ", k, ":", v)
@@ -166,7 +167,7 @@ def mount_host(fs_location, name, options, edit_fstab):
             resp = session.VFolder.mount_host(name, fs_location, options, edit_fstab)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         print("manager")
         for k, v in resp["manager"].items():
             print(" ", k, ":", v)
@@ -193,7 +194,7 @@ def umount_host(name, edit_fstab):
             resp = session.VFolder.umount_host(name, edit_fstab)
         except Exception as e:
             print_error(e)
-            sys.exit(1)
+            sys.exit(ExitCode.FAILURE)
         print("manager")
         for k, v in resp["manager"].items():
             print(" ", k, ":", v)
@@ -202,3 +203,81 @@ def umount_host(name, edit_fstab):
             print(" ", aid)
             for k, v in data.items():
                 print("   ", k, ":", v)
+
+
+@vfolder.command
+@click.argument("vfolder_id", type=str)
+def shared_vfolder_info(vfolder_id):
+    """Show the vfolder permission information of the given virtual folder.
+
+    \b
+    VFOLDER_ID: ID of a virtual folder.
+    """
+    with Session() as session:
+        try:
+            resp = session.VFolder.shared_vfolder_info(vfolder_id)
+            result = resp.get("shared", [])
+            if result:
+                _result = result[0]
+                print(
+                    'Virtual folder "{0}" (ID: {1})'.format(
+                        _result["vfolder_name"], _result["vfolder_id"]
+                    )
+                )
+                print("- Owner: {0}".format(_result["owner"]))
+                print("- Permission: {0}".format(_result["perm"]))
+                print("- Folder Type: {0}".format(_result["type"]))
+                shared_to = _result.get("shared_to", [])
+                if shared_to:
+                    print("- Shared to:")
+                    for k, v in shared_to.items():
+                        print("\t- {0}: {1}\n".format(k, v))
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=str)
+@click.argument("user_id", type=str)
+@click.option(
+    "-p", "--permission", type=str, metavar="PERMISSION", help="Folder's innate permission."
+)
+def update_shared_vf_permission(vfolder_id, user_id, permission):
+    """
+    Update permission for shared vfolders.
+
+    \b
+    VFOLDER_ID: ID of a virtual folder.
+    USER_ID: ID of user who have been granted access to shared vFolder.
+    PERMISSION: Permission to update. "ro" (read-only) / "rw" (read-write) / "wd" (write-delete).
+    """
+    with Session() as session:
+        try:
+            resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, permission)
+            print("Updated.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+        print(resp)
+
+
+@vfolder.command()
+@click.argument("vfolder_id", type=str)
+@click.argument("user_id", type=str)
+def remove_shared_vf_permission(vfolder_id, user_id):
+    """
+    Remove permission for shared vfolders.
+
+    \b
+    VFOLDER_ID: ID of a virtual folder.
+    USER_ID: ID of user who have been granted access to shared vFolder.
+    """
+    with Session() as session:
+        try:
+            resp = session.VFolder.update_shared_vfolder(vfolder_id, user_id, None)
+            print("Removed.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+        print(resp)

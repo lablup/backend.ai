@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Sequence, Set, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Sequence, Set, cast, overload
 
 import attr
 import graphene
@@ -25,7 +25,7 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .group import resolve_group_name_or_id
+from .group import resolve_group_name_or_id, resolve_groups
 from .user import UserRole
 
 if TYPE_CHECKING:
@@ -96,6 +96,7 @@ scaling_groups = sa.Table(
     sa.Column("driver", sa.String(length=64), nullable=False),
     sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={}),
     sa.Column("scheduler", sa.String(length=64), nullable=False),
+    sa.Column("use_host_network", sa.Boolean, nullable=False, default=False),
     sa.Column(
         "scheduler_opts",
         StructuredJSONObjectColumn(ScalingGroupOpts),
@@ -166,24 +167,71 @@ sgroups_for_keypairs = sa.Table(
 )
 
 
+@overload
 async def query_allowed_sgroups(
     db_conn: SAConnection,
     domain_name: str,
-    group: Union[uuid.UUID, str],
+    group: uuid.UUID,
+    access_key: str,
+) -> Sequence[Row]:
+    ...
+
+
+@overload
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: Iterable[uuid.UUID],
+    access_key: str,
+) -> Sequence[Row]:
+    ...
+
+
+@overload
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: str,
+    access_key: str,
+) -> Sequence[Row]:
+    ...
+
+
+@overload
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: Iterable[str],
+    access_key: str,
+) -> Sequence[Row]:
+    ...
+
+
+async def query_allowed_sgroups(
+    db_conn: SAConnection,
+    domain_name: str,
+    group: uuid.UUID | Iterable[uuid.UUID] | str | Iterable[str],
     access_key: str,
 ) -> Sequence[Row]:
     query = sa.select([sgroups_for_domains]).where(sgroups_for_domains.c.domain == domain_name)
     result = await db_conn.execute(query)
     from_domain = {row["scaling_group"] for row in result}
 
-    group_id = await resolve_group_name_or_id(db_conn, domain_name, group)
+    group_ids: Iterable[uuid.UUID] = []
+    match group:
+        case uuid.UUID() | str():
+            if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):
+                group_ids = [group_id]
+            else:
+                group_ids = []
+        case list() | tuple() | set():
+            group_ids = await resolve_groups(db_conn, domain_name, cast(Iterable, group))
     from_group: Set[str]
-    if group_id is None:
+    if not group_ids:
         from_group = set()  # empty
     else:
-        query = sa.select([sgroups_for_groups]).where(
-            (sgroups_for_groups.c.group == group_id),
-        )
+        group_cond = sgroups_for_groups.c.group.in_(group_ids)
+        query = sa.select([sgroups_for_groups]).where(group_cond)
         result = await db_conn.execute(query)
         from_group = {row["scaling_group"] for row in result}
 
@@ -213,6 +261,7 @@ class ScalingGroup(graphene.ObjectType):
     driver_opts = graphene.JSONString()
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
+    use_host_network = graphene.Boolean()
 
     @classmethod
     def from_row(
@@ -232,6 +281,7 @@ class ScalingGroup(graphene.ObjectType):
             driver_opts=row["driver_opts"],
             scheduler=row["scheduler"],
             scheduler_opts=row["scheduler_opts"].to_json(),
+            use_host_network=row["use_host_network"],
         )
 
     @classmethod
@@ -384,6 +434,7 @@ class CreateScalingGroupInput(graphene.InputObjectType):
     driver_opts = graphene.JSONString(required=False, default={})
     scheduler = graphene.String(required=True)
     scheduler_opts = graphene.JSONString(required=False, default={})
+    use_host_network = graphene.Boolean(required=False, default=False)
 
 
 class ModifyScalingGroupInput(graphene.InputObjectType):
@@ -394,6 +445,7 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
     driver_opts = graphene.JSONString(required=False)
     scheduler = graphene.String(required=False)
     scheduler_opts = graphene.JSONString(required=False)
+    use_host_network = graphene.Boolean(required=False)
 
 
 class CreateScalingGroup(graphene.Mutation):
@@ -425,6 +477,7 @@ class CreateScalingGroup(graphene.Mutation):
             "driver_opts": props.driver_opts,
             "scheduler": props.scheduler,
             "scheduler_opts": ScalingGroupOpts.from_json(props.scheduler_opts),
+            "use_host_network": bool(props.use_host_network),
         }
         insert_query = sa.insert(scaling_groups).values(data)
         return await simple_db_mutate_returning_item(
@@ -464,6 +517,7 @@ class ModifyScalingGroup(graphene.Mutation):
         set_if_set(
             props, data, "scheduler_opts", clean_func=lambda v: ScalingGroupOpts.from_json(v)
         )
+        set_if_set(props, data, "use_host_network")
         update_query = sa.update(scaling_groups).values(data).where(scaling_groups.c.name == name)
         return await simple_db_mutate(cls, info.context, update_query)
 
