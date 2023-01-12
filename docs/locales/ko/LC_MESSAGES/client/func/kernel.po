@@ -252,7 +252,7 @@ msgstr ""
 
 # 830f746e84164135bc17725208ed9ebc
 #: ai.backend.client.kernel.Kernel.get_or_create:17 of
-msgid "The list of vfolder names that belongs to the currrent API access key."
+msgid "The list of vfolder names that belongs to the current API access key."
 msgstr ""
 
 # 2bb3cac4c41047ad90ef6c0c2104c007

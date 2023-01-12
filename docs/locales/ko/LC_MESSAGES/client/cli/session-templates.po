@@ -35,7 +35,7 @@ msgstr ""
 #: ../../client/cli/session-templates.rst:10 ead7e56b00084b7cbed7c34f227b8e5c
 msgid ""
 "A session template includes common session parameters such as resource "
-"slots, vfolder mounts, the kernel iamge to use, and etc. It also support an "
+"slots, vfolder mounts, the kernel image to use, and etc. It also support an "
 "extra feature that automatically clones a Git repository upon startup as a "
 "bootstrap command."
 msgstr ""

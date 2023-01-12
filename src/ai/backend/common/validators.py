@@ -204,7 +204,7 @@ class StringList(DelimiterSeperatedList[str]):
 T_enum = TypeVar("T_enum", bound=enum.Enum)
 
 
-class Enum(t.Trafaret):
+class Enum(t.Trafaret, Generic[T_enum]):
     def __init__(self, enum_cls: Type[T_enum], *, use_name: bool = False) -> None:
         self.enum_cls = enum_cls
         self.use_name = use_name
@@ -541,6 +541,8 @@ class TimeDuration(t.Trafaret):
                     return datetime.timedelta(hours=t)
                 elif value[-1] == "m":
                     return datetime.timedelta(minutes=t)
+                elif value[-1] == "s":
+                    return datetime.timedelta(seconds=t)
                 else:
                     self._failure("value is not a known time duration", value=value)
         except ValueError:

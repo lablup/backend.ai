@@ -34,6 +34,11 @@ session-expire = "1d"
 # user = 1000
 # group = 1000
 
+# The starting port number for aiomonitor.
+# Since the storage-proxy is composed of multiple processes, each process will be exposed
+# via the port number of this base port number + pidx.
+# aiomonitor-port = 48300
+
 
 [api.client]
 # Client-facing API
@@ -56,6 +61,12 @@ secret = "some-secret-shared-with-manager"
 [debug]
 # Enable the debug mode by overriding the global loglevel and "ai.backend" loglevel.
 enabled = false
+
+# Enable or disable the asyncio debug mode.
+asyncio = false
+
+# Use the custom task factory to get more detailed asyncio task information; this may have performance penalties
+enhanced-aiomonitor-task-info = false
 
 
 [logging]
@@ -125,7 +136,7 @@ purity_fs_name = "FB-NFS1"  # the name of filesystem used by the filesystem API
 # An extended version for CephFS, which supports extended inode attributes
 # for per-directory quota and fast metadata queries.
 backend = "cephfs"
-path = "/vfroot/ceph-fuse"
+path = "/mnt/vfroot/ceph-fuse"
 
 [volume.netapp]
 backend = "netapp"
@@ -142,3 +153,27 @@ netapp_xcp_container_name = "netapp-xcp" # only required when xcp activated by c
 netapp_xcp_hostname = "xcp-hostname"
 # default xcp catalog path goes to the directory named "catalog" of the first NetApp volume
 netapp_xcp_catalog_path = "path for xcp-catalog" # Hint: execute command cat /opt/NetApp/xFiles/xcp/xcp.ini and see nfs mount path
+
+[volume.weka]
+backend = "weka"
+path = "/vfroot/weka"
+
+[volume.weka.options]
+weka_endpoint = "https://wekaio.example.com"  # Endpoint to Weka.IO API
+weka_username = ""  # Weka.IO Username
+weka_password = ""  # Weka.IO Password
+weka_organization = ""  # Weka.IO Organization
+weka_fs_name = ""  # Target filesystem to use as vFolder, must match with the one mounted under `volume.weka.path`
+weka_verify_ssl = false  # If set to true, allow to communicate to server with insecure ssl context
+
+[volume.gpfs]
+backend = "spectrumscale"
+path = "/gpfs/example_fs"
+
+[volume.gpfs.options]
+gpfs_endpoint = "https://gpfs.example.com"  # Endpoint to Spectrum Scale API
+gpfs_username = "admin"  # Spectrum Scale GUI Username
+gpfs_password = "admin"  # Spectrum Scale GUI Password
+gpfs_fs_name = "example_fs"  # Target filesystem to use as vFolder, must match with the one mounted under `volume.gpfs.path`
+gpfs_verify_ssl = false  # Skips GPFS API's SSL Certificate validation if set to true. Defaults to false.
+gpfs_owner = "1000:1000"  # Default ownership to created fileset

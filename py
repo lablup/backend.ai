@@ -15,4 +15,4 @@ PYTHONPATH="${PYTHONPATH}"
 for plugin_dir in $(ls -d plugins/*/ 2>/dev/null); do
   PYTHONPATH="${plugin_dir}/src:${PYTHONPATH}"
 done
-PYTHONPATH="src:${PYTHONPATH}" python "$@"
+PYTHONPATH="src:${PYTHONPATH}" exec python "$@"

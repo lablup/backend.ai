@@ -1,5 +1,5 @@
 python_sources(
-    name="lib",
+    name="src",
     dependencies=[
         ":resources",
     ],
@@ -16,7 +16,7 @@ python_requirements()
 python_distribution(
     name="dist",
     dependencies=[
-        ":lib",
+        ":src",
     ],
     provides=python_artifact(
         name="backend.ai-kernel-binary",
@@ -55,6 +55,8 @@ platform_resources(
     dependency_map={
         "linux_x86_64": ":linux-x86_64-binaries",
         "linux_arm64": ":linux-arm64-binaries",
+        "macos_x86_64": ":linux-x86_64-binaries",
+        "macos_arm64": ":linux-arm64-binaries",
     },
 )
 

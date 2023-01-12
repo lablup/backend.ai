@@ -4,13 +4,22 @@ import asyncio
 import logging
 import re
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, TypedDict, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Iterable,
+    Optional,
+    Sequence,
+    TypedDict,
+    Union,
+    overload,
+)
 
 import aiohttp
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
-from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
@@ -24,6 +33,7 @@ from .base import (
     GUID,
     IDColumn,
     ResourceSlotColumn,
+    VFolderHostPermissionColumn,
     batch_multiresult,
     batch_result,
     metadata,
@@ -107,7 +117,12 @@ groups = sa.Table(
     ),
     # TODO: separate resource-related fields with new domain resource policy table when needed.
     sa.Column("total_resource_slots", ResourceSlotColumn(), default="{}"),
-    sa.Column("allowed_vfolder_hosts", pgsql.ARRAY(sa.String), nullable=False, default="{}"),
+    sa.Column(
+        "allowed_vfolder_hosts",
+        VFolderHostPermissionColumn(),
+        nullable=False,
+        default={},
+    ),
     sa.UniqueConstraint("name", "domain_name", name="uq_groups_name_domain_name"),
     # dotfiles column, \x90 means empty list in msgpack
     sa.Column(
@@ -116,31 +131,71 @@ groups = sa.Table(
 )
 
 
+def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:
+    query = (
+        sa.select([groups.c.id])
+        .select_from(groups)
+        .where(
+            cond & (groups.c.domain_name == domain_name),
+        )
+    )
+    return query
+
+
 async def resolve_group_name_or_id(
     db_conn: SAConnection,
     domain_name: str,
     value: Union[str, uuid.UUID],
 ) -> Optional[uuid.UUID]:
-    if isinstance(value, str):
-        query = (
-            sa.select([groups.c.id])
-            .select_from(groups)
-            .where(
-                (groups.c.name == value) & (groups.c.domain_name == domain_name),
-            )
-        )
-        return await db_conn.scalar(query)
-    elif isinstance(value, uuid.UUID):
-        query = (
-            sa.select([groups.c.id])
-            .select_from(groups)
-            .where(
-                (groups.c.id == value) & (groups.c.domain_name == domain_name),
-            )
-        )
-        return await db_conn.scalar(query)
-    else:
-        raise TypeError("unexpected type for group_name_or_id")
+    match value:
+        case uuid.UUID():
+            cond = groups.c.id == value
+        case str():
+            cond = groups.c.name == value
+        case _:
+            raise TypeError("unexpected type for group_name_or_id")
+    query = _build_group_query(cond, domain_name)
+    return await db_conn.scalar(query)
+
+
+@overload
+async def resolve_groups(
+    db_conn: SAConnection,
+    domain_name: str,
+    values: Iterable[uuid.UUID],
+) -> Iterable[uuid.UUID]:
+    ...
+
+
+@overload
+async def resolve_groups(
+    db_conn: SAConnection,
+    domain_name: str,
+    values: Iterable[str],
+) -> Iterable[uuid.UUID]:
+    ...
+
+
+async def resolve_groups(
+    db_conn: SAConnection,
+    domain_name: str,
+    values: Iterable[uuid.UUID] | Iterable[str],
+) -> Iterable[uuid.UUID]:
+    listed_val = [*values]
+    match listed_val:
+        case [uuid.UUID(), *_]:
+            query = _build_group_query((groups.c.id.in_(listed_val)), domain_name)
+        case [str(), *_]:
+            query = _build_group_query((groups.c.name.in_(listed_val)), domain_name)
+        case []:
+            return []
+        case _:
+            raise TypeError("unexpected type for group_name_or_id")
+
+    rows = (await db_conn.execute(query)).fetchall()
+    return_val = [row["id"] for row in rows]
+
+    return return_val
 
 
 class Group(graphene.ObjectType):
@@ -152,7 +207,7 @@ class Group(graphene.ObjectType):
     modified_at = GQLDateTime()
     domain_name = graphene.String()
     total_resource_slots = graphene.JSONString()
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String)
+    allowed_vfolder_hosts = graphene.JSONString()
     integration_id = graphene.String()
 
     scaling_groups = graphene.List(lambda: graphene.String)
@@ -170,7 +225,7 @@ class Group(graphene.ObjectType):
             modified_at=row["modified_at"],
             domain_name=row["domain_name"],
             total_resource_slots=row["total_resource_slots"].to_json(),
-            allowed_vfolder_hosts=row["allowed_vfolder_hosts"],
+            allowed_vfolder_hosts=row["allowed_vfolder_hosts"].to_json(),
             integration_id=row["integration_id"],
         )
 
@@ -298,7 +353,7 @@ class GroupInput(graphene.InputObjectType):
     is_active = graphene.Boolean(required=False, default=True)
     domain_name = graphene.String(required=True)
     total_resource_slots = graphene.JSONString(required=False)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String, required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
 
 
@@ -310,7 +365,7 @@ class ModifyGroupInput(graphene.InputObjectType):
     total_resource_slots = graphene.JSONString(required=False)
     user_update_mode = graphene.String(required=False)
     user_uuids = graphene.List(lambda: graphene.String, required=False)
-    allowed_vfolder_hosts = graphene.List(lambda: graphene.String, required=False)
+    allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
 
 

@@ -7,7 +7,7 @@ from ai.backend.client.output.types import FieldSpec
 
 from ..request import Request
 from ..session import api_session
-from .base import BaseFunction, api_function
+from .base import BaseFunction, api_function, resolve_fields
 
 __all__ = ("ScalingGroup",)
 
@@ -18,6 +18,7 @@ _default_list_fields = (
     scaling_group_fields["created_at"],
     scaling_group_fields["driver"],
     scaling_group_fields["scheduler"],
+    scaling_group_fields["use_host_network"],
 )
 
 _default_detail_fields = (
@@ -29,6 +30,7 @@ _default_detail_fields = (
     scaling_group_fields["driver_opts"],
     scaling_group_fields["scheduler"],
     scaling_group_fields["scheduler_opts"],
+    scaling_group_fields["use_host_network"],
 )
 
 
@@ -121,13 +123,12 @@ class ScalingGroup(BaseFunction):
         driver_opts: Mapping[str, str] = None,
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
-        fields: Iterable[str] = None,
+        use_host_network: bool = False,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Creates a new scaling group with the given options.
         """
-        if fields is None:
-            fields = ("name",)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: CreateScalingGroupInput!) {
@@ -137,7 +138,10 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        resolved_fields = resolve_fields(
+            fields, scaling_group_fields, (scaling_group_fields["name"],)
+        )
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "input": {
@@ -147,6 +151,7 @@ class ScalingGroup(BaseFunction):
                 "driver_opts": json.dumps(driver_opts),
                 "scheduler": scheduler,
                 "scheduler_opts": json.dumps(scheduler_opts),
+                "use_host_network": use_host_network,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
@@ -163,13 +168,12 @@ class ScalingGroup(BaseFunction):
         driver_opts: Mapping[str, str] = None,
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
-        fields: Iterable[str] = None,
+        use_host_network: bool = False,
+        fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
         Update existing scaling group.
         """
-        if fields is None:
-            fields = ("name",)
         query = textwrap.dedent(
             """\
             mutation($name: String!, $input: ModifyScalingGroupInput!) {
@@ -179,7 +183,10 @@ class ScalingGroup(BaseFunction):
             }
         """
         )
-        query = query.replace("$fields", " ".join(fields))
+        resolved_fields = resolve_fields(
+            fields, scaling_group_fields, (scaling_group_fields["name"],)
+        )
+        query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "input": {
@@ -189,6 +196,7 @@ class ScalingGroup(BaseFunction):
                 "driver_opts": None if driver_opts is None else json.dumps(driver_opts),
                 "scheduler": scheduler,
                 "scheduler_opts": None if scheduler_opts is None else json.dumps(scheduler_opts),
+                "use_host_network": use_host_network,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
