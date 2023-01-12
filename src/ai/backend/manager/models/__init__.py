@@ -6,7 +6,7 @@ from . import error_logs as _errorlogs
 from . import image as _image
 from . import kernel as _kernel
 from . import keypair as _keypair
-from . import project as _group
+from . import project as _project
 from . import resource_policy as _rpolicy
 from . import resource_preset as _rpreset
 from . import scaling_group as _sgroup
@@ -21,7 +21,7 @@ __all__ = (
     *_acl.__all__,
     *_agent.__all__,
     *_domain.__all__,
-    *_group.__all__,
+    *_project.__all__,
     *_image.__all__,
     *_kernel.__all__,
     *_keypair.__all__,
