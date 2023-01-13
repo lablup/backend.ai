@@ -301,7 +301,6 @@ class ImageRef:
                 self._name, self._tag = ImageRef._parse_image_tag(value, True)
             if not rx_slug.search(self._tag):
                 raise InvalidImageTag(f"Image tag({self._tag} is invalid.")
-        print(f"{self._tag = }")
         self._update_tag_set()
 
     @staticmethod
