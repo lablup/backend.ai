@@ -279,7 +279,7 @@ class BaseRunner(metaclass=ABCMeta):
             self.kernel_mgr = None
 
     async def _shutdown_jupyter_kernel(self):
-        if self.kernel_mgr and self.kernel_mgr.is_alive():
+        if self.kernel_mgr and await self.kernel_mgr.is_alive():
             assert self.kernel_client is not None
             log.info("shutting down " + self.jupyter_kspec_name + " kernel...")
             await self.kernel_mgr.shutdown_kernel()
