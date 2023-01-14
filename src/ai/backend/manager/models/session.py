@@ -1,14 +1,28 @@
 from __future__ import annotations
 
+import asyncio
 import enum
+from contextlib import asynccontextmanager as actxmgr
+from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Union,
+)
 from uuid import UUID
 
 import aiotools
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
+from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -26,6 +40,12 @@ from ai.backend.common.types import (
 )
 
 from ..api.exceptions import (
+    AgentError,
+    BackendError,
+    KernelCreationFailed,
+    KernelDestructionFailed,
+    KernelExecutionFailed,
+    KernelRestartFailed,
     MainKernelNotFound,
     SessionNotFound,
     TooManyKernelsFound,
@@ -52,6 +72,7 @@ from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import UserRow
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
@@ -61,6 +82,7 @@ if TYPE_CHECKING:
 
 __all__ = (
     "determine_session_status",
+    "handle_session_exception",
     "SessionStatus",
     "SESSION_STATUS_TRANSITION_MAP",
     "DEAD_SESSION_STATUSES",
@@ -135,6 +157,21 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
     )
 )
 
+OP_EXC = {
+    "create_session": KernelCreationFailed,
+    "restart_session": KernelRestartFailed,
+    "destroy_session": KernelDestructionFailed,
+    "execute": KernelExecutionFailed,
+    "shutdown_service": KernelExecutionFailed,
+    "upload_file": KernelExecutionFailed,
+    "download_file": KernelExecutionFailed,
+    "download_single": KernelExecutionFailed,
+    "list_files": KernelExecutionFailed,
+    "get_logs_from_agent": KernelExecutionFailed,
+    "refresh_session": KernelExecutionFailed,
+    "commit_session": KernelExecutionFailed,
+}
+
 
 KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
     KernelStatus.PENDING: SessionStatus.PENDING,
@@ -150,6 +187,19 @@ KERNEL_SESSION_STATUS_MAPPING: Mapping[KernelStatus, SessionStatus] = {
     KernelStatus.TERMINATED: SessionStatus.TERMINATED,
     KernelStatus.ERROR: SessionStatus.ERROR,
     KernelStatus.CANCELLED: SessionStatus.CANCELLED,
+}
+
+SESSION_KERNEL_STATUS_MAPPING: Mapping[SessionStatus, KernelStatus] = {
+    SessionStatus.PENDING: KernelStatus.PENDING,
+    SessionStatus.SCHEDULED: KernelStatus.SCHEDULED,
+    SessionStatus.PREPARING: KernelStatus.PREPARING,
+    SessionStatus.PULLING: KernelStatus.PULLING,
+    SessionStatus.RUNNING: KernelStatus.RUNNING,
+    SessionStatus.RESTARTING: KernelStatus.RESTARTING,
+    SessionStatus.TERMINATING: KernelStatus.TERMINATING,
+    SessionStatus.TERMINATED: KernelStatus.TERMINATED,
+    SessionStatus.ERROR: KernelStatus.ERROR,
+    SessionStatus.CANCELLED: KernelStatus.CANCELLED,
 }
 
 SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
@@ -305,6 +355,75 @@ def determine_session_status(sibling_kernels: Sequence[KernelRow]) -> SessionSta
             case _:
                 break
     return candidate
+
+
+@actxmgr
+async def handle_session_exception(
+    db: ExtendedAsyncSAEngine,
+    op: str,
+    session_id: SessionId,
+    error_callback=None,
+    cancellation_callback=None,
+    set_error: bool = False,
+) -> AsyncIterator[None]:
+    exc_class = OP_EXC[op]
+    try:
+        yield
+    except asyncio.TimeoutError:
+        if set_error:
+            await SessionRow.set_session_status(
+                db,
+                session_id,
+                SessionStatus.ERROR,
+                reason=f"operation-timeout ({op})",
+            )
+        if error_callback:
+            await error_callback()
+        raise exc_class("TIMEOUT") from None
+    except asyncio.CancelledError:
+        if cancellation_callback:
+            await cancellation_callback()
+        raise
+    except AgentError as e:
+        if set_error:
+            await SessionRow.set_session_status(
+                db,
+                session_id,
+                SessionStatus.ERROR,
+                reason=f"agent-error ({e!r})",
+                status_data={
+                    "error": {
+                        "src": "agent",
+                        "agent_id": e.agent_id,
+                        "name": e.exc_name,
+                        "repr": e.exc_repr,
+                    },
+                },
+            )
+        if error_callback:
+            await error_callback()
+        raise exc_class("FAILURE", e) from None
+    except BackendError:
+        # silently re-raise to make them handled by gateway http handlers
+        raise
+    except Exception as e:
+        if set_error:
+            await SessionRow.set_session_status(
+                db,
+                session_id,
+                SessionStatus.ERROR,
+                reason=f"other-error ({e!r})",
+                status_data={
+                    "error": {
+                        "src": "other",
+                        "name": e.__class__.__name__,
+                        "repr": repr(e),
+                    },
+                },
+            )
+        if error_callback:
+            await error_callback()
+        raise
 
 
 def _build_session_fetch_query(
@@ -491,10 +610,11 @@ class SessionRow(Base):
         nullable=False,
         index=True,
     )
-    status_changed = sa.Column(
-        "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
-    )
+    # status_changed = sa.Column(
+    #     "status_changed", sa.DateTime(timezone=True), nullable=True, index=True
+    # )
     status_info = sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null())
+
     status_data = sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null())
     # status_data contains a JSON object that contains detailed data for the last status change.
     # During scheduling (as PENDING + ("no-available-instances" | "predicate-checks-failed")):
@@ -552,7 +672,10 @@ class SessionRow(Base):
         # indexing
         sa.Index(
             "ix_sessions_updated_order",
-            sa.func.greatest("created_at", "terminated_at", "status_changed"),
+            sa.func.greatest(
+                "created_at",
+                "terminated_at",
+            ),
             unique=False,
         ),
     )
@@ -562,13 +685,88 @@ class SessionRow(Base):
         kerns = tuple(kern for kern in self.kernels if kern.cluster_role == DEFAULT_ROLE)
         if len(kerns) > 1:
             raise TooManyKernelsFound(
-                f"Session (id: {self.id}) " "has more than 1 main kernel.",
+                f"Session (id: {self.id}) has more than 1 main kernel.",
             )
         if len(kerns) == 0:
             raise MainKernelNotFound(
                 f"Session (id: {self.id}) has no main kernel.",
             )
         return kerns[0]
+
+    @property
+    def status_changed(self) -> datetime:
+        return datetime.fromisoformat(self.status_history[self.status.name])
+
+    def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
+        kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)
+        if len(kerns) > 1:
+            raise TooManyKernelsFound(
+                f"Session (id: {self.id}) has more than 1 kernel with {cluster_name = }",
+            )
+        if len(kerns) == 0:
+            raise MainKernelNotFound(
+                f"Session (id: {self.id}) has no kernel with {cluster_name = }.",
+            )
+        return kerns[0]
+
+    @staticmethod
+    async def set_session_status(
+        db: ExtendedAsyncSAEngine,
+        session_id: SessionId,
+        status: SessionStatus,
+        *,
+        status_data: Optional[Mapping[str, Any]] = None,
+        reason: Optional[str] = None,
+    ) -> None:
+        now = datetime.now(tzutc())
+        data = {
+            "status": status,
+            "status_history": sql_json_merge(
+                SessionRow.status_history,
+                (),
+                {
+                    status.name: datetime.now(tzutc()).isoformat(),
+                },
+            ),
+        }
+        if status_data is not None:
+            data["status_data"] = status_data
+        if reason is not None:
+            data["status_info"] = reason
+        if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
+            data["terminated_at"] = now
+
+        async def _update() -> None:
+            async with db.begin_session() as db_sess:
+                query = (
+                    sa.update(SessionRow)
+                    .values(**data)
+                    .where(
+                        (SessionRow.id == session_id)
+                        & ~(SessionRow.status.in_(DEAD_SESSION_STATUSES)),
+                    )
+                )
+                await db_sess.execute(query)
+
+        await execute_with_retry(_update)
+
+    async def set_session_result(
+        db: ExtendedAsyncSAEngine,
+        session_id: SessionId,
+        success: bool,
+        exit_code: int,
+    ) -> None:
+        # TODO: store exit code?
+        data = {
+            "result": SessionResult.SUCCESS if success else SessionResult.FAILURE,
+        }
+
+        async def _update() -> None:
+            async with db.begin_session() as db_sess:
+                query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
+                await db_sess.execute(query)
+
+        await execute_with_retry(_update)
 
     @classmethod
     async def match_sessions(
@@ -833,7 +1031,7 @@ DEFAULT_SESSION_ORDERING = [
         sa.func.greatest(
             SessionRow.created_at,
             SessionRow.terminated_at,
-            SessionRow.status_changed,
+            # SessionRow.status_changed,
         )
     ),
 ]
@@ -1008,51 +1206,49 @@ class ComputeSession(graphene.ObjectType):
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
     _queryfilter_fieldspec = {
-        "type": ("kernels_session_type", lambda s: SessionTypes[s]),
-        "name": ("kernels_session_name", None),
-        "image": ("kernels_image", None),
-        "architecture": ("kernels_architecture", None),
-        "domain_name": ("kernels_domain_name", None),
+        "session_type": ("session_type", lambda s: SessionTypes[s]),
+        "name": ("name", None),
+        "image": ("image", None),
+        "architecture": ("architecture", None),
+        "domain_name": ("domain_name", None),
         "group_name": ("groups_group_name", None),
         "user_email": ("users_email", None),
-        "access_key": ("kernels_access_key", None),
-        "scaling_group": ("kernels_scaling_group", None),
-        "cluster_mode": ("kernels_cluster_mode", lambda s: ClusterMode[s]),
-        "cluster_template": ("kernels_cluster_template", None),
-        "cluster_size": ("kernels_cluster_size", None),
-        "status": ("kernels_status", lambda s: KernelStatus[s]),
-        "status_info": ("kernels_status_info", None),
-        "status_changed": ("kernels_status_changed", dtparse),
-        "result": ("kernels_result", lambda s: SessionResult[s]),
-        "created_at": ("kernels_created_at", dtparse),
-        "terminated_at": ("kernels_terminated_at", dtparse),
-        "starts_at": ("kernels_starts_at", dtparse),
-        "startup_command": ("kernels_startup_command", None),
-        "agent": ("kernels_agent", None),
-        "agents": ("kernels_agent", None),
+        "access_key": ("access_key", None),
+        "scaling_group": ("scaling_group", None),
+        "cluster_mode": ("cluster_mode", lambda s: ClusterMode[s]),
+        "cluster_template": ("cluster_template", None),
+        "cluster_size": ("cluster_size", None),
+        "status": ("status", lambda s: KernelStatus[s]),
+        "status_info": ("status_info", None),
+        # "status_changed": ("status_changed", dtparse),
+        "result": ("result", lambda s: SessionResult[s]),
+        "created_at": ("created_at", dtparse),
+        "terminated_at": ("terminated_at", dtparse),
+        "starts_at": ("starts_at", dtparse),
+        "startup_command": ("startup_command", None),
     }
 
     _queryorder_colmap = {
-        "id": "kernels_id",
-        "type": "kernels_session_type",
-        "name": "kernels_session_name",
-        "image": "kernels_image",
-        "architecture": "kernels_architecture",
-        "domain_name": "kernels_domain_name",
-        "group_name": "kernels_group_name",
+        "id": "id",
+        "session_type": "session_type",
+        "name": "name",
+        "image": "image",
+        "architecture": "architecture",
+        "domain_name": "domain_name",
+        "group_name": "group_name",
         "user_email": "users_email",
-        "access_key": "kernels_access_key",
-        "scaling_group": "kernels_scaling_group",
-        "cluster_mode": "kernels_cluster_mode",
-        "cluster_template": "kernels_cluster_template",
-        "cluster_size": "kernels_cluster_size",
-        "status": "kernels_status",
-        "status_info": "kernels_status_info",
-        "status_changed": "kernels_status_info",
-        "result": "kernels_result",
-        "created_at": "kernels_created_at",
-        "terminated_at": "kernels_terminated_at",
-        "starts_at": "kernels_starts_at",
+        "access_key": "access_key",
+        "scaling_group": "scaling_group",
+        "cluster_mode": "cluster_mode",
+        "cluster_template": "cluster_template",
+        "cluster_size": "cluster_size",
+        "status": "status",
+        "status_info": "status_info",
+        # "status_changed": "status_info",
+        "result": "result",
+        "created_at": "created_at",
+        "terminated_at": "terminated_at",
+        "starts_at": "starts_at",
     }
 
     @classmethod
@@ -1060,11 +1256,11 @@ class ComputeSession(graphene.ObjectType):
         cls,
         ctx: GraphQueryContext,
         *,
-        domain_name: str = None,
-        group_id: UUID = None,
-        access_key: str = None,
-        status: str = None,
-        filter: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[UUID] = None,
+        access_key: Optional[str] = None,
+        status: Optional[str] = None,
+        filter: Optional[str] = None,
     ) -> int:
         if isinstance(status, str):
             status_list = [SessionStatus[s] for s in status.split(",")]
@@ -1096,14 +1292,16 @@ class ComputeSession(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        domain_name: str = None,
-        group_id: UUID = None,
-        access_key: str = None,
-        status: str = None,
-        filter: str = None,
-        order: str = None,
+        domain_name: Optional[str] = None,
+        group_id: Optional[UUID] = None,
+        access_key: Optional[str] = None,
+        status: Optional[str] = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> Sequence[ComputeSession | None]:
-        if isinstance(status, str):
+        if status is None:
+            status_list = None
+        elif isinstance(status, str):
             status_list = [SessionStatus[s] for s in status.split(",")]
         elif isinstance(status, SessionStatus):
             status_list = [status]

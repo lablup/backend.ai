@@ -682,7 +682,7 @@ class SchedulerDispatcher(aobject):
                         status=SessionStatus.SCHEDULED,
                         status_info="scheduled",
                         status_data={},
-                        status_changed=now,
+                        # status_changed=now,
                         status_history=sql_json_merge(
                             SessionRow.status_history,
                             (),
@@ -884,7 +884,7 @@ class SchedulerDispatcher(aobject):
                         status=SessionStatus.SCHEDULED,
                         status_info="scheduled",
                         status_data={},
-                        status_changed=now,
+                        # status_changed=now,
                         status_history=sql_json_merge(
                             SessionRow.status_history,
                             (),
@@ -949,7 +949,7 @@ class SchedulerDispatcher(aobject):
                             sa.update(SessionRow)
                             .values(
                                 status=SessionStatus.PREPARING,
-                                status_changed=now,
+                                # status_changed=now,
                                 status_info="",
                                 status_data={},
                                 status_history=sql_json_merge(
@@ -1060,7 +1060,7 @@ class SchedulerDispatcher(aobject):
                         sa.update(SessionRow)
                         .values(
                             status=SessionStatus.CANCELLED,
-                            status_changed=now,
+                            # status_changed=now,
                             status_info="failed-to-start",
                             status_data=status_data,
                             terminated_at=now,

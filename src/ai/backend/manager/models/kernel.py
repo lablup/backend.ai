@@ -1,23 +1,38 @@
 from __future__ import annotations
 
+import asyncio
 import enum
+import logging
 import uuid
+from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence, Type, TypedDict, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Mapping,
+    Optional,
+    Sequence,
+    Type,
+    TypedDict,
+    TypeVar,
+)
 
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
+from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import noload, relationship, selectinload
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
@@ -30,7 +45,17 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 
+from ..api.exceptions import (
+    BackendError,
+    KernelCreationFailed,
+    KernelDestructionFailed,
+    KernelExecutionFailed,
+    KernelRestartFailed,
+    SessionNotFound,
+)
 from ..defs import DEFAULT_ROLE
+from ..exceptions import AgentError
+from .agent import AgentStatus
 from .base import (
     GUID,
     Base,
@@ -51,12 +76,14 @@ from .group import groups
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import users
+from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
 __all__ = (
     "get_user_email",
+    "handle_kernel_exception",
     "kernels",
     "KernelRow",
     "KERNEL_STATUS_TRANSITION_MAP",
@@ -73,6 +100,8 @@ __all__ = (
     "LIVE_STATUS",
     "recalc_concurrency_used",
 )
+
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
 
 
 class KernelStatus(enum.Enum):
@@ -133,6 +162,22 @@ DEAD_KERNEL_STATUSES = (
 )
 
 LIVE_STATUS = (KernelStatus.RUNNING,)
+
+
+OP_EXC = {
+    "create_session": KernelCreationFailed,
+    "restart_session": KernelRestartFailed,
+    "destroy_session": KernelDestructionFailed,
+    "execute": KernelExecutionFailed,
+    "shutdown_service": KernelExecutionFailed,
+    "upload_file": KernelExecutionFailed,
+    "download_file": KernelExecutionFailed,
+    "download_single": KernelExecutionFailed,
+    "list_files": KernelExecutionFailed,
+    "get_logs_from_agent": KernelExecutionFailed,
+    "refresh_session": KernelExecutionFailed,
+    "commit_session": KernelExecutionFailed,
+}
 
 
 async def get_user_email(
@@ -243,6 +288,76 @@ KERNEL_STATUS_TRANSITION_MAP: Mapping[KernelStatus, set[KernelStatus]] = {
     KernelStatus.ERROR: set(),
     KernelStatus.CANCELLED: set(),
 }
+
+
+@actxmgr
+async def handle_kernel_exception(
+    db: ExtendedAsyncSAEngine,
+    op: str,
+    kernel_id: KernelId,
+    error_callback=None,
+    cancellation_callback=None,
+    set_error: bool = False,
+) -> AsyncIterator[None]:
+    exc_class = OP_EXC[op]
+    # NOTE: Error logging is done outside of this actxmanager.
+    try:
+        yield
+    except asyncio.TimeoutError:
+        if set_error:
+            await KernelRow.set_kernel_status(
+                db,
+                kernel_id,
+                KernelStatus.ERROR,
+                reason=f"operation-timeout ({op})",
+            )
+        if error_callback:
+            await error_callback()
+        raise exc_class("TIMEOUT") from None
+    except asyncio.CancelledError:
+        if cancellation_callback:
+            await cancellation_callback()
+        raise
+    except AgentError as e:
+        if set_error:
+            await KernelRow.set_kernel_status(
+                db,
+                kernel_id,
+                KernelStatus.ERROR,
+                reason=f"agent-error ({e!r})",
+                status_data={
+                    "error": {
+                        "src": "agent",
+                        "agent_id": e.agent_id,
+                        "name": e.exc_name,
+                        "repr": e.exc_repr,
+                    },
+                },
+            )
+        if error_callback:
+            await error_callback()
+        raise exc_class("FAILURE", e) from None
+    except BackendError:
+        # silently re-raise to make them handled by gateway http handlers
+        raise
+    except Exception as e:
+        if set_error:
+            await KernelRow.set_kernel_status(
+                db,
+                kernel_id,
+                KernelStatus.ERROR,
+                reason=f"other-error ({e!r})",
+                status_data={
+                    "error": {
+                        "src": "other",
+                        "name": e.__class__.__name__,
+                        "repr": repr(e),
+                    },
+                },
+            )
+        if error_callback:
+            await error_callback()
+        raise
 
 
 kernels = sa.Table(
@@ -420,6 +535,80 @@ class KernelRow(Base):
     @property
     def image_ref(self) -> ImageRef:
         return ImageRef(self.image, [self.registry], self.architecture)
+
+    @property
+    def cluster_name(self) -> str:
+        if self.cluster_role == DEFAULT_ROLE:
+            return self.cluster_role
+        return self.cluster_role + str(self.cluster_idx)
+
+    @staticmethod
+    async def get_kernel(
+        db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
+    ) -> KernelRow:
+        async with db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(KernelRow)
+                .where(KernelRow.id == kern_id)
+                .options(
+                    noload("*"),
+                    selectinload(KernelRow.agent).options(noload("*")),
+                )
+            )
+            result = (await db_sess.execute(query)).scalars().all()
+
+            cand = result
+            if not allow_stale:
+                cand = [
+                    k
+                    for k in result
+                    if (k.status not in DEAD_KERNEL_STATUSES)
+                    and (k.agent.status == AgentStatus.ALIVE)
+                ]
+            if not cand:
+                raise SessionNotFound
+            return cand[0]
+
+    @staticmethod
+    async def set_kernel_status(
+        db: ExtendedAsyncSAEngine,
+        kernel_id: KernelId,
+        status: KernelStatus,
+        *,
+        status_data: Optional[Mapping[str, Any]] = None,
+        reason: Optional[str] = None,
+    ) -> None:
+        assert status != KernelStatus.TERMINATED, (
+            "TERMINATED status update must be handled in " "mark_kernel_terminated()"
+        )
+        now = datetime.now(tzutc())
+        data = {
+            "status": status,
+            "status_changed": now,
+            "status_history": sql_json_merge(
+                kernels.c.status_history,
+                (),
+                {
+                    status.name: now.isoformat(),  # ["PULLING", "PREPARING"]
+                },
+            ),
+        }
+        if status_data is not None:
+            data["status_data"] = status_data
+        if reason is not None:
+            data["status_info"] = reason
+        if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
+            data["terminated_at"] = now
+
+        async def _update() -> None:
+            async with db.begin_session() as db_sess:
+                kernel_query = sa.select(KernelRow.status).where(KernelRow.id == kernel_id)
+                current_status = (await db_sess.execute(kernel_query)).scalar()
+                if status in KERNEL_STATUS_TRANSITION_MAP[current_status]:
+                    query = sa.update(KernelRow).values(**data).where(KernelRow.id == kernel_id)
+                    await db_sess.execute(query)
+
+        await execute_with_retry(_update)
 
 
 DEFAULT_KERNEL_ORDERING = [

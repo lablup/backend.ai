@@ -97,7 +97,7 @@ def upgrade():
             server_default="PENDING",
             nullable=False,
         ),
-        sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True),
+        # sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True),
         sa.Column("status_history", pgsql.JSONB(), nullable=True, default=sa.null()),
         sa.Column("status_info", sa.Unicode(), nullable=True, default=sa.null()),
         sa.Column("status_data", pgsql.JSONB(), nullable=True, default=sa.null()),
@@ -185,7 +185,7 @@ def upgrade():
             server_default="PENDING",
             nullable=False,
         )
-        status_changed = sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True)
+        # status_changed = sa.Column("status_changed", sa.DateTime(timezone=True), nullable=True)
         status_history = sa.Column(
             "status_history", pgsql.JSONB(), nullable=True, default=sa.null()
         )
@@ -239,10 +239,10 @@ def upgrade():
         op.f("ix_sessions_scaling_group_name"), "sessions", ["scaling_group_name"], unique=False
     )
     op.create_index(op.f("ix_sessions_session_type"), "sessions", ["session_type"], unique=False)
-    op.create_index(op.f("ix_sessions_status"), "sessions", ["status"], unique=False)
-    op.create_index(
-        op.f("ix_sessions_status_changed"), "sessions", ["status_changed"], unique=False
-    )
+    # op.create_index(op.f("ix_sessions_status"), "sessions", ["status"], unique=False)
+    # op.create_index(
+    #     op.f("ix_sessions_status_changed"), "sessions", ["status_changed"], unique=False
+    # )
     op.create_index(op.f("ix_sessions_terminated_at"), "sessions", ["terminated_at"], unique=False)
 
     query = sa.select([kernels]).select_from(kernels).order_by(kernels.c.created_at)
@@ -287,7 +287,7 @@ def upgrade():
                 "terminated_at": row["terminated_at"],
                 "starts_at": row["starts_at"],
                 "status": row["status"],
-                "status_changed": row["status_changed"],
+                # "status_changed": row["status_changed"],
                 "status_history": row["status_history"],
                 "status_info": row["status_info"],
                 "status_data": row["status_data"],
@@ -301,40 +301,41 @@ def upgrade():
         else:
             sess = all_kernel_sessions[sess_id]
 
-            st_change = sess["status_changed"]
+            # st_change = sess["status_changed"]
 
             if sess["created_at"] > row["created_at"]:
                 sess["created_at"] = row["created_at"]
-                st_change = row["st_change"]
+                # st_change = row["st_change"]
 
             if sess["starts_at"] > row["starts_at"]:
                 sess["starts_at"] = row["starts_at"]
-                st_change = row["st_change"]
+                # st_change = row["st_change"]
 
             if str(sess["status"]) not in ("ERROR", "CANCELLED"):
                 if KernelStatus.index(str(sess["status"])) > KernelStatus.index(str(row["status"])):
                     sess["status"] = row["status"]
-                    st_change = row["st_change"]
+                    # st_change = row["st_change"]
 
             if sess["terminated_at"] is not None and row["terminated_at"] is not None:
                 if sess["terminated_at"] < row["terminated_at"]:
                     sess["terminated_at"] = row["terminated_at"]
-                    st_change = row["status_changed"]
+                    # st_change = row["status_changed"]
             elif sess["terminated_at"] is None:
                 pass
             elif row["terminated_at"] is None:
                 sess["terminated_at"] = None
-            sess["status_changed"] = st_change
+            # sess["status_changed"] = st_change
 
-            # if sess['status_info'] != row['status_info']:
-            #     import json
-            #     sinfo = sess['status_info']
-            #     try:
-            #         sinfo = json.loads(sinfo)
-            #     except json.decoder.JSONDecodeError:
-            #         sinfo = {sess['id']: sinfo}
-            #     sinfo = {**sinfo, row['id']: row['status_info']}
-            #     sess['status_info'] = json.dumps(sinfo)
+            if sess["status_info"] != row["status_info"]:
+                import json
+
+                sinfo = sess["status_info"]
+                try:
+                    sinfo = json.loads(sinfo)
+                except json.decoder.JSONDecodeError:
+                    sinfo = {sess["id"]: sinfo}
+                sinfo = {**sinfo, row["id"]: row["status_info"]}
+                sess["status_info"] = json.dumps(sinfo)
 
     if all_kernel_sessions:
         creates = tuple(all_kernel_sessions.values())
@@ -541,8 +542,8 @@ def downgrade():
 
     # Session table
     op.drop_index(op.f("ix_sessions_terminated_at"), table_name="sessions")
-    op.drop_index(op.f("ix_sessions_status_changed"), table_name="sessions")
-    op.drop_index(op.f("ix_sessions_status"), table_name="sessions")
+    # op.drop_index(op.f("ix_sessions_status_changed"), table_name="sessions")
+    # op.drop_index(op.f("ix_sessions_status"), table_name="sessions")
     op.drop_index(op.f("ix_sessions_session_type"), table_name="sessions")
     op.drop_index(op.f("ix_sessions_scaling_group_name"), table_name="sessions")
     op.drop_index(op.f("ix_sessions_result"), table_name="sessions")

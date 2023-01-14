@@ -50,7 +50,7 @@ from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.idle import AppStreamingStatus
 
 from ..defs import DEFAULT_ROLE
-from ..models import KernelRow, SessionRow, kernels
+from ..models import KernelRow, SessionRow
 from .auth import auth_required
 from .exceptions import (
     AppNotFound,
@@ -661,15 +661,15 @@ async def handle_kernel_terminating(
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["stream.context"]
     try:
-        kernel = await root_ctx.registry.get_kernel(
+        kernel = await KernelRow.get_kernel(
+            root_ctx.db,
             event.kernel_id,
-            (kernels.c.cluster_role, kernels.c.status),
             allow_stale=True,
         )
     except SessionNotFound:
         return
-    if kernel["cluster_role"] == DEFAULT_ROLE:
-        stream_key = kernel["id"]
+    if kernel.cluster_role == DEFAULT_ROLE:
+        stream_key = kernel.id
         cancelled_tasks = []
         for sock in app_ctx.stream_stdin_socks[stream_key]:
             sock.close()

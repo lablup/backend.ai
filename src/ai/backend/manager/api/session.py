@@ -1480,12 +1480,12 @@ async def handle_kernel_creation_lifecycle(
         # State transition is done by the DoPrepareEvent handler inside the scheduler-distpacher object.
         pass
     elif isinstance(event, KernelPullingEvent):
-        await root_ctx.registry.set_kernel_status(
-            event.kernel_id, KernelStatus.PULLING, event.reason
+        await KernelRow.set_kernel_status(
+            root_ctx.db, event.kernel_id, KernelStatus.PULLING, reason=event.reason
         )
     elif isinstance(event, KernelCreatingEvent):
-        await root_ctx.registry.set_kernel_status(
-            event.kernel_id, KernelStatus.PREPARING, event.reason
+        await KernelRow.set_kernel_status(
+            root_ctx.db, event.kernel_id, KernelStatus.PREPARING, reason=event.reason
         )
     elif isinstance(event, KernelStartedEvent):
         await root_ctx.registry.finalize_running(event.creation_info)
@@ -1661,9 +1661,9 @@ async def handle_batch_result(
     """
     root_ctx: RootContext = app["_root.context"]
     if isinstance(event, SessionSuccessEvent):
-        await root_ctx.registry.set_session_result(event.session_id, True, event.exit_code)
+        await SessionRow.set_session_result(root_ctx.db, event.session_id, True, event.exit_code)
     elif isinstance(event, SessionFailureEvent):
-        await root_ctx.registry.set_session_result(event.session_id, False, event.exit_code)
+        await SessionRow.set_session_result(root_ctx.db, event.session_id, False, event.exit_code)
     async with root_ctx.db.begin_session() as db_sess:
         session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
     await root_ctx.registry.destroy_session(
