@@ -301,8 +301,8 @@ class SchedulerDispatcher(aobject):
             for item in cancelled_sessions:
                 await self.event_producer.produce_event(
                     SessionCancelledEvent(
-                        item.session_id,
-                        item.session_creation_id,
+                        item.id,
+                        item.creation_id,
                         reason=KernelLifecycleEventReason.PENDING_TIMEOUT,
                     ),
                 )
