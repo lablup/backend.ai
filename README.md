@@ -255,6 +255,15 @@ animated vector graphics)
 We now recommend using in-kernel applications such as Jupyter Lab, Visual Studio Code Server,
 or native SSH connection to kernels via our client SDK or desktop apps.
 
+Python Version Compatibility
+----------------------------
+
+| Backend.AI Core Version | Compatible Python Version |
+|:-----------------------:|:-------------------------:|
+| 23.03.x                 | 3.11.x                    |
+| 22.03.x / 22.09.x       | 3.10.x                    |
+| 21.03.x / 21.09.x       | 3.8.x                     |
+
 
 License
 -------

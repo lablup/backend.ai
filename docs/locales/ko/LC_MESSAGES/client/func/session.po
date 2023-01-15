@@ -219,7 +219,7 @@ msgstr ""
 #: 788d1134f5bf417ea843a7bc4f3d6995 97cda7892e5a4261b5548bb2bbf2d1fe
 #: ai.backend.client.func.session.ComputeSession.create_from_template:48
 #: ai.backend.client.func.session.ComputeSession.get_or_create:44 of
-msgid "The list of vfolder names that belongs to the currrent API access key."
+msgid "The list of vfolder names that belongs to the current API access key."
 msgstr ""
 
 #: 42a898247c9a4c618938c1895d5d8367 a5055659b0b241c392bc4e3a555a7ea8
@@ -227,7 +227,7 @@ msgstr ""
 #: ai.backend.client.func.session.ComputeSession.get_or_create:47 of
 msgid ""
 "Mapping which contains custom path to mount vfolder. Key and value of "
-"this map should be vfolder name and custom path. Defalut mounts or "
+"this map should be vfolder name and custom path. Default mounts or "
 "relative paths are under /home/work. If you want different paths, names "
 "should be absolute paths. The target mount path of vFolders should not "
 "overlap with the linux system folders. vFolders which has a dot(.) prefix"
@@ -769,14 +769,14 @@ msgstr ""
 #~ " of returning the information of it."
 #~ msgstr ""
 
-#~ msgid "The list of vfolder names that belongs to the currrent API access key."
+#~ msgid "The list of vfolder names that belongs to the current API access key."
 #~ msgstr ""
 
 #~ msgid ""
 #~ "Mapping which contains custom path to"
 #~ " mount vfolder. Key and value of "
 #~ "this map should be vfolder name "
-#~ "and custom path. Defalut mounts or "
+#~ "and custom path. Default mounts or "
 #~ "relative paths are under /home/work. If"
 #~ " you want different paths, names "
 #~ "should be absolute paths. The target "
