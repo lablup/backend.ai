@@ -927,9 +927,9 @@ class AgentRegistry:
                 # BACKENDAI_SERVICE_PORTS are set as per-kernel env-vars.
                 # (In the future, each kernel in a cluster session may use different images)
                 "BACKENDAI_PREOPEN_PORTS": ",".join(
-                    str(port) for port in scheduled_session.preopen_ports
+                    str(port) for port in scheduled_session.main_kernel.preopen_ports
                 )
-                if scheduled_session.preopen_ports is not None
+                if scheduled_session.main_kernel.preopen_ports is not None
                 else "",
             }
         )
@@ -1211,7 +1211,7 @@ class AgentRegistry:
                                 "BACKENDAI_CLUSTER_LOCAL_RANK": str(binding.kernel.local_rank),
                                 "BACKENDAI_CLUSTER_HOST": str(binding.kernel.cluster_hostname),
                                 "BACKENDAI_SERVICE_PORTS": str(
-                                    image_infos[binding.kernel.image_ref].labels.get(
+                                    image_infos[binding.kernel.image].labels.get(
                                         "ai.backend.service-ports"
                                     )
                                 ),

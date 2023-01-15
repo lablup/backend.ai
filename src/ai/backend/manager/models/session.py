@@ -794,16 +794,15 @@ class SessionRow(Base):
             )
         ]
         try:
-            UUID(str(session_name_or_id))
+            session_id = UUID(str(session_name_or_id))
         except ValueError:
             pass
         else:
             # Fetch id-based query first
-            assert isinstance(session_name_or_id, UUID)
             query_list = [
                 aiotools.apartial(
                     _match_sessions_by_id,
-                    session_id=SessionId(session_name_or_id),
+                    session_id=SessionId(session_id),
                     allow_prefix=False,
                 ),
                 *query_list,
@@ -812,7 +811,7 @@ class SessionRow(Base):
                 query_list = [
                     aiotools.apartial(
                         _match_sessions_by_id,
-                        session_id=SessionId(session_name_or_id),
+                        session_id=SessionId(session_id),
                         allow_prefix=True,
                     ),
                     *query_list,
@@ -1358,6 +1357,7 @@ class ComputeSession(graphene.ObjectType):
             )
             .select_from(j)
             .where(SessionRow.id.in_(session_ids))
+            .options(selectinload(SessionRow.kernels))
         )
         if domain_name is not None:
             query = query.where(SessionRow.domain_name == domain_name)
@@ -1370,7 +1370,7 @@ class ComputeSession(graphene.ObjectType):
                 query,
                 cls,
                 session_ids,
-                lambda row: row.id,
+                lambda row: row.SessionRow.id,
             )
 
     @classmethod
@@ -1388,6 +1388,7 @@ class ComputeSession(graphene.ObjectType):
             sa.select(SessionRow)
             .select_from(j)
             .where(SessionDependencyRow.session_id.in_(session_ids))
+            .options(selectinload(SessionRow.kernels))
         )
         async with ctx.db.begin_readonly_session() as db_sess:
             return await batch_multiresult_in_session(
@@ -1396,7 +1397,7 @@ class ComputeSession(graphene.ObjectType):
                 query,
                 cls,
                 session_ids,
-                lambda row: row.id,
+                lambda row: row.SessionRow.id,
             )
 
 

@@ -132,7 +132,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                 fields.extend(
                     [
                         session_fields["group_name"],
-                        session_fields["kernel_id"],
+                        session_fields["main_kernel_id"],
                         session_fields["image"],
                         session_fields["type"],
                         session_fields["status"],
@@ -146,7 +146,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                         [
                             session_fields["tag"],
                             session_fields["created_at"],
-                            session_fields["occupied_slots"],
+                            session_fields["occupying_slots"],
                         ]
                     )
 
@@ -243,8 +243,8 @@ def _info_cmd(docs: str = None):
                 session_fields["name"],
             ]
             if session_.api_version[0] >= 6:
-                fields.append(session_fields["session_id"])
-                fields.append(session_fields["kernel_id"])
+                fields.append(session_fields["id"])
+                fields.append(session_fields["main_kernel_id"])
             fields.extend(
                 [
                     session_fields["image"],
@@ -254,7 +254,7 @@ def _info_cmd(docs: str = None):
                     session_fields["status"],
                     session_fields["status_info"],
                     session_fields["status_data"],
-                    session_fields["occupied_slots"],
+                    session_fields["occupying_slots"],
                 ]
             )
             if session_.api_version[0] >= 6:

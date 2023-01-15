@@ -55,7 +55,6 @@ from ..api.exceptions import (
 )
 from ..defs import DEFAULT_ROLE
 from ..exceptions import AgentError
-from .agent import AgentStatus
 from .base import (
     GUID,
     Base,
@@ -546,13 +545,15 @@ class KernelRow(Base):
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
     ) -> KernelRow:
+        from .agent import AgentStatus
+
         async with db.begin_readonly_session() as db_sess:
             query = (
                 sa.select(KernelRow)
                 .where(KernelRow.id == kern_id)
                 .options(
                     noload("*"),
-                    selectinload(KernelRow.agent).options(noload("*")),
+                    selectinload(KernelRow.agent_row).options(noload("*")),
                 )
             )
             result = (await db_sess.execute(query)).scalars().all()
@@ -563,7 +564,7 @@ class KernelRow(Base):
                     k
                     for k in result
                     if (k.status not in DEAD_KERNEL_STATUSES)
-                    and (k.agent.status == AgentStatus.ALIVE)
+                    and (k.agent_row.status == AgentStatus.ALIVE)
                 ]
             if not cand:
                 raise SessionNotFound
