@@ -601,7 +601,7 @@ class KernelRow(Base):
         if status in (KernelStatus.CANCELLED, KernelStatus.TERMINATED):
             data["terminated_at"] = now
 
-        async def _update() -> None:
+        async def _transit() -> None:
             async with db.begin_session() as db_sess:
                 kernel_query = sa.select(KernelRow.status).where(KernelRow.id == kernel_id)
                 current_status = (await db_sess.execute(kernel_query)).scalar()
@@ -609,7 +609,7 @@ class KernelRow(Base):
                     query = sa.update(KernelRow).values(**data).where(KernelRow.id == kernel_id)
                     await db_sess.execute(query)
 
-        await execute_with_retry(_update)
+        await execute_with_retry(_transit)
 
 
 DEFAULT_KERNEL_ORDERING = [

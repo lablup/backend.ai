@@ -430,11 +430,11 @@ def _build_session_fetch_query(
     base_cond,
     access_key: AccessKey | None = None,
     *,
-    max_matches: int | None,
     allow_stale: bool = True,
     for_update: bool = False,
     do_ordering: bool = False,
-    eager_loading_op: Iterable | None = None,
+    max_matches: Optional[int] = None,
+    eager_loading_op: Optional[Sequence] = None,
 ):
     cond = base_cond
     if access_key:
@@ -447,14 +447,13 @@ def _build_session_fetch_query(
         .order_by(sa.desc(SessionRow.created_at))
         .execution_options(populate_existing=True)
     )
-    if max_matches:
+    if max_matches is not None:
         query = query.limit(max_matches).offset(0)
     if for_update:
         query = query.with_for_update()
     if do_ordering:
         query = query.order_by(SessionRow.created_at)
-
-    if eager_loading_op:
+    if eager_loading_op is not None:
         query = query.options(*eager_loading_op)
 
     return query
@@ -465,11 +464,11 @@ async def _match_sessions_by_id(
     session_id: SessionId,
     access_key: AccessKey | None = None,
     *,
-    max_matches: int | None = None,
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
-    eager_loading_op=None,
+    max_matches: Optional[int] = None,
+    eager_loading_op: Optional[Sequence] = None,
 ) -> List[SessionRow]:
     if allow_prefix:
         cond = sa.sql.expression.cast(SessionRow.id, sa.String).like(f"{session_id}%")
@@ -493,11 +492,11 @@ async def _match_sessions_by_name(
     session_name: str,
     access_key: AccessKey,
     *,
-    max_matches: int | None,
     allow_prefix: bool = False,
     allow_stale: bool = True,
     for_update: bool = False,
-    eager_loading_op=None,
+    max_matches: Optional[int] = None,
+    eager_loading_op: Optional[Sequence] = None,
 ) -> List[SessionRow]:
     if allow_prefix:
         cond = sa.sql.expression.cast(SessionRow.name, sa.String).like(f"{session_name}%")
@@ -736,19 +735,12 @@ class SessionRow(Base):
         if status in (SessionStatus.CANCELLED, SessionStatus.TERMINATED):
             data["terminated_at"] = now
 
-        async def _update() -> None:
+        async def _transit() -> None:
             async with db.begin_session() as db_sess:
-                query = (
-                    sa.update(SessionRow)
-                    .values(**data)
-                    .where(
-                        (SessionRow.id == session_id)
-                        & ~(SessionRow.status.in_(DEAD_SESSION_STATUSES)),
-                    )
-                )
+                query = sa.update(SessionRow).values(**data).where(SessionRow.id == session_id)
                 await db_sess.execute(query)
 
-        await execute_with_retry(_update)
+        await execute_with_retry(_transit)
 
     async def set_session_result(
         db: ExtendedAsyncSAEngine,
@@ -773,13 +765,13 @@ class SessionRow(Base):
         cls,
         db_session: SASession,
         session_name_or_id: Union[str, UUID],
-        access_key: AccessKey | None,
+        access_key: Optional[AccessKey],
         *,
         allow_prefix: bool = False,
         allow_stale: bool = True,
         for_update: bool = False,
         max_matches: int = 10,
-        eager_loading_op=None,
+        eager_loading_op: Optional[Sequence] = None,
     ) -> List[SessionRow]:
         """
         Match the prefix of session ID or session name among the sessions
@@ -835,7 +827,7 @@ class SessionRow(Base):
     async def get_session(
         cls,
         session_name_or_id: Union[str, UUID],
-        access_key: AccessKey | None = None,
+        access_key: Optional[AccessKey] = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
@@ -879,7 +871,7 @@ class SessionRow(Base):
     async def get_session_with_kernels(
         cls,
         session_name_or_id: str | UUID,
-        access_key: AccessKey | None = None,
+        access_key: Optional[AccessKey] = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
@@ -913,7 +905,7 @@ class SessionRow(Base):
     async def get_session_with_main_kernel(
         cls,
         session_name_or_id: str | UUID,
-        access_key: AccessKey | None = None,
+        access_key: Optional[AccessKey] = None,
         *,
         allow_stale: bool = False,
         for_update: bool = False,
@@ -933,7 +925,7 @@ class SessionRow(Base):
         cls,
         db_session: SASession,
         session_id: SessionId,
-        access_key: AccessKey | None = None,
+        access_key: Optional[AccessKey] = None,
         *,
         max_matches: int | None = None,
         allow_stale: bool = True,

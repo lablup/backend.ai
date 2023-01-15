@@ -1080,13 +1080,13 @@ class AgentRegistry:
                 )
                 result = await db_sess.execute(query)
                 session: SessionRow = result.scalars().first()
-                updated_sess_status = determine_session_status(session.kernels)
-                if updated_sess_status in SESSION_STATUS_TRANSITION_MAP[session.status]:
+                candidate_status = determine_session_status(session.kernels)
+                if candidate_status in SESSION_STATUS_TRANSITION_MAP[session.status]:
                     update_query = (
                         sa.update(SessionRow)
                         .where(SessionRow.id == session_id)
                         .values(
-                            status=updated_sess_status,
+                            status=candidate_status,
                             status_history=sql_json_merge(
                                 SessionRow.status_history,
                                 (),
@@ -1595,17 +1595,45 @@ class AgentRegistry:
         async with handle_session_exception(
             self.db,
             "destroy_session",
-            session,
+            session_id,
             set_error=True,
         ):
 
-            async def _fetch() -> Sequence[KernelRow]:
-                async with self.db.begin_readonly_session() as db_sess:
-                    query = sa.select(KernelRow).where(KernelRow.session_id == session_id)
-                    result = await db_sess.execute(query)
-                return result.scalars().all()
+            async with self.db.begin_readonly_session() as db_sess:
+                query = (
+                    sa.select(SessionRow)
+                    .where(SessionRow.id == session_id)
+                    .options(selectinload(SessionRow.kernels))
+                )
+                result = await db_sess.execute(query)
+                target_session = result.scalars().first()
 
-            kernel_list = await execute_with_retry(_fetch)
+            match target_session.status:
+                case SessionStatus.PENDING:
+                    await SessionRow.set_session_status(
+                        self.db, session_id, SessionStatus.CANCELLED
+                    )
+                case SessionStatus.PULLING:
+                    raise GenericForbidden("Cannot destroy sessions in pulling status")
+                case SessionStatus.SCHEDULED | SessionStatus.PREPARING | SessionStatus.TERMINATING | SessionStatus.ERROR:
+                    if not forced:
+                        raise GenericForbidden(
+                            "Cannot destroy sessions in scheduled/preparing/terminating/error status",
+                        )
+                    log.warning(
+                        "force-terminating session (s:{}, status:{})",
+                        session_id,
+                        target_session.status,
+                    )
+                    await SessionRow.set_session_status(
+                        self.db, session_id, SessionStatus.TERMINATING
+                    )
+                case _:
+                    await SessionRow.set_session_status(
+                        self.db, session_id, SessionStatus.TERMINATING
+                    )
+
+            kernel_list = target_session.kernels
             main_stat = {}
             per_agent_tasks = []
             now = datetime.now(tzutc())
@@ -2480,7 +2508,7 @@ class AgentRegistry:
             lambda r: r.get(str(kernel_id)),
         )
 
-        async def _update_kernel_status() -> Tuple[AccessKey, AgentId] | None:
+        async def _update_kernel_status() -> Tuple[SessionId, AccessKey, AgentId] | None:
             async with self.db.begin_session() as db_sess:
                 # Check the current status.
                 select_query = (
@@ -2504,7 +2532,7 @@ class AgentRegistry:
                     # Skip if non-existent, already terminated, or restarting.
                     return None
 
-                access_key, agent = kernel.access_key, kernel.agent
+                session_id, access_key, agent = kernel.session_id, kernel.access_key, kernel.agent
                 # Change the status to TERMINATED.
                 # (we don't delete the row for later logging and billing)
                 now = datetime.now(tzutc())
@@ -2532,14 +2560,47 @@ class AgentRegistry:
                     sa.update(KernelRow).values(**values).where(KernelRow.id == kernel_id)
                 )
                 await db_sess.execute(update_query)
-                return access_key, agent
+                return session_id, access_key, agent
 
         result = await execute_with_retry(_update_kernel_status)
         if result is None:
             return
 
         assert result is not None
-        access_key, agent = result
+        session_id, access_key, agent = result
+
+        async def _check_session() -> None:
+            async with self.db.begin_session() as db_sess:
+                query = (
+                    sa.select(SessionRow)
+                    .where(SessionRow.id == session_id)
+                    .options(selectinload(SessionRow.kernels))
+                )
+                result = await db_sess.execute(query)
+                session: SessionRow = result.scalars().first()
+                candidate_status = determine_session_status(session.kernels)
+                if candidate_status in SESSION_STATUS_TRANSITION_MAP[session.status]:
+                    now = datetime.now(tzutc())
+                    update_query = (
+                        sa.update(SessionRow)
+                        .where(SessionRow.id == session_id)
+                        .values(
+                            status=candidate_status,
+                            terminated_at=now,
+                            status_history=sql_json_merge(
+                                SessionRow.status_history,
+                                (),
+                                {
+                                    SessionStatus.TERMINATED.name: datetime.now(
+                                        tzutc()
+                                    ).isoformat(),
+                                },
+                            ),
+                        )
+                    )
+                    await db_sess.execute(update_query)
+
+        await execute_with_retry(_check_session)
 
         async def _recalc() -> None:
             async with self.db.begin() as conn:
