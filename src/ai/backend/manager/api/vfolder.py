@@ -117,31 +117,25 @@ async def ensure_vfolder_status(
     match perm:
         case VFolderAccessStatus.READABLE:
             # if READABLE access status is requested, all operation statuses are accepted.
-            available_vf_statuses = set(
-                [
-                    VFolderOperationStatus.READY,
-                    VFolderOperationStatus.PERFORMING,
-                    VFolderOperationStatus.CLONING,
-                    VFolderOperationStatus.DELETING,
-                    VFolderOperationStatus.MOUNTED,
-                ]
-            )
+            available_vf_statuses = {
+                VFolderOperationStatus.READY,
+                VFolderOperationStatus.PERFORMING,
+                VFolderOperationStatus.CLONING,
+                VFolderOperationStatus.DELETING,
+                VFolderOperationStatus.MOUNTED,
+            }
         case VFolderAccessStatus.UPDATABLE:
             # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
-            available_vf_statuses = set(
-                [
-                    VFolderOperationStatus.READY,
-                    VFolderOperationStatus.MOUNTED,
-                ]
-            )
+            available_vf_statuses = {
+                VFolderOperationStatus.READY,
+                VFolderOperationStatus.MOUNTED,
+            }
         case VFolderAccessStatus.DELETABLE:
             # if DELETABLE access status is requested, only READY operation status is accepted.
-            available_vf_statuses = set(
-                [
-                    VFolderOperationStatus.READY,
-                    VFolderOperationStatus.DELETING,
-                ]
-            )
+            available_vf_statuses = {
+                VFolderOperationStatus.READY,
+                VFolderOperationStatus.DELETING,
+            }
         case _:
             # Otherwise, raise VFolderFilterStatusNotAvailable()
             raise VFolderFilterStatusNotAvailable()
@@ -160,12 +154,8 @@ async def ensure_vfolder_status(
                 f"Cannot find any folder with the given identity ({folder_id = }, {folder_name = })"
             )
         for entry in entries:
-            if entry["status"] in available_vf_statuses:
-                break
-        else:
-            raise VFolderFilterStatusFailed(
-                f"Cannot perform function with given accessible statuses. expect: {list(available_vf_statuses)}, got: {[entry['status'] for entry in entries]}"
-            )
+            if entry["status"] not in available_vf_statuses:
+                raise VFolderFilterStatusFailed()
 
 
 def vfolder_permission_required(perm: VFolderPermission):
