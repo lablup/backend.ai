@@ -19,8 +19,7 @@ jobs:
     - name: aaa
       run: ls /
     - name: bbb
-      working-directory: ../../
-      run: ls -al
+      run: pwd
 
     - run: echo The Title of your PR is ${{ github.event.pull_request.title }}
     - run: echo The Number of your PR is ${{ github.event.pull_request.number }}
