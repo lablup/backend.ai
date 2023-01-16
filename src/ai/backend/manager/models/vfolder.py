@@ -176,7 +176,7 @@ vfolders = sa.Table(
     ),
     sa.CheckConstraint(
         "(ownership_type = 'user' AND \"user\" IS NOT NULL) OR "
-        "(ownership_type = 'project' AND \"project\" IS NOT NULL)",
+        "(ownership_type = 'project' AND \"project_id\" IS NOT NULL)",
         name="ownership_type_match_with_user_or_project",
     ),
     sa.CheckConstraint(
