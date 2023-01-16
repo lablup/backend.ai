@@ -528,7 +528,7 @@ async def session_hangtime_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             await asyncio.sleep(hangtime.seconds)
 
     session_force_termination_taks = []
-    for status, hangtime_fmt in root_ctx.local_config["manager"]["max-session-hangtime"].items():
+    for status, hangtime_fmt in root_ctx.local_config["manager"]["session-hang-toleration-threshold"].items():
         try:
             kernel_status = KernelStatus[status]
         except KeyError:

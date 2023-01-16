@@ -30,7 +30,7 @@ disabled-plugins = []
 
 hide-agents = true
 
-max-session-hangtime = { "PREPARING" = "1h", "TERMINATING" = "30m" }
+session-hang-toleration-threshold = { "PREPARING" = "1h", "TERMINATING" = "30m" }
 
 
 [docker-registry]
