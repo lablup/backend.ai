@@ -51,7 +51,7 @@ async def test_background_task(etcd_fixture, create_app_and_client) -> None:
     ) -> None:
         done_handler_ctx["event_name"] = event.name
         update_body = attr.asdict(event)  # type: ignore
-        update_handler_ctx.update(**update_body)
+        done_handler_ctx.update(**update_body)
 
     async def _mock_task(reporter):
         reporter.total_progress = 2
