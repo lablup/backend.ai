@@ -676,7 +676,7 @@ async def server_main(
         ".image",
         ".userconfig",
         ".domainconfig",
-        ".groupconfig",
+        ".projectconfig",
         ".logs",
     ]
     root_app = build_root_app(pidx, _args[0], subapp_pkgs=subapp_pkgs)
