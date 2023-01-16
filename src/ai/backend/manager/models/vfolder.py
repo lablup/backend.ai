@@ -180,7 +180,7 @@ vfolders = sa.Table(
         name="ownership_type_match_with_user_or_project",
     ),
     sa.CheckConstraint(
-        '("user" IS NULL AND "project" IS NOT NULL) OR ("user" IS NOT NULL AND "project" IS NULL)',
+        '("user" IS NULL AND "project_id" IS NOT NULL) OR ("user" IS NOT NULL AND "project_id" IS NULL)',
         name="either_one_of_user_or_project",
     ),
 )
@@ -319,7 +319,7 @@ async def query_accessible_vfolders(
                     "max_files": row.vfolders_max_files,
                     "ownership_type": row.vfolders_ownership_type,
                     "user": str(row.vfolders_user) if row.vfolders_user else None,
-                    "project": str(row.vfolders_project) if row.vfolders_project else None,
+                    "project_id": str(row.vfolders_project_id) if row.vfolders_project_id else None,
                     "creator": row.vfolders_creator,
                     "user_email": row.users_email if "users_email" in row_keys else None,
                     "project_name": row.projects_name if "projects_name" in row_keys else None,
@@ -604,7 +604,9 @@ async def prepare_vfolder_mounts(
     for key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
-        if vfolder["project"] is not None and vfolder["project"] != str(user_scope.project_id):
+        if vfolder["project_id"] is not None and vfolder["project_id"] != str(
+            user_scope.project_id
+        ):
             # User's accessible project vfolders should not be mounted
             # if not belong to the execution kernel.
             continue
@@ -618,7 +620,7 @@ async def prepare_vfolder_mounts(
             )
         except VFolderOperationFailed as e:
             raise InvalidAPIParameters(e.extra_msg, e.extra_data) from None
-        if vfolder["name"] == ".local" and vfolder["project"] is not None:
+        if vfolder["name"] == ".local" and vfolder["project_id"] is not None:
             # Auto-create per-user subdirectory inside the project-owned ".local" vfolder.
             async with storage_manager.request(
                 vfolder["host"],
@@ -712,7 +714,8 @@ class VirtualFolder(graphene.ObjectType):
             name=row["name"],
             user=row["user"],
             user_email=row["users_email"],
-            group=row["project"],
+            project_id=row["project_id"],
+            group=row["project_id"],
             group_name=row["projects_name"],
             creator=row["creator"],
             unmanaged_path=row["unmanaged_path"],
@@ -740,7 +743,7 @@ class VirtualFolder(graphene.ObjectType):
         "id": ("vfolders_id", uuid.UUID),
         "host": ("vfolders_host", None),
         "name": ("vfolders_name", None),
-        "project": ("vfolders_project", uuid.UUID),
+        "project_id": ("vfolders_project_id", uuid.UUID),
         "project_name": ("projects_name", None),
         "user": ("vfolders_user", uuid.UUID),
         "user_email": ("users_email", None),
@@ -761,7 +764,7 @@ class VirtualFolder(graphene.ObjectType):
         "id": "vfolders_id",
         "host": "vfolders_host",
         "name": "vfolders_name",
-        "project": "vfolders_project",
+        "project_id": "vfolders_project_id",
         "project_name": "projects_name",
         "user": "vfolders_user",
         "user_email": "users_email",

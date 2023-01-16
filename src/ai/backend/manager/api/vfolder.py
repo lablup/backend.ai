@@ -443,7 +443,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "creator": request["user"]["email"],
             "ownership_type": VFolderOwnershipType(ownership_type),
             "user": user_uuid,
-            "project": project_uuid,
+            "project_id": project_uuid,
             "unmanaged_path": "",
             "cloneable": params["cloneable"],
             "status": VFolderOperationStatus.READY,
@@ -509,7 +509,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                     "is_owner": (row.vfolders_user == user_uuid),
                     "permission": row.vfolders_permission,
                     "user": str(row.vfolders_user) if row.vfolders_user else None,
-                    "project": str(row.vfolders_project) if row.vfolders_project else None,
+                    "project_id": str(row.vfolders_project_id) if row.vfolders_project_id else None,
                     "creator": row.vfolders_creator,
                     "user_email": row.users_email,
                     "project_name": row.projects_name,
@@ -534,7 +534,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
             extra_vf_conds = None
             if params["group_id"] is not None:
                 # Note: user folders should be returned even when group_id is specified.
-                extra_vf_conds = (vfolders.c.project == params["group_id"]) | (
+                extra_vf_conds = (vfolders.c.project_id == params["group_id"]) | (
                     vfolders.c.user.isnot(None)
                 )
             entries = await query_accessible_vfolders(
@@ -556,7 +556,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                     "is_owner": entry["is_owner"],
                     "permission": entry["permission"].value,
                     "user": str(entry["user"]) if entry["user"] else None,
-                    "group": str(entry["project"]) if entry["project"] else None,
+                    "group": str(entry["project_id"]) if entry["project_id"] else None,
                     "creator": entry["creator"],
                     "user_email": entry["user_email"],
                     "group_name": entry["project_name"],
@@ -761,7 +761,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "created_at": str(row["created_at"]),
         "last_used": str(row["created_at"]),
         "user": str(row["user"]),
-        "group": str(row["project"]),
+        "group": str(row["project_id"]),
         "type": "user" if row["user"] is not None else "project",
         "is_owner": is_owner,
         "permission": permission,
@@ -1716,7 +1716,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
 
         # Get the project-type virtual folder.
         query = (
-            sa.select([vfolders.c.id, vfolders.c.ownership_type, vfolders.c.project])
+            sa.select([vfolders.c.id, vfolders.c.ownership_type, vfolders.c.project_id])
             .select_from(vfolders)
             .where(
                 (vfolders.c.ownership_type == VFolderOwnershipType.PROJECT)
@@ -1739,7 +1739,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
             .where(
                 (users.c.email.in_(params["emails"]))
                 & (users.c.email != request["user"]["email"])
-                & (apus.c.project_id == vf_info["project"]),
+                & (apus.c.project_id == vf_info["project_id"]),
             )
         )
         result = await conn.execute(query)
@@ -2134,7 +2134,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             "creator": request["user"]["email"],
             "ownership_type": VFolderOwnershipType(ownership_type),
             "user": user_uuid,
-            "project": project_uuid,
+            "project_id": project_uuid,
             "unmanaged_path": "",
             "cloneable": params["cloneable"],
         }
@@ -2213,7 +2213,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
                 vfolder_permissions,
                 vfolders.c.id,
                 vfolders.c.name,
-                vfolders.c.project,
+                vfolders.c.project_id,
                 vfolders.c.user.label("vfolder_user"),
                 users.c.email,
             ]
