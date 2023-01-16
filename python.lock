@@ -21,7 +21,6 @@
 //     "aiohttp_sse>=2.0",
 //     "aiohttp~=3.8.1",
 //     "aiomonitor-ng~=0.7.0",
-//     "aioredis[hiredis]~=2.0.1",
 //     "aioresponses>=0.7.3",
 //     "aiosqlite~=0.17.0",
 //     "aiotools~=1.5.9",
@@ -379,28 +378,6 @@
           ],
           "requires_python": null,
           "version": "0.7"
-        },
-        {
-          "artifacts": [
-            {
-              "algorithm": "sha256",
-              "hash": "9ac0d0b3b485d293b8ca1987e6de8658d7dafcca1cddfcd1d506cae8cdebfdd6",
-              "url": "https://files.pythonhosted.org/packages/9b/a9/0da089c3ae7a31cbcd2dcf0214f6f571e1295d292b6139e2bac68ec081d0/aioredis-2.0.1-py3-none-any.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "eaa51aaf993f2d71f54b70527c440437ba65340588afeb786cd87c55c89cd98e",
-              "url": "https://files.pythonhosted.org/packages/2e/cf/9eb144a0b05809ffc5d29045c4b51039000ea275bc1268d0351c9e7dfc06/aioredis-2.0.1.tar.gz"
-            }
-          ],
-          "project_name": "aioredis",
-          "requires_dists": [
-            "async-timeout",
-            "hiredis>=1.0; implementation_name == \"cpython\" and extra == \"hiredis\"",
-            "typing-extensions"
-          ],
-          "requires_python": ">=3.6",
-          "version": "2.0.1"
         },
         {
           "artifacts": [
@@ -4460,7 +4437,6 @@
     "aiohttp_sse>=2.0",
     "aiohttp~=3.8.1",
     "aiomonitor-ng~=0.7.0",
-    "aioredis[hiredis]~=2.0.1",
     "aioresponses>=0.7.3",
     "aiosqlite~=0.17.0",
     "aiotools~=1.5.9",
