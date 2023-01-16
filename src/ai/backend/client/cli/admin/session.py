@@ -131,7 +131,7 @@ def _list_cmd(name: str = "list", docs: str = None):
                     fields.append(session_fields["session_id"])
                 fields.extend(
                     [
-                        session_fields["group_name"],
+                        session_fields["project_name"],
                         session_fields["kernel_id"],
                         session_fields["image"],
                         session_fields["type"],

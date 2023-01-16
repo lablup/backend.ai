@@ -48,15 +48,15 @@ class ScalingGroup(BaseFunction):
 
     @api_function
     @classmethod
-    async def list_available(cls, group: str):
+    async def list_available(cls, project: str):
         """
         List available scaling groups for the current user,
-        considering the user, the user's domain, and the designated user group.
+        considering the user, the user's domain, and the designated user project.
         """
         rqst = Request(
             "GET",
             "/scaling-groups",
-            params={"group": group},
+            params={"project": project},
         )
         async with rqst.fetch() as resp:
             data = await resp.json()
@@ -71,7 +71,7 @@ class ScalingGroup(BaseFunction):
     ) -> Sequence[dict]:
         """
         List available scaling groups for the current user,
-        considering the user, the user's domain, and the designated user group.
+        considering the user, the user's domain, and the designated user project.
         """
         query = textwrap.dedent(
             """\
@@ -290,67 +290,67 @@ class ScalingGroup(BaseFunction):
 
     @api_function
     @classmethod
-    async def associate_group(cls, scaling_group: str, group_id: str):
+    async def associate_group(cls, scaling_group: str, project_id: str):
         """
-        Associate scaling_group with group.
+        Associate scaling_group with project.
 
         :param scaling_group: The name of a scaling group.
-        :param group_id: The ID of a group.
+        :param project_id: The ID of a project.
         """
         query = textwrap.dedent(
             """\
-            mutation($scaling_group: String!, $user_group: UUID!) {
-                associate_scaling_group_with_user_group(
-                        scaling_group: $scaling_group, user_group: $user_group) {
+            mutation($scaling_group: String!, $project: UUID!) {
+                associate_scaling_group_with_project(
+                        scaling_group: $scaling_group, project: $project) {
                     ok msg
                 }
             }
         """
         )
-        variables = {"scaling_group": scaling_group, "user_group": group_id}
+        variables = {"scaling_group": scaling_group, "project": project_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["associate_scaling_group_with_user_group"]
+        return data["associate_scaling_group_with_project"]
 
     @api_function
     @classmethod
-    async def dissociate_group(cls, scaling_group: str, group_id: str):
+    async def dissociate_group(cls, scaling_group: str, project_id: str):
         """
-        Dissociate scaling_group from group.
+        Dissociate scaling_group from project.
 
         :param scaling_group: The name of a scaling group.
-        :param group_id: The ID of a group.
+        :param project_id: The ID of a project.
         """
         query = textwrap.dedent(
             """\
-            mutation($scaling_group: String!, $user_group: String!) {
-                disassociate_scaling_group_with_user_group(
-                        scaling_group: $scaling_group, user_group: $user_group) {
+            mutation($scaling_group: String!, $project: String!) {
+                disassociate_scaling_group_with_project(
+                        scaling_group: $scaling_group, project: $project) {
                     ok msg
                 }
             }
         """
         )
-        variables = {"scaling_group": scaling_group, "user_group": group_id}
+        variables = {"scaling_group": scaling_group, "project": project_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["disassociate_scaling_group_with_user_group"]
+        return data["disassociate_scaling_group_with_project"]
 
     @api_function
     @classmethod
-    async def dissociate_all_group(cls, group_id: str):
+    async def dissociate_all_project(cls, project_id: str):
         """
-        Dissociate all scaling_groups from group.
+        Dissociate all scaling_groups from project.
 
-        :param group_id: The ID of a group.
+        :param project_id: The ID of a project.
         """
         query = textwrap.dedent(
             """\
-            mutation($group_id: UUID!) {
-                disassociate_all_scaling_groups_with_group(user_group: $group_id) {
+            mutation($project_id: UUID!) {
+                disassociate_all_scaling_groups_with_group(project: $project) {
                     ok msg
                 }
             }
         """
         )
-        variables = {"group_id": group_id}
+        variables = {"project": project_id}
         data = await api_session.get().Admin._query(query, variables)
-        return data["disassociate_all_scaling_groups_with_group"]
+        return data["disassociate_all_scaling_groups_with_project"]

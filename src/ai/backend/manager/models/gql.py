@@ -139,10 +139,10 @@ class Mutations(graphene.ObjectType):
     purge_domain = PurgeDomain.Field()
 
     # admin only
-    create_group = CreateProject.Field()
-    modify_group = ModifyProject.Field()
-    delete_group = DeleteProject.Field()
-    purge_group = PurgeProject.Field()
+    create_project = CreateProject.Field()
+    modify_project = ModifyProject.Field()
+    delete_project = DeleteProject.Field()
+    purge_project = PurgeProject.Field()
 
     # super-admin only
     create_user = CreateUser.Field()
@@ -180,13 +180,13 @@ class Mutations(graphene.ObjectType):
     modify_scaling_group = ModifyScalingGroup.Field()
     delete_scaling_group = DeleteScalingGroup.Field()
     associate_scaling_group_with_domain = AssociateScalingGroupWithDomain.Field()
-    associate_scaling_group_with_user_group = AssociateScalingGroupWithUserProject.Field()
+    associate_scaling_group_with_project = AssociateScalingGroupWithUserProject.Field()
     associate_scaling_group_with_keypair = AssociateScalingGroupWithKeyPair.Field()
     disassociate_scaling_group_with_domain = DisassociateScalingGroupWithDomain.Field()
-    disassociate_scaling_group_with_user_group = DisassociateScalingGroupWithUserProject.Field()
+    disassociate_scaling_group_with_project = DisassociateScalingGroupWithUserProject.Field()
     disassociate_scaling_group_with_keypair = DisassociateScalingGroupWithKeyPair.Field()
     disassociate_all_scaling_groups_with_domain = DisassociateAllScalingGroupsWithDomain.Field()
-    disassociate_all_scaling_groups_with_group = DisassociateAllScalingGroupsWithProject.Field()
+    disassociate_all_scaling_groups_with_project = DisassociateAllScalingGroupsWithProject.Field()
 
 
 class Queries(graphene.ObjectType):
@@ -246,7 +246,7 @@ class Queries(graphene.ObjectType):
         is_active=graphene.Boolean(),
     )
 
-    group = graphene.Field(
+    project = graphene.Field(
         Project,
         id=graphene.UUID(required=True),
         domain_name=graphene.String(),
@@ -254,14 +254,14 @@ class Queries(graphene.ObjectType):
 
     # Within a single domain, this will always return nothing or a single item,
     # but if queried across all domains by superadmins, it may return multiple results
-    # because the group name is unique only inside each domain.
-    groups_by_name = graphene.List(
+    # because the project name is unique only inside each domain.
+    projects_by_name = graphene.List(
         Project,
         name=graphene.String(required=True),
         domain_name=graphene.String(),
     )
 
-    groups = graphene.List(
+    projects = graphene.List(
         Project,
         domain_name=graphene.String(),
         is_active=graphene.Boolean(),
@@ -294,7 +294,7 @@ class Queries(graphene.ObjectType):
     users = graphene.List(  # legacy non-paginated list
         User,
         domain_name=graphene.String(),
-        group_id=graphene.UUID(),
+        project_id=graphene.UUID(),
         is_active=graphene.Boolean(),
         status=graphene.String(),
     )
@@ -307,7 +307,7 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
         # intrinsic filters
         domain_name=graphene.String(),
-        group_id=graphene.UUID(),
+        project_id=graphene.UUID(),
         is_active=graphene.Boolean(),
         status=graphene.String(),
     )
@@ -376,9 +376,9 @@ class Queries(graphene.ObjectType):
     )
 
     # super-admin only
-    scaling_groups_for_user_group = graphene.List(
+    scaling_groups_for_project = graphene.List(
         ScalingGroup,
-        user_group=graphene.String(required=True),
+        project=graphene.String(required=True),
         is_active=graphene.Boolean(),
     )
 
@@ -412,7 +412,7 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
         # intrinsic filters
         domain_name=graphene.String(),
-        group_id=graphene.UUID(),
+        project_id=graphene.UUID(),
         access_key=graphene.String(),  # must be empty for user requests
     )
 
@@ -428,7 +428,7 @@ class Queries(graphene.ObjectType):
     vfolders = graphene.List(  # legacy non-paginated list
         VirtualFolder,
         domain_name=graphene.String(),
-        group_id=graphene.String(),
+        project_id=graphene.String(),
         access_key=graphene.String(),  # must be empty for user requests
     )
 
@@ -450,7 +450,7 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
         # intrinsic filters
         domain_name=graphene.String(),
-        group_id=graphene.String(),
+        project_id=graphene.String(),
         access_key=graphene.String(),
         status=graphene.String(),
     )
@@ -475,7 +475,7 @@ class Queries(graphene.ObjectType):
         order_asc=graphene.Boolean(),
         # intrinsic filters
         domain_name=graphene.String(),
-        group_id=graphene.String(),
+        project_id=graphene.String(),
         access_key=graphene.String(),
         status=graphene.String(),
     )
@@ -643,7 +643,7 @@ class Queries(graphene.ObjectType):
         return await Domain.load_all(info.context, is_active=is_active)
 
     @staticmethod
-    async def resolve_group(
+    async def resolve_project(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         id: uuid.UUID,
@@ -660,7 +660,7 @@ class Queries(graphene.ObjectType):
                 "Project.by_id",
                 domain_name=domain_name,
             )
-            group = await loader.load(id)
+            project = await loader.load(id)
         elif client_role == UserRole.ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
@@ -669,7 +669,7 @@ class Queries(graphene.ObjectType):
                 "Project.by_id",
                 domain_name=client_domain,
             )
-            group = await loader.load(id)
+            project = await loader.load(id)
         elif client_role == UserRole.USER:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
@@ -678,20 +678,20 @@ class Queries(graphene.ObjectType):
                 "Project.by_id",
                 domain_name=client_domain,
             )
-            group = await loader.load(id)
+            project = await loader.load(id)
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
                 "Project.by_user",
             )
-            client_groups = await loader.load(client_user_id)
-            if group.id not in (g.id for g in client_groups):
+            client_projects = await loader.load(client_user_id)
+            if project.id not in (g.id for g in client_projects):
                 raise InsufficientPrivilege
         else:
             raise InvalidAPIParameters("Unknown client role")
-        return group
+        return project
 
     @staticmethod
-    async def resolve_groups_by_name(
+    async def resolve_projects_by_name(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         name: str,
@@ -708,7 +708,7 @@ class Queries(graphene.ObjectType):
                 "Project.by_name",
                 domain_name=domain_name,
             )
-            groups = await loader.load(name)
+            projects = await loader.load(name)
         elif client_role == UserRole.ADMIN:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
@@ -717,7 +717,7 @@ class Queries(graphene.ObjectType):
                 "Project.by_name",
                 domain_name=client_domain,
             )
-            groups = await loader.load(name)
+            projects = await loader.load(name)
         elif client_role == UserRole.USER:
             if domain_name is not None and domain_name != client_domain:
                 raise InsufficientPrivilege
@@ -726,20 +726,20 @@ class Queries(graphene.ObjectType):
                 "Project.by_name",
                 domain_name=client_domain,
             )
-            groups = await loader.load(name)
+            projects = await loader.load(name)
             loader = ctx.dataloader_manager.get_loader(
                 ctx,
                 "Project.by_user",
             )
-            client_groups = await loader.load(client_user_id)
-            client_group_ids = set(g.id for g in client_groups)
-            groups = filter(lambda g: g.id in client_group_ids, groups)
+            client_projects = await loader.load(client_user_id)
+            client_project_ids = set(g.id for g in client_projects)
+            projects = filter(lambda g: g.id in client_project_ids, projects)
         else:
             raise InvalidAPIParameters("Unknown client role")
-        return groups
+        return projects
 
     @staticmethod
-    async def resolve_groups(
+    async def resolve_projects(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         *,
@@ -761,8 +761,8 @@ class Queries(graphene.ObjectType):
                 ctx,
                 "Project.by_user",
             )
-            client_groups = await loader.load(client_user_id)
-            return client_groups
+            client_projects = await loader.load(client_user_id)
+            return client_projects
         else:
             raise InvalidAPIParameters("Unknown client role")
         return await Project.load_all(info.context, domain_name=domain_name, is_active=is_active)
@@ -857,7 +857,7 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         is_active: bool = None,
         status: UserStatus = None,
     ) -> Sequence[User]:
@@ -880,7 +880,7 @@ class Queries(graphene.ObjectType):
         return await User.load_all(
             info.context,
             domain_name=domain_name,
-            project_id=group_id,
+            project_id=project_id,
             is_active=is_active,
             status=status,
             limit=100,
@@ -896,7 +896,7 @@ class Queries(graphene.ObjectType):
         filter: str = None,
         order: str = None,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         is_active: bool = None,
         status: UserStatus = None,
     ) -> UserList:
@@ -919,7 +919,7 @@ class Queries(graphene.ObjectType):
         total_count = await User.load_count(
             info.context,
             domain_name=domain_name,
-            project_id=group_id,
+            project_id=project_id,
             is_active=is_active,
             status=status,
             filter=filter,
@@ -929,7 +929,7 @@ class Queries(graphene.ObjectType):
             limit,
             offset,
             domain_name=domain_name,
-            project_id=group_id,
+            project_id=project_id,
             is_active=is_active,
             status=status,
             filter=filter,
@@ -1112,15 +1112,15 @@ class Queries(graphene.ObjectType):
 
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
-    async def resolve_scaling_groups_for_group(
+    async def resolve_scaling_groups_for_project(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
-        user_group,
+        project,
         is_active: bool = None,
     ) -> Sequence[ScalingGroup]:
-        return await ScalingGroup.load_by_group(
+        return await ScalingGroup.load_by_project(
             info.context,
-            user_group,
+            project,
             is_active=is_active,
         )
 
@@ -1180,7 +1180,7 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
@@ -1189,7 +1189,7 @@ class Queries(graphene.ObjectType):
         total_count = await VirtualFolder.load_count(
             info.context,
             domain_name=domain_name,  # scope
-            project_id=group_id,  # scope
+            project_id=project_id,  # scope
             user_id=user_id,  # scope
             filter=filter,
         )
@@ -1198,7 +1198,7 @@ class Queries(graphene.ObjectType):
             limit,
             offset,
             domain_name=domain_name,  # scope
-            project_id=group_id,  # scope
+            project_id=project_id,  # scope
             user_id=user_id,  # scope
             filter=filter,
             order=order,
@@ -1245,7 +1245,7 @@ class Queries(graphene.ObjectType):
         session_id: SessionId,
         role: UserRole = None,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         access_key: AccessKey = None,
     ) -> ComputeContainerList:
         # TODO: adopt the generic queryfilter language
@@ -1254,7 +1254,7 @@ class Queries(graphene.ObjectType):
             session_id,  # filter (mandatory)
             cluster_role=role,  # filter
             domain_name=domain_name,  # scope
-            project_id=group_id,  # scope
+            project_id=project_id,  # scope
             access_key=access_key,  # scope
             filter=filter,
         )
@@ -1265,7 +1265,7 @@ class Queries(graphene.ObjectType):
             session_id,  # filter (mandatory)
             cluster_role=role,  # filter
             domain_name=domain_name,  # scope
-            project_id=group_id,  # scope
+            project_id=project_id,  # scope
             access_key=access_key,  # scope
             filter=filter,
             order=order,
@@ -1279,9 +1279,9 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         container_id: str,
     ) -> ComputeContainer:
-        # We need to check the group membership of the designated kernel,
+        # We need to check the project membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
-        # by other users and in other groups.
+        # by other users and in other projects.
         # Let's just protect the domain/user boundary here.
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.detail")
@@ -1298,7 +1298,7 @@ class Queries(graphene.ObjectType):
         filter: str = None,
         order: str = None,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         access_key: AccessKey = None,
         status: str = None,
     ) -> ComputeSessionList:
@@ -1306,7 +1306,7 @@ class Queries(graphene.ObjectType):
             info.context,
             status=status,  # filter
             domain_name=domain_name,  # scope
-            project_id=group_id,  # scope
+            project_id=project_id,  # scope
             access_key=access_key,  # scope
             filter=filter,
         )
@@ -1316,7 +1316,7 @@ class Queries(graphene.ObjectType):
             offset,  # slice
             status=status,  # filter
             domain_name=domain_name,  # scope
-            project_id=group_id,  # scope
+            project_id=project_id,  # scope
             access_key=access_key,  # scope
             filter=filter,
             order=order,
@@ -1333,9 +1333,9 @@ class Queries(graphene.ObjectType):
         domain_name: str = None,
         access_key: AccessKey = None,
     ) -> ComputeSession:
-        # We need to check the group membership of the designated kernel,
+        # We need to check the project membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
-        # by other users and in other groups.
+        # by other users and in other projects.
         # Let's just protect the domain/user boundary here.
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(
@@ -1355,7 +1355,7 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        group_id: uuid.UUID = None,
+        project_id: uuid.UUID = None,
         access_key: AccessKey = None,
         status: str = None,
         order_key: str = None,
@@ -1364,7 +1364,7 @@ class Queries(graphene.ObjectType):
         total_count = await LegacyComputeSession.load_count(
             info.context,
             domain_name=domain_name,
-            project_id=group_id,
+            project_id=project_id,
             access_key=access_key,
             status=status,
         )
@@ -1373,7 +1373,7 @@ class Queries(graphene.ObjectType):
             limit,
             offset,
             domain_name=domain_name,
-            project_id=group_id,
+            project_id=project_id,
             access_key=access_key,
             status=status,
             order_key=order_key,
@@ -1392,9 +1392,9 @@ class Queries(graphene.ObjectType):
         access_key: AccessKey = None,
         status: str = None,
     ) -> Optional[LegacyComputeSession]:
-        # We need to check the group membership of the designated kernel,
+        # We need to check the project membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
-        # by other users and in other groups.
+        # by other users and in other projects.
         # Let's just protect the domain/user boundary here.
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(

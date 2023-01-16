@@ -1,38 +1,38 @@
 import textwrap
 from typing import Iterable, Optional, Sequence
 
-from ai.backend.client.output.fields import group_fields
+from ai.backend.client.output.fields import project_fields
 from ai.backend.client.output.types import FieldSpec
 
 from ..session import api_session
 from .base import BaseFunction, api_function, resolve_fields
 
-__all__ = ("Group",)
+__all__ = ("Project",)
 
 _default_list_fields = (
-    group_fields["id"],
-    group_fields["name"],
-    group_fields["is_active"],
-    group_fields["created_at"],
-    group_fields["integration_id"],
+    project_fields["id"],
+    project_fields["name"],
+    project_fields["is_active"],
+    project_fields["created_at"],
+    project_fields["integration_id"],
 )
 _default_detail_fields = (
-    group_fields["id"],
-    group_fields["name"],
-    group_fields["description"],
-    group_fields["is_active"],
-    group_fields["created_at"],
-    group_fields["domain_name"],
-    group_fields["total_resource_slots"],
-    group_fields["allowed_vfolder_hosts"],
-    group_fields["integration_id"],
+    project_fields["id"],
+    project_fields["name"],
+    project_fields["description"],
+    project_fields["is_active"],
+    project_fields["created_at"],
+    project_fields["domain_name"],
+    project_fields["total_resource_slots"],
+    project_fields["allowed_vfolder_hosts"],
+    project_fields["integration_id"],
 )
 
 
-class Group(BaseFunction):
+class Project(BaseFunction):
     """
-    Provides a shortcut of :func:`Group.query()
-    <ai.backend.client.admin.Admin.query>` that fetches various group information.
+    Provides a shortcut of :func:`Project.query()
+    <ai.backend.client.admin.Admin.query>` that fetches various project information.
 
     .. note::
 
@@ -50,29 +50,29 @@ class Group(BaseFunction):
         domain_name: str = None,
     ) -> Sequence[dict]:
         """
-        Find the group(s) by its name.
-        It may return multiple groups when there are groups with the same name
+        Find the project(s) by its name.
+        It may return multiple projects when there are projects with the same name
         in different domains and it is invoked with a super-admin account
         without setting the domain name.
 
-        :param domain_name: Name of domain to get groups from.
-        :param fields: Per-group query fields to fetch.
+        :param domain_name: Name of domain to get projects from.
+        :param fields: Per-project query fields to fetch.
         """
         query = textwrap.dedent(
             """\
             query($name: String!, $domain_name: String) {
-                groups_by_name(name: $name, domain_name: $domain_name) {$fields}
+                projects_by_name(name: $name, domain_name: $domain_name) {$fields}
             }
         """
         )
-        resolved_fields = resolve_fields(fields, group_fields, _default_detail_fields)
+        resolved_fields = resolve_fields(fields, project_fields, _default_detail_fields)
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
             "name": name,
             "domain_name": domain_name,
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["groups_by_name"]
+        return data["projects_by_name"]
 
     @api_function
     @classmethod
@@ -82,24 +82,24 @@ class Group(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
     ) -> Sequence[dict]:
         """
-        Fetches the list of groups.
+        Fetches the list of projects.
 
-        :param domain_name: Name of domain to list groups.
-        :param fields: Per-group query fields to fetch.
+        :param domain_name: Name of domain to list projects.
+        :param fields: Per-project query fields to fetch.
         """
         if fields is None:
             fields = _default_list_fields
         query = textwrap.dedent(
             """\
             query($domain_name: String) {
-                groups(domain_name: $domain_name) {$fields}
+                projects(domain_name: $domain_name) {$fields}
             }
         """
         )
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"domain_name": domain_name}
         data = await api_session.get().Admin._query(query, variables)
-        return data["groups"]
+        return data["projects"]
 
     @api_function
     @classmethod
@@ -109,24 +109,24 @@ class Group(BaseFunction):
         fields: Sequence[FieldSpec] = _default_detail_fields,
     ) -> dict:
         """
-        Fetch information of a group with group ID.
+        Fetch information of a project with project ID.
 
-        :param gid: ID of the group to fetch.
-        :param fields: Additional per-group query fields to fetch.
+        :param gid: ID of the project to fetch.
+        :param fields: Additional per-project query fields to fetch.
         """
         if fields is None:
             fields = _default_detail_fields
         query = textwrap.dedent(
             """\
             query($gid: UUID!) {
-                group(id: $gid) {$fields}
+                project(id: $gid) {$fields}
             }
         """
         )
         query = query.replace("$fields", " ".join(f.field_ref for f in fields))
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
-        return data["group"]
+        return data["project"]
 
     @api_function
     @classmethod
@@ -142,22 +142,22 @@ class Group(BaseFunction):
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
-        Creates a new group with the given options.
+        Creates a new project with the given options.
         You need an admin privilege for this operation.
         """
         query = textwrap.dedent(
             """\
-            mutation($name: String!, $input: GroupInput!) {
-                create_group(name: $name, props: $input) {
-                    ok msg group {$fields}
+            mutation($name: String!, $input: ProjectInput!) {
+                create_project(name: $name, props: $input) {
+                    ok msg project {$fields}
                 }
             }
         """
         )
         resolved_fields = resolve_fields(
             fields,
-            group_fields,
-            (group_fields["id"], group_fields["domain_name"], group_fields["name"]),
+            project_fields,
+            (project_fields["id"], project_fields["domain_name"], project_fields["name"]),
         )
         query = query.replace("$fields", " ".join(resolved_fields))
         variables = {
@@ -172,7 +172,7 @@ class Group(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["create_group"]
+        return data["create_project"]
 
     @api_function
     @classmethod
@@ -188,13 +188,13 @@ class Group(BaseFunction):
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
-        Update existing group.
+        Update existing project.
         You need an admin privilege for this operation.
         """
         query = textwrap.dedent(
             """\
-            mutation($gid: UUID!, $input: ModifyGroupInput!) {
-                modify_group(gid: $gid, props: $input) {
+            mutation($gid: UUID!, $input: ModifyProjectInput!) {
+                modify_project(gid: $gid, props: $input) {
                     ok msg
                 }
             }
@@ -212,18 +212,18 @@ class Group(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_group"]
+        return data["modify_project"]
 
     @api_function
     @classmethod
     async def delete(cls, gid: str):
         """
-        Inactivates the existing group. Does not actually delete it for safety.
+        Inactivates the existing project. Does not actually delete it for safety.
         """
         query = textwrap.dedent(
             """\
             mutation($gid: UUID!) {
-                delete_group(gid: $gid) {
+                delete_project(gid: $gid) {
                     ok msg
                 }
             }
@@ -231,18 +231,18 @@ class Group(BaseFunction):
         )
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
-        return data["delete_group"]
+        return data["delete_project"]
 
     @api_function
     @classmethod
     async def purge(cls, gid: str):
         """
-        Delete the existing group. This action cannot be undone.
+        Delete the existing project. This action cannot be undone.
         """
         query = textwrap.dedent(
             """\
             mutation($gid: UUID!) {
-                purge_group(gid: $gid) {
+                purge_project(gid: $gid) {
                     ok msg
                 }
             }
@@ -250,7 +250,7 @@ class Group(BaseFunction):
         )
         variables = {"gid": gid}
         data = await api_session.get().Admin._query(query, variables)
-        return data["purge_group"]
+        return data["purge_project"]
 
     @api_function
     @classmethod
@@ -258,13 +258,13 @@ class Group(BaseFunction):
         cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
     ) -> dict:
         """
-        Add users to a group.
+        Add users to a project.
         You need an admin privilege for this operation.
         """
         query = textwrap.dedent(
             """\
-            mutation($gid: UUID!, $input: ModifyGroupInput!) {
-                modify_group(gid: $gid, props: $input) {
+            mutation($gid: UUID!, $input: ModifyProjectInput!) {
+                modify_project(gid: $gid, props: $input) {
                     ok msg
                 }
             }
@@ -278,7 +278,7 @@ class Group(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_group"]
+        return data["modify_project"]
 
     @api_function
     @classmethod
@@ -286,13 +286,13 @@ class Group(BaseFunction):
         cls, gid: str, user_uuids: Iterable[str], fields: Iterable[FieldSpec | str] = None
     ) -> dict:
         """
-        Remove users from a group.
+        Remove users from a project.
         You need an admin privilege for this operation.
         """
         query = textwrap.dedent(
             """\
-            mutation($gid: UUID!, $input: ModifyGroupInput!) {
-                modify_group(gid: $gid, props: $input) {
+            mutation($gid: UUID!, $input: ModifyProjectInput!) {
+                modify_project(gid: $gid, props: $input) {
                     ok msg
                 }
             }
@@ -306,4 +306,4 @@ class Group(BaseFunction):
             },
         }
         data = await api_session.get().Admin._query(query, variables)
-        return data["modify_group"]
+        return data["modify_project"]

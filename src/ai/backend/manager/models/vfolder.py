@@ -686,8 +686,10 @@ class VirtualFolder(graphene.ObjectType):
     name = graphene.String()
     user = graphene.UUID()  # User.id (current owner, null in project vfolders)
     user_email = graphene.String()  # User.email (current owner, null in project vfolders)
-    group = graphene.UUID()  # Group.id (current owner, null in user vfolders)
-    group_name = graphene.String()  # Group.name (current owenr, null in user vfolders)
+    project_id = graphene.UUID()  # Project.id (current owner, null in user vfolders)
+    project_name = graphene.String()  # project.name (current owenr, null in user vfolders)
+    group = graphene.UUID()  # Legacy.
+    group_name = graphene.String()  # Legacy.
     creator = graphene.String()  # User.email (always set)
     unmanaged_path = graphene.String()
     usage_mode = graphene.String()
@@ -715,6 +717,7 @@ class VirtualFolder(graphene.ObjectType):
             user=row["user"],
             user_email=row["users_email"],
             project_id=row["project_id"],
+            project_name=row["projects_name"],
             group=row["project_id"],
             group_name=row["projects_name"],
             creator=row["creator"],

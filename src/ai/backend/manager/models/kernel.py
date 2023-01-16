@@ -949,6 +949,8 @@ class ComputeSession(graphene.ObjectType):
 
     # ownership
     domain_name = graphene.String()
+    project_name = graphene.String()
+    project_id = graphene.UUID()
     group_name = graphene.String()
     group_id = graphene.UUID()
     user_email = graphene.String()
@@ -1006,6 +1008,8 @@ class ComputeSession(graphene.ObjectType):
             "cluster_size": row["cluster_size"],
             # ownership
             "domain_name": row["domain_name"],
+            "project_name": row["project_name"],
+            "project_id": row["project_id"],
             "group_name": row["project_name"],
             "group_id": row["project_id"],
             "user_email": row["email"],

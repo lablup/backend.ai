@@ -626,7 +626,7 @@ class AssociateScalingGroupWithUserProject(graphene.Mutation):
 
     class Arguments:
         scaling_group = graphene.String(required=True)
-        user_group = graphene.UUID(required=True)
+        project = graphene.UUID(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -637,12 +637,12 @@ class AssociateScalingGroupWithUserProject(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         scaling_group: str,
-        user_group: uuid.UUID,
+        project: uuid.UUID,
     ) -> AssociateScalingGroupWithUserProject:
         insert_query = sa.insert(sgroups_for_projects).values(
             {
                 "scaling_group": scaling_group,
-                "project": user_group,
+                "project": project,
             }
         )
         return await simple_db_mutate(cls, info.context, insert_query)
@@ -654,7 +654,7 @@ class DisassociateScalingGroupWithUserProject(graphene.Mutation):
 
     class Arguments:
         scaling_group = graphene.String(required=True)
-        user_group = graphene.UUID(required=True)
+        project = graphene.UUID(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -665,11 +665,11 @@ class DisassociateScalingGroupWithUserProject(graphene.Mutation):
         root,
         info: graphene.ResolveInfo,
         scaling_group: str,
-        user_group: uuid.UUID,
+        project: uuid.UUID,
     ) -> DisassociateScalingGroupWithUserProject:
         delete_query = sa.delete(sgroups_for_projects).where(
             (sgroups_for_projects.c.scaling_group == scaling_group)
-            & (sgroups_for_projects.c.project == user_group),
+            & (sgroups_for_projects.c.project == project),
         )
         return await simple_db_mutate(cls, info.context, delete_query)
 
@@ -679,7 +679,7 @@ class DisassociateAllScalingGroupsWithProject(graphene.Mutation):
     allowed_roles = (UserRole.SUPERADMIN,)
 
     class Arguments:
-        user_group = graphene.UUID(required=True)
+        project = graphene.UUID(required=True)
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -689,10 +689,10 @@ class DisassociateAllScalingGroupsWithProject(graphene.Mutation):
         cls,
         root,
         info: graphene.ResolveInfo,
-        user_group: uuid.UUID,
+        project: uuid.UUID,
     ) -> DisassociateAllScalingGroupsWithProject:
         delete_query = sa.delete(sgroups_for_projects).where(
-            sgroups_for_projects.c.project == user_group
+            sgroups_for_projects.c.project == project
         )
         return await simple_db_mutate(cls, info.context, delete_query)
 
