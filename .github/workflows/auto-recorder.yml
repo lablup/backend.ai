@@ -5,7 +5,7 @@ permissions:
   contents: write
 defaults:
   run:
-    working-directory: ./scripts
+    working-directory: scripts
 
 jobs:
   auto-record:
