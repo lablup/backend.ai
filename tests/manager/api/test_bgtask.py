@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import cast
 
 import attr
 import pytest
@@ -41,7 +40,9 @@ async def test_background_task(etcd_fixture, create_app_and_client) -> None:
         # since assertions inside the handler does not affect the test result
         # because the handlers are executed inside a separate asyncio task.
         update_handler_ctx["event_name"] = event.name
-        update_handler_ctx.update(**attr.asdict(cast(attr.AttrsInstance, event)))
+        # type checker complains event is not a subclass of AttrsInstance, but it definitely is...
+        update_body = attr.asdict(event)  # type: ignore
+        update_handler_ctx.update(**update_body)
 
     async def done_sub(
         context: web.Application,
@@ -49,7 +50,8 @@ async def test_background_task(etcd_fixture, create_app_and_client) -> None:
         event: BgtaskDoneEvent,
     ) -> None:
         done_handler_ctx["event_name"] = event.name
-        done_handler_ctx.update(**attr.asdict(cast(attr.AttrsInstance, event)))
+        update_body = attr.asdict(event)  # type: ignore
+        update_handler_ctx.update(**update_body)
 
     async def _mock_task(reporter):
         reporter.total_progress = 2
@@ -99,7 +101,8 @@ async def test_background_task_fail(etcd_fixture, create_app_and_client) -> None
         event: BgtaskFailedEvent,
     ) -> None:
         fail_handler_ctx["event_name"] = event.name
-        fail_handler_ctx.update(**attr.asdict(cast(attr.AttrsInstance, event)))
+        update_body = attr.asdict(event)  # type: ignore
+        fail_handler_ctx.update(**update_body)
 
     async def _mock_task(reporter):
         reporter.total_progress = 2
