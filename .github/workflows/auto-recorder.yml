@@ -12,14 +12,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    #- uses: actions/checkout@v3
-    #  with:
-    #    ref: ${{ github.head_ref }}
-    - run: ls -a
-    - name: aaa
-      run: ls /root/
-    - name: bbb
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.head_ref }}
+    - name: a
       run: pwd
+    - name: b
+      run: ls 
+    - name: c
+      run: scripts/ls
 
     - run: echo The Title of your PR is ${{ github.event.pull_request.title }}
     - run: echo The Number of your PR is ${{ github.event.pull_request.number }}
