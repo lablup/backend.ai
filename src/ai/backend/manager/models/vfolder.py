@@ -164,7 +164,7 @@ vfolders = sa.Table(
     ),
     sa.Column("user", GUID, sa.ForeignKey("users.uuid"), nullable=True),  # owner if user vfolder
     sa.Column(
-        "project", GUID, sa.ForeignKey("projects.id"), nullable=True
+        "project_id", GUID, sa.ForeignKey("projects.id"), nullable=True
     ),  # owner if project vfolder
     sa.Column("cloneable", sa.Boolean, default=False, nullable=False),
     sa.Column(
@@ -285,7 +285,7 @@ async def query_accessible_vfolders(
         vfolders.c.max_size,
         vfolders.c.ownership_type,
         vfolders.c.user,
-        vfolders.c.project,
+        vfolders.c.project_id,
         vfolders.c.creator,
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
@@ -387,12 +387,12 @@ async def query_accessible_vfolders(
             result = await conn.execute(query)
             grps = result.fetchall()
             project_ids = [g.project_id for g in grps]
-        j = vfolders.join(projects, vfolders.c.project == projects.c.id)
+        j = vfolders.join(projects, vfolders.c.project_id == projects.c.id)
         query = sa.select(
             vfolders_selectors + [vfolders.c.permission, projects.c.name], use_labels=True
         ).select_from(j)
         if user_role != UserRole.SUPERADMIN:
-            query = query.where(vfolders.c.project.in_(project_ids))
+            query = query.where(vfolders.c.project_id.in_(project_ids))
         if extra_vf_project_conds is not None:
             query = query.where(extra_vf_project_conds)
         is_owner = (user_role == UserRole.ADMIN or user_role == "admin") or (
@@ -793,7 +793,7 @@ class VirtualFolder(graphene.ObjectType):
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if project_id is not None:
-            query = query.where(vfolders.c.project == project_id)
+            query = query.where(vfolders.c.project_id == project_id)
         if user_id is not None:
             query = query.where(vfolders.c.user == user_id)
         if filter is not None:
@@ -820,7 +820,7 @@ class VirtualFolder(graphene.ObjectType):
         from .user import users
 
         j = vfolders.join(users, vfolders.c.user == users.c.uuid, isouter=True).join(
-            projects, vfolders.c.project == projects.c.id, isouter=True
+            projects, vfolders.c.project_id == projects.c.id, isouter=True
         )
         query = (
             sa.select([vfolders, users.c.email, projects.c.name.label("projects_name")])
@@ -831,7 +831,7 @@ class VirtualFolder(graphene.ObjectType):
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if project_id is not None:
-            query = query.where(vfolders.c.project == project_id)
+            query = query.where(vfolders.c.project_id == project_id)
         if user_id is not None:
             query = query.where(vfolders.c.user == user_id)
         if filter is not None:
@@ -871,7 +871,7 @@ class VirtualFolder(graphene.ObjectType):
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if project_id is not None:
-            query = query.where(vfolders.c.project == project_id)
+            query = query.where(vfolders.c.project_id == project_id)
         async with graph_ctx.db.begin_readonly() as conn:
             return await batch_multiresult(
                 graph_ctx,
