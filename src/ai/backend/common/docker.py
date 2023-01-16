@@ -230,11 +230,11 @@ class PlatformTagSet(Mapping):
         for t in tags:
             match = rx.search(t)
             if match is None:
-                raise InvalidImageTag("invalid tag-version string", t)
+                raise InvalidImageTag(t)
             key = match.group("tag")
             value = match.group("version")
             if key in self._data:
-                raise InvalidImageTag("duplicate platform tag with different versions", t)
+                raise InvalidImageTag(t)
             if value is None:
                 value = ""
             self._data[key] = value
@@ -280,13 +280,13 @@ class ImageRef:
         self._arch = arch_name_aliases.get(architecture, architecture)
         rx_slug = type(self)._rx_slug
         if "://" in value or value.startswith("//"):
-            raise InvalidImageName("ImageRef should not contain the protocol scheme.")
+            raise InvalidImageName(value)
         parts = value.split("/", maxsplit=1)
         if len(parts) == 1:
             self._registry = default_registry
             self._name, self._tag = ImageRef._parse_image_tag(value, True)
             if not rx_slug.search(self._tag):
-                raise InvalidImageTag(f"Image tag({self._tag} is invalid.")
+                raise InvalidImageTag(self._tag)
         else:
             if is_known_registry(parts[0], known_registries):
                 self._registry = parts[0]
@@ -300,7 +300,7 @@ class ImageRef:
                 self._registry = default_registry
                 self._name, self._tag = ImageRef._parse_image_tag(value, True)
             if not rx_slug.search(self._tag):
-                raise InvalidImageTag(f"Image tag({self._tag} is invalid.")
+                raise InvalidImageTag(self._tag)
         self._update_tag_set()
 
     @staticmethod
