@@ -19,7 +19,7 @@ jobs:
     - run: echo The Title of your PR is ${{ github.event.pull_request.title }}
     - run: echo The Number of your PR is ${{ github.event.pull_request.number }}
     - name: dodo
-      working-directory: ..
+      working-directory: ../changes
       run: python dowork.py ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
     - run: ls -al
     - uses: stefanzweifel/git-auto-commit-action@v4
