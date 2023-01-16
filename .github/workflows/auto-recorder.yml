@@ -17,7 +17,7 @@ jobs:
     #    ref: ${{ github.head_ref }}
     - run: ls -a
     - name: aaa
-      run: ls /
+      run: ls /root/
     - name: bbb
       run: pwd
 
