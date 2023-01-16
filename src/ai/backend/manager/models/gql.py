@@ -144,6 +144,12 @@ class Mutations(graphene.ObjectType):
     delete_project = DeleteProject.Field()
     purge_project = PurgeProject.Field()
 
+    # legacy
+    create_group = CreateProject.Field()
+    modify_group = ModifyProject.Field()
+    delete_group = DeleteProject.Field()
+    purge_group = PurgeProject.Field()
+
     # super-admin only
     create_user = CreateUser.Field()
     modify_user = ModifyUser.Field()
@@ -181,12 +187,18 @@ class Mutations(graphene.ObjectType):
     delete_scaling_group = DeleteScalingGroup.Field()
     associate_scaling_group_with_domain = AssociateScalingGroupWithDomain.Field()
     associate_scaling_group_with_project = AssociateScalingGroupWithUserProject.Field()
+    associate_scaling_group_with_group = AssociateScalingGroupWithUserProject.Field()  # legacy
     associate_scaling_group_with_keypair = AssociateScalingGroupWithKeyPair.Field()
     disassociate_scaling_group_with_domain = DisassociateScalingGroupWithDomain.Field()
     disassociate_scaling_group_with_project = DisassociateScalingGroupWithUserProject.Field()
+    disassociate_scaling_group_with_group = (
+        DisassociateScalingGroupWithUserProject.Field()
+    )  # legacy
     disassociate_scaling_group_with_keypair = DisassociateScalingGroupWithKeyPair.Field()
     disassociate_all_scaling_groups_with_domain = DisassociateAllScalingGroupsWithDomain.Field()
-    disassociate_all_scaling_groups_with_project = DisassociateAllScalingGroupsWithProject.Field()
+    disassociate_all_scaling_groups_with_project = (
+        DisassociateAllScalingGroupsWithProject.Field()
+    )  # legacy
 
 
 class Queries(graphene.ObjectType):
@@ -251,6 +263,12 @@ class Queries(graphene.ObjectType):
         id=graphene.UUID(required=True),
         domain_name=graphene.String(),
     )
+    # legacy
+    group = graphene.Field(
+        Project,
+        id=graphene.UUID(required=True),
+        domain_name=graphene.String(),
+    )
 
     # Within a single domain, this will always return nothing or a single item,
     # but if queried across all domains by superadmins, it may return multiple results
@@ -262,6 +280,18 @@ class Queries(graphene.ObjectType):
     )
 
     projects = graphene.List(
+        Project,
+        domain_name=graphene.String(),
+        is_active=graphene.Boolean(),
+    )
+    # legacy
+    groups_by_name = graphene.List(
+        Project,
+        name=graphene.String(required=True),
+        domain_name=graphene.String(),
+    )
+
+    groups = graphene.List(
         Project,
         domain_name=graphene.String(),
         is_active=graphene.Boolean(),
@@ -690,6 +720,55 @@ class Queries(graphene.ObjectType):
             raise InvalidAPIParameters("Unknown client role")
         return project
 
+    # legacy
+    @staticmethod
+    async def resolve_group(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        id: uuid.UUID,
+        *,
+        domain_name: str = None,
+    ) -> Project:
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+        client_domain = ctx.user["domain_name"]
+        client_user_id = ctx.user["uuid"]
+        if client_role == UserRole.SUPERADMIN:
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "Project.by_id",
+                domain_name=domain_name,
+            )
+            project = await loader.load(id)
+        elif client_role == UserRole.ADMIN:
+            if domain_name is not None and domain_name != client_domain:
+                raise InsufficientPrivilege
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "Project.by_id",
+                domain_name=client_domain,
+            )
+            project = await loader.load(id)
+        elif client_role == UserRole.USER:
+            if domain_name is not None and domain_name != client_domain:
+                raise InsufficientPrivilege
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "Project.by_id",
+                domain_name=client_domain,
+            )
+            project = await loader.load(id)
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "Project.by_user",
+            )
+            client_projects = await loader.load(client_user_id)
+            if project.id not in (g.id for g in client_projects):
+                raise InsufficientPrivilege
+        else:
+            raise InvalidAPIParameters("Unknown client role")
+        return project
+
     @staticmethod
     async def resolve_projects_by_name(
         executor: AsyncioExecutor,
@@ -738,8 +817,87 @@ class Queries(graphene.ObjectType):
             raise InvalidAPIParameters("Unknown client role")
         return projects
 
+    # legacy
+    @staticmethod
+    async def resolve_groups_by_name(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        name: str,
+        *,
+        domain_name: str = None,
+    ) -> Sequence[Project]:
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+        client_domain = ctx.user["domain_name"]
+        client_user_id = ctx.user["uuid"]
+        if client_role == UserRole.SUPERADMIN:
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "Project.by_name",
+                domain_name=domain_name,
+            )
+            projects = await loader.load(name)
+        elif client_role == UserRole.ADMIN:
+            if domain_name is not None and domain_name != client_domain:
+                raise InsufficientPrivilege
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "Project.by_name",
+                domain_name=client_domain,
+            )
+            projects = await loader.load(name)
+        elif client_role == UserRole.USER:
+            if domain_name is not None and domain_name != client_domain:
+                raise InsufficientPrivilege
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "Project.by_name",
+                domain_name=client_domain,
+            )
+            projects = await loader.load(name)
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "Project.by_user",
+            )
+            client_projects = await loader.load(client_user_id)
+            client_project_ids = set(g.id for g in client_projects)
+            projects = filter(lambda g: g.id in client_project_ids, projects)
+        else:
+            raise InvalidAPIParameters("Unknown client role")
+        return projects
+
     @staticmethod
     async def resolve_projects(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        *,
+        domain_name: str = None,
+        is_active: bool = None,
+    ) -> Sequence[Project]:
+        ctx: GraphQueryContext = info.context
+        client_role = ctx.user["role"]
+        client_domain = ctx.user["domain_name"]
+        client_user_id = ctx.user["uuid"]
+        if client_role == UserRole.SUPERADMIN:
+            pass
+        elif client_role == UserRole.ADMIN:
+            if domain_name is not None and domain_name != client_domain:
+                raise InsufficientPrivilege
+            domain_name = client_domain
+        elif client_role == UserRole.USER:
+            loader = ctx.dataloader_manager.get_loader(
+                ctx,
+                "Project.by_user",
+            )
+            client_projects = await loader.load(client_user_id)
+            return client_projects
+        else:
+            raise InvalidAPIParameters("Unknown client role")
+        return await Project.load_all(info.context, domain_name=domain_name, is_active=is_active)
+
+    # legacy
+    @staticmethod
+    async def resolve_groups(
         executor: AsyncioExecutor,
         info: graphene.ResolveInfo,
         *,
