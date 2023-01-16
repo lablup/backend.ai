@@ -102,7 +102,7 @@ else
     echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd
   fi
 
-  echo "Executing the main program..."
+  echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID,42\" \"$@\"..."
   exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID,42" "$@"
 
 fi
