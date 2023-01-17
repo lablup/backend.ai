@@ -1078,6 +1078,7 @@ class ComputeSession(graphene.ObjectType):
     service_ports = graphene.JSONString()
     mounts = graphene.List(lambda: graphene.String)
     occupying_slots = graphene.JSONString()
+    occupied_slots = graphene.JSONString()  # legacy
 
     # statistics
     num_queries = BigInt()
@@ -1150,6 +1151,20 @@ class ComputeSession(graphene.ObjectType):
         Calculate the sum of occupying resource slots of all sub-kernels,
         and return the JSON-serializable object from the sum result.
         """
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
+        containers = await loader.load(self.session_id)
+        zero = ResourceSlot()
+        return sum(
+            (
+                ResourceSlot({SlotName(k): Decimal(v) for k, v in c.occupied_slots.items()})
+                for c in containers
+            ),
+            start=zero,
+        ).to_json()
+
+    # legacy
+    async def resolve_occupied_slots(self, info: graphene.ResolveInfo) -> Mapping[str, Any]:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader(graph_ctx, "ComputeContainer.by_session")
         containers = await loader.load(self.session_id)
