@@ -170,6 +170,7 @@ def upgrade():
         )
 
         # Lifecycle
+        timeout = sa.Column("timeout", sa.BigInteger(), nullable=True)
         created_at = sa.Column(
             "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True
         )
