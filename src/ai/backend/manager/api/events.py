@@ -78,7 +78,8 @@ BgtaskEvents = Union[BgtaskUpdatedEvent, BgtaskDoneEvent, BgtaskCancelledEvent, 
             t.Key("ownerAccessKey", default=None) >> "owner_access_key": t.Null | t.String,
             t.Key("sessionId", default=None) >> "session_id": t.Null | tx.UUID,
             # NOTE: if set, sessionId overrides sessionName and ownerAccessKey parameters.
-            tx.AliasedKey(["group", "groupName"], default="*") >> "group_name": t.String,
+            tx.AliasedKey(["project", "projectName", "group", "groupName"], default="*")
+            >> "project_name": t.String,
             t.Key("scope", default="*"): t.Enum("*", "session", "kernel"),
         }
     )
@@ -102,7 +103,7 @@ async def push_session_events(
     if user_role == UserRole.USER:
         if access_key != request["keypair"]["access_key"]:
             raise GenericForbidden
-    project_name = params["group_name"]
+    project_name = params["project_name"]
     my_queue: asyncio.Queue[Sentinel | SessionEventInfo] = asyncio.Queue()
     log.info("PUSH_SESSION_EVENTS (ak:{}, s:{}, g:{})", access_key, session_name, project_name)
     if project_name == "*":

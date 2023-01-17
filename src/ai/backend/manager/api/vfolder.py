@@ -279,7 +279,9 @@ def vfolder_check_exists(handler: Callable[..., Awaitable[web.Response]]):
             t.Key("usage_mode", default="general"): tx.Enum(VFolderUsageMode) | t.Null,
             t.Key("permission", default="rw"): tx.Enum(VFolderPermission) | t.Null,
             tx.AliasedKey(["unmanaged_path", "unmanagedPath"], default=None): t.String | t.Null,
-            tx.AliasedKey(["group", "groupId", "group_id"], default=None): tx.UUID
+            tx.AliasedKey(
+                ["project", "projectId", "project_id", "group", "groupId", "group_id"], default=None
+            ): tx.UUID
             | t.String
             | t.Null,
             t.Key("quota", default=None): tx.BinarySize | t.Null,
@@ -295,7 +297,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     user_uuid = request["user"]["uuid"]
     resource_policy = request["keypair"]["resource_policy"]
     domain_name = request["user"]["domain_name"]
-    project_id_or_name = params["group"]
+    project_id_or_name = params["project"]
     log.info(
         "VFOLDER.CREATE (ak:{}, vf:{}, vfh:{}, umod:{}, perm:{})",
         access_key,
@@ -331,7 +333,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     if not verify_vfolder_name(params["name"]):
         raise InvalidAPIParameters(f'{params["name"]} is reserved for internal operations.')
     if params["name"].startswith(".") and params["name"] != ".local":
-        if params["group"] is not None:
+        if params["project"] is not None:
             raise InvalidAPIParameters("dot-prefixed vfolders cannot be a project folder.")
 
     async with root_ctx.db.begin() as conn:
@@ -458,7 +460,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
             "creator": request["user"]["email"],
             "ownership_type": ownership_type,
             "user": user_uuid,
-            "group": project_uuid,
+            "group": project_uuid,  # legacy
+            "project": project_uuid,  # legacy
             "cloneable": params["cloneable"],
             "status": VFolderOperationStatus.READY,
         }
@@ -485,7 +488,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
     t.Dict(
         {
             t.Key("all", default=False): t.ToBool,
-            tx.AliasedKey(["group_id", "groupId"], default=None): tx.UUID | t.String | t.Null,
+            tx.AliasedKey(["project_id", "projectId", "group_id", "groupId"], default=None): tx.UUID
+            | t.String
+            | t.Null,
             tx.AliasedKey(["owner_user_email", "ownerUserEmail"], default=None): t.Email | t.Null,
         }
     ),
@@ -532,9 +537,9 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
             raise InvalidAPIParameters("Deprecated use of 'all' option")
         else:
             extra_vf_conds = None
-            if params["group_id"] is not None:
-                # Note: user folders should be returned even when group_id is specified.
-                extra_vf_conds = (vfolders.c.project_id == params["group_id"]) | (
+            if params["project_id"] is not None:
+                # Note: user folders should be returned even when project_id is specified.
+                extra_vf_conds = (vfolders.c.project_id == params["project_id"]) | (
                     vfolders.c.user.isnot(None)
                 )
             entries = await query_accessible_vfolders(
@@ -556,10 +561,12 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                     "is_owner": entry["is_owner"],
                     "permission": entry["permission"].value,
                     "user": str(entry["user"]) if entry["user"] else None,
-                    "group": str(entry["project_id"]) if entry["project_id"] else None,
+                    "group": str(entry["project_id"]) if entry["project_id"] else None,  # legacy
+                    "group_name": entry["project_name"],  # legacy
+                    "project": str(entry["project_id"]) if entry["project_id"] else None,
+                    "project_name": entry["project_name"],
                     "creator": entry["creator"],
                     "user_email": entry["user_email"],
-                    "group_name": entry["project_name"],
                     "ownership_type": entry["ownership_type"].value,
                     "type": entry["ownership_type"].value,  # legacy
                     "cloneable": entry["cloneable"],
@@ -618,7 +625,9 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group_id", "groupId"], default=None): tx.UUID | t.String | t.Null,
+            tx.AliasedKey(["project_id", "projectId", "group_id", "groupId"], default=None): tx.UUID
+            | t.String
+            | t.Null,
         }
     ),
 )
@@ -627,7 +636,7 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
     log.info("VFOLDER.LIST_HOSTS (ak:{})", access_key)
     domain_name = request["user"]["domain_name"]
-    project_id = params["group_id"]
+    project_id = params["project_id"]
     domain_admin = request["user"]["role"] == UserRole.ADMIN
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
@@ -761,7 +770,8 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "created_at": str(row["created_at"]),
         "last_used": str(row["created_at"]),
         "user": str(row["user"]),
-        "group": str(row["project_id"]),
+        "group": str(row["project_id"]),  # legacy
+        "project": str(row["project_id"]),
         "type": "user" if row["user"] is not None else "project",
         "is_owner": is_owner,
         "permission": permission,
@@ -2178,7 +2188,8 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         "creator": request["user"]["email"],
         "ownership_type": ownership_type,
         "user": user_uuid,
-        "group": project_uuid,
+        "group": project_uuid,  # legacy
+        "project": project_uuid,
         "cloneable": params["cloneable"],
         "bgtask_id": str(task_id),
     }

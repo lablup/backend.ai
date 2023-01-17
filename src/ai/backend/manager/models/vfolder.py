@@ -718,8 +718,8 @@ class VirtualFolder(graphene.ObjectType):
             user_email=row["users_email"],
             project_id=row["project_id"],
             project_name=row["projects_name"],
-            group=row["project_id"],
-            group_name=row["projects_name"],
+            group=row["project_id"],  # legacy
+            group_name=row["projects_name"],  # legacy
             creator=row["creator"],
             unmanaged_path=row["unmanaged_path"],
             usage_mode=row["usage_mode"],

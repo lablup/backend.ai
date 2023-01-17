@@ -91,7 +91,7 @@ async def list_presets(request: web.Request) -> web.Response:
     t.Dict(
         {
             t.Key("scaling_group", default=None): t.Null | t.String,
-            t.Key("group", default="default"): t.String,
+            tx.AliasedKey(["project", "group"], default="default"): t.String,
         }
     )
 )
@@ -123,7 +123,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     log.info(
         "CHECK_PRESETS (ak:{}, g:{}, sg:{})",
         request["keypair"]["access_key"],
-        params["group"],
+        params["project"],
         params["scaling_group"],
     )
 
@@ -144,7 +144,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             .select_from(j)
             .where(
                 (association_projects_users.c.user_id == request["user"]["uuid"])
-                & (projects.c.name == params["group"])
+                & (projects.c.name == params["project"])
                 & (domains.c.name == domain_name),
             )
         )
@@ -272,9 +272,12 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         resp["keypair_limits"] = keypair_limits.to_json()
         resp["keypair_using"] = keypair_occupied.to_json()
         resp["keypair_remaining"] = keypair_remaining.to_json()
-        resp["group_limits"] = project_limits.to_json()
-        resp["group_using"] = project_occupied.to_json()
-        resp["group_remaining"] = project_remaining.to_json()
+        resp["group_limits"] = project_limits.to_json()  # legacy
+        resp["group_using"] = project_occupied.to_json()  # legacy
+        resp["group_remaining"] = project_remaining.to_json()  # legacy
+        resp["project_limits"] = project_limits.to_json()
+        resp["project_using"] = project_occupied.to_json()
+        resp["project_remaining"] = project_remaining.to_json()
         resp["scaling_group_remaining"] = sgroup_remaining.to_json()
         resp["scaling_groups"] = per_sgroup
     return web.json_response(resp, status=200)
@@ -482,7 +485,7 @@ async def get_container_stats_for_period(
 @check_api_params(
     t.Dict(
         {
-            tx.MultiKey("group_ids"): t.List(t.String) | t.Null,
+            tx.MultiAliasedKey(["project_ids", "group_ids"]): t.List(t.String) | t.Null,
             t.Key("month"): t.Regexp(r"^\d{6}", re.ASCII),
         }
     ),
@@ -493,10 +496,10 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
     Return usage statistics of terminated containers for a specified month.
     The date/time comparison is done using the configured timezone.
 
-    :param group_ids: If not None, query containers only in those groups.
+    :param project_ids: If not None, query containers only in those projects.
     :param month: The year-month to query usage statistics. ex) "202006" to query for Jun 2020
     """
-    log.info("USAGE_PER_MONTH (g:[{}], month:{})", ",".join(params["group_ids"]), params["month"])
+    log.info("USAGE_PER_MONTH (g:[{}], month:{})", ",".join(params["project_ids"]), params["month"])
     root_ctx: RootContext = request.app["_root.context"]
     local_tz = root_ctx.shared_config["system"]["timezone"]
     try:
@@ -504,7 +507,9 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
         end_date = start_date + relativedelta(months=+1)
     except ValueError:
         raise InvalidAPIParameters(extra_msg="Invalid date values")
-    resp = await get_container_stats_for_period(request, start_date, end_date, params["group_ids"])
+    resp = await get_container_stats_for_period(
+        request, start_date, end_date, params["project_ids"]
+    )
     log.debug("container list are retrieved for month {0}", params["month"])
     return web.json_response(resp, status=200)
 
@@ -514,7 +519,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("group_id"): t.String | t.Null,
+            tx.AliasedKey(["project_id", "group_id"]): t.String | t.Null,
             t.Key("start_date"): t.Regexp(r"^\d{8}$", re.ASCII),
             t.Key("end_date"): t.Regexp(r"^\d{8}$", re.ASCII),
         }
@@ -523,16 +528,16 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
 )
 async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     """
-    Return usage statistics of terminated containers belonged to the given group for a specified
+    Return usage statistics of terminated containers belonged to the given project for a specified
     period in dates.
     The date/time comparison is done using the configured timezone.
 
-    :param group_id: If not None, query containers only in the group.
+    :param project_id: If not None, query containers only in the project.
     :param start_date str: "yyyymmdd" format.
     :param end_date str: "yyyymmdd" format.
     """
     root_ctx: RootContext = request.app["_root.context"]
-    project_id = params["group_id"]
+    project_id = params["project_id"]
     local_tz = root_ctx.shared_config["system"]["timezone"]
     try:
         start_date = datetime.strptime(params["start_date"], "%Y%m%d").replace(tzinfo=local_tz)

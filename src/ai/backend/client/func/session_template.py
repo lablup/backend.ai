@@ -25,7 +25,7 @@ class SessionTemplate(BaseFunction):
             project_name = api_session.get().config.project
         body = {
             "payload": template,
-            "group_name": project_name,
+            "project_name": project_name,
             "domain_name": domain_name,
             "owner_access_key": owner_access_key,
         }

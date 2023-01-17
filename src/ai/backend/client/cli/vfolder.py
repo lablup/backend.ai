@@ -195,7 +195,7 @@ def info(name):
             print("- Ownership Type: {0}".format(result["type"]))
             print("- Permission:", result["permission"])
             print("- Usage Mode: {0}".format(result.get("usage_mode", "")))
-            print("- Project ID: {0}".format(result["group"]))
+            print("- Project ID: {0}".format(result["project"]))
             print("- User ID: {0}".format(result["user"]))
             print("- Clone Allowed: {0}".format(result["cloneable"]))
         except Exception as e:
@@ -648,7 +648,7 @@ def leave(name, shared_user_uuid):
     with Session() as session:
         try:
             vfolder_info = session.VFolder(name).info()
-            if vfolder_info["type"] == "group":
+            if vfolder_info["type"] == "project":
                 print("You cannot leave a project virtual folder.")
                 return
             if vfolder_info["is_owner"]:

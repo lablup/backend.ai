@@ -140,6 +140,26 @@ class MultiKey(t.Key):
         return [raw_value]
 
 
+class MultiAliasedKey(t.Key):
+    def __init__(self, names: Sequence[str], **kwargs) -> None:
+        super().__init__(names[0], **kwargs)
+        self.names = names
+
+    def get_data(self, data, default) -> List:
+        values: List = []
+        if isinstance(data, (multidict.MultiDict, multidict.MultiDictProxy)):
+            for name in self.names:
+                values.extend(data.getall(name, default))
+        # fallback for plain dicts
+        for name in self.names:
+            raw_value = data.get(name, default)
+            if isinstance(raw_value, (list, tuple, set)):
+                values.extend(raw_value)
+            else:
+                values.append(raw_value)
+        return values
+
+
 class BinarySize(t.Trafaret):
     def check_and_return(self, value: Any) -> Union[_BinarySize, Decimal]:
         try:

@@ -589,26 +589,26 @@ async def test(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            t.Key("group", default=None): t.Null | tx.UUID,
+            tx.AliasedKey(["project", "group"], default=None): t.Null | tx.UUID,
         }
     )
 )
 async def get_role(request: web.Request, params: Any) -> web.Response:
-    project_role = None
     root_ctx: RootContext = request.app["_root.context"]
+    project_role = None
     log.info(
         "AUTH.ROLES(ak:{}, d:{}, p:{})",
         request["keypair"]["access_key"],
         request["user"]["domain_name"],
-        params["group"],
+        params["project"],
     )
-    if params["group"] is not None:
+    if params["project"] is not None:
         query = (
             # TODO: per-project role is not yet implemented.
             sa.select([association_projects_users.c.project_id])
             .select_from(association_projects_users)
             .where(
-                (association_projects_users.c.project_id == params["group"])
+                (association_projects_users.c.project_id == params["project"])
                 & (association_projects_users.c.user_id == request["user"]["uuid"]),
             )
         )
@@ -624,7 +624,8 @@ async def get_role(request: web.Request, params: Any) -> web.Response:
     resp_data = {
         "global_role": "superadmin" if request["is_superadmin"] else "user",
         "domain_role": "admin" if request["is_admin"] else "user",
-        "group_role": project_role,
+        "group_role": project_role,  # legacy
+        "project_role": project_role,
     }
     return web.json_response(resp_data)
 

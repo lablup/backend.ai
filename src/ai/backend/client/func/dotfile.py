@@ -24,10 +24,10 @@ class Dotfile(BaseFunction):
             "permission": permission,
         }
         if project:
-            body["group"] = project
+            body["project"] = project
             if domain:
                 body["domain"] = domain
-            rqst_endpoint = "/group-config/dotfiles"
+            rqst_endpoint = "/project-config/dotfiles"
         elif domain:
             body["domain"] = domain
             rqst_endpoint = "/domain-config/dotfiles"
@@ -52,10 +52,10 @@ class Dotfile(BaseFunction):
     ) -> "List[Mapping[str, str]]":
         params = {}
         if project:
-            params["group"] = project
+            params["project"] = project
             if domain:
                 params["domain"] = domain
-            rqst_endpoint = "/group-config/dotfiles"
+            rqst_endpoint = "/project-config/dotfiles"
         elif domain:
             params["domain"] = domain
             rqst_endpoint = "/domain-config/dotfiles"
@@ -84,10 +84,10 @@ class Dotfile(BaseFunction):
     async def get(self) -> str:
         params = {"path": self.path}
         if self.project:
-            params["group"] = self.project
+            params["project"] = self.project
             if self.domain:
                 params["domain"] = self.domain
-            rqst_endpoint = "/group-config/dotfiles"
+            rqst_endpoint = "/project-config/dotfiles"
         elif self.domain:
             params["domain"] = self.domain
             rqst_endpoint = "/domain-config/dotfiles"
@@ -108,10 +108,10 @@ class Dotfile(BaseFunction):
             "permission": permission,
         }
         if self.project:
-            body["group"] = self.project
+            body["project"] = self.project
             if self.domain:
                 body["domain"] = self.domain
-            rqst_endpoint = "/group-config/dotfiles"
+            rqst_endpoint = "/project-config/dotfiles"
         elif self.domain:
             body["domain"] = self.domain
             rqst_endpoint = "/domain-config/dotfiles"
@@ -129,10 +129,10 @@ class Dotfile(BaseFunction):
     async def delete(self):
         params = {"path": self.path}
         if self.project:
-            params["group"] = self.project
+            params["project"] = self.project
             if self.domain:
                 params["domain"] = self.domain
-            rqst_endpoint = "/group-config/dotfiles"
+            rqst_endpoint = "/project-config/dotfiles"
         elif self.domain:
             params["domain"] = self.domain
             rqst_endpoint = "/domain-config/dotfiles"

@@ -38,7 +38,10 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group", "groupId", "group_id"]): tx.UUID | t.String,
+            tx.AliasedKey(
+                ["project", "projectId", "project_id", "group", "groupId", "group_id"]
+            ): tx.UUID
+            | t.String,
             t.Key("domain", default=None): t.String | t.Null,
             t.Key("data"): t.String(max_length=MAXIMUM_DOTFILE_SIZE),
             t.Key("path"): t.String,
@@ -47,9 +50,9 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
     )
 )
 async def create(request: web.Request, params: Any) -> web.Response:
-    log.info("GROUPCONFIG.CREATE_DOTFILE (project: {0})", params["group"])
+    log.info("GROUPCONFIG.CREATE_DOTFILE (project: {0})", params["project"])
     root_ctx: RootContext = request.app["_root.context"]
-    project_id_or_name = params["group"]
+    project_id_or_name = params["project"]
     async with root_ctx.db.begin() as conn:
         if isinstance(project_id_or_name, str):
             if params["domain"] is None:
@@ -103,14 +106,17 @@ async def create(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group", "groupId", "group_id"]): tx.UUID | t.String,
+            tx.AliasedKey(
+                ["project", "projectId", "project_id", "group", "groupId", "group_id"]
+            ): tx.UUID
+            | t.String,
             t.Key("domain", default=None): t.String | t.Null,
             t.Key("path", default=None): t.Null | t.String,
         }
     )
 )
 async def list_or_get(request: web.Request, params: Any) -> web.Response:
-    log.info("GROUPCONFIG.LIST_OR_GET_DOTFILE (project: {0})", params["group"])
+    log.info("GROUPCONFIG.LIST_OR_GET_DOTFILE (project: {0})", params["project"])
     root_ctx: RootContext = request.app["_root.context"]
     resp = []
     project_id_or_name = params["project"]
@@ -177,7 +183,10 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group", "groupId", "group_id"]): tx.UUID | t.String,
+            tx.AliasedKey(
+                ["project", "projectId", "project_id", "group", "groupId", "group_id"]
+            ): tx.UUID
+            | t.String,
             t.Key("domain", default=None): t.String | t.Null,
             t.Key("data"): t.String(max_length=MAXIMUM_DOTFILE_SIZE),
             t.Key("path"): t.String,
@@ -188,7 +197,7 @@ async def list_or_get(request: web.Request, params: Any) -> web.Response:
 async def update(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.UPDATE_DOTFILE (domain:{0})", params["domain"])
     root_ctx: RootContext = request.app["_root.context"]
-    project_id_or_name = params["group"]
+    project_id_or_name = params["project"]
     async with root_ctx.db.begin() as conn:
         if isinstance(project_id_or_name, str):
             if params["domain"] is None:
@@ -233,7 +242,10 @@ async def update(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group", "groupId", "group_id"]): tx.UUID | t.String,
+            tx.AliasedKey(
+                ["project", "projectId", "project_id", "group", "groupId", "group_id"]
+            ): tx.UUID
+            | t.String,
             t.Key("domain", default=None): t.String | t.Null,
             t.Key("path"): t.String,
         }
@@ -242,7 +254,7 @@ async def update(request: web.Request, params: Any) -> web.Response:
 async def delete(request: web.Request, params: Any) -> web.Response:
     log.info("GROUPCONFIG.DELETE_DOTFILE (domain:{0})", params["domain"])
     root_ctx: RootContext = request.app["_root.context"]
-    project_id_or_name = params["group"]
+    project_id_or_name = params["project"]
     async with root_ctx.db.begin() as conn:
         if isinstance(project_id_or_name, str):
             if params["domain"] is None:

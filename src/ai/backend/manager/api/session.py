@@ -280,7 +280,7 @@ overwritten_param_check = t.Dict(
         t.Key("session_name"): t.Regexp(r"^(?=.{4,64}$)\w[\w.-]*\w$", re.ASCII),
         t.Key("image", default=None): t.Null | t.String,
         tx.AliasedKey(["session_type", "sess_type"]): tx.Enum(SessionTypes),
-        t.Key("group", default=None): t.Null | t.String,
+        tx.AliasedKey(["project", "group"], default=None): t.Null | t.String,
         t.Key("domain", default=None): t.Null | t.String,
         t.Key("config", default=None): t.Null | t.Mapping(t.String, t.Any),
         t.Key("tag", default=None): t.Null | t.String,
@@ -386,7 +386,7 @@ async def _query_userinfo(
             .select_from(projects)
             .where(
                 (projects.c.domain_name == params["domain"])
-                & (projects.c.name == params["group"])
+                & (projects.c.name == params["project"])
                 & (projects.c.is_active),
             )
         )
@@ -401,7 +401,7 @@ async def _query_userinfo(
             .select_from(projects)
             .where(
                 (projects.c.domain_name == owner_domain)
-                & (projects.c.name == params["group"])
+                & (projects.c.name == params["project"])
                 & (projects.c.is_active),
             )
         )
@@ -417,7 +417,7 @@ async def _query_userinfo(
             .where(
                 (apus.c.user_id == owner_uuid)
                 & (projects.c.domain_name == owner_domain)
-                & (projects.c.name == params["group"])
+                & (projects.c.name == params["project"])
                 & (projects.c.is_active),
             )
         )
@@ -678,7 +678,10 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
             >> "architecture": t.String,
             tx.AliasedKey(["type", "sessionType"], default="interactive")
             >> "session_type": tx.Enum(SessionTypes),
-            tx.AliasedKey(["group", "groupName", "group_name"], default=undefined): UndefChecker
+            tx.AliasedKey(
+                ["project", "projectName", "project_name", "group", "groupName", "group_name"],
+                default=undefined,
+            ): UndefChecker
             | t.Null
             | t.String,
             tx.AliasedKey(["domain", "domainName", "domain_name"], default=undefined): UndefChecker
@@ -866,7 +869,10 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
             >> "architecture": t.String,
             tx.AliasedKey(["type", "sessionType"], default="interactive")
             >> "session_type": tx.Enum(SessionTypes),
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+            tx.AliasedKey(
+                ["project", "projectName", "project_name", "group", "groupName", "group_name"],
+                default="default",
+            ): t.String,
             tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
             tx.AliasedKey(["cluster_size", "clusterSize"], default=1): t.ToInt[1:],  # new in APIv6
             tx.AliasedKey(["cluster_mode", "clusterMode"], default="single-node"): tx.Enum(
@@ -944,7 +950,10 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             tx.AliasedKey(["template_id", "templateId"]): t.Null | tx.UUID,
             tx.AliasedKey(["type", "sessionType"], default="interactive")
             >> "sess_type": tx.Enum(SessionTypes),
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+            tx.AliasedKey(
+                ["project", "projectName", "project_name", "group", "groupName", "group_name"],
+                default="default",
+            ): t.String,
             tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
             tx.AliasedKey(["scaling_group", "scalingGroup"], default=None): t.Null | t.String,
             t.Key("tag", default=None): t.Null | t.String,
@@ -1950,7 +1959,8 @@ async def get_info(request: web.Request) -> web.Response:
         await root_ctx.registry.increment_session_usage(session_name, owner_access_key)
         kern = await root_ctx.registry.get_session(session_name, owner_access_key)
         resp["domainName"] = kern["domain_name"]
-        resp["groupId"] = str(kern["project_id"])
+        resp["groupId"] = str(kern["project_id"])  # legacy
+        resp["projectId"] = str(kern["project_id"])
         resp["userId"] = str(kern["user_uuid"])
         resp["lang"] = kern["image"]  # legacy
         resp["image"] = kern["image"]

@@ -40,7 +40,10 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+            tx.AliasedKey(
+                ["project", "projectName", "project_name", "group", "groupName", "group_name"],
+                default="default",
+            ): t.String,
             tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
             t.Key("owner_access_key", default=None): t.Null | t.String,
             t.Key("payload"): t.String,
@@ -100,7 +103,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 .select_from(projects)
                 .where(
                     (projects.c.domain_name == params["domain"])
-                    & (projects.c.name == params["group"])
+                    & (projects.c.name == params["project"])
                     & (projects.c.is_active),
                 )
             )
@@ -115,7 +118,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 .select_from(projects)
                 .where(
                     (projects.c.domain_name == owner_domain)
-                    & (projects.c.name == params["group"])
+                    & (projects.c.name == params["project"])
                     & (projects.c.is_active),
                 )
             )
@@ -131,7 +134,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 .where(
                     (apus.c.user_id == owner_uuid)
                     & (projects.c.domain_name == owner_domain)
-                    & (projects.c.name == params["group"])
+                    & (projects.c.name == params["project"])
                     & (projects.c.is_active),
                 )
             )
@@ -176,7 +179,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
     t.Dict(
         {
             t.Key("all", default=False): t.ToBool,
-            tx.AliasedKey(["group_id", "groupId"], default=None): tx.UUID | t.String | t.Null,
+            tx.AliasedKey(["project_id", "projectId", "group_id", "groupId"], default=None): tx.UUID
+            | t.String
+            | t.Null,
         }
     ),
 )
@@ -229,8 +234,8 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
                 )
         else:
             extra_conds = None
-            if params["group_id"] is not None:
-                extra_conds = session_templates.c.project_id == params["group_id"]
+            if params["project_id"] is not None:
+                extra_conds = session_templates.c.project_id == params["project_id"]
             entries = await query_accessible_session_templates(
                 conn,
                 user_uuid,
@@ -251,7 +256,8 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
                     "user": str(entry["user"]),
                     "project": str(entry["project"]),
                     "user_email": entry["user_email"],
-                    "group_name": entry["project_name"],
+                    "group_name": entry["project_name"],  # legacy
+                    "project_name": entry["project_name"],
                     "type": "user" if entry["user"] is not None else "group",
                 }
             )

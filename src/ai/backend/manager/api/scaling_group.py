@@ -44,7 +44,10 @@ async def query_wsproxy_status(
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group", "group_id", "group_name"]): tx.UUID | t.String,
+            tx.AliasedKey(
+                ["project", "project_id", "project_name", "group", "group_id", "group_name"]
+            ): tx.UUID
+            | t.String,
         }
     ),
 )
@@ -52,10 +55,10 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
-    group_id_or_name = params["group"]
-    log.info("SGROUPS.LIST(ak:{}, g:{}, d:{})", access_key, group_id_or_name, domain_name)
+    project_id_or_name = params["project"]
+    log.info("SGROUPS.LIST(ak:{}, p:{}, d:{})", access_key, project_id_or_name, domain_name)
     async with root_ctx.db.begin() as conn:
-        sgroups = await query_allowed_sgroups(conn, domain_name, group_id_or_name, access_key)
+        sgroups = await query_allowed_sgroups(conn, domain_name, project_id_or_name, access_key)
         return web.json_response(
             {
                 "scaling_groups": [{"name": sgroup["name"]} for sgroup in sgroups],
@@ -69,7 +72,10 @@ async def list_available_sgroups(request: web.Request, params: Any) -> web.Respo
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group", "group_id", "group_name"], default=None): t.Null
+            tx.AliasedKey(
+                ["project", "project_id", "project_name", "group", "group_id", "group_name"],
+                default=None,
+            ): t.Null
             | tx.UUID
             | t.String,
         }
@@ -80,10 +86,12 @@ async def get_wsproxy_version(request: web.Request, params: Any) -> web.Response
     scaling_group_name = request.match_info["scaling_group"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
-    group_id_or_name = params["group"]
-    log.info("SGROUPS.LIST(ak:{}, g:{}, d:{})", access_key, group_id_or_name, domain_name)
+    project_id_or_name = params["project"]
+    log.info("SGROUPS.LIST(ak:{}, p:{}, d:{})", access_key, project_id_or_name, domain_name)
     async with root_ctx.db.begin_readonly() as conn:
-        sgroups = await query_allowed_sgroups(conn, domain_name, group_id_or_name or "", access_key)
+        sgroups = await query_allowed_sgroups(
+            conn, domain_name, project_id_or_name or "", access_key
+        )
         for sgroup in sgroups:
             if sgroup["name"] == scaling_group_name:
                 wsproxy_addr = sgroup["wsproxy_addr"]

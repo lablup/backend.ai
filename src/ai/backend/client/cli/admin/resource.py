@@ -84,7 +84,7 @@ def usage_per_month(month, projects):
     with Session() as session:
         ret = session.Resource.usage_per_month(month, list(projects))
         for item in ret:
-            print("Group:", item["g_name"] + " (" + item["g_id"] + ")")
+            print("Project:", item["g_name"] + " (" + item["g_id"] + ")")
             print("  Domain:", item["domain_name"])
             print(
                 "  Total Allocated:",

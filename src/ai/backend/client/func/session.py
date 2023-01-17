@@ -314,7 +314,7 @@ class ComputeSession(BaseFunction):
                 {
                     "owner_access_key": owner_access_key,
                     "domain": domain_name,
-                    "group": project_name,
+                    "project": project_name,
                     "type": type_,
                     "enqueueOnly": enqueue_only,
                     "maxWaitSeconds": max_wait,
@@ -456,7 +456,7 @@ class ComputeSession(BaseFunction):
             "tag": tag,
             "image": image,
             "domain": domain_name,
-            "group": project_name,
+            "project": project_name,
             get_naming(api_session.get().api_version, "name_arg"): name,
             "bootstrap_script": bootstrap_script,
             "enqueueOnly": enqueue_only,

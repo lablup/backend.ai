@@ -144,6 +144,7 @@ class Mutations(graphene.ObjectType):
     delete_project = DeleteProject.Field()
     purge_project = PurgeProject.Field()
 
+    # admin only
     # legacy
     create_group = CreateProject.Field()
     modify_group = ModifyProject.Field()
@@ -278,19 +279,18 @@ class Queries(graphene.ObjectType):
         name=graphene.String(required=True),
         domain_name=graphene.String(),
     )
-
     projects = graphene.List(
         Project,
         domain_name=graphene.String(),
         is_active=graphene.Boolean(),
     )
+
     # legacy
     groups_by_name = graphene.List(
         Project,
         name=graphene.String(required=True),
         domain_name=graphene.String(),
     )
-
     groups = graphene.List(
         Project,
         domain_name=graphene.String(),
@@ -324,6 +324,7 @@ class Queries(graphene.ObjectType):
     users = graphene.List(  # legacy non-paginated list
         User,
         domain_name=graphene.String(),
+        group_id=graphene.UUID(),  # legacy
         project_id=graphene.UUID(),
         is_active=graphene.Boolean(),
         status=graphene.String(),
@@ -337,6 +338,7 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
         # intrinsic filters
         domain_name=graphene.String(),
+        group_id=graphene.UUID(),  # legacy
         project_id=graphene.UUID(),
         is_active=graphene.Boolean(),
         status=graphene.String(),
@@ -413,6 +415,14 @@ class Queries(graphene.ObjectType):
     )
 
     # super-admin only
+    # legacy
+    scaling_groups_for_group = graphene.List(
+        ScalingGroup,
+        group=graphene.String(required=True),
+        is_active=graphene.Boolean(),
+    )
+
+    # super-admin only
     scaling_groups_for_keypair = graphene.List(
         ScalingGroup,
         access_key=graphene.String(required=True),
@@ -442,6 +452,7 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
         # intrinsic filters
         domain_name=graphene.String(),
+        group_id=graphene.UUID(),  # legacy
         project_id=graphene.UUID(),
         access_key=graphene.String(),  # must be empty for user requests
     )
@@ -458,6 +469,7 @@ class Queries(graphene.ObjectType):
     vfolders = graphene.List(  # legacy non-paginated list
         VirtualFolder,
         domain_name=graphene.String(),
+        group_id=graphene.String(),  # legacy
         project_id=graphene.String(),
         access_key=graphene.String(),  # must be empty for user requests
     )
@@ -480,6 +492,7 @@ class Queries(graphene.ObjectType):
         order=graphene.String(),
         # intrinsic filters
         domain_name=graphene.String(),
+        group_id=graphene.String(),  # legacy
         project_id=graphene.String(),
         access_key=graphene.String(),
         status=graphene.String(),
@@ -505,6 +518,7 @@ class Queries(graphene.ObjectType):
         order_asc=graphene.Boolean(),
         # intrinsic filters
         domain_name=graphene.String(),
+        group_id=graphene.String(),  # legacy
         project_id=graphene.String(),
         access_key=graphene.String(),
         status=graphene.String(),
@@ -1015,7 +1029,8 @@ class Queries(graphene.ObjectType):
         info: graphene.ResolveInfo,
         *,
         domain_name: str = None,
-        project_id: uuid.UUID = None,
+        group_id: Optional[uuid.UUID] = None,
+        project_id: Optional[uuid.UUID] = None,
         is_active: bool = None,
         status: UserStatus = None,
     ) -> Sequence[User]:
@@ -1035,6 +1050,7 @@ class Queries(graphene.ObjectType):
             raise InsufficientPrivilege()
         else:
             raise InvalidAPIParameters("Unknown client role")
+        project_id = project_id or group_id
         return await User.load_all(
             info.context,
             domain_name=domain_name,
@@ -1054,7 +1070,8 @@ class Queries(graphene.ObjectType):
         filter: str = None,
         order: str = None,
         domain_name: str = None,
-        project_id: uuid.UUID = None,
+        group_id: Optional[uuid.UUID] = None,
+        project_id: Optional[uuid.UUID] = None,
         is_active: bool = None,
         status: UserStatus = None,
     ) -> UserList:
@@ -1074,6 +1091,7 @@ class Queries(graphene.ObjectType):
             raise InsufficientPrivilege()
         else:
             raise InvalidAPIParameters("Unknown client role")
+        project_id = project_id or group_id
         total_count = await User.load_count(
             info.context,
             domain_name=domain_name,
@@ -1282,6 +1300,21 @@ class Queries(graphene.ObjectType):
             is_active=is_active,
         )
 
+    # legacy
+    @staticmethod
+    @privileged_query(UserRole.SUPERADMIN)
+    async def resolve_scaling_groups_for_group(
+        executor: AsyncioExecutor,
+        info: graphene.ResolveInfo,
+        group,
+        is_active: bool = None,
+    ) -> Sequence[ScalingGroup]:
+        return await ScalingGroup.load_by_project(
+            info.context,
+            group,
+            is_active=is_active,
+        )
+
     @staticmethod
     @privileged_query(UserRole.SUPERADMIN)
     async def resolve_scaling_groups_for_keypair(
@@ -1338,12 +1371,14 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        project_id: uuid.UUID = None,
+        group_id: Optional[uuid.UUID] = None,  # legacy
+        project_id: Optional[uuid.UUID] = None,
         user_id: uuid.UUID = None,
         filter: str = None,
         order: str = None,
     ) -> VirtualFolderList:
         # TODO: adopt the generic queryfilter language
+        project_id = project_id or group_id
         total_count = await VirtualFolder.load_count(
             info.context,
             domain_name=domain_name,  # scope
@@ -1403,10 +1438,12 @@ class Queries(graphene.ObjectType):
         session_id: SessionId,
         role: UserRole = None,
         domain_name: str = None,
-        project_id: uuid.UUID = None,
+        group_id: Optional[uuid.UUID] = None,  # legacy
+        project_id: Optional[uuid.UUID] = None,
         access_key: AccessKey = None,
     ) -> ComputeContainerList:
         # TODO: adopt the generic queryfilter language
+        project_id = project_id or group_id
         total_count = await ComputeContainer.load_count(
             info.context,
             session_id,  # filter (mandatory)
@@ -1456,10 +1493,12 @@ class Queries(graphene.ObjectType):
         filter: str = None,
         order: str = None,
         domain_name: str = None,
-        project_id: uuid.UUID = None,
+        group_id: Optional[uuid.UUID] = None,  # legacy
+        project_id: Optional[uuid.UUID] = None,
         access_key: AccessKey = None,
         status: str = None,
     ) -> ComputeSessionList:
+        project_id = project_id or group_id
         total_count = await ComputeSession.load_count(
             info.context,
             status=status,  # filter
@@ -1513,12 +1552,14 @@ class Queries(graphene.ObjectType):
         offset: int,
         *,
         domain_name: str = None,
-        project_id: uuid.UUID = None,
+        group_id: Optional[uuid.UUID] = None,  # legacy
+        project_id: Optional[uuid.UUID] = None,
         access_key: AccessKey = None,
         status: str = None,
         order_key: str = None,
         order_asc: bool = True,
     ) -> LegacyComputeSessionList:
+        project_id = project_id or group_id
         total_count = await LegacyComputeSession.load_count(
             info.context,
             domain_name=domain_name,

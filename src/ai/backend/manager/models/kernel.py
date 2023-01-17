@@ -951,8 +951,8 @@ class ComputeSession(graphene.ObjectType):
     domain_name = graphene.String()
     project_name = graphene.String()
     project_id = graphene.UUID()
-    group_name = graphene.String()
-    group_id = graphene.UUID()
+    group_name = graphene.String()  # legacy
+    group_id = graphene.UUID()  # legacy
     user_email = graphene.String()
     user_id = graphene.UUID()
     access_key = graphene.String()
@@ -1010,8 +1010,8 @@ class ComputeSession(graphene.ObjectType):
             "domain_name": row["domain_name"],
             "project_name": row["project_name"],
             "project_id": row["project_id"],
-            "group_name": row["project_name"],
-            "group_id": row["project_id"],
+            "group_name": row["project_name"],  # legacy
+            "group_id": row["project_id"],  # legacy
             "user_email": row["email"],
             "user_id": row["user_uuid"],
             "access_key": row["access_key"],
@@ -1338,8 +1338,8 @@ class LegacyComputeSession(graphene.ObjectType):
     architecture = graphene.String()
     registry = graphene.String()
     domain_name = graphene.String()
-    group_name = graphene.String()
-    group_id = graphene.UUID()
+    group_name = graphene.String()  # legacy
+    group_id = graphene.UUID()  # legacy
     scaling_group = graphene.String()
     user_uuid = graphene.UUID()
     access_key = graphene.String()
@@ -1485,6 +1485,9 @@ class LegacyComputeSession(graphene.ObjectType):
             "architecture": row["architecture"],
             "registry": row["registry"],
             "domain_name": row["domain_name"],
+            "project_name": row["name"],
+            "project_id": row["project_id"],
+            # legacy
             "group_name": row[
                 "name"
             ],  # project.name (project is omitted since use_labels=True is not used)

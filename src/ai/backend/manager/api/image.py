@@ -247,8 +247,16 @@ async def get_import_image_form(request: web.Request) -> web.Response:
                             "type": "choice",
                             "choices": accessible_projects,
                             "label": "Group to build image",
-                            "help": "The user project where the import task will be executed.",
-                        },
+                            "help": "The user group where the import task will be executed."
+                            # " This field is a legacy. Recommend to use 'project' field",
+                        },  # legacy
+                        # {
+                        #     "name": "project",
+                        #     "type": "choice",
+                        #     "choices": accessible_projects,
+                        #     "label": "Project to build image",
+                        #     "help": "The user project where the import task will be executed."
+                        # },
                         {
                             "name": "scalingGroup",
                             "type": "choice",
@@ -274,7 +282,7 @@ async def get_import_image_form(request: web.Request) -> web.Response:
             t.Key("launchOptions", default={}): t.Dict(
                 {
                     t.Key("scalingGroup", default="default"): t.String,
-                    t.Key("group", default="default"): t.String,
+                    tx.AliasedKey(["project", "group"], default="default"): t.String,
                 }
             ).allow_extra("*"),
             t.Key("brand"): t.String,
@@ -371,7 +379,7 @@ async def import_image(request: web.Request, params: Any) -> web.Response:
             )
             .where(
                 (domains.c.name == request["user"]["domain_name"])
-                & (projects.c.name == params["launchOptions"]["group"])
+                & (projects.c.name == params["launchOptions"]["project"])
                 & (domains.c.is_active)
                 & (projects.c.is_active),
             )

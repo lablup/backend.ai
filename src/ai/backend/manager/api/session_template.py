@@ -33,7 +33,10 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+            tx.AliasedKey(
+                ["project", "projectName", "project_name", "group", "groupName", "group_name"],
+                default="default",
+            ): t.String,
             tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
             t.Key("owner_access_key", default=None): t.Null | t.String,
             t.Key("payload"): t.String,
@@ -64,7 +67,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
             template_data = check_task_template(st["template"])
             template_id = uuid.uuid4().hex
             name = st["name"] if "name" in st else template_data["metadata"]["name"]
-            if "group_id" in st:
+            if "project_id" in st:
+                project_id = st["project_id"]
+            elif "group_id" in st:  # legacy
                 project_id = st["group_id"]
             if "user_uuid" in st:
                 user_uuid = st["user_uuid"]
@@ -95,7 +100,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
     t.Dict(
         {
             t.Key("all", default=False): t.ToBool,
-            tx.AliasedKey(["group_id", "groupId"], default=None): tx.UUID | t.String | t.Null,
+            tx.AliasedKey(["project_id", "projectId", "group_id", "groupId"], default=None): tx.UUID
+            | t.String
+            | t.Null,
         }
     ),
 )
@@ -153,9 +160,11 @@ async def list_template(request: web.Request, params: Any) -> web.Response:
                     "created_at": str(entry["created_at"]),
                     "is_owner": entry["is_owner"],
                     "user": str(entry["user"]),
-                    "group": str(entry["project"]),
+                    "group": str(entry["project"]),  # legacy
+                    "group_name": entry["project_name"],  # legacy
+                    "project": str(entry["project"]),
+                    "project_name": entry["project_name"],
                     "user_email": entry["user_email"],
-                    "group_name": entry["project_name"],
                     "domain_name": domain_name,
                     "type": entry["type"],
                     "template": entry["template"],
@@ -211,7 +220,8 @@ async def get(request: web.Request, params: Any) -> web.Response:
                     "template": row.template,
                     "name": row.name,
                     "user_uuid": str(row.user_uuid),
-                    "group_id": str(row.project_id),
+                    "group_id": str(row.project_id),  # legacy
+                    "project_id": str(row.project_id),
                     "domain_name": domain_name,
                 }
             )
@@ -227,7 +237,10 @@ async def get(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["group", "groupName", "group_name"], default="default"): t.String,
+            tx.AliasedKey(
+                ["project", "projectName", "project_name", "group", "groupName", "group_name"],
+                default="default",
+            ): t.String,
             tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
             t.Key("payload"): t.String,
             t.Key("owner_access_key", default=None): t.Null | t.String,
@@ -269,7 +282,9 @@ async def put(request: web.Request, params: Any) -> web.Response:
         for st in body["session_templates"]:
             template_data = check_task_template(st["template"])
             name = st["name"] if "name" in st else template_data["metadata"]["name"]
-            if "group_id" in st:
+            if "project_id" in st:
+                project_id = st["project_id"]
+            elif "group_id" in st:  # legacy
                 project_id = st["group_id"]
             if "user_uuid" in st:
                 user_uuid = st["user_uuid"]
