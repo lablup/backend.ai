@@ -1077,6 +1077,7 @@ class ComputeSession(graphene.ObjectType):
     scaling_group = graphene.String()
     service_ports = graphene.JSONString()
     mounts = graphene.List(lambda: graphene.String)
+    vfolder_mounts = graphene.List(lambda: graphene.String)
     occupying_slots = graphene.JSONString()
     occupied_slots = graphene.JSONString()  # legacy
 
@@ -1135,6 +1136,8 @@ class ComputeSession(graphene.ObjectType):
             "resource_opts": row.resource_opts,
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
+            "mounts": row.vfolder_mounts,
+            "vfolder_mounts": row.vfolder_mounts,
             # statistics
             "num_queries": row.num_queries,
         }
