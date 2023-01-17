@@ -530,7 +530,8 @@ async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[N
 
     session_force_termination_tasks = []
     thresholds_json = await root_ctx.shared_config.etcd.get("session/hang-toleration-threshold")
-    for status, threshold_fmt in json.loads(thresholds_json).items():
+    thresholds_dict = json.loads(thresholds_json) if thresholds_json else {}
+    for status, threshold_fmt in thresholds_dict.items():
         try:
             kernel_status = KernelStatus[status]
         except KeyError:
