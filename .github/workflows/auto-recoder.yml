@@ -1,4 +1,4 @@
-name: auto-recorder
+name: auto-recoder
 on: 
   pull_request:
 permissions:
@@ -8,7 +8,7 @@ permissions:
 #    working-directory: scripts
 
 jobs:
-  auto-record:
+  auto-recode:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,7 +25,13 @@ jobs:
     - name: d
       working-directory: changes
       run: ls -al
-
+    - name: e
+      working-directory: .github/workflows
+      run: ls -al
+    #- name: run do work
+    #  working-directory: scripts
+    #  run: python dowork.py ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
+    
     #- name: d
     #  run: echo The Title of your PR is ${{ github.event.pull_request.title }}
     #- name: e
