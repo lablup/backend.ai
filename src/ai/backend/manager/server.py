@@ -464,7 +464,6 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    import json
     from contextlib import suppress
     from datetime import timedelta
     from uuid import UUID
@@ -529,9 +528,8 @@ async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[N
             await asyncio.sleep(threshold.seconds)
 
     session_force_termination_tasks = []
-    thresholds_json = await root_ctx.shared_config.etcd.get("session/hang-toleration-threshold")
-    thresholds_dict = json.loads(thresholds_json) if thresholds_json else {}
-    for status, threshold_fmt in thresholds_dict.items():
+    raw_session_config = await root_ctx.shared_config.etcd.get_prefix("config/session")
+    for status, threshold_fmt in raw_session_config.get("hang-toleration-threshold", {}).items():
         try:
             kernel_status = KernelStatus[status]
         except KeyError:
