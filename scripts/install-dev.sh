@@ -963,6 +963,8 @@ configure_backendai() {
   show_note "How to reset this setup:"
   echo "  > ${WHITE}$(dirname $0)/delete-dev.sh${NC}"
   echo " "
+
+  ./backend.ai mgr etcd put session/hang-toleration-threshold '{"PREPARING": "1h", "TERMINATING": "30m"}'
 }
 
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then

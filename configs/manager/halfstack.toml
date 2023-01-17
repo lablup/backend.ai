@@ -30,8 +30,6 @@ disabled-plugins = []
 
 hide-agents = true
 
-session-hang-toleration-threshold = { "PREPARING" = "1h", "TERMINATING" = "30m" }
-
 
 [docker-registry]
 ssl-verify = false

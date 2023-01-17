@@ -463,7 +463,8 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @actxmgr
-async def session_hangtime_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+async def hanging_sessions_scanner_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    import json
     from contextlib import suppress
     from datetime import timedelta
     from uuid import UUID
@@ -475,16 +476,16 @@ async def session_hangtime_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.kernel import KernelStatus
     from .models.utils import ExtendedAsyncSAEngine
 
-    async def _fetch_kernels_with_status_and_hangtime(
+    async def _fetch_kernels_staying_in_status_over_threshold_time(
         db: ExtendedAsyncSAEngine,
         status: KernelStatus | None = None,
-        hangtime: timedelta | None = None,
+        threshold: timedelta | None = None,
     ) -> tuple[UUID, ...]:
         async with db.begin_readonly() as conn:
             query = sa.select(kernels)
             if status:
                 query = query.where(kernels.c.status == status)
-                if hangtime is not None:
+                if threshold is not None:
                     query = query.where(
                         (
                             datetime.now(tz=tzutc())
@@ -492,20 +493,20 @@ async def session_hangtime_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                                 sa.types.DateTime(timezone=True)
                             )
                         )
-                        > hangtime
+                        > threshold
                     )
                 query = query.order_by(kernels.c.status_history[status.name].asc())
             result = await conn.execute(query)
             return tuple(kernel.session_id for kernel in result.fetchall())
 
-    async def _terminate_hanging_sessions(
+    async def _force_terminate_hanging_sessions(
         status: KernelStatus,
-        hangtime: timedelta,
+        threshold: timedelta,
         reason: KernelLifecycleEventReason = KernelLifecycleEventReason.HANGTIME_EXCEEDED,
     ) -> None:
         while True:
-            session_ids = await _fetch_kernels_with_status_and_hangtime(
-                root_ctx.db, status=status, hangtime=hangtime
+            session_ids = await _fetch_kernels_staying_in_status_over_threshold_time(
+                root_ctx.db, status=status, threshold=threshold
             )
             log.debug(f"{len(session_ids)} {status} kernels found.")
 
@@ -525,37 +526,38 @@ async def session_hangtime_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 ]
             )
 
-            await asyncio.sleep(hangtime.seconds)
+            await asyncio.sleep(threshold.seconds)
 
-    session_force_termination_taks = []
-    for status, hangtime_fmt in root_ctx.local_config["manager"]["session-hang-toleration-threshold"].items():
+    session_force_termination_tasks = []
+    thresholds_json = await root_ctx.shared_config.etcd.get("session/hang-toleration-threshold")
+    for status, threshold_fmt in json.loads(thresholds_json).items():
         try:
             kernel_status = KernelStatus[status]
         except KeyError:
             continue
 
-        match hangtime_fmt[-1]:
+        match threshold_fmt[-1]:
             case "h":
-                hangtime = timedelta(hours=int(hangtime_fmt[:-1]))
+                threshold = timedelta(hours=int(threshold_fmt[:-1]))
             case "m":
-                hangtime = timedelta(minutes=int(hangtime_fmt[:-1]))
+                threshold = timedelta(minutes=int(threshold_fmt[:-1]))
             case "s":
-                hangtime = timedelta(seconds=int(hangtime_fmt[:-1]))
+                threshold = timedelta(seconds=int(threshold_fmt[:-1]))
             case _:
                 log.error(
-                    f'Skip "{status}:{hangtime_fmt}" as it is an invalid argument. Supported postfixes: "h", "m", "s"'
+                    f'Skip "{status}:{threshold_fmt}" as it is an invalid argument. Supported postfixes: "h", "m", "s"'
                 )
                 continue
 
-        session_force_termination_taks.append(
+        session_force_termination_tasks.append(
             asyncio.create_task(
-                _terminate_hanging_sessions(status=kernel_status, hangtime=hangtime)
+                _force_terminate_hanging_sessions(status=kernel_status, threshold=threshold)
             )
         )
 
     yield
 
-    for task in session_force_termination_taks:
+    for task in session_force_termination_tasks:
         if not task.done():
             if not task.cancelled():
                 task.cancel()
@@ -712,7 +714,7 @@ def build_root_app(
             agent_registry_ctx,
             sched_dispatcher_ctx,
             background_task_ctx,
-            session_hangtime_ctx,
+            hanging_sessions_scanner_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:

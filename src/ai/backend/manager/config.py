@@ -262,12 +262,6 @@ manager_local_config_iv = (
                     t.Key("importer-image", default="lablup/importer:manylinux2010"): t.String,
                     t.Key("max-wsmsg-size", default=16 * (2**20)): t.ToInt,  # default: 16 MiB
                     t.Key("aiomonitor-port", default=48100): t.Int[1:65535],
-                    t.Key("session-hang-toleration-threshold", default={}): t.Dict(
-                        {
-                            t.Key("PREPARING", optional=True): t.String,
-                            t.Key("TERMINATING", optional=True): t.String,
-                        },
-                    ),
                 }
             ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(
@@ -318,6 +312,9 @@ _shdefs: Mapping[str, Any] = {
     },
     "watcher": {
         "token": None,
+    },
+    "session": {
+        "hang-toleration-threshold": {},
     },
 }
 
@@ -390,6 +387,19 @@ shared_config_iv = t.Dict(
             {
                 t.Key("token", default=_shdefs["watcher"]["token"]): t.Null | t.String,
             }
+        ).allow_extra("*"),
+        t.Key("session", default=_shdefs["session"]): t.Dict(
+            {
+                t.Key(
+                    "hang-toleration-threshold",
+                    default=_shdefs["session"]["hang-toleration-threshold"],
+                ): t.Dict(
+                    {
+                        t.Key("PREPARING", optional=True): t.String,
+                        t.Key("TERMINATING", optional=True): t.String,
+                    },
+                ),
+            },
         ).allow_extra("*"),
     }
 ).allow_extra("*")
