@@ -6,7 +6,6 @@ aiohttp_cors~=0.7
 aiohttp_sse>=2.0
 aiodns>=3.0
 aiomonitor-ng~=0.7.0
-aioredis[hiredis]~=2.0.1
 aioresponses>=0.7.3
 aiosqlite~=0.17.0
 aiotools~=1.5.9
