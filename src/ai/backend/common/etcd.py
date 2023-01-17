@@ -98,6 +98,8 @@ def _slash(v: str):
 P = ParamSpec("P")
 R = TypeVar("R")
 
+RecursiveDict = Mapping[str, Union["RecursiveDict", Optional[str]]]
+
 
 class AsyncEtcd:
 
@@ -303,7 +305,7 @@ class AsyncEtcd:
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
         scope_prefix_map: Mapping[ConfigScopes, str] = None,
-    ) -> Mapping[str, Optional[str]]:
+    ) -> RecursiveDict:
         """
         Retrieves all key-value pairs under the given key prefix as a nested dictionary.
         All dictionary keys are automatically unquoted.
