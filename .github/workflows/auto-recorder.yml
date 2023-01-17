@@ -25,17 +25,17 @@ jobs:
     - name: d
       working-deirctory: changes
       run: ls -al
-
+    
     #- name: d
     #  run: echo The Title of your PR is ${{ github.event.pull_request.title }}
     #- name: e
     #  run: echo The Number of your PR is ${{ github.event.pull_request.number }}
-    - name: f
-      working-directory: scripts
-      run: python dowork.py ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
-    - run: ls -al
-    - uses: stefanzweifel/git-auto-commit-action@v4
-      with:
-        commit_message: GitHub Actions added ${{github.event.pull_request.number}}.YOUR_PR_FEAT.md file in backend.ai/changes folder and its content is your PR's title without feature. 
+    #- name: f
+    #  working-directory: scripts
+    #  run: python dowork.py ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
+    #- run: ls -al
+    #- uses: stefanzweifel/git-auto-commit-action@v4
+    #  with:
+    #    commit_message: GitHub Actions added ${{github.event.pull_request.number}}.YOUR_PR_FEAT.md file in backend.ai/changes folder and its content is your PR's title without feature. 
         
     
