@@ -18,14 +18,18 @@ jobs:
     - name: a
       run: pwd
     - name: b
-      run: ls 
+      run: ls -al
     - name: c
       working-directory: scripts
-      run: ls
+      run: ls -al
     - name: d
-      run: echo The Title of your PR is ${{ github.event.pull_request.title }}
-    - name: e
-      run: echo The Number of your PR is ${{ github.event.pull_request.number }}
+      working-deirctory: changes
+      run: ls -al
+
+    #- name: d
+    #  run: echo The Title of your PR is ${{ github.event.pull_request.title }}
+    #- name: e
+    #  run: echo The Number of your PR is ${{ github.event.pull_request.number }}
     - name: f
       working-directory: scripts
       run: python dowork.py ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
