@@ -2688,7 +2688,7 @@ class AgentRegistry:
         email = await self._get_user_email(kernel)
         async with handle_session_exception(self.db, "commit_session", session.id):
             async with RPCContext(
-                kernel.agent_id,
+                kernel.agent,
                 kernel.agent_addr,
                 invoke_timeout=None,
                 keepalive_timeout=self.rpc_keepalive_timeout,
