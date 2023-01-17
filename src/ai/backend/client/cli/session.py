@@ -198,12 +198,12 @@ def _create_cmd(docs: str = None):
         "If not specified, config's domain name will be used.",
     )
     @click.option(
-        "-g",
-        "--group",
-        metavar="GROUP_NAME",
+        "-j",
+        "--project",
+        metavar="PROJECT_NAME",
         default=None,
         help="Group name where the session is spawned. "
-        "User should be a member of the group to execute the code.",
+        "User should be a member of the project to execute the code.",
     )
     @click.option(
         "--assign-agent",
@@ -243,7 +243,7 @@ def _create_cmd(docs: str = None):
         assign_agent: str | None,
         # resource grouping
         domain: str | None,
-        group: str | None,
+        project: str | None,
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -292,7 +292,7 @@ def _create_cmd(docs: str = None):
                     resource_opts=resource_opts,
                     owner_access_key=owner,
                     domain_name=domain,
-                    group_name=group,
+                    project_name=project,
                     scaling_group=scaling_group,
                     bootstrap_script=bootstrap_script.read()
                     if bootstrap_script is not None
@@ -500,12 +500,12 @@ def _create_from_template_cmd(docs: str = None):
         "If not specified, config's domain name will be used.",
     )
     @click.option(
-        "-g",
-        "--group",
-        metavar="GROUP_NAME",
+        "-p",
+        "--project",
+        metavar="PROJECT_NAME",
         default=None,
         help="Group name where the session is spawned. "
-        "User should be a member of the group to execute the code.",
+        "User should be a member of the project to execute the code.",
     )
     # template overrides
     @click.option(
@@ -553,7 +553,7 @@ def _create_from_template_cmd(docs: str = None):
         resource_opts: Sequence[str],
         # resource grouping
         domain: str | None,
-        group: str | None,
+        project: str | None,
         # template overrides
         no_mount: bool,
         no_env: bool,
@@ -608,7 +608,7 @@ def _create_from_template_cmd(docs: str = None):
                     resource_opts=resource_opts,
                     owner_access_key=owner,
                     domain_name=domain,
-                    group_name=group,
+                    project_name=project,
                     scaling_group=scaling_group,
                     tag=tag,
                 )
@@ -1223,7 +1223,7 @@ def _fetch_session_names():
     fields: List[FieldSpec] = [
         session_fields["name"],
         session_fields["session_id"],
-        session_fields["group_name"],
+        session_fields["project_name"],
         session_fields["kernel_id"],
         session_fields["image"],
         session_fields["type"],

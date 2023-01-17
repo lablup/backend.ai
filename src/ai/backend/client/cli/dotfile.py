@@ -42,13 +42,13 @@ def dotfile():
     "-d", "--domain", "domain", metavar="DOMAIN", help="Specify the domain name of domain dotfiles."
 )
 @click.option(
-    "-g",
-    "--group",
-    metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
-    "(If group name is provided, domain name must be specified with option -d)",
+    "-j",
+    "--project",
+    metavar="PROJECT",
+    help="Sepcify the project name or id of project dotfiles. "
+    "(If project name is provided, domain name must be specified with option -d)",
 )
-def create(path, permission, dotfile_path, owner_access_key, domain, group):
+def create(path, permission, dotfile_path, owner_access_key, domain, project):
     """
     Store dotfile to Backend.AI Manager.
     Dotfiles will be automatically loaded when creating kernels.
@@ -73,7 +73,7 @@ def create(path, permission, dotfile_path, owner_access_key, domain, group):
                 permission,
                 owner_access_key=owner_access_key,
                 domain=domain,
-                group=group,
+                project=project,
             )
             print_info(f"Dotfile {dotfile_.path} created and ready")
         except Exception as e:
@@ -95,20 +95,20 @@ def create(path, permission, dotfile_path, owner_access_key, domain, group):
     "-d", "--domain", "domain", metavar="DOMAIN", help="Specify the domain name of domain dotfiles."
 )
 @click.option(
-    "-g",
-    "--group",
-    metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
-    "(If group name is provided, domain name must be specified with option -d)",
+    "-p",
+    "--project",
+    metavar="PROJECT",
+    help="Sepcify the project name or id of project dotfiles. "
+    "(If project name is provided, domain name must be specified with option -d)",
 )
-def get(path, owner_access_key, domain, group):
+def get(path, owner_access_key, domain, project):
     """
     Print dotfile content.
     """
     with Session() as session:
         try:
             dotfile_ = session.Dotfile(
-                path, owner_access_key=owner_access_key, domain=domain, group=group
+                path, owner_access_key=owner_access_key, domain=domain, project=project
             )
             body = dotfile_.get()
             print(body["data"])
@@ -130,15 +130,15 @@ def get(path, owner_access_key, domain, group):
     "-d", "--domain", "domain", metavar="DOMAIN", help="Specify the domain name of domain dotfiles."
 )
 @click.option(
-    "-g",
-    "--group",
-    metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
-    "(If group name is provided, domain name must be specified with option -d)",
+    "-p",
+    "--project",
+    metavar="PROJECT",
+    help="Sepcify the project name or id of project dotfiles. "
+    "(If project name is provided, domain name must be specified with option -d)",
 )
-def list(owner_access_key, domain, group):
+def list(owner_access_key, domain, project):
     """
-    List availabe user/domain/group dotfiles.
+    List availabe user/domain/project dotfiles.
     """
     fields = [
         ("Path", "path", None),
@@ -148,7 +148,7 @@ def list(owner_access_key, domain, group):
     with Session() as session:
         try:
             resp = session.Dotfile.list_dotfiles(
-                owner_access_key=owner_access_key, domain=domain, group=group
+                owner_access_key=owner_access_key, domain=domain, project=project
             )
             if not resp:
                 print("There is no dotfiles created yet.")
@@ -194,13 +194,13 @@ def list(owner_access_key, domain, group):
     "-d", "--domain", "domain", metavar="DOMAIN", help="Specify the domain name of domain dotfiles."
 )
 @click.option(
-    "-g",
-    "--group",
-    metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
-    "(If group name is provided, domain name must be specified with option -d)",
+    "-p",
+    "--project",
+    metavar="RPOJECT",
+    help="Sepcify the project name or id of project dotfiles. "
+    "(If project name is provided, domain name must be specified with option -d)",
 )
-def update(path, permission, dotfile_path, owner_access_key, domain, group):
+def update(path, permission, dotfile_path, owner_access_key, domain, project):
     """
     Update dotfile stored in Backend.AI Manager.
     """
@@ -217,7 +217,7 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
             if not permission:
                 permission = "755"
             dotfile_ = session.Dotfile(
-                path, owner_access_key=owner_access_key, domain=domain, group=group
+                path, owner_access_key=owner_access_key, domain=domain, project=project
             )
             dotfile_.update(body, permission)
             print_info(f"Dotfile {dotfile_.path} updated")
@@ -241,19 +241,19 @@ def update(path, permission, dotfile_path, owner_access_key, domain, group):
     "-d", "--domain", "domain", metavar="DOMAIN", help="Specify the domain name of domain dotfiles."
 )
 @click.option(
-    "-g",
-    "--group",
-    metavar="GROUP",
-    help="Sepcify the group name or id of group dotfiles. "
-    "(If group name is provided, domain name must be specified with option -d)",
+    "-p",
+    "--project",
+    metavar="PROJECT",
+    help="Sepcify the project name or id of project dotfiles. "
+    "(If project name is provided, domain name must be specified with option -d)",
 )
-def delete(path, force, owner_access_key, domain, group):
+def delete(path, force, owner_access_key, domain, project):
     """
     Delete dotfile from Backend.AI Manager.
     """
     with Session() as session:
         dotfile_ = session.Dotfile(
-            path, owner_access_key=owner_access_key, domain=domain, group=group
+            path, owner_access_key=owner_access_key, domain=domain, project=project
         )
         if not force:
             print_warn("Are you sure? (y/[n])")

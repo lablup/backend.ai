@@ -1,4 +1,4 @@
-from typing import Any, List, Mapping
+from typing import Any, List, Mapping, Optional
 
 from ..request import Request
 from ..session import api_session
@@ -14,18 +14,18 @@ class SessionTemplate(BaseFunction):
         cls,
         template: str,
         domain_name: str = None,
-        group_name: str = None,
+        project_name: Optional[str] = None,
         owner_access_key: str = None,
     ) -> "SessionTemplate":
         rqst = Request("POST", "/template/session")
         if domain_name is None:
             # Even if config.domain is None, it can be guessed in the manager by user information.
             domain_name = api_session.get().config.domain
-        if group_name is None:
-            group_name = api_session.get().config.group
+        if project_name is None:
+            project_name = api_session.get().config.project
         body = {
             "payload": template,
-            "group_name": group_name,
+            "group_name": project_name,
             "domain_name": domain_name,
             "owner_access_key": owner_access_key,
         }

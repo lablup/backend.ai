@@ -44,7 +44,7 @@ def info(ctx: CLIContext, email: str) -> None:
         user_fields["status_info"],
         user_fields["created_at"],
         user_fields["domain_name"],
-        user_fields["groups"],
+        user_fields["projects"],
         user_fields["allowed_client_ip"],
     ]
     with Session() as session:
@@ -65,12 +65,12 @@ def info(ctx: CLIContext, email: str) -> None:
     default=None,
     help="Filter users in a specific state (active, inactive, deleted, before-verification).",
 )
-@click.option("-g", "--group", type=str, default=None, help="Filter by group ID.")
+@click.option("-j", "--project", type=str, default=None, help="Filter by project ID.")
 @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
 @click.option("--order", default=None, help="Set the query ordering expression.")
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", default=None, help="The page size for pagination.")
-def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
+def list(ctx: CLIContext, status, project, filter_, order, offset, limit) -> None:
     """
     List users.
     (admin privilege required)
@@ -86,14 +86,14 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
         user_fields["status_info"],
         user_fields["created_at"],
         user_fields["domain_name"],
-        user_fields["groups"],
+        user_fields["projects"],
         user_fields["allowed_client_ip"],
     ]
     try:
         with Session() as session:
             fetch_func = lambda pg_offset, pg_size: session.User.paginated_list(
                 status,
-                group,
+                project,
                 fields=fields,
                 page_offset=pg_offset,
                 page_size=pg_size,

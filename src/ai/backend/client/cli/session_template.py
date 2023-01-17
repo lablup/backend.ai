@@ -32,12 +32,12 @@ def session_template():
     "If not specified, config's domain name will be used.",
 )
 @click.option(
-    "-g",
-    "--group",
-    metavar="GROUP_NAME",
+    "-j",
+    "--project",
+    metavar="PROJECT_NAME",
     default=None,
     help="Group name where the session is spawned. "
-    "User should be a member of the group to execute the code.",
+    "User should be a member of the project to execute the code.",
 )
 @click.option(
     "-o",
@@ -47,7 +47,7 @@ def session_template():
     metavar="ACCESS_KEY",
     help="Set the owner of the target session explicitly.",
 )
-def create(template_path, domain, group, owner_access_key):
+def create(template_path, domain, project, owner_access_key):
     """
     Store task template to Backend.AI Manager and return template ID.
     Template can be used when creating new session.
@@ -64,7 +64,7 @@ def create(template_path, domain, group, owner_access_key):
         try:
             # TODO: Make user select template type when cluster template is implemented
             template = session.SessionTemplate.create(
-                body, domain_name=domain, group_name=group, owner_access_key=owner_access_key
+                body, domain_name=domain, project_name=project, owner_access_key=owner_access_key
             )
             print_info(f"Task template {template.template_id} created and ready")
         except Exception as e:
@@ -121,7 +121,7 @@ def list(list_all):
         ("Owner", "is_owner"),
         ("Type", "type"),
         ("User", "user"),
-        ("Group", "group"),
+        ("Project", "project"),
     ]
     with Session() as session:
         try:

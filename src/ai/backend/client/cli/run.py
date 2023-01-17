@@ -454,12 +454,12 @@ def prepare_mount_arg(
     "If not specified, config's domain name will be used.",
 )
 @click.option(
-    "-g",
-    "--group",
-    metavar="GROUP_NAME",
+    "-j",
+    "--project",
+    metavar="PROJECT_NAME",
     default=None,
-    help="Group name where the session is spawned. "
-    "User should be a member of the group to execute the code.",
+    help="Project name where the session is spawned. "
+    "User should be a member of the project to execute the code.",
 )
 @click.option("--preopen", default=None, type=list_expr, help="Pre-open service ports")
 @click.option(
@@ -503,7 +503,7 @@ def run(
     cluster_mode,
     resource_opts,
     domain,
-    group,
+    project,
     preopen,
     assign_agent,  # resource grouping
 ):
@@ -618,7 +618,7 @@ def run(
                 envs=envs,
                 resources=resources,
                 domain_name=domain,
-                group_name=group,
+                project_name=project,
                 scaling_group=scaling_group,
                 tag=tag,
             )
@@ -634,8 +634,8 @@ def run(
         elif compute_session.status == "RUNNING":
             if compute_session.created:
                 vprint_done(
-                    "[{0}] Session {1} is ready (domain={2}, group={3}).".format(
-                        idx, compute_session.name, compute_session.domain, compute_session.group
+                    "[{0}] Session {1} is ready (domain={2}, project={3}).".format(
+                        idx, compute_session.name, compute_session.domain, compute_session.project
                     )
                 )
             else:
@@ -722,7 +722,7 @@ def run(
                 resources=resources,
                 resource_opts=resource_opts,
                 domain_name=domain,
-                group_name=group,
+                project_name=project,
                 scaling_group=scaling_group,
                 bootstrap_script=bootstrap_script.read() if bootstrap_script is not None else None,
                 tag=tag,
@@ -741,8 +741,8 @@ def run(
         elif compute_session.status == "RUNNING":
             if compute_session.created:
                 vprint_done(
-                    "[{0}] Session {1} is ready (domain={2}, group={3}).".format(
-                        idx, compute_session.name, compute_session.domain, compute_session.group
+                    "[{0}] Session {1} is ready (domain={2}, project={3}).".format(
+                        idx, compute_session.name, compute_session.domain, compute_session.project
                     )
                 )
             else:

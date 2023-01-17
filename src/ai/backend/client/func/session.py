@@ -92,7 +92,7 @@ class ComputeSession(BaseFunction):
     status: str
     service_ports: List[str]
     domain: str
-    group: str
+    project: str
 
     @api_function
     @classmethod
@@ -179,7 +179,7 @@ class ComputeSession(BaseFunction):
         cluster_size: int = 1,
         cluster_mode: Literal["single-node", "multi-node"] = "single-node",
         domain_name: str = None,
-        group_name: str = None,
+        project_name: Optional[str] = None,
         bootstrap_script: str = None,
         tag: str = None,
         scaling_group: str = None,
@@ -266,8 +266,8 @@ class ComputeSession(BaseFunction):
         if domain_name is None:
             # Even if config.domain is None, it can be guessed in the manager by user information.
             domain_name = api_session.get().config.domain
-        if group_name is None:
-            group_name = api_session.get().config.group
+        if project_name is None:
+            project_name = api_session.get().config.project
 
         mounts.extend(api_session.get().config.vfolder_mounts)
         prefix = get_naming(api_session.get().api_version, "path")
@@ -314,7 +314,7 @@ class ComputeSession(BaseFunction):
                 {
                     "owner_access_key": owner_access_key,
                     "domain": domain_name,
-                    "group": group_name,
+                    "group": project_name,
                     "type": type_,
                     "enqueueOnly": enqueue_only,
                     "maxWaitSeconds": max_wait,
@@ -336,7 +336,7 @@ class ComputeSession(BaseFunction):
             o.status = data.get("status", "RUNNING")
             o.service_ports = data.get("servicePorts", [])
             o.domain = domain_name
-            o.group = group_name
+            o.project = project_name
             return o
 
     @api_function
@@ -362,7 +362,7 @@ class ComputeSession(BaseFunction):
         cluster_size: Union[int, Undefined] = undefined,
         cluster_mode: Union[Literal["single-node", "multi-node"], Undefined] = undefined,
         domain_name: Union[str, Undefined] = undefined,
-        group_name: Union[str, Undefined] = undefined,
+        project_name: Union[str, Undefined] = undefined,
         bootstrap_script: Union[str, Undefined] = undefined,
         tag: Union[str, Undefined] = undefined,
         scaling_group: Union[str, Undefined] = undefined,
@@ -442,8 +442,8 @@ class ComputeSession(BaseFunction):
         if domain_name is undefined:
             # Even if config.domain is None, it can be guessed in the manager by user information.
             domain_name = api_session.get().config.domain
-        if group_name is undefined:
-            group_name = api_session.get().config.group
+        if project_name is undefined:
+            project_name = api_session.get().config.project
         if mounts is undefined:
             mounts = []
         if api_session.get().config.vfolder_mounts:
@@ -456,7 +456,7 @@ class ComputeSession(BaseFunction):
             "tag": tag,
             "image": image,
             "domain": domain_name,
-            "group": group_name,
+            "group": project_name,
             get_naming(api_session.get().api_version, "name_arg"): name,
             "bootstrap_script": bootstrap_script,
             "enqueueOnly": enqueue_only,
@@ -491,7 +491,7 @@ class ComputeSession(BaseFunction):
             o.status = data.get("status", "RUNNING")
             o.service_ports = data.get("servicePorts", [])
             o.domain = domain_name
-            o.group = group_name
+            o.project = project_name
             return o
 
     def __init__(self, name: str, owner_access_key: str = None) -> None:

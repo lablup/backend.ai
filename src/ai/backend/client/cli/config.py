@@ -54,8 +54,8 @@ def config():
     if config.domain:
         click.echo('Domain name: "{0}"'.format(click.style(config.domain, bold=True)))
         nrows += 1
-    if config.group:
-        click.echo('Group name: "{0}"'.format(click.style(config.group, bold=True)))
+    if config.project:
+        click.echo('Project name: "{0}"'.format(click.style(config.project, bold=True)))
         nrows += 1
     if config.is_anonymous:
         click.echo("Access key: (this is an anonymous session)")

@@ -26,19 +26,19 @@ def vfolder() -> None:
 
 def _list_cmd(docs: str = None):
     @pass_ctx_obj
-    @click.option("-g", "--group", type=str, default=None, help="Filter by group ID.")
+    @click.option("-j", "--project", type=str, default=None, help="Filter by project ID.")
     @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
     @click.option("--order", default=None, help="Set the query ordering expression.")
     @click.option("--offset", default=0, help="The index of the current page start for pagination.")
     @click.option("--limit", default=None, help="The page size for pagination.")
-    def list(ctx: CLIContext, group, filter_, order, offset, limit) -> None:
+    def list(ctx: CLIContext, project, filter_, order, offset, limit) -> None:
         """
         List virtual folders.
         """
         try:
             with Session() as session:
                 fetch_func = lambda pg_offset, pg_size: session.VFolder.paginated_list(
-                    group,
+                    project,
                     fields=_default_list_fields,
                     page_offset=pg_offset,
                     page_size=pg_size,
