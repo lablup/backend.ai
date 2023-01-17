@@ -28,9 +28,9 @@ jobs:
     - name: e
       working-directory: .github/workflows
       run: ls -al
-    #- name: run do work
-    #  working-directory: scripts
-    #  run: python dowork.py ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
+    - name: run do work
+      working-directory: scripts
+      run: python dowork.py ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
     
     #- name: d
     #  run: echo The Title of your PR is ${{ github.event.pull_request.title }}
