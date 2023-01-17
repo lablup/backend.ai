@@ -23,9 +23,9 @@ jobs:
       working-directory: scripts
       run: ls -al
     - name: d
-      working-deirctory: changes
+      working-directory: changes
       run: ls -al
-    
+
     #- name: d
     #  run: echo The Title of your PR is ${{ github.event.pull_request.title }}
     #- name: e
