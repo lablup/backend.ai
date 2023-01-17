@@ -41,6 +41,7 @@ lark-parser~=0.11.3
 more-itertools~=8.13.0
 msgpack>=1.0.0
 multidict>=6.0
+mypy==0.991
 namedlist~=1.8
 netifaces~=0.11.0
 networkx~=2.8.7
