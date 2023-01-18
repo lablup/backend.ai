@@ -11,7 +11,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        ref: main #${{ github.head_ref }} # pull request를 요청한 branch 이름
+        ref: ${{ github.head_ref }} # pull request를 요청한 branch 이름
     
     - name: is there newly created change log in file 
       working-directory: changes
