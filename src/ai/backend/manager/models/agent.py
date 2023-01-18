@@ -83,7 +83,6 @@ agents = sa.Table(
     sa.Column("version", sa.String(length=64), nullable=False),
     sa.Column("architecture", sa.String(length=32), nullable=False),
     sa.Column("compute_plugins", pgsql.JSONB(), nullable=False, default={}),
-    sa.Column("abuse_report_path", sa.String(length=128), nullable=True),
     sa.Column("auto_terminate", sa.Boolean(), nullable=False, server_default=true(), default=False),
 )
 
@@ -107,7 +106,6 @@ class Agent(graphene.ObjectType):
     version = graphene.String()
     compute_plugins = graphene.JSONString()
     hardware_metadata = graphene.JSONString()
-    abuse_report_path = graphene.String()
     auto_terminate = graphene.Boolean()
     local_config = graphene.JSONString()
 
@@ -149,7 +147,6 @@ class Agent(graphene.ObjectType):
             lost_at=row["lost_at"],
             version=row["version"],
             compute_plugins=row["compute_plugins"],
-            abuse_report_path=row["abuse_report_path"],
             auto_terminate=row["auto_terminate"],
             # legacy fields
             mem_slots=BinarySize.from_str(row["available_slots"]["mem"]) // mega,
@@ -206,9 +203,6 @@ class Agent(graphene.ObjectType):
     async def resolve_local_config(self, info: graphene.ResolveInfo) -> Optional[Mapping[str, Any]]:
         return {
             "agent": {
-                "abuse-report-path": str(self.abuse_report_path)
-                if self.abuse_report_path is not None
-                else None,
                 "auto_terminate": self.auto_terminate,
             },
         }

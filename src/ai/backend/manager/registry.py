@@ -67,6 +67,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    AbuseReport,
     AccessKey,
     AgentId,
     BinarySize,
@@ -2641,7 +2642,6 @@ class AgentRegistry:
         )
         current_addr = agent_info["addr"]
         sgroup = agent_info.get("scaling_group", "default")
-        abuse_report_path = agent_info["abuse_report_path"]
         auto_terminate = agent_info["abusing_container_auto_terminate"]
         async with self.heartbeat_lock:
 
@@ -2667,7 +2667,6 @@ class AgentRegistry:
                                 agents.c.version,
                                 agents.c.compute_plugins,
                                 agents.c.architecture,
-                                agents.c.abuse_report_path,
                                 agents.c.auto_terminate,
                             ]
                         )
@@ -2696,7 +2695,6 @@ class AgentRegistry:
                                 "version": agent_info["version"],
                                 "compute_plugins": agent_info["compute_plugins"],
                                 "architecture": agent_info.get("architecture", "x86_64"),
-                                "abuse_report_path": abuse_report_path,
                                 "auto_terminate": auto_terminate,
                             }
                         )
@@ -2716,8 +2714,6 @@ class AgentRegistry:
                             updates["compute_plugins"] = agent_info["compute_plugins"]
                         if row["architecture"] != agent_info["architecture"]:
                             updates["architecture"] = agent_info["architecture"]
-                        if row["abuse_report_path"] != abuse_report_path:
-                            updates["abuse_report_path"] = abuse_report_path
                         if row["auto_terminate"] != auto_terminate:
                             updates["auto_terminate"] = auto_terminate
                         # occupied_slots are updated when kernels starts/terminates
@@ -2743,7 +2739,6 @@ class AgentRegistry:
                                     "version": agent_info["version"],
                                     "compute_plugins": agent_info["compute_plugins"],
                                     "architecture": agent_info["architecture"],
-                                    "abuse_report_path": abuse_report_path,
                                     "auto_terminate": auto_terminate,
                                 }
                             )
@@ -3231,16 +3226,23 @@ class AgentRegistry:
         self,
         session_name_or_id: Union[str, SessionId],
         access_key: AccessKey,
-    ) -> Optional[Mapping[str, str]]:
+    ) -> Mapping[str, str]:
         kernel = await self.get_session(session_name_or_id, access_key)
         if kernel["status"] != KernelStatus.RUNNING:
-            return None
-        async with RPCContext(
-            kernel["agent"],
-            kernel["agent_addr"],
-            invoke_timeout=None,
-        ) as rpc:
-            return await rpc.call.get_abusing_report(str(kernel["id"]))
+            return {"abuse_report": AbuseReport.NONE.value, "kernel": str(kernel["id"])}
+        hash_name = "abuse_report"
+        abuse_report: Mapping[str, str] = await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.hgetall(hash_name),
+        )
+        if abuse_report is None:
+            report_result = AbuseReport.NONE.value
+        else:
+            report_result = abuse_report.get(str(kernel["id"]), AbuseReport.NONE.value)
+        return {
+            "kernel": kernel["id"],
+            "abuse_report": report_result,
+        }
 
 
 async def check_scaling_group(

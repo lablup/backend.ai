@@ -90,6 +90,7 @@ from ai.backend.common.logging import BraceStyleAdapter, pretty
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    AbuseReport,
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
@@ -1252,6 +1253,7 @@ class AbstractAgent(
         return hwinfo
 
     async def _cleanup_reported_kernels(self, interval: float):
+        # dest_path == abuse_report_path
         dest_path: Path = self.local_config["agent"]["abuse-report-path"]
         auto_terminate: bool = self.local_config["agent"].get(
             "force-terminate-abusing-containers", False
@@ -1265,15 +1267,18 @@ class AbstractAgent(
             os.remove(path)
 
         terminated_kernels: MutableMapping[str, ContainerLifecycleEvent] = {}
+        abuse_report: MutableMapping[str, str] = {}
         try:
             async with FileLock(path=dest_path / "report.lock"):
                 for reported_kernel in dest_path.glob("report.*.json"):
                     raw_body = await self.loop.run_in_executor(None, _read, reported_kernel)
                     body: MutableMapping[str, str] = json.loads(raw_body)
+                    kern_id = body["ID"]
                     if auto_terminate:
-                        log.debug("cleanup requested: {} ({})", body["ID"], body.get("reason"))
-                        terminated_kernels[body["ID"]] = ContainerLifecycleEvent(
-                            KernelId(UUID(body["ID"])),
+                        log.debug("cleanup requested: {} ({})", kern_id, body.get("reason"))
+                        abuse_report[kern_id] = AbuseReport.CLEANING.value
+                        terminated_kernels[kern_id] = ContainerLifecycleEvent(
+                            KernelId(UUID(kern_id)),
                             ContainerId(body["CID"]),
                             LifecycleEvent.DESTROY,
                             KernelLifecycleEventReason.from_value(body.get("reason"))
@@ -1281,14 +1286,29 @@ class AbstractAgent(
                         )
                         await self.loop.run_in_executor(None, _rm, reported_kernel)
                     else:
+                        abuse_report[kern_id] = AbuseReport.CLEANING.value
                         log.debug(
                             "abusing container detected, skipping auto-termination: {} ({})",
-                            body["ID"],
+                            kern_id,
                             body.get("reason"),
                         )
         finally:
             for kernel_id, ev in terminated_kernels.items():
                 await self.container_lifecycle_queue.put(ev)
+
+            async def _set_abuse_report(r: Redis):
+                pipe = r.pipeline()
+                name = "abuse_report"
+                all_reports = await pipe.hgetall(name)
+                deleting_reports = [kid for kid in all_reports if kid not in abuse_report]
+                await pipe.hdel(name, *deleting_reports)
+                await pipe.hset(name, mapping=cast(Mapping, abuse_report))
+                return pipe
+
+            await redis_helper.execute(
+                self.redis_stat_pool,
+                _set_abuse_report,
+            )
 
     @abstractmethod
     async def scan_images(self) -> Mapping[str, str]:

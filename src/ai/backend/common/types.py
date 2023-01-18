@@ -289,6 +289,12 @@ class CommitStatus(str, enum.Enum):
     ONGOING = "ongoing"
 
 
+class AbuseReport(str, enum.Enum):
+    NONE = "none"
+    DETECTED = "detected"
+    CLEANING = "cleaning"
+
+
 class MovingStatValue(TypedDict):
     min: str
     max: str
