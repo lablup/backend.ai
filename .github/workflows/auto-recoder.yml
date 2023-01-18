@@ -1,0 +1,45 @@
+name: Olaf
+
+on:
+   workflow_dispatch:
+      inputs:
+          prnum:
+            required: true
+
+          contentsss:
+            description: 'write contents'     
+            required: true
+            default: 'wirte here'
+         
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.head_ref }} # pull request를 요청한 branch 이름
+    
+    - name: is there newly created change log in file 
+      working-directory: changes
+      run: ls -al
+
+    - run: echo ${{github.event.inputs.contentsss}}
+    - name: do work
+      run: |
+        script=$(cat <<EOF
+        import sys
+        pr_number = sys.argv[1]
+        pr_title_feat = sys.argv[2]
+        pr_title_cont = sys.argv[3 : len(sys.argv)]
+    
+        index = pr_title_feat.find(":")
+    
+        new_title = pr_number + "." + pr_title_feat[0:index] + ".md"
+        file = open("/home/runner/work/backend.ai/backend.ai/changes/"+new_title, "w")
+    
+        file.write(${{github.event.contentsss}})
+        file.close()
+        EOF
+        )
+        echo "$script" | python - ${{github.event.inputs.prnum}} ${{github.event.inputs.pull_request.title}}
