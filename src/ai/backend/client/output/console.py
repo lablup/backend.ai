@@ -117,28 +117,28 @@ class ConsoleOutputHandler(BaseOutputHandler):
         initial_page_offset: int,
         page_size: int = None,
     ) -> None:
+        fields: Sequence[FieldSpec] = []
+
+        def infinite_fetch(page_size):
+            nonlocal fields
+            current_offset = initial_page_offset
+            while True:
+                result = fetch_func(current_offset, page_size)
+                if result.total_count == 0:
+                    raise NoItems
+                current_offset += len(result.items)
+                if not fields:
+                    fields.extend(result.fields)
+                yield from result.items
+                if current_offset >= result.total_count:
+                    break
+
         if sys.stdout.isatty() and page_size is None:
             page_size = get_preferred_page_size()
-            fields: Sequence[FieldSpec] = []
-
-            def infinite_fetch():
-                nonlocal fields
-                current_offset = initial_page_offset
-                while True:
-                    result = fetch_func(current_offset, page_size)
-                    if result.total_count == 0:
-                        raise NoItems
-                    current_offset += len(result.items)
-                    if not fields:
-                        fields.extend(result.fields)
-                    yield from result.items
-                    if current_offset >= result.total_count:
-                        break
-
             try:
                 echo_via_pager(
                     tabulate_items(
-                        infinite_fetch(),
+                        infinite_fetch(page_size),
                         fields,
                     ),
                 )
@@ -146,10 +146,9 @@ class ConsoleOutputHandler(BaseOutputHandler):
                 print("No matching items.")
         else:
             page_size = page_size or 20
-            result = fetch_func(initial_page_offset, page_size)
             for line in tabulate_items(
-                result.items,  # type: ignore
-                result.fields,
+                infinite_fetch(page_size),
+                fields,
             ):
                 print(line, end="")
 
