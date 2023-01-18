@@ -128,7 +128,8 @@ async def prepare_sshd_service(service_info):
         "/tmp/dropbear/dropbear_rsa_host_key",
         "-E",  # show logs in stderr
         "-F",  # run in foreground
-        "-s",  # disable password logins
+        "-g",  # Disable password logins for root
+        "-w",  # Disallow root logins
         # '-W', str(256 * 1024),  # recv buffer size (256 KiB) -> built-in during compilation
         "-K",
         "15",  # keepalive interval
