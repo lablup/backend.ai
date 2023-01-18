@@ -1,8 +1,6 @@
 name: Olaf
 
 on:
-   schedule:
-     - cron: '55 22 * * *' # AM 07:55, South Korea!
    workflow_dispatch:
       inputs:
          logLevel:
@@ -43,4 +41,3 @@ jobs:
         EOF
         )
         echo "$script" | python - ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
-        
