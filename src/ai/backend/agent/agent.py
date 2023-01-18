@@ -748,13 +748,16 @@ class AbstractAgent(
         async def _set_all_commit_status(r: Redis):
             pipe = r.pipeline()
             for subdir, ongoing_kernel_map in status_map.items():
-                name = f"kernel_commit_status.{subdir}"
-                kern_statuses = await pipe.hgetall(name)
-                remaining_statuses = [
-                    kern_id for kern_id in kern_statuses if kern_id not in ongoing_kernel_map
-                ]
-                await pipe.hdel(name, *remaining_statuses)
-                await pipe.hset(name, mapping=cast(Mapping, ongoing_kernel_map))
+                hash_name = f"kernel_commit_status.{subdir}"
+                all_kern_statuses = await pipe.hgetall(hash_name)
+                deleting_statuses: list[str] = []
+                for kern_id in self.kernel_registry:
+                    str_kern_id = str(kern_id)
+                    if str_kern_id in all_kern_statuses and str_kern_id not in ongoing_kernel_map:
+                        deleting_statuses.append(str_kern_id)
+
+                await pipe.hdel(hash_name, *deleting_statuses)
+                await pipe.hset(hash_name, mapping=cast(Mapping, ongoing_kernel_map))
             return pipe
 
         await redis_helper.execute(
@@ -1298,11 +1301,15 @@ class AbstractAgent(
 
             async def _set_abuse_report(r: Redis):
                 pipe = r.pipeline()
-                name = "abuse_report"
-                all_reports = await pipe.hgetall(name)
-                deleting_reports = [kid for kid in all_reports if kid not in abuse_report]
-                await pipe.hdel(name, *deleting_reports)
-                await pipe.hset(name, mapping=cast(Mapping, abuse_report))
+                hash_name = "abuse_report"
+                all_reports = await pipe.hgetall(hash_name)
+                deleting_reports: list[str] = []
+                for kern_id in self.kernel_registry:
+                    str_kern_id = str(kern_id)
+                    if str_kern_id in all_reports and str_kern_id not in abuse_report:
+                        deleting_reports.append(str_kern_id)
+                await pipe.hdel(hash_name, *deleting_reports)
+                await pipe.hset(hash_name, mapping=cast(Mapping, abuse_report))
                 return pipe
 
             await redis_helper.execute(
