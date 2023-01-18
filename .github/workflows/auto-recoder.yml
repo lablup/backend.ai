@@ -38,10 +38,10 @@ jobs:
     #    echo "$script" | python - ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
 
     - name: Get user input for file content
-        id: user_input
         run: |
           read -p "Enter the content for the file: " content
           echo "::set-output name=content::$content"
+        id: user_input
 
     - name: do work
         run: |
