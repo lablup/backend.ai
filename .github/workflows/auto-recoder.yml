@@ -24,7 +24,7 @@ jobs:
       working-directory: changes
       run: ls -al
 
-    - run: echo ${{github.event.contentsss}}
+    - run: echo ${{github.event.inputs.contentsss}}
     - name: do work
       run: |
         script=$(cat <<EOF
@@ -42,4 +42,4 @@ jobs:
         file.close()
         EOF
         )
-        echo "$script" | python - ${{github.event.prnum}} ${{github.event.pull_request.title}}
+        echo "$script" | python - ${{github.event.inputs.prnum}} ${{github.event.inputs.pull_request.title}}
