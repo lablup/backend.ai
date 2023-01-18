@@ -3,13 +3,14 @@ name: Olaf
 on:
    workflow_dispatch:
       inputs:
-         logLevel:
-            description: 'Log level'     
+          prnum:
             required: true
-            default: 'warning'
-         tags:
-            description: 'Test scenario tags'
 
+          contentsss:
+            description: 'write contents'     
+            required: true
+            default: 'wirte here'
+         
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -23,6 +24,7 @@ jobs:
       working-directory: changes
       run: ls -al
 
+    - run: echo ${{github.event.contentsss}}
     - name: do work
       run: |
         script=$(cat <<EOF
@@ -36,8 +38,8 @@ jobs:
         new_title = pr_number + "." + pr_title_feat[0:index] + ".md"
         file = open("/home/runner/work/backend.ai/backend.ai/changes/"+new_title, "w")
     
-        file.write(" ".join(pr_title_cont))
+        file.write(${{github.event.contentsss}})
         file.close()
         EOF
         )
-        echo "$script" | python - ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
+        echo "$script" | python - ${{github.event.prnum}} ${{github.event.pull_request.title}}
