@@ -13,6 +13,10 @@ jobs:
       with:
         ref: ${{ github.head_ref }}
 
+    - name: is there newly created change log in file 
+      working-directory: changes
+      run: ls -al
+
     - name: do work
       run: |
         script=$(cat <<EOF
