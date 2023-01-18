@@ -333,7 +333,7 @@ async def login_handler(request: web.Request) -> web.Response:
         session["authenticated"] = False
         login_fail_count += 1
         await _set_login_history(last_login_attempt, login_fail_count)
-    log.info("LOGIN_HANDLER: Authorization succeed for {}", creds["username"])
+    log.info("LOGIN_HANDLER: Authorization succeeded for {}", creds["username"])
     return web.json_response(result)
 
 
