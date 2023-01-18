@@ -3,10 +3,7 @@ on:
   pull_request:
 permissions:
   contents: write
-#defaults:
-#  run:
-#    working-directory: scripts
-
+  
 jobs:
   auto-recode:
     runs-on: ubuntu-latest
@@ -15,27 +12,27 @@ jobs:
     - uses: actions/checkout@v3
       with:
         ref: ${{ github.head_ref }}
-    - name: a
-      run: pwd
-    - name: b
-      run: ls -al
-    - name: c
-      working-directory: scripts
-      run: ls -al
-    - name: d
-      working-directory: changes
-      run: ls -al
-    - name: e
-      working-directory: .github/workflows
-      run: ls -al
-    - name: run do work
-      working-directory: scripts
-      run: python dowork.py ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
-    - name: see that dowork.py work correctly
-      working-directory: changes
-      run: ls -al
-    - name: commit changes in this repository
+
+    - name: do work
+      run: |
+        script=$(cat <<EOF
+        import sys
+        pr_number = sys.argv[1]
+        pr_title_feat = sys.argv[2]
+        pr_title_cont = sys.argv[3 : len(sys.argv)]
+
+        index = pr_title_feat.find(":")
+
+        new_title = pr_number + "." + pr_title_feat[0:index] + ".md"
+        file = open("/home/runner/work/backend.ai/backend.ai/changes/"+new_title, "w")
+
+        file.write(" ".join(pr_title_cont))
+        file.close()
+        EOF
+        )
+        echo "$script" | python - ${{github.event.pull_request.number}} ${{github.event.pull_request.title}}
+
+    - name: commit message for adding change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
-        commit_message: GitHub Actions added ${{github.event.pull_request.number}}.YOUR_PR_FEAT.md file in backend.ai/changes folder and its content is your PR's title without feature. 
-
+        commit_message: GitHub Actions added ${{github.event.pull_request.number}}.YOUR_PR_FEAT.md file in backend.ai/changes folder and its content is your PR's title without feature.
