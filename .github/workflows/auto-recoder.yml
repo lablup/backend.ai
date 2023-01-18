@@ -12,10 +12,13 @@ jobs:
     - uses: actions/checkout@v3
       with:
         ref: ${{ github.head_ref }}
-
+    
     - name: is there newly created change log in file 
       working-directory: changes
       run: ls -al
+
+    - name: test
+      run: ${{ github.head_ref }}
 
     - name: do work
       run: |
