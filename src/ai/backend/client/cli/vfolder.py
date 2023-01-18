@@ -211,7 +211,7 @@ def info(name):
     "--base-dir",
     type=Path,
     default=None,
-    help="Set the parent directory from where the file is uploaded.  "
+    help="The local parent directory which contains the file to be uploaded.  "
     "[default: current working directry]",
 )
 @click.option(
@@ -264,7 +264,7 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     "--base-dir",
     type=Path,
     default=None,
-    help="Set the parent directory from where the file is uploaded.  "
+    help="The local parent directory which will contain the downloaded file.  "
     "[default: current working directry]",
 )
 @click.option(
