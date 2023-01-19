@@ -23,6 +23,7 @@ from uuid import UUID
 
 import graphene
 import sqlalchemy as sa
+from aiotools import TaskGroup
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from redis.asyncio import Redis
@@ -1091,11 +1092,19 @@ class ComputeSession(graphene.ObjectType):
             containers = await self.resolve_containers(info)
         if containers is None:
             return []
-        return [
-            result
-            for con in containers
-            if (result := await con.resolve_abusing_report(info, self.access_key)) is not None
-        ]
+        tasks = []
+        async with TaskGroup() as tg:
+            for con in containers:
+                tasks.append(tg.create_task(con.resolve_abusing_report(info, self.access_key)))
+        result = []
+        for t in tasks:
+            if t.cancelled():
+                continue
+            r = t.result()
+            if r is None:
+                continue
+            result.append(r)
+        return result
 
     _queryfilter_fieldspec = {
         "id": ("kernels_id", None),
