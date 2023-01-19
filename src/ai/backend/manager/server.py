@@ -802,7 +802,7 @@ def main(ctx: click.Context, config_path: Path, log_level: str, debug: bool = Fa
         print("Try 'backend.ai mgr start-server -h' for help")
         exit(1)
 
-    print("Selected logging level for manager : "+ log_level)
+    print("Selected logging level for manager : " + log_level)
 
     cfg = load_config(config_path, log_level)
 
