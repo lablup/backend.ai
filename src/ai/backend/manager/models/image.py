@@ -22,7 +22,7 @@ import graphene
 import sqlalchemy as sa
 import trafaret as t
 import yaml
-from graphql.execution.executors.asyncio import AsyncioExecutor
+from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 

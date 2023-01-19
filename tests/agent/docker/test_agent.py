@@ -14,7 +14,7 @@ from ai.backend.common.types import AutoPullBehavior
 
 class DummyEtcd:
     async def get_prefix(self, key: str) -> Mapping[str, Any]:
-        pass
+        return {}
 
 
 @pytest.fixture

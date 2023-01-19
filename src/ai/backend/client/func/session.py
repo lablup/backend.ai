@@ -23,6 +23,7 @@ from uuid import UUID
 
 import aiohttp
 from aiohttp import hdrs
+from faker import Faker
 from tqdm import tqdm
 
 from ai.backend.client.output.fields import session_fields
@@ -55,6 +56,7 @@ _default_list_fields = (
     session_fields["status_info"],
     session_fields["status_changed"],
     session_fields["result"],
+    session_fields["abusing_reports"],
 )
 
 
@@ -251,7 +253,8 @@ class ComputeSession(BaseFunction):
         if name is not None:
             assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
         else:
-            name = f"pysdk-{secrets.token_hex(5)}"
+            faker = Faker()
+            name = f"pysdk-{faker.user_name()}"
         if mounts is None:
             mounts = []
         if mount_map is None:
@@ -959,6 +962,23 @@ class ComputeSession(BaseFunction):
             params=params,
         )
         async with api_rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    async def get_abusing_report(self):
+        """
+        Retrieves abusing reports of session's sibling kernels.
+        """
+        params = {}
+        if self.owner_access_key:
+            params["owner_access_key"] = self.owner_access_key
+        prefix = get_naming(api_session.get().api_version, "path")
+        rqst = Request(
+            "GET",
+            f"/{prefix}/{self.name}/abusing-report",
+            params=params,
+        )
+        async with rqst.fetch() as resp:
             return await resp.json()
 
     # only supported in AsyncAPISession

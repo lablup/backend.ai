@@ -36,6 +36,7 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginCont
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
+    ClusterSSHPortMapping,
     ContainerId,
     DeviceId,
     DeviceName,
@@ -237,7 +238,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         pass
 
-    async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
+    async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
         if sshkey is None:
             return
@@ -878,16 +879,16 @@ class KubernetesAgent(
             # Additional check to filter out real worker pods only?
 
             async def _fetch_container_info(pod: Any):
-                kernel_id: Union[str, None] = "(unknown)"
+                kernel_id: Union[KernelId, str, None] = "(unknown)"
                 try:
                     kernel_id = await get_kernel_id_from_deployment(pod)
-                    if kernel_id is None:
+                    if kernel_id is None or kernel_id not in self.kernel_registry:
                         return
                     # Is it okay to assume that only one container resides per pod?
                     if pod["status"]["containerStatuses"][0]["stats"].keys()[0] in status_filter:
                         result.append(
                             (
-                                KernelId(uuid.UUID(kernel_id)),
+                                kernel_id,
                                 await container_from_pod(pod),
                             ),
                         )
@@ -930,6 +931,7 @@ class KubernetesAgent(
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
+        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> KubernetesKernelCreationContext:
         return KubernetesKernelCreationContext(
             kernel_id,
@@ -977,16 +979,16 @@ class KubernetesAgent(
             await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
     async def create_overlay_network(self, network_name: str) -> None:
-        return await super().create_overlay_network(network_name)
+        raise NotImplementedError
 
     async def destroy_overlay_network(self, network_name: str) -> None:
-        return await super().destroy_overlay_network(network_name)
+        raise NotImplementedError
 
     async def create_local_network(self, network_name: str) -> None:
-        return await super().create_local_network(network_name)
+        raise NotImplementedError
 
     async def destroy_local_network(self, network_name: str) -> None:
-        return await super().destroy_local_network(network_name)
+        raise NotImplementedError
 
     async def restart_kernel__load_config(
         self,
@@ -1017,9 +1019,11 @@ class KubernetesAgent(
         )
 
 
-async def get_kernel_id_from_deployment(pod: Any) -> Optional[str]:
+async def get_kernel_id_from_deployment(pod: Any) -> Optional[KernelId]:
     # TODO: create function which extracts kernel id from pod object
-    return pod.get("metadata", {}).get("name")
+    if (kernel_id := pod.get("metadata", {}).get("name")) is not None:
+        return KernelId(uuid.UUID(kernel_id))
+    return None
 
 
 async def container_from_pod(pod: Any) -> Container:

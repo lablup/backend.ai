@@ -165,6 +165,8 @@ def local_config(
                 "name": test_db,
                 "user": "postgres",
                 "password": "develove",
+                "pool-size": 8,
+                "max-overflow": 64,
             },
             "manager": {
                 "id": f"i-{test_id}",
@@ -172,6 +174,8 @@ def local_config(
                 "distributed-lock": "filelock",
                 "ipc-base-path": ipc_base_path,
                 "service-addr": HostPortPair("127.0.0.1", 29100 + get_parallel_slot() * 10),
+                "allowed-plugins": set(),
+                "disabled-plugins": set(),
             },
             "debug": {
                 "enabled": False,
@@ -632,6 +636,7 @@ def get_headers(app, default_keypair):
         method,
         url,
         req_bytes,
+        allowed_ip="10.10.10.10",  # Same with fixture
         ctype="application/json",
         hash_type="sha256",
         api_version="v5.20191215",
@@ -645,6 +650,7 @@ def get_headers(app, default_keypair):
             "Content-Type": ctype,
             "Content-Length": str(len(req_bytes)),
             "X-BackendAI-Version": api_version,
+            "X-Forwarded-For": allowed_ip,
         }
         if api_version >= "v4.20181215":
             req_bytes = b""

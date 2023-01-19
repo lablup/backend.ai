@@ -42,7 +42,7 @@ msgstr ""
 
 #: ../../manager/admin-api/sessions.rst:65 077a583de3b74fb4bc645910aa57497b
 msgid ""
-"The sessions may be queried one by one using ``compute_sesssion`` field on "
+"The sessions may be queried one by one using ``compute_session`` field on "
 "the root query schema, or as a paginated list using ``compute_session_list``."
 msgstr ""
 
