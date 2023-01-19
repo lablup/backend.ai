@@ -563,10 +563,6 @@ class AbstractAgent(
         self.images = {}  # repoTag -> digest
         self.restarting_kernels = {}
         self.terminating_kernels = set()
-        self.stat_ctx = StatContext(
-            self,
-            mode=StatModes(local_config["container"]["stats-type"]),
-        )
         self.timer_tasks = []
         self.port_pool = set(
             range(
@@ -612,8 +608,10 @@ class AbstractAgent(
             self.timer_tasks.append(aiotools.create_timer(self._scan_images_wrapper, 20.0))
             await self.scan_running_kernels()
 
-        if self.stat_ctx.mode == StatModes.CGROUP:
-            self.stat_ctx.mode = await StatModes.check_docker_cgroup_driver()
+        self.stat_ctx = await StatContext.new(
+            self,
+            mode=StatModes(self.local_config["container"]["stats-type"]),
+        )
 
         # Prepare stat collector tasks.
         self.timer_tasks.append(aiotools.create_timer(self.collect_node_stat, 5.0))

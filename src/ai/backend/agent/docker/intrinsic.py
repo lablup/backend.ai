@@ -3,7 +3,6 @@ import logging
 import os
 import platform
 from decimal import Decimal
-from functools import partial
 from pathlib import Path
 from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, cast
 
@@ -176,8 +175,8 @@ class CPUPlugin(AbstractComputePlugin):
         ctx: StatContext,
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
-        async def sysfs_impl(container_id, mode):
-            match mode:
+        async def sysfs_impl(container_id):
+            match ctx.mode:
                 case StatModes.CGROUPFS:
                     cpu_prefix = f"/sys/fs/cgroup/cpuacct/docker/{container_id}/"
                 case StatModes.SYSTEMD:
@@ -210,9 +209,9 @@ class CPUPlugin(AbstractComputePlugin):
 
         match ctx.mode:
             case StatModes.CGROUPFS | StatModes.SYSTEMD:
-                impl = partial(sysfs_impl, mode=ctx.mode)
+                impl = sysfs_impl
             case StatModes.DOCKER:
-                impl = cast(partial[Any], api_impl)
+                impl = api_impl
             case _:
                 raise RuntimeError("should not reach here")
 
@@ -467,8 +466,8 @@ class MemoryPlugin(AbstractComputePlugin):
             #         total_size += path.stat().st_size
             # return total_size
 
-        async def sysfs_impl(container_id, mode):
-            match mode:
+        async def sysfs_impl(container_id):
+            match ctx.mode:
                 case StatModes.CGROUPFS:
                     mem_prefix = f"/sys/fs/cgroup/memory/docker/{container_id}/"
                     io_prefix = f"/sys/fs/cgroup/blkio/docker/{container_id}/"
@@ -532,9 +531,9 @@ class MemoryPlugin(AbstractComputePlugin):
 
         match ctx.mode:
             case StatModes.CGROUPFS | StatModes.SYSTEMD:
-                impl = partial(sysfs_impl, mode=ctx.mode)
+                impl = sysfs_impl
             case StatModes.DOCKER:
-                impl = cast(partial[Any], api_impl)
+                impl = api_impl
             case _:
                 raise RuntimeError("should not reach here")
 

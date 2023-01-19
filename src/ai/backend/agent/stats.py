@@ -40,6 +40,7 @@ from ai.backend.common.types import (
     MetricKey,
     MetricValue,
     MovingStatValue,
+    aobject,
 )
 
 from .utils import remove_exponent
@@ -67,30 +68,38 @@ def check_cgroup_available():
 
 
 class StatModes(enum.Enum):
+    """
+    CGROUP = Tries to automatically detect docker's current cgroup driver
+    CGROUPFS = Manually set cgroup driver to cgroupfs
+    SYSTEMD = Manually set cgroup driver to systemd
+    """
+
     CGROUP = "cgroup"
     CGROUPFS = "cgroupfs"
-    DOCKER = "docker"
     SYSTEMD = "systemd"
+    DOCKER = "docker"
 
     @staticmethod
-    def get_preferred_mode():
+    async def get_preferred_mode():
         """
         Returns the most preferred statistics collector type for the host OS.
         """
         if check_cgroup_available():
-            return StatModes.CGROUP
+            docker_cgroup_driver = await StatModes.check_docker_cgroup_driver()
+            if docker_cgroup_driver is not None:
+                return docker_cgroup_driver
+            else:  # Fallback to default (cgroupfs)
+                return StatModes.CGROUPFS
         return StatModes.DOCKER
 
     @classmethod
     async def check_docker_cgroup_driver(cls):
-        try:
-            docker = Docker()
-            result = await docker._query_json("info", method="GET")
-        except DockerError:
-            return None
-        finally:
-            await docker.close()
-        return cls(result["CgroupDriver"])
+        async with Docker() as docker:
+            try:
+                result = await docker._query_json("info", method="GET")
+                return cls(result["CgroupDriver"])
+            except DockerError:
+                return None
 
 
 class MetricTypes(enum.Enum):
@@ -269,19 +278,20 @@ class Metric:
         }
 
 
-class StatContext:
+class StatContext(aobject):
 
     agent: "AbstractAgent"
+    _mode: Optional[StatModes]
     mode: StatModes
     node_metrics: Mapping[MetricKey, Metric]
     device_metrics: Mapping[MetricKey, MutableMapping[DeviceId, Metric]]
     kernel_metrics: MutableMapping[KernelId, MutableMapping[MetricKey, Metric]]
 
     def __init__(
-        self, agent: "AbstractAgent", mode: StatModes = None, *, cache_lifespan: int = 120
+        self, agent: "AbstractAgent", mode: Optional[StatModes] = None, *, cache_lifespan: int = 120
     ) -> None:
         self.agent = agent
-        self.mode = mode if mode is not None else StatModes.get_preferred_mode()
+        self._mode = mode
         self.cache_lifespan = cache_lifespan
 
         self.node_metrics = {}
@@ -290,6 +300,12 @@ class StatContext:
 
         self._lock = asyncio.Lock()
         self._timestamps: MutableMapping[str, float] = {}
+
+    async def __ainit__(self) -> None:
+        if self._mode is None:
+            self.mode = await StatModes.get_preferred_mode()
+        else:
+            self.mode = self._mode
 
     def update_timestamp(self, timestamp_key: str) -> Tuple[float, float]:
         """
