@@ -135,7 +135,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         for k, v in all_updates.items()
                     ]
                 )
-                await session.commit()
 
     async def _scan_image(
         self,

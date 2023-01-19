@@ -88,11 +88,13 @@ class ExtendedAsyncSAEngine(SAEngine):
                     self._readonly_txn_count -= 1
 
     @actxmgr
-    async def begin_session(self) -> AsyncIterator[SASession]:
+    async def begin_session(self, do_commit: bool = True) -> AsyncIterator[SASession]:
         async with self.begin() as conn:
             session = SASession(bind=conn)
             try:
                 yield session
+                if do_commit:
+                    await session.commit()
             except Exception as e:
                 await session.rollback()
                 raise e
