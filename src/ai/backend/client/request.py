@@ -28,7 +28,7 @@ from typing import (
 import aiohttp
 import aiohttp.web
 import appdirs
-import attr
+import attrs
 from aiohttp.client import _RequestContextManager, _WSRequestContextManager
 from dateutil.tz import tzutc
 from multidict import CIMultiDict
@@ -758,7 +758,7 @@ class WebSocketContextManager:
         return None
 
 
-@attr.s(auto_attribs=True, slots=True, frozen=True)
+@attrs.define(auto_attribs=True, slots=True, frozen=True)
 class SSEMessage:
     event: str
     data: str

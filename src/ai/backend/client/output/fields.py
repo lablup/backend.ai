@@ -158,6 +158,7 @@ scaling_group_fields = FieldSet(
         FieldSpec("driver_opts", formatter=nested_dict_formatter),
         FieldSpec("scheduler"),
         FieldSpec("scheduler_opts", formatter=nested_dict_formatter),
+        FieldSpec("use_host_network"),
     ]
 )
 
@@ -290,5 +291,11 @@ vfolder_fields = FieldSet(
         FieldSpec("num_files"),
         FieldSpec("cur_size"),
         FieldSpec("cloneable"),
+    ]
+)
+
+permission_fields = FieldSet(
+    [
+        FieldSpec("vfolder_host_permission_list"),
     ]
 )

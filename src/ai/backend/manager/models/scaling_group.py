@@ -96,6 +96,7 @@ scaling_groups = sa.Table(
     sa.Column("driver", sa.String(length=64), nullable=False),
     sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={}),
     sa.Column("scheduler", sa.String(length=64), nullable=False),
+    sa.Column("use_host_network", sa.Boolean, nullable=False, default=False),
     sa.Column(
         "scheduler_opts",
         StructuredJSONObjectColumn(ScalingGroupOpts),
@@ -260,6 +261,7 @@ class ScalingGroup(graphene.ObjectType):
     driver_opts = graphene.JSONString()
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
+    use_host_network = graphene.Boolean()
 
     @classmethod
     def from_row(
@@ -279,6 +281,7 @@ class ScalingGroup(graphene.ObjectType):
             driver_opts=row["driver_opts"],
             scheduler=row["scheduler"],
             scheduler_opts=row["scheduler_opts"].to_json(),
+            use_host_network=row["use_host_network"],
         )
 
     @classmethod
@@ -431,6 +434,7 @@ class CreateScalingGroupInput(graphene.InputObjectType):
     driver_opts = graphene.JSONString(required=False, default={})
     scheduler = graphene.String(required=True)
     scheduler_opts = graphene.JSONString(required=False, default={})
+    use_host_network = graphene.Boolean(required=False, default=False)
 
 
 class ModifyScalingGroupInput(graphene.InputObjectType):
@@ -441,6 +445,7 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
     driver_opts = graphene.JSONString(required=False)
     scheduler = graphene.String(required=False)
     scheduler_opts = graphene.JSONString(required=False)
+    use_host_network = graphene.Boolean(required=False)
 
 
 class CreateScalingGroup(graphene.Mutation):
@@ -472,6 +477,7 @@ class CreateScalingGroup(graphene.Mutation):
             "driver_opts": props.driver_opts,
             "scheduler": props.scheduler,
             "scheduler_opts": ScalingGroupOpts.from_json(props.scheduler_opts),
+            "use_host_network": bool(props.use_host_network),
         }
         insert_query = sa.insert(scaling_groups).values(data)
         return await simple_db_mutate_returning_item(
@@ -511,6 +517,7 @@ class ModifyScalingGroup(graphene.Mutation):
         set_if_set(
             props, data, "scheduler_opts", clean_func=lambda v: ScalingGroupOpts.from_json(v)
         )
+        set_if_set(props, data, "use_host_network")
         update_query = sa.update(scaling_groups).values(data).where(scaling_groups.c.name == name)
         return await simple_db_mutate(cls, info.context, update_query)
 

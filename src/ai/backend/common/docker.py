@@ -2,7 +2,10 @@ import ipaddress
 import itertools
 import json
 import logging
+import os
 import re
+import sys
+from pathlib import Path
 from typing import (
     Any,
     Dict,
@@ -13,6 +16,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
     Union,
 )
 
@@ -23,7 +27,7 @@ from packaging import version
 from .etcd import AsyncEtcd
 from .etcd import quote as etcd_quote
 from .etcd import unquote as etcd_unquote
-from .exception import UnknownImageRegistry
+from .exception import InvalidImageName, InvalidImageTag, UnknownImageRegistry
 from .logging import BraceStyleAdapter
 
 __all__ = (
@@ -67,6 +71,48 @@ default_repository = "lablup"
 
 MIN_KERNELSPEC = 1
 MAX_KERNELSPEC = 1
+
+
+def get_docker_connector() -> tuple[yarl.URL, aiohttp.BaseConnector]:
+    connector_cls: Type[aiohttp.UnixConnector] | Type[aiohttp.NamedPipeConnector]
+    if raw_docker_host := os.environ.get("DOCKER_HOST", None):
+        docker_host = yarl.URL(raw_docker_host)
+        match docker_host.scheme:
+            case "http" | "https":
+                return docker_host, aiohttp.TCPConnector()
+            case "unix":
+                search_paths = [Path(docker_host.path)]
+                connector_cls = aiohttp.UnixConnector
+            case "npipe":
+                search_paths = [Path(docker_host.path.replace("/", "\\"))]
+                connector_cls = aiohttp.NamedPipeConnector
+            case _ as unknown_scheme:
+                raise RuntimeError("unsupported connection scheme", unknown_scheme)
+    else:
+        match sys.platform:
+            case "linux" | "darwin":
+                search_paths = [
+                    Path("/run/docker.sock"),
+                    Path("/var/run/docker.sock"),
+                    Path.home() / ".docker/run/docker.sock",
+                ]
+                connector_cls = aiohttp.UnixConnector
+            case "win32":
+                search_paths = [
+                    Path(r"\\.\pipe\docker_engine"),
+                ]
+                connector_cls = aiohttp.NamedPipeConnector
+            case _ as platform_name:
+                raise RuntimeError("unsupported platform", platform_name)
+    for p in search_paths:
+        if p.exists() and (p.is_socket() or p.is_fifo()):
+            decoded_path = os.fsdecode(p)
+            return (
+                yarl.URL("http://localhost"),
+                connector_cls(decoded_path),
+            )
+    else:
+        raise RuntimeError("could not find the docker socket")
 
 
 async def login(
@@ -136,6 +182,7 @@ async def get_known_registries(etcd: AsyncEtcd) -> Mapping[str, yarl.URL]:
         if isinstance(value, str):
             results[name] = yarl.URL(value)
         elif isinstance(value, Mapping):
+            assert isinstance(value[""], str)
             results[name] = yarl.URL(value[""])
     return results
 
@@ -162,6 +209,7 @@ async def get_registry_info(etcd: AsyncEtcd, name: str) -> Tuple[yarl.URL, dict]
     registry_addr = item[""]
     if not registry_addr:
         raise UnknownImageRegistry(name)
+    assert isinstance(registry_addr, str)
     creds = {}
     username = item.get("username")
     if username is not None:
@@ -184,11 +232,11 @@ class PlatformTagSet(Mapping):
         for t in tags:
             match = rx.search(t)
             if match is None:
-                raise ValueError("invalid tag-version string", t)
+                raise InvalidImageTag(t)
             key = match.group("tag")
             value = match.group("version")
             if key in self._data:
-                raise ValueError("duplicate platform tag with different versions", t)
+                raise InvalidImageTag(t)
             if value is None:
                 value = ""
             self._data[key] = value
@@ -234,13 +282,13 @@ class ImageRef:
         self._arch = arch_name_aliases.get(architecture, architecture)
         rx_slug = type(self)._rx_slug
         if "://" in value or value.startswith("//"):
-            raise ValueError("ImageRef should not contain the protocol scheme.")
+            raise InvalidImageName(value)
         parts = value.split("/", maxsplit=1)
         if len(parts) == 1:
             self._registry = default_registry
             self._name, self._tag = ImageRef._parse_image_tag(value, True)
             if not rx_slug.search(self._tag):
-                raise ValueError("Invalid image tag")
+                raise InvalidImageTag(self._tag)
         else:
             if is_known_registry(parts[0], known_registries):
                 self._registry = parts[0]
@@ -254,7 +302,7 @@ class ImageRef:
                 self._registry = default_registry
                 self._name, self._tag = ImageRef._parse_image_tag(value, True)
             if not rx_slug.search(self._tag):
-                raise ValueError("Invalid image tag")
+                raise InvalidImageTag(self._tag)
         self._update_tag_set()
 
     @staticmethod
@@ -267,7 +315,7 @@ class ImageRef:
             image = image_tag[0]
             tag = image_tag[1]
         if not image:
-            raise ValueError("Empty image repository/name")
+            raise InvalidImageName("Empty image repository/name")
         if ("/" not in image) and using_default_registry:
             image = default_repository + "/" + image
         return image, tag

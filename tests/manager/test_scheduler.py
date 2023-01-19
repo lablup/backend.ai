@@ -9,7 +9,7 @@ from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
-import attr
+import attrs
 import pytest
 import trafaret as t
 from dateutil.parser import parse as dtparse
@@ -273,7 +273,7 @@ def example_agents_no_valid():
     ]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class SessionKernelIdPair:
     session_id: UUID
     kernel_ids: Sequence[KernelId]
@@ -335,6 +335,7 @@ _common_dummy_for_pending_session: Mapping[str, Any] = dict(
     startup_command=None,
     internal_data=None,
     preopen_ports=[],
+    use_host_network=False,
 )
 
 _common_dummy_for_existing_session: Mapping[str, Any] = dict(
@@ -357,6 +358,7 @@ def example_pending_sessions():
                     agent_addr=None,
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
+                    local_rank=0,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
                     image_ref=common_image_ref,
                     resource_opts={},
@@ -406,6 +408,7 @@ def example_pending_sessions():
                     agent_addr=None,
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
+                    local_rank=0,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
                     image_ref=common_image_ref,
                     resource_opts={},
@@ -455,6 +458,7 @@ def example_pending_sessions():
                     agent_addr=None,
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
+                    local_rank=0,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
                     image_ref=common_image_ref,
                     resource_opts={},
@@ -478,6 +482,7 @@ def example_pending_sessions():
                     agent_addr=None,
                     cluster_role="sub",
                     cluster_idx=2,
+                    local_rank=1,
                     cluster_hostname="sub1",
                     image_ref=common_image_ref,
                     resource_opts={},
@@ -501,6 +506,7 @@ def example_pending_sessions():
                     agent_addr=None,
                     cluster_role="sub",
                     cluster_idx=3,
+                    local_rank=2,
                     cluster_hostname="sub2",
                     image_ref=common_image_ref,
                     resource_opts={},
@@ -556,6 +562,7 @@ def example_existing_sessions():
                     agent_addr=None,
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
+                    local_rank=0,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
                     image_ref=common_image_ref,
                     resource_opts={},
@@ -579,6 +586,7 @@ def example_existing_sessions():
                     agent_addr=None,
                     cluster_role="sub",
                     cluster_idx=2,
+                    local_rank=1,
                     cluster_hostname="sub1",
                     image_ref=common_image_ref,
                     resource_opts={},
@@ -622,6 +630,7 @@ def example_existing_sessions():
                     agent_addr=None,
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
+                    local_rank=0,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
                     image_ref=common_image_ref,
                     resource_opts={},
@@ -665,6 +674,7 @@ def example_existing_sessions():
                     agent_addr=None,
                     cluster_role=DEFAULT_ROLE,
                     cluster_idx=1,
+                    local_rank=0,
                     cluster_hostname=f"{DEFAULT_ROLE}0",
                     image_ref=common_image_ref,
                     resource_opts={},

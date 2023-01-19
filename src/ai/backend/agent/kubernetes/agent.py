@@ -36,6 +36,7 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginCont
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
+    ClusterSSHPortMapping,
     ContainerId,
     DeviceId,
     DeviceName,
@@ -237,7 +238,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         pass
 
-    async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
+    async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
         if sshkey is None:
             return
@@ -930,6 +931,7 @@ class KubernetesAgent(
         kernel_config: KernelCreationConfig,
         *,
         restarting: bool = False,
+        cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
     ) -> KubernetesKernelCreationContext:
         return KubernetesKernelCreationContext(
             kernel_id,
@@ -977,16 +979,16 @@ class KubernetesAgent(
             await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
     async def create_overlay_network(self, network_name: str) -> None:
-        return await super().create_overlay_network(network_name)
+        raise NotImplementedError
 
     async def destroy_overlay_network(self, network_name: str) -> None:
-        return await super().destroy_overlay_network(network_name)
+        raise NotImplementedError
 
     async def create_local_network(self, network_name: str) -> None:
-        return await super().create_local_network(network_name)
+        raise NotImplementedError
 
     async def destroy_local_network(self, network_name: str) -> None:
-        return await super().destroy_local_network(network_name)
+        raise NotImplementedError
 
     async def restart_kernel__load_config(
         self,

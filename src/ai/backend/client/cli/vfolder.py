@@ -211,7 +211,7 @@ def info(name):
     "--base-dir",
     type=Path,
     default=None,
-    help="Set the parent directory from where the file is uploaded.  "
+    help="The local parent directory which contains the file to be uploaded.  "
     "[default: current working directry]",
 )
 @click.option(
@@ -264,7 +264,7 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     "--base-dir",
     type=Path,
     default=None,
-    help="Set the parent directory from where the file is uploaded.  "
+    help="The local parent directory which will contain the downloaded file.  "
     "[default: current working directry]",
 )
 @click.option(
@@ -509,7 +509,7 @@ def invite(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).invite(perm, emails)
             invited_ids = result.get("invited_ids", [])
-            if len(invited_ids) > 0:
+            if invited_ids:
                 print("Invitation sent to:")
                 for invitee in invited_ids:
                     print("\t- " + invitee)
@@ -594,7 +594,7 @@ def share(name, emails, perm):
             assert perm in ["rw", "ro", "wd"], "Invalid permission: {}".format(perm)
             result = session.VFolder(name).share(perm, emails)
             shared_emails = result.get("shared_emails", [])
-            if len(shared_emails) > 0:
+            if shared_emails:
                 print("Shared with {} permission to:".format(perm))
                 for _email in shared_emails:
                     print("\t- " + _email)
@@ -619,7 +619,7 @@ def unshare(name, emails):
         try:
             result = session.VFolder(name).unshare(emails)
             unshared_emails = result.get("unshared_emails", [])
-            if len(unshared_emails) > 0:
+            if unshared_emails:
                 print("Unshared from:")
                 for _email in unshared_emails:
                     print("\t- " + _email)

@@ -33,7 +33,7 @@ from typing import (
 from urllib.parse import quote as _quote
 from urllib.parse import unquote
 
-import grpc
+import grpc  # pants: no-infer-dep (etcetra)
 import trafaret as t
 from etcetra import EtcdCommunicator, WatchEvent
 from etcetra.client import EtcdClient, EtcdTransactionAction
@@ -97,6 +97,8 @@ def _slash(v: str):
 
 P = ParamSpec("P")
 R = TypeVar("R")
+
+GetPrefixValue = Mapping[str, Union["GetPrefixValue", Optional[str]]]
 
 
 class AsyncEtcd:
@@ -303,7 +305,7 @@ class AsyncEtcd:
         *,
         scope: ConfigScopes = ConfigScopes.MERGED,
         scope_prefix_map: Mapping[ConfigScopes, str] = None,
-    ) -> Mapping[str, Optional[str]]:
+    ) -> GetPrefixValue:
         """
         Retrieves all key-value pairs under the given key prefix as a nested dictionary.
         All dictionary keys are automatically unquoted.
