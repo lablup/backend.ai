@@ -778,15 +778,31 @@ async def server_main_logwrapper(
     help="The config file path. (default: ./manager.toml and /etc/backend.ai/manager.toml)",
 )
 @click.option(
+    "--debug",
+    is_flag=True,
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
     "--log-level",
     default="info",
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
+def main(ctx: click.Context, config_path: Path, log_level: str, debug: bool = False) -> None:
     """
     Start the manager service as a foreground process.
     """
+    if debug:
+        print("Please use --log-level options instead")
+        print("--debug options will soon change to --log-level TEXT option.")
+        log_level = "debug"
+
+    if log_level not in ["debug", "info", "warning", "error", "critical"]:
+        print("Undefined log-level")
+        print("Try 'backend.ai mgr start-server -h' for help")
+        exit(1)
+
+    print("Selected logging level for manager : "+ log_level)
 
     cfg = load_config(config_path, log_level)
 

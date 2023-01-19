@@ -34,12 +34,17 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
     help="The config file path. (default: ./manager.conf and /etc/backend.ai/manager.conf)",
 )
 @click.option(
+    "--debug",
+    is_flag=True,
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
     "--log-level",
     default="info",
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx, config_path, log_level):
+def main(ctx, config_path, log_level, debug):
     """
     Manager Administration CLI
     """
