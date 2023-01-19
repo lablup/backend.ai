@@ -9,7 +9,17 @@ import uuid
 from collections import OrderedDict
 from datetime import timedelta
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Iterable, Iterator, Mapping, Tuple, TypeVar, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 if TYPE_CHECKING:
     from decimal import Decimal
@@ -187,6 +197,23 @@ def str_to_timedelta(tstr: str) -> timedelta:
         raise ValueError("Invalid time expression")
     params = {n: -float(t) if sign == "-" else float(t) for n, t in groups.items() if t}
     return timedelta(**params)  # type: ignore
+
+
+def coerce_none(data: Mapping[str, Any]) -> Mapping[str, Any]:
+    coerced: MutableMapping[str, Any] = {}
+    for k, v in data.items():
+        if v is None:
+            coerced[k] = ""
+        elif isinstance(v, dict):
+            coerced[k] = coerce_none(v)
+        elif isinstance(v, (list, tuple)):
+            v_coerced = []
+            for v_elem in v:
+                v_coerced.append(coerce_none(v_elem))
+            coerced[k] = v_coerced
+        else:
+            coerced[k] = v
+    return coerced
 
 
 class FstabEntry:

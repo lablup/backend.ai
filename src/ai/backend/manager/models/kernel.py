@@ -12,7 +12,6 @@ from typing import (
     Iterable,
     List,
     Mapping,
-    MutableMapping,
     Optional,
     Sequence,
     Type,
@@ -46,6 +45,7 @@ from ai.backend.common.types import (
     SlotName,
     VFolderMount,
 )
+from ai.backend.common.utils import coerce_none
 
 from ..defs import DEFAULT_ROLE
 from .base import (
@@ -769,26 +769,12 @@ class ComputeContainer(graphene.ObjectType):
     ) -> Optional[Mapping[str, Any]]:
         graph_ctx: GraphQueryContext = info.context
 
-        def _convert_none_to_str(data: Mapping[str, Any]) -> Mapping[str, Any]:
-            converted: MutableMapping[str, Any] = {}
-            for k, v in data.items():
-                if v is None:
-                    converted[k] = ""
-                    continue
-                if isinstance(v, dict):
-                    converted[k] = _convert_none_to_str(v)
-                    continue
-                converted[k] = v
-            return converted
-
         if access_key is None:
             return None
-        return (
-            _convert_none_to_str(return_val)
-            if (return_val := await graph_ctx.registry.get_abusing_report(self.id, access_key))
-            is not None
-            else None
-        )
+        return_val = await graph_ctx.registry.get_abusing_report(self.id, access_key)
+        if return_val is None:
+            return None
+        return coerce_none(return_val)
 
     _queryfilter_fieldspec = {
         "image": ("image", None),

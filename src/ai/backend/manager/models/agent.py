@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, Mapping, MutableMapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence
 
 import graphene
 import sqlalchemy as sa
@@ -15,6 +15,7 @@ from sqlalchemy.sql.expression import true
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata, ResourceSlot
+from ai.backend.common.utils import coerce_none
 
 from .base import (
     EnumType,
@@ -202,24 +203,10 @@ class Agent(graphene.ObjectType):
             return None
         graph_ctx: GraphQueryContext = info.context
 
-        def _convert_none_to_str(data: Mapping[str, Any]) -> Mapping[str, Any]:
-            converted: MutableMapping[str, Any] = {}
-            for k, v in data.items():
-                if v is None:
-                    converted[k] = ""
-                    continue
-                if isinstance(v, dict):
-                    converted[k] = _convert_none_to_str(v)
-                    continue
-                converted[k] = v
-            return converted
-
-        return (
-            _convert_none_to_str(return_val)
-            if (return_val := await graph_ctx.registry.get_agent_local_config(self.id, self.addr))
-            is not None
-            else None
-        )
+        return_val = await graph_ctx.registry.get_agent_local_config(self.id, self.addr)
+        if return_val is None:
+            return None
+        return coerce_none(return_val)
 
     _queryfilter_fieldspec = {
         "id": ("id", None),
