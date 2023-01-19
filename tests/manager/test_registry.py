@@ -61,7 +61,6 @@ async def test_handle_heartbeat(
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
-            "abuse_report_path": "/path",
             "abusing_container_auto_terminate": False,
         },
     )
@@ -81,7 +80,6 @@ async def test_handle_heartbeat(
             "available_slots": ResourceSlot({"cpu": _1, "mem": _1g}),
             "version": "19.12.0",
             "compute_plugins": [],
-            "abuse_report_path": "/path",
             "auto_terminate": False,
         }
     )
@@ -96,7 +94,6 @@ async def test_handle_heartbeat(
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
-            "abuse_report_path": "",
             "abusing_container_auto_terminate": False,
         },
     )
@@ -120,7 +117,6 @@ async def test_handle_heartbeat(
             "available_slots": ResourceSlot({"cpu": _1, "mem": _1g}),
             "version": "19.12.0",
             "compute_plugins": [],
-            "abuse_report_path": "/path",
             "auto_terminate": False,
         }
     )
@@ -135,7 +131,6 @@ async def test_handle_heartbeat(
             "version": "19.12.0",
             "compute_plugins": [],
             "images": image_data,
-            "abuse_report_path": "/path",
             "abusing_container_auto_terminate": False,
         },
     )

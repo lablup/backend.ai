@@ -795,12 +795,6 @@ class AbstractAgent(
                     msgpack.packb([(repo_tag, digest) for repo_tag, digest in self.images.items()])
                 ),
                 "architecture": get_arch_name(),
-                "abuse_report_path": str(self.local_config["agent"].get("abuse-report-path"))
-                if self.local_config["agent"].get("abuse-report-path") is not None
-                else None,
-                "abusing_container_auto_terminate": self.local_config["agent"].get(
-                    "force-terminate-abusing-containers", False
-                ),
             }
             await self.produce_event(AgentHeartbeatEvent(agent_info))
         except asyncio.TimeoutError:
