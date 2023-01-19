@@ -793,16 +793,16 @@ def main(ctx: click.Context, config_path: Path, log_level: str, debug: bool = Fa
     Start the manager service as a foreground process.
     """
     if debug:
-        print("Please use --log-level options instead")
-        print("--debug options will soon change to --log-level TEXT option.")
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = "debug"
 
     if log_level not in ["debug", "info", "warning", "error", "critical"]:
-        print("Undefined log-level")
-        print("Try 'backend.ai mgr start-server -h' for help")
+        click.echo("Undefined log-level")
+        click.echo("Try 'backend.ai mgr start-server -h' for help")
         exit(1)
 
-    print("Selected logging level for manager : " + log_level)
+    click.echo("Selected logging level for manager : " + log_level)
 
     cfg = load_config(config_path, log_level)
 

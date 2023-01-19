@@ -174,16 +174,16 @@ async def server_main(
 def main(cli_ctx, config_path, log_level, debug=False):
 
     if debug:
-        print("Please use --log-level options instead")
-        print("--debug options will soon change to --log-level TEXT option.")
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = "debug"
 
     if log_level not in ["debug", "info", "warning", "error", "critical"]:
-        print("Undefined log-level")
-        print("Try './py -m ai.backend.storage.server --help' for help")
+        click.echo("Undefined log-level")
+        click.echo("Try './py -m ai.backend.storage.server --help' for help")
         exit(1)
 
-    print("Selected logging level for storage : " + log_level)
+    click.echo("Selected logging level for storage : " + log_level)
 
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "storage-proxy")

@@ -352,13 +352,15 @@ async def watcher_server(loop, pidx, args):
 def main(cli_ctx, config_path, log_level, debug=False):
 
     if debug:
-        print("Please use --log-level options instead")
-        print("--debug options will soon change to --log-level TEXT option.")
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = "debug"
 
     if log_level not in ["debug", "info", "warning", "error", "critical"]:
-        print("Undefined log-level")
+        click.echo("Undefined log-level")
         exit(1)
+
+    click.echo("Selected logging level for watcher : " + log_level)
 
     watcher_config_iv = (
         t.Dict(
