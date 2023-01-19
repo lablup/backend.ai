@@ -163,10 +163,28 @@ async def server_main(
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    default="info",
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(cli_ctx, config_path, debug):
+def main(cli_ctx, config_path, log_level, debug=False):
+
+    if debug:
+        print("Please use --log-level options instead")
+        print("--debug options will soon change to --log-level TEXT option.")
+        log_level = "debug"
+
+    if log_level not in ["debug", "info", "warning", "error", "critical"]:
+        print("Undefined log-level")
+        print("Try './py -m ai.backend.storage.server --help' for help")
+        exit(1)
+
+    print("Selected logging level for storage : " + log_level)
+
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "storage-proxy")
 
@@ -174,7 +192,7 @@ def main(cli_ctx, config_path, debug):
     config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
     config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
     config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-    if debug:
+    if log_level == "debug":
         config.override_key(raw_cfg, ("debug", "enabled"), True)
 
     try:
@@ -188,9 +206,8 @@ def main(cli_ctx, config_path, debug):
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
-    if local_config["debug"]["enabled"]:
-        config.override_key(local_config, ("logging", "level"), "DEBUG")
-        config.override_key(local_config, ("logging", "pkg-ns", "ai.backend"), "DEBUG")
+    config.override_key(local_config, ("logging", "level"), log_level.upper())
+    config.override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
 
     # if os.getuid() != 0:
     #     print('Storage agent can only be run as root', file=sys.stderr)

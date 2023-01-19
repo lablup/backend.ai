@@ -341,10 +341,24 @@ async def watcher_server(loop, pidx, args):
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    default="info",
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(cli_ctx, config_path, debug):
+def main(cli_ctx, config_path, log_level, debug=False):
+
+    if debug:
+        print("Please use --log-level options instead")
+        print("--debug options will soon change to --log-level TEXT option.")
+        log_level = "debug"
+
+    if log_level not in ["debug", "info", "warning", "error", "critical"]:
+        print("Undefined log-level")
+        exit(1)
 
     watcher_config_iv = (
         t.Dict(
@@ -383,7 +397,7 @@ def main(cli_ctx, config_path, debug):
     config.override_with_env(
         raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
     )
-    if debug:
+    if log_level == "debug":
         config.override_key(raw_cfg, ("debug", "enabled"), True)
 
     try:

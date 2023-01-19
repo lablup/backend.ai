@@ -827,15 +827,32 @@ async def server_main(
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    default="info",
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    debug: bool,
+    log_level: str,
+    debug: bool = False,
 ) -> int:
 
+    if debug:
+        print("Please use --log-level options instead")
+        print("--debug options will soon change to --log-level TEXT option.")
+        log_level = "debug"
+
+    if log_level not in ["debug", "info", "warning", "error", "critical"]:
+        print("Undefined log-level")
+        print("Try 'backend.ai ag start-server -h' for help")
+        exit(1)
+
+    print("Selected logging level for agent : " + log_level)
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
 
@@ -853,10 +870,10 @@ def main(
     config.override_with_env(raw_cfg, ("container", "bind-host"), "BACKEND_BIND_HOST_OVERRIDE")
     config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
     config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
-    if debug:
-        config.override_key(raw_cfg, ("debug", "enabled"), True)
-        config.override_key(raw_cfg, ("logging", "level"), "DEBUG")
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), "DEBUG")
+
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "debug")
+    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
@@ -935,7 +952,7 @@ def main(
                 log.info("runtime: {0}", utils.env_info())
 
                 log_config = logging.getLogger("ai.backend.agent.config")
-                if debug:
+                if log_level == "debug":
                     log_config.debug("debug mode enabled.")
 
                 if cfg["agent"]["event-loop"] == "uvloop":
