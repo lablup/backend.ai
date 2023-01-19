@@ -961,28 +961,30 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         ipc_base_path = self.local_config["agent"]["ipc-base-path"]
         (ipc_base_path / "container").mkdir(parents=True, exist_ok=True)
         self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
-        socket_relay_name = f"backendai-socket-relay.{self.local_instance_id}"
-        socket_relay_container = PersistentServiceContainer(
-            "backendai-socket-relay:latest",
-            {
-                "Cmd": [
-                    f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
-                    f"TCP-CONNECT:127.0.0.1:{self.local_config['agent']['agent-sock-port']}",
-                ],
-                "HostConfig": {
-                    "Mounts": [
-                        {
-                            "Type": "bind",
-                            "Source": str(ipc_base_path / "container"),
-                            "Target": "/ipc",
-                        },
+        # Workaround for Docker Desktop for Mac's UNIX socket mount failure with virtiofs
+        if sys.platform != "darwin":
+            socket_relay_name = f"backendai-socket-relay.{self.local_instance_id}"
+            socket_relay_container = PersistentServiceContainer(
+                "backendai-socket-relay:latest",
+                {
+                    "Cmd": [
+                        f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
+                        f"TCP-CONNECT:127.0.0.1:{self.local_config['agent']['agent-sock-port']}",
                     ],
-                    "NetworkMode": "host",
+                    "HostConfig": {
+                        "Mounts": [
+                            {
+                                "Type": "bind",
+                                "Source": str(ipc_base_path / "container"),
+                                "Target": "/ipc",
+                            },
+                        ],
+                        "NetworkMode": "host",
+                    },
                 },
-            },
-            name=socket_relay_name,
-        )
-        await socket_relay_container.ensure_running_latest()
+                name=socket_relay_name,
+            )
+            await socket_relay_container.ensure_running_latest()
         self.agent_sock_task = asyncio.create_task(self.handle_agent_socket())
         self.monitor_docker_task = asyncio.create_task(self.monitor_docker_events())
         self.monitor_swarm_task = asyncio.create_task(self.check_swarm_status(as_task=True))
