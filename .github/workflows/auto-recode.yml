@@ -1,0 +1,61 @@
+name: auto-recoder
+on: 
+  pull_request:
+permissions:
+  contents: write
+  
+jobs:
+  auto-recode:
+    runs-on: ubuntu-latest 
+    
+    env:
+      FEAT: default
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.head_ref }}
+    
+    - name: do work
+      run: |
+        script=$(cat <<EOF
+        import os
+
+        env_file = os.getenv('GITHUB_ENV')
+        myfile = open(env_file, "a")
+
+        pr_number = "${{github.event.pull_request.number}}"
+        path = "/home/runner/work/backend.ai/backend.ai/changes"
+        t_types = ["breaking","feature","enhance","deprecation","fix","doc","deps","misc"]
+        target_file = ""
+
+        files = os.listdir(path)
+        print(str(files) + " are in changes floder.")
+
+        for file in files :
+            if str(file[0:file.find(".")]) == pr_number :
+                print("Change log file already exist for this PR.")
+                exit(0)
+
+        for t_type in t_types :
+            if t_type in files : 
+                target_file = t_type
+                myfile.write("FEAT=" + t_type)  
+                myfile.close()
+                os.rename(path + "/" + target_file , path + "/" + pr_number + "." + target_file + ".md")
+                print(target_file +" file changed to "+ pr_number+"."+target_file+".md")
+                exit(0)
+
+        if target_file == "":
+            print("There is not change log file for this PR in changes folder.")
+            print("Also, there is not feature named file in changes folder.")
+            exit(0)
+        
+        EOF
+        )
+        echo "$script" | python
+
+    - name: commit message for changing change log file
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: GitHub Actions changed file name. ${{ env.FEAT }} -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
