@@ -21,9 +21,6 @@ jobs:
         script=$(cat <<EOF
         import os
 
-        env_file = os.getenv('GITHUB_ENV')
-        myfile = open(env_file, "a")
-
         pr_number = "${{github.event.pull_request.number}}"
         path = "/home/runner/work/backend.ai/backend.ai/changes"
         t_types = ["breaking","feature","enhance","deprecation","fix","doc","deps","misc"]
@@ -40,6 +37,8 @@ jobs:
         for t_type in t_types :
             if t_type in files : 
                 target_file = t_type
+                env_file = os.getenv('GITHUB_ENV')
+                myfile = open(env_file, "a")
                 myfile.write("FEAT=" + t_type)  
                 myfile.close()
                 os.rename(path + "/" + target_file , path + "/" + pr_number + "." + target_file + ".md")
