@@ -3,6 +3,7 @@ A module to collect various performance metrics of Docker containers.
 
 Reference: https://www.datadoghq.com/blog/how-to-collect-docker-metrics/
 """
+from __future__ import annotations
 
 import asyncio
 import enum
@@ -72,6 +73,7 @@ class StatModes(enum.Enum):
     CGROUP = Tries to automatically detect docker's current cgroup driver
     CGROUPFS = Manually set cgroup driver to cgroupfs
     SYSTEMD = Manually set cgroup driver to systemd
+    DOCKER = Manually set cgroup driver to docker
     """
 
     CGROUP = "cgroup"
@@ -93,7 +95,7 @@ class StatModes(enum.Enum):
         return StatModes.DOCKER
 
     @classmethod
-    async def check_docker_cgroup_driver(cls):
+    async def check_docker_cgroup_driver(cls) -> StatModes:
         async with Docker() as docker:
             try:
                 result = await docker._query_json("info", method="GET")
