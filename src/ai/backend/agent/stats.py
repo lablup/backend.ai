@@ -95,7 +95,7 @@ class StatModes(enum.Enum):
         return StatModes.DOCKER
 
     @classmethod
-    async def check_docker_cgroup_driver(cls) -> StatModes:
+    async def check_docker_cgroup_driver(cls) -> Optional[StatModes]:
         async with Docker() as docker:
             try:
                 result = await docker._query_json("info", method="GET")
