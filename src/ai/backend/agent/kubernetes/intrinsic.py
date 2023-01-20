@@ -147,7 +147,7 @@ class CPUPlugin(AbstractComputePlugin):
         return []
 
     async def gather_process_measures(
-        self, ctx: StatContext, pids: Sequence[int]
+        self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
         return []
 
@@ -294,7 +294,7 @@ class MemoryPlugin(AbstractComputePlugin):
         return []
 
     async def gather_process_measures(
-        self, ctx: StatContext, pids: Sequence[int]
+        self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
         return []
 
