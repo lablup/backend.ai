@@ -348,14 +348,15 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             )
 
         # agent-socket mount
-        mounts.append(
-            Mount(
-                MountTypes.BIND,
-                self.agent_sockpath,
-                Path("/opt/kernel/agent.sock"),
-                MountPermission.READ_WRITE,
+        if sys.platform != "darwin":
+            mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    self.agent_sockpath,
+                    Path("/opt/kernel/agent.sock"),
+                    MountPermission.READ_WRITE,
+                )
             )
-        )
         ipc_base_path = self.local_config["agent"]["ipc-base-path"]
 
         # domain-socket proxy mount
