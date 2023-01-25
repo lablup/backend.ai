@@ -67,11 +67,18 @@ class libnuma:
         try:
             match sys.platform:
                 case "linux":
-                    docker_cpuset_path = Path("/sys/fs/cgroup/cpuset/docker/cpuset.cpus")
+                    docker_cpuset_path = Path(
+                        "/sys/fs/cgroup/system.slice/docker.service/cpuset.cpus.effective"
+                    )
+                    cpuset_source = "the docker cgroup (v2)"
+                    if not docker_cpuset_path.exists():
+                        docker_cpuset_path = Path(
+                            "/sys/fs/cgroup/cpuset/docker/cpuset.effective_cpus"
+                        )
+                        cpuset_source = "the docker cgroup (v1)"
                     try:
                         docker_cpuset = docker_cpuset_path.read_text()
                         cpuset = {*parse_cpuset(docker_cpuset)}
-                        cpuset_source = "the docker cgroup"
                         return cpuset
                     except (IOError, ValueError):
                         try:
