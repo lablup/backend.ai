@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.9 (2023-01-25)
+
+Ai.Backend.Manager 22.09.9 (2023-01-25)
+
+### Fixes
+* Add comment out on gpfs sample volume when setting up the development environment with ./script/install-dev.sh ([#965](https://github.com/lablup/backend.ai/issues/965))
+* Disable the socket-relay container on macOS to avoid UNIX socket bind-mount compatibility issue in for macOS + virtiofs setups ([#986](https://github.com/lablup/backend.ai/issues/986))
+
+### Miscellaneous
+* Update the socket-relay container's base distro (Alpine) version to 3.17 to enable support for `AF_VSOCK` in the latest socat 1.7.4 package ([#988](https://github.com/lablup/backend.ai/issues/988))
+
+
 ## 22.09.8 (2023-01-10)
 
 Ai.Backend.Manager 22.09.8 (2023-01-10)
