@@ -1,11 +1,11 @@
-name: auto-recoder
+name: pr-number-assign
 on: 
   pull_request:
 permissions:
   contents: write
   
 jobs:
-  auto-recode:
+  pr-number-assign:
     runs-on: ubuntu-latest 
     
     env:
@@ -57,4 +57,4 @@ jobs:
     - name: commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
-        commit_message: GitHub Actions changed file name. ${{ env.FEAT }} -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
+        commit_message: GitHub Actions changed file name. '${{ env.FEAT }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
