@@ -135,6 +135,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     port_pool: Set[int]
     agent_sockpath: Path
     resource_lock: asyncio.Lock
+    gwbridge_subnet: Optional[str]
 
     def __init__(
         self,
@@ -146,6 +147,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
         restarting: bool = False,
+        gwbridge_subnet: Optional[str] = None,
     ) -> None:
         super().__init__(kernel_id, kernel_config, local_config, computers, restarting=restarting)
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
@@ -163,6 +165,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.container_configs = []
         self.domain_socket_proxies = []
         self.computer_docker_args = {}
+
+        self.gwbridge_subnet = gwbridge_subnet
 
     def _kernel_resource_spec_read(self, filename):
         with open(filename, "r") as f:
@@ -417,22 +421,36 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 }
             )
-            # RDMA mounts
-            ib_root = Path("/dev/infiniband")
-            if ib_root.is_dir() and (ib_root / "uverbs0").exists():
+            if self.gwbridge_subnet is not None:
                 self.container_configs.append(
                     {
-                        "HostConfig": {
-                            "Devices": [
-                                {
-                                    "PathOnHost": "/dev/infiniband",
-                                    "PathInContainer": "/dev/infiniband",
-                                    "CgroupPermissions": "rwm",
-                                },
-                            ],
-                        },
+                        "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
                     }
                 )
+        elif self.local_config["container"].get("alternative-bridge") is not None:
+            self.container_configs.append(
+                {
+                    "HostConfig": {
+                        "NetworkMode": self.local_config["container"]["alternative-bridge"],
+                    },
+                }
+            )
+        # RDMA mounts
+        ib_root = Path("/dev/infiniband")
+        if ib_root.is_dir() and (ib_root / "uverbs0").exists():
+            self.container_configs.append(
+                {
+                    "HostConfig": {
+                        "Devices": [
+                            {
+                                "PathOnHost": "/dev/infiniband",
+                                "PathInContainer": "/dev/infiniband",
+                                "CgroupPermissions": "rwm",
+                            },
+                        ],
+                    },
+                }
+            )
 
     async def install_ssh_keypair(self, cluster_info: ClusterInfo) -> None:
         sshkey = cluster_info["ssh_keypair"]
@@ -815,6 +833,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     scan_images_timer: asyncio.Task
     metadata_server_runner: web.AppRunner
     docker_ptask_group: aiotools.PersistentTaskGroup
+    gwbridge_subnet: Optional[str]
 
     def __init__(
         self,
@@ -846,6 +865,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         await self.check_swarm_status()
         if self.heartbeat_extra_info["swarm_enabled"]:
             log.info("The Docker Swarm cluster is configured and enabled")
+        try:
+            async with Docker() as docker:
+                gwbridge = await docker.networks.get("docker_gwbridge")
+                gwbridge_info = await gwbridge.show()
+                self.gwbridge_subnet = gwbridge_info["IPAM"]["Config"][0]["Subnet"]
+        except (DockerError, KeyError, IndexError):
+            self.gwbridge_subnet = None
         ipc_base_path = self.local_config["agent"]["ipc-base-path"]
         (ipc_base_path / "container").mkdir(parents=True, exist_ok=True)
         self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
@@ -1128,6 +1154,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.agent_sockpath,
             self.resource_lock,
             restarting=restarting,
+            gwbridge_subnet=self.gwbridge_subnet,
         )
 
     async def restart_kernel__load_config(
