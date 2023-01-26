@@ -141,6 +141,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
     agent_sockpath: Path
     resource_lock: asyncio.Lock
     cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
+    gwbridge_subnet: Optional[str]
 
     def __init__(
         self,
@@ -153,6 +154,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         resource_lock: asyncio.Lock,
         restarting: bool = False,
         cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping] = None,
+        gwbridge_subnet: Optional[str] = None,
     ) -> None:
         super().__init__(kernel_id, kernel_config, local_config, computers, restarting=restarting)
         scratch_dir = (self.local_config["container"]["scratch-root"] / str(kernel_id)).resolve()
@@ -172,6 +174,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.computer_docker_args = {}
 
         self.cluster_ssh_port_mapping = cluster_ssh_port_mapping
+        self.gwbridge_subnet = gwbridge_subnet
 
     def _kernel_resource_spec_read(self, filename):
         with open(filename, "r") as f:
@@ -435,6 +438,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     },
                 }
             )
+            if self.gwbridge_subnet is not None:
+                self.container_configs.append(
+                    {
+                        "Env": [f"OMPI_MCA_btl_tcp_if_exclude=127.0.0.1/32,{self.gwbridge_subnet}"],
+                    }
+                )
         elif self.local_config["container"].get("alternative-bridge") is not None:
             self.container_configs.append(
                 {
@@ -918,6 +927,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     scan_images_timer: asyncio.Task
     metadata_server: MetadataServer
     docker_ptask_group: aiotools.PersistentTaskGroup
+    gwbridge_subnet: Optional[str]
 
     def __init__(
         self,
@@ -957,6 +967,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 )
         await super().__ainit__()
         await self.check_swarm_status()
+        try:
+            async with Docker() as docker:
+                gwbridge = await docker.networks.get("docker_gwbridge")
+                gwbridge_info = await gwbridge.show()
+                self.gwbridge_subnet = gwbridge_info["IPAM"]["Config"][0]["Subnet"]
+        except DockerError:
+            self.gwbridge_subnet = None
         if self.heartbeat_extra_info["swarm_enabled"]:
             log.info("The Docker Swarm cluster is configured and enabled")
         ipc_base_path = self.local_config["agent"]["ipc-base-path"]
@@ -1250,6 +1267,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.resource_lock,
             restarting=restarting,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
+            gwbridge_subnet=self.gwbridge_subnet,
         )
 
     async def restart_kernel__load_config(
