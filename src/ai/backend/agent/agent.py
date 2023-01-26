@@ -986,32 +986,13 @@ class AbstractAgent(
         event: LifecycleEvent,
         reason: KernelLifecycleEventReason,
         *,
-        container_id: ContainerId = None,
+        container_id: Optional[ContainerId] = None,
         exit_code: int = None,
         done_future: asyncio.Future = None,
         suppress_events: bool = False,
     ) -> None:
         try:
             kernel_obj = self.kernel_registry[kernel_id]
-            if kernel_obj.termination_reason:
-                reason = kernel_obj.termination_reason
-            if container_id is not None:
-                if event == LifecycleEvent.START:
-                    # Update the container ID (for restarted kernels).
-                    # This will be overwritten by create_kernel() soon, but
-                    # updating here improves consistency of kernel_id to container_id
-                    # mapping earlier.
-                    kernel_obj["container_id"] = container_id
-                elif container_id != kernel_obj["container_id"]:
-                    # This should not happen!
-                    log.warning(
-                        "container id mismatch for kernel_obj (k:{}, c:{}) with event (e:{}, c:{})",
-                        kernel_id,
-                        kernel_obj["container_id"],
-                        event.name,
-                        container_id,
-                    )
-            container_id = kernel_obj["container_id"]
         except KeyError:
             if event == LifecycleEvent.START:
                 # When creating a new kernel, the kernel_registry is not populated yet
@@ -1026,10 +1007,36 @@ class AbstractAgent(
                     event.name,
                     kernel_id,
                 )
+        assert kernel_obj is not None
+        if kernel_obj.termination_reason:
+            reason = kernel_obj.termination_reason
+        if container_id is not None:
+            if event == LifecycleEvent.START:
+                # Update the container ID (for restarted kernels).
+                # This will be overwritten by create_kernel() soon, but
+                # updating here improves consistency of kernel_id to container_id
+                # mapping earlier.
+                kernel_obj["container_id"] = container_id
+            elif container_id != kernel_obj["container_id"]:
+                # This should not happen!
+                log.warning(
+                    "container id mismatch for kernel_obj (k:{}, c:{}) with event (e:{}, c:{})",
+                    kernel_id,
+                    kernel_obj["container_id"],
+                    event.name,
+                    container_id,
+                )
+        cid = kernel_obj.get("container_id")
+        if cid is None:
+            log.warning(
+                "kernel has no container_id (k:{}) with event (e:{})",
+                kernel_id,
+                event.name,
+            )
         await self.container_lifecycle_queue.put(
             ContainerLifecycleEvent(
                 kernel_id,
-                container_id,
+                cid,
                 event,
                 reason,
                 done_future,
@@ -1673,9 +1680,17 @@ class AbstractAgent(
                 kernel_id,
                 LifecycleEvent.DESTROY,
                 KernelLifecycleEventReason.UNKNOWN,
-                container_id=cid,
+                container_id=ContainerId(cid),
             )
             raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
+        except Exception:
+            log.warning(
+                "Kernel failed to create container (k:{}). Kernel is going to be unregistered.",
+                kernel_id,
+            )
+            async with self.registry_lock:
+                del self.kernel_registry[kernel_id]
+            raise
         async with self.registry_lock:
             self.kernel_registry[ctx.kernel_id].data.update(container_data)
         await kernel_obj.init()
