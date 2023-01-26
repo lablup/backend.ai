@@ -2251,7 +2251,6 @@ class AgentRegistry:
                 network_name = f'bai-multinode-{session["session_id"]}'
                 try:
                     try:
-                        # await rpc.call.destroy_overlay_network(network_name)
                         await asyncio.sleep(2.0)
                         network = await self.docker.networks.get(network_name)
                         await network.delete()

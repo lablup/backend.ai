@@ -68,7 +68,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import AsyncFileWriter, current_loop
 
 from ..agent import ACTIVE_STATUS_SET, AbstractAgent, AbstractKernelCreationContext, ComputerContext
-from ..exception import ContainerCreationError, InitializationError, UnsupportedResource
+from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ..kernel import AbstractKernel, KernelFeatures
 from ..proxy import DomainSocketProxy, proxy_connection
@@ -957,9 +957,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     docker_version["ApiVersion"],
                 )
         await super().__ainit__()
-        await self.check_swarm_status()
-        if self.heartbeat_extra_info["swarm_enabled"]:
-            log.info("The Docker Swarm cluster is configured and enabled")
         ipc_base_path = self.local_config["agent"]["ipc-base-path"]
         (ipc_base_path / "container").mkdir(parents=True, exist_ok=True)
         self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
@@ -989,7 +986,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await socket_relay_container.ensure_running_latest()
         self.agent_sock_task = asyncio.create_task(self.handle_agent_socket())
         self.monitor_docker_task = asyncio.create_task(self.monitor_docker_events())
-        self.monitor_swarm_task = asyncio.create_task(self.check_swarm_status(as_task=True))
         self.docker_ptask_group = aiotools.PersistentTaskGroup()
 
         await prepare_kernel_metadata_uri_handling(self.local_config)
@@ -1022,10 +1018,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if self.monitor_docker_task is not None:
                 self.monitor_docker_task.cancel()
                 await self.monitor_docker_task
-
-        if self.monitor_swarm_task is not None:
-            self.monitor_swarm_task.cancel()
-            await self.monitor_swarm_task
 
         await self.metadata_server_runner.cleanup()
         if self.docker:
@@ -1072,34 +1064,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
             await asyncio.gather(*fetch_tasks, return_exceptions=True)
         return result
-
-    async def check_swarm_status(self, as_task=False):
-        try:
-            while True:
-                if as_task:
-                    await asyncio.sleep(30)
-                try:
-                    swarm_enabled = self.local_config["container"].get("swarm-enabled", False)
-                    if not swarm_enabled:
-                        continue
-                    async with closing_async(Docker()) as docker:
-                        docker_info = await docker.system.info()
-                        if docker_info["Swarm"]["LocalNodeState"] == "inactive":
-                            raise InitializationError(
-                                "The swarm mode is enabled but the node state of "
-                                "the local Docker daemon is inactive.",
-                            )
-                except InitializationError as e:
-                    log.exception(str(e))
-                    swarm_enabled = False
-                finally:
-                    self.heartbeat_extra_info = {
-                        "swarm_enabled": swarm_enabled,
-                    }
-                    if not as_task:
-                        return
-        except asyncio.CancelledError:
-            pass
 
     async def scan_images(self) -> Mapping[str, str]:
         async with closing_async(Docker()) as docker:
@@ -1409,29 +1373,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     pass
                 except FileNotFoundError:
                     pass
-
-    async def create_overlay_network(self, network_name: str) -> None:
-        if not self.heartbeat_extra_info["swarm_enabled"]:
-            raise RuntimeError("This agent has not joined to a swarm cluster.")
-        async with closing_async(Docker()) as docker:
-            await docker.networks.create(
-                {
-                    "Name": network_name,
-                    "Driver": "overlay",
-                    "Attachable": True,
-                    "Labels": {
-                        "ai.backend.cluster-network": "1",
-                    },
-                }
-            )
-
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        docker = Docker()
-        try:
-            network = await docker.networks.get(network_name)
-            await network.delete()
-        finally:
-            await docker.close()
 
     async def create_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:
