@@ -275,7 +275,7 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
      "coc.preferences.willSaveHandlerTimeout": 5000,
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.8/bin/python",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.9/bin/python",
      "python.formatting.provider": "black",
      "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
      "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
