@@ -471,7 +471,7 @@ check_python() {
 }
 
 search_pants_python_from_pyenv() {
-  local _PYENV_PYVER=$(pyenv versions --bare | grep '^3\.9\.' | grep -v '/envs/' | sort -t. -k1,1r -k 2,2nr -k 3,3nr | head -n 1)
+  local _PYENV_PYVER=$(pyenv latest 3.9)
   if [ -z "$_PYENV_PYVER" ]; then
     >&2 echo "No Python 3.9 available via pyenv!"
     >&2 echo "Please install Python 3.9 using pyenv and try again."
@@ -483,17 +483,10 @@ search_pants_python_from_pyenv() {
 }
 
 bootstrap_pants() {
-  set -e
   mkdir -p .tmp
   set +e
-  if [ "$(uname -m)" = "arm64" -a "$DISTRO" = "Darwin" ]; then
-    # In macOS with Apple Silicon, let Pants use Python 3.9 from pyenv
-    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-    echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
-  elif [ "$(uname -m)" = "aarch64" ]; then
-    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-    echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
-  fi
+  local _PYENV_PYVER=$(search_pants_python_from_pyenv)
+  echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
   PANTS="./pants"
   ./pants version
   if [ $? -eq 1 ]; then
