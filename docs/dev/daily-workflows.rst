@@ -177,12 +177,19 @@ To (re-)generate the virtualenv, run:
 
 .. code-block:: console
 
-    $ ./pants export ::
+    $ ./pants export
 
 Then configure your IDEs/editors to use
 ``dist/export/python/virtualenvs/python-default/VERSION/bin/python`` as the
 interpreter for your code, where ``VERSION`` is the interpreter version
 specified in ``pants.toml``.
+
+As of Pants 2.16, you may also export the virtualenvs by the individual lockfiles
+using the ``--resolve`` option like:
+
+.. code-block:: console
+
+    $ ./pants export --resolve=python-default --resolve=mypy
 
 To make LSP (language server protocol) services like PyLance to detect our source packages correctly,
 you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
@@ -233,7 +240,7 @@ Set the following keys in the workspace settings:
 
 .. warning::
 
-   When the target Python version has changed when you pull a new version/branch, you need to re-run ``./pants export ::``
+   When the target Python version has changed when you pull a new version/branch, you need to re-run ``./pants export``
    and manually update the Python interpreter path and mypy executable path configurations.
 
 Vim/NeoVim
@@ -289,7 +296,7 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When each branch has different external package requirements, you should run ``./pants export ::``
+When each branch has different external package requirements, you should run ``./pants export``
 before running codes after ``git switch``-ing between such branches.
 
 Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
@@ -445,7 +452,7 @@ Adding new external dependencies
   .. code-block:: console
 
      $ ./pants generate-lockfiles
-     $ ./pants export ::
+     $ ./pants export
 
 Merging lockfile conflicts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
