@@ -978,12 +978,6 @@ class KubernetesAgent(
             scratch_dir = self.local_config["container"]["scratch-root"] / str(kernel_id)
             await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
-    async def create_overlay_network(self, network_name: str) -> None:
-        raise NotImplementedError
-
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        raise NotImplementedError
-
     async def create_local_network(self, network_name: str) -> None:
         raise NotImplementedError
 
