@@ -22,8 +22,11 @@ jobs:
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Prepare the pip cache directory
-      run: mkdir -p ~/.cache/pip
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: pip-lint-${{ runner.os }}-${{ runner.arch }}-${{ env.PROJECT_PYTHON_VERSION }}-${{ hashFiles('*.lock', 'tools/*.lock') }}
     - name: Set up Python for Pants
       uses: actions/setup-python@v4
       with:
@@ -32,7 +35,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
@@ -80,8 +82,11 @@ jobs:
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Prepare the pip cache directory
-      run: mkdir -p ~/.cache/pip
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: pip-typecheck-${{ runner.os }}-${{ runner.arch }}-${{ env.PROJECT_PYTHON_VERSION }}-${{ hashFiles('*.lock', 'tools/*.lock') }}
     - name: Set up Python for Pants
       uses: actions/setup-python@v4
       with:
@@ -90,7 +95,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
@@ -146,8 +150,11 @@ jobs:
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-    - name: Prepare the pip cache directory
-      run: mkdir -p ~/.cache/pip
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: pip-test-${{ runner.os }}-${{ runner.arch }}-${{ env.PROJECT_PYTHON_VERSION }}-${{ hashFiles('*.lock', 'tools/*.lock') }}
     - name: Set up Python for Pants
       uses: actions/setup-python@v4
       with:
@@ -156,7 +163,6 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
     - name: Prepare cache dir for Pants
       run: mkdir -p .tmp
     - name: Bootstrap Pants
@@ -219,9 +225,11 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-        cache: pip
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: pip-deploy-${{ runner.os }}-${{ runner.arch }}-${{ env.PROJECT_PYTHON_VERSION }}-${{ hashFiles('*.lock', 'tools/*.lock') }}
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v2
       # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
