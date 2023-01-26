@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython==3.10.8"
+//     "CPython==3.10.9"
 //   ],
 //   "generated_with_requirements": [
 //     "Jinja2~=3.1.2",
@@ -4530,7 +4530,7 @@
     "zipstream-new~=1.1.8"
   ],
   "requires_python": [
-    "==3.10.8"
+    "==3.10.9"
   ],
   "resolver_version": "pip-2020-resolver",
   "style": "universal",
