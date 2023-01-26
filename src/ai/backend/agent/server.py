@@ -631,18 +631,6 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def create_overlay_network(self, network_name: str) -> None:
-        log.debug("rpc::create_overlay_network(name:{})", network_name)
-        return await self.agent.create_overlay_network(network_name)
-
-    @rpc_function
-    @collect_error
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        log.debug("rpc::destroy_overlay_network(name:{})", network_name)
-        return await self.agent.destroy_overlay_network(network_name)
-
-    @rpc_function
-    @collect_error
     async def create_local_network(self, network_name: str) -> None:
         log.debug("rpc::create_local_network(name:{})", network_name)
         return await self.agent.create_local_network(network_name)
