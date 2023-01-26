@@ -1558,28 +1558,24 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                                             handle_action_start(kernel_id, evdata),
                                         )
                                     )
-                                    break
                                 case "die":
                                     await asyncio.shield(
                                         self.docker_ptask_group.create_task(
                                             handle_action_die(kernel_id, evdata),
                                         )
                                     )
-                                    break
                                 case "pause":
                                     await asyncio.shield(
                                         self.docker_ptask_group.create_task(
                                             handle_action_pause(kernel_id, evdata),
                                         )
                                     )
-                                    break
                                 case "unpause":
                                     await asyncio.shield(
                                         self.docker_ptask_group.create_task(
                                             handle_action_unpause(kernel_id, evdata),
                                         )
                                     )
-                                    break
                         except asyncio.CancelledError:
                             # We are shutting down...
                             return
