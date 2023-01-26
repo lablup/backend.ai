@@ -22,6 +22,8 @@ jobs:
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Prepare the pip cache directory
+      run: mkdir -p ~/.cache/pip
     - name: Set up Python for Pants
       uses: actions/setup-python@v4
       with:
@@ -78,6 +80,8 @@ jobs:
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Prepare the pip cache directory
+      run: mkdir -p ~/.cache/pip
     - name: Set up Python for Pants
       uses: actions/setup-python@v4
       with:
@@ -142,6 +146,8 @@ jobs:
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Prepare the pip cache directory
+      run: mkdir -p ~/.cache/pip
     - name: Set up Python for Pants
       uses: actions/setup-python@v4
       with:
@@ -203,6 +209,8 @@ jobs:
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Prepare the pip cache directory
+      run: mkdir -p ~/.cache/pip
     - name: Set up Python for Pants
       uses: actions/setup-python@v4
       with:
