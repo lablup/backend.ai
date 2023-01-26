@@ -485,14 +485,6 @@ search_pants_python_from_pyenv() {
 bootstrap_pants() {
   set -e
   mkdir -p .tmp
-  if [ -f '.pants.env' -a -f './pants-local' ]; then
-    echo "It seems that you have an already locally bootstrapped Pants."
-    echo "The installer will keep using it."
-    echo "If you want to reset it, delete ./.pants.env and ./pants-local files."
-    ./pants-local version
-    PANTS="./pants-local"
-    return
-  fi
   set +e
   if [ "$(uname -m)" = "arm64" -a "$DISTRO" = "Darwin" ]; then
     # In macOS with Apple Silicon, let Pants use Python 3.9 from pyenv
@@ -506,23 +498,8 @@ bootstrap_pants() {
   ./pants version
   if [ $? -eq 1 ]; then
     # If we can't find the prebuilt Pants package, then try the source installation.
-    show_info "Downloading and building Pants for the current setup"
-    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-    # In most cases, we won't need to modify the source code of pants.
-    echo "ENABLE_PANTSD=true" > "$ROOT_PATH/.pants.env"
-    echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
-    if [ -d tools/pants-src ]; then
-      rm -rf tools/pants-src
-    fi
-    local PANTS_CLONE_VERSION="release_${PANTS_VERSION}"
-    set -e
-    git -c advice.detachedHead=false clone --branch=$PANTS_CLONE_VERSION --depth=1 https://github.com/pantsbuild/pants tools/pants-src
-    cd tools/pants-src
-    local arch_name=$(uname -p)
-    cd ../..
-    ln -s tools/pants-local
-    ./pants-local version
-    PANTS="./pants-local"
+    show_error "Cannot proceed the installation because Pants is not available for your platform!"
+    exit 1
   fi
   set +e
 }
