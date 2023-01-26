@@ -40,7 +40,7 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.10.5"]
+interpreter_constraints = ["CPython==3.10.9"]
 tailor_pex_binary_targets = false
 resolves_to_interpreter_constraints = "{'python-kernel': ['==3.10.*']}"
 
@@ -87,7 +87,7 @@ lockfile = "tools/pytest.lock"
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 
 [mypy]
-version = "mypy>=0.961"
+version = "mypy==0.961"
 interpreter_constraints = ["CPython>=3.10,<4"]
 extra_requirements.add = [
 ]

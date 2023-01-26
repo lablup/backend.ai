@@ -308,7 +308,9 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                 proc_path = Path(f"/proc/{host_pid}/status")
                 proc_status = {
                     k: v
-                    for k, v in map(lambda l: l.split(":\t"), proc_path.read_text().splitlines())
+                    for k, v in map(
+                        lambda line: line.split(":\t"), proc_path.read_text().splitlines()
+                    )
                 }
                 nspids = [
                     *map(lambda pid: ContainerPID(PID(int(pid))), proc_status["NSpid"].split())

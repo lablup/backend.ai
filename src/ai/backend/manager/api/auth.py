@@ -45,7 +45,7 @@ if TYPE_CHECKING:
 
 log: Final = BraceStyleAdapter(logging.getLogger(__name__))
 
-whois_timezone_info: Final = {
+_whois_timezone_info: Final = {
     "A": 1 * 3600,
     "ACDT": 10.5 * 3600,
     "ACST": 9.5 * 3600,
@@ -274,6 +274,7 @@ whois_timezone_info: Final = {
     "YEKT": 5 * 3600,
     "Z": 0 * 3600,
 }
+whois_timezone_info: Final[Mapping[str, int]] = {k: int(v) for k, v in _whois_timezone_info.items()}
 
 
 def _extract_auth_params(request):

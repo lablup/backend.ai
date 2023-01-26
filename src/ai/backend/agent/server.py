@@ -20,7 +20,6 @@ from typing import (
     Callable,
     ClassVar,
     Coroutine,
-    Dict,
     Literal,
     Mapping,
     Sequence,
@@ -431,7 +430,7 @@ class AgentRPCServer(aobject):
         session_id: str,
         kernel_id: str,
         updated_config: dict,
-    ):
+    ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
             creation_id,
@@ -444,15 +443,14 @@ class AgentRPCServer(aobject):
     @collect_error
     async def execute(
         self,
-        kernel_id,  # type: str
-        api_version,  # type: int
-        run_id,  # type: str
-        mode,  # type: Literal['query', 'batch', 'continue', 'input']
-        code,  # type: str
-        opts,  # type: Dict[str, Any]
-        flush_timeout,  # type: float
-    ):
-        # type: (...) -> Dict[str, Any]
+        kernel_id: str,
+        api_version: int,
+        run_id: str,
+        mode: Literal["query", "batch", "continue", "input"],
+        code: str,
+        opts: dict[str, Any],
+        flush_timeout: float,
+    ) -> dict[str, Any]:
         if mode != "continue":
             log.info(
                 "rpc::execute(k:{0}, run-id:{1}, mode:{2}, code:{3!r})",
@@ -476,8 +474,8 @@ class AgentRPCServer(aobject):
     @collect_error
     async def execute_batch(
         self,
-        kernel_id,  # type: str
-        startup_command,  # type: str
+        kernel_id: str,
+        startup_command: str,
     ) -> None:
         # DEPRECATED
         asyncio.create_task(
@@ -492,11 +490,10 @@ class AgentRPCServer(aobject):
     @collect_error
     async def start_service(
         self,
-        kernel_id,  # type: str
-        service,  # type: str
-        opts,  # type: Dict[str, Any]
-    ):
-        # type: (...) -> Dict[str, Any]
+        kernel_id: str,
+        service: str,
+        opts: dict[str, Any],
+    ) -> dict[str, Any]:
         log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
         return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts)
 
