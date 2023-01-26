@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, SubsystemRule, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -107,6 +107,6 @@ def target_types():
 def rules():
     return [
         *collect_rules(),
-        SubsystemRule(PlatformResourcesSusbystem),
+        *PlatformResourcesSusbystem.rules(),
         UnionRule(InferDependenciesRequest, InferPlatformSpecificDependenciesRequest),
     ]
