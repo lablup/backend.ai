@@ -486,6 +486,15 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 After this, re-running any Pants command will automatically reinitialize itself and
 all cached data as necessary.
 
+Changing or updating the Python runtime for Pants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you run ``scripts/install-dev.sh``, it automatically creates ``.pants.bootstrap``
+to explicitly set a specific pyenv Python version to run Pants.
+
+If you have removed/upgraded this specific Python version from pyenv, you also need to
+update ``.pants.bootstrap`` accordingly.
+
 .. _debugging-tests:
 
 Debugging test cases (or interactively running test cases)
