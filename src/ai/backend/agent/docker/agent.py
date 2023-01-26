@@ -971,7 +971,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 gwbridge = await docker.networks.get("docker_gwbridge")
                 gwbridge_info = await gwbridge.show()
                 self.gwbridge_subnet = gwbridge_info["IPAM"]["Config"][0]["Subnet"]
-        except DockerError:
+        except (DockerError, KeyError, IndexError):
             self.gwbridge_subnet = None
         ipc_base_path = self.local_config["agent"]["ipc-base-path"]
         (ipc_base_path / "container").mkdir(parents=True, exist_ok=True)
