@@ -27,7 +27,7 @@ class PlatformResourcesSusbystem(Subsystem):
     help = "The platform-specific resource provider."
     platform = EnumOption(
         "--target",
-        default=lambda cls: Platform.current,
+        default=lambda cls: Platform.create_for_localhost(),
         enum_type=Platform,
         advanced=False,
         help="Select only resources compatible with the given platform",
