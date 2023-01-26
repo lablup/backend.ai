@@ -114,7 +114,7 @@ def setup_towncrier_lockfile(
 ) -> GeneratePythonLockfile:
     return GeneratePythonLockfile.from_tool(
         subsystem,
-        use_pex=python_setup.generate_lockfiles_with_pex,
+        use_pex=None,
     )
 
 
