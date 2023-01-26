@@ -49,7 +49,7 @@
             "pyflakes<3.1.0,>=3.0.0"
           ],
           "requires_python": ">=3.8.1",
-          "version": "6"
+          "version": "6.0.0"
         },
         {
           "artifacts": [
@@ -67,7 +67,7 @@
           "project_name": "mccabe",
           "requires_dists": [],
           "requires_python": ">=3.6",
-          "version": "0.7"
+          "version": "0.7.0"
         },
         {
           "artifacts": [
@@ -85,7 +85,7 @@
           "project_name": "pycodestyle",
           "requires_dists": [],
           "requires_python": ">=3.6",
-          "version": "2.10"
+          "version": "2.10.0"
         },
         {
           "artifacts": [
@@ -174,7 +174,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.108",
+  "pex_version": "2.1.120",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [

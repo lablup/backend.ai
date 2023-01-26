@@ -67,7 +67,7 @@
             "uvloop>=0.15.2; extra == \"uvloop\""
           ],
           "requires_python": ">=3.7",
-          "version": "22.12"
+          "version": "22.12.0"
         },
         {
           "artifacts": [
@@ -126,7 +126,7 @@
           "project_name": "pathspec",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "0.11"
+          "version": "0.11.0"
         },
         {
           "artifacts": [
@@ -180,7 +180,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.108",
+  "pex_version": "2.1.120",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
