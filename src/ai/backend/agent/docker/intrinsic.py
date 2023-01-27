@@ -176,9 +176,9 @@ class CPUPlugin(AbstractComputePlugin):
         container_ids: Sequence[str],
     ) -> Sequence[ContainerMeasurement]:
         async def sysfs_impl(container_id):
-            cpu_prefix = f"/sys/fs/cgroup/cpuacct/docker/{container_id}/"
+            cpu_path = ctx.agent.get_cgroup_path("cpuacct", container_id)
             try:
-                cpu_used = read_sysfs(cpu_prefix + "cpuacct.usage", int) / 1e6
+                cpu_used = read_sysfs(cpu_path / "cpuacct.usage", int) / 1e6
             except IOError as e:
                 log.warning(
                     "cannot read stats: sysfs unreadable for container {0}\n{1!r}",
@@ -460,11 +460,11 @@ class MemoryPlugin(AbstractComputePlugin):
             # return total_size
 
         async def sysfs_impl(container_id):
-            mem_prefix = f"/sys/fs/cgroup/memory/docker/{container_id}/"
-            io_prefix = f"/sys/fs/cgroup/blkio/docker/{container_id}/"
+            mem_path = ctx.agent.get_cgroup_path("memory", container_id)
+            io_path = ctx.agent.get_cgroup_path("blkio", container_id)
             try:
-                mem_cur_bytes = read_sysfs(mem_prefix + "memory.usage_in_bytes", int)
-                io_stats = Path(io_prefix + "blkio.throttle.io_service_bytes").read_text()
+                mem_cur_bytes = read_sysfs(mem_path / "memory.usage_in_bytes", int)
+                io_stats = (io_path / "blkio.throttle.io_service_bytes").read_text()
                 # example data:
                 #   8:0 Read 13918208
                 #   8:0 Write 0
