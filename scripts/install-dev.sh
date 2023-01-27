@@ -652,7 +652,16 @@ setup_environment() {
 
   show_info "Creating the unified virtualenv for IDEs..."
   check_snappy
-  $PANTS export
+  $PANTS export \
+    --resolve=python-default \
+    --resolve=python-kernel \
+    --resolve=pants-plugins \
+    --resolve=flake8 \
+    --resolve=mypy \
+    --resolve=isort \
+    --resolve=black
+  # NOTE: Some resolves like pytest are not needed to be exported at this point
+  # because pants will generate temporary resolves when actually running the test cases.
 
   # Install postgresql, etcd packages via docker
   show_info "Creating docker compose configuration file for \"halfstack\"..."
