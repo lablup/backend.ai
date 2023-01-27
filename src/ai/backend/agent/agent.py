@@ -991,6 +991,7 @@ class AbstractAgent(
         done_future: asyncio.Future = None,
         suppress_events: bool = False,
     ) -> None:
+        cid: Optional[ContainerId] = None
         try:
             kernel_obj = self.kernel_registry[kernel_id]
         except KeyError:
@@ -1007,26 +1008,27 @@ class AbstractAgent(
                     event.name,
                     kernel_id,
                 )
-        assert kernel_obj is not None
-        if kernel_obj.termination_reason:
-            reason = kernel_obj.termination_reason
-        if container_id is not None:
-            if event == LifecycleEvent.START:
-                # Update the container ID (for restarted kernels).
-                # This will be overwritten by create_kernel() soon, but
-                # updating here improves consistency of kernel_id to container_id
-                # mapping earlier.
-                kernel_obj["container_id"] = container_id
-            elif container_id != kernel_obj["container_id"]:
-                # This should not happen!
-                log.warning(
-                    "container id mismatch for kernel_obj (k:{}, c:{}) with event (e:{}, c:{})",
-                    kernel_id,
-                    kernel_obj["container_id"],
-                    event.name,
-                    container_id,
-                )
-        cid = kernel_obj.get("container_id")
+        else:
+            assert kernel_obj is not None
+            if kernel_obj.termination_reason:
+                reason = kernel_obj.termination_reason
+            if container_id is not None:
+                if event == LifecycleEvent.START:
+                    # Update the container ID (for restarted kernels).
+                    # This will be overwritten by create_kernel() soon, but
+                    # updating here improves consistency of kernel_id to container_id
+                    # mapping earlier.
+                    kernel_obj["container_id"] = container_id
+                elif container_id != kernel_obj["container_id"]:
+                    # This should not happen!
+                    log.warning(
+                        "container id mismatch for kernel_obj (k:{}, c:{}) with event (e:{}, c:{})",
+                        kernel_id,
+                        kernel_obj["container_id"],
+                        event.name,
+                        container_id,
+                    )
+            cid = kernel_obj.get("container_id")
         if cid is None:
             log.warning(
                 "kernel has no container_id (k:{}) with event (e:{})",
