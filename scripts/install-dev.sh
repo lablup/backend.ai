@@ -397,7 +397,7 @@ install_python() {
       show_info "Installing Python ${pants_python_version} for Pants to run ..."
       pyenv install "${pants_python_version}"
     else
-      show_info "Confirmed Python ${pants_python_version} available for Pants"
+      echo "✓ Python ${pants_python_version} as the Pants runtime is already installed."
     fi
   fi
   if [ -z "$(pyenv versions | grep -E "^\\*?[[:space:]]+${PYTHON_VERSION//./\\.}([[:blank:]]+.*)?$")" ]; then
@@ -421,7 +421,7 @@ install_python() {
       exit 1
     fi
   else
-    echo "${PYTHON_VERSION} (as the Backend.AI runtime) is already installed."
+    echo "✓ Python ${PYTHON_VERSION} as the Backend.AI runtime is already installed."
   fi
 }
 
