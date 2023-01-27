@@ -31,7 +31,7 @@ from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE
 from ..exceptions import BackendClientError
-from ..pagination import generate_paginated_results
+from ..pagination import fetch_paginated_result
 from ..request import (
     AttachedFile,
     Request,
@@ -112,7 +112,7 @@ class ComputeSession(BaseFunction):
         :param is_active: Fetches active or inactive users only if not None.
         :param fields: Additional per-user query fields to fetch.
         """
-        return await generate_paginated_results(
+        return await fetch_paginated_result(
             "compute_session_list",
             {
                 "status": (status, "String"),
