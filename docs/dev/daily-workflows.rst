@@ -177,18 +177,28 @@ To (re-)generate the virtualenv, run:
 
 .. code-block:: console
 
-    $ ./pants export ::
+    $ ./pants export
 
 Then configure your IDEs/editors to use
 ``dist/export/python/virtualenvs/python-default/VERSION/bin/python`` as the
 interpreter for your code, where ``VERSION`` is the interpreter version
 specified in ``pants.toml``.
 
-.. tip::
+As of Pants 2.16, you may also export the virtualenvs by the individual lockfiles
+using the ``--resolve`` option like:
 
-   To activate flake8/mypy checks (in Vim) and get proper intelli-sense support
-   for pytest (in VSCode), just install them in the exported venv as follows.
-   (You need to repeat this when you re-export!)
+.. code-block:: console
+
+    $ ./pants export --resolve=python-default --resolve=mypy
+
+To make LSP (language server protocol) services like PyLance to detect our source packages correctly,
+you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
+``plugins/*/`` directories if you have added Backend.AI plugin checkouts.
+
+For linters and formatters, configure the tool executable paths to indicate
+``dist/export/python/virtualenvs/tools/TOOLNAME/bin/EXECUTABLE``.
+For example, flake8's executable path is
+``dist/export/python/virtualenvs/tools/flake8/bin/flake8``.
 
 Currently we have four Python tools to configure in this way:
 
@@ -230,7 +240,7 @@ Set the following keys in the workspace settings:
 
 .. warning::
 
-   When the target Python version has changed when you pull a new version/branch, you need to re-run ``./pants export ::``
+   When the target Python version has changed when you pull a new version/branch, you need to re-run ``./pants export``
    and manually update the Python interpreter path and mypy executable path configurations.
 
 Vim/NeoVim
@@ -272,7 +282,7 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
      "coc.preferences.willSaveHandlerTimeout": 5000,
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.5/bin/python",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.9/bin/python",
      "python.formatting.provider": "black",
      "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
      "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
@@ -282,14 +292,15 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "python.linting.flake8Path": "dist/export/python/virtualenvs/tools/flake8/bin/flake8"
    }
 
+
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When each branch has different external package requirements, you should run ``./pants export ::``
+When each branch has different external package requirements, you should run ``./pants export``
 before running codes after ``git switch``-ing between such branches.
 
 Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
-In that case, run ``killall -r pantsd`` (``killall pantsd`` in macOS) and it will be fine.
+In that case, run ``pgrep pantsd | xargs kill`` and it will be fine.
 
 Running entrypoints
 -------------------
@@ -394,7 +405,7 @@ Writing documentation
 
   .. code-block:: console
 
-     $ pyenv virtualenv 3.10.4 venv-bai-docs
+     $ pyenv virtualenv 3.10.9 venv-bai-docs
 
 * Activate the virtualenv and run:
 
@@ -441,7 +452,7 @@ Adding new external dependencies
   .. code-block:: console
 
      $ ./pants generate-lockfiles
-     $ ./pants export ::
+     $ ./pants export
 
 Merging lockfile conflicts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -469,11 +480,20 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 
 .. code-block:: console
 
-   $ killall -r pantsd   # just `killall pantsd` in macOS
-   $ rm -r .tmp .pants.d ~/.cache/pants
+   $ pgrep pantsd | xargs kill
+   $ rm -r .tmp/immutable* .pants.d ~/.cache/pants
 
 After this, re-running any Pants command will automatically reinitialize itself and
 all cached data as necessary.
+
+Changing or updating the Python runtime for Pants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you run ``scripts/install-dev.sh``, it automatically creates ``.pants.bootstrap``
+to explicitly set a specific pyenv Python version to run Pants.
+
+If you have removed/upgraded this specific Python version from pyenv, you also need to
+update ``.pants.bootstrap`` accordingly.
 
 .. _debugging-tests:
 
@@ -570,7 +590,7 @@ Making a new release
 * Run ``LOCKSET=tools/towncrier ./py -m towncrier`` to auto-generate the changelog.
 
   - You may append ``--draft`` to see a preview of the changelog update without
-    actually modifying the filesytem.
+    actually modifying the filesystem.
 
   - (WIP: `lablup/backend.ai#427 <https://github.com/lablup/backend.ai/pull/427>`_).
 

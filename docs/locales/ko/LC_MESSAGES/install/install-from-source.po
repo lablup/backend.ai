@@ -9,247 +9,447 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Backend.AI API Documentation 1.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2022-06-06 03:39+0000\n"
+"POT-Creation-Date: 2022-11-11 22:50-0600\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.10.1\n"
+"Generated-By: Babel 2.10.3\n"
 
-#: ../../install/install-from-source.rst:2 8dcfac13c80042ea88f92f29a015d41e
+#: ../../install/install-from-source.rst:2 1583d3c8b5f44012898d41d7358472d4
 msgid "Install from Source"
 msgstr ""
 
-#: ../../install/install-from-source.rst:4 d5c8f41bde434095b2c89f79e4bf4806
+#: ../../install/install-from-source.rst:6 e05809fe6e654795a5b0893dd98d4295
 msgid ""
-"This is the recommended way to install on most setups, for both development "
-"and production."
+"For production deployments, we recommend to create separate virtualenvs "
+"for individual services and install the pre-built wheel distributions, "
+"following :doc:`/install/install-from-package`."
 msgstr ""
 
-#: ../../install/install-from-source.rst:8 89fe4c759c0d4093880187b43e61298a
-msgid ""
-"For production deployments, we also recommend pinning specific releases when "
-"cloning or updating source repositories."
+#: ../../install/install-from-source.rst:11 f53a2beb30a0490c90912d0a79730de7
+msgid "Setting Up Manager and Agent (single node, all-in-one)"
 msgstr ""
 
-#: ../../install/install-from-source.rst:12 9fc42233bb2e4f03a0eaa494664958b4
-msgid "Setting Up Manager and Agent (single node)"
+#: ../../install/install-from-source.rst:13 6fd54305343b444b90290c03c7ee9be9
+msgid "Check out :doc:`/dev/development-setup`."
 msgstr ""
 
-#: ../../install/install-from-source.rst:15 622b358c708044528c65fc1ce50772a0
-msgid "Prerequisites"
-msgstr "필수 선행 사항"
-
-#: ../../install/install-from-source.rst:17 a22a732bc04341de8f05528073c714d1
-msgid "For a standard installation:"
-msgstr ""
-
-#: ../../install/install-from-source.rst:19 3cd5e31b377c4d9898f84285db870852
-msgid "Ubuntu 16.04+ / CentOS 7.4+ / macOS 10.12+"
-msgstr ""
-
-#: ../../install/install-from-source.rst:21 49667fd997b849208a8f3425930fd8fe
-msgid ""
-"For Linux: ``sudo`` with access to the package manager (``apt-get`` or "
-"``yum``)"
-msgstr ""
-
-#: ../../install/install-from-source.rst:22 d4ab2ae5dda445558319d437006dbe17
-msgid ""
-"For macOS: `homebrew <https://brew.sh>`_ with the latest Xcode Command Line "
-"tools."
-msgstr ""
-
-#: ../../install/install-from-source.rst:24 354f75a65152469a8e3e45d46b567f4d
-msgid "bash"
-msgstr ""
-
-#: ../../install/install-from-source.rst:25 bfb693c207d147bfb2f8a7c6ec2071d5
-msgid "git"
-msgstr ""
-
-#: ../../install/install-from-source.rst:27 5f4a72df6e9c41cbae4a00a37090e495
-msgid "To enable CUDA (only supported in Ubuntu or CentOS):"
-msgstr ""
-
-#: ../../install/install-from-source.rst:29 858936e4197d40b2a318060d52214f30
-msgid "CUDA 8.0 or later (with compatible NVIDIA driver)"
-msgstr ""
-
-#: ../../install/install-from-source.rst:30 8dc0eb66ed8441c399a6c91862b63079
-msgid "nvidia-docker 1.0 or 2.0"
-msgstr ""
-
-#: ../../install/install-from-source.rst:34 7d2380188f3a43d1b7f6c637e337d8b7
-msgid "Running the Installer"
-msgstr ""
-
-#: ../../install/install-from-source.rst:36 afc896aec2bf425b89391fe24e3cc25f
-msgid ""
-"Clone `the meta repository <https://github.com/lablup/backend.ai>`_ first. "
-"For the best result, clone the branch of this repo that matches with the "
-"target server branch you want to install. Inside the cloned working copy, "
-"``scripts/install-dev.sh`` is the automatic single-node installation script."
-msgstr ""
-
-#: ../../install/install-from-source.rst:40 66e603c513ca456f9c935d2a8b070b33
-msgid "It provides the following options (check with ``--help``):"
-msgstr ""
-
-#: ../../install/install-from-source.rst:42 0daaf090c2d94661ba54a54575df1193
-msgid "``--python-version``: The Python version to install."
-msgstr ""
-
-#: ../../install/install-from-source.rst:43 0d67ce67ddda478d8db4b7e8402c3cf4
-msgid ""
-"``--install-path``: The target directory where individual Backend.AI "
-"components are installed together as subdirectories."
-msgstr ""
-
-#: ../../install/install-from-source.rst:44 d8eeaa3e2f6f445190d3d044c0b14924
-msgid ""
-"``--server-branch``: The branch/tag used for the manager, agent, and common "
-"components."
-msgstr ""
-
-#: ../../install/install-from-source.rst:45 a79ff541ca7d46a6b669b3355d16ce58
-msgid "``--client-branch``: The branch/tag used for the client-py component."
-msgstr ""
-
-#: ../../install/install-from-source.rst:46 552e2a9f32b94971a65c1f29be76f24e
-msgid ""
-"``--enable-cuda``: If specified, the installer will install the open-source "
-"version of CUDA plugin for the agent."
-msgstr ""
-
-#: ../../install/install-from-source.rst:47 7d94c4635f5447e1b85dd67767acd43e
-msgid "``--cuda-branch``: The branch/tag used for the CUDA plugin."
-msgstr ""
-
-#: ../../install/install-from-source.rst:49 781519ad53664414bbce3a1e8eb7464e
-msgid ""
-"With default options, the script will install a source-based single-node "
-"Backend.AI cluster as follows:"
-msgstr ""
-
-#: ../../install/install-from-source.rst:51 4ffd50d9326c4080b3286a2cca216f1b
-msgid ""
-"The installer tries to install pyenv, the designated Python version, docker-"
-"compose, and a few libraries (e.g., libsnappy) automatically after checking "
-"their availability.  If it encounters an error during installation, it will "
-"show manual instructions and stop."
-msgstr ""
-
-#: ../../install/install-from-source.rst:53 0690e2db09e44dea8d325dd3f0430edb
-msgid ""
-"It creates a set of Docker containers for Redis 5, PostgreSQL 9.6, and etcd "
-"3.3 via docker-compose, with the default credentials: The Redis and etcd is "
-"configured without authentication and PostgreSQL uses ``postgres`` / "
-"``develove``. We call these containers as \"halfstack\"."
-msgstr ""
-
-#: ../../install/install-from-source.rst:56 9ef28813c0604f7fbd6f410c19a9f25a
-msgid ""
-"``./backend.ai-dev/{component}`` where components are manager, agent, "
-"common, client, and a few others, using separate virtualenvs. They are all "
-"installed as \"editable\" so modifying the cloned sources takes effects "
-"immediately."
-msgstr ""
-
-#: ../../install/install-from-source.rst:58 17d408d683594e44b8ccd5d5bab293e4
-msgid ""
-"For convenience, when ``cd``-ing into individual component directories, "
-"pyenv will activate the virtualenv automatically for supported shells. This "
-"is configured via ``pyenv local`` command during installation."
-msgstr ""
-
-#: ../../install/install-from-source.rst:60 0cf82f6f22a9425d89c577c9be428b27
-msgid ""
-"The default vfolder mount point is ``./backend.ai/vfolder`` and the default "
-"vfolder host is ``local``."
-msgstr ""
-
-#: ../../install/install-from-source.rst:61 d01367ae6f3940a2b876ee56432aa125
-msgid ""
-"The installer automatically populates the example fixtures (in the ``sample-"
-"configs`` directory of `the manager repository <https://github.com/lablup/"
-"backend.ai-manager>`_) for during the database initialization."
-msgstr ""
-
-#: ../../install/install-from-source.rst:63 b03d95308cc143959b9e8f371bbbabe0
-msgid ""
-"It automatically updates the list of available Backend.AI kernel images from "
-"the public Docker Hub. It also pulls a few frequently used images such as "
-"the base Python image."
-msgstr ""
-
-#: ../../install/install-from-source.rst:65 38f7c59d9cf447d2bbcf07eb77f4bbd6
-msgid ""
-"The manager and agent are *NOT* daemonized. You must run them by running "
-"``scripts/run-with-halfstack.sh python -m ...`` inside each component's "
-"source clones. Those wrapper scripts configure environment variables "
-"suitable for the default halfstack containers."
-msgstr ""
-
-#: ../../install/install-from-source.rst:71
-#: ../../install/install-from-source.rst:132 5740f74bbdc548c683bb09eb2ea76efb
-#: eef3f205d8fd486ba6d1f559b43ec738
-msgid "Verifying the Installation"
-msgstr ""
-
-#: ../../install/install-from-source.rst:73 891412544f14498f95b8f1675dbf5ced
-msgid ""
-"Run the manager and agent as follows in their respective component "
-"directories:"
-msgstr ""
-
-#: ../../install/install-from-source.rst:75 855f732131ca4361a8797ee0dea874fc
-msgid "manager:"
-msgstr ""
-
-#: ../../install/install-from-source.rst:82 c6b6da0de42d4d219990fb8a51bf7452
-msgid ""
-"By default, it listens on the localhost's 8080 port using the plain-text "
-"HTTP."
-msgstr ""
-
-#: ../../install/install-from-source.rst:84 51ecd8d237174e239bff627b83dedf06
-msgid "agent:"
-msgstr ""
-
-#: ../../install/install-from-source.rst:94 d428f179d01a4302ace2c5c204d41185
-msgid ""
-"The manager and agent may be executed without the root privilege on both "
-"Linux and macOS. In Linux, the installer sets extra capability bits to the "
-"Python executable so that the agent can manage cgroups and access the Docker "
-"daemon."
-msgstr ""
-
-#: ../../install/install-from-source.rst:98 5b4c7b4747a2464f895cca06be5456e4
-msgid ""
-"If all is well, they will say \"started\" or \"serving at ...\". You can "
-"also check their CLI options using ``--help`` option to change service IP "
-"and ports or enable the debug mode."
-msgstr ""
-
-#: ../../install/install-from-source.rst:101 9f216bd4dc9a4470a40a07938eab29c4
-msgid ""
-"To run a \"hello world\" example, you first need to configure the client "
-"using the following script:"
-msgstr ""
-
-#: ../../install/install-from-source.rst:110 5a23c6c0917c4156a4741be049eb6e76
-msgid ""
-"And then run the following inside the client directory. If you see similar "
-"console logs, your installation is now working:"
-msgstr ""
-
-#: ../../install/install-from-source.rst:125 9c87ae088764496983d2e68efa1819e7
+#: ../../install/install-from-source.rst:18 08cd640effde4b4aab3cc43a5c4a895c
 msgid "Setting Up Additional Agents (multi-node)"
 msgstr ""
 
-#: ../../install/install-from-source.rst:128 3028da0c419741b29771f2d79e07b73c
-msgid "Updating Manager Configuration for Multi-Nodes"
+#: ../../install/install-from-source.rst:21 9dac1b3e20cd4cf19b255460962c63d7
+msgid "Updating manager configuration for multi-nodes"
 msgstr ""
+
+#: ../../install/install-from-source.rst:23 2f09431502e8460eabf5358b48b78884
+msgid ""
+"Since ``scripts/install-dev.sh`` assumes a single-node all-in-one setup, "
+"it configures the etcd and Redis addresses to be ``127.0.0.1``."
+msgstr ""
+
+#: ../../install/install-from-source.rst:25 71acd4fdc48a4fba86583258ebbf9fc2
+msgid ""
+"You need to update the etcd configuration of the Redis address so that "
+"additional agent nodes can connect to the Redis server using the address "
+"advertised via etcd:"
+msgstr ""
+
+#: ../../install/install-from-source.rst:33 0ed9598977f540188199515c33819b4c
+msgid ""
+"where ``MANAGER_IP`` is an IP address of the manager node accessible from"
+" other agent nodes."
+msgstr ""
+
+#: ../../install/install-from-source.rst:36 04ecf9e8e114470da0e020d2c5ec58c1
+msgid "Installing additional agents in different nodes"
+msgstr ""
+
+#: ../../install/install-from-source.rst:38 f54d867e27714d00afb8e188305c1d75
+msgid ""
+"First, you need to initialize a working copy of the core repository for "
+"each additional agent node. As our ``scripts/install-dev.sh`` does not "
+"yet provide an \"agent-only\" installation mode, you need to manually "
+"perform the same repository cloning along with the pyenv, Python, and "
+"Pants setup procedures as the script does."
+msgstr ""
+
+#: ../../install/install-from-source.rst:44 e9349f6f07404d3cab36ee4c2b92d511
+msgid ""
+"Since we use the mono-repo for the core packages, there is no way to "
+"separately clone the agent sources only. Just clone the entire repository"
+" and configure/execute the agent only. Ensure that you **also pull the "
+"LFS files and submodules** when you manually clone it."
+msgstr ""
+
+#: ../../install/install-from-source.rst:48 e9866a26ff964ef49c5d0ad653343e14
+msgid ""
+"Once your ``./pants`` is up and working, run ``./pants export`` to "
+"populate virtualenvs and install dependencies."
+msgstr ""
+
+#: ../../install/install-from-source.rst:50 ca4e5d23670546dbad1c6a6a87a20aec
+msgid ""
+"Then start to configure ``agent.toml`` by copying it from "
+"`configs/agent/halfstack.toml "
+"<https://github.com/lablup/backend.ai/blob/main/configs/agent/halfstack.toml>`_"
+" as follows:"
+msgstr ""
+
+#: ../../install/install-from-source.rst:52 2bb9f635d5454a4aaf50cc5cdac552de
+msgid "**agent.toml**"
+msgstr ""
+
+#: ../../install/install-from-source.rst:54 8f5f0ee4b23042de8a3b4493ad11349e
+msgid "``[etcd].addr.host``: Replace with ``MANAGER_IP``"
+msgstr ""
+
+#: ../../install/install-from-source.rst:56 4332a8dca72d40fb861fb0d8b97d579d
+msgid "``[agent].rpc-listen-addr.host``: Replace with ``AGENT_IP``"
+msgstr ""
+
+#: ../../install/install-from-source.rst:58 efeb59f2f6ca41fc84924749cdedf216
+msgid "``[container].bind-host``: Replace with ``AGENT_IP``"
+msgstr ""
+
+#: ../../install/install-from-source.rst:60 1bdbb50086314d3c8a6a6ccd5f85aff0
+msgid "``[watcher].service-addr.host``: Replace with ``AGENT_IP``"
+msgstr ""
+
+#: ../../install/install-from-source.rst:62 585de63713ee4ca8ab1b191d09e49143
+msgid ""
+"where ``AGENT_IP`` is an IP address of this agent node accessible from "
+"the manager and ``MANAGER_IP`` is an IP address of the manager node "
+"accessible from this agent node."
+msgstr ""
+
+#: ../../install/install-from-source.rst:64 becae019351a4ae48be0f21d2677bc2d
+msgid ""
+"Now execute ``./backend.ai ag start-server`` to connect this agent node "
+"to an existing manager."
+msgstr ""
+
+#: ../../install/install-from-source.rst:66 51e6d4aa8b1b42a482f9a683e4441868
+msgid ""
+"We assume that the agent and manager nodes reside in a same local "
+"network, where all TCP ports are open to each other. If this is not the "
+"case, you should configure firewalls to open all the port numbers "
+"appearing in ``agent.toml``."
+msgstr ""
+
+#: ../../install/install-from-source.rst:69 48e08129660046a3806cab8ab871e222
+msgid ""
+"There are more complicated setup scenarios such as splitting network "
+"planes for control and container-to-container communications, but we "
+"provide assistance with them for enterprise customers only."
+msgstr ""
+
+#: ../../install/install-from-source.rst:73 28673912bc3f4bb7806f70dc76e2f9bf
+msgid "Setting Up Accelerators"
+msgstr ""
+
+#: ../../install/install-from-source.rst:75 83e5eea24ff7418dac8778c26ee72fb8
+msgid ""
+"Ensure that your accelerator is properly set up using vendor-specific "
+"installation methods."
+msgstr ""
+
+#: ../../install/install-from-source.rst:77 28d72d8758a64b39afa362f02501e072
+msgid ""
+"Clone the accelerator plugin package into ``plugins`` directory if "
+"necessary or just use one of the already existing one in the mono-repo."
+msgstr ""
+
+#: ../../install/install-from-source.rst:79 1f850d850c3b44f7920f90e183ecef1b
+msgid ""
+"You also need to configure ``agent.toml``'s ``[agent].allow-compute-"
+"plugins`` with the full package path (e.g., "
+"``ai.backend.accelerator.cuda_open``) to activate them."
+msgstr ""
+
+#: ../../install/install-from-source.rst:82 718851a410d94154ac5983f1f82849f4
+msgid "Setting Up Shared Storage"
+msgstr ""
+
+#: ../../install/install-from-source.rst:84 7f604512af854145a2384600de275bf0
+msgid ""
+"To make vfolders working properly with multiple nodes, you must enable "
+"and configure Linux NFS to share the manager node's ``vfroot/local`` "
+"directory under the working copy and mount it in the same path in all "
+"agent nodes."
+msgstr ""
+
+#: ../../install/install-from-source.rst:86 5f3ba0ef8c5043e5af5f827b85d9a9ba
+msgid ""
+"It is recommended to unify the UID and GID of the storage-proxy service, "
+"all of the agent services across nodes, container UID and GID "
+"(configurable in ``agent.toml``), and the NFS volume."
+msgstr ""
+
+#: ../../install/install-from-source.rst:89 2e5c30b43c5c4bc1b06f2029c65fb254
+msgid "Configuring Overlay Networks for Multi-node Training (Optional)"
+msgstr ""
+
+#: ../../install/install-from-source.rst:93 761bbcd686ae46698979a2faab197ea0
+msgid ""
+"All other features of Backend.AI except multi-node training work without "
+"this configuration. The Docker Swarm mode is used to configure overlay "
+"networks to ensure privacy between cluster sessions, while the container "
+"monitoring and configuration is done by Backend.AI itself."
+msgstr ""
+
+#: ../../install/install-from-source.rst:97 80ae9bafc5a645018f95053d420b87a5
+msgid ""
+"Currently the cross-node inter-container overlay routing is controlled "
+"via Docker Swarm's overlay networks. In the manager, you need to `create "
+"a Swarm <https://docs.docker.com/engine/swarm/swarm-tutorial/create-"
+"swarm/>`_. In the agent nodes, you need to `join the Swarm "
+"<https://docs.docker.com/engine/swarm/swarm-tutorial/add-nodes/>`_. Then "
+"restart all manager and agent daemons to make it working."
+msgstr ""
+
+#~ msgid ""
+#~ "This is the recommended way to "
+#~ "install on most setups, for both "
+#~ "development and production."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For production deployments, we also "
+#~ "recommend pinning specific releases when "
+#~ "cloning or updating source repositories."
+#~ msgstr ""
+
+#~ msgid "Prerequisites"
+#~ msgstr "필수 선행 사항"
+
+#~ msgid "For a standard installation:"
+#~ msgstr ""
+
+#~ msgid "Ubuntu 16.04+ / CentOS 7.4+ / macOS 10.12+"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For Linux: ``sudo`` with access to "
+#~ "the package manager (``apt-get`` or "
+#~ "``yum``)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For macOS: `homebrew <https://brew.sh>`_ with"
+#~ " the latest Xcode Command Line tools."
+#~ msgstr ""
+
+#~ msgid "bash"
+#~ msgstr ""
+
+#~ msgid "git"
+#~ msgstr ""
+
+#~ msgid "To enable CUDA (only supported in Ubuntu or CentOS):"
+#~ msgstr ""
+
+#~ msgid "CUDA 8.0 or later (with compatible NVIDIA driver)"
+#~ msgstr ""
+
+#~ msgid "nvidia-docker 1.0 or 2.0"
+#~ msgstr ""
+
+#~ msgid "Running the Installer"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Clone `the meta repository "
+#~ "<https://github.com/lablup/backend.ai>`_ first. For "
+#~ "the best result, clone the branch "
+#~ "of this repo that matches with the"
+#~ " target server branch you want to "
+#~ "install. Inside the cloned working copy,"
+#~ " ``scripts/install-dev.sh`` is the "
+#~ "automatic single-node installation script."
+#~ msgstr ""
+
+#~ msgid "It provides the following options (check with ``--help``):"
+#~ msgstr ""
+
+#~ msgid "``--python-version``: The Python version to install."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--install-path``: The target directory "
+#~ "where individual Backend.AI components are "
+#~ "installed together as subdirectories."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--server-branch``: The branch/tag used "
+#~ "for the manager, agent, and common "
+#~ "components."
+#~ msgstr ""
+
+#~ msgid "``--client-branch``: The branch/tag used for the client-py component."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``--enable-cuda``: If specified, the "
+#~ "installer will install the open-source"
+#~ " version of CUDA plugin for the "
+#~ "agent."
+#~ msgstr ""
+
+#~ msgid "``--cuda-branch``: The branch/tag used for the CUDA plugin."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "With default options, the script will"
+#~ " install a source-based single-node"
+#~ " Backend.AI cluster as follows:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The installer tries to install pyenv,"
+#~ " the designated Python version, docker-"
+#~ "compose, and a few libraries (e.g., "
+#~ "libsnappy) automatically after checking their"
+#~ " availability.  If it encounters an "
+#~ "error during installation, it will show"
+#~ " manual instructions and stop."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "It creates a set of Docker "
+#~ "containers for Redis 5, PostgreSQL 9.6,"
+#~ " and etcd 3.3 via docker-compose, "
+#~ "with the default credentials: The Redis"
+#~ " and etcd is configured without "
+#~ "authentication and PostgreSQL uses "
+#~ "``postgres`` / ``develove``. We call "
+#~ "these containers as \"halfstack\"."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "``./backend.ai-dev/{component}`` where components"
+#~ " are manager, agent, common, client, "
+#~ "and a few others, using separate "
+#~ "virtualenvs. They are all installed as"
+#~ " \"editable\" so modifying the cloned "
+#~ "sources takes effects immediately."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For convenience, when ``cd``-ing into "
+#~ "individual component directories, pyenv will"
+#~ " activate the virtualenv automatically for"
+#~ " supported shells. This is configured "
+#~ "via ``pyenv local`` command during "
+#~ "installation."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The default vfolder mount point is "
+#~ "``./backend.ai/vfolder`` and the default "
+#~ "vfolder host is ``local``."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The installer automatically populates the "
+#~ "example fixtures (in the ``sample-"
+#~ "configs`` directory of `the manager "
+#~ "repository <https://github.com/lablup/backend.ai-"
+#~ "manager>`_) for during the database "
+#~ "initialization."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "It automatically updates the list of "
+#~ "available Backend.AI kernel images from "
+#~ "the public Docker Hub. It also "
+#~ "pulls a few frequently used images "
+#~ "such as the base Python image."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The manager and agent are *NOT* "
+#~ "daemonized. You must run them by "
+#~ "running ``scripts/run-with-halfstack.sh python"
+#~ " -m ...`` inside each component's "
+#~ "source clones. Those wrapper scripts "
+#~ "configure environment variables suitable for"
+#~ " the default halfstack containers."
+#~ msgstr ""
+
+#~ msgid "Verifying the Installation"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Run the manager and agent as "
+#~ "follows in their respective component "
+#~ "directories:"
+#~ msgstr ""
+
+#~ msgid "manager:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "By default, it listens on the "
+#~ "localhost's 8080 port using the "
+#~ "plain-text HTTP."
+#~ msgstr ""
+
+#~ msgid "agent:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The manager and agent may be "
+#~ "executed without the root privilege on"
+#~ " both Linux and macOS. In Linux, "
+#~ "the installer sets extra capability bits"
+#~ " to the Python executable so that "
+#~ "the agent can manage cgroups and "
+#~ "access the Docker daemon."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "If all is well, they will say "
+#~ "\"started\" or \"serving at ...\". You"
+#~ " can also check their CLI options "
+#~ "using ``--help`` option to change "
+#~ "service IP and ports or enable the"
+#~ " debug mode."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "To run a \"hello world\" example, "
+#~ "you first need to configure the "
+#~ "client using the following script:"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "And then run the following inside "
+#~ "the client directory. If you see "
+#~ "similar console logs, your installation "
+#~ "is now working:"
+#~ msgstr ""
+
+#~ msgid "Updating Manager Configuration for Multi-Nodes"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For production deployments, we recommend "
+#~ "to create separate virtualenvs for "
+#~ "individual services and install the "
+#~ "pre-built wheel distributions."
+#~ msgstr ""
+
+#~ msgid "Setting Up Manager and Agent (single node)"
+#~ msgstr ""
+
+#~ msgid "Check out :doc:`/install/development-setup`."
+#~ msgstr ""
+
+#~ msgid "(TODO)"
+#~ msgstr ""
+

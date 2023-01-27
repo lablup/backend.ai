@@ -100,6 +100,7 @@ ENV/
 /storage-proxy.toml
 /webserver.conf
 /cuda-mock.toml
+/.pants.bootstrap
 /.pants.env
 /docker-compose.halfstack.current.yml
 /alembic.ini
