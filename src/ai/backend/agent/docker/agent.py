@@ -40,6 +40,7 @@ from aiodocker.exceptions import DockerError
 from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
+from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef
 from ai.backend.common.events import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable
@@ -921,6 +922,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
 class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
+    docker_info: Mapping[str, Any]
     monitor_docker_task: asyncio.Task
     agent_sockpath: Path
     agent_sock_task: asyncio.Task
@@ -965,6 +967,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     docker_version["Version"],
                     docker_version["ApiVersion"],
                 )
+            docker_info = await docker.system.info()
+            log.info(
+                "Cgroup Driver: {0}, Cgroup Version: {1}",
+                docker_info["CgroupDriver"],
+                docker_info["CgroupVersion"],
+            )
+            self.docker_info = docker_info
         await super().__ainit__()
         try:
             async with Docker() as docker:
@@ -1032,6 +1041,18 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         await self.metadata_server.cleanup()
         if self.docker:
             await self.docker.close()
+
+    def get_cgroup_path(self, controller: str, container_id: str) -> Path:
+        driver = self.docker_info["CgroupDriver"]
+        version = self.docker_info["CgroupVersion"]
+        mount_point = get_cgroup_mount_point(version, controller)
+        # See https://docs.docker.com/config/containers/runmetrics/#find-the-cgroup-for-a-given-container
+        match driver:
+            case "cgroupfs":
+                cgroup = f"docker/{container_id}"
+            case "systemd":
+                cgroup = f"system.slice/docker-{container_id}.scope"
+        return mount_point / cgroup
 
     async def detect_resources(
         self,
