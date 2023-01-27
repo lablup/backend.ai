@@ -68,19 +68,36 @@ class libnuma:
             match sys.platform:
                 case "linux":
                     try:
-                        docker_cpuset_path = (
-                            get_cgroup_mount_point("2", "cpuset")
-                            / "system.slice/docker.service/cpuset.cpus.effective"
-                        )
-                        cpuset_source = "the docker cgroup (v2)"
-                        if not docker_cpuset_path.exists():
-                            docker_cpuset_path = (
-                                get_cgroup_mount_point("1", "cpuset")
-                                / "docker/cpuset.effective_cpus"
-                            )
-                            cpuset_source = "the docker cgroup (v1)"
-                    except RuntimeError:
-                        pass  # couldn't find the cgroup mount point. try alternatives.
+                        docker_host, connector = get_docker_connector()
+                        async with aiohttp.ClientSession(connector=connector) as sess:
+                            async with sess.get(docker_host / "info") as resp:
+                                data = await resp.json()
+                    except (RuntimeError, aiohttp.ClientError):
+                        pass
+                    else:
+                        try:
+                            driver = data["CgroupDriver"]
+                            version = data["CgroupVersion"]
+                            mount_point = get_cgroup_mount_point(version, "cpuset")
+
+                            match driver:
+                                case "cgroupfs":
+                                    cgroup = "docker"
+                                case "systemd":
+                                    cgroup = "system.slice/docker.service"
+
+                            match version:
+                                case "1":
+                                    # FIXME: systemd & cgroup v1 path doesn't exists
+                                    cpuset_source_name = "cpuset.effective_cpus"
+                                case "2":
+                                    cpuset_source_name = "cpuset.cpus.effective"
+
+                            docker_cpuset_path = mount_point / cgroup / cpuset_source_name
+                            log.debug(f"docker_cpuset_path: {docker_cpuset_path}")
+                            cpuset_source = "the docker cgroup (v{})".format(version)
+                        except RuntimeError:
+                            pass  # couldn't find the cgroup mount point. try alternatives.
                     try:
                         docker_cpuset = docker_cpuset_path.read_text()
                         cpuset = {*parse_cpuset(docker_cpuset)}
