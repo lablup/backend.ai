@@ -15,6 +15,7 @@ import yarl
 from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
+from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.models.image import ImageRow, ImageType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -242,9 +243,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             if (reporter := self.reporter.get()) is not None:
                 await reporter.update(1, message=progress_msg)
 
-        idx = 0
         for architecture, manifest in manifests.items():
-            idx += 1
             if manifest is None:
                 skip_reason = "missing/deleted"
                 continue
@@ -287,6 +286,8 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         update_key: updates,
                     }
                 )
+            except (InvalidImageName, InvalidImageTag) as e:
+                skip_reason = str(e)
             finally:
                 if skip_reason:
                     log.warning(

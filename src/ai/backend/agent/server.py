@@ -23,7 +23,6 @@ from typing import (
     Callable,
     ClassVar,
     Coroutine,
-    Dict,
     Literal,
     Mapping,
     Optional,
@@ -451,7 +450,7 @@ class AgentRPCServer(aobject):
         session_id: str,
         kernel_id: str,
         updated_config: dict,
-    ):
+    ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
             creation_id,
@@ -464,15 +463,14 @@ class AgentRPCServer(aobject):
     @collect_error
     async def execute(
         self,
-        kernel_id,  # type: str
-        api_version,  # type: int
-        run_id,  # type: str
-        mode,  # type: Literal['query', 'batch', 'continue', 'input']
-        code,  # type: str
-        opts,  # type: Dict[str, Any]
-        flush_timeout,  # type: float
-    ):
-        # type: (...) -> Dict[str, Any]
+        kernel_id: str,
+        api_version: int,
+        run_id: str,
+        mode: Literal["query", "batch", "continue", "input"],
+        code: str,
+        opts: dict[str, Any],
+        flush_timeout: float,
+    ) -> dict[str, Any]:
         if mode != "continue":
             log.info(
                 "rpc::execute(k:{0}, run-id:{1}, mode:{2}, code:{3!r})",
@@ -496,8 +494,8 @@ class AgentRPCServer(aobject):
     @collect_error
     async def execute_batch(
         self,
-        kernel_id,  # type: str
-        startup_command,  # type: str
+        kernel_id: str,
+        startup_command: str,
     ) -> None:
         # DEPRECATED
         asyncio.create_task(
@@ -512,11 +510,10 @@ class AgentRPCServer(aobject):
     @collect_error
     async def start_service(
         self,
-        kernel_id,  # type: str
-        service,  # type: str
-        opts,  # type: Dict[str, Any]
-    ):
-        # type: (...) -> Dict[str, Any]
+        kernel_id: str,
+        service: str,
+        opts: dict[str, Any],
+    ) -> dict[str, Any]:
         log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
         return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts)
 
@@ -524,9 +521,9 @@ class AgentRPCServer(aobject):
     @collect_error
     async def get_commit_status(
         self,
-        kernel_id,  # type: str
-        subdir,  # type: str
-    ):
+        kernel_id: str,
+        subdir: str,
+    ) -> dict[str, Any]:
         # Only this function logs debug since web sends request at short intervals
         log.debug("rpc::get_commit_status(k:{})", kernel_id)
         status: CommitStatus = await self.agent.get_commit_status(
@@ -542,10 +539,10 @@ class AgentRPCServer(aobject):
     @collect_error
     async def commit(
         self,
-        kernel_id,  # type: str
-        subdir,  # type: str
-        filename,  # type: str
-    ):
+        kernel_id: str,
+        subdir: str,
+        filename: str,
+    ) -> dict[str, Any]:
         log.info("rpc::commit(k:{})", kernel_id)
         bgtask_mgr = self.local_config["background_task_manager"]
         task_id = await bgtask_mgr.start(
@@ -629,18 +626,6 @@ class AgentRPCServer(aobject):
         # TODO: implement
         log.info("rpc::shutdown_agent()")
         pass
-
-    @rpc_function
-    @collect_error
-    async def create_overlay_network(self, network_name: str) -> None:
-        log.debug("rpc::create_overlay_network(name:{})", network_name)
-        return await self.agent.create_overlay_network(network_name)
-
-    @rpc_function
-    @collect_error
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        log.debug("rpc::destroy_overlay_network(name:{})", network_name)
-        return await self.agent.destroy_overlay_network(network_name)
 
     @rpc_function
     @collect_error
