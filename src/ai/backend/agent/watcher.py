@@ -328,6 +328,14 @@ async def watcher_server(loop, pidx, args):
             subprocess.run(["shutdown", "-h", "now"])
         await runner.cleanup()
 
+from enum import Enum
+
+class LogLevel(str, Enum):
+    debug = "debug"
+    info = "info"
+    warning = "warning"
+    error = "error"
+    critical = "critical"
 
 @click.command()
 @click.option(
@@ -345,6 +353,7 @@ async def watcher_server(loop, pidx, args):
 )
 @click.option(
     "--log-level",
+    type=click.Choice(LogLevel, case_sensitive=False),
     default="info",
     help="Choose logging level from... debug, info, warning, error, critical",
 )
@@ -355,10 +364,6 @@ def main(cli_ctx, config_path, log_level, debug=False):
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = "debug"
-
-    if log_level not in ["debug", "info", "warning", "error", "critical"]:
-        click.echo("Undefined log-level")
-        exit(1)
 
     click.echo("Selected logging level for watcher : " + log_level)
 

@@ -767,6 +767,14 @@ async def server_main_logwrapper(
     except Exception:
         traceback.print_exc()
 
+from enum import Enum
+
+class LogLevel(str, Enum):
+    debug = "debug"
+    info = "info"
+    warning = "warning"
+    error = "error"
+    critical = "critical"
 
 @click.group(invoke_without_command=True)
 @click.option(
@@ -784,6 +792,7 @@ async def server_main_logwrapper(
 )
 @click.option(
     "--log-level",
+    type=click.Choice(LogLevel, case_sensitive=False),
     default="info",
     help="Choose logging level from... debug, info, warning, error, critical",
 )
@@ -796,11 +805,6 @@ def main(ctx: click.Context, config_path: Path, log_level: str, debug: bool = Fa
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = "debug"
-
-    if log_level not in ["debug", "info", "warning", "error", "critical"]:
-        click.echo("Undefined log-level")
-        click.echo("Try 'backend.ai mgr start-server -h' for help")
-        exit(1)
 
     click.echo("Selected logging level for manager : " + log_level)
 

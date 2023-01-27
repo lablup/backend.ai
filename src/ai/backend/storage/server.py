@@ -149,6 +149,14 @@ async def server_main(
         if aiomon_started:
             m.close()
 
+from enum import Enum
+
+class LogLevel(str, Enum):
+    debug = "debug"
+    info = "info"
+    warning = "warning"
+    error = "error"
+    critical = "critical"
 
 @click.group(invoke_without_command=True)
 @click.option(
@@ -167,6 +175,7 @@ async def server_main(
 )
 @click.option(
     "--log-level",
+    type=click.Choice(LogLevel, case_sensitive=False),
     default="info",
     help="Choose logging level from... debug, info, warning, error, critical",
 )
@@ -177,11 +186,6 @@ def main(cli_ctx, config_path, log_level, debug=False):
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = "debug"
-
-    if log_level not in ["debug", "info", "warning", "error", "critical"]:
-        click.echo("Undefined log-level")
-        click.echo("Try './py -m ai.backend.storage.server --help' for help")
-        exit(1)
 
     click.echo("Selected logging level for storage : " + log_level)
 

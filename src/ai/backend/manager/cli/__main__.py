@@ -23,6 +23,14 @@ from .context import CLIContext, init_logger, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
+from enum import Enum
+
+class LogLevel(str, Enum):
+    debug = "debug"
+    info = "info"
+    warning = "warning"
+    error = "error"
+    critical = "critical"
 
 @click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
@@ -40,6 +48,7 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 )
 @click.option(
     "--log-level",
+    type=click.Choice(LogLevel, case_sensitive=False),
     default="info",
     help="Choose logging level from... debug, info, warning, error, critical",
 )
