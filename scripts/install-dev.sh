@@ -391,10 +391,14 @@ set_brew_python_build_flags() {
 
 install_python() {
   if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-    PYTHON_39_LATEST_MINOR=$(pyenv install -l | grep -i -E '^\s+3\.9\..+' | awk -F. '{print $3}' | sort -nr | head -n 1)
-    PANTS_PYTHON_VERSION="3.9.${PYTHON_39_LATEST_MINOR}"
-    show_info "Installing python ${PANTS_PYTHON_VERSION} for pants to run"
-    pyenv install --skip-existing "${PANTS_PYTHON_VERSION}"
+    local pants_python_version=$(pyenv latest -q '3.9')  # get the latest 3.9 from all installed versions
+    if [ -z "$pants_python_version" ]; then
+      pants_python_version=$(pyenv latest -q -k '3.9')  # get the latest 3.9 from all installable versions
+      show_info "Installing Python ${pants_python_version} for Pants to run ..."
+      pyenv install "${pants_python_version}"
+    else
+      show_info "Confirmed Python ${pants_python_version} available for Pants"
+    fi
   fi
   if [ -z "$(pyenv versions | grep -E "^\\*?[[:space:]]+${PYTHON_VERSION//./\\.}([[:blank:]]+.*)?$")" ]; then
     if [ "$DISTRO" = "Darwin" ]; then
@@ -417,7 +421,7 @@ install_python() {
       exit 1
     fi
   else
-    echo "${PYTHON_VERSION} is already installed."
+    echo "${PYTHON_VERSION} (as the Backend.AI runtime) is already installed."
   fi
 }
 
@@ -471,7 +475,7 @@ check_python() {
 }
 
 search_pants_python_from_pyenv() {
-  local _PYENV_PYVER=$(pyenv latest 3.9)
+  local _PYENV_PYVER=$(pyenv latest -q '3.9')
   if [ -z "$_PYENV_PYVER" ]; then
     >&2 echo "No Python 3.9 available via pyenv!"
     >&2 echo "Please install Python 3.9 using pyenv and try again."
