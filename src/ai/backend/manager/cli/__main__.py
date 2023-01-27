@@ -34,7 +34,6 @@ class LogLevel(str, Enum):
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
-@click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
     "-f",
     "--config-path",
