@@ -5,6 +5,7 @@ import signal
 import ssl
 import subprocess
 import sys
+from enum import Enum
 from pathlib import Path
 from pprint import pformat, pprint
 
@@ -328,7 +329,6 @@ async def watcher_server(loop, pidx, args):
             subprocess.run(["shutdown", "-h", "now"])
         await runner.cleanup()
 
-from enum import Enum
 
 class LogLevel(str, Enum):
     debug = "debug"
@@ -336,6 +336,7 @@ class LogLevel(str, Enum):
     warning = "warning"
     error = "error"
     critical = "critical"
+
 
 @click.command()
 @click.option(

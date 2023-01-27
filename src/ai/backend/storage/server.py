@@ -6,6 +6,7 @@ import os
 import pwd
 import ssl
 import sys
+from enum import Enum
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import Any, AsyncIterator, Sequence
@@ -149,7 +150,6 @@ async def server_main(
         if aiomon_started:
             m.close()
 
-from enum import Enum
 
 class LogLevel(str, Enum):
     debug = "debug"
@@ -157,6 +157,7 @@ class LogLevel(str, Enum):
     warning = "warning"
     error = "error"
     critical = "critical"
+
 
 @click.group(invoke_without_command=True)
 @click.option(

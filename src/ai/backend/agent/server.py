@@ -11,6 +11,7 @@ import os.path
 import shutil
 import signal
 import sys
+from enum import Enum
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import ip_network
 from pathlib import Path
@@ -814,7 +815,6 @@ async def server_main(
         if aiomon_started:
             monitor.close()
 
-from enum import Enum
 
 class LogLevel(str, Enum):
     debug = "debug"
@@ -822,6 +822,7 @@ class LogLevel(str, Enum):
     warning = "warning"
     error = "error"
     critical = "critical"
+
 
 @click.group(invoke_without_command=True)
 @click.option(

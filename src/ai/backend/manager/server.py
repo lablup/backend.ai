@@ -12,6 +12,7 @@ import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import (
     Any,
@@ -767,7 +768,6 @@ async def server_main_logwrapper(
     except Exception:
         traceback.print_exc()
 
-from enum import Enum
 
 class LogLevel(str, Enum):
     debug = "debug"
@@ -775,6 +775,7 @@ class LogLevel(str, Enum):
     warning = "warning"
     error = "error"
     critical = "critical"
+
 
 @click.group(invoke_without_command=True)
 @click.option(

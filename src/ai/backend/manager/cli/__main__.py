@@ -5,6 +5,7 @@ import logging
 import subprocess
 import sys
 from datetime import datetime
+from enum import Enum
 from functools import partial
 from pathlib import Path
 
@@ -23,7 +24,6 @@ from .context import CLIContext, init_logger, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
-from enum import Enum
 
 class LogLevel(str, Enum):
     debug = "debug"
@@ -31,6 +31,7 @@ class LogLevel(str, Enum):
     warning = "warning"
     error = "error"
     critical = "critical"
+
 
 @click.group(invoke_without_command=True, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option(
