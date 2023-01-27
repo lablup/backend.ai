@@ -459,8 +459,12 @@ async def update_password_handler(request: web.Request) -> web.StreamResponse:
         if isinstance(payload, str):
             payload = json.loads(payload)
         print(f'#-- {payload=}', flush=True)
+
+    # for checker in checkers
         if "PasswordLengthChecker" in checkers:
-            strong, msg = await PasswordLengthChecker().check(payload["new_password"])
+            checker = checkers["PasswordLengthChecker"]
+            print(f'#-- {checker=}', flush=True)
+            strong, msg = await PasswordLengthChecker(**checker).check(payload["new_password"])
             if not strong:
                 return web.json_response({"msg": msg}, status=400)
     return await web_handler(request, is_anonymous=False)
