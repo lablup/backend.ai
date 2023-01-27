@@ -9,6 +9,7 @@ from typing import Iterator
 import aiohttp
 import aiotools
 
+from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import get_docker_connector
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -67,15 +68,20 @@ class libnuma:
         try:
             match sys.platform:
                 case "linux":
-                    docker_cpuset_path = Path(
-                        "/sys/fs/cgroup/system.slice/docker.service/cpuset.cpus.effective"
-                    )
-                    cpuset_source = "the docker cgroup (v2)"
-                    if not docker_cpuset_path.exists():
-                        docker_cpuset_path = Path(
-                            "/sys/fs/cgroup/cpuset/docker/cpuset.effective_cpus"
+                    try:
+                        docker_cpuset_path = (
+                            get_cgroup_mount_point("2", "cpuset")
+                            / "system.slice/docker.service/cpuset.cpus.effective"
                         )
-                        cpuset_source = "the docker cgroup (v1)"
+                        cpuset_source = "the docker cgroup (v2)"
+                        if not docker_cpuset_path.exists():
+                            docker_cpuset_path = (
+                                get_cgroup_mount_point("1", "cpuset")
+                                / "docker/cpuset.effective_cpus"
+                            )
+                            cpuset_source = "the docker cgroup (v1)"
+                    except RuntimeError:
+                        pass  # couldn't find the cgroup mount point. try alternatives.
                     try:
                         docker_cpuset = docker_cpuset_path.read_text()
                         cpuset = {*parse_cpuset(docker_cpuset)}
