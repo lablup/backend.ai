@@ -652,7 +652,7 @@ setup_environment() {
 
   show_info "Creating the unified virtualenv for IDEs..."
   check_snappy
-  $PANTS export '::'
+  $PANTS export
 
   # Install postgresql, etcd packages via docker
   show_info "Creating docker compose configuration file for \"halfstack\"..."
