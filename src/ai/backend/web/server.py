@@ -265,7 +265,7 @@ async def login_handler(request: web.Request) -> web.Response:
     last_login_attempt = login_time
     if login_fail_count >= ALLOWED_FAIL_COUNT:
         log.info(
-            "Too many consecutive login attempts for {}: {}",
+            "LOGIN_HANDLER: Too many consecutive login attempts for {}: {}",
             creds["username"],
             login_fail_count,
         )
@@ -323,7 +323,7 @@ async def login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
     except BackendAPIError as e:
-        log.info("Authorization failed for {}: {}", creds["username"], e)
+        log.info("LOGIN_HANDLER: Authorization failed for {}: {}", creds["username"], e)
         result["authenticated"] = False
         result["data"] = {
             "type": e.data.get("type"),
@@ -333,6 +333,7 @@ async def login_handler(request: web.Request) -> web.Response:
         session["authenticated"] = False
         login_fail_count += 1
         await _set_login_history(last_login_attempt, login_fail_count)
+    log.info("LOGIN_HANDLER: Authorization succeeded for {}", creds["username"])
     return web.json_response(result)
 
 
