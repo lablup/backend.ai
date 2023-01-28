@@ -446,29 +446,6 @@ async def token_login_handler(request: web.Request) -> web.Response:
     return web.json_response(result)
 
 
-async def update_password_handler(request: web.Request) -> web.StreamResponse:
-    print('#-- update_password_handler', flush=True)
-    checkers = request.app["config"]["service"].get("password_checkers", [])
-    print('#-- checkers:', checkers, flush=True)
-    if len(checkers) > 0:
-        request_headers = extra_config_headers.check(request.headers)
-        secure_context = request_headers.get("X-BackendAI-Encoded", None)
-        payload = request["payload"] if secure_context else request.content
-        if isinstance(payload, bytes):
-            payload = payload.decode()
-        if isinstance(payload, str):
-            payload = json.loads(payload)
-        print(f'#-- {payload=}', flush=True)
-
-    # for checker in checkers
-        if "PasswordLengthChecker" in checkers:
-            checker = checkers["PasswordLengthChecker"]
-            print(f'#-- {checker=}', flush=True)
-            strong, msg = await PasswordLengthChecker(**checker).check(payload["new_password"])
-            if not strong:
-                return web.json_response({"msg": msg}, status=400)
-    return await web_handler(request, is_anonymous=False)
-
 async def server_shutdown(app) -> None:
     pass
 
@@ -548,7 +525,6 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/func/{path:saml/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", web_handler))
-    cors.add(app.router.add_route("POST", "/func/{path:auth/update-password}", update_password_handler))
     cors.add(app.router.add_route("GET", "/func/{path:stream/kernel/_/events}", web_handler))
     cors.add(app.router.add_route("GET", "/func/{path:stream/session/[^/]+/apps$}", web_handler))
     cors.add(app.router.add_route("GET", "/func/{path:stream/.*$}", websocket_handler))

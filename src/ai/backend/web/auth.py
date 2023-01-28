@@ -1,7 +1,5 @@
 import json
-import re
-from abc import abstractmethod
-from typing import List, Optional
+from typing import Optional
 
 from aiohttp import web
 
@@ -83,51 +81,3 @@ async def get_anonymous_session(
         skip_sslcert_validation=not config["api"]["ssl_verify"],
     )
     return APISession(config=api_config, proxy_mode=True)
-
-
-
-class BasePasswordChecker:
-    """
-    Base class for password strength checkers.
-    """
-    @abstractmethod
-    async def check(self, password: str) -> (bool, str):
-        """
-        Check the strength of the given password. The returned list contains
-        a boolean value indicating whether the password is strong enough,
-        and a message describing the reason of insecurity.
-        """
-
-
-class PasswordLengthChecker(BasePasswordChecker):
-    def __init__(
-        self,
-        *,
-        min_length: int = 9,
-        min_alphabet: int = 1,
-        min_digit: int = 1,
-        min_special: int = 1,
-    ):
-        self.min_length = min_length
-        self.min_alphabet = min_alphabet
-        self.min_digit = min_digit
-        self.min_special = min_special
-        return super().__init__()
-
-    async def check(self, password: str) -> (bool, str):
-        if not password:
-            return False, "Empty password"
-        error_msg = (
-            f"Password should be at least {self.min_length} characters with "
-            f"{self.min_alphabet} alphabet(s), {self.min_digit} number(s), and "
-            f"{self.min_special} special character(s)"
-        )
-        if len(password) < self.min_length:
-            return False, error_msg
-        if len(re.findall(r"[A-Za-z]", password)) < self.min_alphabet:
-            return False, error_msg
-        if len(re.findall(r"[0-9]", password)) < self.min_digit:
-            return False, error_msg
-        if len(re.findall(r"[~`!@#$%^&*(),.?\-=_+;:'\"{}\[\]|<>/]", password)) < self.min_special:
-            return False, error_msg
-        return True, ""
