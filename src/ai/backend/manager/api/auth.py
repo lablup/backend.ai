@@ -922,19 +922,19 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
         return web.json_response({"error_msg": "new password mismitch"}, status=400)
 
     # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
-    # The hook handlers should accept the old password and the new password and implement their
-    # own password validation rules.
-    # They should return None if the validation is successful and raise the Reject error
-    # otherwise.
+    # The hook handlers should accept the request and whole ``params` dict.
+    # They should return None if the validation is successful and raise the
+    # Reject error otherwise.
     hook_result = await root_ctx.hook_plugin_ctx.dispatch(
         "VERIFY_PASSWORD_FORMAT",
-        (params["old_password"], params["new_password"]),
+        (request, params),
         return_when=ALL_COMPLETED,
     )
     if hook_result.status != PASSED:
         hook_result.reason = hook_result.reason or "invalid password format"
         raise RejectedByHook.from_hook_result(hook_result)
 
+    raise AuthorizationFailed("Test Error")
     async with root_ctx.db.begin() as conn:
         # Update user password.
         data = {
