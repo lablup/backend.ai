@@ -81,4 +81,3 @@ async def get_anonymous_session(
         skip_sslcert_validation=not config["api"]["ssl_verify"],
     )
     return APISession(config=api_config, proxy_mode=True)
-
