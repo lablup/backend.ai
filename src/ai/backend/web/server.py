@@ -30,7 +30,6 @@ from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common.web.session import extra_config_headers, get_session
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
-from ai.backend.web.auth import PasswordLengthChecker
 
 from . import __version__, user_agent
 from .config import config_iv
