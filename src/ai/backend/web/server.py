@@ -32,7 +32,7 @@ from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 
 from . import __version__, user_agent
-from .auth import get_client_ip, fill_x_forwarded_for_header_to_api_session
+from .auth import fill_x_forwarded_for_header_to_api_session, get_client_ip
 from .config import config_iv
 from .logging import BraceStyleAdapter
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
@@ -270,7 +270,7 @@ async def login_handler(request: web.Request) -> web.Response:
             "LOGIN_HANDLER: Too many consecutive login fails (email:{}, count:{}, ip:{})",
             creds["username"],
             login_fail_count,
-            client_ip
+            client_ip,
         )
         await _set_login_history(last_login_attempt, login_fail_count)
         return web.HTTPTooManyRequests(
@@ -314,7 +314,11 @@ async def login_handler(request: web.Request) -> web.Response:
             result["data"] = public_return  # store public info from token
             login_fail_count = 0
             await _set_login_history(last_login_attempt, login_fail_count)
-            log.info("LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})", creds["username"], client_ip)
+            log.info(
+                "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
+                creds["username"],
+                client_ip,
+            )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
@@ -328,7 +332,12 @@ async def login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
     except BackendAPIError as e:
-        log.info("LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}", creds["username"], client_ip, e)
+        log.info(
+            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+            creds["username"],
+            client_ip,
+            e,
+        )
         result["authenticated"] = False
         result["data"] = {
             "type": e.data.get("type"),

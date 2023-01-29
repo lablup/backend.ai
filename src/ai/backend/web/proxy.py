@@ -16,11 +16,7 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 
-from .auth import (
-    fill_x_forwarded_for_header_to_api_session,
-    get_anonymous_session,
-    get_api_session
-)
+from .auth import fill_x_forwarded_for_header_to_api_session, get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__name__))

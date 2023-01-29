@@ -93,8 +93,7 @@ def get_client_ip(request: web.Request) -> str:
 
 
 def fill_x_forwarded_for_header_to_api_session(
-    request: web.Request,
-    api_session: APISession
+    request: web.Request, api_session: APISession
 ) -> None:
     client_ip = get_client_ip(request)
     if client_ip:

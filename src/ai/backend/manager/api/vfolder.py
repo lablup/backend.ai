@@ -817,7 +817,7 @@ async def get_quota(request: web.Request, params: Any) -> web.Response:
         "VFOLDER.GET_QUOTA (email:{}, volume_name:{}, vf:{})",
         request["user"]["email"],
         volume_name,
-        params["id"]
+        params["id"],
     )
 
     # Permission check for the requested vfolder.
