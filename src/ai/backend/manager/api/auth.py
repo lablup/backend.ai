@@ -947,7 +947,6 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
         hook_result.reason = hook_result.reason or "invalid password format"
         raise RejectedByHook.from_hook_result(hook_result)
 
-    raise AuthorizationFailed("Test Error")
     async with root_ctx.db.begin() as conn:
         # Update user password.
         data = {
