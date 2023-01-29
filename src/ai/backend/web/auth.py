@@ -83,9 +83,9 @@ async def get_anonymous_session(
     return APISession(config=api_config, proxy_mode=True)
 
 
-def get_client_ip(request: web.Request) -> str:
+def get_client_ip(request: web.Request) -> Optional[str]:
     client_ip = request.headers.get("X-Forwarded-For")
-    if not client_ip:
+    if not client_ip and request.transport:
         client_ip = request.transport.get_extra_info("peername")[0]
     if not client_ip:
         client_ip = request.remote
