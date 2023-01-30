@@ -177,11 +177,23 @@ class CPUPlugin(AbstractComputePlugin):
     ) -> Sequence[ContainerMeasurement]:
         async def sysfs_impl(container_id):
             cpu_path = ctx.agent.get_cgroup_path("cpuacct", container_id)
+            version = ctx.agent.docker_info["CgroupVersion"]
             try:
-                cpu_used = read_sysfs(cpu_path / "cpuacct.usage", int) / 1e6
+                match version:
+                    case "1":
+                        cpu_used = read_sysfs(cpu_path / "cpuacct.usage", int) / 1e6
+                    case "2":
+                        cpu_stats = {
+                            k: v
+                            for k, v in map(
+                                lambda line: line.split(" "),
+                                (cpu_path / "cpu.stat").read_text().splitlines(),
+                            )
+                        }
+                        cpu_used = int(cpu_stats["usage_usec"]) / 1e3
             except IOError as e:
                 log.warning(
-                    "cannot read stats: sysfs unreadable for container {0}\n{1!r}",
+                    "CPUPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
                     e,
                 )
@@ -462,29 +474,46 @@ class MemoryPlugin(AbstractComputePlugin):
         async def sysfs_impl(container_id):
             mem_path = ctx.agent.get_cgroup_path("memory", container_id)
             io_path = ctx.agent.get_cgroup_path("blkio", container_id)
+            version = ctx.agent.docker_info["CgroupVersion"]
+
             try:
-                mem_cur_bytes = read_sysfs(mem_path / "memory.usage_in_bytes", int)
-                io_stats = (io_path / "blkio.throttle.io_service_bytes").read_text()
-                # example data:
-                #   8:0 Read 13918208
-                #   8:0 Write 0
-                #   8:0 Sync 0
-                #   8:0 Async 13918208
-                #   8:0 Total 13918208
-                #   Total 13918208
                 io_read_bytes = 0
                 io_write_bytes = 0
-                for line in io_stats.splitlines():
-                    if line.startswith("Total "):
-                        continue
-                    dev, op, nbytes = line.strip().split()
-                    if op == "Read":
-                        io_read_bytes += int(nbytes)
-                    elif op == "Write":
-                        io_write_bytes += int(nbytes)
+                match version:
+                    case "1":
+                        mem_cur_bytes = read_sysfs(mem_path / "memory.usage_in_bytes", int)
+                        io_stats = (io_path / "blkio.throttle.io_service_bytes").read_text()
+                        # example data:
+                        #   8:0 Read 13918208
+                        #   8:0 Write 0
+                        #   8:0 Sync 0
+                        #   8:0 Async 13918208
+                        #   8:0 Total 13918208
+                        #   Total 13918208
+                        for line in io_stats.splitlines():
+                            if line.startswith("Total "):
+                                continue
+                            dev, op, nbytes = line.strip().split()
+                            if op == "Read":
+                                io_read_bytes += int(nbytes)
+                            elif op == "Write":
+                                io_write_bytes += int(nbytes)
+                    case "2":
+                        mem_cur_bytes = read_sysfs(mem_path / "memory.current", int)
+                        lines = (io_path / "io.stat").read_text().splitlines()
+                        # example data:
+                        # 8:16 rbytes=1459200 wbytes=314773504 rios=192 wios=353 dbytes=0 dios=0
+                        # 8:0 rbytes=3387392 wbytes=176128 rios=103 wios=32 dbytes=0 dios=0
+                        for line in lines:
+                            for io_stat in line.split()[1:]:
+                                stat, value = io_stat.split("=")
+                                if stat == "rbytes":
+                                    io_read_bytes += int(value)
+                                if stat == "wbytes":
+                                    io_write_bytes += int(value)
             except IOError as e:
                 log.warning(
-                    "cannot read stats: sysfs unreadable for container {0}\n{1!r}",
+                    "MemoryPlugin: cannot read stats: sysfs unreadable for container {0}\n{1!r}",
                     container_id[:7],
                     e,
                 )

@@ -97,7 +97,7 @@
             "zope.interface; extra == \"tests\""
           ],
           "requires_python": ">=3.6",
-          "version": "22.2"
+          "version": "22.2.0"
         },
         {
           "artifacts": [
@@ -195,7 +195,7 @@
             "typing-extensions>=3.7.4.3"
           ],
           "requires_python": ">=3.7",
-          "version": "1"
+          "version": "1.0.0"
         },
         {
           "artifacts": [
@@ -391,7 +391,7 @@
           "project_name": "py",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "1.11"
+          "version": "1.11.0"
         },
         {
           "artifacts": [
@@ -503,7 +503,7 @@
           "project_name": "six",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7",
-          "version": "1.16"
+          "version": "1.16.0"
         },
         {
           "artifacts": [
@@ -600,7 +600,7 @@
           "project_name": "typing-extensions",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "4.4"
+          "version": "4.4.0"
         },
         {
           "artifacts": [
@@ -665,14 +665,14 @@
             "sphinxcontrib-asyncio~=0.3.0; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "0.17"
+          "version": "0.17.0"
         }
       ],
       "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.108",
+  "pex_version": "2.1.120",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
