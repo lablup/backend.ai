@@ -18,7 +18,7 @@ class NoItems(Exception):
 class ConsoleOutputHandler(BaseOutputHandler):
     def print_item(
         self,
-        item: Mapping[str, Any] | None,
+        item: Optional[Mapping[str, Any]],
         fields: Sequence[FieldSpec],
     ) -> None:
         if item is None:
@@ -115,7 +115,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
         self,
         fetch_func: Callable[[int, int], PaginatedResult],
         initial_page_offset: int,
-        page_size: int = None,
+        page_size: Optional[int] = None,
     ) -> None:
         fields: Sequence[FieldSpec] = []
 
