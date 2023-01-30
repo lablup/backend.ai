@@ -6,7 +6,7 @@
 // {
 //   "version": 3,
 //   "valid_for_interpreter_constraints": [
-//     "CPython==3.10.9",
+//     "CPython==3.11.1",
 //     "CPython==3.9.*"
 //   ],
 //   "generated_with_requirements": [
@@ -109,13 +109,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6f590d76b713d5de4e49fe4fbca24474469f53c83632d5d0fd056f7ff7e8112b",
-              "url": "https://files.pythonhosted.org/packages/c2/8b/abb577ca6ab2c71814d535b1ed1464c5f4aaefe1a31bbeb85013eb9b2401/setuptools-66.1.1-py3-none-any.whl"
+              "hash": "9d790961ba6219e9ff7d9557622d2fe136816a264dd01d5997cfc057d804853d",
+              "url": "https://files.pythonhosted.org/packages/bf/27/969c914650fdf0d08b0b92bdbddfc08bea9df6d86aeefd75ba4730f50bc9/setuptools-67.0.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "ac4008d396bc9cd983ea483cb7139c0240a07bbc74ffb6232fceffedc6cf03a8",
-              "url": "https://files.pythonhosted.org/packages/3c/7b/00030a938499c8f8345be02ab5b7d748d359ea59c2f020b7b0a21b82f832/setuptools-66.1.1.tar.gz"
+              "hash": "883131c5b6efa70b9101c7ef30b2b7b780a4283d5fc1616383cdf22c83cbefe6",
+              "url": "https://files.pythonhosted.org/packages/fe/db/68d856066c59bd9f05e827c3cf80164d870b8b6af37dc5ad6c87a71d20f2/setuptools-67.0.0.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -167,7 +167,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "66.1.1"
+          "version": "67.0.0"
         }
       ],
       "platform_tag": null
@@ -182,7 +182,7 @@
     "setuptools>=60.0"
   ],
   "requires_python": [
-    "==3.10.9",
+    "==3.11.1",
     "==3.9.*"
   ],
   "resolver_version": "pip-2020-resolver",
