@@ -425,6 +425,10 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         )
         entrypoint_sh_path = self.resolve_krunner_filepath("runner/entrypoint.sh")
 
+        fantompass_path = self.resolve_krunner_filepath("runner/fantompass.py")
+        hash_phrase_path = self.resolve_krunner_filepath("runner/hash_phrase.py")
+        words_json_path = self.resolve_krunner_filepath("runner/words.json")
+
         if matched_libc_style == "musl":
             terminfo_path = self.resolve_krunner_filepath("runner/terminfo.alpine3.8")
             _mount(MountTypes.BIND, terminfo_path, "/home/work/.terminfo")
@@ -432,6 +436,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         _mount(MountTypes.BIND, dotfile_extractor_path, "/opt/kernel/extract_dotfiles.py")
         _mount(MountTypes.BIND, entrypoint_sh_path, "/opt/kernel/entrypoint.sh")
         _mount(MountTypes.BIND, suexec_path, "/opt/kernel/su-exec")
+        _mount(MountTypes.BIND, fantompass_path, "/opt/kernel/fantompass.py")
+        _mount(MountTypes.BIND, hash_phrase_path, "/opt/kernel/hash_phrase.py")
+        _mount(MountTypes.BIND, words_json_path, "/opt/kernel/words.json")
         if jail_path is not None:
             _mount(MountTypes.BIND, jail_path, "/opt/kernel/jail")
         _mount(MountTypes.BIND, hook_path, "/opt/kernel/libbaihook.so")
@@ -1792,30 +1799,10 @@ class AbstractAgent(
         """
 
     @abstractmethod
-    async def create_overlay_network(self, network_name: str) -> None:
-        """
-        Create an overlay network for a multi-node multicontainer session, where containers in different
-        agents can connect to each other using cluster hostnames without explicit port mapping.
-
-        This is called by the manager before kernel creation.
-        It may raise :exc:`NotImplementedError` and then the manager
-        will cancel creation of the session.
-        """
-
-    @abstractmethod
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        """
-        Destroy an overlay network.
-
-        This is called by the manager after kernel destruction.
-        """
-
-    @abstractmethod
     async def create_local_network(self, network_name: str) -> None:
         """
         Create a local bridge network for a single-node multicontainer session, where containers in the
         same agent can connect to each other using cluster hostnames without explicit port mapping.
-        Depending on the backend, this may be an alias to :meth:`create_overlay_network()`.
 
         This is called by the manager before kernel creation.
         It may raise :exc:`NotImplementedError` and then the manager
@@ -1825,8 +1812,7 @@ class AbstractAgent(
     @abstractmethod
     async def destroy_local_network(self, network_name: str) -> None:
         """
-        Destroy a local bridge network.
-        Depending on the backend, this may be an alias to :meth:`destroy_overlay_network()`.
+        Destroy a local bridge network used for a single-node multi-container session.
 
         This is called by the manager after kernel destruction.
         """

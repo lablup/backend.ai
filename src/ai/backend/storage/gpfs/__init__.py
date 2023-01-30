@@ -32,7 +32,7 @@ class GPFSVolume(BaseVolume):
         options: Optional[Mapping[str, Any]] = None,
     ) -> None:
         super().__init__(local_config, mount_path, fsprefix=fsprefix, options=options)
-        verify_ssl = self.config.get("verify_ssl", False)
+        verify_ssl = self.config.get("gpfs_verify_ssl", False)
 
         self.api_client = GPFSAPIClient(
             self.config["gpfs_endpoint"],
@@ -130,7 +130,7 @@ class GPFSVolume(BaseVolume):
             self.fs,
             str(vfid),
             path=vfpath,
-            owner=self.config.get("owner", "1000:1000"),
+            owner=self.config.get("gpfs_owner", "1000:1000"),
         )
         if options is not None and options.quota is not None:
             try:
