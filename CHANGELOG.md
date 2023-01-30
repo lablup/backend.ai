@@ -43,7 +43,7 @@ Ai.Backend.Manager 22.09.7 (2023-01-09)
 ### Features
 * Support IBM Spectrum Scale storage ([#744](https://github.com/lablup/backend.ai/issues/744))
 * Add support for Ceph file system in Storage Proxy. ([#760](https://github.com/lablup/backend.ai/issues/760))
-* Add `custom-auth` endpoint in Webserver to support custom authentication logic withv Manager plugin. ([#936](https://github.com/lablup/backend.ai/issues/936))
+* Add `custom-auth` endpoint in Webserver to support custom authentication logic with Manager plugin. ([#936](https://github.com/lablup/backend.ai/issues/936))
 * Remove the `Server` HTTP response header from the web server since it could potentially expose more attack surfaces to crackers ([#947](https://github.com/lablup/backend.ai/issues/947))
 
 ### Fixes
