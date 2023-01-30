@@ -12,7 +12,6 @@ import sys
 import traceback
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import (
     Any,
@@ -41,6 +40,7 @@ from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__
@@ -769,14 +769,6 @@ async def server_main_logwrapper(
         traceback.print_exc()
 
 
-class LogLevel(str, Enum):
-    DEBUG = "debug"
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
-
-
 @click.group(invoke_without_command=True)
 @click.option(
     "-f",
@@ -793,19 +785,21 @@ class LogLevel(str, Enum):
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogLevel, case_sensitive=False),
-    default=LogLevel.INFO,
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, log_level: LogLevel, debug: bool = False) -> None:
+def main(
+    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
+) -> None:
     """
     Start the manager service as a foreground process.
     """
     if debug:
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogLevel.DEBUG
+        log_level = LogSeverity.DEBUG
 
     click.echo("Selected logging level for manager : " + log_level.value)
 

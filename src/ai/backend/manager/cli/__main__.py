@@ -5,7 +5,6 @@ import logging
 import subprocess
 import sys
 from datetime import datetime
-from enum import Enum
 from functools import partial
 from pathlib import Path
 
@@ -17,20 +16,13 @@ from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
 
 from ..config import load as load_config
 from .context import CLIContext, init_logger, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
-
-
-class LogLevel(str, Enum):
-    DEBUG = "debug"
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
@@ -49,8 +41,8 @@ class LogLevel(str, Enum):
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogLevel, case_sensitive=False),
-    default=LogLevel.INFO,
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context

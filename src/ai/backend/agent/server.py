@@ -11,7 +11,6 @@ import os.path
 import shutil
 import signal
 import sys
-from enum import Enum
 from ipaddress import _BaseAddress as BaseIPAddress
 from ipaddress import ip_network
 from pathlib import Path
@@ -58,6 +57,7 @@ from ai.backend.common.types import (
     HostPortPair,
     KernelCreationConfig,
     KernelId,
+    LogSeverity,
     SessionId,
     aobject,
 )
@@ -801,14 +801,6 @@ async def server_main(
             monitor.close()
 
 
-class LogLevel(str, Enum):
-    DEBUG = "debug"
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
-
-
 @click.group(invoke_without_command=True)
 @click.option(
     "-f",
@@ -825,15 +817,15 @@ class LogLevel(str, Enum):
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogLevel, case_sensitive=False),
-    default=LogLevel.INFO,
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
 def main(
     cli_ctx: click.Context,
     config_path: Path,
-    log_level: LogLevel,
+    log_level: LogSeverity,
     debug: bool = False,
 ) -> int:
 
@@ -841,7 +833,7 @@ def main(
     if debug:
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogLevel.DEBUG
+        log_level = LogSeverity.DEBUG
 
     click.echo("Selected logging level for agent : " + log_level.value)
     # Determine where to read configuration.

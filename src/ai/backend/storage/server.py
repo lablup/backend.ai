@@ -6,7 +6,6 @@ import os
 import pwd
 import ssl
 import sys
-from enum import Enum
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import Any, AsyncIterator, Sequence
@@ -20,6 +19,7 @@ from setproctitle import setproctitle
 from ai.backend.common import config
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__ as VERSION
@@ -151,14 +151,6 @@ async def server_main(
             m.close()
 
 
-class LogLevel(str, Enum):
-    DEBUG = "debug"
-    INFO = "info"
-    WARNING = "warning"
-    ERROR = "error"
-    CRITICAL = "critical"
-
-
 @click.group(invoke_without_command=True)
 @click.option(
     "-f",
@@ -176,8 +168,8 @@ class LogLevel(str, Enum):
 )
 @click.option(
     "--log-level",
-    type=click.Choice(LogLevel, case_sensitive=False),
-    default=LogLevel.INFO,
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
@@ -186,7 +178,7 @@ def main(cli_ctx, config_path, log_level, debug=False):
     if debug:
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = LogLevel.DEBUG
+        log_level = LogSeverity.DEBUG
 
     click.echo("Selected logging level for storage : " + log_level.value)
 
