@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pants.engine.addresses import Addresses, UnparsedAddressInputs
 from pants.engine.platform import Platform
-from pants.engine.rules import Get, SubsystemRule, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -27,7 +27,7 @@ class PlatformResourcesSusbystem(Subsystem):
     help = "The platform-specific resource provider."
     platform = EnumOption(
         "--target",
-        default=lambda cls: Platform.current,
+        default=lambda cls: Platform.create_for_localhost(),
         enum_type=Platform,
         advanced=False,
         help="Select only resources compatible with the given platform",
@@ -107,6 +107,6 @@ def target_types():
 def rules():
     return [
         *collect_rules(),
-        SubsystemRule(PlatformResourcesSusbystem),
+        *PlatformResourcesSusbystem.rules(),
         UnionRule(InferDependenciesRequest, InferPlatformSpecificDependenciesRequest),
     ]

@@ -179,7 +179,7 @@
             "pycares>=4.0.0"
           ],
           "requires_python": null,
-          "version": "3"
+          "version": "3.0.0"
         },
         {
           "artifacts": [
@@ -200,7 +200,7 @@
             "typing-extensions>=3.6.5"
           ],
           "requires_python": ">=3.6",
-          "version": "0.21"
+          "version": "0.21.0"
         },
         {
           "artifacts": [
@@ -218,7 +218,7 @@
           "project_name": "aiofiles",
           "requires_dists": [],
           "requires_python": "<4.0,>=3.6",
-          "version": "0.8"
+          "version": "0.8.0"
         },
         {
           "artifacts": [
@@ -331,7 +331,7 @@
             "typing; python_version < \"3.5\""
           ],
           "requires_python": null,
-          "version": "0.7"
+          "version": "0.7.0"
         },
         {
           "artifacts": [
@@ -351,7 +351,7 @@
             "aiohttp>=3.0"
           ],
           "requires_python": ">=3.7",
-          "version": "2.1"
+          "version": "2.1.0"
         },
         {
           "artifacts": [
@@ -377,7 +377,7 @@
             "typing-extensions>=4.1"
           ],
           "requires_python": null,
-          "version": "0.7"
+          "version": "0.7.0"
         },
         {
           "artifacts": [
@@ -437,7 +437,7 @@
             "typing_extensions>=3.7.2"
           ],
           "requires_python": ">=3.6",
-          "version": "0.17"
+          "version": "0.17.0"
         },
         {
           "artifacts": [
@@ -542,7 +542,7 @@
           "project_name": "aniso8601",
           "requires_dists": [],
           "requires_python": null,
-          "version": "7"
+          "version": "7.0.0"
         },
         {
           "artifacts": [
@@ -637,7 +637,7 @@
             "uvloop>=0.15.3; platform_system != \"Windows\" and extra == \"test\""
           ],
           "requires_python": ">=3.7.0",
-          "version": "0.27"
+          "version": "0.27.0"
         },
         {
           "artifacts": [
@@ -655,7 +655,7 @@
           "project_name": "asynctest",
           "requires_dists": [],
           "requires_python": ">=3.5",
-          "version": "0.13"
+          "version": "0.13.0"
         },
         {
           "artifacts": [
@@ -714,7 +714,7 @@
             "zope.interface; extra == \"tests\""
           ],
           "requires_python": ">=3.6",
-          "version": "22.2"
+          "version": "22.2.0"
         },
         {
           "artifacts": [
@@ -739,7 +739,7 @@
             "wheel>=0.34.2; extra == \"build\""
           ],
           "requires_python": ">=3.6",
-          "version": "4"
+          "version": "4.0.0"
         },
         {
           "artifacts": [
@@ -768,7 +768,7 @@
             "wheel>=0.34.2; extra == \"build\""
           ],
           "requires_python": ">=3.6",
-          "version": "3"
+          "version": "3.0.0"
         },
         {
           "artifacts": [
@@ -982,7 +982,7 @@
             "typing_extensions; python_version < \"3.8\""
           ],
           "requires_python": ">=3.7",
-          "version": "22.2"
+          "version": "22.2.0"
         },
         {
           "artifacts": [
@@ -1245,7 +1245,7 @@
             "twine>=1.12.0; extra == \"docstest\""
           ],
           "requires_python": ">=3.6",
-          "version": "39"
+          "version": "39.0.0"
         },
         {
           "artifacts": [
@@ -1349,7 +1349,7 @@
             "pytest>=6; extra == \"test\""
           ],
           "requires_python": ">=3.7",
-          "version": "1.1"
+          "version": "1.1.0"
         },
         {
           "artifacts": [
@@ -1481,7 +1481,7 @@
             "six>=1.9.0"
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "2.16"
+          "version": "2.16.0"
         },
         {
           "artifacts": [
@@ -1685,7 +1685,7 @@
             "six>=1.5.2"
           ],
           "requires_python": ">=3.7",
-          "version": "1.50"
+          "version": "1.50.0"
         },
         {
           "artifacts": [
@@ -1747,7 +1747,7 @@
             "setuptools"
           ],
           "requires_python": ">=3.7",
-          "version": "1.50"
+          "version": "1.50.0"
         },
         {
           "artifacts": [
@@ -1780,7 +1780,7 @@
           "project_name": "hiredis",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>=2.7",
-          "version": "1.1"
+          "version": "1.1.0"
         },
         {
           "artifacts": [
@@ -1802,7 +1802,7 @@
             "pyreadline; sys_platform == \"win32\" and python_version < \"3.8\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "10"
+          "version": "10.0"
         },
         {
           "artifacts": [
@@ -1825,7 +1825,7 @@
             "pytest; extra == \"tests\""
           ],
           "requires_python": ">=3.7",
-          "version": "4.4"
+          "version": "4.4.0"
         },
         {
           "artifacts": [
@@ -1861,7 +1861,7 @@
           "project_name": "iniconfig",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "2"
+          "version": "2.0.0"
         },
         {
           "artifacts": [
@@ -1903,7 +1903,7 @@
             "typing-extensions>=3.7.4.3"
           ],
           "requires_python": ">=3.7",
-          "version": "1"
+          "version": "1.0.0"
         },
         {
           "artifacts": [
@@ -2067,7 +2067,7 @@
             "urllib3>=1.23"
           ],
           "requires_python": null,
-          "version": "9.1"
+          "version": "9.1.0"
         },
         {
           "artifacts": [
@@ -2201,7 +2201,7 @@
             "tox; extra == \"dev\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.19"
+          "version": "3.19.0"
         },
         {
           "artifacts": [
@@ -2239,7 +2239,7 @@
           "project_name": "more-itertools",
           "requires_dists": [],
           "requires_python": ">=3.5",
-          "version": "8.13"
+          "version": "8.13.0"
         },
         {
           "artifacts": [
@@ -2444,7 +2444,7 @@
           "project_name": "netifaces",
           "requires_dists": [],
           "requires_python": null,
-          "version": "0.11"
+          "version": "0.11.0"
         },
         {
           "artifacts": [
@@ -2524,7 +2524,7 @@
           "project_name": "packaging",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "23"
+          "version": "23.0"
         },
         {
           "artifacts": [
@@ -2569,7 +2569,7 @@
             "ptyprocess>=0.5"
           ],
           "requires_python": null,
-          "version": "4.8"
+          "version": "4.8.0"
         },
         {
           "artifacts": [
@@ -2622,7 +2622,7 @@
             "tox; extra == \"dev\""
           ],
           "requires_python": ">=3.6",
-          "version": "1"
+          "version": "1.0.0"
         },
         {
           "artifacts": [
@@ -2760,7 +2760,7 @@
           "project_name": "ptyprocess",
           "requires_dists": [],
           "requires_python": null,
-          "version": "0.7"
+          "version": "0.7.0"
         },
         {
           "artifacts": [
@@ -2778,7 +2778,7 @@
           "project_name": "py",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "1.11"
+          "version": "1.11.0"
         },
         {
           "artifacts": [
@@ -2872,7 +2872,7 @@
             "idna>=2.1; extra == \"idna\""
           ],
           "requires_python": null,
-          "version": "4.3"
+          "version": "4.3.0"
         },
         {
           "artifacts": [
@@ -2938,7 +2938,7 @@
           "project_name": "pycryptodome",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "3.16"
+          "version": "3.16.0"
         },
         {
           "artifacts": [
@@ -2958,7 +2958,7 @@
             "importlib-metadata; python_version < \"3.8\" and extra == \"plugins\""
           ],
           "requires_python": ">=3.6",
-          "version": "2.14"
+          "version": "2.14.0"
         },
         {
           "artifacts": [
@@ -2990,7 +2990,7 @@
             "zope.interface; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "2.6"
+          "version": "2.6.0"
         },
         {
           "artifacts": [
@@ -3079,7 +3079,7 @@
             "click>=5.0; extra == \"cli\""
           ],
           "requires_python": ">=3.5",
-          "version": "0.20"
+          "version": "0.20.0"
         },
         {
           "artifacts": [
@@ -3201,7 +3201,7 @@
           "project_name": "pyyaml",
           "requires_dists": [],
           "requires_python": ">=3.6",
-          "version": "6"
+          "version": "6.0"
         },
         {
           "artifacts": [
@@ -3375,7 +3375,7 @@
             "typing-extensions<5.0,>=4.0.0; python_version < \"3.9\""
           ],
           "requires_python": "<4.0.0,>=3.6.3",
-          "version": "12.6"
+          "version": "12.6.0"
         },
         {
           "artifacts": [
@@ -3429,7 +3429,7 @@
             "botocore[crt]<2.0a.0,>=1.20.29; extra == \"crt\""
           ],
           "requires_python": ">=3.7",
-          "version": "0.6"
+          "version": "0.6.0"
         },
         {
           "artifacts": [
@@ -3576,7 +3576,7 @@
           "project_name": "six",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7",
-          "version": "1.16"
+          "version": "1.16.0"
         },
         {
           "artifacts": [
@@ -3678,7 +3678,7 @@
           "project_name": "tblib",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "1.7"
+          "version": "1.7.0"
         },
         {
           "artifacts": [
@@ -3691,7 +3691,7 @@
           "project_name": "temporenc",
           "requires_dists": [],
           "requires_python": null,
-          "version": "0.1"
+          "version": "0.1.0"
         },
         {
           "artifacts": [
@@ -3713,7 +3713,7 @@
             "tornado>=4.5; extra == \"doc\""
           ],
           "requires_python": ">=3.6",
-          "version": "8.1"
+          "version": "8.1.0"
         },
         {
           "artifacts": [
@@ -4161,7 +4161,7 @@
           "project_name": "types-tabulate",
           "requires_dists": [],
           "requires_python": null,
-          "version": "0.9"
+          "version": "0.9.0.0"
         },
         {
           "artifacts": [
@@ -4179,7 +4179,7 @@
           "project_name": "typing-extensions",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "4.4"
+          "version": "4.4.0"
         },
         {
           "artifacts": [
@@ -4201,7 +4201,7 @@
             "typing>=3.7.4; python_version < \"3.5\""
           ],
           "requires_python": null,
-          "version": "0.8"
+          "version": "0.8.0"
         },
         {
           "artifacts": [
@@ -4295,7 +4295,7 @@
             "sphinxcontrib-asyncio~=0.3.0; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "0.17"
+          "version": "0.17.0"
         },
         {
           "artifacts": [
@@ -4321,13 +4321,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d6b06432f184438d99ac1f456eaf22fe1ade524c3dd16e661142dc54e9cba574",
-              "url": "https://files.pythonhosted.org/packages/78/d5/2b5719b738791cd798e8f097eba4bb093ff5efca5cef2f3d37a72daa111f/websocket_client-1.4.2-py3-none-any.whl"
+              "hash": "fb5d81b95d350f3a54838ebcb4c68a5353bbd1412ae8f068b1e5280faeb13074",
+              "url": "https://files.pythonhosted.org/packages/62/38/62b0f0bc9bfde55f0a5611ee0a6136ed965513bbae62a74b670e54469171/websocket_client-1.5.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "d6e8f90ca8e2dd4e8027c4561adeb9456b54044312dba655e7cae652ceb9ae59",
-              "url": "https://files.pythonhosted.org/packages/75/af/1d13b93e7a21aca7f8ab8645fcfcfad21fc39716dc9dce5dc2a97f73ff78/websocket-client-1.4.2.tar.gz"
+              "hash": "561ca949e5bbb5d33409a37235db55c279235c78ee407802f1d2314fff8a8536",
+              "url": "https://files.pythonhosted.org/packages/02/cd/1adc1276f1e8f6a929783f4c2992ec7a4934a81f8ced3d4a87191cc168c2/websocket-client-1.5.0.tar.gz"
             }
           ],
           "project_name": "websocket-client",
@@ -4339,7 +4339,7 @@
             "wsaccel; extra == \"optional\""
           ],
           "requires_python": ">=3.7",
-          "version": "1.4.2"
+          "version": "1.5.0"
         },
         {
           "artifacts": [
@@ -4446,7 +4446,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.108",
+  "pex_version": "2.1.120",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
