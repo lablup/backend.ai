@@ -4,8 +4,8 @@ from .formatters import (
     AgentStatFormatter,
     ContainerListFormatter,
     DependencyListFormatter,
-    GroupListFormatter,
     KernelStatFormatter,
+    ProjectListFormatter,
     SubFieldOutputFormatter,
     mibytes_output_formatter,
     nested_dict_formatter,
@@ -266,7 +266,7 @@ user_fields = FieldSet(
         FieldSpec("modified_at"),
         FieldSpec("domain_name"),
         FieldSpec("role"),
-        FieldSpec("projects { id name }", formatter=GroupListFormatter()),
+        FieldSpec("projects { id name }", formatter=ProjectListFormatter()),
         FieldSpec("allowed_client_ip"),
     ]
 )

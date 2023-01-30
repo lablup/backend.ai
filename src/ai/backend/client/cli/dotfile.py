@@ -7,7 +7,7 @@ from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 
 from ..session import Session
-from .pretty import print_error, print_info, print_warn
+from .pretty import print_error, print_fail, print_info, print_warn
 
 
 @main.group()
@@ -48,13 +48,29 @@ def dotfile():
     help="Sepcify the project name or id of project dotfiles. "
     "(If project name is provided, domain name must be specified with option -d)",
 )
-def create(path, permission, dotfile_path, owner_access_key, domain, project):
+@click.option(
+    "-g",
+    "--group",
+    metavar="GROUP",
+    help="Sepcify the project name or id of project dotfiles. "
+    "(If project name is provided, domain name must be specified with option -d). "
+    "This option is deprecated, use `--project` option instead.",
+)
+def create(path, permission, dotfile_path, owner_access_key, domain, project, group):
     """
     Store dotfile to Backend.AI Manager.
     Dotfiles will be automatically loaded when creating kernels.
 
     PATH: Where dotfiles will be created when starting kernel
     """
+
+    if group:
+        print_warn("`--group` option is deprecated. Use `--project` option instead.")
+        if not project:
+            project = group
+        else:
+            print_fail("Cannot use `--project` and `--group` options simultaneously.")
+            sys.exit(ExitCode.FAILURE)
 
     if dotfile_path:
         with open(dotfile_path, "r") as fr:

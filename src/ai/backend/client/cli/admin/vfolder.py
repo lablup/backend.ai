@@ -11,7 +11,7 @@ from ai.backend.client.func.vfolder import _default_list_fields
 from ai.backend.client.session import Session
 
 from ..extensions import pass_ctx_obj
-from ..pretty import print_error
+from ..pretty import print_error, print_fail, print_warn
 from ..types import CLIContext
 from ..vfolder import vfolder as user_vfolder
 from . import admin
@@ -27,14 +27,28 @@ def vfolder() -> None:
 def _list_cmd(docs: str = None):
     @pass_ctx_obj
     @click.option("-j", "--project", type=str, default=None, help="Filter by project ID.")
+    @click.option(
+        "-g",
+        "--group",
+        type=str,
+        default=None,
+        help="Filter by project ID. This option is deprecated, use `--project` option instead.",
+    )
     @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
     @click.option("--order", default=None, help="Set the query ordering expression.")
     @click.option("--offset", default=0, help="The index of the current page start for pagination.")
     @click.option("--limit", default=None, help="The page size for pagination.")
-    def list(ctx: CLIContext, project, filter_, order, offset, limit) -> None:
+    def list(ctx: CLIContext, project, group, filter_, order, offset, limit) -> None:
         """
         List virtual folders.
         """
+        if group:
+            print_warn("`--group` option is deprecated. Use `--project` option instead.")
+            if not project:
+                project = group
+            else:
+                print_fail("Cannot use `--project` and `--group` options simultaneously.")
+                sys.exit(ExitCode.FAILURE)
         try:
             with Session() as session:
                 fetch_func = lambda pg_offset, pg_size: session.VFolder.paginated_list(

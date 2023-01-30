@@ -461,6 +461,15 @@ def prepare_mount_arg(
     help="Project name where the session is spawned. "
     "User should be a member of the project to execute the code.",
 )
+@click.option(
+    "-g",
+    "--group",
+    metavar="PROJECT_NAME",
+    default=None,
+    help="Project name where the session is spawned. "
+    "User should be a member of the project to execute the code. "
+    "This option is deprecated, use `--project` option instead.",
+)
 @click.option("--preopen", default=None, type=list_expr, help="Pre-open service ports")
 @click.option(
     "--assign-agent",
@@ -504,6 +513,7 @@ def run(
     resource_opts,
     domain,
     project,
+    group,
     preopen,
     assign_agent,  # resource grouping
 ):
@@ -517,6 +527,13 @@ def run(
           runtime or programming language.')
     FILES: The code file(s). Can be added multiple times.
     """
+    if group:
+        print_warn("`--group` option is deprecated. Use `--project` option instead.")
+        if not project:
+            project = group
+        else:
+            print_fail("Cannot use `--project` and `--group` options simultaneously.")
+            sys.exit(ExitCode.FAILURE)
     if quiet:
         vprint_info = vprint_wait = vprint_done = _noop
     else:

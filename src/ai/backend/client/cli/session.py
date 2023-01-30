@@ -202,8 +202,17 @@ def _create_cmd(docs: str = None):
         "--project",
         metavar="PROJECT_NAME",
         default=None,
-        help="Group name where the session is spawned. "
+        help="Project name where the session is spawned. "
         "User should be a member of the project to execute the code.",
+    )
+    @click.option(
+        "-g",
+        "--group",
+        metavar="PROJECT_NAME",
+        default=None,
+        help="Project name where the session is spawned. "
+        "User should be a member of the project to execute the code. "
+        "This option is deprecated, use `--project` option instead.",
     )
     @click.option(
         "--assign-agent",
@@ -244,6 +253,7 @@ def _create_cmd(docs: str = None):
         # resource grouping
         domain: str | None,
         project: str | None,
+        group: str | None,
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -262,6 +272,13 @@ def _create_cmd(docs: str = None):
         else:
             name = name
 
+        if group:
+            print_warn("`--group` option is deprecated. Use `--project` option instead.")
+            if not project:
+                project = group
+            else:
+                print_fail("Cannot use `--project` and `--group` options simultaneously.")
+                sys.exit(ExitCode.FAILURE)
         ######
         envs = prepare_env_arg(env)
         resources = prepare_resource_arg(resources)

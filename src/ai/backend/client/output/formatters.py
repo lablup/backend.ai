@@ -220,7 +220,7 @@ class AgentStatFormatter(OutputFormatter):
         return self.format_console(value, field)
 
 
-class GroupListFormatter(OutputFormatter):
+class ProjectListFormatter(OutputFormatter):
     def format_console(self, value: Any, field: FieldSpec) -> str:
         return ", ".join(g["name"] for g in value)
 
