@@ -1,8 +1,8 @@
-"""change_group_into_project
+"""migrate_group_to_project
 
-Revision ID: a7f0a772c522
-Revises: 213a04e90ecf
-Create Date: 2023-01-08 21:53:08.761724
+Revision ID: eb8f901bdf4f
+Revises: b6b884fbae1f
+Create Date: 2023-01-30 15:11:28.759396
 
 """
 import enum
@@ -18,8 +18,8 @@ from ai.backend.manager.models import VFolderOwnershipType
 from ai.backend.manager.models.base import GUID, JSONB, ResourceSlotColumn, convention
 
 # revision identifiers, used by Alembic.
-revision = "a7f0a772c522"
-down_revision = "213a04e90ecf"
+revision = "eb8f901bdf4f"
+down_revision = "b6b884fbae1f"
 branch_labels = None
 depends_on = None
 
@@ -141,9 +141,10 @@ def upgrade():
             onupdate="CASCADE",
             ondelete="CASCADE",
         ),
-        sa.UniqueConstraint("scaling_group", "project", name="uq_sgroup_project"),
+        # sa.UniqueConstraint("scaling_group", "project", name="uq_sgroup_project"),
     )
     op.add_column("kernels", sa.Column("project_id", GUID(), nullable=True))
+    op.add_column("sessions", sa.Column("project_id", GUID(), nullable=True))
     op.add_column(
         "session_templates",
         sa.Column("project_id", GUID(), nullable=True),
@@ -154,6 +155,9 @@ def upgrade():
     # Create foreign keys and constraints
     op.create_foreign_key(
         op.f("fk_kernels_project_id_projects"), "kernels", "projects", ["project_id"], ["id"]
+    )
+    op.create_foreign_key(
+        op.f("fk_sessions_project_id_projects"), "sessions", "projects", ["project_id"], ["id"]
     )
     op.create_foreign_key(
         op.f("fk_session_templates_project_id_projects"),
@@ -323,6 +327,16 @@ def upgrade():
 
     query = textwrap.dedent(
         """
+        UPDATE sessions
+        SET project_id = me.group_id
+        FROM sessions me
+        WHERE sessions.id = me.id;
+        """
+    )
+    conn.execute(text(query))
+
+    query = textwrap.dedent(
+        """
         UPDATE session_templates
         SET project_id = me.group_id
         FROM session_templates me
@@ -341,19 +355,22 @@ def upgrade():
     )
     conn.execute(text(query))
     op.alter_column("kernels", column_name="project_id", nullable=False)
+    op.alter_column("sessions", column_name="project_id", nullable=False)
 
     # remove legacy tables
     op.drop_table("association_groups_users")
 
     op.drop_constraint("fk_kernels_group_id_groups", "kernels", type_="foreignkey")
     op.drop_column("kernels", "group_id")
+    op.drop_constraint("fk_sessions_group_id_groups", "sessions", type_="foreignkey")
+    op.drop_column("sessions", "group_id")
 
     op.drop_constraint(
         "fk_session_templates_group_id_groups", "session_templates", type_="foreignkey"
     )
     op.drop_column("session_templates", "group_id")
 
-    op.drop_constraint("uq_sgroup_ugroup", "sgroups_for_groups", type_="unique")
+    # op.drop_constraint("uq_sgroup_ugroup", "sgroups_for_groups", type_="unique")
     op.drop_index("ix_sgroups_for_groups_group", table_name="sgroups_for_groups")
     op.drop_constraint(
         "fk_sgroups_for_groups_group_groups", "sgroups_for_groups", type_="foreignkey"
@@ -480,7 +497,7 @@ def downgrade():
             onupdate="CASCADE",
             ondelete="CASCADE",
         ),
-        sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
+        # sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
     )
     op.create_index(
         "ix_sgroups_for_groups_scaling_group", "sgroups_for_groups", ["scaling_group"], unique=False
@@ -504,6 +521,10 @@ def downgrade():
         "kernels", sa.Column("group_id", postgresql.UUID(), autoincrement=False, nullable=True)
     )
     op.create_foreign_key("fk_kernels_group_id_groups", "kernels", "groups", ["group_id"], ["id"])
+    op.add_column(
+        "sessions", sa.Column("group_id", postgresql.UUID(), autoincrement=False, nullable=True)
+    )
+    op.create_foreign_key("fk_sessions_group_id_groups", "sessions", "groups", ["group_id"], ["id"])
 
     op.create_index("ix_groups_domain_name", "groups", ["domain_name"], unique=False)
 
@@ -665,6 +686,16 @@ def downgrade():
 
     query = textwrap.dedent(
         """
+        UPDATE sessions
+        SET group_id = me.project_id
+        FROM sessions me
+        WHERE sessions.id = me.id;
+        """
+    )
+    conn.execute(text(query))
+
+    query = textwrap.dedent(
+        """
         UPDATE session_templates
         SET group_id = me.project_id
         FROM session_templates me
@@ -683,9 +714,10 @@ def downgrade():
     )
     conn.execute(text(query))
     op.alter_column("kernels", column_name="group_id", nullable=False)
+    op.alter_column("sessions", column_name="group_id", nullable=False)
 
     # remove legacy tables
-    op.drop_constraint("uq_sgroup_project", "sgroups_for_projects", type_="unique")
+    # op.drop_constraint("uq_sgroup_project", "sgroups_for_projects", type_="unique")
     op.drop_table("sgroups_for_projects")
 
     op.drop_constraint(op.f("fk_vfolders_project_id_projects"), "vfolders", type_="foreignkey")
@@ -698,6 +730,8 @@ def downgrade():
 
     op.drop_constraint(op.f("fk_kernels_project_id_projects"), "kernels", type_="foreignkey")
     op.drop_column("kernels", "project_id")
+    op.drop_constraint(op.f("fk_sessions_project_id_projects"), "sessions", type_="foreignkey")
+    op.drop_column("sessions", "project_id")
 
     op.drop_table("association_projects_users")
 

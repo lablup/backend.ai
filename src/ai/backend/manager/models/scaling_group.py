@@ -150,7 +150,6 @@ sgroups_for_projects = sa.Table(
         nullable=False,
         primary_key=True,
     ),
-    sa.UniqueConstraint("scaling_group", "project", name="uq_sgroup_project"),
 )
 
 
