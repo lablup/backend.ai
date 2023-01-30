@@ -182,6 +182,7 @@ async def get_known_registries(etcd: AsyncEtcd) -> Mapping[str, yarl.URL]:
         if isinstance(value, str):
             results[name] = yarl.URL(value)
         elif isinstance(value, Mapping):
+            assert isinstance(value[""], str)
             results[name] = yarl.URL(value[""])
     return results
 
@@ -208,6 +209,7 @@ async def get_registry_info(etcd: AsyncEtcd, name: str) -> Tuple[yarl.URL, dict]
     registry_addr = item[""]
     if not registry_addr:
         raise UnknownImageRegistry(name)
+    assert isinstance(registry_addr, str)
     creds = {}
     username = item.get("username")
     if username is not None:

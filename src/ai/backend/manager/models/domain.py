@@ -10,6 +10,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
@@ -17,10 +18,11 @@ from ai.backend.common.types import ResourceSlot
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
+    Base,
     ResourceSlotColumn,
     VFolderHostPermissionColumn,
     batch_result,
-    metadata,
+    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -36,6 +38,7 @@ log = BraceStyleAdapter(logging.getLogger(__file__))
 
 __all__: Sequence[str] = (
     "domains",
+    "DomainRow",
     "Domain",
     "DomainInput",
     "ModifyDomainInput",
@@ -53,7 +56,7 @@ _rx_slug = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$")
 
 domains = sa.Table(
     "domains",
-    metadata,
+    mapper_registry.metadata,
     sa.Column("name", sa.String(length=64), primary_key=True),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, default=True),
@@ -80,6 +83,18 @@ domains = sa.Table(
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     ),
 )
+
+
+class DomainRow(Base):
+    __table__ = domains
+    sessions = relationship("SessionRow", back_populates="domain")
+    users = relationship("UserRow", back_populates="domain")
+    projects = relationship("ProjectRow", back_populates="domain")
+    scaling_groups = relationship(
+        "ScalingGroupRow",
+        secondary="sgroups_for_domains",
+        back_populates="domains",
+    )
 
 
 class Domain(graphene.ObjectType):

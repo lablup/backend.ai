@@ -937,21 +937,21 @@ def status_history(session_id):
 
 @session.command()
 @click.argument("session_id", metavar="SESSID")
-@click.argument("new_id", metavar="NEWID")
-def rename(session_id, new_id):
+@click.argument("new_name", metavar="NEWNAME")
+def rename(session_id, new_name):
     """
     Renames session name of running session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
-    NEWID: New Session ID to rename to.
+    NEWNAME: New Session name.
     """
 
     with Session() as session:
         try:
             kernel = session.ComputeSession(session_id)
-            kernel.rename(new_id)
-            print_done(f"Session renamed to {new_id}.")
+            kernel.rename(new_name)
+            print_done(f"Session renamed to {new_name}.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -1211,20 +1211,18 @@ def _fetch_session_names():
             "PENDING",
             "SCHEDULED",
             "PREPARING",
-            "PULLING",
             "RUNNING",
+            "RUNNING_DEGRADED",
             "RESTARTING",
             "TERMINATING",
-            "RESIZING",
-            "SUSPENDED",
             "ERROR",
         ]
     )
     fields: List[FieldSpec] = [
         session_fields["name"],
-        session_fields["session_id"],
+        session_fields["id"],
         session_fields["project_name"],
-        session_fields["kernel_id"],
+        session_fields["main_kernel_id"],
         session_fields["image"],
         session_fields["type"],
         session_fields["status"],

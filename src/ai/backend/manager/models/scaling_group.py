@@ -12,15 +12,17 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.orm import relationship
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import JSONSerializableMixin, SessionTypes
 
 from .base import (
+    Base,
     StructuredJSONObjectColumn,
     batch_multiresult,
     batch_result,
-    metadata,
+    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -34,6 +36,7 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = (
     # table defs
     "scaling_groups",
+    "ScalingGroupRow",
     "sgroups_for_domains",
     "sgroups_for_projects",
     "sgroups_for_keypairs",
@@ -87,7 +90,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
 
 scaling_groups = sa.Table(
     "scaling_groups",
-    metadata,
+    mapper_registry.metadata,
     sa.Column("name", sa.String(length=64), primary_key=True),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, index=True, default=True),
@@ -112,37 +115,40 @@ scaling_groups = sa.Table(
 
 sgroups_for_domains = sa.Table(
     "sgroups_for_domains",
-    metadata,
+    mapper_registry.metadata,
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
     sa.Column(
         "domain",
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
-    sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
 )
 
 
 sgroups_for_projects = sa.Table(
     "sgroups_for_projects",
-    metadata,
+    mapper_registry.metadata,
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
     sa.Column(
         "project",
         sa.ForeignKey("projects.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
     sa.UniqueConstraint("scaling_group", "project", name="uq_sgroup_project"),
 )
@@ -150,21 +156,43 @@ sgroups_for_projects = sa.Table(
 
 sgroups_for_keypairs = sa.Table(
     "sgroups_for_keypairs",
-    metadata,
+    mapper_registry.metadata,
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
     sa.Column(
         "access_key",
         sa.ForeignKey("keypairs.access_key", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
-    sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
 )
+
+
+class ScalingGroupRow(Base):
+    __table__ = scaling_groups
+    sessions = relationship("SessionRow", back_populates="scaling_group")
+    agents = relationship("AgentRow", back_populates="scaling_group_row")
+    domains = relationship(
+        "DomainRow",
+        secondary=sgroups_for_domains,
+        back_populates="scaling_groups",
+    )
+    projects = relationship(
+        "ProjectRow",
+        secondary=sgroups_for_projects,
+        back_populates="scaling_groups",
+    )
+    keypairs = relationship(
+        "KeyPairRow",
+        secondary=sgroups_for_keypairs,
+        back_populates="scaling_groups",
+    )
 
 
 @overload

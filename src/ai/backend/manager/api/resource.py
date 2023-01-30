@@ -23,6 +23,7 @@ from dateutil.relativedelta import relativedelta
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -130,7 +131,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
         keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
-        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(access_key, conn=conn)
+        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(
+            access_key, db_sess=SASession(conn)
+        )
         keypair_remaining = keypair_limits - keypair_occupied
 
         # Check project resource limit and get project_id.
@@ -159,7 +162,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         project_limits = ResourceSlot.from_policy(project_resource_policy, known_slot_types)
-        project_occupied = await root_ctx.registry.get_project_occupancy(project_id, conn=conn)
+        project_occupied = await root_ctx.registry.get_project_occupancy(
+            project_id, db_sess=SASession(conn)
+        )
         project_remaining = project_limits - project_occupied
 
         # Check domain resource limit.
@@ -170,7 +175,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         domain_limits = ResourceSlot.from_policy(domain_resource_policy, known_slot_types)
-        domain_occupied = await root_ctx.registry.get_domain_occupancy(domain_name, conn=conn)
+        domain_occupied = await root_ctx.registry.get_domain_occupancy(
+            domain_name, db_sess=SASession(conn)
+        )
         domain_remaining = domain_limits - domain_occupied
 
         # Take minimum remaining resources. There's no need to merge limits and occupied.
