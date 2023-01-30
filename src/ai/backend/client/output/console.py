@@ -119,11 +119,11 @@ class ConsoleOutputHandler(BaseOutputHandler):
     ) -> None:
         fields: Sequence[FieldSpec] = []
 
-        def infinite_fetch(page_size):
+        def infinite_fetch(_page_size):
             nonlocal fields
             current_offset = initial_page_offset
             while True:
-                result = fetch_func(current_offset, page_size)
+                result = fetch_func(current_offset, _page_size)
                 if result.total_count == 0:
                     raise NoItems
                 current_offset += len(result.items)
