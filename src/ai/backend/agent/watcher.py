@@ -331,11 +331,11 @@ async def watcher_server(loop, pidx, args):
 
 
 class LogLevel(str, Enum):
-    debug = "debug"
-    info = "info"
-    warning = "warning"
-    error = "error"
-    critical = "critical"
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
 
 
 @click.command()
@@ -355,7 +355,7 @@ class LogLevel(str, Enum):
 @click.option(
     "--log-level",
     type=click.Choice(LogLevel, case_sensitive=False),
-    default="info",
+    default=LogLevel.INFO,
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
@@ -364,9 +364,9 @@ def main(cli_ctx, config_path, log_level, debug=False):
     if debug:
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = "debug"
+        log_level = LogLevel.DEBUG
 
-    click.echo("Selected logging level for watcher : " + log_level)
+    click.echo("Selected logging level for watcher : " + log_level.value)
 
     watcher_config_iv = (
         t.Dict(
@@ -405,7 +405,7 @@ def main(cli_ctx, config_path, log_level, debug=False):
     config.override_with_env(
         raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
     )
-    if log_level == "debug":
+    if log_level.value == "debug":
         config.override_key(raw_cfg, ("debug", "enabled"), True)
 
     try:

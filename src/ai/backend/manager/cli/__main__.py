@@ -26,11 +26,11 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 
 
 class LogLevel(str, Enum):
-    debug = "debug"
-    info = "info"
-    warning = "warning"
-    error = "error"
-    critical = "critical"
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
@@ -50,7 +50,7 @@ class LogLevel(str, Enum):
 @click.option(
     "--log-level",
     type=click.Choice(LogLevel, case_sensitive=False),
-    default="info",
+    default=LogLevel.INFO,
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context

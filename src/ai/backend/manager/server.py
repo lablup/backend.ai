@@ -770,12 +770,11 @@ async def server_main_logwrapper(
 
 
 class LogLevel(str, Enum):
-    debug = "debug"
-    info = "info"
-    warning = "warning"
-    error = "error"
-    critical = "critical"
-
+    DEBUG = "debug"
+    INFO = "info"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
 
 @click.group(invoke_without_command=True)
 @click.option(
@@ -794,22 +793,22 @@ class LogLevel(str, Enum):
 @click.option(
     "--log-level",
     type=click.Choice(LogLevel, case_sensitive=False),
-    default="info",
+    default=LogLevel.INFO,
     help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, log_level: str, debug: bool = False) -> None:
+def main(ctx: click.Context, config_path: Path, log_level: LogLevel, debug: bool = False) -> None:
     """
     Start the manager service as a foreground process.
     """
     if debug:
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
-        log_level = "debug"
+        log_level = LogLevel.DEBUG
 
-    click.echo("Selected logging level for manager : " + log_level)
+    click.echo("Selected logging level for manager : " + log_level.value)
 
-    cfg = load_config(config_path, log_level)
+    cfg = load_config(config_path, log_level.value)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))
