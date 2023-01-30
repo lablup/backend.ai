@@ -54,7 +54,7 @@ __all__: Sequence[str] = (
     "UserRow",
     "User",
     "UserList",
-    "UserGroup",
+    "UserProject",
     "UserRole",
     "UserInput",
     "ModifyUserInput",
@@ -136,15 +136,15 @@ class UserRow(Base):
     __table__ = users
     sessions = relationship("SessionRow", back_populates="user")
     domain = relationship("DomainRow", back_populates="users")
-    groups = relationship("AssocGroupUserRow", back_populates="user")
+    projects = relationship("AssocProjectUserRow", back_populates="user")
 
 
-class UserGroup(graphene.ObjectType):
+class UserProject(graphene.ObjectType):
     id = graphene.UUID()
     name = graphene.String()
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[UserGroup]:
+    def from_row(cls, ctx: GraphQueryContext, row: Row) -> Optional[UserProject]:
         if row is None:
             return None
         return cls(
@@ -193,15 +193,25 @@ class User(graphene.ObjectType):
     role = graphene.String()
     allowed_client_ip = graphene.List(lambda: graphene.String)
 
-    groups = graphene.List(lambda: UserGroup)
+    groups = graphene.List(lambda: UserProject)  # legacy
+    projects = graphene.List(lambda: UserProject)
 
     async def resolve_groups(
         self,
         info: graphene.ResolveInfo,
-    ) -> Iterable[UserGroup]:
+    ) -> Iterable[UserProject]:
         ctx: GraphQueryContext = info.context
         manager = ctx.dataloader_manager
-        loader = manager.get_loader(ctx, "UserGroup.by_user_id")
+        loader = manager.get_loader(ctx, "UserProject.by_user_id")
+        return await loader.load(self.id)
+
+    async def resolve_projects(
+        self,
+        info: graphene.ResolveInfo,
+    ) -> Iterable[UserProject]:
+        ctx: GraphQueryContext = info.context
+        manager = ctx.dataloader_manager
+        loader = manager.get_loader(ctx, "UserProject.by_user_id")
         return await loader.load(self.id)
 
     @classmethod
