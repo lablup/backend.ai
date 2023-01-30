@@ -776,6 +776,7 @@ class LogLevel(str, Enum):
     ERROR = "error"
     CRITICAL = "critical"
 
+
 @click.group(invoke_without_command=True)
 @click.option(
     "-f",

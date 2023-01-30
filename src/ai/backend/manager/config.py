@@ -490,7 +490,7 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
 
 
 class SharedConfig(AbstractConfig):
-    def __init__(   
+    def __init__(
         self,
         etcd_addr: HostPortPair,
         etcd_user: Optional[str],
