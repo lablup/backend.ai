@@ -34,10 +34,6 @@ jobs:
         gha-cache-key: pants-cache0-sbom-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
-    - uses: actions/checkout@v3
-    - uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
     - uses: CycloneDX/gh-python-generate-sbom@v1.0.1
     - name: Upload SBOM report
       uses: actions/upload-artifact@v3
