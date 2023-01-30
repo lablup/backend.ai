@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Any, Callable, List, Mapping, Optional, Sequence, Iterator, MutableMapping
+from typing import Any, Callable, Iterator, List, Mapping, MutableMapping, Optional, Sequence
 
 from tabulate import tabulate
 
@@ -9,7 +9,6 @@ from ai.backend.client.cli.pagination import echo_via_pager, get_preferred_page_
 from ai.backend.client.cli.pretty import print_error, print_fail
 
 from .types import BaseOutputHandler, FieldSpec, PaginatedResult
-
 
 _Item = MutableMapping[str, Any]
 
@@ -137,18 +136,19 @@ class ConsoleOutputHandler(BaseOutputHandler):
                     break
 
         if sys.stdout.isatty() and page_size is None:
-            page_size = get_preferred_page_size()
+            preferred_page_size = get_preferred_page_size()
             try:
                 echo_via_pager(
                     tabulate_items(
-                        infinite_fetch(page_size),
+                        infinite_fetch(preferred_page_size),
                         fields,
                     ),
                 )
             except NoItems:
                 print("No matching items.")
         else:
-            page_size = page_size or 20
+            if page_size is None:
+                page_size = 20
             for line in tabulate_items(
                 infinite_fetch(page_size),
                 fields,
