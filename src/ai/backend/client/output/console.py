@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Any, Callable, Mapping, Optional, Sequence
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Iterator, MutableMapping
 
 from tabulate import tabulate
 
@@ -9,6 +9,9 @@ from ai.backend.client.cli.pagination import echo_via_pager, get_preferred_page_
 from ai.backend.client.cli.pretty import print_error, print_fail
 
 from .types import BaseOutputHandler, FieldSpec, PaginatedResult
+
+
+_Item = MutableMapping[str, Any]
 
 
 class NoItems(Exception):
@@ -117,9 +120,9 @@ class ConsoleOutputHandler(BaseOutputHandler):
         initial_page_offset: int,
         page_size: Optional[int] = None,
     ) -> None:
-        fields: Sequence[FieldSpec] = []
+        fields: List[FieldSpec] = []
 
-        def infinite_fetch(_page_size):
+        def infinite_fetch(_page_size) -> Iterator[_Item]:
             nonlocal fields
             current_offset = initial_page_offset
             while True:
