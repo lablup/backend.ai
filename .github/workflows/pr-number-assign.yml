@@ -23,7 +23,7 @@ jobs:
         import re
 
         pr_number = "${{github.event.pull_request.number}}"
-        path = "./changes"#"/home/runner/work/backend.ai/backend.ai/changes"
+        path = "./changes"
         t_types = ["breaking","feature","enhance","deprecation","fix","doc","deps","misc"]
         pattern = r'^(\.)?(' +'|'.join(t_types)+ ')(\.)?(md)?$'
         result = None
