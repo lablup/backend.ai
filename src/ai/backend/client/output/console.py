@@ -10,7 +10,7 @@ from ai.backend.client.cli.pretty import print_error, print_fail
 
 from .types import BaseOutputHandler, FieldSpec, PaginatedResult
 
-_Item = MutableMapping[str, Any]
+_Item = Mapping[str, Any]
 
 
 class NoItems(Exception):
