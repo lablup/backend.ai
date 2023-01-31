@@ -45,7 +45,7 @@ jobs:
 
                 env_file = os.getenv('GITHUB_ENV')
                 myfile = open(env_file, "a")
-                myfile.write("ORIGINAL_FILENAME=" + original_filename)
+                myfile.write("ORIGINAL_FILENAME=" + original_filename +"\n")
                 myfile.write("FEAT=" + feat)  
                 myfile.close()
                 
