@@ -40,7 +40,7 @@ jobs:
             result = re.search(pattern, file)
             if result:
                 original_filename = result.group()
-                feat = re.search(r'|'.join(t_types),result).group()
+                feat = re.search(r'|'.join(t_types),original_filename).group()
                 os.rename(path + "/" + original_filename , path + "/" + pr_number + "." + feat + ".md")
 
                 env_file = os.getenv('GITHUB_ENV')
