@@ -20,7 +20,7 @@ class NoItems(Exception):
 class ConsoleOutputHandler(BaseOutputHandler):
     def print_item(
         self,
-        item: Optional[Mapping[str, Any]],
+        item: Optional[_Item],
         fields: Sequence[FieldSpec],
     ) -> None:
         if item is None:
@@ -42,7 +42,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
 
     def print_items(
         self,
-        items: Sequence[Mapping[str, Any]],
+        items: Sequence[_Item],
         fields: Sequence[FieldSpec],
     ) -> None:
         field_map = {f.field_name: f for f in fields}
@@ -64,7 +64,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
 
     def print_list(
         self,
-        items: Sequence[Mapping[str, Any]],
+        items: Sequence[_Item],
         fields: Sequence[FieldSpec],
         *,
         is_scalar: bool = False,
@@ -157,7 +157,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
 
     def print_mutation_result(
         self,
-        item: Mapping[str, Any],
+        item: _Item,
         item_name: Optional[str] = None,
         action_name: Optional[str] = None,
         extra_info: Mapping = {},
