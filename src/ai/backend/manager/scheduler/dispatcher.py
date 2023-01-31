@@ -529,15 +529,16 @@ class SchedulerDispatcher(aobject):
                 candidate_agents,
             ),
         ]
-        if not compatible_candidate_agents:
-            raise InstanceNotAvailable(
-                extra_msg=(
-                    f"No agents found to be compatible with the image acrhitecture "
-                    f"(image[0]: {sess_ctx.kernels[0].image_ref}, "
-                    f"arch: {requested_architecture})"
-                ),
-            )
         try:
+            if not compatible_candidate_agents:
+                raise InstanceNotAvailable(
+                    extra_msg=(
+                        f"No agents found to be compatible with the image acrhitecture "
+                        f"(image[0]: {sess_ctx.kernels[0].image_ref}, "
+                        f"arch: {requested_architecture})"
+                    ),
+                )
+
             # If sess_ctx.agent_id is already set for manual assignment by superadmin,
             # skip assign_agent_for_session().
             agent_id = None
@@ -1173,4 +1174,5 @@ async def _rollback_predicate_mutations(
     # (especially with multi-node multi-container cluster sessions)
     # may accumulate up multiple subtractions, resulting in
     # negative concurrency_occupied values.
+    log.debug("recalculate concurrency used in rollback predicates (ak: {})", session.access_key)
     await recalc_concurrency_used(db_conn, sched_ctx.registry.redis_stat, session.access_key)
