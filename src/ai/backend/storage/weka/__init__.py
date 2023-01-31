@@ -3,14 +3,14 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta
-from pathlib import Path, PurePath
+from pathlib import Path, PurePath, PurePosixPath
 from typing import Any, FrozenSet, Mapping
 from uuid import UUID
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
 from ai.backend.storage.abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
-from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptions
+from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderUsage
 from ai.backend.storage.vfs import BaseVolume
 
 from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError, WekaNotFoundError
@@ -160,3 +160,12 @@ class WekaVolume(BaseVolume):
         if not weka_path.startswith("/"):
             weka_path = "/" + weka_path
         await self.api_client.set_quota_v1(weka_path, inode_id, hard_limit=size_bytes)
+
+    async def get_usage(
+        self, vfid: UUID, relpath: PurePosixPath = PurePosixPath(".")
+    ) -> VFolderUsage:
+        assert self._fs_uid is not None
+        vfpath = self.mangle_vfpath(vfid)
+        inode_id = await self._get_inode_id(vfpath)
+        quota = await self.api_client.get_quota(self._fs_uid, inode_id)
+        return VFolderUsage(file_count=-1, used_bytes=quota.used_bytes)

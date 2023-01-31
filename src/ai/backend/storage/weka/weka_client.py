@@ -25,6 +25,7 @@ class WekaQuota:
     hard_limit: Optional[int]
     soft_limit: Optional[int]
     grace_seconds: Optional[int]
+    used_bytes: Optional[int]
 
     @classmethod
     def from_json(cls, quota_id: str, data: Any):
@@ -34,6 +35,7 @@ class WekaQuota:
             data["hard_limit_bytes"],
             data["soft_limit_bytes"],
             data["grace_seconds"],
+            data["used_bytes"],
         )
 
     def to_json(self):
@@ -43,6 +45,7 @@ class WekaQuota:
             "hard_limit": self.hard_limit,
             "soft_limit": self.soft_limit,
             "grace_seconds": self.grace_seconds,
+            "used_bytes": self.used_bytes,
         }
 
 
@@ -306,6 +309,7 @@ class WekaAPIClient:
             data["data"][quota_id]["hard_limit_bytes"],
             data["data"][quota_id]["soft_limit_bytes"],
             data["data"][quota_id]["grace_seconds"],
+            data["data"][quota_id]["used_bytes"],
         )
 
     @error_handler
