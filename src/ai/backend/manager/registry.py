@@ -2603,7 +2603,15 @@ class AgentRegistry:
 
         async def _recalc() -> None:
             async with self.db.begin() as conn:
+                log.debug(
+                    "recalculate concurrency used in kernel termination (ak: {})",
+                    access_key,
+                )
                 await recalc_concurrency_used(conn, self.redis_stat, access_key)
+                log.debug(
+                    "recalculate agent resource occupancy in kernel termination (agent: {})",
+                    agent,
+                )
                 await recalc_agent_resource_occupancy(conn, agent)
 
         await execute_with_retry(_recalc)
