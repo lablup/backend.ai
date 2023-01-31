@@ -20,11 +20,13 @@ jobs:
       run: |
         script=$(cat <<EOF
         import os
+        import re
 
         pr_number = "${{github.event.pull_request.number}}"
         path = "/home/runner/work/backend.ai/backend.ai/changes"
         t_types = ["breaking","feature","enhance","deprecation","fix","doc","deps","misc"]
-        target_file = ""
+        pattern = r'^(\.)?(' +'|'.join(t_types)+ ')(\.)?(md)?$'
+        result = None
 
         files = os.listdir(path)
         print(str(files) + " are in changes floder.")
@@ -34,18 +36,22 @@ jobs:
                 print("Change log file already exist for this PR.")
                 exit(0)
 
-        for t_type in t_types :
-            if t_type in files : 
-                target_file = t_type
+        for file in files:
+            result = re.search(pattern, file)
+            if result:
+                original_filename = result.group()
+                feat = re.search(r'|'.join(t_types), ).group()
+                os.rename(path + "/" + original_filename , path + "/" + pr_number + "." + feat + ".md")
+
                 env_file = os.getenv('GITHUB_ENV')
                 myfile = open(env_file, "a")
-                myfile.write("FEAT=" + t_type)  
+                myfile.write("FEAT=" + feat)  
                 myfile.close()
-                os.rename(path + "/" + target_file , path + "/" + pr_number + "." + target_file + ".md")
-                print(target_file +" file changed to "+ pr_number+"."+target_file+".md")
+                
+                print(feat + " file changed to " + pr_number + "." + feat + ".md")
                 exit(0)
 
-        if target_file == "":
+        if result:
             print("There is not change log file for this PR in changes folder.")
             print("Also, there is not feature named file in changes folder.")
             exit(0)

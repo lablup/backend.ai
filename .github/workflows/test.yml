@@ -1,0 +1,36 @@
+name: pr-number-assign
+on: 
+  pull_request:
+  push:
+permissions:
+  contents: write
+  
+jobs:
+  pr-number-assign:
+    runs-on: ubuntu-latest 
+    
+    env:
+      FEAT: default
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: ${{ github.head_ref }}
+  
+    - name: do work
+      run: |
+        script=$(cat <<EOF
+      
+        import os
+        print(__file__)
+        print(os.path.realpath(__file__))
+        print(os.path.abspath(__file__))
+
+        EOF
+        )
+        echo "$script" | python
+
+    - name: commit message for changing change log file
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: GitHub Actions changed file name. '${{ env.FEAT }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
