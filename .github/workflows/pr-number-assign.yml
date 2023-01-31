@@ -45,10 +45,10 @@ jobs:
 
                 env_file = os.getenv('GITHUB_ENV')
                 myfile = open(env_file, "a")
-                myfile.write("FEAT=" + feat)  
+                myfile.write("FEAT=" + original_filename)  
                 myfile.close()
                 
-                print(feat + " file changed to " + pr_number + "." + feat + ".md")
+                print(original_filename + " file changed to " + pr_number + "." + feat + ".md")
                 exit(0)
 
         if result:
