@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import zlib
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import snappy
 from sqlalchemy.sql.dml import Insert, Update
 
 from ai.backend.common import msgpack
@@ -37,7 +37,7 @@ async def test_handle_heartbeat(
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
 
     registry, mock_dbconn, mock_dbsess, mock_dbresult, mock_shared_config, _, _ = registry_ctx
-    image_data = snappy.compress(
+    image_data = zlib.compress(
         msgpack.packb(
             [
                 ("index.docker.io/lablup/python:3.6-ubuntu18.04",),

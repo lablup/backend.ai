@@ -382,11 +382,10 @@ set_brew_python_build_flags() {
   local _prefix_gdbm="$(brew --prefix gdbm)"
   local _prefix_tcltk="$(brew --prefix tcl-tk)"
   local _prefix_xz="$(brew --prefix xz)"
-  local _prefix_snappy="$(brew --prefix snappy)"
   local _prefix_libffi="$(brew --prefix libffi)"
   local _prefix_protobuf="$(brew --prefix protobuf)"
-  export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_snappy}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
-  export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_snappy}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
+  export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
+  export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
 }
 
 install_python() {
@@ -582,15 +581,6 @@ if [ $ENABLE_CUDA -eq 1 ] && [ $ENABLE_CUDA_MOCK -eq 1 ]; then
   exit 1
 fi
 
-check_snappy() {
-  pip download python-snappy
-  local pkgfile=$(ls | grep snappy)
-  if [[ $pkgfile =~ .*\.tar.gz ]]; then
-    # source build is required!
-    install_system_pkg "libsnappy-dev" "snappy-devel" "snappy"
-  fi
-  rm -f $pkgfile
-}
 read -r -d '' pyenv_init_script <<"EOS"
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
@@ -655,7 +645,6 @@ setup_environment() {
   show_info "Using the current working-copy directory as the installation path..."
 
   show_info "Creating the unified virtualenv for IDEs..."
-  check_snappy
   $PANTS export \
     --resolve=python-default \
     --resolve=python-kernel \
