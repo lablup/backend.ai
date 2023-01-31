@@ -61,6 +61,8 @@ jobs:
         )
         echo "$script" | python
 
+    - run: echo ${{ github.actor }}
+
     - name: commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
