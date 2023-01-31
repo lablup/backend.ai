@@ -82,18 +82,17 @@ class libnuma:
 
                             match driver:
                                 case "cgroupfs":
-                                    cgroup = "docker"
+                                    cgroup_parent = "docker"
                                 case "systemd":
-                                    cgroup = "system.slice/docker.service"
+                                    cgroup_parent = "system.slice"
 
                             match version:
                                 case "1":
-                                    # FIXME: systemd & cgroup v1 path doesn't exists
                                     cpuset_source_name = "cpuset.effective_cpus"
                                 case "2":
                                     cpuset_source_name = "cpuset.cpus.effective"
 
-                            docker_cpuset_path = mount_point / cgroup / cpuset_source_name
+                            docker_cpuset_path = mount_point / cgroup_parent / cpuset_source_name
                             log.debug(f"docker_cpuset_path: {docker_cpuset_path}")
                             cpuset_source = "the docker cgroup (v{})".format(version)
                         except RuntimeError:
