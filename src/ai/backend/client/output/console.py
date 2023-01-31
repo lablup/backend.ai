@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import Any, Callable, Iterator, List, Mapping, MutableMapping, Optional, Sequence
+from typing import Any, Callable, Iterator, List, Mapping, Optional, Sequence
 
 from tabulate import tabulate
 
@@ -121,7 +121,7 @@ class ConsoleOutputHandler(BaseOutputHandler):
     ) -> None:
         fields: List[FieldSpec] = []
 
-        def infinite_fetch(_page_size) -> Iterator[_Item]:
+        def infinite_fetch(_page_size: int) -> Iterator[_Item]:
             nonlocal fields
             current_offset = initial_page_offset
             while True:
