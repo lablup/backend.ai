@@ -45,7 +45,8 @@ jobs:
 
                 env_file = os.getenv('GITHUB_ENV')
                 myfile = open(env_file, "a")
-                myfile.write("FEAT=" + original_filename)  
+                myfile.write("ORIGINAL_FILENAME=" + original_filename)
+                myfile.write("FEAT=" + feat)  
                 myfile.close()
                 
                 print(original_filename + " file changed to " + pr_number + "." + feat + ".md")
@@ -63,4 +64,4 @@ jobs:
     - name: commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
-        commit_message: GitHub Actions changed file name. '${{ env.FEAT }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
+        commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
