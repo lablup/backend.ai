@@ -18,7 +18,8 @@ jobs:
     
     - name: do work
       run: |
-        script=$(cat <<EOF
+        scripts=$(cat <<EOF
+        #!/usr/bin/env python
         import os
         import re
 
@@ -56,12 +57,11 @@ jobs:
             print("There is not change log file for this PR in changes folder.")
             print("Also, there is not feature named file in changes folder.")
             exit(0)
+
         
         EOF
         )
-        echo "$shell" | python
-
-    - run: echo ${{ github.actor }}
+        echo "$scripts" | python
 
     - name: commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
