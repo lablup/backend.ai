@@ -24,15 +24,15 @@ jobs:
 
         pr_number = "${{github.event.pull_request.number}}"
         path = "./changes"
-        t_types = ["breaking","feature","enhance","deprecation","fix","doc","deps","misc"]
-        pattern = r'^(\.)?(' +'|'.join(t_types)+ ')(\.)?(md)?$'
+        t_types = ["breaking", "feature", "enhance", "deprecation", "fix", "doc", "deps", "misc"]
+        pattern = r"^(\.)?(" + "|".join(t_types) + ")(\.)?(md)?$"
         result = None
 
         files = os.listdir(path)
         print(str(files) + " are in changes floder.")
 
-        for file in files :
-            if str(file[0:file.find(".")]) == pr_number :
+        for file in files:
+            if str(file[0 : file.find(".")]) == pr_number:
                 print("Change log file already exist for this PR.")
                 exit(0)
 
@@ -40,15 +40,15 @@ jobs:
             result = re.search(pattern, file)
             if result:
                 original_filename = result.group()
-                feat = re.search(r'|'.join(t_types),original_filename).group()
-                os.rename(path + "/" + original_filename , path + "/" + pr_number + "." + feat + ".md")
+                feat = re.search(r"|".join(t_types), original_filename).group()
+                os.rename(path + "/" + original_filename, path + "/" + pr_number + "." + feat + ".md")
 
-                env_file = os.getenv('GITHUB_ENV')
+                env_file = os.getenv("GITHUB_ENV")
                 myfile = open(env_file, "a")
-                myfile.write("ORIGINAL_FILENAME=" + original_filename +"\n")
-                myfile.write("FEAT=" + feat)  
+                myfile.write("ORIGINAL_FILENAME=" + original_filename + "\n")
+                myfile.write("FEAT=" + feat)
                 myfile.close()
-                
+
                 print(original_filename + " file changed to " + pr_number + "." + feat + ".md")
                 exit(0)
 
@@ -59,11 +59,12 @@ jobs:
         
         EOF
         )
-        echo "$script" | python
+        echo "$shell" | python
 
     - run: echo ${{ github.actor }}
 
     - name: commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
+        commit_user_name: ${{ github.actor }}
         commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
