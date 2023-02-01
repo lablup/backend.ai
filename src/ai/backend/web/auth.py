@@ -81,3 +81,21 @@ async def get_anonymous_session(
         skip_sslcert_validation=not config["api"]["ssl_verify"],
     )
     return APISession(config=api_config, proxy_mode=True)
+
+
+def get_client_ip(request: web.Request) -> Optional[str]:
+    client_ip = request.headers.get("X-Forwarded-For")
+    if not client_ip and request.transport:
+        client_ip = request.transport.get_extra_info("peername")[0]
+    if not client_ip:
+        client_ip = request.remote
+    return client_ip
+
+
+def fill_x_forwarded_for_header_to_api_session(
+    request: web.Request, api_session: APISession
+) -> None:
+    client_ip = get_client_ip(request)
+    if client_ip:
+        _headers = {"X-Forwarded-For": client_ip}
+        api_session.aiohttp_session.headers.update(_headers)
