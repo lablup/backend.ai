@@ -763,6 +763,7 @@ class VirtualFolder(graphene.ObjectType):
         "group_name": "groups_name",
         "user": "vfolders_user",
         "user_email": "users_email",
+        "creator": "vfolders_creator",
         "usage_mode": "vfolders_usage_mode",
         "permission": "vfolders_permission",
         "ownership_type": "vfolders_ownership_type",

@@ -22,7 +22,7 @@ from pants.option.subsystem import Subsystem
 logger = logging.getLogger(__name__)
 
 
-class PlatformResourcesSusbystem(Subsystem):
+class PlatformResourcesSubsystem(Subsystem):
     options_scope = "platform-specific-resources"
     help = "The platform-specific resource provider."
     platform = EnumOption(
@@ -73,7 +73,7 @@ class InferPlatformSpecificDependenciesRequest(InferDependenciesRequest):
 @rule
 async def infer_platform_specific_dependencies(
     request: InferPlatformSpecificDependenciesRequest,
-    subsystem: PlatformResourcesSusbystem,
+    subsystem: PlatformResourcesSubsystem,
 ) -> InferredDependencies:
     logger.info("infer_platform_specific_dependencies")
     logger.info(
@@ -107,6 +107,6 @@ def target_types():
 def rules():
     return [
         *collect_rules(),
-        *PlatformResourcesSusbystem.rules(),
+        *PlatformResourcesSubsystem.rules(),
         UnionRule(InferDependenciesRequest, InferPlatformSpecificDependenciesRequest),
     ]
