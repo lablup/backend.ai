@@ -102,7 +102,7 @@
             "zipp>=0.5"
           ],
           "requires_python": ">=3.7",
-          "version": "6"
+          "version": "6.0.0"
         },
         {
           "artifacts": [
@@ -126,7 +126,7 @@
             "twisted>=16.4.0; extra == \"scripts\""
           ],
           "requires_python": null,
-          "version": "22.10"
+          "version": "22.10.0"
         },
         {
           "artifacts": [
@@ -466,7 +466,7 @@
             "twisted; extra == \"dev\""
           ],
           "requires_python": ">=3.7",
-          "version": "22.12"
+          "version": "22.12.0"
         },
         {
           "artifacts": [
@@ -484,7 +484,7 @@
           "project_name": "typing-extensions",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "4.4"
+          "version": "4.4.0"
         },
         {
           "artifacts": [
@@ -520,14 +520,14 @@
             "sphinx>=3.5; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.11"
+          "version": "3.11.0"
         }
       ],
       "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.108",
+  "pex_version": "2.1.120",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [

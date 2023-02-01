@@ -2,7 +2,7 @@ from typing import Any, Dict, Sequence, Union
 
 from ai.backend.client.output.fields import keypair_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.client.pagination import generate_paginated_results
+from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.session import api_session
 
 from .base import BaseFunction, api_function
@@ -192,7 +192,7 @@ class KeyPair(BaseFunction):
         }
         if user_id is not None:
             variables["email"] = (user_id, "String")
-        return await generate_paginated_results(
+        return await fetch_paginated_result(
             "keypair_list",
             variables,
             fields,

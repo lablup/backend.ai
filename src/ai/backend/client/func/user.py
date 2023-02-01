@@ -8,7 +8,7 @@ from typing import Iterable, Sequence, Union
 from ai.backend.client.auth import AuthToken, AuthTokenTypes
 from ai.backend.client.output.fields import user_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.client.pagination import generate_paginated_results
+from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.request import Request
 from ai.backend.client.session import api_session
 
@@ -156,7 +156,7 @@ class User(BaseFunction):
         :param group: Fetch users in a specific group.
         :param fields: Additional per-user query fields to fetch.
         """
-        return await generate_paginated_results(
+        return await fetch_paginated_result(
             "user_list",
             {
                 "status": (status, "String"),

@@ -12,6 +12,7 @@ import sys
 import time
 import traceback
 import weakref
+import zlib
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from decimal import Decimal
@@ -47,7 +48,6 @@ from uuid import UUID
 import aiotools
 import attrs
 import pkg_resources
-import snappy
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
@@ -729,9 +729,10 @@ class AbstractAgent(
                     }
                     for key, computer in self.computers.items()
                 },
-                "images": snappy.compress(
+                "images": zlib.compress(
                     msgpack.packb([(repo_tag, digest) for repo_tag, digest in self.images.items()])
                 ),
+                "images.opts": {"compression": "zlib"},  # compression: zlib or None
                 "architecture": get_arch_name(),
             }
             await self.produce_event(AgentHeartbeatEvent(agent_info))
