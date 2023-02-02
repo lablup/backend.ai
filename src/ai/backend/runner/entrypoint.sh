@@ -28,6 +28,14 @@ if [ $USER_ID -eq 0 ]; then
   # Extract dotfiles
   /opt/backend.ai/bin/python /opt/kernel/extract_dotfiles.py
 
+  echo "Generate random alpha-numeric password"
+  if [ ! -f "$HOME/.password" ]; then
+    /opt/backend.ai/bin/python /opt/kernel/fantompass.py > "$HOME/.password"
+    export ALPHA_NUMERIC_VAL=$(cat $HOME/.password)
+    chmod 0644 "$HOME/.password"
+    echo "work:$ALPHA_NUMERIC_VAL" | chpasswd
+  fi
+
   echo "Executing the main program..."
   exec "$@"
 
@@ -44,6 +52,7 @@ else
     if [ -z "$USER_NAME" ]; then
       USER_NAME=work
       adduser -s /bin/ash -h "/home/$USER_NAME" -H -D -u $USER_ID -G $GROUP_NAME -g "User" $USER_NAME
+      usermod -aG shadow $USER_NAME
     fi
     export SHELL=/bin/ash
   else
@@ -56,12 +65,14 @@ else
     if [ -z "$USER_NAME" ]; then
       USER_NAME=work
       useradd -s /bin/bash -d "/home/$USER_NAME" -M -r -u $USER_ID -g $GROUP_NAME -o -c "User" $USER_NAME
+      usermod -aG shadow $USER_NAME
     else
       cp -R "/home/$USER_NAME/*" /home/work/
       cp -R "/home/$USER_NAME/.*" /home/work/
       usermod -s /bin/bash -d /home/work -l work -g $GROUP_NAME $USER_NAME
       USER_NAME=work
       chown -R $USER_NAME:$GROUP_NAME /home/work
+      usermod -aG shadow $USER_NAME
     fi
     export SHELL=/bin/bash
   fi
@@ -83,7 +94,15 @@ else
   # Extract dotfiles
   /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python /opt/kernel/extract_dotfiles.py
 
-  echo "Executing the main program..."
-  exec /opt/kernel/su-exec $USER_ID:$GROUP_ID "$@"
+  echo "Generate random alpha-numeric password"
+  if [ ! -f "$HOME/.password" ]; then
+    /opt/kernel/su-exec $USER_ID:$GROUP_ID  /opt/backend.ai/bin/python /opt/kernel/fantompass.py > "$HOME/.password"
+    export ALPHA_NUMERIC_VAL=$(cat $HOME/.password)
+    chmod 0644 "$HOME/.password"
+    echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd
+  fi
+
+  echo "Executing the main program: /opt/kernel/su-exec \"$USER_ID:$GROUP_ID,42\" \"$@\"..."
+  exec /opt/kernel/su-exec "$USER_ID:$GROUP_ID,42" "$@"
 
 fi

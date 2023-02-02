@@ -18,6 +18,7 @@ _default_list_fields = (
     scaling_group_fields["created_at"],
     scaling_group_fields["driver"],
     scaling_group_fields["scheduler"],
+    scaling_group_fields["use_host_network"],
 )
 
 _default_detail_fields = (
@@ -29,6 +30,7 @@ _default_detail_fields = (
     scaling_group_fields["driver_opts"],
     scaling_group_fields["scheduler"],
     scaling_group_fields["scheduler_opts"],
+    scaling_group_fields["use_host_network"],
 )
 
 
@@ -121,6 +123,7 @@ class ScalingGroup(BaseFunction):
         driver_opts: Mapping[str, str] = None,
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
+        use_host_network: bool = False,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
@@ -148,6 +151,7 @@ class ScalingGroup(BaseFunction):
                 "driver_opts": json.dumps(driver_opts),
                 "scheduler": scheduler,
                 "scheduler_opts": json.dumps(scheduler_opts),
+                "use_host_network": use_host_network,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
@@ -164,6 +168,7 @@ class ScalingGroup(BaseFunction):
         driver_opts: Mapping[str, str] = None,
         scheduler: str = None,
         scheduler_opts: Mapping[str, str] = None,
+        use_host_network: bool = False,
         fields: Iterable[FieldSpec | str] = None,
     ) -> dict:
         """
@@ -191,6 +196,7 @@ class ScalingGroup(BaseFunction):
                 "driver_opts": None if driver_opts is None else json.dumps(driver_opts),
                 "scheduler": scheduler,
                 "scheduler_opts": None if scheduler_opts is None else json.dumps(scheduler_opts),
+                "use_host_network": use_host_network,
             },
         }
         data = await api_session.get().Admin._query(query, variables)
