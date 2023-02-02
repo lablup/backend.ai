@@ -1,6 +1,6 @@
 import shutil
 import sys
-from typing import Any, Callable, Iterator, List, Literal, MutableMapping, Sequence
+from typing import Any, Callable, Iterator, List, Literal, Mapping, Sequence
 
 import click
 from tabulate import tabulate
@@ -14,7 +14,7 @@ def get_preferred_page_size() -> int:
     return min(MAX_PAGE_SIZE, shutil.get_terminal_size((80, 20)).lines)
 
 
-_Item = MutableMapping[str, Any]
+_Item = Mapping[str, Any]
 
 
 def tabulate_items(

@@ -12,6 +12,7 @@ import sys
 import time
 import traceback
 import weakref
+import zlib
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from decimal import Decimal
@@ -47,7 +48,6 @@ from uuid import UUID
 import aiotools
 import attrs
 import pkg_resources
-import snappy
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
@@ -729,9 +729,10 @@ class AbstractAgent(
                     }
                     for key, computer in self.computers.items()
                 },
-                "images": snappy.compress(
+                "images": zlib.compress(
                     msgpack.packb([(repo_tag, digest) for repo_tag, digest in self.images.items()])
                 ),
+                "images.opts": {"compression": "zlib"},  # compression: zlib or None
                 "architecture": get_arch_name(),
             }
             await self.produce_event(AgentHeartbeatEvent(agent_info))
@@ -986,13 +987,30 @@ class AbstractAgent(
         event: LifecycleEvent,
         reason: KernelLifecycleEventReason,
         *,
-        container_id: ContainerId = None,
+        container_id: Optional[ContainerId] = None,
         exit_code: int = None,
         done_future: asyncio.Future = None,
         suppress_events: bool = False,
     ) -> None:
+        cid: Optional[ContainerId] = None
         try:
             kernel_obj = self.kernel_registry[kernel_id]
+        except KeyError:
+            if event == LifecycleEvent.START:
+                # When creating a new kernel, the kernel_registry is not populated yet
+                # during creation of actual containers.
+                # The Docker daemon may publish the container creation event before
+                # returning the API and our async handlers may deliver the event earlier.
+                # In such cases, it is safe to ignore the missing kernel_regisry item.
+                pass
+            else:
+                log.warning(
+                    "injecting lifecycle event (e:{}) for unknown kernel (k:{})",
+                    event.name,
+                    kernel_id,
+                )
+        else:
+            assert kernel_obj is not None
             if kernel_obj.termination_reason:
                 reason = kernel_obj.termination_reason
             if container_id is not None:
@@ -1011,25 +1029,17 @@ class AbstractAgent(
                         event.name,
                         container_id,
                     )
-            container_id = kernel_obj["container_id"]
-        except KeyError:
-            if event == LifecycleEvent.START:
-                # When creating a new kernel, the kernel_registry is not populated yet
-                # during creation of actual containers.
-                # The Docker daemon may publish the container creation event before
-                # returning the API and our async handlers may deliver the event earlier.
-                # In such cases, it is safe to ignore the missing kernel_regisry item.
-                pass
-            else:
-                log.warning(
-                    "injecting lifecycle event (e:{}) for unknown kernel (k:{})",
-                    event.name,
-                    kernel_id,
-                )
+            cid = kernel_obj.get("container_id")
+        if cid is None:
+            log.warning(
+                "kernel has no container_id (k:{}) with event (e:{})",
+                kernel_id,
+                event.name,
+            )
         await self.container_lifecycle_queue.put(
             ContainerLifecycleEvent(
                 kernel_id,
-                container_id,
+                cid,
                 event,
                 reason,
                 done_future,
@@ -1673,9 +1683,17 @@ class AbstractAgent(
                 kernel_id,
                 LifecycleEvent.DESTROY,
                 KernelLifecycleEventReason.UNKNOWN,
-                container_id=cid,
+                container_id=ContainerId(cid),
             )
             raise AgentError("Kernel failed to create container (k:{})", str(ctx.kernel_id))
+        except Exception:
+            log.warning(
+                "Kernel failed to create container (k:{}). Kernel is going to be unregistered.",
+                kernel_id,
+            )
+            async with self.registry_lock:
+                del self.kernel_registry[kernel_id]
+            raise
         async with self.registry_lock:
             self.kernel_registry[ctx.kernel_id].data.update(container_data)
         await kernel_obj.init()
@@ -1799,30 +1817,10 @@ class AbstractAgent(
         """
 
     @abstractmethod
-    async def create_overlay_network(self, network_name: str) -> None:
-        """
-        Create an overlay network for a multi-node multicontainer session, where containers in different
-        agents can connect to each other using cluster hostnames without explicit port mapping.
-
-        This is called by the manager before kernel creation.
-        It may raise :exc:`NotImplementedError` and then the manager
-        will cancel creation of the session.
-        """
-
-    @abstractmethod
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        """
-        Destroy an overlay network.
-
-        This is called by the manager after kernel destruction.
-        """
-
-    @abstractmethod
     async def create_local_network(self, network_name: str) -> None:
         """
         Create a local bridge network for a single-node multicontainer session, where containers in the
         same agent can connect to each other using cluster hostnames without explicit port mapping.
-        Depending on the backend, this may be an alias to :meth:`create_overlay_network()`.
 
         This is called by the manager before kernel creation.
         It may raise :exc:`NotImplementedError` and then the manager
@@ -1832,8 +1830,7 @@ class AbstractAgent(
     @abstractmethod
     async def destroy_local_network(self, network_name: str) -> None:
         """
-        Destroy a local bridge network.
-        Depending on the backend, this may be an alias to :meth:`destroy_overlay_network()`.
+        Destroy a local bridge network used for a single-node multi-container session.
 
         This is called by the manager after kernel destruction.
         """
