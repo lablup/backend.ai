@@ -12,6 +12,7 @@ import sys
 import time
 import traceback
 import weakref
+import zlib
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from decimal import Decimal
@@ -47,7 +48,6 @@ from uuid import UUID
 import aiotools
 import attrs
 import pkg_resources
-import snappy
 import zmq
 import zmq.asyncio
 from async_timeout import timeout
@@ -729,9 +729,10 @@ class AbstractAgent(
                     }
                     for key, computer in self.computers.items()
                 },
-                "images": snappy.compress(
+                "images": zlib.compress(
                     msgpack.packb([(repo_tag, digest) for repo_tag, digest in self.images.items()])
                 ),
+                "images.opts": {"compression": "zlib"},  # compression: zlib or None
                 "architecture": get_arch_name(),
             }
             await self.produce_event(AgentHeartbeatEvent(agent_info))
@@ -1799,30 +1800,10 @@ class AbstractAgent(
         """
 
     @abstractmethod
-    async def create_overlay_network(self, network_name: str) -> None:
-        """
-        Create an overlay network for a multi-node multicontainer session, where containers in different
-        agents can connect to each other using cluster hostnames without explicit port mapping.
-
-        This is called by the manager before kernel creation.
-        It may raise :exc:`NotImplementedError` and then the manager
-        will cancel creation of the session.
-        """
-
-    @abstractmethod
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        """
-        Destroy an overlay network.
-
-        This is called by the manager after kernel destruction.
-        """
-
-    @abstractmethod
     async def create_local_network(self, network_name: str) -> None:
         """
         Create a local bridge network for a single-node multicontainer session, where containers in the
         same agent can connect to each other using cluster hostnames without explicit port mapping.
-        Depending on the backend, this may be an alias to :meth:`create_overlay_network()`.
 
         This is called by the manager before kernel creation.
         It may raise :exc:`NotImplementedError` and then the manager
@@ -1832,8 +1813,7 @@ class AbstractAgent(
     @abstractmethod
     async def destroy_local_network(self, network_name: str) -> None:
         """
-        Destroy a local bridge network.
-        Depending on the backend, this may be an alias to :meth:`destroy_overlay_network()`.
+        Destroy a local bridge network used for a single-node multi-container session.
 
         This is called by the manager after kernel destruction.
         """
