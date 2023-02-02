@@ -37,7 +37,6 @@ import pkg_resources
 import zmq
 from aiodocker.docker import Docker, DockerContainer
 from aiodocker.exceptions import DockerError
-from aiohttp import web
 from aiomonitor.task import preserve_termination_log
 from async_timeout import timeout
 
@@ -82,8 +81,8 @@ from ..utils import (
     host_pid_to_container_pid,
     update_nested_dict,
 )
-from .kernel import DockerKernel, prepare_kernel_metadata_uri_handling
-from .metadata.server import create_server as create_metadata_server
+from .kernel import DockerKernel
+from .metadata.server import MetadataServer
 from .resources import detect_resources
 from .utils import PersistentServiceContainer
 
@@ -916,7 +915,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     agent_sockpath: Path
     agent_sock_task: asyncio.Task
     scan_images_timer: asyncio.Task
-    metadata_server_runner: web.AppRunner
+    metadata_server: MetadataServer
     docker_ptask_group: aiotools.PersistentTaskGroup
 
     def __init__(
@@ -962,45 +961,41 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         ipc_base_path = self.local_config["agent"]["ipc-base-path"]
         (ipc_base_path / "container").mkdir(parents=True, exist_ok=True)
         self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
-        socket_relay_name = f"backendai-socket-relay.{self.local_instance_id}"
-        socket_relay_container = PersistentServiceContainer(
-            "backendai-socket-relay:latest",
-            {
-                "Cmd": [
-                    f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
-                    f"TCP-CONNECT:127.0.0.1:{self.local_config['agent']['agent-sock-port']}",
-                ],
-                "HostConfig": {
-                    "Mounts": [
-                        {
-                            "Type": "bind",
-                            "Source": str(ipc_base_path / "container"),
-                            "Target": "/ipc",
-                        },
+        # Workaround for Docker Desktop for Mac's UNIX socket mount failure with virtiofs
+        if sys.platform != "darwin":
+            socket_relay_name = f"backendai-socket-relay.{self.local_instance_id}"
+            socket_relay_container = PersistentServiceContainer(
+                "backendai-socket-relay:latest",
+                {
+                    "Cmd": [
+                        f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
+                        f"TCP-CONNECT:127.0.0.1:{self.local_config['agent']['agent-sock-port']}",
                     ],
-                    "NetworkMode": "host",
+                    "HostConfig": {
+                        "Mounts": [
+                            {
+                                "Type": "bind",
+                                "Source": str(ipc_base_path / "container"),
+                                "Target": "/ipc",
+                            },
+                        ],
+                        "NetworkMode": "host",
+                    },
                 },
-            },
-            name=socket_relay_name,
-        )
-        await socket_relay_container.ensure_running_latest()
+                name=socket_relay_name,
+            )
+            await socket_relay_container.ensure_running_latest()
         self.agent_sock_task = asyncio.create_task(self.handle_agent_socket())
         self.monitor_docker_task = asyncio.create_task(self.monitor_docker_events())
         self.monitor_swarm_task = asyncio.create_task(self.check_swarm_status(as_task=True))
         self.docker_ptask_group = aiotools.PersistentTaskGroup()
 
-        await prepare_kernel_metadata_uri_handling(self.local_config)
-        metadata_server_runner = web.AppRunner(
-            await create_metadata_server(self.local_config, self.kernel_registry),
+        self.metadata_server = await MetadataServer.new(
+            self.local_config,
+            self.etcd,
+            self.kernel_registry,
         )
-        await metadata_server_runner.setup()
-        site = web.TCPSite(
-            metadata_server_runner,
-            "0.0.0.0",
-            self.local_config["agent"]["metadata-server-port"],
-        )
-        await site.start()
-        self.metadata_server_runner = metadata_server_runner
+        await self.metadata_server.start_server()
         # For legacy accelerator plugins
         self.docker = Docker()
 
@@ -1024,7 +1019,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.monitor_swarm_task.cancel()
             await self.monitor_swarm_task
 
-        await self.metadata_server_runner.cleanup()
+        await self.metadata_server.cleanup()
         if self.docker:
             await self.docker.close()
 
@@ -1161,7 +1156,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         if msg[0] == b"host-pid-to-container-pid":
                             container_id = msg[1].decode()
                             host_pid = struct.unpack("i", msg[2])[0]
-                            container_pid = await host_pid_to_container_pid(container_id, host_pid)
+                            container_pid = await host_pid_to_container_pid(
+                                container_id,
+                                host_pid,
+                            )
                             reply = [
                                 struct.pack("i", 0),
                                 struct.pack("i", container_pid),
