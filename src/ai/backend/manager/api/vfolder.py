@@ -46,7 +46,7 @@ from ..models import (
     VFolderPermissionValidator,
     VFolderUsageMode,
     agents,
-    ensure_allowed_permission_host,
+    ensure_host_permission_allowed,
     filter_allowed_permission_host,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
@@ -350,7 +350,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         else:
             group_id = group_id_or_name
         if not unmanaged_path:
-            await ensure_allowed_permission_host(
+            await ensure_host_permission_allowed(
                 conn,
                 folder_host,
                 allowed_vfolder_types=allowed_vfolder_types,
@@ -596,7 +596,7 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == params["id"])
         )
         folder_host = await conn.scalar(query)
-        await ensure_allowed_permission_host(
+        await ensure_host_permission_allowed(
             conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -900,7 +900,7 @@ async def update_quota(request: web.Request, params: Any) -> web.Response:
     else:
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
         async with root_ctx.db.begin_readonly() as conn:
-            await ensure_allowed_permission_host(
+            await ensure_host_permission_allowed(
                 conn,
                 folder_host,
                 allowed_vfolder_types=allowed_vfolder_types,
@@ -1033,7 +1033,7 @@ async def rename_vfolder(request: web.Request, params: Any, row: VFolderRow) -> 
                     raise InvalidAPIParameters(
                         "Cannot change the name of a vfolder " "that is not owned by myself."
                     )
-                await ensure_allowed_permission_host(
+                await ensure_host_permission_allowed(
                     conn,
                     entry["host"],
                     allowed_vfolder_types=allowed_vfolder_types,
@@ -1075,7 +1075,7 @@ async def update_vfolder_options(
     async with root_ctx.db.begin_readonly() as conn:
         query = sa.select([vfolders.c.host]).select_from(vfolders).where(vfolders.c.id == row["id"])
         folder_host = await conn.scalar(query)
-        await ensure_allowed_permission_host(
+        await ensure_host_permission_allowed(
             conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -1178,7 +1178,7 @@ async def create_download_session(
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
-        await ensure_allowed_permission_host(
+        await ensure_host_permission_allowed(
             conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -1235,7 +1235,7 @@ async def create_upload_session(request: web.Request, params: Any, row: VFolderR
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
-        await ensure_allowed_permission_host(
+        await ensure_host_permission_allowed(
             conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -1289,7 +1289,7 @@ async def rename_file(request: web.Request, params: Any, row: VFolderRow) -> web
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
     async with root_ctx.db.begin_readonly() as conn:
-        await ensure_allowed_permission_host(
+        await ensure_host_permission_allowed(
             conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -1598,7 +1598,7 @@ async def invite(request: web.Request, params: Any) -> web.Response:
             raise VFolderNotFound()
         folder_host = vf.host
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-        await ensure_allowed_permission_host(
+        await ensure_host_permission_allowed(
             conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -1932,7 +1932,7 @@ async def share(request: web.Request, params: Any) -> web.Response:
             raise InternalServerError(f"Multiple project folders found: {folder_name}")
         vf_info = vf_infos[0]
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-        await ensure_allowed_permission_host(
+        await ensure_host_permission_allowed(
             conn,
             vf_info["host"],
             allowed_vfolder_types=allowed_vfolder_types,
@@ -2051,7 +2051,7 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
             raise InternalServerError(f"Multiple project folders found: {folder_name}")
         vf_info = vf_infos[0]
         allowed_vfolder_types = await root_ctx.shared_config.get_vfolder_types()
-        await ensure_allowed_permission_host(
+        await ensure_host_permission_allowed(
             conn,
             vf_info["host"],
             allowed_vfolder_types=allowed_vfolder_types,
@@ -2137,7 +2137,7 @@ async def delete(request: web.Request) -> web.Response:
         # query_accesible_vfolders returns list
         entry = entries[0]
         folder_host = entry["host"]
-        await ensure_allowed_permission_host(
+        await ensure_host_permission_allowed(
             conn,
             folder_host,
             allowed_vfolder_types=allowed_vfolder_types,

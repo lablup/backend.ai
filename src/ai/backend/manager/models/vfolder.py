@@ -55,7 +55,7 @@ __all__: Sequence[str] = (
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
     "filter_allowed_permission_host",
-    "ensure_allowed_permission_host",
+    "ensure_host_permission_allowed",
 )
 
 
@@ -605,7 +605,7 @@ async def prepare_vfolder_mounts(
     for key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
-        await ensure_allowed_permission_host(
+        await ensure_host_permission_allowed(
             conn,
             vfolder["host"],
             allowed_vfolder_types=allowed_vfolder_types,
@@ -687,7 +687,7 @@ async def prepare_vfolder_mounts(
     return matched_vfolder_mounts
 
 
-async def ensure_allowed_permission_host(
+async def ensure_host_permission_allowed(
     db_conn,
     folder_host: str,
     *,
