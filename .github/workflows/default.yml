@@ -175,7 +175,9 @@ jobs:
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
 
-  deploy-to-pypi:
+
+
+  build:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
@@ -219,9 +221,6 @@ jobs:
         gha-cache-key: pants-cache0-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
-    - name: Install local dependencies for packaging and publishing
-      run: |
-        pip install -U 'twine~=4.0' 'packaging>=21.3'
     - name: Build packages
       run: |
         # Normalize the package version
@@ -245,33 +244,20 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
-    - name: Publish to PyPI
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      # We don't use `./pants publish ::` because we manually rename the
-      # wheels after buildling them to add arch-specific tags.
-      run: |
-        twine upload dist/*.whl dist/*.tar.gz
-    - name: Extract the release changelog
-      run: |
-        python ./scripts/extract-release-changelog.py
-        python ./scripts/determine-release-type.py
-    - name: Release to GitHub
-      uses: softprops/action-gh-release@v1
+    - name: Upload wheels
+      uses: actions/upload-artifact@v3
       with:
-        body_path: "CHANGELOG_RELEASE.md"
-        prerelease: ${{ env.IS_PRERELEASE }}
-        files: |
-          dist/*.whl
+        name: wheels
+        path: dist/*.whl
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
         name: pants.deploy.log
         path: .pants.d/pants.log
       if: always()  # We want the log even on failures.
-      
-  windows-conda:
+
+
+  windows-conda-build:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: windows-latest
@@ -306,9 +292,6 @@ jobs:
     - uses: s-weigand/setup-conda@v1
       with:
         activate-conda: false
-    - name: Install local dependencies for packaging and publishing
-      run: |
-        pip install -U 'twine~=4.0' 'packaging>=21.3'
     - name: conda-pack
       run: |
         pip install conda-pack
@@ -316,12 +299,60 @@ jobs:
         conda activate backend.ai-client
         pip install backend.ai-client
         conda-pack -o backend.ai-client.tar.gz
+    - name: Upload conda-pack
+      uses: actions/upload-artifact@v3
+      with:
+        name: conda-pack
+        path: backend.ai-client.tar.gz
+    - name: Upload pants log
+      uses: actions/upload-artifact@v3
+      with:
+        name: pants.deploy.log
+        path: .pants.d/pants.log
+      if: always()
+
+
+  deploy-to-pypi:
+    needs: [build, windows-conda-build]
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Extract Python version from pants.toml
+      shell: bash
+      run: |
+        export LANG=C.UTF-8
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
+    - name: Install local dependencies for packaging and publishing
+      run: |
+        pip install -U 'twine~=4.0'
+    - name: Download wheels
+      uses: actions/download-artifact@v3
+      with:
+        name: wheels
+        path: dist
+    - name: Download conda-pack
+      uses: actions/download-artifact@v3
+      with:
+        name: conda-pack
+        path: dist
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
         TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      # We don't use `./pants publish ::` because we manually rename the
+      # wheels after buildling them to add arch-specific tags.
       run: |
-        twine upload backend.ai-client.tar.gz
+        twine upload dist/*.whl dist/*.tar.gz
     - name: Extract the release changelog
       run: |
         python ./scripts/extract-release-changelog.py
@@ -332,10 +363,5 @@ jobs:
         body_path: "CHANGELOG_RELEASE.md"
         prerelease: ${{ env.IS_PRERELEASE }}
         files: |
-          backend.ai-client.tar.gz
-    - name: Upload pants log
-      uses: actions/upload-artifact@v3
-      with:
-        name: pants.deploy.log
-        path: .pants.d/pants.log
-      if: always()
+          dist/*.whl
+          dist/*.tar.gz
