@@ -54,7 +54,8 @@ __all__: Sequence[str] = (
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
-    "filter_allowed_perm_host",
+    "filter_allowed_permission_host",
+    "ensure_allowed_permission_host",
 )
 
 
@@ -604,7 +605,7 @@ async def prepare_vfolder_mounts(
     for key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
-        await filter_allowed_perm_host(
+        await ensure_allowed_permission_host(
             conn,
             vfolder["host"],
             allowed_vfolder_types=allowed_vfolder_types,
@@ -612,7 +613,7 @@ async def prepare_vfolder_mounts(
             resource_policy=resource_policy,
             domain_name=user_scope.domain_name,
             group_id=user_scope.group_id,
-            perm=VFolderHostPermission.MOUNT_IN_SESSION,
+            permission=VFolderHostPermission.MOUNT_IN_SESSION,
         )
         if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
             # User's accessible group vfolders should not be mounted
@@ -686,11 +687,32 @@ async def prepare_vfolder_mounts(
     return matched_vfolder_mounts
 
 
-async def filter_allowed_perm_host(
+async def ensure_allowed_permission_host(
     db_conn,
     folder_host: str,
     *,
-    perm: VFolderHostPermission,
+    permission: VFolderHostPermission,
+    allowed_vfolder_types: Sequence[str],
+    user_uuid: uuid.UUID,
+    resource_policy: Mapping[str, Any],
+    domain_name: str,
+    group_id: Optional[uuid.UUID] = None,
+) -> None:
+    allowed_hosts = await filter_allowed_permission_host(
+        db_conn,
+        allowed_vfolder_types=allowed_vfolder_types,
+        user_uuid=user_uuid,
+        resource_policy=resource_policy,
+        domain_name=domain_name,
+        group_id=group_id,
+    )
+    if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
+        raise InvalidAPIParameters(f"`{permission}` Not allowed in vfolder host(`{folder_host}`)")
+
+
+async def filter_allowed_permission_host(
+    db_conn,
+    *,
     allowed_vfolder_types: Sequence[str],
     user_uuid: uuid.UUID,
     resource_policy: Mapping[str, Any],
@@ -708,9 +730,6 @@ async def filter_allowed_perm_host(
             db_conn, resource_policy, domain_name, group_id
         )
         allowed_hosts = allowed_hosts | allowed_hosts_by_group
-    # TODO: handle legacy host lists assuming that volume names don't overlap?
-    if folder_host not in allowed_hosts or perm not in allowed_hosts[folder_host]:
-        raise InvalidAPIParameters(f"`{perm}` Not allowed in vfolder host(`{folder_host}`)")
     return allowed_hosts
 
 
