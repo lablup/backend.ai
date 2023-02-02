@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import zlib
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import snappy
 from sqlalchemy.sql.dml import Insert, Update
 
 from ai.backend.common import msgpack
@@ -16,7 +16,9 @@ from ai.backend.manager.registry import AgentRegistry
 
 @pytest.mark.asyncio
 async def test_handle_heartbeat(
-    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
+    registry_ctx: tuple[
+        AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock
+    ],
     mocker,
 ) -> None:
     mock_get_known_registries = AsyncMock(
@@ -34,8 +36,8 @@ async def test_handle_heartbeat(
 
     mocker.patch("ai.backend.common.plugin.scan_entrypoints", mocked_entrypoints)
 
-    registry, mock_dbconn, mock_dbresult, mock_shared_config, _, _ = registry_ctx
-    image_data = snappy.compress(
+    registry, mock_dbconn, mock_dbsess, mock_dbresult, mock_shared_config, _, _ = registry_ctx
+    image_data = zlib.compress(
         msgpack.packb(
             [
                 ("index.docker.io/lablup/python:3.6-ubuntu18.04",),
@@ -144,9 +146,11 @@ async def test_handle_heartbeat(
 
 @pytest.mark.asyncio
 async def test_convert_resource_spec_to_resource_slot(
-    registry_ctx: tuple[AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock],
+    registry_ctx: tuple[
+        AgentRegistry, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock, MagicMock
+    ],
 ):
-    registry, _, _, _, _, _ = registry_ctx
+    registry, _, _, _, _, _, _ = registry_ctx
     allocations = {
         "cuda": {
             SlotName("cuda.shares"): {

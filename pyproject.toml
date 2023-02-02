@@ -72,7 +72,7 @@ implicit_optional = true  # FIXME: remove after adding https://github.com/haunts
 mypy_path = "stubs:src:tools/pants-plugins"
 namespace_packages = true
 explicit_package_bases = true
-python_executable = "dist/export/python/virtualenvs/python-default/3.10.8/bin/python"
+python_executable = "dist/export/python/virtualenvs/python-default/3.10.9/bin/python"
 
 [tool.black]
 line-length = 100
