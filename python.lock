@@ -858,38 +858,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a612ed29551900e6504e749df9b3c991453ee2bf2656d63777d76b4cbd644fed",
-              "url": "https://files.pythonhosted.org/packages/8c/43/0818e7927109bd9302a94a02ae2ed0784d8b341a873063f4494d4f6a2f5d/boto3-1.26.44-py3-none-any.whl"
+              "hash": "0a0171c648da81916e6f5badebfefdbd15280118f69462eb9425f7bff4c1323f",
+              "url": "https://files.pythonhosted.org/packages/4e/3d/b73facfe7a2a2956261c699f2f5e3329268b3d423aa9f0fc3c73d1abf616/boto3-1.26.62-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "4f4c3018caf2ddaf355f202be8ff48c5ecf9d4208d6d6c581055428fcfa2309b",
-              "url": "https://files.pythonhosted.org/packages/5f/62/24dd1c986417c8c8e559725760e22d256c153bc5becce9fb0b1ee7297301/boto3-1.26.44.tar.gz"
+              "hash": "0271e05cf962de53deb4ee5c6e37433c8284584a26f45275cf43de3f99410aa4",
+              "url": "https://files.pythonhosted.org/packages/19/af/d999f8a0b93d13c1ae5fa14e77c0cd52e177f1b4dcde385edcc34397bdfe/boto3-1.26.62.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.30.0,>=1.29.44",
+            "botocore<1.30.0,>=1.29.62",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.7.0,>=0.6.0"
           ],
           "requires_python": ">=3.7",
-          "version": "1.26.44"
+          "version": "1.26.62"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d4c10df0946ada82827b9f5323c43ba2ee5e81ae9c2acfbd2c59f65668c27863",
-              "url": "https://files.pythonhosted.org/packages/fd/48/48dc7e518a71557189048577754008f9741ded7faa7ad4c17cf236c9e780/botocore-1.29.44-py3-none-any.whl"
+              "hash": "11730086c8acc33372f438dd9ae3e960e6fc1c0dfa2801768b0585c8c874977e",
+              "url": "https://files.pythonhosted.org/packages/59/67/8640a56d9706a6280a1a2863de429e707497d276e5e6f7817749deae3a40/botocore-1.29.62-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e48371ff2c375f6a5ac2e6cdbb2d32aa14b1c9c0c049f12af96ec5614c55a6f1",
-              "url": "https://files.pythonhosted.org/packages/4e/25/82c85c4f4bb3b076e55d07bf8bf13b53c715f92d8f43b49e36e61bbe73a1/botocore-1.29.44.tar.gz"
-              "hash": "e582ac0729018da415b0b5de14ea31ffd0ad0483a9fdb8147902526d06347fb7",
-              "url": "https://files.pythonhosted.org/packages/15/14/b7c79524e8cc07dff7d3c040be652950d017da7da7ddcdd022e998b5373b/botocore-1.29.40.tar.gz"
+              "hash": "8c7fdc6b14d9ef48ee8d1070700ab4204c121bc04ee57874e8419a9cdbe51144",
+              "url": "https://files.pythonhosted.org/packages/b3/12/4809feb1033504581655cce477026aab24f0efcaffc9a9035af439d56bb8/botocore-1.29.62.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -900,7 +898,7 @@
             "urllib3<1.27,>=1.25.4"
           ],
           "requires_python": ">=3.7",
-          "version": "1.29.44"
+          "version": "1.29.62"
         },
         {
           "artifacts": [
@@ -1464,7 +1462,7 @@
             "six>=1.9.0"
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7",
-          "version": "2.15"
+          "version": "2.16.0"
         },
         {
           "artifacts": [
@@ -1807,7 +1805,7 @@
             "pytest; extra == \"tests\""
           ],
           "requires_python": ">=3.7",
-          "version": "4.4"
+          "version": "4.5.0"
         },
         {
           "artifacts": [
@@ -1842,8 +1840,8 @@
           ],
           "project_name": "iniconfig",
           "requires_dists": [],
-          "requires_python": null,
-          "version": "1.1.1"
+          "requires_python": ">=3.7",
+          "version": "2.0.0"
         },
         {
           "artifacts": [
@@ -1930,13 +1928,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d4a67ae86ee014bcb96bd8190714f6af921f2b0f52f4208b086aa5acfd9f8d65",
-              "url": "https://files.pythonhosted.org/packages/00/e4/d6b3f0e3c00caf230ce117a096e057b536748747b1cfc74ec3d14c366a5b/jupyter_client-7.4.8-py3-none-any.whl"
+              "hash": "c53731eb590b68839b0ce04bf46ff8c4f03278f5d9fe5c3b0f268a57cc2bd97e",
+              "url": "https://files.pythonhosted.org/packages/1f/f6/2b63e6021171dc90517681537358313a58855d3bfbaafc7861d99134f959/jupyter_client-8.0.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "109a3c33b62a9cf65aa8325850a0999a795fac155d9de4f7555aef5f310ee35a",
-              "url": "https://files.pythonhosted.org/packages/76/e5/5213bf5edc3250c5c19135e3f04e3bc6573d2f694fab07ac9f6d75a582cf/jupyter_client-7.4.8.tar.gz"
+              "hash": "47ac9f586dbcff4d79387ec264faf0fdeb5f14845fa7345fd7d1e378f8096011",
+              "url": "https://files.pythonhosted.org/packages/d8/41/fddcf62081f88e06be196091beb41c07fe85562199d7439dfd3bf8c57601/jupyter_client-8.0.2.tar.gz"
             }
           ],
           "project_name": "jupyter-client",
@@ -1965,20 +1963,20 @@
             "tornado>=6.2",
             "traitlets>=5.3"
           ],
-          "requires_python": ">=3.7",
-          "version": "7.4.8"
+          "requires_python": ">=3.8",
+          "version": "8.0.2"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "0f99cc639c8d00d591acfcc028aeea81473ea6c72fabe86426398220e2d91b1d",
-              "url": "https://files.pythonhosted.org/packages/30/4d/8d6c7de0899bdadb0be2f1d2ed995bcf29b3c94248d3f4a4cb5a078bad08/jupyter_core-5.1.2-py3-none-any.whl"
+              "hash": "4bdc2928c37f6917130c667d8b8708f20aee539d8283c6be72aabd2a4b4c83b0",
+              "url": "https://files.pythonhosted.org/packages/c2/63/86691c2c6014b034c7eccc3000512c58532b4a11343e01faddd74c80a9de/jupyter_core-5.2.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "62b00d52f030643d29f86aafdfd9b36d42421823599a272eb4c2df1d1cc7f723",
-              "url": "https://files.pythonhosted.org/packages/ed/b8/75360f262cc391f3d06d73b1e40d40a4bc7aaf6a4b8b0cb2452ae753c58e/jupyter_core-5.1.2.tar.gz"
+              "hash": "1407cdb4c79ee467696c04b76633fc1884015fa109323365a6372c8e890cc83f",
+              "url": "https://files.pythonhosted.org/packages/aa/81/f1700beb330c715e3ecf72c6713849f18ed653d49fb2f621705cae2d3b56/jupyter_core-5.2.0.tar.gz"
             }
           ],
           "project_name": "jupyter-core",
@@ -1998,7 +1996,7 @@
             "traitlets>=5.3"
           ],
           "requires_python": ">=3.8",
-          "version": "5.1.2"
+          "version": "5.2.0"
         },
         {
           "artifacts": [
@@ -2489,7 +2487,7 @@
           "project_name": "packaging",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "22"
+          "version": "23.0"
         },
         {
           "artifacts": [
@@ -3422,13 +3420,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "57f6f22bde4e042978bcd50176fdb381d7c21a9efa4041202288d3737a0c6a54",
-              "url": "https://files.pythonhosted.org/packages/ef/e3/29d6e1a07e8d90ace4a522d9689d03e833b67b50d1588e693eec15f26251/setuptools-65.6.3-py3-none-any.whl"
+              "hash": "a7687c12b444eaac951ea87a9627c4f904ac757e7abdc5aac32833234af90378",
+              "url": "https://files.pythonhosted.org/packages/c8/24/157fed9a57108b3e1b6ccd86e95823327f231ef12464b0eca13650eb33ac/setuptools-67.1.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "a7620757bf984b58deaf32fc8a4577a9bbc0850cf92c20e1ce41c38c19e5fb75",
-              "url": "https://files.pythonhosted.org/packages/b6/21/cb9a8d0b2c8597c83fce8e9c02884bce3d4951e41e807fc35791c6b23d9a/setuptools-65.6.3.tar.gz"
+              "hash": "e261cdf010c11a41cb5cb5f1bf3338a7433832029f559a6a7614bd42a967c300",
+              "url": "https://files.pythonhosted.org/packages/bf/7c/3a0bb8db53f6b6dec4cb162d307cc5d37162dee65458b2be42817de30fda/setuptools-67.1.0.tar.gz"
             }
           ],
           "project_name": "setuptools",
@@ -3480,7 +3478,7 @@
             "wheel; extra == \"testing-integration\""
           ],
           "requires_python": ">=3.7",
-          "version": "65.6.3"
+          "version": "67.1.0"
         },
         {
           "artifacts": [
@@ -3796,13 +3794,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c864831efa0ba6576d09b44884b34e41defc18c0d7e720b4a2d6698c842cab3e",
-              "url": "https://files.pythonhosted.org/packages/44/2d/76503546de9c5eaf70a5864288e9b3eb4d017c7bd7800b5fd6e93d1d4ab0/traitlets-5.8.0-py3-none-any.whl"
+              "hash": "9e6ec080259b9a5940c797d58b613b5e31441c2257b87c2e795c5228ae80d2d8",
+              "url": "https://files.pythonhosted.org/packages/77/75/c28e9ef7abec2b7e9ff35aea3e0be6c1aceaf7873c26c95ae1f0d594de71/traitlets-5.9.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6cc57d6dc28c85d5365961726ffd19b538739347749e13ebe34e03323a0e8f84",
-              "url": "https://files.pythonhosted.org/packages/56/48/0eb99357330a02974d537be8e4096bc58cfac1089e3153570119ccea7a40/traitlets-5.8.0.tar.gz"
+              "hash": "f6cde21a9c68cf756af02035f72d5a723bf607e862e7be33ece505abf4a3bad9",
+              "url": "https://files.pythonhosted.org/packages/39/c3/205e88f02959712b62008502952707313640369144a7fded4cbc61f48321/traitlets-5.9.0.tar.gz"
             }
           ],
           "project_name": "traitlets",
@@ -3816,7 +3814,7 @@
             "sphinx; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "5.8"
+          "version": "5.9.0"
         },
         {
           "artifacts": [
@@ -4261,7 +4259,7 @@
             "wsaccel; extra == \"optional\""
           ],
           "requires_python": ">=3.7",
-          "version": "1.4.2"
+          "version": "1.5.0"
         },
         {
           "artifacts": [
