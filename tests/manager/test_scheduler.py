@@ -341,7 +341,6 @@ common_image = ImageRow(
 _common_dummy_for_pending_session: Mapping[str, Any] = dict(
     domain_name="default",
     project_id=example_project_id,
-    resource_policy={},
     resource_opts={},
     vfolder_mounts=[],
     environ={},
