@@ -115,23 +115,31 @@ async def ensure_vfolder_status(
     else:
         raise VFolderFilterStatusFailed("either vFolder id nor name not supplied")
 
-    if perm == VFolderAccessStatus.READABLE:
-        # if READABLE access status is requested, all operation status is accepted.
-        vf_status_conds = vfolders.c.status.in_(
-            [
+    available_vf_statuses = set()
+    match perm:
+        case VFolderAccessStatus.READABLE:
+            # if READABLE access status is requested, all operation statuses are accepted.
+            available_vf_statuses = {
                 VFolderOperationStatus.READY,
                 VFolderOperationStatus.PERFORMING,
                 VFolderOperationStatus.CLONING,
                 VFolderOperationStatus.DELETING,
                 VFolderOperationStatus.MOUNTED,
-            ]
-        )
-    elif perm == VFolderAccessStatus.UPDATABLE:
-        # if UPDATABLE access status is requested, only READY operation status is accepted.
-        vf_status_conds = vfolders.c.status == VFolderOperationStatus.READY
-    else:
-        # Otherwise, raise VFolderFilterStatusNotAvailable()
-        raise VFolderFilterStatusNotAvailable()
+            }
+        case VFolderAccessStatus.UPDATABLE:
+            # if UPDATABLE access status is requested, READY and MOUNTED operation statuses are accepted.
+            available_vf_statuses = {
+                VFolderOperationStatus.READY,
+                VFolderOperationStatus.MOUNTED,
+            }
+        case VFolderAccessStatus.DELETABLE:
+            # if DELETABLE access status is requested, only READY operation status is accepted.
+            available_vf_statuses = {
+                VFolderOperationStatus.READY,
+            }
+        case _:
+            # Otherwise, raise VFolderFilterStatusNotAvailable()
+            raise VFolderFilterStatusNotAvailable()
     async with root_ctx.db.begin_readonly() as conn:
         entries = await query_accessible_vfolders(
             conn,
@@ -139,11 +147,16 @@ async def ensure_vfolder_status(
             user_role=user_role,
             domain_name=domain_name,
             allowed_vfolder_types=allowed_vfolder_types,
-            extra_vf_conds=(vf_name_conds & vf_status_conds),
+            extra_vf_conds=vf_name_conds,
             allow_privileged_access=True,
         )
         if len(entries) == 0:
-            raise VFolderFilterStatusFailed()
+            raise VFolderFilterStatusFailed(
+                f"Cannot find any folder with the given identity ({folder_id = }, {folder_name = })"
+            )
+        for entry in entries:
+            if entry["status"] not in available_vf_statuses:
+                raise VFolderFilterStatusFailed()
 
 
 def vfolder_permission_required(perm: VFolderPermission):
@@ -578,7 +591,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
     ),
 )
 async def delete_by_id(request: web.Request, params: Any) -> web.Response:
-    await ensure_vfolder_status(request, VFolderAccessStatus.UPDATABLE, folder_id=params["id"])
+    await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, folder_id=params["id"])
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     user_uuid = request["user"]["uuid"]
@@ -2081,9 +2094,9 @@ async def unshare(request: web.Request, params: Any) -> web.Response:
 
 @auth_required
 @server_status_required(ALL_ALLOWED)
-async def delete(request: web.Request) -> web.Response:
+async def delete_by_name(request: web.Request) -> web.Response:
     await ensure_vfolder_status(
-        request, VFolderAccessStatus.UPDATABLE, folder_name=request.match_info["name"]
+        request, VFolderAccessStatus.DELETABLE, folder_name=request.match_info["name"]
     )
     root_ctx: RootContext = request.app["_root.context"]
     folder_name = request.match_info["name"]
@@ -2981,7 +2994,7 @@ def create_app(default_cors_options):
     cors.add(root_resource.add_route("DELETE", delete_by_id))
     vfolder_resource = cors.add(app.router.add_resource(r"/{name}"))
     cors.add(vfolder_resource.add_route("GET", get_info))
-    cors.add(vfolder_resource.add_route("DELETE", delete))
+    cors.add(vfolder_resource.add_route("DELETE", delete_by_name))
     cors.add(add_route("GET", r"/_/hosts", list_hosts))
     cors.add(add_route("GET", r"/_/all-hosts", list_all_hosts))
     cors.add(add_route("GET", r"/_/allowed-types", list_allowed_types))

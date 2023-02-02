@@ -132,6 +132,7 @@ class VFolderAccessStatus(str, enum.Enum):
 
     READABLE = "readable"
     UPDATABLE = "updatable"
+    DELETABLE = "deletable"
 
 
 vfolders = sa.Table(
