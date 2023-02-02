@@ -47,7 +47,7 @@ from ..models import (
     VFolderUsageMode,
     agents,
     ensure_host_permission_allowed,
-    filter_allowed_permission_host,
+    filter_host_allowed_permission,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
     groups,
@@ -2300,7 +2300,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
         raise InvalidAPIParameters("proxy name of source and target vfolders must be equal.")
 
     async with root_ctx.db.begin() as conn:
-        allowed_hosts = await filter_allowed_permission_host(
+        allowed_hosts = await filter_host_allowed_permission(
             conn,
             allowed_vfolder_types=allowed_vfolder_types,
             user_uuid=user_uuid,

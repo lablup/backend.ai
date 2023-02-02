@@ -54,7 +54,7 @@ __all__: Sequence[str] = (
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
-    "filter_allowed_permission_host",
+    "filter_host_allowed_permission",
     "ensure_host_permission_allowed",
 )
 
@@ -698,7 +698,7 @@ async def ensure_host_permission_allowed(
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
 ) -> None:
-    allowed_hosts = await filter_allowed_permission_host(
+    allowed_hosts = await filter_host_allowed_permission(
         db_conn,
         allowed_vfolder_types=allowed_vfolder_types,
         user_uuid=user_uuid,
@@ -710,7 +710,7 @@ async def ensure_host_permission_allowed(
         raise InvalidAPIParameters(f"`{permission}` Not allowed in vfolder host(`{folder_host}`)")
 
 
-async def filter_allowed_permission_host(
+async def filter_host_allowed_permission(
     db_conn,
     *,
     allowed_vfolder_types: Sequence[str],
