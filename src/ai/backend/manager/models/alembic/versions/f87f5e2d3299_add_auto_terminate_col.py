@@ -1,16 +1,16 @@
 """add_auto_terminate_col
 
-Revision ID: d8ebb92a3a1e
-Revises: 213a04e90ecf
-Create Date: 2023-01-18 11:22:19.239649
+Revision ID: f87f5e2d3299
+Revises: b6b884fbae1f
+Create Date: 2023-02-03 18:45:16.597352
 
 """
 import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "d8ebb92a3a1e"
-down_revision = "213a04e90ecf"
+revision = "f87f5e2d3299"
+down_revision = "b6b884fbae1f"
 branch_labels = None
 depends_on = None
 
