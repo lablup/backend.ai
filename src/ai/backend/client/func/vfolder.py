@@ -23,7 +23,7 @@ from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE, MAX_INFLIGHT_CHUNKS
 from ..exceptions import BackendClientError
-from ..pagination import generate_paginated_results
+from ..pagination import fetch_paginated_result
 from ..request import Request
 from .base import BaseFunction, api_function
 
@@ -111,7 +111,7 @@ class VFolder(BaseFunction):
         :param group: Fetch vfolders in a specific group.
         :param fields: Additional per-vfolder query fields to fetch.
         """
-        return await generate_paginated_results(
+        return await fetch_paginated_result(
             "vfolder_list",
             {
                 "group_id": (group, "UUID"),
@@ -218,7 +218,7 @@ class VFolder(BaseFunction):
                                         # Retry.
                                         raise ResponseFailed
                                 size = int(raw_resp.headers["Content-Length"])
-                                if_range = raw_resp.headers["Last-Modified"]
+                                if_range = raw_resp.headers.get("Last-Modified")
                                 q: janus.Queue[bytes] = janus.Queue(MAX_INFLIGHT_CHUNKS)
                                 try:
                                     with tqdm(

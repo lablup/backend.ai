@@ -158,17 +158,18 @@ scaling_group_fields = FieldSet(
         FieldSpec("driver_opts", formatter=nested_dict_formatter),
         FieldSpec("scheduler"),
         FieldSpec("scheduler_opts", formatter=nested_dict_formatter),
+        FieldSpec("use_host_network"),
     ]
 )
 
 
 session_fields = FieldSet(
     [
-        FieldSpec("id", "Kernel ID", alt_name="kernel_id"),
+        FieldSpec("id", "Session ID", alt_name="session_id"),
+        FieldSpec("main_kernel_id", "Main Kernel ID"),
         FieldSpec("tag"),
         FieldSpec("name"),
         FieldSpec("type"),
-        FieldSpec("session_id", "Session ID"),
         FieldSpec("image"),
         FieldSpec("registry"),
         FieldSpec("cluster_template"),
@@ -195,7 +196,7 @@ session_fields = FieldSet(
         FieldSpec("scaling_group"),
         FieldSpec("service_ports", formatter=nested_dict_formatter),
         FieldSpec("mounts"),
-        FieldSpec("occupied_slots", formatter=resource_slot_formatter),
+        FieldSpec("occupying_slots", formatter=resource_slot_formatter),
         FieldSpec(
             "containers",
             subfields=container_fields,
@@ -290,5 +291,11 @@ vfolder_fields = FieldSet(
         FieldSpec("num_files"),
         FieldSpec("cur_size"),
         FieldSpec("cloneable"),
+    ]
+)
+
+permission_fields = FieldSet(
+    [
+        FieldSpec("vfolder_host_permission_list"),
     ]
 )

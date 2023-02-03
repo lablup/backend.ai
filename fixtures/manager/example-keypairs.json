@@ -78,6 +78,19 @@
             "role": "user"
         },
         {
+            "uuid": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "username": "user2",
+            "email": "user2@lablup.com",
+            "password": "P7oxTDdz",
+            "need_password_change": false,
+            "full_name": "User Lablup",
+            "description": "Lablup's User Account, Number 2",
+            "status": "active",
+            "status_info": "admin-requested",
+            "domain_name": "default",
+            "role": "user"
+        },
+        {
             "uuid": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
             "username": "monitor",
             "email": "monitor@lablup.com",
@@ -106,6 +119,10 @@
         },
         {
             "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "user_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
+        },
+        {
+            "group_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
             "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"
         }
     ],
@@ -120,7 +137,18 @@
             "max_vfolder_count": 10,
             "max_vfolder_size": 0,
             "idle_timeout": 3600,
-            "allowed_vfolder_hosts": ["local:volume1"]
+            "allowed_vfolder_hosts": {
+                "local:volume1": [
+                    "create-vfolder",
+                    "modify-vfolder",
+                    "delete-vfolder",
+                    "mount-in-session",
+                    "upload-file",
+                    "download-file",
+                    "invite-others",
+                    "set-user-specific-permission"
+                ]
+            }
         }
     ],
     "keypairs": [
@@ -156,6 +184,17 @@
             "num_queries": 0,
             "is_admin": false,
             "user": "dfa9da54-4b28-432f-be29-c0d680c7a412"
+        },
+        {
+            "user_id": "user2@lablup.com",
+            "access_key": "AKIANATWOUSEREXAMPLE",
+            "secret_key": "P7oxTDdzHbEpUSs5v7r7EWj9yKstp8VpZ7SEyA-g",
+            "is_active": true,
+            "resource_policy": "default",
+            "rate_limit": 30000,
+            "num_queries": 0,
+            "is_admin": false,
+            "user": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"
         },
         {
             "user_id": "monitor@lablup.com",

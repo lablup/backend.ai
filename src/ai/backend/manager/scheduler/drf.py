@@ -10,8 +10,9 @@ import trafaret as t
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SessionId
 
+from ..models import AgentRow, SessionRow
 from ..models.scaling_group import ScalingGroupOpts
-from .types import AbstractScheduler, AgentContext, ExistingSession, KernelInfo, PendingSession
+from .types import AbstractScheduler, KernelInfo
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
 
@@ -29,8 +30,8 @@ class DRFScheduler(AbstractScheduler):
     def pick_session(
         self,
         total_capacity: ResourceSlot,
-        pending_sessions: Sequence[PendingSession],
-        existing_sessions: Sequence[ExistingSession],
+        pending_sessions: Sequence[SessionRow],
+        existing_sessions: Sequence[SessionRow],
     ) -> Optional[SessionId]:
         self.total_capacity = total_capacity
 
@@ -65,13 +66,13 @@ class DRFScheduler(AbstractScheduler):
         # who has the lowest dominant share.
         for pending_sess in pending_sessions:
             if pending_sess.access_key == least_dominant_share_user:
-                return SessionId(pending_sess.session_id)
+                return SessionId(pending_sess.id)
 
         return None
 
     def _assign_agent(
         self,
-        agents: Sequence[AgentContext],
+        agents: Sequence[AgentRow],
         access_key: AccessKey,
         requested_slots: ResourceSlot,
     ) -> Optional[AgentId]:
@@ -106,14 +107,14 @@ class DRFScheduler(AbstractScheduler):
 
             # Choose the agent.
             chosen_agent = max(possible_agents, key=lambda a: a.available_slots)
-            return chosen_agent.agent_id
+            return chosen_agent.id
 
         return None
 
     def assign_agent_for_session(
         self,
-        agents: Sequence[AgentContext],
-        pending_session: PendingSession,
+        agents: Sequence[AgentRow],
+        pending_session: SessionRow,
     ) -> Optional[AgentId]:
         return self._assign_agent(
             agents,
@@ -123,7 +124,7 @@ class DRFScheduler(AbstractScheduler):
 
     def assign_agent_for_kernel(
         self,
-        agents: Sequence[AgentContext],
+        agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
     ) -> Optional[AgentId]:
         return self._assign_agent(

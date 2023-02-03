@@ -17,7 +17,7 @@ from typing import (
     Set,
 )
 
-import attr
+import attrs
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.engine.row import Row
@@ -40,7 +40,7 @@ from ai.backend.common.types import (
 )
 
 from ..defs import DEFAULT_ROLE
-from ..models import kernels, keypairs
+from ..models import AgentRow, KernelRow, SessionRow, kernels, keypairs
 from ..models.scaling_group import ScalingGroupOpts
 from ..registry import AgentRegistry
 
@@ -58,14 +58,14 @@ def merge_resource(
             target[k] = update[k]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class AgentAllocationContext:
     agent_id: Optional[AgentId]
     agent_addr: str
     scaling_group: str
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class AgentContext:
     agent_id: AgentId
     agent_addr: str
@@ -75,13 +75,13 @@ class AgentContext:
     occupied_slots: ResourceSlot
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ScheduleDecision:
     agent_id: AgentId
     kernel_id: KernelId
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class SchedulingContext:
     """
     Context for each scheduling decision.
@@ -91,7 +91,7 @@ class SchedulingContext:
     known_slot_types: Mapping[SlotName, SlotTypes]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class ExistingSession:
     kernels: List[KernelInfo]
     access_key: AccessKey
@@ -169,7 +169,7 @@ class ExistingSession:
         return list(items.values())
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class PendingSession:
     """
     Context for individual session-related information used during scheduling.
@@ -202,6 +202,7 @@ class PendingSession:
     internal_data: Optional[MutableMapping[str, Any]]
     preopen_ports: List[int]
     created_at: datetime
+    use_host_network: bool
 
     @property
     def main_kernel_id(self) -> KernelId:
@@ -237,6 +238,7 @@ class PendingSession:
             kernels.c.startup_command,
             kernels.c.preopen_ports,
             kernels.c.created_at,
+            kernels.c.use_host_network,
         }
 
     @classmethod
@@ -283,6 +285,7 @@ class PendingSession:
             startup_command=row["startup_command"],
             preopen_ports=row["preopen_ports"],
             created_at=row["created_at"],
+            use_host_network=row["use_host_network"],
         )
 
     @classmethod
@@ -299,7 +302,7 @@ class PendingSession:
         return list(items.values())
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KernelInfo:
     """
     Representing invididual kernel info.
@@ -314,6 +317,7 @@ class KernelInfo:
     agent_addr: str
     cluster_role: str
     cluster_idx: int
+    local_rank: int
     cluster_hostname: str
     image_ref: ImageRef
     resource_opts: Mapping[str, Any]
@@ -335,6 +339,7 @@ class KernelInfo:
             kernels.c.agent_addr,  # for scheduled kernels
             kernels.c.cluster_role,
             kernels.c.cluster_idx,
+            kernels.c.local_rank,
             kernels.c.cluster_hostname,
             kernels.c.image,
             kernels.c.architecture,
@@ -356,6 +361,7 @@ class KernelInfo:
             agent_addr=row["agent_addr"],
             cluster_role=row["cluster_role"],
             cluster_idx=row["cluster_idx"],
+            local_rank=row["local_rank"],
             cluster_hostname=row["cluster_hostname"],
             image_ref=ImageRef(row["image"], [row["registry"]], row["architecture"]),
             resource_opts=row["resource_opts"],
@@ -366,13 +372,14 @@ class KernelInfo:
         )
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class KernelAgentBinding:
-    kernel: KernelInfo
+    kernel: KernelRow
     agent_alloc_ctx: AgentAllocationContext
+    allocated_host_ports: Set[int]
 
 
-@attr.s(auto_attribs=True, slots=True)
+@attrs.define(auto_attribs=True, slots=True)
 class PredicateResult:
     passed: bool
     message: Optional[str] = None
@@ -407,8 +414,8 @@ class AbstractScheduler(metaclass=ABCMeta):
     def pick_session(
         self,
         total_capacity: ResourceSlot,
-        pending_sessions: Sequence[PendingSession],
-        existing_sessions: Sequence[ExistingSession],
+        pending_sessions: Sequence[SessionRow],
+        existing_sessions: Sequence[SessionRow],
     ) -> Optional[SessionId]:
         """
         Pick a session to try schedule.
@@ -419,8 +426,8 @@ class AbstractScheduler(metaclass=ABCMeta):
     @abstractmethod
     def assign_agent_for_session(
         self,
-        possible_agents: Sequence[AgentContext],
-        pending_session: PendingSession,
+        possible_agents: Sequence[AgentRow],
+        pending_session: SessionRow,
     ) -> Optional[AgentId]:
         """
         Assign an agent for the entire session, only considering the total requested
@@ -435,7 +442,7 @@ class AbstractScheduler(metaclass=ABCMeta):
     @abstractmethod
     def assign_agent_for_kernel(
         self,
-        possible_agents: Sequence[AgentContext],
+        possible_agents: Sequence[AgentRow],
         pending_kernel: KernelInfo,
     ) -> Optional[AgentId]:
         """

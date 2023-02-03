@@ -21,18 +21,18 @@ import tomli
 import uvloop
 import yarl
 from aiohttp import web
-from aiohttp_session import get_session
-from aiohttp_session import setup as setup_session
-from aiohttp_session.redis_storage import RedisStorage
-from aioredis import Redis as AioRedisLegacy
 from redis.asyncio import Redis
 from setproctitle import setproctitle
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
+from ai.backend.common.web.session import extra_config_headers, get_session
+from ai.backend.common.web.session import setup as setup_session
+from ai.backend.common.web.session.redis_storage import RedisStorage
 
 from . import __version__, user_agent
+from .auth import fill_x_forwarded_for_header_to_api_session, get_client_ip
 from .config import config_iv
 from .logging import BraceStyleAdapter
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
@@ -187,6 +187,13 @@ async def login_handler(request: web.Request) -> web.Response:
             ),
             content_type="application/problem+json",
         )
+    request_headers = extra_config_headers.check(request.headers)
+    secure_context = request_headers.get("X-BackendAI-Encoded", None)
+    client_ip = get_client_ip(request)
+    if not secure_context:
+        # For non-encrypted requests, just read the body as-is.
+        # Encrypted requests are handled by the `decrypt_payload` middleware.
+        request["payload"] = await request.text()
     try:
         creds = json.loads(request["payload"])
     except json.JSONDecodeError as e:
@@ -260,9 +267,10 @@ async def login_handler(request: web.Request) -> web.Response:
     last_login_attempt = login_time
     if login_fail_count >= ALLOWED_FAIL_COUNT:
         log.info(
-            "Too many consecutive login attempts for {}: {}",
+            "LOGIN_HANDLER: Too many consecutive login fails (email:{}, count:{}, ip:{})",
             creds["username"],
             login_fail_count,
+            client_ip,
         )
         await _set_login_history(last_login_attempt, login_fail_count)
         return web.HTTPTooManyRequests(
@@ -286,6 +294,7 @@ async def login_handler(request: web.Request) -> web.Response:
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
+            fill_x_forwarded_for_header_to_api_session(request, api_session)
             token = await api_session.User.authorize(creds["username"], creds["password"])
             stored_token = {
                 "type": "keypair",
@@ -305,6 +314,11 @@ async def login_handler(request: web.Request) -> web.Response:
             result["data"] = public_return  # store public info from token
             login_fail_count = 0
             await _set_login_history(last_login_attempt, login_fail_count)
+            log.info(
+                "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
+                creds["username"],
+                client_ip,
+            )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
@@ -318,7 +332,12 @@ async def login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
     except BackendAPIError as e:
-        log.info("Authorization failed for {}: {}", creds["username"], e)
+        log.info(
+            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+            creds["username"],
+            client_ip,
+            e,
+        )
         result["authenticated"] = False
         result["data"] = {
             "type": e.data.get("type"),
@@ -393,11 +412,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
-            # Send X-Forwarded-For header for token authentication with the client IP.
-            client_ip = request.headers.get("X-Forwarded-For", request.remote)
-            if client_ip:
-                _headers = {"X-Forwarded-For": client_ip}
-                api_session.aiohttp_session.headers.update(_headers)
+            fill_x_forwarded_for_header_to_api_session(request, api_session)
             # Instead of email and password, cookie token will be used for auth.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             token = await api_session.User.authorize("fake-email", "fake-pwd")
@@ -471,19 +486,13 @@ async def server_main(
         config["session"]["redis"]["port"]
     ).with_password(config["session"]["redis"]["password"]) / str(config["session"]["redis"]["db"])
     keepalive_options = {}
-    if hasattr(socket, "TCP_KEEPIDLE"):
-        keepalive_options[socket.TCP_KEEPIDLE] = 20
-    if hasattr(socket, "TCP_KEEPINTVL"):
-        keepalive_options[socket.TCP_KEEPINTVL] = 5
-    if hasattr(socket, "TCP_KEEPCNT"):
-        keepalive_options[socket.TCP_KEEPCNT] = 3
+    if (_TCP_KEEPIDLE := getattr(socket, "TCP_KEEPIDLE", None)) is not None:
+        keepalive_options[_TCP_KEEPIDLE] = 20
+    if (_TCP_KEEPINTVL := getattr(socket, "TCP_KEEPINTVL", None)) is not None:
+        keepalive_options[_TCP_KEEPINTVL] = 5
+    if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
+        keepalive_options[_TCP_KEEPCNT] = 3
     app["redis"] = await Redis.from_url(
-        str(redis_url),
-        socket_keepalive=True,
-        socket_keepalive_options=keepalive_options,
-    )
-    # FIXME: remove after aio-libs/aiohttp-session#704 is merged
-    aioredis_legacy_client = await AioRedisLegacy.from_url(
         str(redis_url),
         socket_keepalive=True,
         socket_keepalive_options=keepalive_options,
@@ -493,8 +502,7 @@ async def server_main(
         await app["redis"].flushdb()
         log.info("flushed session storage.")
     redis_storage = RedisStorage(
-        # FIXME: replace to app['redis'] after aio-libs/aiohttp-session#704 is merged
-        aioredis_legacy_client,
+        app["redis"],
         max_age=config["session"]["max_age"],
     )
 
@@ -519,9 +527,10 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/server/login-check", login_check_handler))
     cors.add(app.router.add_route("POST", "/server/logout", logout_handler))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
-    cors.add(app.router.add_route("GET", "/func/{path:hanati/user}", anon_web_plugin_handler))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
+    cors.add(app.router.add_route("POST", "/func/{path:custom-auth/.*$}", anon_web_plugin_handler))
+    cors.add(app.router.add_route("GET", "/func/{path:custom-auth/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:saml/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", web_handler))
@@ -552,6 +561,12 @@ async def server_main(
 
     app.on_shutdown.append(server_shutdown)
     app.on_cleanup.append(server_cleanup)
+
+    async def on_prepare(request, response):
+        # Remove "Server" header for a security reason.
+        response.headers.popall("Server", None)
+
+    app.on_response_prepare.append(on_prepare)
 
     ssl_ctx = None
     if config["service"]["ssl_enabled"]:

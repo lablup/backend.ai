@@ -12,15 +12,17 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.orm import relationship
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import JSONSerializableMixin, SessionTypes
 
 from .base import (
+    Base,
     StructuredJSONObjectColumn,
     batch_multiresult,
     batch_result,
-    metadata,
+    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -34,6 +36,7 @@ if TYPE_CHECKING:
 __all__: Sequence[str] = (
     # table defs
     "scaling_groups",
+    "ScalingGroupRow",
     "sgroups_for_domains",
     "sgroups_for_groups",
     "sgroups_for_keypairs",
@@ -87,7 +90,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
 
 scaling_groups = sa.Table(
     "scaling_groups",
-    metadata,
+    mapper_registry.metadata,
     sa.Column("name", sa.String(length=64), primary_key=True),
     sa.Column("description", sa.String(length=512)),
     sa.Column("is_active", sa.Boolean, index=True, default=True),
@@ -96,6 +99,7 @@ scaling_groups = sa.Table(
     sa.Column("driver", sa.String(length=64), nullable=False),
     sa.Column("driver_opts", pgsql.JSONB(), nullable=False, default={}),
     sa.Column("scheduler", sa.String(length=64), nullable=False),
+    sa.Column("use_host_network", sa.Boolean, nullable=False, default=False),
     sa.Column(
         "scheduler_opts",
         StructuredJSONObjectColumn(ScalingGroupOpts),
@@ -111,59 +115,83 @@ scaling_groups = sa.Table(
 
 sgroups_for_domains = sa.Table(
     "sgroups_for_domains",
-    metadata,
+    mapper_registry.metadata,
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
     sa.Column(
         "domain",
         sa.ForeignKey("domains.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
-    sa.UniqueConstraint("scaling_group", "domain", name="uq_sgroup_domain"),
 )
 
 
 sgroups_for_groups = sa.Table(
     "sgroups_for_groups",
-    metadata,
+    mapper_registry.metadata,
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
     sa.Column(
         "group",
         sa.ForeignKey("groups.id", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
-    sa.UniqueConstraint("scaling_group", "group", name="uq_sgroup_ugroup"),
 )
 
 
 sgroups_for_keypairs = sa.Table(
     "sgroups_for_keypairs",
-    metadata,
+    mapper_registry.metadata,
     sa.Column(
         "scaling_group",
         sa.ForeignKey("scaling_groups.name", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
     sa.Column(
         "access_key",
         sa.ForeignKey("keypairs.access_key", onupdate="CASCADE", ondelete="CASCADE"),
         index=True,
         nullable=False,
+        primary_key=True,
     ),
-    sa.UniqueConstraint("scaling_group", "access_key", name="uq_sgroup_akey"),
 )
+
+
+class ScalingGroupRow(Base):
+    __table__ = scaling_groups
+    sessions = relationship("SessionRow", back_populates="scaling_group")
+    agents = relationship("AgentRow", back_populates="scaling_group_row")
+    domains = relationship(
+        "DomainRow",
+        secondary=sgroups_for_domains,
+        back_populates="scaling_groups",
+    )
+    groups = relationship(
+        "GroupRow",
+        secondary=sgroups_for_groups,
+        back_populates="scaling_groups",
+    )
+    keypairs = relationship(
+        "KeyPairRow",
+        secondary=sgroups_for_keypairs,
+        back_populates="scaling_groups",
+    )
 
 
 @overload
@@ -260,6 +288,7 @@ class ScalingGroup(graphene.ObjectType):
     driver_opts = graphene.JSONString()
     scheduler = graphene.String()
     scheduler_opts = graphene.JSONString()
+    use_host_network = graphene.Boolean()
 
     @classmethod
     def from_row(
@@ -279,6 +308,7 @@ class ScalingGroup(graphene.ObjectType):
             driver_opts=row["driver_opts"],
             scheduler=row["scheduler"],
             scheduler_opts=row["scheduler_opts"].to_json(),
+            use_host_network=row["use_host_network"],
         )
 
     @classmethod
@@ -431,6 +461,7 @@ class CreateScalingGroupInput(graphene.InputObjectType):
     driver_opts = graphene.JSONString(required=False, default={})
     scheduler = graphene.String(required=True)
     scheduler_opts = graphene.JSONString(required=False, default={})
+    use_host_network = graphene.Boolean(required=False, default=False)
 
 
 class ModifyScalingGroupInput(graphene.InputObjectType):
@@ -441,6 +472,7 @@ class ModifyScalingGroupInput(graphene.InputObjectType):
     driver_opts = graphene.JSONString(required=False)
     scheduler = graphene.String(required=False)
     scheduler_opts = graphene.JSONString(required=False)
+    use_host_network = graphene.Boolean(required=False)
 
 
 class CreateScalingGroup(graphene.Mutation):
@@ -472,6 +504,7 @@ class CreateScalingGroup(graphene.Mutation):
             "driver_opts": props.driver_opts,
             "scheduler": props.scheduler,
             "scheduler_opts": ScalingGroupOpts.from_json(props.scheduler_opts),
+            "use_host_network": bool(props.use_host_network),
         }
         insert_query = sa.insert(scaling_groups).values(data)
         return await simple_db_mutate_returning_item(
@@ -511,6 +544,7 @@ class ModifyScalingGroup(graphene.Mutation):
         set_if_set(
             props, data, "scheduler_opts", clean_func=lambda v: ScalingGroupOpts.from_json(v)
         )
+        set_if_set(props, data, "use_host_network")
         update_query = sa.update(scaling_groups).values(data).where(scaling_groups.c.name == name)
         return await simple_db_mutate(cls, info.context, update_query)
 

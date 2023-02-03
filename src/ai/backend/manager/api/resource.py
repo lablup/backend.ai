@@ -23,6 +23,7 @@ from dateutil.relativedelta import relativedelta
 from dateutil.tz import tzutc
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
@@ -130,7 +131,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
         keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
-        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(access_key, conn=conn)
+        keypair_occupied = await root_ctx.registry.get_keypair_occupancy(
+            access_key, db_sess=SASession(conn)
+        )
         keypair_remaining = keypair_limits - keypair_occupied
 
         # Check group resource limit and get group_id.
@@ -159,7 +162,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         group_limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
-        group_occupied = await root_ctx.registry.get_group_occupancy(group_id, conn=conn)
+        group_occupied = await root_ctx.registry.get_group_occupancy(
+            group_id, db_sess=SASession(conn)
+        )
         group_remaining = group_limits - group_occupied
 
         # Check domain resource limit.
@@ -170,7 +175,9 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         domain_limits = ResourceSlot.from_policy(domain_resource_policy, known_slot_types)
-        domain_occupied = await root_ctx.registry.get_domain_occupancy(domain_name, conn=conn)
+        domain_occupied = await root_ctx.registry.get_domain_occupancy(
+            domain_name, db_sess=SASession(conn)
+        )
         domain_remaining = domain_limits - domain_occupied
 
         # Take minimum remaining resources. There's no need to merge limits and occupied.
@@ -308,6 +315,7 @@ async def get_container_stats_for_period(
                 [
                     kernels.c.id,
                     kernels.c.container_id,
+                    kernels.c.session_id,
                     kernels.c.session_name,
                     kernels.c.access_key,
                     kernels.c.agent,
@@ -325,6 +333,7 @@ async def get_container_stats_for_period(
                     kernels.c.status_history,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
+                    kernels.c.cluster_mode,
                     groups.c.name,
                     users.c.email,
                 ]
@@ -399,6 +408,7 @@ async def get_container_stats_for_period(
             gpu_allocated = row.occupied_slots["cuda.shares"]
         c_info = {
             "id": str(row["id"]),
+            "session_id": str(row["session_id"]),
             "container_id": row["container_id"],
             "domain_name": row["domain_name"],
             "group_id": str(row["group_id"]),
@@ -430,6 +440,7 @@ async def get_container_stats_for_period(
             "status": row["status"].name,
             "status_changed": str(row["status_changed"]),
             "status_history": row["status_history"] or {},
+            "cluster_mode": row["cluster_mode"],
         }
         if group_id not in objs_per_group:
             objs_per_group[group_id] = {
@@ -585,11 +596,9 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
         rows = result.fetchall()
 
     # Build time-series of time-binned stats.
-    rowcount = len(rows)
     now_ts = now.timestamp()
     start_date_ts = start_date.timestamp()
     ts = start_date_ts
-    idx = 0
     tseries = []
     # Iterate over each time window.
     while ts < now_ts:
@@ -602,13 +611,12 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
         io_write_bytes = 0
         disk_used = 0
         # Accumulate stats for containers overlapping with this time window.
-        while (
-            idx < rowcount
-            and ts + time_window > rows[idx].created_at.timestamp()
-            and ts < rows[idx].terminated_at.timestamp()
-        ):
-            # Accumulate stats for overlapping containers in this time window.
-            row = rows[idx]
+        for row in rows:
+            if (
+                ts + time_window <= row.created_at.timestamp()
+                or ts >= row.terminated_at.timestamp()
+            ):
+                continue
             num_sessions += 1
             cpu_allocated += int(row.occupied_slots.get("cpu", 0))
             mem_allocated += int(row.occupied_slots.get("mem", 0))
@@ -624,7 +632,6 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
                 io_read_bytes += int(nmget(last_stat, "io_read.current", 0))
                 io_write_bytes += int(nmget(last_stat, "io_write.current", 0))
                 disk_used += int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/"))
-            idx += 1
         stat = {
             "date": ts,
             "num_sessions": {

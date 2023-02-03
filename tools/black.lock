@@ -4,14 +4,18 @@
 //
 // --- BEGIN PANTS LOCKFILE METADATA: DO NOT EDIT OR REMOVE ---
 // {
-//   "version": 2,
+//   "version": 3,
 //   "valid_for_interpreter_constraints": [
 //     "CPython<4,>=3.10"
 //   ],
 //   "generated_with_requirements": [
 //     "black~=22.6",
 //     "typing-extensions>=3.10.0.0; python_version < \"3.10\""
-//   ]
+//   ],
+//   "manylinux": "manylinux2014",
+//   "requirement_constraints": [],
+//   "only_binary": [],
+//   "no_binary": []
 // }
 // --- END PANTS LOCKFILE METADATA ---
 
@@ -28,33 +32,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "ac609cf8ef5e7115ddd07d85d988d074ed00e10fbc3445aee393e70164a2219c",
-              "url": "https://files.pythonhosted.org/packages/2b/70/1d0e33a4df4ed73e9f02f698a29b5d94ff58e39f029c939ecf96a10fb1f3/black-22.6.0-py3-none-any.whl"
+              "hash": "436cc9167dd28040ad90d3b404aec22cedf24a6e4d7de221bec2730ec0c97bcf",
+              "url": "https://files.pythonhosted.org/packages/0c/51/1f7f93c0555eaf4cbb628e26ba026e3256174a45bd9397ff1ea7cf96bad5/black-22.12.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6797f58943fceb1c461fb572edbe828d811e719c24e03375fd25170ada53825e",
-              "url": "https://files.pythonhosted.org/packages/1a/84/203163902ee26bcf1beaef582ee0c8df3f325da3e961b68d2ece959e19d3/black-22.6.0-cp310-cp310-macosx_11_0_arm64.whl"
+              "hash": "9eedd20838bd5d75b80c9f5487dbcb06836a43833a37846cf1d8c1cc01cef59d",
+              "url": "https://files.pythonhosted.org/packages/79/d9/60852a6fc2f85374db20a9767dacfe50c2172eb8388f46018c8daf836995/black-22.12.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6c6d39e28aed379aec40da1c65434c77d75e65bb59a1e1c283de545fb4e7c6c9",
-              "url": "https://files.pythonhosted.org/packages/61/11/551b0d067a7e6836fc0997ab36ee46ec65259fea8f30104f4870092f3301/black-22.6.0.tar.gz"
+              "hash": "229351e5a18ca30f447bf724d007f890f97e13af070bb6ad4c0a441cd7596a2f",
+              "url": "https://files.pythonhosted.org/packages/a6/59/e873cc6807fb62c11131e5258ca15577a3b7452abad08dc49286cf8245e8/black-22.12.0.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "b270a168d69edb8b7ed32c193ef10fd27844e5c60852039599f9184460ce0807",
-              "url": "https://files.pythonhosted.org/packages/63/96/814e02033701f51701444d5505b5e2594453b1f7e913764a097b1f701633/black-22.6.0-cp310-cp310-macosx_10_9_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "f586c26118bc6e714ec58c09df0157fe2d9ee195c764f630eb0d8e7ccce72e69",
-              "url": "https://files.pythonhosted.org/packages/80/ff/cfcfa4cdb42d8fff75b6b4dc355a1186a95de4714df8cc2a60f69f7b17f8/black-22.6.0-cp310-cp310-macosx_10_9_universal2.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "c85928b9d5f83b23cee7d0efcb310172412fbf7cb9d9ce963bd67fd141781def",
-              "url": "https://files.pythonhosted.org/packages/a7/51/d0acd9f74a946a825a148dcc392433c2332ae405967d76292b9e64712dc8/black-22.6.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "d30b212bffeb1e252b31dd269dfae69dd17e06d92b87ad26e23890f3efea366f",
+              "url": "https://files.pythonhosted.org/packages/e9/e0/6aa02d14785c4039b38bfed6f9ee28a952b2d101c64fc97b15811fa8bd04/black-22.12.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             }
           ],
           "project_name": "black",
@@ -62,7 +56,6 @@
             "aiohttp>=3.7.4; extra == \"d\"",
             "click>=8.0.0",
             "colorama>=0.4.3; extra == \"colorama\"",
-            "dataclasses>=0.6; python_version < \"3.7\"",
             "ipython>=7.8.0; extra == \"jupyter\"",
             "mypy-extensions>=0.4.3",
             "pathspec>=0.9.0",
@@ -73,8 +66,8 @@
             "typing-extensions>=3.10.0.0; python_version < \"3.10\"",
             "uvloop>=0.15.2; extra == \"uvloop\""
           ],
-          "requires_python": ">=3.6.2",
-          "version": "22.6"
+          "requires_python": ">=3.7",
+          "version": "22.12.0"
         },
         {
           "artifacts": [
@@ -121,46 +114,48 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7d15c4ddb0b5c802d161efc417ec1a2558ea2653c2e8ad9c19098201dc1c993a",
-              "url": "https://files.pythonhosted.org/packages/42/ba/a9d64c7bcbc7e3e8e5f93a52721b377e994c22d16196e2b0f1236774353a/pathspec-0.9.0-py2.py3-none-any.whl"
+              "hash": "3a66eb970cbac598f9e5ccb5b2cf58930cd8e3ed86d393d541eaf2d8b1705229",
+              "url": "https://files.pythonhosted.org/packages/e6/be/1a973593d7ce7ac9d1a793b81eb265c152a62f34825169fbd7c4e4548e34/pathspec-0.11.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e564499435a2673d586f6b2130bb5b95f04a3ba06f81b8f895b651a3c76aabb1",
-              "url": "https://files.pythonhosted.org/packages/f6/33/436c5cb94e9f8902e59d1d544eb298b83c84b9ec37b5b769c5a0ad6edb19/pathspec-0.9.0.tar.gz"
+              "hash": "64d338d4e0914e91c1792321e6907b5a593f1ab1851de7fc269557a21b30ebbc",
+              "url": "https://files.pythonhosted.org/packages/f4/8e/f91cffb32740b251cff04cad1e7cdd2c710582c735a01f56307316c148f2/pathspec-0.11.0.tar.gz"
             }
           ],
           "project_name": "pathspec",
           "requires_dists": [],
-          "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "0.9"
+          "requires_python": ">=3.7",
+          "version": "0.11.0"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "027d8e83a2d7de06bbac4e5ef7e023c02b863d7ea5d079477e722bb41ab25788",
-              "url": "https://files.pythonhosted.org/packages/ed/22/967181c94c3a4063fe64e15331b4cb366bdd7dfbf46fcb8ad89650026fec/platformdirs-2.5.2-py3-none-any.whl"
+              "hash": "83c8f6d04389165de7c9b6f0c682439697887bca0aa2f1c87ef1826be3584490",
+              "url": "https://files.pythonhosted.org/packages/c1/c7/9be9d651b93efce682b45142a6267034fc4215972780748618c02e236361/platformdirs-2.6.2-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "58c8abb07dcb441e6ee4b11d8df0ac856038f944ab98b7be6b27b2a3c7feef19",
-              "url": "https://files.pythonhosted.org/packages/ff/7b/3613df51e6afbf2306fc2465671c03390229b55e3ef3ab9dd3f846a53be6/platformdirs-2.5.2.tar.gz"
+              "hash": "e1fea1fe471b9ff8332e229df3cb7de4f53eeea4998d3b6bfff542115e998bd2",
+              "url": "https://files.pythonhosted.org/packages/cf/4d/198b7e6c6c2b152f4f9f4cdf975d3590e33e63f1920f2d89af7f0390e6db/platformdirs-2.6.2.tar.gz"
             }
           ],
           "project_name": "platformdirs",
           "requires_dists": [
             "appdirs==1.4.4; extra == \"test\"",
-            "furo>=2021.7.5b38; extra == \"docs\"",
-            "proselint>=0.10.2; extra == \"docs\"",
-            "pytest-cov>=2.7; extra == \"test\"",
-            "pytest-mock>=3.6; extra == \"test\"",
-            "pytest>=6; extra == \"test\"",
-            "sphinx-autodoc-typehints>=1.12; extra == \"docs\"",
-            "sphinx>=4; extra == \"docs\""
+            "covdefaults>=2.2.2; extra == \"test\"",
+            "furo>=2022.12.7; extra == \"docs\"",
+            "proselint>=0.13; extra == \"docs\"",
+            "pytest-cov>=4; extra == \"test\"",
+            "pytest-mock>=3.10; extra == \"test\"",
+            "pytest>=7.2; extra == \"test\"",
+            "sphinx-autodoc-typehints>=1.19.5; extra == \"docs\"",
+            "sphinx>=5.3; extra == \"docs\"",
+            "typing-extensions>=4.4; python_version < \"3.8\""
           ],
           "requires_python": ">=3.7",
-          "version": "2.5.2"
+          "version": "2.6.2"
         },
         {
           "artifacts": [
@@ -185,7 +180,8 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.99",
+  "pex_version": "2.1.120",
+  "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
     "black~=22.6",

@@ -8,7 +8,7 @@ import numbers
 import sys
 import uuid
 from abc import ABCMeta, abstractmethod
-from collections import UserDict, namedtuple
+from collections import UserDict, defaultdict, namedtuple
 from contextvars import ContextVar
 from decimal import Decimal
 from ipaddress import ip_address, ip_network
@@ -33,7 +33,7 @@ from typing import (
     overload,
 )
 
-import attr
+import attrs
 import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
@@ -214,6 +214,27 @@ AccessKey = NewType("AccessKey", str)
 SecretKey = NewType("SecretKey", str)
 
 
+class AbstractPermission(str, enum.Enum):
+    """
+    Abstract enum type for permissions
+    """
+
+
+class VFolderHostPermission(AbstractPermission):
+    """
+    Atomic permissions for a virtual folder under a host given to a specific access key.
+    """
+
+    CREATE = "create-vfolder"
+    MODIFY = "modify-vfolder"  # rename, update-options
+    DELETE = "delete-vfolder"
+    MOUNT_IN_SESSION = "mount-in-session"
+    UPLOAD_FILE = "upload-file"
+    DOWNLOAD_FILE = "download-file"
+    INVITE_OTHERS = "invite-others"  # invite other user to user-type vfolder
+    SET_USER_PERM = "set-user-specific-permission"  # override permission of group-type vfolder
+
+
 class LogSeverity(str, enum.Enum):
     CRITICAL = "critical"
     ERROR = "error"
@@ -244,6 +265,7 @@ class ServicePortProtocols(str, enum.Enum):
     HTTP = "http"
     TCP = "tcp"
     PREOPEN = "preopen"
+    INTERNAL = "internal"
 
 
 class SessionTypes(str, enum.Enum):
@@ -749,7 +771,7 @@ class JSONSerializableMixin(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-@attr.define(slots=True)
+@attrs.define(slots=True)
 class VFolderMount(JSONSerializableMixin):
     name: str
     vfid: uuid.UUID
@@ -788,6 +810,35 @@ class VFolderMount(JSONSerializableMixin):
         )
 
 
+class VFolderHostPermissionMap(dict, JSONSerializableMixin):
+    def __or__(self, other: Any) -> VFolderHostPermissionMap:
+        if self is other:
+            return self
+        if not isinstance(other, dict):
+            raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
+        union_map: Dict[str, set] = defaultdict(set)
+        for host, perms in [*self.items(), *other.items()]:
+            try:
+                perm_list = [VFolderHostPermission(perm) for perm in perms]
+            except ValueError:
+                raise ValueError(f"Invalid type. Permissions of Host `{host}` are ({perms})")
+            union_map[host] |= set(perm_list)
+        return VFolderHostPermissionMap(union_map)
+
+    def to_json(self) -> dict[str, Any]:
+        return {host: [perm.value for perm in perms] for host, perms in self.items()}
+
+    @classmethod
+    def from_json(cls, obj: Mapping[str, Any]) -> JSONSerializableMixin:
+        return cls(**cls.as_trafaret().check(obj))
+
+    @classmethod
+    def as_trafaret(cls) -> t.Trafaret:
+        from . import validators as tx
+
+        return t.Dict(t.String, t.List(tx.Enum(VFolderHostPermission)))
+
+
 class ImageRegistry(TypedDict):
     name: str
     url: str
@@ -811,12 +862,16 @@ class ServicePort(TypedDict):
     host_ports: Sequence[Optional[int]]
 
 
+ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, Tuple[str, int]])
+
+
 class ClusterInfo(TypedDict):
     mode: ClusterMode
     size: int
     replicas: Mapping[str, int]  # per-role kernel counts
     network_name: Optional[str]
     ssh_keypair: Optional[ClusterSSHKeyPair]
+    cluster_ssh_port_mapping: Optional[ClusterSSHPortMapping]
 
 
 class ClusterSSHKeyPair(TypedDict):
@@ -825,7 +880,7 @@ class ClusterSSHKeyPair(TypedDict):
 
 
 class DeviceModelInfo(TypedDict):
-    device_id: DeviceId
+    device_id: DeviceId | str
     model_name: str
     data: Mapping[str, Any]
 
@@ -841,6 +896,8 @@ class KernelCreationResult(TypedDict):
     repl_out_port: int
     stdin_port: int  # legacy
     stdout_port: int  # legacy
+    scaling_group: str
+    agent_addr: str
 
 
 class KernelCreationConfig(TypedDict):
@@ -861,12 +918,21 @@ class KernelCreationConfig(TypedDict):
     startup_command: Optional[str]
     internal_data: Optional[Mapping[str, Any]]
     preopen_ports: List[int]
+    allocated_host_ports: List[int]
+    scaling_group: str
+    agent_addr: str
+
+
+class SessionEnqueueingConfig(TypedDict):
+    creation_config: dict
+    kernel_configs: List[KernelEnqueueingConfig]
 
 
 class KernelEnqueueingConfig(TypedDict):
     image_ref: ImageRef
     cluster_role: str
     cluster_idx: int
+    local_rank: int
     cluster_hostname: str
     creation_config: dict
     bootstrap_script: str
@@ -909,7 +975,7 @@ class EtcdRedisConfig(TypedDict, total=False):
     password: Optional[str]
 
 
-@attr.s(auto_attribs=True)
+@attrs.define(auto_attribs=True)
 class RedisConnectionInfo:
     client: Redis | redis.asyncio.sentinel.Sentinel
     service_name: Optional[str]
