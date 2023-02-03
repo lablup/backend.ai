@@ -11,18 +11,21 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import true
 
 from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import AgentId, BinarySize, HardwareMetadata, ResourceSlot
 
 from .base import (
+    Base,
     EnumType,
     Item,
     PaginatedList,
     ResourceSlotColumn,
     batch_result,
-    metadata,
+    mapper_registry,
     privileged_mutation,
     set_if_set,
     simple_db_mutate,
@@ -40,6 +43,7 @@ if TYPE_CHECKING:
 
 __all__: Sequence[str] = (
     "agents",
+    "AgentRow",
     "AgentStatus",
     "AgentList",
     "Agent",
@@ -47,6 +51,7 @@ __all__: Sequence[str] = (
     "AgentSummaryList",
     "ModifyAgent",
     "recalc_agent_resource_occupancy",
+    "list_schedulable_agents_by_sgroup",
 )
 
 
@@ -59,7 +64,7 @@ class AgentStatus(enum.Enum):
 
 agents = sa.Table(
     "agents",
-    metadata,
+    mapper_registry.metadata,
     sa.Column("id", sa.String(length=64), primary_key=True),
     sa.Column(
         "status", EnumType(AgentStatus), nullable=False, index=True, default=AgentStatus.ALIVE
@@ -85,6 +90,26 @@ agents = sa.Table(
     sa.Column("compute_plugins", pgsql.JSONB(), nullable=False, default={}),
     sa.Column("auto_terminate", sa.Boolean(), nullable=False, server_default=true(), default=False),
 )
+
+
+class AgentRow(Base):
+    __table__ = agents
+    kernels = relationship("KernelRow", back_populates="agent_row")
+    scaling_group_row = relationship("ScalingGroupRow", back_populates="agents")
+
+
+async def list_schedulable_agents_by_sgroup(
+    db_sess: SASession,
+    sgroup_name: str,
+) -> Sequence[AgentRow]:
+    query = sa.select(AgentRow).where(
+        (AgentRow.status == AgentStatus.ALIVE)
+        & (AgentRow.scaling_group == sgroup_name)
+        & (AgentRow.schedulable == true()),
+    )
+
+    result = await db_sess.execute(query)
+    return result.scalars().all()
 
 
 class Agent(graphene.ObjectType):

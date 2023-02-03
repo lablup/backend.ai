@@ -929,6 +929,11 @@ class KernelCreationConfig(TypedDict):
     agent_addr: str
 
 
+class SessionEnqueueingConfig(TypedDict):
+    creation_config: dict
+    kernel_configs: List[KernelEnqueueingConfig]
+
+
 class KernelEnqueueingConfig(TypedDict):
     image_ref: ImageRef
     cluster_role: str
