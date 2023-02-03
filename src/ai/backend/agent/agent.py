@@ -93,6 +93,7 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
     ClusterSSHPortMapping,
+    CommitStatus,
     ContainerId,
     DeviceId,
     DeviceName,
@@ -633,6 +634,11 @@ class AbstractAgent(
         self.last_registry_written_time = time.monotonic()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
 
+        # Report commit status
+        self.timer_tasks.append(
+            aiotools.create_timer(self._report_all_kernel_commit_status_map, 20.0)
+        )
+
         # Notify the gateway.
         await self.produce_event(AgentStartedEvent(reason="self-started"))
 
@@ -702,6 +708,60 @@ class AbstractAgent(
         pretty_message = "".join(traceback.format_exception_only(exc_type, exc)).strip()
         pretty_tb = "".join(traceback.format_tb(tb)).strip()
         await self.produce_event(AgentErrorEvent(pretty_message, pretty_tb))
+
+    async def _report_all_kernel_commit_status_map(self) -> None:
+        """
+        Commit statuses are managed by `lock` file.
+        +- base_commit_path
+        |_ subdir1 (usually user's email)
+            |_ commit_file1 (named by timestamp)
+            |_ commit_file2
+            |_ lock
+                |_ kernel_id1 (means the user is currently committing the kernel)
+                |_ kernel_id2
+        |_ subdir2
+        ...
+        `status_map` is like below.
+        {
+            str(subdir1): {
+                str(kernel_id1): CommitStatus.ONGOING.value,
+                str(kernel_id2): CommitStatus.ONGOING.value,
+            },
+            str(subdir2): ...,
+        }
+        """
+        loop = current_loop()
+        base_commit_path: Path = self.local_config["agent"]["image-commit-path"]
+        status_map = {}
+
+        def _map_commit_status() -> None:
+            for subdir in base_commit_path.iterdir():
+                ongoing_list = [commit_path.name for commit_path in subdir.glob("./**/lock/*")]
+                status_map[str(subdir)] = {
+                    kern: CommitStatus.ONGOING.value for kern in ongoing_list
+                }
+
+        await loop.run_in_executor(None, _map_commit_status)
+
+        async def _set_all_commit_status(r: Redis):
+            pipe = r.pipeline()
+            for subdir, ongoing_kernel_map in status_map.items():
+                hash_name = f"kernel_commit_status.{subdir}"
+                all_kern_statuses = await pipe.hgetall(hash_name)
+                deleting_statuses: list[str] = []
+                for kern_id in self.kernel_registry:
+                    str_kern_id = str(kern_id)
+                    if str_kern_id in all_kern_statuses and str_kern_id not in ongoing_kernel_map:
+                        deleting_statuses.append(str_kern_id)
+
+                await pipe.hdel(hash_name, *deleting_statuses)
+                await pipe.hset(hash_name, mapping=cast(Mapping, ongoing_kernel_map))
+            return pipe
+
+        await redis_helper.execute(
+            self.redis_stat_pool,
+            _set_all_commit_status,
+        )
 
     async def heartbeat(self, interval: float):
         """
@@ -2010,7 +2070,7 @@ class AbstractAgent(
     async def commit(self, reporter, kernel_id: KernelId, subdir: str, filename: str):
         return await self.kernel_registry[kernel_id].commit(kernel_id, subdir, filename)
 
-    async def get_commit_status(self, kernel_id: KernelId, subdir: str):
+    async def get_commit_status(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         return await self.kernel_registry[kernel_id].check_duplicate_commit(kernel_id, subdir)
 
     async def accept_file(self, kernel_id: KernelId, filename: str, filedata):

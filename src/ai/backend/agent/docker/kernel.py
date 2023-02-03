@@ -141,7 +141,7 @@ class DockerKernel(AbstractKernel):
         lock_path = commit_path / "lock" / str(kernel_id)
         return commit_path, lock_path
 
-    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str):
+    async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         _, lock_path = self._get_commit_path(kernel_id, subdir)
         if lock_path.exists():
             return CommitStatus.ONGOING
