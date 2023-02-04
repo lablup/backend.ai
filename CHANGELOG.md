@@ -16,6 +16,29 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.10 (2023-02-04)
+
+Ai.Backend.Manager 22.09.10 (2023-02-04)
+
+### Breaking Changes
+* Now the mono-repo is updated to use Pants 2.16.0.dev5. Check out the PR description for the migration guide. ([#998](https://github.com/lablup/backend.ai/issues/998))
+
+### Features
+* Support using systemd cgroup driver for Docker ([#1000](https://github.com/lablup/backend.ai/issues/1000))
+* Apply a hook `VERIFY_PASSWORD_FORMAT` for signup API handler to enforce the password policy for new users. ([#1008](https://github.com/lablup/backend.ai/issues/1008))
+
+### Fixes
+* Disable the socket-relay container mount on macOS to avoid UNIX socket bind-mount compatibility issue in for macOS + virtiofs setups ([#993](https://github.com/lablup/backend.ai/issues/993))
+* Fix `mpirun` failing to run when trying to specify mutlple hosts on multi-container session ([#995](https://github.com/lablup/backend.ai/issues/995))
+* Fix `--limit` option being treated as `str` instead of `int` ([#1003](https://github.com/lablup/backend.ai/issues/1003))
+* Rollback predicate mutations early when there is no candidate agent for a given image architecture. ([#1004](https://github.com/lablup/backend.ai/issues/1004))
+* Remove unused loop in CLI generate_paginated_results function, remove some vars of the function and rename the function. ([#1007](https://github.com/lablup/backend.ai/issues/1007))
+
+### Miscellaneous
+* More explicit log for webserver's `login_handler` to filter and save the authentication logs only. ([#984](https://github.com/lablup/backend.ai/issues/984))
+* Bump base Python version from 3.10.8 to 3.10.9 to reduce potential bugs. ([#997](https://github.com/lablup/backend.ai/issues/997))
+
+
 ## 22.09.9 (2023-01-25)
 
 Ai.Backend.Manager 22.09.9 (2023-01-25)
