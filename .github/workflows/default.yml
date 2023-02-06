@@ -223,6 +223,9 @@ jobs:
         gha-cache-key: pants-cache0-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'packaging>=21.3'
     - name: Build packages
       run: |
         # Normalize the package version
@@ -334,7 +337,7 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
-    - name: Install local dependencies for packaging and publishing
+    - name: Install local dependencies for publishing
       run: |
         pip install -U 'twine~=4.0'
     - name: Download wheels
