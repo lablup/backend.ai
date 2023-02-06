@@ -25,6 +25,8 @@ from typing import (
 
 import aiohttp
 import aiohttp_cors
+import aiotools
+import attrs
 import sqlalchemy as sa
 import trafaret as t
 from aiohttp import web
@@ -46,6 +48,7 @@ from ..models import (
     VFolderPermissionValidator,
     VFolderUsageMode,
     agents,
+    delete_vfolder_by_ids,
     ensure_host_permission_allowed,
     filter_host_allowed_permission,
     get_allowed_vfolder_hosts_by_group,
@@ -593,6 +596,8 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
 async def delete_by_id(request: web.Request, params: Any) -> web.Response:
     await ensure_vfolder_status(request, VFolderAccessStatus.DELETABLE, folder_id=params["id"])
     root_ctx: RootContext = request.app["_root.context"]
+    app_ctx: PrivateContext = request.app["folders.context"]
+
     access_key = request["keypair"]["access_key"]
     user_uuid = request["user"]["uuid"]
     domain_name = request["user"]["domain_name"]
@@ -618,27 +623,14 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             domain_name=domain_name,
             permission=VFolderHostPermission.DELETE,
         )
-        folder_id = uuid.UUID(params["id"])
-        query = (
-            sa.update(vfolders)
-            .values(status=VFolderOperationStatus.DELETING)
-            .where(vfolders.c.id == folder_id)
+    folder_id = uuid.UUID(params["id"])
+    async with root_ctx.db.begin_session() as db_sess:
+        await delete_vfolder_by_ids(
+            db_sess,
+            root_ctx.storage_manager,
+            app_ctx.storage_ptask_group,
+            vfolder_infos=[(folder_id, folder_host)],
         )
-        await conn.execute(query)
-        query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
-        await conn.execute(query)
-    # fs-level deletion may fail or take longer time
-    # but let's complete the db transaction to reflect that it's deleted.
-    async with root_ctx.storage_manager.request(
-        folder_host,
-        "POST",
-        "folder/delete",
-        json={
-            "volume": root_ctx.storage_manager.split_host(folder_host)[1],
-            "vfid": str(folder_id),
-        },
-    ):
-        pass
     return web.Response(status=204)
 
 
@@ -2099,6 +2091,8 @@ async def delete_by_name(request: web.Request) -> web.Response:
         request, VFolderAccessStatus.DELETABLE, folder_name=request.match_info["name"]
     )
     root_ctx: RootContext = request.app["_root.context"]
+    app_ctx: PrivateContext = request.app["folders.context"]
+
     folder_name = request.match_info["name"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
@@ -2161,30 +2155,15 @@ async def delete_by_name(request: web.Request) -> web.Response:
         )
         # Folder owner OR user who have DELETE permission can delete folder.
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
-            raise InvalidAPIParameters("Cannot delete the vfolder " "that is not owned by myself.")
-        query = (
-            sa.update(vfolders)
-            .values(status=VFolderOperationStatus.DELETING)
-            .where(vfolders.c.id == entry["id"])
-        )
-        await conn.execute(query)
+            raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
 
-        folder_id = entry["id"]
-        query = sa.delete(vfolders).where(vfolders.c.id == folder_id)
-        await conn.execute(query)
-    # fs-level deletion may fail or take longer time
-    # but let's complete the db transaction to reflect that it's deleted.
-    proxy_name, volume_name = root_ctx.storage_manager.split_host(folder_host)
-    async with root_ctx.storage_manager.request(
-        proxy_name,
-        "POST",
-        "folder/delete",
-        json={
-            "volume": volume_name,
-            "vfid": str(folder_id),
-        },
-    ):
-        pass
+    async with root_ctx.db.begin_session() as db_sess:
+        await delete_vfolder_by_ids(
+            db_sess,
+            root_ctx.storage_manager,
+            app_ctx.storage_ptask_group,
+            vfolder_infos=[(entry["id"], folder_host)],
+        )
     return web.Response(status=204)
 
 
@@ -2972,12 +2951,22 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
     return web.json_response(resp, status=200)
 
 
+@attrs.define(slots=True, auto_attribs=True, init=False)
+class PrivateContext:
+    database_ptask_group: aiotools.PersistentTaskGroup
+    storage_ptask_group: aiotools.PersistentTaskGroup
+
+
 async def init(app: web.Application) -> None:
-    pass
+    app_ctx: PrivateContext = app["folders.context"]
+    app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
+    app_ctx.storage_ptask_group = aiotools.PersistentTaskGroup()
 
 
 async def shutdown(app: web.Application) -> None:
-    pass
+    app_ctx: PrivateContext = app["folders.context"]
+    await app_ctx.database_ptask_group.shutdown()
+    await app_ctx.storage_ptask_group.shutdown()
 
 
 def create_app(default_cors_options):
@@ -2986,6 +2975,7 @@ def create_app(default_cors_options):
     app["api_versions"] = (2, 3, 4)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
+    app["folders.context"] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     root_resource = cors.add(app.router.add_resource(r""))

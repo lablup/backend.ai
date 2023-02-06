@@ -5,7 +5,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
 from uuid import UUID, uuid4
 
-import aiohttp
+import aiotools
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -16,6 +16,7 @@ from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
@@ -964,7 +965,7 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import vfolder_permissions, vfolders
+        from . import delete_vfolder_by_ids, vfolder_permissions, vfolders
 
         await conn.execute(
             vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
@@ -975,28 +976,21 @@ class PurgeUser(graphene.Mutation):
             .where(vfolders.c.user == user_uuid),
         )
         target_vfs = result.fetchall()
-        result = await conn.execute(
-            sa.delete(vfolders).where(vfolders.c.user == user_uuid),
-        )
-        for row in target_vfs:
-            try:
-                async with storage_manager.request(
-                    row["host"],
-                    "POST",
-                    "folder/delete",
-                    json={
-                        "volume": storage_manager.split_host(row["host"])[1],
-                        "vfid": str(row["id"]),
-                    },
-                    raise_for_status=True,
-                ):
-                    pass
-            except aiohttp.ClientResponseError:
-                log.error("error on deleting vfolder filesystem directory: {0}", row["id"])
-                raise VFolderOperationFailed
-        if result.rowcount > 0:
-            log.info("deleted {0} user's virtual folders ({1})", result.rowcount, user_uuid)
-        return result.rowcount
+
+        storage_ptask_group = aiotools.PersistentTaskGroup()
+        try:
+            deleted_count = await delete_vfolder_by_ids(
+                SASession(conn),
+                storage_manager,
+                storage_ptask_group,
+                vfolder_infos=[(vf["id"], vf["host"]) for vf in target_vfs],
+            )
+        except VFolderOperationFailed as e:
+            log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
+            raise
+        if deleted_count > 0:
+            log.info("deleted {0} user's virtual folders ({1})", deleted_count, user_uuid)
+        return deleted_count
 
     @classmethod
     async def user_vfolder_mounted_to_active_kernels(
