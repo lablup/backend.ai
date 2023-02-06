@@ -18,6 +18,7 @@ jobs:
     
     - name: do work
       run: |
+        pip install tomlkit
         scripts=$(cat <<EOF
         #!/usr/bin/env python
         import os
