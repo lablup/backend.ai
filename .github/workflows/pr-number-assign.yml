@@ -77,7 +77,6 @@ jobs:
       uses: evvanErb/get-github-email-by-username-action@v1.25
       with: 
         github-username: ${{ github.actor }}
-        token: ${{ github.token }}
 
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
