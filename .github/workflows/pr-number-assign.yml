@@ -74,6 +74,7 @@ jobs:
 
     - name: hihihihi
       run: echo "hihi"
+    - name: second
       run: echo "${{github.event.pusher.email}}"
 
     - name: Make commit message for changing change log file
