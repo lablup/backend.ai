@@ -75,7 +75,7 @@ jobs:
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
-        commit_user_name: ${{ github.actor }}
-        #commit_author: leejiwon <110564003+leejiwon1125@users.noreply.github.com>
-        commit_user_email: leejiwon1125@postech.ac.kr
+        commit_user_name: qwerqwer
+        commit_author: asdfasdf
+        commit_user_email: zxcvzxcv
         commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
