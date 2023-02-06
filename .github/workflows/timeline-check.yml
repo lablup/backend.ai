@@ -41,3 +41,6 @@ jobs:
       env:
         BASE_BRANCH: ${{ github.base_ref }}
         PR_NUMBER: ${{ github.event.number }}
+
+needs:
+  - pr-number-assign

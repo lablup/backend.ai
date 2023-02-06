@@ -74,3 +74,6 @@ jobs:
       with:
         commit_user_name: ${{ github.actor }}
         commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
+
+resolves:
+  - timeline-check
