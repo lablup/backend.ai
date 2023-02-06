@@ -21,18 +21,18 @@ jobs:
         pip install tomlkit
         scripts=$(cat <<EOF
         #!/usr/bin/env python
-
-        from pathlib import Path
         import os
         import re
+        from pathlib import Path
+
         import tomlkit
 
         pr_number = "${{github.event.pull_request.number}}"
-        path = Path('./changes')
-        
-        with open('./pyproject.toml', 'r') as f:
+        path = Path("./changes")
+
+        with open("./pyproject.toml", "r") as f:
             data = tomlkit.load(f)
-            t_types = [sub['directory'] for sub in data["tool"]["towncrier"]["type"]]
+            t_types = [sub["directory"] for sub in data["tool"]["towncrier"]["type"]]
 
         pattern = r"^(\.)?(" + "|".join(t_types) + ")(\.)?(md)?$"
         result = None
@@ -52,7 +52,7 @@ jobs:
                 feat = re.search(r"|".join(t_types), original_filename).group()
                 file_path = path / original_filename
                 file_path.rename(path / (pr_number + "." + feat + ".md"))
- 
+
                 env_file = os.getenv("GITHUB_ENV")
                 myfile = open(env_file, "a")
                 myfile.write("ORIGINAL_FILENAME=" + original_filename + "\n")
@@ -67,7 +67,6 @@ jobs:
             print("Also, there is not feature named file in changes folder.")
             exit(0)
 
-        
         EOF
         )
         echo "$scripts" | python
