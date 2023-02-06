@@ -27,12 +27,13 @@ jobs:
 
         pr_number = "${{github.event.pull_request.number}}"
         path = "./changes"
-        pattern = r"^(\.)?(" + "|".join(t_types) + ")(\.)?(md)?$"
-        result = None
-
+        
         with open('./pyproject.toml', 'r') as f:
             data = tomlkit.load(f)
             t_types = [sub['directory'] for sub in data["tool"]["towncrier"]["type"]]
+
+        pattern = r"^(\.)?(" + "|".join(t_types) + ")(\.)?(md)?$"
+        result = None
 
         files = os.listdir(path)
         print(str(files) + " are in changes floder.")
