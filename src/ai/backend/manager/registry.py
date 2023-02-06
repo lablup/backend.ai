@@ -10,6 +10,7 @@ import time
 import typing
 import uuid
 import weakref
+import zlib
 from collections import defaultdict
 from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
@@ -34,7 +35,6 @@ from typing import (
 
 import aiodocker
 import aiotools
-import snappy
 import sqlalchemy as sa
 import zmq
 from async_timeout import timeout as _timeout
@@ -417,6 +417,7 @@ class AgentRegistry:
                 self.storage_manager,
                 allowed_vfolder_types,
                 user_scope,
+                resource_policy,
                 requested_mounts,
                 requested_mount_map,
             )
@@ -2381,7 +2382,7 @@ class AgentRegistry:
 
             # Update the mapping of kernel images to agents.
             known_registries = await get_known_registries(self.shared_config.etcd)
-            loaded_images = msgpack.unpackb(snappy.decompress(agent_info["images"]))
+            loaded_images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
 
             async def _pipe_builder(r: Redis):
                 pipe = r.pipeline()
@@ -2603,7 +2604,15 @@ class AgentRegistry:
 
         async def _recalc() -> None:
             async with self.db.begin() as conn:
+                log.debug(
+                    "recalculate concurrency used in kernel termination (ak: {})",
+                    access_key,
+                )
                 await recalc_concurrency_used(conn, self.redis_stat, access_key)
+                log.debug(
+                    "recalculate agent resource occupancy in kernel termination (agent: {})",
+                    agent,
+                )
                 await recalc_agent_resource_occupancy(conn, agent)
 
         await execute_with_retry(_recalc)
