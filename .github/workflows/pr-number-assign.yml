@@ -73,7 +73,8 @@ jobs:
         echo "$scripts" | python
 
     - name: hihihihi
-      run: echo  ${{github.event.pusher.email}}
+      run: echo "hihi"
+      run: echo "${{github.event.pusher.email}}"
 
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
