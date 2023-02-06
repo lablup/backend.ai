@@ -12,7 +12,8 @@ jobs:
       FEAT: default
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checks-out repository
+      uses: actions/checkout@v3
       with:
         ref: ${{ github.head_ref }}
     
