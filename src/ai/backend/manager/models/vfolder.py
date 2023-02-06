@@ -14,7 +14,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
-from ai.backend.common.types import VFolderHostPermissionMap, VFolderMount
+from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderMount
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
 from ..defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
@@ -54,6 +54,8 @@ __all__: Sequence[str] = (
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
     "prepare_vfolder_mounts",
+    "filter_host_allowed_permission",
+    "ensure_host_permission_allowed",
 )
 
 
@@ -130,6 +132,7 @@ class VFolderAccessStatus(str, enum.Enum):
 
     READABLE = "readable"
     UPDATABLE = "updatable"
+    DELETABLE = "deletable"
 
 
 vfolders = sa.Table(
@@ -472,7 +475,7 @@ async def get_allowed_vfolder_hosts_by_group(
 
 async def get_allowed_vfolder_hosts_by_user(
     conn: SAConnection,
-    resource_policy,
+    resource_policy: Mapping[str, Any],
     domain_name: str,
     user_uuid: uuid.UUID,
     group_id: Optional[uuid.UUID] = None,
@@ -529,6 +532,7 @@ async def prepare_vfolder_mounts(
     storage_manager: StorageSessionManager,
     allowed_vfolder_types: Sequence[str],
     user_scope: UserScope,
+    resource_policy: Mapping[str, Any],
     requested_mounts: Sequence[str],
     requested_mount_map: Mapping[str, str],
 ) -> Sequence[VFolderMount]:
@@ -602,6 +606,16 @@ async def prepare_vfolder_mounts(
     for key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
+        await ensure_host_permission_allowed(
+            conn,
+            vfolder["host"],
+            allowed_vfolder_types=allowed_vfolder_types,
+            user_uuid=user_scope.user_uuid,
+            resource_policy=resource_policy,
+            domain_name=user_scope.domain_name,
+            group_id=user_scope.group_id,
+            permission=VFolderHostPermission.MOUNT_IN_SESSION,
+        )
         if vfolder["group"] is not None and vfolder["group"] != str(user_scope.group_id):
             # User's accessible group vfolders should not be mounted
             # if not belong to the execution kernel.
@@ -672,6 +686,52 @@ async def prepare_vfolder_mounts(
                 )
 
     return matched_vfolder_mounts
+
+
+async def ensure_host_permission_allowed(
+    db_conn,
+    folder_host: str,
+    *,
+    permission: VFolderHostPermission,
+    allowed_vfolder_types: Sequence[str],
+    user_uuid: uuid.UUID,
+    resource_policy: Mapping[str, Any],
+    domain_name: str,
+    group_id: Optional[uuid.UUID] = None,
+) -> None:
+    allowed_hosts = await filter_host_allowed_permission(
+        db_conn,
+        allowed_vfolder_types=allowed_vfolder_types,
+        user_uuid=user_uuid,
+        resource_policy=resource_policy,
+        domain_name=domain_name,
+        group_id=group_id,
+    )
+    if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
+        raise InvalidAPIParameters(f"`{permission}` Not allowed in vfolder host(`{folder_host}`)")
+
+
+async def filter_host_allowed_permission(
+    db_conn,
+    *,
+    allowed_vfolder_types: Sequence[str],
+    user_uuid: uuid.UUID,
+    resource_policy: Mapping[str, Any],
+    domain_name: str,
+    group_id: Optional[uuid.UUID] = None,
+) -> VFolderHostPermissionMap:
+    allowed_hosts = VFolderHostPermissionMap()
+    if "user" in allowed_vfolder_types:
+        allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
+            db_conn, resource_policy, domain_name, user_uuid
+        )
+        allowed_hosts = allowed_hosts | allowed_hosts_by_user
+    if "group" in allowed_vfolder_types and group_id is not None:
+        allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
+            db_conn, resource_policy, domain_name, group_id
+        )
+        allowed_hosts = allowed_hosts | allowed_hosts_by_group
+    return allowed_hosts
 
 
 class VirtualFolder(graphene.ObjectType):
@@ -763,6 +823,7 @@ class VirtualFolder(graphene.ObjectType):
         "group_name": "groups_name",
         "user": "vfolders_user",
         "user_email": "users_email",
+        "creator": "vfolders_creator",
         "usage_mode": "vfolders_usage_mode",
         "permission": "vfolders_permission",
         "ownership_type": "vfolders_ownership_type",

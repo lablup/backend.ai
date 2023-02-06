@@ -49,32 +49,32 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6f62d78e2f89b4500b080fe3a81690850cd254227f27f75c3a0c491a1f351ba7",
-              "url": "https://files.pythonhosted.org/packages/b8/5b/f18e227df38b94b4ee30d2502fd531bebac23946a2497e5595067a561274/isort-5.10.1-py3-none-any.whl"
+              "hash": "c033fd0edb91000a7f09527fe5c75321878f98322a77ddcc81adbd83724afb7b",
+              "url": "https://files.pythonhosted.org/packages/91/3b/a63bafb8141b67c397841b36ad46e7469716af2b2d00cb0be2dfb9667130/isort-5.11.4-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e8443a5e7a020e9d7f97f1d7d9cd17c88bcb3bc7e218bf9cf5095fe550be2951",
-              "url": "https://files.pythonhosted.org/packages/ab/e9/964cb0b2eedd80c92f5172f1f8ae0443781a9d461c1372a3ce5762489593/isort-5.10.1.tar.gz"
+              "hash": "6db30c5ded9815d813932c04c2f85a360bcdd35fed496f4d8f35495ef0a261b6",
+              "url": "https://files.pythonhosted.org/packages/76/46/004e2dd6c312e8bb7cb40a6c01b770956e0ef137857e82d47bd9c829356b/isort-5.11.4.tar.gz"
             }
           ],
           "project_name": "isort",
           "requires_dists": [
             "colorama<0.5.0,>=0.4.3; extra == \"colors\"",
-            "pip-api; extra == \"requirements_deprecated_finder\"",
-            "pipreqs; extra == \"pipfile_deprecated_finder\" or extra == \"requirements_deprecated_finder\"",
-            "requirementslib; extra == \"pipfile_deprecated_finder\"",
+            "pip-api; extra == \"requirements-deprecated-finder\"",
+            "pipreqs; extra == \"pipfile-deprecated-finder\" or extra == \"requirements-deprecated-finder\"",
+            "requirementslib; extra == \"pipfile-deprecated-finder\"",
             "setuptools; extra == \"plugins\""
           ],
-          "requires_python": "<4.0,>=3.6.1",
-          "version": "5.10.1"
+          "requires_python": ">=3.7.0",
+          "version": "5.11.4"
         }
       ],
       "platform_tag": null
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.108",
+  "pex_version": "2.1.120",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
