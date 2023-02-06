@@ -16,7 +16,7 @@ jobs:
       with:
         ref: ${{ github.head_ref }}
     
-    - name: do work
+    - name: Assign pr-number 
       run: |
         pip install tomlkit
         scripts=$(cat <<EOF
@@ -71,7 +71,7 @@ jobs:
         )
         echo "$scripts" | python
 
-    - name: commit message for changing change log file
+    - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_user_name: ${{ github.actor }}
