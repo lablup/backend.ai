@@ -76,5 +76,5 @@ jobs:
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_user_name: ${{ github.actor }}
-        commit_user_email: piono623@naver.com
+        commit_user_email: invalidemail@invalid.ac.kr
         commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
