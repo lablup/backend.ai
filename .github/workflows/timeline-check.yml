@@ -5,7 +5,11 @@ on:
     types: [labeled, unlabeled, opened, synchronize, reopened]
 
 jobs:
+  pr-number-assign:
+    uses: ./.github/workflows/pr-number-assign.yml
+
   towncrier:
+    needs: [pr-number-assign]
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') }}
     runs-on: ubuntu-latest
     steps:

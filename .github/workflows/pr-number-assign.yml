@@ -1,6 +1,6 @@
 name: pr-number-assign
 on: 
-  [workflow_call, pull_request]
+  [workflow_call]
 permissions:
   contents: write
   
