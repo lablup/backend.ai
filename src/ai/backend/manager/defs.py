@@ -30,7 +30,6 @@ RESERVED_VFOLDERS = [
     ".terminfo",
     ".jupyter",
     ".tmux.conf",
-    ".ssh",
     "/bin",
     "/boot",
     "/dev",
