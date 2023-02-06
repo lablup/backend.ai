@@ -1,6 +1,6 @@
 name: pr-number-assign
 on: 
-  pull_request:
+  [workflow_call, pull_request]
 permissions:
   contents: write
   
@@ -74,6 +74,3 @@ jobs:
       with:
         commit_user_name: ${{ github.actor }}
         commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
-
-resolves:
-  - timeline-check
