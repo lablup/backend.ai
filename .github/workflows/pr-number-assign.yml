@@ -82,7 +82,7 @@ jobs:
     - name: Check user info
       run: |
         echo "Actor : $GITHUB_ACTOR"
-        echo "User email: ${{ steps.get_user_info.outputs.email }}"
+        echo "User email : ${{ steps.get_user_info.outputs.email }}"
         echo "Recent id in github api(https://api.github.com/users/${{github.actor}}/events/public): ${{ steps.get_user_info.outputs.id }}"
         echo "Workflow-Triggered commit message: ${{ steps.get_user_info.outputs.message }}"
         
