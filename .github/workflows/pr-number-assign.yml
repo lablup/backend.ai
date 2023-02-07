@@ -86,8 +86,7 @@ jobs:
     - name: Display user email
       run: |
         echo "User email is ${{ steps.get_user_email.outputs.email }}"
-        echo "${{ GITHUB_OUTPUT.email }}"
-
+        
 
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
