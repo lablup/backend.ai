@@ -91,4 +91,4 @@ jobs:
       with:
         commit_user_name: ${{ github.actor }}
         commit_user_email: ${{ steps.get_user_info.outputs.email }}
-        commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
+        commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{ github.event.pull_request.number }}.${{ env.FEAT }}.md'
