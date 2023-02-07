@@ -397,7 +397,7 @@ def main(cli_ctx, config_path, log_level, debug=False):
     config.override_with_env(
         raw_cfg, ("watcher", "service-addr", "port"), "BACKEND_WATCHER_SERVICE_PORT"
     )
-    if log_level.value == "debug":
+    if log_level == LogSeverity.DEBUG:
         config.override_key(raw_cfg, ("debug", "enabled"), True)
 
     try:

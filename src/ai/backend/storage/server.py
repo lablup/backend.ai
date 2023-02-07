@@ -189,7 +189,7 @@ def main(cli_ctx, config_path, log_level, debug=False):
     config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
     config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
     config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-    if log_level.value == "debug":
+    if log_level == LogSeverity.DEBUG:
         config.override_key(raw_cfg, ("debug", "enabled"), True)
 
     try:

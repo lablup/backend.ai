@@ -854,7 +854,7 @@ def main(
     config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
     config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level.value == "debug")
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
     config.override_key(raw_cfg, ("logging", "level"), log_level.name)
     config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.name)
 
@@ -935,7 +935,7 @@ def main(
                 log.info("runtime: {0}", utils.env_info())
 
                 log_config = logging.getLogger("ai.backend.agent.config")
-                if log_level.value == "debug":
+                if log_level == LogSeverity.DEBUG:
                     log_config.debug("debug mode enabled.")
 
                 if cfg["agent"]["event-loop"] == "uvloop":
