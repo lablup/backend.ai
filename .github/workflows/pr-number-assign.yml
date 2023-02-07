@@ -81,10 +81,12 @@ jobs:
 
     - name: Get user email
       id: get_user_email
-      run: echo "::set-output name=email::$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')"
+      run: echo "email=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')" >> $GITHUB_OUTPUT
+      #run: echo "::set-output name=email::$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')"
     - name: Display user email
-      run: echo "User email is ${{ steps.get_user_email.outputs.email }}"
-
+      run: |
+        echo "User email is ${{ steps.get_user_email.outputs.email }}"
+        echo "${{ GITHUB_OUTPUT.email }}"
 
 
     - name: Make commit message for changing change log file
