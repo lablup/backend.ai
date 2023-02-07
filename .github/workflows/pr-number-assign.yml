@@ -72,15 +72,18 @@ jobs:
         )
         echo "$scripts" | python
 
-    - name: Get user email
-      id: get_user_email
+    #- name: Get user email
+    #  id: get_user_email
+    #  run: |
+    #    email=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')
+    #    echo "User email is $email"
+    
+    #- run: echo "${{get_user_email.email}}"
+
+    - name: Make commit message for changing change log file
       run: |
         email=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')
         echo "User email is $email"
-    
-    - run: echo "${{get_user_email.email}}"
-
-    - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_user_name: ${{ github.actor }}
