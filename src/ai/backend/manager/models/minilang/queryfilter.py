@@ -1,4 +1,4 @@
-from typing import Any, Mapping, Union
+from typing import Any, Mapping, Optional, Type, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
@@ -50,32 +50,35 @@ _parser = Lark(
 
 
 class QueryFilterTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, fieldspec: Mapping[str, FieldSpecItem] = None) -> None:
+    def __init__(
+        self, sa_table: sa.Table, fieldspec: Optional[Mapping[str, FieldSpecItem]] = None
+    ) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._fieldspec = fieldspec
 
-    def string(self, s):
-        (s,) = s
+    def string(self, token: list[Token]) -> str:
+        s = token[0]
         # SQL-side escaping is handled by SQLAlchemy
         return s[1:-1].replace('\\"', '"')
 
-    def number(self, n):
-        (n,) = n
+    def number(self, token: list[Token]) -> int | float:
+        n = token[0]
         if "." in n:
             return float(n)
         return int(n)
 
     array = list
 
-    def atom(self, a):
-        (a,) = a
+    def atom(self, token: list[Token]) -> Type[sa.sql.elements.SingletonConstant]:
+        a = token[0]
         if a.value == "null":
             return sa.null()
         elif a.value == "true":
             return sa.true()
         elif a.value == "false":
             return sa.false()
+        raise ValueError("Unknown/unsupported atomic token", a.value)
 
     def _get_col(self, col_name: str) -> sa.Column:
         try:
@@ -162,7 +165,7 @@ class QueryFilterTransformer(Transformer):
 
 
 class QueryFilterParser:
-    def __init__(self, fieldspec: Mapping[str, FieldSpecItem] = None) -> None:
+    def __init__(self, fieldspec: Optional[Mapping[str, FieldSpecItem]] = None) -> None:
         self._fieldspec = fieldspec
         self._parser = _parser
 
