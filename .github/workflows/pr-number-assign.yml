@@ -75,14 +75,16 @@ jobs:
     - name: Get user info
       id: get_user_info
       run: | 
-        echo "email=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')" >> $GITHUB_OUTPUT
+        echo "email=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[-1].author.email')" >> $GITHUB_OUTPUT
         echo "recentid=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].id')" >> $GITHUB_OUTPUT
+        echo "message=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[-1].message')" >> $GITHUB_OUTPUT
 
     - name: Check user info
       run: |
         echo "Actor is $GITHUB_ACTOR"
-        echo "recent id in github api is ${{ steps.get_user_info.outputs.recentid }}"
         echo "User email is ${{ steps.get_user_info.outputs.email }}"
+        echo "recent id in github api is ${{ steps.get_user_info.outputs.recentid }}"
+        echo "Workflow-triggered commit message is ${{ steps.get_user_info.outputs.message }}"
         
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
