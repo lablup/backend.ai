@@ -77,8 +77,9 @@ jobs:
       run: echo "email=$(curl -Ls https://api.github.com/users/rapsealk/events/public | jq -r '.[0].payload.commits[0].author.email')" >> $GITHUB_OUTPUT
     
     - name: Check user actor and email
-      run: echo "Actor is $GITHUB_ACTOR or ${{ github.actor }}"
-      run: echo "User email is ${{ steps.get_user_email.outputs.email }}"
+      run: |
+        echo "Actor is $GITHUB_ACTOR or ${{ github.actor }}"
+        echo "User email is ${{ steps.get_user_email.outputs.email }}"
         
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
