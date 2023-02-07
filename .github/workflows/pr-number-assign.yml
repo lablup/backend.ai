@@ -10,7 +10,6 @@ jobs:
     
     env:
       FEAT: default
-      USER_EMAIL: ${{ steps.get_user_email.outputs.email }}
 
     steps:
     - name: Checks-out repository
@@ -81,7 +80,7 @@ jobs:
       id: get_user_email
       run: echo "::set-output name=email::$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR | jq -r '.email')"
     - name: Display user email
-      run: echo "User email is ${USER_EMAIL}"
+      run: echo "User email is ${{ steps.get_user_email.outputs.email }}"
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
