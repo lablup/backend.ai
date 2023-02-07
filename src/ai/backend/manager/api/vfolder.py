@@ -2489,6 +2489,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
                 vfolders.c.id,
                 vfolders.c.name,
                 vfolders.c.group,
+                vfolders.c.status,
                 vfolders.c.user.label("vfolder_user"),
                 users.c.email,
             ]
@@ -2505,6 +2506,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
             {
                 "vfolder_id": str(shared.id),
                 "vfolder_name": str(shared.name),
+                "status": str(shared.status),
                 "owner": str(owner),
                 "type": folder_type,
                 "shared_to": {
