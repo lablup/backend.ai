@@ -78,7 +78,7 @@ jobs:
         echo "email=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')" >> $GITHUB_OUTPUT
         echo "recentid=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].id')" >> $GITHUB_OUTPUT
 
-    - name: Check user inf
+    - name: Check user info
       run: |
         echo "Actor is $GITHUB_ACTOR"
         echo "recent id in github api is ${{ steps.get_user_info.outputs.recentid }}"
