@@ -72,21 +72,21 @@ jobs:
         )
         echo "$scripts" | python
 
-    - name: Get user email
-      id: get_user_email
+    - name: Get user info
+      id: get_user_info
       run: | 
         echo "email=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')" >> $GITHUB_OUTPUT
         echo "recentid=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].id')" >> $GITHUB_OUTPUT
 
-    - name: Check user actor and email
+    - name: Check user inf
       run: |
-        echo "data in github api ::  recentid: ${{ steps.get_user_email.outputs.recentid }}"
         echo "Actor is $GITHUB_ACTOR"
-        echo "User email is ${{ steps.get_user_email.outputs.email }}"
+        echo "recent id in github api is ${{ steps.get_user_info.outputs.recentid }}"
+        echo "User email is ${{ steps.get_user_info.outputs.email }}"
         
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_user_name: ${{ github.actor }}
-        commit_user_email: ${{ steps.get_user_email.outputs.email }}
+        commit_user_email: ${{ steps.get_user_info.outputs.email }}
         commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
