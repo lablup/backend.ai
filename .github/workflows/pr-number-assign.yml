@@ -74,10 +74,13 @@ jobs:
 
     - name: Get user email
       id: get_user_email
-      run: echo "email=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')" >> $GITHUB_OUTPUT
-    
+      run: | 
+        echo "email=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')" >> $GITHUB_OUTPUT
+        echo "recentid=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].id')" >> $GITHUB_OUTPUT
+
     - name: Check user actor and email
       run: |
+        echo "data in github api ::  recentid: ${{ steps.get_user_email.outputs.recentid }}"
         echo "Actor is $GITHUB_ACTOR"
         echo "User email is ${{ steps.get_user_email.outputs.email }}"
         
