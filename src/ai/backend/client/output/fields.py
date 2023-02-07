@@ -115,6 +115,7 @@ keypair_fields = FieldSet(
             alt_name="full_name",
             formatter=SubFieldOutputFormatter("full_name"),
         ),
+        FieldSpec("projects"),
         FieldSpec("access_key"),
         FieldSpec("secret_key"),
         FieldSpec("is_active"),

@@ -2,6 +2,7 @@ from typing import Any, Mapping, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
+from lark.lexer import Token
 
 from . import FieldSpecItem
 
@@ -105,8 +106,8 @@ class QueryFilterTransformer(Transformer):
             val = self._transform_val_leaf(col_name, value)
         return val
 
-    def binary_expr(self, *args):
-        children = args[0]
+    def binary_expr(self, *args) -> sa.sql.elements.BinaryExpression:
+        children: list[Token] = args[0]
         col = self._get_col(children[0].value)
         op = children[1].value
         val = self._transform_val(children[0].value, children[2])

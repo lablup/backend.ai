@@ -40,6 +40,7 @@ from .base import (
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .user import ModifyUserInput, UserRole
+from .utils import agg_str
 
 __all__: Sequence[str] = (
     "keypairs",
@@ -164,6 +165,7 @@ class KeyPair(graphene.ObjectType):
     rate_limit = graphene.Int()
     num_queries = graphene.Int()
     user = graphene.UUID()
+    projects = graphene.List(lambda: graphene.String)
 
     ssh_public_key = graphene.String()
 
@@ -211,6 +213,7 @@ class KeyPair(graphene.ObjectType):
             user=row["user"],
             ssh_public_key=row["ssh_public_key"],
             concurrency_limit=0,  # deprecated
+            projects=row["groups_name"].split(","),
         )
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
@@ -290,6 +293,7 @@ class KeyPair(graphene.ObjectType):
         "rate_limit": ("keypairs_rate_limit", None),
         "num_queries": ("keypairs_num_queries", None),
         "ssh_public_key": ("keypairs_ssh_public_key", None),
+        "projects": ("groups_name", None),
     }
 
     _queryorder_colmap = {
@@ -303,6 +307,7 @@ class KeyPair(graphene.ObjectType):
         "last_used": "keypairs_last_used",
         "rate_limit": "keypairs_rate_limit",
         "num_queries": "keypairs_num_queries",
+        "projects": ("groups_name", agg_str),
     }
 
     @classmethod
@@ -345,12 +350,25 @@ class KeyPair(graphene.ObjectType):
         filter: str = None,
         order: str = None,
     ) -> Sequence[KeyPair]:
+        from .group import association_groups_users, groups
         from .user import users
 
-        j = sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+        j = (
+            sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
+            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+            .join(groups, association_groups_users.c.group_id == groups.c.id)
+        )
         query = (
-            sa.select([keypairs, users.c.email, users.c.full_name])
+            sa.select(
+                [
+                    keypairs,
+                    users.c.email,
+                    users.c.full_name,
+                    agg_str(groups.c.name).label("groups_name"),
+                ]
+            )
             .select_from(j)
+            .group_by(keypairs, users.c.email, users.c.full_name)
             .limit(limit)
             .offset(offset)
         )

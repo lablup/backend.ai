@@ -1,7 +1,8 @@
-from typing import Mapping
+from typing import Any, Mapping, Optional
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
+from lark.lexer import Token
 
 __all__ = ("QueryOrderParser",)
 
@@ -22,7 +23,7 @@ _parser = Lark(
 
 
 class QueryOrderTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, column_map: Mapping[str, str] = None) -> None:
+    def __init__(self, sa_table: sa.Table, column_map: Optional[Mapping[str, Any]] = None) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._column_map = column_map
@@ -30,15 +31,23 @@ class QueryOrderTransformer(Transformer):
     def _get_col(self, col_name: str) -> sa.Column:
         try:
             if self._column_map:
-                col = self._sa_table.c[self._column_map[col_name]]
+                col_value = self._column_map[col_name]
+                if isinstance(col_value, tuple) or isinstance(col_value, list):
+                    if len(col_value) == 1:
+                        col = col_value[0]
+                    else:
+                        func = col_value[1]
+                        col = func(col_value[0])
+                else:
+                    col = self._sa_table.c[self._column_map[col_name]]
             else:
                 col = self._sa_table.c[col_name]
             return col
         except KeyError:
             raise ValueError("Unknown/unsupported field name", col_name)
 
-    def col(self, *args):
-        children = args[0]
+    def col(self, *args) -> sa.sql.elements.UnaryExpression:
+        children: list[Token] = args[0]
         if len(children) == 2:
             op = children[0].value
             col = self._get_col(children[1].value)
@@ -54,7 +63,7 @@ class QueryOrderTransformer(Transformer):
 
 
 class QueryOrderParser:
-    def __init__(self, column_map: Mapping[str, str] = None) -> None:
+    def __init__(self, column_map: Optional[Mapping[str, Any]] = None) -> None:
         self._column_map = column_map
         self._parser = _parser
 
