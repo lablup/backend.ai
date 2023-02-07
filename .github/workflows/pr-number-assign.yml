@@ -72,13 +72,16 @@ jobs:
         )
         echo "$scripts" | python
 
+    - name: Get user email
+      id: get_user_email
+      run: |
+        email=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')
+        echo "User email is $email"
+        echo "::set-env name=user_email::$email"
     
-    
-    - run: echo "$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')"
-
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_user_name: ${{ github.actor }}
-        commit_user_email: "$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')"
+        commit_user_email: ${{ env.user_email }}
         commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{github.event.pull_request.number}}.${{ env.FEAT }}.md'
