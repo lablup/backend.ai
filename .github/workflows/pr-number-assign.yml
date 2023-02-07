@@ -72,9 +72,9 @@ jobs:
         )
         echo "$scripts" | python
 
-    - run: echo " ${{ github.event.issue.pull_request}}  "
-    - run: echo " ${{ github.event.issue.user.login }} "
-    - run: echo " ${{ github.event.actor.url }} "
+    - run: echo ${{ github.event.issue.pull_request}}
+    - run: echo ${{ github.event.issue.user.login }}
+    - run: echo ${{ github.actor.url }}
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
