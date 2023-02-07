@@ -77,7 +77,7 @@ jobs:
       run: |
         echo "email=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[0].author.email')" >> $GITHUB_STATE
     
-    - run: $(grep "email=" $GITHUB_STATE | cut -d "=" -f 2)
+    - run: echo "$(grep "email=" $GITHUB_STATE | cut -d "=" -f 2)"
 
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
