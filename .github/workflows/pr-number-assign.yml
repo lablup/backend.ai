@@ -84,7 +84,7 @@ jobs:
         echo "Actor is $GITHUB_ACTOR"
         echo "User email is ${{ steps.get_user_info.outputs.email }}"
         echo "recent id in github api is ${{ steps.get_user_info.outputs.recentid }}"
-        echo "Workflow-triggered commit message is ${{ steps.get_user_info.outputs.message }}"
+        echo "Workflow-Triggered commit message is ${{ steps.get_user_info.outputs.message }}"
         
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
