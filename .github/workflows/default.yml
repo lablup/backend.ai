@@ -176,7 +176,6 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-
   build:
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
@@ -249,11 +248,11 @@ jobs:
              "dist/backend.ai_${pkgname}-${PKGVER}-py3-none-${MANYLINUX_PTAG}.${MACOS_PTAG}.whl"
         done
         ls -lh dist
-    - name: Upload wheels
+    - name: Upload wheels and sdist
       uses: actions/upload-artifact@v3
       with:
         name: wheels
-        path: dist/*.whl
+        path: dist/*.whl dist/*.tar.gz
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
@@ -262,8 +261,8 @@ jobs:
       if: always()  # We want the log even on failures.
 
 
-  windows-conda-build:
-    needs: [lint, typecheck, test]
+  windows-conda-package:
+    needs: [build]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: windows-latest
     steps:
@@ -294,31 +293,31 @@ jobs:
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
-    - uses: s-weigand/setup-conda@v1
+    - name: Download built wheels and sdist
+      uses: actions/download-artifact@v3
+      with:
+        name: wheels and sdist
+        path: dist
+    - name: Install conda-pack
+      uses: s-weigand/setup-conda@v1
       with:
         activate-conda: false
-    - name: conda-pack
+    - name: Create conda environment
       run: |
         pip install conda-pack
         conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
         conda activate backend.ai-client
-        pip install backend.ai-client
-        conda-pack -o backend.ai-client.tar.gz
+        pip install dist/backend.ai-client-*.whl
+        conda-pack -o backend.ai-client-windows-conda.tar.gz
     - name: Upload conda-pack
       uses: actions/upload-artifact@v3
       with:
-        name: conda-pack
-        path: backend.ai-client.tar.gz
-    - name: Upload pants log
-      uses: actions/upload-artifact@v3
-      with:
-        name: pants.deploy.log
-        path: .pants.d/pants.log
-      if: always()
+        name: windows-conda
+        path: backend.ai-client-windows-conda.tar.gz
 
 
   deploy-to-pypi:
-    needs: [build, windows-conda-build]
+    needs: [windows-conda-build]
     if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
@@ -340,16 +339,16 @@ jobs:
     - name: Install local dependencies for publishing
       run: |
         pip install -U 'twine~=4.0'
-    - name: Download wheels
+    - name: Download built wheels and sdist
       uses: actions/download-artifact@v3
       with:
-        name: wheels
+        name: wheels and sdist
         path: dist
     - name: Download conda-pack
       uses: actions/download-artifact@v3
       with:
-        name: conda-pack
-        path: dist
+        name: windows-conda
+        path: windows-conda
     - name: Publish to PyPI
       env:
         TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
@@ -370,3 +369,4 @@ jobs:
         files: |
           dist/*.whl
           dist/*.tar.gz
+          windows-conda/backend.ai-client-windows-conda.tar.gz
