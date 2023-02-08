@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Mapping, Optional, Sequence
 from uuid import UUID, uuid4
 
 import aiohttp
@@ -39,8 +39,8 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .storage import StorageSessionManager
 
 if TYPE_CHECKING:
@@ -263,7 +263,7 @@ class User(graphene.ObjectType):
         async with ctx.db.begin_readonly() as conn:
             return [cls.from_row(ctx, row) async for row in (await conn.stream(query))]
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "uuid": ("uuid", None),
         "username": ("username", None),
         "email": ("email", None),
@@ -280,19 +280,19 @@ class User(graphene.ObjectType):
         "allowed_client_ip": ("allowed_client_ip", None),
     }
 
-    _queryorder_colmap = {
-        "uuid": "uuid",
-        "username": "username",
-        "email": "email",
-        "need_password_change": "need_password_change",
-        "full_name": "full_name",
-        "is_active": "is_active",
-        "status": "status",
-        "status_info": "status_info",
-        "created_at": "created_at",
-        "modified_at": "modified_at",
-        "domain_name": "domain_name",
-        "role": "role",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "uuid": ("uuid", None),
+        "username": ("username", None),
+        "email": ("email", None),
+        "need_password_change": ("need_password_change", None),
+        "full_name": ("full_name", None),
+        "is_active": ("is_active", None),
+        "status": ("status", None),
+        "status_info": ("status_info", None),
+        "created_at": ("created_at", None),
+        "modified_at": ("modified_at", None),
+        "domain_name": ("domain_name", None),
+        "role": ("role", None),
     }
 
     @classmethod
@@ -377,7 +377,7 @@ class User(graphene.ObjectType):
         if order is not None:
             if group_id is not None:
                 qoparser = QueryOrderParser(
-                    {k: "users_" + v for k, v in cls._queryorder_colmap.items()}
+                    {k: ("users_" + v[0], v[1]) for k, v in cls._queryorder_colmap.items()}
                 )
             else:
                 qoparser = QueryOrderParser(cls._queryorder_colmap)

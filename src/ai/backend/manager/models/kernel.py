@@ -72,8 +72,8 @@ from .base import (
     mapper_registry,
 )
 from .group import groups
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import users
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -762,7 +762,7 @@ class ComputeContainer(graphene.ObjectType):
             return None
         return await graph_ctx.registry.get_abusing_report(self.id, self.agent, self.agent_addr)
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "image": ("image", None),
         "architecture": ("architecture", None),
         "agent": ("agent", None),
@@ -778,20 +778,20 @@ class ComputeContainer(graphene.ObjectType):
         "terminated_at": ("terminated_at", dtparse),
     }
 
-    _queryorder_colmap = {
-        "image": "image",
-        "architecture": "architecture",
-        "agent": "agent",
-        "agent_addr": "agent_addr",
-        "cluster_idx": "cluster_idx",
-        "local_rank": "local_rank",
-        "cluster_role": "cluster_role",
-        "cluster_hostname": "cluster_hostname",
-        "status": "status",
-        "status_info": "status_info",
-        "status_changed": "status_info",
-        "created_at": "created_at",
-        "terminated_at": "terminated_at",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "image": ("image", None),
+        "architecture": ("architecture", None),
+        "agent": ("agent", None),
+        "agent_addr": ("agent_addr", None),
+        "cluster_idx": ("cluster_idx", None),
+        "local_rank": ("local_rank", None),
+        "cluster_role": ("cluster_role", None),
+        "cluster_hostname": ("cluster_hostname", None),
+        "status": ("status", None),
+        "status_info": ("status_info", None),
+        "status_changed": ("status_info", None),
+        "created_at": ("created_at", None),
+        "terminated_at": ("terminated_at", None),
     }
 
     @classmethod

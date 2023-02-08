@@ -99,9 +99,9 @@ def test_column_map(virtual_grid_db) -> None:
     conn, grid = virtual_grid_db
     parser = QueryOrderParser(
         {
-            "v1": "data1",
-            "v2": "data2",
-            "v3": "data3",
+            "v1": ("data1", None),
+            "v2": ("data2", None),
+            "v3": ("data3", None),
         }
     )
 

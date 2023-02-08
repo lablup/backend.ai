@@ -69,8 +69,8 @@ from .base import (
 )
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -1215,7 +1215,7 @@ class ComputeSession(graphene.ObjectType):
             return []
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "session_type": ("session_type", lambda s: SessionTypes[s]),
         "name": ("name", None),
         "image": ("image", None),
@@ -1238,27 +1238,27 @@ class ComputeSession(graphene.ObjectType):
         "startup_command": ("startup_command", None),
     }
 
-    _queryorder_colmap = {
-        "id": "id",
-        "session_type": "session_type",
-        "name": "name",
-        "image": "image",
-        "architecture": "architecture",
-        "domain_name": "domain_name",
-        "group_name": "group_name",
-        "user_email": "users_email",
-        "access_key": "access_key",
-        "scaling_group": "scaling_group",
-        "cluster_mode": "cluster_mode",
-        "cluster_template": "cluster_template",
-        "cluster_size": "cluster_size",
-        "status": "status",
-        "status_info": "status_info",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("id", None),
+        "session_type": ("session_type", None),
+        "name": ("name", None),
+        "image": ("image", None),
+        "architecture": ("architecture", None),
+        "domain_name": ("domain_name", None),
+        "group_name": ("group_name", None),
+        "user_email": ("users_email", None),
+        "access_key": ("access_key", None),
+        "scaling_group": ("scaling_group", None),
+        "cluster_mode": ("cluster_mode", None),
+        "cluster_template": ("cluster_template", None),
+        "cluster_size": ("cluster_size", None),
+        "status": ("status", None),
+        "status_info": ("status_info", None),
         # "status_changed": "status_info",
-        "result": "result",
-        "created_at": "created_at",
-        "terminated_at": "terminated_at",
-        "starts_at": "starts_at",
+        "result": ("result", None),
+        "created_at": ("created_at", None),
+        "terminated_at": ("terminated_at", None),
+        "starts_at": ("starts_at", None),
     }
 
     @classmethod

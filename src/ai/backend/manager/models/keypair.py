@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import secrets
 import uuid
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, TypedDict
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence, Tuple, TypedDict
 
 import graphene
 import sqlalchemy as sa
@@ -37,8 +37,8 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import ModifyUserInput, UserRole
 from .utils import agg_str
 
@@ -280,7 +280,7 @@ class KeyPair(graphene.ObjectType):
                 if (obj := cls.from_row(graph_ctx, row)) is not None
             ]
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "access_key": ("keypairs_access_key", None),
         "user_id": ("users_uuid", None),
         "email": ("users_email", None),
@@ -296,17 +296,17 @@ class KeyPair(graphene.ObjectType):
         "projects": ("groups_name", None),
     }
 
-    _queryorder_colmap = {
-        "access_key": "keypairs_access_key",
-        "email": "users_email",
-        "full_name": "users_full_name",
-        "is_active": "keypairs_is_active",
-        "is_admin": "keypairs_is_admin",
-        "resource_policy": "keypairs_resource_policy",
-        "created_at": "keypairs_created_at",
-        "last_used": "keypairs_last_used",
-        "rate_limit": "keypairs_rate_limit",
-        "num_queries": "keypairs_num_queries",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "access_key": ("keypairs_access_key", None),
+        "email": ("users_email", None),
+        "full_name": ("users_full_name", None),
+        "is_active": ("keypairs_is_active", None),
+        "is_admin": ("keypairs_is_admin", None),
+        "resource_policy": ("keypairs_resource_policy", None),
+        "created_at": ("keypairs_created_at", None),
+        "last_used": ("keypairs_last_used", None),
+        "rate_limit": ("keypairs_rate_limit", None),
+        "num_queries": ("keypairs_num_queries", None),
         "projects": ("groups_name", agg_str),
     }
 

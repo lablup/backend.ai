@@ -1,16 +1,16 @@
-from typing import Any, Mapping, Optional, Type, Union
+from typing import Any, Callable, Mapping, Optional, Tuple, Type, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
 from lark.lexer import Token
 
-from . import FieldSpecItem
-
 __all__ = (
     "FilterableSQLQuery",
     "QueryFilterParser",
+    "FieldSpecItem",
 )
 
+FieldSpecItem = Tuple[str, Optional[Callable[[str], Any]]]
 
 FilterableSQLQuery = Union[sa.sql.Select, sa.sql.Update, sa.sql.Delete]
 

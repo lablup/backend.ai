@@ -33,8 +33,8 @@ from .base import (
 from .group import association_groups_users
 from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from .keypair import keypairs
-from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.ordering import OrderSpecItem, QueryOrderParser
+from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .scaling_group import query_allowed_sgroups
 from .user import UserRole, users
 
@@ -228,7 +228,7 @@ class Agent(graphene.ObjectType):
         graph_ctx: GraphQueryContext = info.context
         return await graph_ctx.registry.get_agent_local_config(self.id, self.addr)
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
         "status": ("status", lambda s: AgentStatus[s]),
         "status_changed": ("status_changed", dtparse),
@@ -241,18 +241,18 @@ class Agent(graphene.ObjectType):
         "version": ("version", None),
     }
 
-    _queryorder_colmap = {
-        "id": "id",
-        "status": "status",
-        "status_changed": "status_changed",
-        "region": "region",
-        "scaling_group": "scaling_group",
-        "schedulable": "schedulable",
-        "first_contact": "first_contact",
-        "lost_at": "lost_at",
-        "version": "version",
-        "available_slots": "available_slots",
-        "occupied_slots": "occupied_slots",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("id", None),
+        "status": ("status", None),
+        "status_changed": ("status_changed", None),
+        "region": ("region", None),
+        "scaling_group": ("scaling_group", None),
+        "schedulable": ("schedulable", None),
+        "first_contact": ("first_contact", None),
+        "lost_at": ("lost_at", None),
+        "version": ("version", None),
+        "available_slots": ("available_slots", None),
+        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod
@@ -446,20 +446,20 @@ class AgentSummary(graphene.ObjectType):
             architecture=row["architecture"],
         )
 
-    _queryfilter_fieldspec = {
+    _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
         "status": ("status", lambda s: AgentStatus[s]),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulabe", None),
     }
 
-    _queryorder_colmap = {
-        "id": "id",
-        "status": "status",
-        "scaling_group": "scaling_group",
-        "schedulable": "schedulable",
-        "available_slots": "available_slots",
-        "occupied_slots": "occupied_slots",
+    _queryorder_colmap: Mapping[str, OrderSpecItem] = {
+        "id": ("id", None),
+        "status": ("status", None),
+        "scaling_group": ("scaling_group", None),
+        "schedulable": ("schedulable", None),
+        "available_slots": ("available_slots", None),
+        "occupied_slots": ("occupied_slots", None),
     }
 
     @classmethod

@@ -1,10 +1,15 @@
-from typing import Any, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
 from lark.lexer import Token
 
-__all__ = ("QueryOrderParser",)
+__all__ = (
+    "QueryOrderParser",
+    "OrderSpecItem",
+)
+
+OrderSpecItem = tuple[str, Optional[Callable[[str], Any]]]
 
 _grammar = r"""
     ?start: expr
@@ -23,7 +28,9 @@ _parser = Lark(
 
 
 class QueryOrderTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, column_map: Optional[Mapping[str, Any]] = None) -> None:
+    def __init__(
+        self, sa_table: sa.Table, column_map: Optional[Mapping[str, OrderSpecItem]] = None
+    ) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._column_map = column_map
@@ -31,13 +38,9 @@ class QueryOrderTransformer(Transformer):
     def _get_col(self, col_name: str) -> sa.Column:
         try:
             if self._column_map:
-                col_value = self._column_map[col_name]
-                if isinstance(col_value, tuple) or isinstance(col_value, list):
-                    if len(col_value) == 1:
-                        col = col_value[0]
-                    else:
-                        func = col_value[1]
-                        col = func(col_value[0])
+                col_value, func = self._column_map[col_name]
+                if func is not None:
+                    col = func(col_value)
                 else:
                     col = self._sa_table.c[self._column_map[col_name]]
             else:
@@ -63,7 +66,7 @@ class QueryOrderTransformer(Transformer):
 
 
 class QueryOrderParser:
-    def __init__(self, column_map: Optional[Mapping[str, Any]] = None) -> None:
+    def __init__(self, column_map: Optional[Mapping[str, OrderSpecItem]] = None) -> None:
         self._column_map = column_map
         self._parser = _parser
 
