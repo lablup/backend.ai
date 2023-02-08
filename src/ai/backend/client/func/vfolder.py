@@ -593,6 +593,13 @@ class VFolder(BaseFunction):
 
     @api_function
     @classmethod
+    async def list_shared_vfolders(cls):
+        rqst = Request("GET", "folders/_/shared")
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    @classmethod
     async def shared_vfolder_info(cls, vfolder_id: str):
         rqst = Request("GET", "folders/_/shared")
         rqst.set_json({"vfolder_id": vfolder_id})
