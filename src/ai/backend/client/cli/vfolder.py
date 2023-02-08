@@ -191,6 +191,7 @@ def info(name):
             print('Virtual folder "{0}" (ID: {1})'.format(result["name"], result["id"]))
             print("- Owner:", result["is_owner"])
             print("- Permission:", result["permission"])
+            print("- Status: {0}".format(result["status"]))
             print("- Number of files: {0}".format(result["numFiles"]))
             print("- Ownership Type: {0}".format(result["type"]))
             print("- Permission:", result["permission"])
