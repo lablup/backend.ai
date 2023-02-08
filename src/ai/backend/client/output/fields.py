@@ -281,6 +281,7 @@ vfolder_fields = FieldSet(
         FieldSpec("user", alt_name="user_id"),
         FieldSpec("group", alt_name="group_id"),
         FieldSpec("creator"),
+        FieldSpec("status"),
         FieldSpec("unmanaged_path"),
         FieldSpec("usage_mode"),
         FieldSpec("permission"),
