@@ -10,9 +10,10 @@ import attrs
 import graphene
 import trafaret as t
 from aiohttp import web
-from graphql.error import GraphQLError, format_error  # pants: no-infer-dep
-from graphql.execution import ExecutionResult  # pants: no-infer-dep
-from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
+from graphql.type.schema import GraphQLSchema
+from graphql.error import GraphQLError  # pants: no-infer-dep
+from graphql.execution import execute, ExecutionContext, ExecutionResult, MiddlewareManager  # pants: no-infer-dep
+from graphql.language import DocumentNode, OperationDefinitionNode
 
 from ai.backend.common import validators as tx
 from ai.backend.common.logging import BraceStyleAdapter
@@ -70,9 +71,29 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         storage_manager=root_ctx.storage_manager,
         registry=root_ctx.registry,
     )
-    result = app_ctx.gql_schema.execute(
+    # exe_ctx = ExecutionContext(
+    #     app_ctx.gql_schema,
+    #     fragments={},
+    #     root_value=None,
+    #     operation=OperationDefinitionNode(),
+    #     field_resolver=None,
+    #     type_resolver=None,
+    #     subscribe_field_resolver=None,
+    #     variable_values=params["variables"],
+    #     context_value=gql_ctx,
+    #     middleware_manager=MiddlewareManager(
+    #         GQLLoggingMiddleware(),
+    #         GQLMutationUnfrozenRequiredMiddleware(),
+    #         GQLMutationPrivilegeCheckMiddleware(),
+    #     ),
+    #     errors=[],
+    #     is_awaitable=None,
+    # )
+    result = await execute(
+        # params["query"],
+        app_ctx.gql_schema,
+        app_ctx.gql_document_node,
         params["query"],
-        app_ctx.gql_executor,
         variable_values=params["variables"],
         operation_name=params["operation_name"],
         context_value=gql_ctx,
@@ -81,7 +102,6 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
             GQLMutationUnfrozenRequiredMiddleware(),
             GQLMutationPrivilegeCheckMiddleware(),
         ],
-        return_promise=True,
     )
     if inspect.isawaitable(result):
         result = await result
@@ -120,7 +140,7 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
         errors = []
         for e in result.errors:
             if isinstance(e, GraphQLError):
-                errmsg = format_error(e)
+                errmsg = str(e)
                 errors.append(errmsg)
             else:
                 errmsg = {"message": str(e)}
@@ -132,17 +152,17 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
 
 @attrs.define(auto_attribs=True, slots=True, init=False)
 class PrivateContext:
-    gql_executor: AsyncioExecutor
-    gql_schema: graphene.Schema
+    gql_schema: GraphQLSchema
+    gql_document_node: DocumentNode
 
 
 async def init(app: web.Application) -> None:
     app_ctx: PrivateContext = app["admin.context"]
-    app_ctx.gql_executor = AsyncioExecutor()
-    app_ctx.gql_schema = graphene.Schema(
-        query=Queries,
-        mutation=Mutations,
-        auto_camelcase=False,
+    app_ctx.gql_document_node = DocumentNode()
+    print(f'{type(Queries) = }')
+    app_ctx.gql_schema = GraphQLSchema(
+        query=Queries(),
+        mutation=Mutations(),
     )
 
 
