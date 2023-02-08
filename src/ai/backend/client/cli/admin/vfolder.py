@@ -206,7 +206,7 @@ def umount_host(name, edit_fstab):
 
 
 @vfolder.command
-def list_shared_vfolder():
+def list_shared_vfolders():
     """
     List all shared vfolder.
     (superadmin privilege required)
