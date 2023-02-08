@@ -49,25 +49,26 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "c033fd0edb91000a7f09527fe5c75321878f98322a77ddcc81adbd83724afb7b",
-              "url": "https://files.pythonhosted.org/packages/91/3b/a63bafb8141b67c397841b36ad46e7469716af2b2d00cb0be2dfb9667130/isort-5.11.4-py3-none-any.whl"
+              "hash": "f84c2818376e66cf843d497486ea8fed8700b340f308f076c6fb1229dff318b6",
+              "url": "https://files.pythonhosted.org/packages/0a/63/4036ae70eea279c63e2304b91ee0ac182f467f24f86394ecfe726092340b/isort-5.12.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6db30c5ded9815d813932c04c2f85a360bcdd35fed496f4d8f35495ef0a261b6",
-              "url": "https://files.pythonhosted.org/packages/76/46/004e2dd6c312e8bb7cb40a6c01b770956e0ef137857e82d47bd9c829356b/isort-5.11.4.tar.gz"
+              "hash": "8bef7dde241278824a6d83f44a544709b065191b95b6e50894bdc722fcba0504",
+              "url": "https://files.pythonhosted.org/packages/a9/c4/dc00e42c158fc4dda2afebe57d2e948805c06d5169007f1724f0683010a9/isort-5.12.0.tar.gz"
             }
           ],
           "project_name": "isort",
           "requires_dists": [
-            "colorama<0.5.0,>=0.4.3; extra == \"colors\"",
+            "colorama>=0.4.3; extra == \"colors\"",
             "pip-api; extra == \"requirements-deprecated-finder\"",
+            "pip-shims>=0.5.2; extra == \"pipfile-deprecated-finder\"",
             "pipreqs; extra == \"pipfile-deprecated-finder\" or extra == \"requirements-deprecated-finder\"",
             "requirementslib; extra == \"pipfile-deprecated-finder\"",
             "setuptools; extra == \"plugins\""
           ],
-          "requires_python": ">=3.7.0",
-          "version": "5.11.4"
+          "requires_python": ">=3.8.0",
+          "version": "5.12.0"
         }
       ],
       "platform_tag": null

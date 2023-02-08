@@ -115,7 +115,7 @@
             "tomli; python_full_version <= \"3.11.0a6\" and extra == \"toml\""
           ],
           "requires_python": ">=3.7",
-          "version": "6.5"
+          "version": "6.5.0"
         },
         {
           "artifacts": [
@@ -140,7 +140,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.108",
+  "pex_version": "2.1.120",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [

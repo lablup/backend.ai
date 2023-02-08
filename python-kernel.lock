@@ -242,13 +242,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "83064d61bb2a9bc874e8184331c117b3778c2a7e1851f60cb00d273ceb3285ae",
-              "url": "https://files.pythonhosted.org/packages/c7/b1/e4122cc0de4bdf2830e40f29a7d033b3e9c8dfa9582155587832c9c9eaab/jupyter_core-5.1.5-py3-none-any.whl"
+              "hash": "4bdc2928c37f6917130c667d8b8708f20aee539d8283c6be72aabd2a4b4c83b0",
+              "url": "https://files.pythonhosted.org/packages/c2/63/86691c2c6014b034c7eccc3000512c58532b4a11343e01faddd74c80a9de/jupyter_core-5.2.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8e54c48cde1e0c8345f64bcf9658b78044ddf02b273726cea9d9f59be4b02130",
-              "url": "https://files.pythonhosted.org/packages/fb/a3/1456f5caa41b37a8ef651227e0c3790436a71672349a50e7938fb3e577cc/jupyter_core-5.1.5.tar.gz"
+              "hash": "1407cdb4c79ee467696c04b76633fc1884015fa109323365a6372c8e890cc83f",
+              "url": "https://files.pythonhosted.org/packages/aa/81/f1700beb330c715e3ecf72c6713849f18ed653d49fb2f621705cae2d3b56/jupyter_core-5.2.0.tar.gz"
             }
           ],
           "project_name": "jupyter-core",
@@ -268,7 +268,7 @@
             "traitlets>=5.3"
           ],
           "requires_python": ">=3.8",
-          "version": "5.1.5"
+          "version": "5.2.0"
         },
         {
           "artifacts": [
@@ -350,13 +350,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "83c8f6d04389165de7c9b6f0c682439697887bca0aa2f1c87ef1826be3584490",
-              "url": "https://files.pythonhosted.org/packages/c1/c7/9be9d651b93efce682b45142a6267034fc4215972780748618c02e236361/platformdirs-2.6.2-py3-none-any.whl"
+              "hash": "b1d5eb14f221506f50d6604a561f4c5786d9e80355219694a1b244bcd96f4567",
+              "url": "https://files.pythonhosted.org/packages/ba/24/a83a900a90105f8ad3f20df5bb5a2cde886df7125c7827e196e4ed4fa8a7/platformdirs-3.0.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e1fea1fe471b9ff8332e229df3cb7de4f53eeea4998d3b6bfff542115e998bd2",
-              "url": "https://files.pythonhosted.org/packages/cf/4d/198b7e6c6c2b152f4f9f4cdf975d3590e33e63f1920f2d89af7f0390e6db/platformdirs-2.6.2.tar.gz"
+              "hash": "8a1228abb1ef82d788f74139988b137e78692984ec7b08eaa6c65f1723af28f9",
+              "url": "https://files.pythonhosted.org/packages/11/39/702094fc1434a4408783b071665d9f5d8a1d0ba4dddf9dadf3d50e6eb762/platformdirs-3.0.0.tar.gz"
             }
           ],
           "project_name": "platformdirs",
@@ -367,13 +367,13 @@
             "proselint>=0.13; extra == \"docs\"",
             "pytest-cov>=4; extra == \"test\"",
             "pytest-mock>=3.10; extra == \"test\"",
-            "pytest>=7.2; extra == \"test\"",
-            "sphinx-autodoc-typehints>=1.19.5; extra == \"docs\"",
-            "sphinx>=5.3; extra == \"docs\"",
+            "pytest>=7.2.1; extra == \"test\"",
+            "sphinx-autodoc-typehints!=1.23.4,>=1.22; extra == \"docs\"",
+            "sphinx>=6.1.3; extra == \"docs\"",
             "typing-extensions>=4.4; python_version < \"3.8\""
           ],
           "requires_python": ">=3.7",
-          "version": "2.6.2"
+          "version": "3.0.0"
         },
         {
           "artifacts": [
@@ -562,13 +562,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a1ca5df6414f8b5760f7c5f256e326ee21b581742114545b462b35ffe3f04861",
-              "url": "https://files.pythonhosted.org/packages/76/fa/bd160e08ac7f656d818a0e40ff88e1a302b07ad2384864fb288db3c812fa/traitlets-5.8.1-py3-none-any.whl"
+              "hash": "9e6ec080259b9a5940c797d58b613b5e31441c2257b87c2e795c5228ae80d2d8",
+              "url": "https://files.pythonhosted.org/packages/77/75/c28e9ef7abec2b7e9ff35aea3e0be6c1aceaf7873c26c95ae1f0d594de71/traitlets-5.9.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "32500888f5ff7bbf3b9267ea31748fa657aaf34d56d85e60f91dda7dc7f5785b",
-              "url": "https://files.pythonhosted.org/packages/be/58/2d930cfab2caca22c827229ca61aabd8102423f7e817805cba706dce1598/traitlets-5.8.1.tar.gz"
+              "hash": "f6cde21a9c68cf756af02035f72d5a723bf607e862e7be33ece505abf4a3bad9",
+              "url": "https://files.pythonhosted.org/packages/39/c3/205e88f02959712b62008502952707313640369144a7fded4cbc61f48321/traitlets-5.9.0.tar.gz"
             }
           ],
           "project_name": "traitlets",
@@ -582,7 +582,7 @@
             "sphinx; extra == \"docs\""
           ],
           "requires_python": ">=3.7",
-          "version": "5.8.1"
+          "version": "5.9.0"
         },
         {
           "artifacts": [

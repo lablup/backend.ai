@@ -231,7 +231,7 @@
             "zope.interface; extra == \"tests\""
           ],
           "requires_python": ">=3.6",
-          "version": "22.2"
+          "version": "22.2.0"
         },
         {
           "artifacts": [
@@ -306,7 +306,7 @@
             "tomli; python_full_version <= \"3.11.0a6\" and extra == \"toml\""
           ],
           "requires_python": ">=3.7",
-          "version": "7.1"
+          "version": "7.1.0"
         },
         {
           "artifacts": [
@@ -326,7 +326,7 @@
             "pytest>=6; extra == \"test\""
           ],
           "requires_python": ">=3.7",
-          "version": "1.1"
+          "version": "1.1.0"
         },
         {
           "artifacts": [
@@ -346,7 +346,7 @@
             "pre-commit; extra == \"testing\""
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "1.9"
+          "version": "1.9.0"
         },
         {
           "artifacts": [
@@ -460,7 +460,7 @@
           "project_name": "iniconfig",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "2"
+          "version": "2.0.0"
         },
         {
           "artifacts": [
@@ -556,7 +556,7 @@
           "project_name": "packaging",
           "requires_dists": [],
           "requires_python": ">=3.7",
-          "version": "23"
+          "version": "23.0"
         },
         {
           "artifacts": [
@@ -580,7 +580,7 @@
             "tox; extra == \"dev\""
           ],
           "requires_python": ">=3.6",
-          "version": "1"
+          "version": "1.0.0"
         },
         {
           "artifacts": [
@@ -598,7 +598,7 @@
           "project_name": "py",
           "requires_dists": [],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,>=2.7",
-          "version": "1.11"
+          "version": "1.11.0"
         },
         {
           "artifacts": [
@@ -711,7 +711,7 @@
             "virtualenv; extra == \"testing\""
           ],
           "requires_python": ">=3.6",
-          "version": "3"
+          "version": "3.0.0"
         },
         {
           "artifacts": [
@@ -731,7 +731,7 @@
             "pytest>=4.0.2"
           ],
           "requires_python": "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,>2.7",
-          "version": "0.3"
+          "version": "0.3.0"
         },
         {
           "artifacts": [
@@ -767,7 +767,7 @@
             "pytest>=3.10"
           ],
           "requires_python": ">=3.6",
-          "version": "1.4"
+          "version": "1.4.0"
         },
         {
           "artifacts": [
@@ -790,7 +790,7 @@
             "tox; extra == \"dev\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.10"
+          "version": "3.10.0"
         },
         {
           "artifacts": [
@@ -815,7 +815,7 @@
             "setproctitle; extra == \"setproctitle\""
           ],
           "requires_python": ">=3.6",
-          "version": "2.5"
+          "version": "2.5.0"
         },
         {
           "artifacts": [
@@ -922,7 +922,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.108",
+  "pex_version": "2.1.120",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
