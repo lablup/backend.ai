@@ -108,7 +108,7 @@ report = ["xml", "console"]
 lockfile = "tools/coverage-py.lock"
 
 [mypy]
-version = "mypy==0.991"
+version = "mypy==1.0.0"
 interpreter_constraints = ["CPython>=3.11,<4"]
 extra_requirements.add = [
 ]
