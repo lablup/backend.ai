@@ -105,6 +105,7 @@ class BackgroundTaskManager:
     event_producer: EventProducer
     ongoing_tasks: weakref.WeakSet[asyncio.Task]
     task_update_queues: DefaultDict[uuid.UUID, Set[asyncio.Queue[Sentinel | BgtaskEvents]]]
+    dict_lock: asyncio.Lock = asyncio.Lock()
 
     def __init__(self, event_producer: EventProducer) -> None:
         self.event_producer = event_producer
@@ -170,7 +171,8 @@ class BackgroundTaskManager:
 
         # It is an ongoing task.
         my_queue: asyncio.Queue[BgtaskEvents | Sentinel] = asyncio.Queue()
-        self.task_update_queues[task_id].add(my_queue)
+        async with self.dict_lock:
+            self.task_update_queues[task_id].add(my_queue)
         try:
             async with sse_response(request) as resp:
                 try:
@@ -202,8 +204,9 @@ class BackgroundTaskManager:
                     return resp
         finally:
             self.task_update_queues[task_id].remove(my_queue)
-            if len(self.task_update_queues[task_id]) == 0:
-                del self.task_update_queues[task_id]
+            async with self.dict_lock:
+                if len(self.task_update_queues[task_id]) == 0:
+                    del self.task_update_queues[task_id]
 
     async def start(
         self,
