@@ -56,7 +56,7 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.common.events"))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 PTGExceptionHandler: TypeAlias = Callable[
     [Type[Exception], Exception, TracebackType], Awaitable[None]
