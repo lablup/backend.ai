@@ -149,7 +149,7 @@ if TYPE_CHECKING:
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 __all__ = ["AgentRegistry", "InstanceNotFound"]
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.registry"))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 SESSION_NAME_LEN_LIMIT = 10
 _read_only_txn_opts = {

@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     from .gql import GraphQueryContext
     from .scaling_group import ScalingGroup
 
-log = BraceStyleAdapter(logging.getLogger(__file__))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 __all__: Sequence[str] = (
