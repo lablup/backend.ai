@@ -304,28 +304,39 @@ def upgrade():
 
             # st_change = sess["status_changed"]
 
-            if sess["created_at"] > row["created_at"]:
-                sess["created_at"] = row["created_at"]
-                # st_change = row["st_change"]
-
-            if sess["starts_at"] > row["starts_at"]:
-                sess["starts_at"] = row["starts_at"]
-                # st_change = row["st_change"]
-
-            if str(sess["status"]) not in ("ERROR", "CANCELLED"):
-                if KernelStatus.index(str(sess["status"])) > KernelStatus.index(str(row["status"])):
-                    sess["status"] = row["status"]
-                    # st_change = row["st_change"]
-
-            if sess["terminated_at"] is not None and row["terminated_at"] is not None:
-                if sess["terminated_at"] < row["terminated_at"]:
-                    sess["terminated_at"] = row["terminated_at"]
-                    # st_change = row["status_changed"]
-            elif sess["terminated_at"] is None:
+            try:
+                if sess["created_at"] is not None and row["created_at"] is not None:
+                    if sess["created_at"] > row["created_at"]:
+                        sess["created_at"] = row["created_at"]
+                        # st_change = row["st_change"]
+            except (TypeError, ValueError):
                 pass
-            elif row["terminated_at"] is None:
-                sess["terminated_at"] = None
-            # sess["status_changed"] = st_change
+
+            try:
+                if sess["starts_at"] is not None and row["starts_at"] is not None:
+                    if sess["starts_at"] > row["starts_at"]:
+                        sess["starts_at"] = row["starts_at"]
+                        # st_change = row["st_change"]
+            except (TypeError, ValueError):
+                pass
+
+            # if str(sess["status"]) not in ("ERROR", "CANCELLED"):
+            #     if KernelStatus.index(str(sess["status"])) > KernelStatus.index(str(row["status"])):
+            #         sess["status"] = row["status"]
+            sess["status"] = row["status"]
+
+            try:
+                if sess["terminated_at"] is not None and row["terminated_at"] is not None:
+                    if sess["terminated_at"] < row["terminated_at"]:
+                        sess["terminated_at"] = row["terminated_at"]
+                        # st_change = row["status_changed"]
+                elif sess["terminated_at"] is None:
+                    pass
+                elif row["terminated_at"] is None:
+                    sess["terminated_at"] = None
+                # sess["status_changed"] = st_change
+            except (TypeError, ValueError):
+                pass
 
             if sess["status_info"] != row["status_info"]:
                 import json
