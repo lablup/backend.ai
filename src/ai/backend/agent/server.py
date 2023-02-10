@@ -22,7 +22,6 @@ from typing import (
     Callable,
     ClassVar,
     Coroutine,
-    Dict,
     Literal,
     Mapping,
     Optional,
@@ -78,7 +77,7 @@ from .utils import get_subnet_ip
 if TYPE_CHECKING:
     from .agent import AbstractAgent
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.server"))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 deeplearning_image_keys = {
     "tensorflow",
@@ -450,7 +449,7 @@ class AgentRPCServer(aobject):
         session_id: str,
         kernel_id: str,
         updated_config: dict,
-    ):
+    ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
         return await self.agent.restart_kernel(
             creation_id,
@@ -463,15 +462,14 @@ class AgentRPCServer(aobject):
     @collect_error
     async def execute(
         self,
-        kernel_id,  # type: str
-        api_version,  # type: int
-        run_id,  # type: str
-        mode,  # type: Literal['query', 'batch', 'continue', 'input']
-        code,  # type: str
-        opts,  # type: Dict[str, Any]
-        flush_timeout,  # type: float
-    ):
-        # type: (...) -> Dict[str, Any]
+        kernel_id: str,
+        api_version: int,
+        run_id: str,
+        mode: Literal["query", "batch", "continue", "input"],
+        code: str,
+        opts: dict[str, Any],
+        flush_timeout: float,
+    ) -> dict[str, Any]:
         if mode != "continue":
             log.info(
                 "rpc::execute(k:{0}, run-id:{1}, mode:{2}, code:{3!r})",
@@ -495,8 +493,8 @@ class AgentRPCServer(aobject):
     @collect_error
     async def execute_batch(
         self,
-        kernel_id,  # type: str
-        startup_command,  # type: str
+        kernel_id: str,
+        startup_command: str,
     ) -> None:
         # DEPRECATED
         asyncio.create_task(
@@ -511,11 +509,10 @@ class AgentRPCServer(aobject):
     @collect_error
     async def start_service(
         self,
-        kernel_id,  # type: str
-        service,  # type: str
-        opts,  # type: Dict[str, Any]
-    ):
-        # type: (...) -> Dict[str, Any]
+        kernel_id: str,
+        service: str,
+        opts: dict[str, Any],
+    ) -> dict[str, Any]:
         log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
         return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts)
 
@@ -523,9 +520,9 @@ class AgentRPCServer(aobject):
     @collect_error
     async def get_commit_status(
         self,
-        kernel_id,  # type: str
-        subdir,  # type: str
-    ):
+        kernel_id: str,
+        subdir: str,
+    ) -> dict[str, Any]:
         # Only this function logs debug since web sends request at short intervals
         log.debug("rpc::get_commit_status(k:{})", kernel_id)
         status: CommitStatus = await self.agent.get_commit_status(
@@ -541,10 +538,10 @@ class AgentRPCServer(aobject):
     @collect_error
     async def commit(
         self,
-        kernel_id,  # type: str
-        subdir,  # type: str
-        filename,  # type: str
-    ):
+        kernel_id: str,
+        subdir: str,
+        filename: str,
+    ) -> dict[str, Any]:
         log.info("rpc::commit(k:{})", kernel_id)
         bgtask_mgr = self.local_config["background_task_manager"]
         task_id = await bgtask_mgr.start(
@@ -631,18 +628,6 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def create_overlay_network(self, network_name: str) -> None:
-        log.debug("rpc::create_overlay_network(name:{})", network_name)
-        return await self.agent.create_overlay_network(network_name)
-
-    @rpc_function
-    @collect_error
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        log.debug("rpc::destroy_overlay_network(name:{})", network_name)
-        return await self.agent.destroy_overlay_network(network_name)
-
-    @rpc_function
-    @collect_error
     async def create_local_network(self, network_name: str) -> None:
         log.debug("rpc::create_local_network(name:{})", network_name)
         return await self.agent.create_local_network(network_name)
@@ -702,6 +687,24 @@ async def server_main(
     _args: Tuple[Any, ...],
 ) -> AsyncGenerator[None, signal.Signals]:
     local_config = _args[0]
+
+    # Start aiomonitor.
+    # Port is set by config (default=50200).
+    loop.set_debug(local_config["debug"]["asyncio"])
+    monitor = aiomonitor.Monitor(
+        loop,
+        port=local_config["agent"]["aiomonitor-port"],
+        console_enabled=False,
+        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
+    )
+    monitor.prompt = "monitor (agent) >>> "
+    monitor.console_locals["local_config"] = local_config
+    aiomon_started = False
+    try:
+        monitor.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
     log.info("Preparing kernel runner environments...")
     kernel_mod = importlib.import_module(
@@ -777,19 +780,6 @@ async def server_main(
     # Pre-load compute plugin configurations.
     local_config["plugins"] = await etcd.get_prefix_dict("config/plugins/accelerator")
 
-    # Start aiomonitor.
-    # Port is set by config (default=50200).
-    loop.set_debug(local_config["debug"]["asyncio"])
-    monitor = aiomonitor.Monitor(
-        loop,
-        port=local_config["agent"]["aiomonitor-port"],
-        console_enabled=False,
-        hook_task_factory=local_config["debug"]["enhanced-aiomonitor-task-info"],
-    )
-    monitor.prompt = "monitor (agent) >>> "
-    monitor.console_locals["local_config"] = local_config
-    monitor.start()
-
     # Start RPC server.
     global agent_instance
     agent = await AgentRPCServer.new(
@@ -806,7 +796,8 @@ async def server_main(
             stop_signal = yield
             agent.mark_stop_signal(stop_signal)
     finally:
-        monitor.close()
+        if aiomon_started:
+            monitor.close()
 
 
 @click.group(invoke_without_command=True)

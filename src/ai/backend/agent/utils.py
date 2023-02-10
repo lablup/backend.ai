@@ -32,12 +32,13 @@ from aiodocker.docker import DockerContainer
 from typing_extensions import Final
 
 from ai.backend.common import identity
+from ai.backend.common.cgroup import get_cgroup_of_pid, get_container_id_of_cgroup
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import PID, ContainerPID, HostPID, KernelId
 from ai.backend.common.utils import current_loop
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.utils"))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 IPNetwork = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
 IPAddress = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
@@ -297,26 +298,18 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                 await docker.close()
 
     try:
-        for p in Path("/sys/fs/cgroup/pids/docker").iterdir():
-            if not p.is_dir():
-                continue
-            tasks_path = p / "tasks"
-            cgtasks = [*map(int, tasks_path.read_text().splitlines())]
-            if host_pid not in cgtasks:
-                continue
-            if p.name == container_id:
-                proc_path = Path(f"/proc/{host_pid}/status")
-                proc_status = {
-                    k: v
-                    for k, v in map(lambda l: l.split(":\t"), proc_path.read_text().splitlines())
-                }
-                nspids = [
-                    *map(lambda pid: ContainerPID(PID(int(pid))), proc_status["NSpid"].split())
-                ]
-                return nspids[1]
-            return InOtherContainerPID
-        return NotContainerPID
-    except (ValueError, KeyError, IOError):
+        cgroup = get_cgroup_of_pid("pids", host_pid)
+        cgroup_container_id = get_container_id_of_cgroup(cgroup)
+        if cgroup_container_id is None:
+            return NotContainerPID
+        if cgroup_container_id == container_id:
+            for line in Path(f"/proc/{host_pid}/status").read_text().splitlines():
+                key, value = line.split(":\t", 1)
+                if key == "NSpid":
+                    pid = value.split()[1]
+                    return ContainerPID(PID(int(pid)))
+        return InOtherContainerPID
+    except OSError:
         return NotContainerPID
 
 

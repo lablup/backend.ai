@@ -294,7 +294,7 @@ msgstr ""
 #: ../../dev/daily-workflows.rst:236 6bd97410676d49bf9904d8b2df6365c5
 msgid ""
 "When the target Python version has changed when you pull a new "
-"version/branch, you need to re-run ``./pants export ::`` and manually "
+"version/branch, you need to re-run ``./pants export`` and manually "
 "update the Python interpreter path and mypy executable path "
 "configurations."
 msgstr ""
@@ -349,7 +349,7 @@ msgstr ""
 #: ../../dev/daily-workflows.rst:292 7e7c7974845a482eaa9af3a4c60b61be
 msgid ""
 "When each branch has different external package requirements, you should "
-"run ``./pants export ::`` before running codes after ``git switch``-ing "
+"run ``./pants export`` before running codes after ``git switch``-ing "
 "between such branches."
 msgstr ""
 
@@ -729,7 +729,7 @@ msgstr ""
 #: ../../dev/daily-workflows.rst:576 4cbc0303af454f91a84aadf7cf1ab64b
 msgid ""
 "You may append ``--draft`` to see a preview of the changelog update "
-"without actually modifying the filesytem."
+"without actually modifying the filesystem."
 msgstr ""
 
 #: ../../dev/daily-workflows.rst:579 c337102e9763462996c74c7c4ed17793
@@ -809,7 +809,7 @@ msgstr ""
 
 #~ msgid ""
 #~ "Whenever you re-export the venv "
-#~ "using ``./pants export ::``, you must"
+#~ "using ``./pants export``, you must"
 #~ " *reinstall* the plugins.  There is "
 #~ "also a shrotcut script that does "
 #~ "this for you: ``scripts/reinstall-"

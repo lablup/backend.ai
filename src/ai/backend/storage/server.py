@@ -6,7 +6,6 @@ import os
 import pwd
 import ssl
 import sys
-from contextlib import closing
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import Any, AsyncIterator, Sequence
@@ -28,7 +27,7 @@ from .api.manager import init_manager_app
 from .config import local_config_iv
 from .context import Context
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.storage.server"))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 @aiotools.server
@@ -61,9 +60,14 @@ async def server_main(
     )
     m.prompt = f"monitor (storage-proxy[{pidx}@{os.getpid()}]) >>> "
     m.console_locals["local_config"] = local_config
-    m.start()
+    aiomon_started = False
+    try:
+        m.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
 
-    with closing(m):
+    try:
         etcd_credentials = None
         if local_config["etcd"]["user"]:
             etcd_credentials = {
@@ -141,6 +145,9 @@ async def server_main(
             log.info("Shutting down...")
             await manager_api_runner.cleanup()
             await client_api_runner.cleanup()
+    finally:
+        if aiomon_started:
+            m.close()
 
 
 @click.group(invoke_without_command=True)

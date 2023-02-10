@@ -3,12 +3,12 @@ import ctypes.util
 import logging
 import os
 import sys
-from pathlib import Path
 from typing import Iterator
 
 import aiohttp
 import aiotools
 
+from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import get_docker_connector
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -67,11 +67,39 @@ class libnuma:
         try:
             match sys.platform:
                 case "linux":
-                    docker_cpuset_path = Path("/sys/fs/cgroup/cpuset/docker/cpuset.cpus")
+                    try:
+                        docker_host, connector = get_docker_connector()
+                        async with aiohttp.ClientSession(connector=connector) as sess:
+                            async with sess.get(docker_host / "info") as resp:
+                                data = await resp.json()
+                    except (RuntimeError, aiohttp.ClientError):
+                        pass
+                    else:
+                        try:
+                            driver = data["CgroupDriver"]
+                            version = data["CgroupVersion"]
+                            mount_point = get_cgroup_mount_point(version, "cpuset")
+
+                            match driver:
+                                case "cgroupfs":
+                                    cgroup_parent = "docker"
+                                case "systemd":
+                                    cgroup_parent = "system.slice"
+
+                            match version:
+                                case "1":
+                                    cpuset_source_name = "cpuset.effective_cpus"
+                                case "2":
+                                    cpuset_source_name = "cpuset.cpus.effective"
+
+                            docker_cpuset_path = mount_point / cgroup_parent / cpuset_source_name
+                            log.debug(f"docker_cpuset_path: {docker_cpuset_path}")
+                            cpuset_source = "the docker cgroup (v{})".format(version)
+                        except RuntimeError:
+                            pass  # couldn't find the cgroup mount point. try alternatives.
                     try:
                         docker_cpuset = docker_cpuset_path.read_text()
                         cpuset = {*parse_cpuset(docker_cpuset)}
-                        cpuset_source = "the docker cgroup"
                         return cpuset
                     except (IOError, ValueError):
                         try:

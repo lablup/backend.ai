@@ -23,6 +23,7 @@ from uuid import UUID
 
 import aiohttp
 from aiohttp import hdrs
+from faker import Faker
 from tqdm import tqdm
 
 from ai.backend.client.output.fields import session_fields
@@ -31,7 +32,7 @@ from ai.backend.client.output.types import FieldSpec, PaginatedResult
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE
 from ..exceptions import BackendClientError
-from ..pagination import generate_paginated_results
+from ..pagination import fetch_paginated_result
 from ..request import (
     AttachedFile,
     Request,
@@ -112,7 +113,7 @@ class ComputeSession(BaseFunction):
         :param is_active: Fetches active or inactive users only if not None.
         :param fields: Additional per-user query fields to fetch.
         """
-        return await generate_paginated_results(
+        return await fetch_paginated_result(
             "compute_session_list",
             {
                 "status": (status, "String"),
@@ -252,7 +253,8 @@ class ComputeSession(BaseFunction):
         if name is not None:
             assert 4 <= len(name) <= 64, "Client session token should be 4 to 64 characters long."
         else:
-            name = f"pysdk-{secrets.token_hex(5)}"
+            faker = Faker()
+            name = f"pysdk-{faker.user_name()}"
         if mounts is None:
             mounts = []
         if mount_map is None:

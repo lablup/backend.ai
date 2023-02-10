@@ -14,6 +14,7 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack, redis_helper
@@ -25,12 +26,13 @@ if TYPE_CHECKING:
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
+    Base,
     ForeignKeyIDColumn,
     Item,
     PaginatedList,
     batch_multiresult,
     batch_result,
-    metadata,
+    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -41,6 +43,7 @@ from .user import ModifyUserInput, UserRole
 
 __all__: Sequence[str] = (
     "keypairs",
+    "KeyPairRow",
     "KeyPair",
     "KeyPairList",
     "UserInfo",
@@ -60,7 +63,7 @@ MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
 
 keypairs = sa.Table(
     "keypairs",
-    metadata,
+    mapper_registry.metadata,
     sa.Column("user_id", sa.String(length=256), index=True),
     sa.Column("access_key", sa.String(length=20), primary_key=True),
     sa.Column("secret_key", sa.String(length=40)),
@@ -94,6 +97,17 @@ keypairs = sa.Table(
         "bootstrap_script", sa.String(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=""
     ),
 )
+
+
+class KeyPairRow(Base):
+    __table__ = keypairs
+    sessions = relationship("SessionRow", back_populates="access_key_row")
+    resource_policy_row = relationship("KeyPairResourcePolicyRow", back_populates="keypairs")
+    scaling_groups = relationship(
+        "ScalingGroupRow",
+        secondary="sgroups_for_keypairs",
+        back_populates="keypairs",
+    )
 
 
 class UserInfo(graphene.ObjectType):

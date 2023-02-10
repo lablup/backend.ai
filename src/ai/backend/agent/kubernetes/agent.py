@@ -71,7 +71,7 @@ from .kube_object import (
 )
 from .resources import detect_resources
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.kubernetes.agent"))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKernel]):
@@ -978,17 +978,11 @@ class KubernetesAgent(
             scratch_dir = self.local_config["container"]["scratch-root"] / str(kernel_id)
             await loop.run_in_executor(None, shutil.rmtree, str(scratch_dir))
 
-    async def create_overlay_network(self, network_name: str) -> None:
-        return await super().create_overlay_network(network_name)
-
-    async def destroy_overlay_network(self, network_name: str) -> None:
-        return await super().destroy_overlay_network(network_name)
-
     async def create_local_network(self, network_name: str) -> None:
-        return await super().create_local_network(network_name)
+        raise NotImplementedError
 
     async def destroy_local_network(self, network_name: str) -> None:
-        return await super().destroy_local_network(network_name)
+        raise NotImplementedError
 
     async def restart_kernel__load_config(
         self,

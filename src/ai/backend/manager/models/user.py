@@ -16,6 +16,7 @@ from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
@@ -25,6 +26,7 @@ from ai.backend.common.types import RedisConnectionInfo
 
 from ..api.exceptions import VFolderOperationFailed
 from .base import (
+    Base,
     EnumValueType,
     IDColumn,
     IPColumn,
@@ -32,7 +34,7 @@ from .base import (
     PaginatedList,
     batch_multiresult,
     batch_result,
-    metadata,
+    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -44,11 +46,12 @@ from .storage import StorageSessionManager
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__file__))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 __all__: Sequence[str] = (
     "users",
+    "UserRow",
     "User",
     "UserList",
     "UserGroup",
@@ -104,7 +107,7 @@ INACTIVE_USER_STATUSES = (
 
 users = sa.Table(
     "users",
-    metadata,
+    mapper_registry.metadata,
     IDColumn("uuid"),
     sa.Column("username", sa.String(length=64), unique=True),
     sa.Column("email", sa.String(length=64), index=True, nullable=False, unique=True),
@@ -127,6 +130,13 @@ users = sa.Table(
     sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
     sa.Column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True),
 )
+
+
+class UserRow(Base):
+    __table__ = users
+    sessions = relationship("SessionRow", back_populates="user")
+    domain = relationship("DomainRow", back_populates="users")
+    groups = relationship("AssocGroupUserRow", back_populates="user")
 
 
 class UserGroup(graphene.ObjectType):

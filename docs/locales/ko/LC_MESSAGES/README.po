@@ -137,7 +137,7 @@ msgid "## Advanced Settings"
 msgstr ""
 
 #: ../../README.md:74 d97995e9d6574804b95627bde6f0cbe6
-msgid "### Managing the hierachy of toctree (Table of Contents) of documentation"
+msgid "### Managing the hierarchy of toctree (Table of Contents) of documentation"
 msgstr ""
 
 #: ../../README.md:76 99c7df1fb5934893be0389eab5d27dc4

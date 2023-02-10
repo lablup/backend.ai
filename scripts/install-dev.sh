@@ -382,14 +382,23 @@ set_brew_python_build_flags() {
   local _prefix_gdbm="$(brew --prefix gdbm)"
   local _prefix_tcltk="$(brew --prefix tcl-tk)"
   local _prefix_xz="$(brew --prefix xz)"
-  local _prefix_snappy="$(brew --prefix snappy)"
   local _prefix_libffi="$(brew --prefix libffi)"
   local _prefix_protobuf="$(brew --prefix protobuf)"
-  export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_snappy}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
-  export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_snappy}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
+  export CFLAGS="-I${_prefix_openssl}/include -I${_prefix_sqlite3}/include -I${_prefix_readline}/include -I${_prefix_zlib}/include -I${_prefix_gdbm}/include -I${_prefix_tcltk}/include -I${_prefix_xz}/include -I${_prefix_libffi}/include -I${_prefix_protobuf}/include"
+  export LDFLAGS="-L${_prefix_openssl}/lib -L${_prefix_sqlite3}/lib -L${_prefix_readline}/lib -L${_prefix_zlib}/lib -L${_prefix_gdbm}/lib -L${_prefix_tcltk}/lib -L${_prefix_xz}/lib -L${_prefix_libffi}/lib -L${_prefix_protobuf}/lib"
 }
 
 install_python() {
+  if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
+    local pants_python_version=$(pyenv latest -q '3.9')  # get the latest 3.9 from all installed versions
+    if [ -z "$pants_python_version" ]; then
+      pants_python_version=$(pyenv latest -q -k '3.9')  # get the latest 3.9 from all installable versions
+      show_info "Installing Python ${pants_python_version} for Pants to run ..."
+      pyenv install "${pants_python_version}"
+    else
+      echo "✓ Python ${pants_python_version} as the Pants runtime is already installed."
+    fi
+  fi
   if [ -z "$(pyenv versions | grep -E "^\\*?[[:space:]]+${PYTHON_VERSION//./\\.}([[:blank:]]+.*)?$")" ]; then
     if [ "$DISTRO" = "Darwin" ]; then
       export PYTHON_CONFIGURE_OPTS="--enable-framework --with-tcl-tk"
@@ -411,7 +420,7 @@ install_python() {
       exit 1
     fi
   else
-    echo "${PYTHON_VERSION} is already installed."
+    echo "✓ Python ${PYTHON_VERSION} as the Backend.AI runtime is already installed."
   fi
 }
 
@@ -465,7 +474,7 @@ check_python() {
 }
 
 search_pants_python_from_pyenv() {
-  local _PYENV_PYVER=$(pyenv versions --bare | grep '^3\.9\.' | grep -v '/envs/' | sort -t. -k1,1r -k 2,2nr -k 3,3nr | head -n 1)
+  local _PYENV_PYVER=$(pyenv latest -q '3.9')
   if [ -z "$_PYENV_PYVER" ]; then
     >&2 echo "No Python 3.9 available via pyenv!"
     >&2 echo "Please install Python 3.9 using pyenv and try again."
@@ -477,46 +486,16 @@ search_pants_python_from_pyenv() {
 }
 
 bootstrap_pants() {
-  set -e
   mkdir -p .tmp
-  if [ -f '.pants.env' -a -f './pants-local' ]; then
-    echo "It seems that you have an already locally bootstrapped Pants."
-    echo "The installer will keep using it."
-    echo "If you want to reset it, delete ./.pants.env and ./pants-local files."
-    ./pants-local version
-    PANTS="./pants-local"
-    return
-  fi
   set +e
-  if [ "$(uname -m)" = "arm64" -a "$DISTRO" = "Darwin" ]; then
-    # In macOS with Apple Silicon, let Pants use Python 3.9 from pyenv
-    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-    echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
-  elif [ "$(uname -m)" = "aarch64" ]; then
-    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-    echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
-  fi
+  local _PYENV_PYVER=$(search_pants_python_from_pyenv)
+  echo "export PYTHON=\$(pyenv prefix $_PYENV_PYVER)/bin/python" > "$ROOT_PATH/.pants.bootstrap"
   PANTS="./pants"
   ./pants version
   if [ $? -eq 1 ]; then
     # If we can't find the prebuilt Pants package, then try the source installation.
-    show_info "Downloading and building Pants for the current setup"
-    local _PYENV_PYVER=$(search_pants_python_from_pyenv)
-    # In most cases, we won't need to modify the source code of pants.
-    echo "ENABLE_PANTSD=true" > "$ROOT_PATH/.pants.env"
-    echo "PY=\$(pyenv prefix $_PYENV_PYVER)/bin/python" >> "$ROOT_PATH/.pants.env"
-    if [ -d tools/pants-src ]; then
-      rm -rf tools/pants-src
-    fi
-    local PANTS_CLONE_VERSION="release_${PANTS_VERSION}"
-    set -e
-    git -c advice.detachedHead=false clone --branch=$PANTS_CLONE_VERSION --depth=1 https://github.com/pantsbuild/pants tools/pants-src
-    cd tools/pants-src
-    local arch_name=$(uname -p)
-    cd ../..
-    ln -s tools/pants-local
-    ./pants-local version
-    PANTS="./pants-local"
+    show_error "Cannot proceed the installation because Pants is not available for your platform!"
+    exit 1
   fi
   set +e
 }
@@ -602,15 +581,6 @@ if [ $ENABLE_CUDA -eq 1 ] && [ $ENABLE_CUDA_MOCK -eq 1 ]; then
   exit 1
 fi
 
-check_snappy() {
-  pip download python-snappy
-  local pkgfile=$(ls | grep snappy)
-  if [[ $pkgfile =~ .*\.tar.gz ]]; then
-    # source build is required!
-    install_system_pkg "libsnappy-dev" "snappy-devel" "snappy"
-  fi
-  rm -f $pkgfile
-}
 read -r -d '' pyenv_init_script <<"EOS"
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
@@ -675,8 +645,16 @@ setup_environment() {
   show_info "Using the current working-copy directory as the installation path..."
 
   show_info "Creating the unified virtualenv for IDEs..."
-  check_snappy
-  $PANTS export '::'
+  $PANTS export \
+    --resolve=python-default \
+    --resolve=python-kernel \
+    --resolve=pants-plugins \
+    --resolve=flake8 \
+    --resolve=mypy \
+    --resolve=isort \
+    --resolve=black
+  # NOTE: Some resolves like pytest are not needed to be exported at this point
+  # because pants will generate temporary resolves when actually running the test cases.
 
   # Install postgresql, etcd packages via docker
   show_info "Creating docker compose configuration file for \"halfstack\"..."
@@ -691,6 +669,7 @@ setup_environment() {
   sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/postgres-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
+  mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" pull
 
   show_info "Pre-pulling frequently used kernel images..."
@@ -759,6 +738,7 @@ configure_backendai() {
   sed_inplace "s/^purity/# purity/" ./storage-proxy.toml
   sed_inplace "s/^netapp_/# netapp_/" ./storage-proxy.toml
   sed_inplace "s/^weka_/# weka_/" ./storage-proxy.toml
+  sed_inplace "s/^gpfs_/# gpfs_/" ./storage-proxy.toml
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
@@ -777,6 +757,7 @@ configure_backendai() {
   # configure tester
   echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-admin-api.sh" > ./env-tester-admin.sh
   echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user-api.sh" > ./env-tester-user.sh
+  echo "export BACKENDAI_TEST_CLIENT_ENV=${PWD}/env-local-user2-api.sh" > ./env-tester-user2.sh
 
   if [ "${CODESPACES}" = "true" ]; then
     $docker_sudo docker stop $($docker_sudo docker ps -q)
@@ -864,6 +845,14 @@ configure_backendai() {
   echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user@lablup.com") | .secret_key')" >> "${CLIENT_USER_CONF_FOR_API}"
   echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER_CONF_FOR_API}"
   chmod +x "${CLIENT_USER_CONF_FOR_API}"
+  CLIENT_USER2_CONF_FOR_API="env-local-user2-api.sh"
+  CLIENT_USER2_CONF_FOR_SESSION="env-local-user2-session.sh"
+  echo "# Directly access to the manager using API keypair (user2)" > "${CLIENT_USER2_CONF_FOR_API}"
+  echo "export BACKEND_ENDPOINT=http://127.0.0.1:${MANAGER_PORT}/" >> "${CLIENT_USER2_CONF_FOR_API}"
+  echo "export BACKEND_ACCESS_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user2@lablup.com") | .access_key')" >> "${CLIENT_USER2_CONF_FOR_API}"
+  echo "export BACKEND_SECRET_KEY=$(cat fixtures/manager/example-keypairs.json | jq -r '.keypairs[] | select(.user_id=="user2@lablup.com") | .secret_key')" >> "${CLIENT_USER2_CONF_FOR_API}"
+  echo "export BACKEND_ENDPOINT_TYPE=api" >> "${CLIENT_USER2_CONF_FOR_API}"
+  chmod +x "${CLIENT_USER2_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server a using cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
