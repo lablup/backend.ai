@@ -225,7 +225,7 @@ def list_shared_vfolders():
                 print("- Status: {0}".format(_result["status"]))
                 print("- Permission: {0}".format(_result["perm"]))
                 print("- Folder Type: {0}".format(_result["type"]))
-                shared_to = _result.get("shared_to", [])
+                shared_to = _result.get("shared_to", {})
                 if shared_to:
                     print("- Shared to:")
                     for k, v in shared_to.items():
@@ -258,7 +258,7 @@ def shared_vfolder_info(vfolder_id):
                 print("- Status: {0}".format(_result["status"]))
                 print("- Permission: {0}".format(_result["perm"]))
                 print("- Folder Type: {0}".format(_result["type"]))
-                shared_to = _result.get("shared_to", [])
+                shared_to = _result.get("shared_to", {})
                 if shared_to:
                     print("- Shared to:")
                     for k, v in shared_to.items():
