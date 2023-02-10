@@ -265,10 +265,13 @@ class WekaAPIClient:
                 f"/fileSystems/{fs_uid}/quota/{inode_id}",
             )
             data = await response.json()
-        if len(data["data"].keys()) == 0:
+        if data.get("message") == "Directory has no quota" or len(data["data"].keys()) == 0:
             raise WekaNotFoundError
-        quota_id = data["data"].keys()[0]
-        return WekaQuota.from_json(quota_id, data["data"][quota_id])
+        if "inode_id" in data["data"]:
+            return WekaQuota.from_json(None, data["data"])
+        else:
+            quota_id = list(data["data"].keys())[0]
+            return WekaQuota.from_json(quota_id, data["data"][quota_id])
 
     @error_handler
     async def set_quota(
