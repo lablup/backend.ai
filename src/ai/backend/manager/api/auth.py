@@ -26,7 +26,7 @@ from ai.backend.common.types import ReadableCIDR
 from ..models import keypair_resource_policies, keypairs, users
 from ..models.group import association_groups_users, groups
 from ..models.keypair import generate_keypair as _gen_keypair
-from ..models.keypair import generate_ssh_keypair
+from ..models.keypair import generate_ssh_keypair as _gen_ssh_keypair
 from ..models.user import INACTIVE_USER_STATUSES, UserRole, UserStatus, check_credential
 from ..models.utils import execute_with_retry
 from .exceptions import (
@@ -974,7 +974,7 @@ async def get_ssh_keypair(request: web.Request) -> web.Response:
 
 
 @auth_required
-async def refresh_ssh_keypair(request: web.Request) -> web.Response:
+async def generate_ssh_keypair(request: web.Request) -> web.Response:
     domain_name = request["user"]["domain_name"]
     access_key = request["keypair"]["access_key"]
     log_fmt = "AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})"
@@ -982,7 +982,7 @@ async def refresh_ssh_keypair(request: web.Request) -> web.Response:
     log.info(log_fmt, *log_args)
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
-        pubkey, privkey = generate_ssh_keypair()
+        pubkey, privkey = _gen_ssh_keypair()
         data = {
             "ssh_public_key": pubkey,
             "ssh_private_key": privkey,
@@ -1001,7 +1001,7 @@ async def refresh_ssh_keypair(request: web.Request) -> web.Response:
         }
     )
 )
-async def save_ssh_keypair(request: web.Request, params: Any) -> web.Response:
+async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     access_key = request["keypair"]["access_key"]
     pubkey = params["pubkey"]
@@ -1040,6 +1040,6 @@ def create_app(
     cors.add(app.router.add_route("POST", "/update-password", update_password))
     cors.add(app.router.add_route("POST", "/update-full-name", update_full_name))
     cors.add(app.router.add_route("GET", "/ssh-keypair", get_ssh_keypair))
-    cors.add(app.router.add_route("PATCH", "/ssh-keypair", refresh_ssh_keypair))
-    cors.add(app.router.add_route("POST", "/ssh-keypair", save_ssh_keypair))
+    cors.add(app.router.add_route("PATCH", "/ssh-keypair", generate_ssh_keypair))
+    cors.add(app.router.add_route("POST", "/ssh-keypair", upload_ssh_keypair))
     return app, [auth_middleware]
