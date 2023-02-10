@@ -40,7 +40,7 @@ from .base import (
     simple_db_mutate_returning_item,
 )
 from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser
+from .minilang.queryfilter import QueryFilterParser, get_enum_val
 from .storage import StorageSessionManager
 
 if TYPE_CHECKING:
@@ -271,12 +271,12 @@ class User(graphene.ObjectType):
         "full_name": ("full_name", None),
         "description": ("description", None),
         "is_active": ("is_active", None),
-        "status": ("status", lambda s: UserStatus[s]),
+        "status": ("status", lambda s: get_enum_val(UserStatus, s)),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
-        "role": ("role", lambda s: UserRole[s]),
+        "role": ("role", lambda s: get_enum_val(UserRole, s)),
         "allowed_client_ip": ("allowed_client_ip", None),
     }
 

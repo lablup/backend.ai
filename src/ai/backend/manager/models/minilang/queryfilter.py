@@ -1,4 +1,5 @@
-from typing import Any, Mapping, Union
+from enum import Enum
+from typing import Any, Mapping, Type, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
@@ -46,6 +47,13 @@ _parser = Lark(
     parser="lalr",
     maybe_placeholders=False,
 )
+
+
+def get_enum_val(enum_cls: Type[Enum], value: str) -> Enum:
+    try:
+        return enum_cls[value]
+    except KeyError:
+        return enum_cls(value)
 
 
 class QueryFilterTransformer(Transformer):
