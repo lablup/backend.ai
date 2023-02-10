@@ -26,9 +26,74 @@ def vfolder() -> None:
 
 def _list_cmd(docs: str = None):
     @pass_ctx_obj
-    @click.option("-g", "--group", type=str, default=None, help="Filter by group ID.")
-    @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
-    @click.option("--order", default=None, help="Set the query ordering expression.")
+    @click.option(
+        "-g",
+        "--group",
+        type=str,
+        default=None,
+        help="""\b
+        Filter by group ID.
+
+        \b
+        EXAMPLE
+            --group "$(backend.ai admin group list | grep 'example-group-name' | awk '{print $1}')"
+
+        \b
+        """,
+    )
+    @click.option(
+        "--filter",
+        "filter_",
+        default=None,
+        help="""\b
+        Set the query filter expression.
+
+        \b
+        COLUMNS
+            host, name, created_at, creator,
+            ownership_type (UESR, GROUP),
+            status (READY, PERFORMING, CLONING, DELETING, MOUNTED),
+            permission (READ_ONLY, READ_WRITE, RW_DELETE, OWNER_PERM)
+
+        \b
+        OPERATORS
+            Binary Operators: ==, !=, <, <=, >, >=, is, isnot, like, ilike(case-insensitive), in, contains
+            Condition Operators: &, |
+            Special Symbol: % (wildcard for like and ilike operators)
+
+        \b
+        EXAMPLE QUERIES
+            --filter 'status == "READY" & permission in ["READ_ONLY", "READ_WRITE"]'
+            --filter 'created_at >= "2021-01-01" & created_at < "2023-01-01"'
+            --filter 'creator ilike "%@example.com"'
+
+        \b
+        """,
+    )
+    @click.option(
+        "--order",
+        default=None,
+        help="""\b
+        Set the query ordering expression.
+
+        \b
+        COLUMNS
+            host, name, created_at, creator, ownership_type, status, permission
+
+        \b
+        OPTIONS
+            ascending order (default): (+)column_name
+            descending order: -column_name
+
+        \b
+        EXAMPLE
+            --order 'host'
+            --order '+host'
+            --order '-created_at'
+
+        \b
+        """,
+    )
     @click.option("--offset", default=0, help="The index of the current page start for pagination.")
     @click.option("--limit", type=int, default=None, help="The page size for pagination.")
     def list(ctx: CLIContext, group, filter_, order, offset, limit) -> None:
