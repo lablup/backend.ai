@@ -6,7 +6,6 @@ from pathlib import Path
 import click
 import humanize
 from tabulate import tabulate
-from tqdm import tqdm
 
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.main import main
@@ -17,7 +16,7 @@ from ai.backend.client.session import Session
 from ..compat import asyncio_run
 from ..session import AsyncSession
 from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
-from .pretty import print_done, print_error, print_fail, print_info, print_wait, print_warn
+from .pretty import Spinner, print_done, print_error, print_fail, print_info, print_wait, print_warn
 
 
 @main.group()
@@ -712,23 +711,19 @@ def clone(name, target_name, target_host, usage_mode, permission):
             sys.exit(ExitCode.FAILURE)
 
     async def clone_vfolder_tracker(bgtask_id):
-        print_wait(
-            "Cloning the vfolder... "
-            "(This may take a while depending on its size and number of files!)",
-        )
         async with AsyncSession() as session:
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
                 completion_msg_func = lambda: print_done("Cloning the vfolder is complete.")
                 async with bgtask.listen_events() as response:
-                    # TODO: get the unit of progress from response
-                    with tqdm(unit="bytes", disable=True) as pbar:
+                    async with Spinner(
+                        "Cloning the vfolder... "
+                        "(This may take a while depending on its size and number of files!)",
+                    ):
                         async for ev in response:
                             data = json.loads(ev.data)
                             if ev.event == "bgtask_updated":
-                                pbar.total = data["total_progress"]
-                                pbar.write(data["message"])
-                                pbar.update(data["current_progress"] - pbar.n)
+                                pass  # currently, we don't show any progress
                             elif ev.event == "bgtask_failed":
                                 error_msg = data["message"]
                                 completion_msg_func = lambda: print_fail(
