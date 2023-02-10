@@ -2461,7 +2461,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["vfolder_id", "vfolderId"]): tx.UUID,
+            tx.AliasedKey(["vfolder_id", "vfolderId"], default=None): tx.UUID | t.Null,
         }
     ),
 )
