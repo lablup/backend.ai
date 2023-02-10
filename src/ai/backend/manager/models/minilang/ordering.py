@@ -42,7 +42,7 @@ class QueryOrderTransformer(Transformer):
                 if func is not None:
                     col = func(col_value)
                 else:
-                    col = self._sa_table.c[self._column_map[col_name]]
+                    col = self._sa_table.c[col_value]
             else:
                 col = self._sa_table.c[col_name]
             return col
