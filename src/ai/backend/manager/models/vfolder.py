@@ -766,7 +766,7 @@ async def delete_vfolder_by_ids(
 
     await execute_with_retry(_update_vfolder_status)
 
-    async def _request_delete():
+    async def _delete():
         for folder_id, host_name in vfolder_infos:
             proxy_name, volume_name = storage_manager.split_host(host_name)
             try:
@@ -783,12 +783,13 @@ async def delete_vfolder_by_ids(
             except aiohttp.ClientResponseError:
                 raise VFolderOperationFailed(extra_msg=str(folder_id))
 
-    storage_ptask_group.create_task(_request_delete())
+        async def _delete_row() -> None:
+            await db_session.execute(sa.delete(vfolders).where(cond))
 
-    async def _delete_vfolder() -> None:
-        await db_session.execute(sa.delete(vfolders).where(cond))
+        await execute_with_retry(_delete_row)
 
-    await execute_with_retry(_delete_vfolder)
+    storage_ptask_group.create_task(_delete())
+
     return vfolder_info_len
 
 
