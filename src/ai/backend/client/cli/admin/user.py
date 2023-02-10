@@ -65,15 +65,81 @@ def info(ctx: CLIContext, email: str) -> None:
     default=None,
     help="Filter users in a specific state (active, inactive, deleted, before-verification).",
 )
-@click.option("-g", "--group", type=str, default=None, help="Filter by group ID.")
-@click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
-@click.option("--order", default=None, help="Set the query ordering expression.")
+@click.option(
+    "-g",
+    "--group",
+    type=str,
+    default=None,
+    help="""\b
+    Filter by group ID.
+
+    \b
+    EXAMPLE
+        --group "$(backend.ai admin group list | grep 'example-group-name' | awk '{print $1}')"
+
+    \b
+    """,
+)
+@click.option(
+    "--filter",
+    "filter_",
+    default=None,
+    help="""\b
+    Set the query filter expression.
+
+    \b
+    COLUMNS
+        uuid, username, role, email, full_name, need_password_change,
+        status, status_info, created_at, modified_at, domain_name, allowed_client_ip
+
+    \b
+    OPERATORS
+        Binary Operators: ==, !=, <, <=, >, >=, is, isnot, like, ilike(case-insensitive), in, contains
+        Condition Operators: &, |
+        Special Symbol: % (wildcard for like and ilike operators)
+
+    \b
+    EXAMPLE QUERIES
+        --filter 'status == "ACTIVE" & role in ["ADMIN", "SUPERADMIN"]'
+        --filter 'created_at >= "2021-01-01" & created_at < "2023-01-01"'
+        --filter 'email ilike "%@example.com"'
+
+    \b
+    """,
+)
+@click.option(
+    "--order",
+    default=None,
+    help="""\b
+    Set the query ordering expression.
+
+    \b
+    COLUMNS
+        uuid, username, role, email, full_name, need_password_change,
+        status, status_info, created_at, modified_at, domain_name
+
+    \b
+    OPTIONS
+        ascending order (default): (+)column_name
+        descending order: -column_name
+
+    \b
+    EXAMPLE
+        --order 'uuid'
+        --order '+uuid'
+        --order '-created_at'
+
+    \b
+    """,
+)
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
 def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
     """
     List users.
     (admin privilege required)
+
+
     """
     fields = [
         user_fields["uuid"],
