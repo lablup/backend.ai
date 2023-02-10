@@ -268,7 +268,7 @@ class WekaAPIClient:
         if data.get("message") == "Directory has no quota" or len(data["data"].keys()) == 0:
             raise WekaNotFoundError
         if "inode_id" in data["data"]:
-            return WekaQuota.from_json(None, data["data"])
+            return WekaQuota.from_json("", data["data"])
         else:
             quota_id = list(data["data"].keys())[0]
             return WekaQuota.from_json(quota_id, data["data"][quota_id])
