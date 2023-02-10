@@ -979,6 +979,34 @@ async def refresh_ssh_keypair(request: web.Request) -> web.Response:
     return web.json_response(data, status=200)
 
 
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("pubkey"): t.String,
+            t.Key("privkey"): t.String,
+        }
+    )
+)
+async def save_ssh_keypair(request: web.Request, params: Any) -> web.Response:
+    domain_name = request["user"]["domain_name"]
+    access_key = request["keypair"]["access_key"]
+    pubkey = params["pubkey"]
+    privkey = params["privkey"]
+    log_fmt = "AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})"
+    log_args = (domain_name, access_key)
+    log.info(log_fmt, *log_args)
+    root_ctx: RootContext = request.app["_root.context"]
+    async with root_ctx.db.begin() as conn:
+        data = {
+            "ssh_public_key": pubkey,
+            "ssh_private_key": privkey,
+        }
+        query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
+        await conn.execute(query)
+    return web.json_response(data, status=200)
+
+
 def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
@@ -1000,4 +1028,5 @@ def create_app(
     cors.add(app.router.add_route("POST", "/update-full-name", update_full_name))
     cors.add(app.router.add_route("GET", "/ssh-keypair", get_ssh_keypair))
     cors.add(app.router.add_route("PATCH", "/ssh-keypair", refresh_ssh_keypair))
+    cors.add(app.router.add_route("POST", "/ssh-keypair", save_ssh_keypair))
     return app, [auth_middleware]
