@@ -46,7 +46,7 @@ from .storage import StorageSessionManager
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__file__))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 __all__: Sequence[str] = (

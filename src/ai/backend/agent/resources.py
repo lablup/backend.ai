@@ -56,7 +56,7 @@ if TYPE_CHECKING:
 
     from aiofiles.threadpool.text import AsyncTextIOWrapper
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.resources"))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 

@@ -54,7 +54,7 @@ __all__ = (
     "Measurement",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.stats"))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 def check_cgroup_available():
