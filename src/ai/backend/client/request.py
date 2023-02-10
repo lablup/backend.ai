@@ -40,7 +40,7 @@ from .session import AsyncSession, BaseSession
 from .session import Session as SyncSession
 from .session import api_session
 
-log = logging.getLogger("ai.backend.client.request")
+log = logging.getLogger(__name__)
 
 __all__ = [
     "Request",
