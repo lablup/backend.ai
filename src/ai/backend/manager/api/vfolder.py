@@ -2417,6 +2417,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
             raise InvalidAPIParameters
 
     # Start the clone operation as a background task.
+    # NOTE: Tracking the progress from the storage-proxy is not supported yet. (See #1033)
     async def _clone_bgtask(reporter: ProgressReporter) -> None:
         async with root_ctx.storage_manager.request(
             source_folder_host,

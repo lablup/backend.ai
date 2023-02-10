@@ -710,6 +710,7 @@ def clone(name, target_name, target_host, usage_mode, permission):
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
+    # NOTE: Tracking the progress from the storage-proxy is not supported yet. (See #1033)
     async def clone_vfolder_tracker(bgtask_id):
         async with AsyncSession() as session:
             try:
