@@ -41,6 +41,7 @@ from ..models import (
     KernelStatus,
     UserRole,
     VFolderAccessStatus,
+    VFolderDeletionInfo,
     VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -629,7 +630,7 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             db_sess,
             root_ctx.storage_manager,
             app_ctx.storage_ptask_group,
-            vfolder_infos=[(folder_id, folder_host)],
+            vfolder_infos=[VFolderDeletionInfo(folder_id, folder_host)],
         )
     return web.Response(status=204)
 
@@ -2162,7 +2163,7 @@ async def delete_by_name(request: web.Request) -> web.Response:
             db_sess,
             root_ctx.storage_manager,
             app_ctx.storage_ptask_group,
-            vfolder_infos=[(entry["id"], folder_host)],
+            vfolder_infos=[VFolderDeletionInfo(entry["id"], folder_host)],
         )
     return web.Response(status=204)
 

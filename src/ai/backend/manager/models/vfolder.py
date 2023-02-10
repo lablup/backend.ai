@@ -4,7 +4,7 @@ import enum
 import os.path
 import uuid
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, List, Mapping, NamedTuple, Optional, Sequence
 
 import aiohttp
 import aiotools
@@ -53,6 +53,7 @@ __all__: Sequence[str] = (
     "VFolderPermissionValidator",
     "VFolderOperationStatus",
     "VFolderAccessStatus",
+    "VFolderDeletionInfo",
     "query_accessible_vfolders",
     "delete_vfolder_by_ids",
     "get_allowed_vfolder_hosts_by_group",
@@ -138,6 +139,11 @@ class VFolderAccessStatus(str, enum.Enum):
     READABLE = "readable"
     UPDATABLE = "updatable"
     DELETABLE = "deletable"
+
+
+class VFolderDeletionInfo(NamedTuple):
+    vfolder_id: uuid.UUID
+    host: str
 
 
 vfolders = sa.Table(
@@ -744,7 +750,7 @@ async def delete_vfolder_by_ids(
     storage_manager: StorageSessionManager,
     storage_ptask_group: aiotools.PersistentTaskGroup,
     *,
-    vfolder_infos: Sequence[tuple[uuid.UUID, str]],  # id, host
+    vfolder_infos: Sequence[VFolderDeletionInfo],
 ) -> int:
     vfolder_info_len = len(vfolder_infos)
     vfolder_ids = tuple(vf_id for vf_id, _ in vfolder_infos)

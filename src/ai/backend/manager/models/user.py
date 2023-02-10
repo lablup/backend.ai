@@ -965,7 +965,7 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import delete_vfolder_by_ids, vfolder_permissions, vfolders
+        from . import VFolderDeletionInfo, delete_vfolder_by_ids, vfolder_permissions, vfolders
 
         await conn.execute(
             vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
@@ -983,7 +983,7 @@ class PurgeUser(graphene.Mutation):
                 SASession(conn),
                 storage_manager,
                 storage_ptask_group,
-                vfolder_infos=[(vf["id"], vf["host"]) for vf in target_vfs],
+                vfolder_infos=[VFolderDeletionInfo(vf["id"], vf["host"]) for vf in target_vfs],
             )
         except VFolderOperationFailed as e:
             log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
