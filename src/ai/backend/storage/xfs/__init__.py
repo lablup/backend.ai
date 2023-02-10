@@ -3,12 +3,13 @@ import logging
 import os
 from pathlib import Path, PurePosixPath
 from tempfile import NamedTemporaryFile
-from typing import Dict, List
+from typing import Dict, FrozenSet, List
 from uuid import UUID
 
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize
+from ai.backend.storage.abc import CAP_FAST_SCAN, CAP_FAST_SIZE, CAP_QUOTA, CAP_VFOLDER
 
 from ..exception import ExecutionError, VFolderCreationError
 from ..types import VFolderCreationOptions, VFolderUsage
@@ -144,6 +145,9 @@ class XfsVolume(BaseVolume):
         self.gid = gid if gid is not None else os.getgid()
         self.registry = XfsProjectRegistry()
         await self.registry.init(self)
+
+    async def get_capabilities(self) -> FrozenSet[str]:
+        return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_FAST_SCAN, CAP_FAST_SIZE])
 
     # ----- volume opeartions -----
     async def create_vfolder(

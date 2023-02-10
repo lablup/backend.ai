@@ -60,7 +60,6 @@ class WekaVolume(BaseVolume):
 
     async def get_capabilities(self) -> FrozenSet[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC, CAP_FAST_SIZE])
-        # return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
 
     async def get_hwinfo(self) -> HardwareMetadata:
         assert self._fs_uid is not None
