@@ -566,6 +566,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                     "name": entry["name"],
                     "id": entry["id"].hex,
                     "host": entry["host"],
+                    "status": entry["status"],
                     "usage_mode": entry["usage_mode"].value,
                     "created_at": str(entry["created_at"]),
                     "is_owner": entry["is_owner"],
@@ -797,6 +798,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "name": row["name"],
         "id": row["id"].hex,
         "host": row["host"],
+        "status": row["status"],
         "numFiles": usage["file_count"],  # legacy
         "num_files": usage["file_count"],
         "used_bytes": usage["used_bytes"],  # added in v20.09
@@ -2439,7 +2441,7 @@ async def clone(request: web.Request, params: Any, row: VFolderRow) -> web.Respo
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["vfolder_id", "vfolderId"]): tx.UUID,
+            tx.AliasedKey(["vfolder_id", "vfolderId"], default=None): tx.UUID | t.Null,
         }
     ),
 )
@@ -2467,6 +2469,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
                 vfolders.c.id,
                 vfolders.c.name,
                 vfolders.c.group,
+                vfolders.c.status,
                 vfolders.c.user.label("vfolder_user"),
                 users.c.email,
             ]
@@ -2483,6 +2486,7 @@ async def list_shared_vfolders(request: web.Request, params: Any) -> web.Respons
             {
                 "vfolder_id": str(shared.id),
                 "vfolder_name": str(shared.name),
+                "status": shared.status.value,
                 "owner": str(owner),
                 "type": folder_type,
                 "shared_to": {

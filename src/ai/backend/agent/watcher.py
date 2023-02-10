@@ -23,7 +23,7 @@ from ai.backend.common.utils import Fstab
 
 from . import __version__ as VERSION
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.watcher"))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 shutdown_enabled = False
 
