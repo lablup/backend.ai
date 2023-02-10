@@ -7,7 +7,7 @@ import logging
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path
-from typing import Awaitable, Callable, Iterator, List
+from typing import Awaitable, Callable, Iterator, List, cast
 from uuid import UUID
 
 import attr
@@ -242,7 +242,7 @@ async def get_performance_metric(request: web.Request) -> web.Response:
             metric = await volume.get_performance_metric()
             return web.json_response(
                 {
-                    "metric": attr.asdict(metric),
+                    "metric": attr.asdict(cast(attr.AttrsInstance, metric)),
                 },
             )
 
