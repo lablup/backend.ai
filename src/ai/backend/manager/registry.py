@@ -1441,7 +1441,9 @@ class AgentRegistry:
                     await db_sess.execute(update_query)
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
-        concurrency_used_per_key: MutableMapping[str, int] = defaultdict(lambda: 0)
+        concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
+            set
+        )  # key: access_key, value: set of session_id
         occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
             lambda: ResourceSlot({"cpu": 0, "mem": 0})
         )
@@ -1458,12 +1460,19 @@ class AgentRegistry:
                 async for row in (await conn.stream(query)):
                     occupied_slots_per_agent[row.agent] += ResourceSlot(row.occupied_slots)
                 query = (
-                    sa.select([kernels.c.access_key, kernels.c.agent, kernels.c.occupied_slots])
+                    sa.select(
+                        [
+                            kernels.c.access_key,
+                            kernels.c.session_id,
+                            kernels.c.agent,
+                            kernels.c.occupied_slots,
+                        ]
+                    )
                     .where(kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                     .order_by(sa.asc(kernels.c.access_key))
                 )
                 async for row in (await conn.stream(query)):
-                    concurrency_used_per_key[row.access_key] += 1
+                    concurrency_used_per_key[row.access_key].add(row.session_id)
 
                 if len(occupied_slots_per_agent) > 0:
                     # Update occupied_slots for agents with running containers.
@@ -1495,7 +1504,8 @@ class AgentRegistry:
 
         async def _update(r: Redis):
             updates = {
-                f"{kp_key}.{k}": concurrency_used_per_key[k] for k in concurrency_used_per_key
+                f"{kp_key}.{ak}": len(session_ids)
+                for ak, session_ids in concurrency_used_per_key.items()
             }
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
@@ -1504,7 +1514,8 @@ class AgentRegistry:
             updates = {}
             keys = await r.keys(f"{kp_key}.*")
             for ak in keys:
-                usage = concurrency_used_per_key.get(ak, 0)
+                session_concurrency = concurrency_used_per_key.get(ak)
+                usage = len(session_concurrency) if session_concurrency is not None else 0
                 updates[f"{kp_key}.{ak}"] = usage
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
