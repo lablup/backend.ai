@@ -309,8 +309,12 @@ async def test_agg_str(session_info):
 
     # Delete test kernel data explicitly
     await conn.execute(
-        sa.delete(kernels).where(kernels.c.tag == test_data1 & kernels.c.session_id == session_id)
+        sa.delete(kernels).where(
+            (kernels.c.tag == test_data1) & (kernels.c.session_id == session_id)
+        )
     )
     await conn.execute(
-        sa.delete(kernels).where(kernels.c.tag == test_data2 & kernels.c.session_id == session_id)
+        sa.delete(kernels).where(
+            (kernels.c.tag == test_data2) & (kernels.c.session_id == session_id)
+        )
     )
