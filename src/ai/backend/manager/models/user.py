@@ -16,7 +16,6 @@ from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
@@ -43,6 +42,7 @@ from .base import (
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .storage import StorageSessionManager
+from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -857,7 +857,7 @@ class PurgeUser(graphene.Mutation):
                     target_user_uuid=graph_ctx.user["uuid"],
                     target_user_email=graph_ctx.user["email"],
                 )
-            await cls.delete_vfolders(conn, user_uuid, graph_ctx.storage_manager)
+            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, user_uuid)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
@@ -953,7 +953,7 @@ class PurgeUser(graphene.Mutation):
     @classmethod
     async def delete_vfolders(
         cls,
-        conn: SAConnection,
+        engine: ExtendedAsyncSAEngine,
         user_uuid: UUID,
         storage_manager: StorageSessionManager,
     ) -> int:
@@ -965,25 +965,26 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import VFolderDeletionInfo, delete_vfolder_by_ids, vfolder_permissions, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_removal, vfolder_permissions, vfolders
 
-        await conn.execute(
-            vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
-        )
-        result = await conn.execute(
-            sa.select([vfolders.c.id, vfolders.c.host])
-            .select_from(vfolders)
-            .where(vfolders.c.user == user_uuid),
-        )
-        target_vfs = result.fetchall()
+        async with engine.begin_session() as conn:
+            await conn.execute(
+                vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
+            )
+            result = await conn.execute(
+                sa.select([vfolders.c.id, vfolders.c.host])
+                .select_from(vfolders)
+                .where(vfolders.c.user == user_uuid),
+            )
+            target_vfs = result.fetchall()
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
         try:
-            deleted_count = await delete_vfolder_by_ids(
-                SASession(conn),
+            deleted_count = await initiate_vfolder_removal(
+                engine,
+                [VFolderDeletionInfo(vf["id"], vf["host"]) for vf in target_vfs],
                 storage_manager,
                 storage_ptask_group,
-                vfolder_infos=[VFolderDeletionInfo(vf["id"], vf["host"]) for vf in target_vfs],
             )
         except VFolderOperationFailed as e:
             log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)

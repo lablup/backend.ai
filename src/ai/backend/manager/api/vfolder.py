@@ -9,6 +9,7 @@ import stat
 import uuid
 from datetime import datetime
 from pathlib import Path
+from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -21,6 +22,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
+    Type,
 )
 
 import aiohttp
@@ -49,12 +51,12 @@ from ..models import (
     VFolderPermissionValidator,
     VFolderUsageMode,
     agents,
-    delete_vfolder_by_ids,
     ensure_host_permission_allowed,
     filter_host_allowed_permission,
     get_allowed_vfolder_hosts_by_group,
     get_allowed_vfolder_hosts_by_user,
     groups,
+    initiate_vfolder_removal,
     kernels,
     keypairs,
     query_accessible_vfolders,
@@ -627,11 +629,11 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
         )
     folder_id = uuid.UUID(params["id"])
     async with root_ctx.db.begin_session() as db_sess:
-        await delete_vfolder_by_ids(
+        await initiate_vfolder_removal(
             db_sess,
+            [VFolderDeletionInfo(folder_id, folder_host)],
             root_ctx.storage_manager,
             app_ctx.storage_ptask_group,
-            vfolder_infos=[VFolderDeletionInfo(folder_id, folder_host)],
         )
     return web.Response(status=204)
 
@@ -2160,13 +2162,12 @@ async def delete_by_name(request: web.Request) -> web.Response:
         if not entry["is_owner"] and entry["permission"] != VFolderPermission.RW_DELETE:
             raise InvalidAPIParameters("Cannot delete the vfolder that is not owned by myself.")
 
-    async with root_ctx.db.begin_session() as db_sess:
-        await delete_vfolder_by_ids(
-            db_sess,
-            root_ctx.storage_manager,
-            app_ctx.storage_ptask_group,
-            vfolder_infos=[VFolderDeletionInfo(entry["id"], folder_host)],
-        )
+    await initiate_vfolder_removal(
+        root_ctx.db,
+        [VFolderDeletionInfo(entry["id"], folder_host)],
+        root_ctx.storage_manager,
+        app_ctx.storage_ptask_group,
+    )
     return web.Response(status=204)
 
 
@@ -2956,6 +2957,14 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
     return web.json_response(resp, status=200)
 
 
+async def storage_task_exception_handler(
+    exc_type: Type[Exception],
+    exc_obj: Exception,
+    tb: TracebackType,
+):
+    log.exception("Error while removing vFolder", exc_info=exc_obj)
+
+
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
     database_ptask_group: aiotools.PersistentTaskGroup
@@ -2965,7 +2974,9 @@ class PrivateContext:
 async def init(app: web.Application) -> None:
     app_ctx: PrivateContext = app["folders.context"]
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
-    app_ctx.storage_ptask_group = aiotools.PersistentTaskGroup()
+    app_ctx.storage_ptask_group = aiotools.PersistentTaskGroup(
+        exception_handler=storage_task_exception_handler
+    )
 
 
 async def shutdown(app: web.Application) -> None:
