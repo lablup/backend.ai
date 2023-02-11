@@ -306,6 +306,7 @@ async def query_accessible_vfolders(
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
         vfolders.c.status,
+        vfolders.c.cur_size,
         # vfolders.c.permission,
         # users.c.email,
     ]
@@ -344,6 +345,7 @@ async def query_accessible_vfolders(
                     "unmanaged_path": row.vfolders_unmanaged_path,
                     "cloneable": row.vfolders_cloneable,
                     "status": row.vfolders_status,
+                    "cur_size": row.vfolders_cur_size,
                 }
             )
 
@@ -852,6 +854,7 @@ class VirtualFolder(graphene.ObjectType):
             # num_attached=row['num_attached'],
             cloneable=row["cloneable"],
             status=row["status"],
+            cur_size=row["cur_size"],
         )
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
@@ -881,6 +884,7 @@ class VirtualFolder(graphene.ObjectType):
         "last_used": ("vfolders_last_used", dtparse),
         "cloneable": ("vfolders_cloneable", None),
         "status": ("vfolders_status", lambda s: VFolderOperationStatus[s]),
+        "cur_size": ("vfolders_cur_size", None),
     }
 
     _queryorder_colmap = {
@@ -901,6 +905,7 @@ class VirtualFolder(graphene.ObjectType):
         "last_used": "vfolders_last_used",
         "cloneable": "vfolders_cloneable",
         "status": "vfolders_status",
+        "cur_size": "vfolders_cur_size",
     }
 
     @classmethod
