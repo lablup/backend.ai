@@ -11,11 +11,12 @@ from .exception import InvalidSubpathError, VFolderNotFoundError
 from .types import DirEntry, FSPerfMetric, FSUsage, VFolderCreationOptions, VFolderUsage
 
 # Available capabilities of a volume implementation
-CAP_VFOLDER: Final = "vfolder"
-CAP_VFHOST_QUOTA: Final = "vfhost-quota"
-CAP_METRIC: Final = "metric"
-CAP_QUOTA: Final = "quota"
-CAP_FAST_SCAN: Final = "fast-scan"
+CAP_VFOLDER: Final = "vfolder"  # ability to create vfolder
+CAP_VFHOST_QUOTA: Final = "vfhost-quota"  # ability to set quota per vFolder host
+CAP_METRIC: Final = "metric"  # ability to report disk related metrics
+CAP_QUOTA: Final = "quota"  # ability to set quota per vFolder
+CAP_FAST_SCAN: Final = "fast-scan"  # ability to scan number of files in vFolder fast (e.g. by API)
+CAP_FAST_SIZE: Final = "fast-size"  # ability to scan vFolder size fast (e.g. by API)
 
 
 class AbstractVolume(metaclass=ABCMeta):

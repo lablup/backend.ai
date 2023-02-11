@@ -968,6 +968,34 @@ async def get_usage(request: web.Request, params: Any) -> web.Response:
     return web.json_response(usage, status=200)
 
 
+@superadmin_required
+@server_status_required(READ_ALLOWED)
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("folder_host"): t.String,
+            t.Key("id"): tx.UUID,
+        }
+    )
+)
+async def get_used_bytes(request: web.Request, params: Any) -> web.Response:
+    await ensure_vfolder_status(request, VFolderAccessStatus.READABLE, folder_id=params["id"])
+    root_ctx: RootContext = request.app["_root.context"]
+    proxy_name, volume_name = root_ctx.storage_manager.split_host(params["folder_host"])
+    log.info("VFOLDER.GET_USED_BYTES (volume_name:{}, vf:{})", volume_name, params["id"])
+    async with root_ctx.storage_manager.request(
+        proxy_name,
+        "GET",
+        "folder/used-bytes",
+        json={
+            "volume": volume_name,
+            "vfid": str(params["id"]),
+        },
+    ) as (_, storage_resp):
+        usage = await storage_resp.json()
+    return web.json_response(usage, status=200)
+
+
 @auth_required
 @server_status_required(ALL_ALLOWED)
 @vfolder_permission_required(VFolderPermission.OWNER_PERM)
@@ -3012,4 +3040,5 @@ def create_app(default_cors_options):
     cors.add(add_route("GET", r"/_/quota", get_quota))
     cors.add(add_route("POST", r"/_/quota", update_quota))
     cors.add(add_route("GET", r"/_/usage", get_usage))
+    cors.add(add_route("GET", r"/_/used-bytes", get_used_bytes))
     return app, []
