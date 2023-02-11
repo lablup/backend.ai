@@ -861,10 +861,6 @@ class VirtualFolder(graphene.ObjectType):
         # TODO: measure on-the-fly
         return 0
 
-    async def resolve_cur_size(self, info: graphene.ResolveInfo) -> int:
-        # TODO: measure on-the-fly
-        return 0
-
     _queryfilter_fieldspec = {
         "id": ("vfolders_id", uuid.UUID),
         "host": ("vfolders_host", None),
@@ -884,7 +880,6 @@ class VirtualFolder(graphene.ObjectType):
         "last_used": ("vfolders_last_used", dtparse),
         "cloneable": ("vfolders_cloneable", None),
         "status": ("vfolders_status", lambda s: VFolderOperationStatus[s]),
-        "cur_size": ("vfolders_cur_size", None),
     }
 
     _queryorder_colmap = {
