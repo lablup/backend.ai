@@ -16,7 +16,7 @@ from typing import (
     overload,
 )
 
-import aiohttp
+import aiotools
 import graphene
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -44,7 +44,7 @@ from .base import (
 )
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserRole
-from .utils import execute_with_retry
+from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -561,7 +561,7 @@ class PurgeGroup(graphene.Mutation):
                 raise RuntimeError(
                     "Group has some active session. " "Terminate them first to proceed removal.",
                 )
-            await cls.delete_vfolders(conn, gid, graph_ctx.storage_manager)
+            await cls.delete_vfolders(graph_ctx.db, gid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, gid)
 
         delete_query = sa.delete(groups).where(groups.c.id == gid)
@@ -570,7 +570,7 @@ class PurgeGroup(graphene.Mutation):
     @classmethod
     async def delete_vfolders(
         cls,
-        db_conn: SAConnection,
+        engine: ExtendedAsyncSAEngine,
         group_id: uuid.UUID,
         storage_manager: StorageSessionManager,
     ) -> int:
@@ -582,36 +582,33 @@ class PurgeGroup(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_removal, vfolders
 
         query = (
             sa.select([vfolders.c.id, vfolders.c.host])
             .select_from(vfolders)
             .where(vfolders.c.group == group_id)
         )
-        result = await db_conn.execute(query)
-        target_vfs = result.fetchall()
-        delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
-        result = await db_conn.execute(delete_query)
-        for row in target_vfs:
-            try:
-                async with storage_manager.request(
-                    row["host"],
-                    "POST",
-                    "folder/delete",
-                    json={
-                        "volume": storage_manager.split_host(row["host"])[1],
-                        "vfid": str(row["id"]),
-                    },
-                    raise_for_status=True,
-                ):
-                    pass
-            except aiohttp.ClientResponseError:
-                log.error("error on deleting vfolder filesystem directory: {0}", row["id"])
-                raise VFolderOperationFailed
-        if result.rowcount > 0:
-            log.info("deleted {0} group's virtual folders ({1})", result.rowcount, group_id)
-        return result.rowcount
+        async with engine.begin_session() as db_conn:
+            result = await db_conn.execute(query)
+            target_vfs = result.fetchall()
+            delete_query = sa.delete(vfolders).where(vfolders.c.group == group_id)
+            result = await db_conn.execute(delete_query)
+
+        storage_ptask_group = aiotools.PersistentTaskGroup()
+        try:
+            deleted_count = await initiate_vfolder_removal(
+                engine,
+                [VFolderDeletionInfo(vf["id"], vf["host"]) for vf in target_vfs],
+                storage_manager,
+                storage_ptask_group,
+            )
+        except VFolderOperationFailed as e:
+            log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
+            raise
+        if deleted_count > 0:
+            log.info("deleted {0} group's virtual folders ({1})", deleted_count, group_id)
+        return deleted_count
 
     @classmethod
     async def delete_kernels(
