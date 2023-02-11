@@ -602,13 +602,12 @@ async def delete_by_id(request: web.Request, params: Any) -> web.Response:
             permission=VFolderHostPermission.DELETE,
         )
     folder_id = uuid.UUID(params["id"])
-    async with root_ctx.db.begin_session() as db_sess:
-        await initiate_vfolder_removal(
-            db_sess,
-            [VFolderDeletionInfo(folder_id, folder_host)],
-            root_ctx.storage_manager,
-            app_ctx.storage_ptask_group,
-        )
+    await initiate_vfolder_removal(
+        root_ctx.db,
+        [VFolderDeletionInfo(folder_id, folder_host)],
+        root_ctx.storage_manager,
+        app_ctx.storage_ptask_group,
+    )
     return web.Response(status=204)
 
 
