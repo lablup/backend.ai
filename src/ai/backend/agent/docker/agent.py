@@ -621,6 +621,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     ssh_dir.chmod(0o700)
                     (ssh_dir / "authorized_keys").write_bytes(pubkey)
                     (ssh_dir / "authorized_keys").chmod(0o600)
+                    if not (ssh_dir / "id_rsa").is_file():
+                        (ssh_dir / "id_rsa").write_bytes(privkey)
+                        (ssh_dir / "id_rsa").chmod(0o600)
                     (self.work_dir / "id_container").write_bytes(privkey)
                     (self.work_dir / "id_container").chmod(0o600)
                     if KernelFeatures.UID_MATCH in self.kernel_features:
@@ -629,6 +632,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         if os.geteuid() == 0:  # only possible when I am root.
                             os.chown(ssh_dir, uid, gid)
                             os.chown(ssh_dir / "authorized_keys", uid, gid)
+                            os.chown(ssh_dir / "id_rsa", uid, gid)
                             os.chown(self.work_dir / "id_container", uid, gid)
 
                 await loop.run_in_executor(None, _populate_ssh_config)
