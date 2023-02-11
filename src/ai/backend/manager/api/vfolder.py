@@ -503,33 +503,6 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
 
-    def make_entries(result, user_uuid) -> List[Dict[str, Any]]:
-        entries = []
-        for row in result:
-            entries.append(
-                {
-                    "name": row.vfolders_name,
-                    "id": row.vfolders_id,
-                    "host": row.vfolders_host,
-                    "usage_mode": row.vfolders_usage_mode,
-                    "created_at": row.vfolders_created_at,
-                    "is_owner": (row.vfolders_user == user_uuid),
-                    "permission": row.vfolders_permission,
-                    "user": str(row.vfolders_user) if row.vfolders_user else None,
-                    "group": str(row.vfolders_group) if row.vfolders_group else None,
-                    "creator": row.vfolders_creator,
-                    "user_email": row.users_email,
-                    "group_name": row.groups_name,
-                    "ownership_type": row.vfolders_ownership_type,
-                    "type": row.vfolders_ownership_type,  # legacy
-                    "unmanaged_path": row.vfolders_unmanaged_path,
-                    "cloneable": row.vfolders_cloneable if row.vfolders_cloneable else False,
-                    "max_files": row.vfolders_max_files,
-                    "max_size": row.vfolders_max_size,
-                }
-            )
-        return entries
-
     log.info("VFOLDER.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
     entries: List[Mapping[str, Any]] | Sequence[Mapping[str, Any]]
     owner_user_uuid, owner_user_role = await get_user_scopes(request, params)
@@ -573,6 +546,7 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
                     "cloneable": entry["cloneable"],
                     "max_files": entry["max_files"],
                     "max_size": entry["max_size"],
+                    "cur_size": entry["cur_size"],
                 }
             )
     return web.json_response(resp, status=200)
@@ -792,6 +766,7 @@ async def get_info(request: web.Request, row: VFolderRow) -> web.Response:
         "usage_mode": row["usage_mode"],
         "cloneable": row["cloneable"],
         "max_size": row["max_size"],
+        "cur_size": row["cur_size"],
     }
     return web.json_response(resp, status=200)
 
