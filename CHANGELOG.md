@@ -16,6 +16,22 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.11 (2023-02-12)
+
+Ai.Backend.Manager 22.09.11 (2023-02-12)
+
+### Features
+* Add vfolder status in api response and update vfolder cli `list`, `info` commands to show vfolder's status. ([#1017](https://github.com/lablup/backend.ai/issues/1017))
+* Return API response right after starting vFolder removal instead of waiting until deletion process completes ([#1018](https://github.com/lablup/backend.ai/issues/1018))
+* Make group_id optional in list_shared_vfolders and add a command to list shared vfolders from client-py. ([#1026](https://github.com/lablup/backend.ai/issues/1026))
+* add POST `/ssh/keypair` API to let user use their own SSH keypair instead of randomly generated one ([#1032](https://github.com/lablup/backend.ai/issues/1032))
+* Adds `~/.ssh/id_rsa` in addition to `id_container`, so ease users not to specify the SSH private key always, for example, in cloning a GitHub private repository from terminal. ([#1038](https://github.com/lablup/backend.ai/issues/1038))
+
+### Fixes
+* Update `concurrency_used` per access key by number of sessions rather kernels. ([#1029](https://github.com/lablup/backend.ai/issues/1029))
+* Unable to delete a data folder (vfolder) when its host directory or intermediate parent directories were not exist. ([#1040](https://github.com/lablup/backend.ai/issues/1040))
+
+
 ## 22.09.10 (2023-02-04)
 
 Ai.Backend.Manager 22.09.10 (2023-02-04)
