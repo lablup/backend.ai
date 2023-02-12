@@ -53,7 +53,11 @@ def get_enum_val(enum_cls: Type[Enum], value: str) -> Enum:
     try:
         return enum_cls[value]
     except KeyError:
-        return enum_cls(value)
+        try:
+            return enum_cls(value)
+        except ValueError:
+            names = ", ".join([e.name for e in enum_cls])
+            raise ValueError(f"expected one of `{names}` or in small lettering, got `{value}`")
 
 
 class QueryFilterTransformer(Transformer):
