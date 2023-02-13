@@ -34,7 +34,7 @@ from .group import association_groups_users
 from .kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, kernels
 from .keypair import keypairs
 from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser, get_enum_val
+from .minilang.queryfilter import QueryFilterParser, get_field_enum_val
 from .scaling_group import query_allowed_sgroups
 from .user import UserRole, users
 
@@ -230,7 +230,7 @@ class Agent(graphene.ObjectType):
 
     _queryfilter_fieldspec = {
         "id": ("id", None),
-        "status": ("status", lambda s: get_enum_val(AgentStatus, s)),
+        "status": ("status", lambda s: get_field_enum_val(EnumType, AgentStatus, s)),
         "status_changed": ("status_changed", dtparse),
         "region": ("region", None),
         "scaling_group": ("scaling_group", None),
@@ -448,7 +448,7 @@ class AgentSummary(graphene.ObjectType):
 
     _queryfilter_fieldspec = {
         "id": ("id", None),
-        "status": ("status", lambda s: get_enum_val(AgentStatus, s)),
+        "status": ("status", lambda s: get_field_enum_val(EnumType, AgentStatus, s)),
         "scaling_group": ("scaling_group", None),
         "schedulable": ("schedulabe", None),
     }

@@ -34,7 +34,7 @@ from .base import (
     metadata,
 )
 from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser, get_enum_val
+from .minilang.queryfilter import QueryFilterParser, get_field_enum_val
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
@@ -871,18 +871,27 @@ class VirtualFolder(graphene.ObjectType):
         "user_email": ("users_email", None),
         "creator": ("vfolders_creator", None),
         "unmanaged_path": ("vfolders_unmanaged_path", None),
-        "usage_mode": ("vfolders_usage_mode", lambda s: get_enum_val(VFolderUsageMode, s)),
-        "permission": ("vfolders_permission", lambda s: get_enum_val(VFolderPermission, s)),
+        "usage_mode": (
+            "vfolders_usage_mode",
+            lambda s: get_field_enum_val(EnumValueType, VFolderUsageMode, s),
+        ),
+        "permission": (
+            "vfolders_permission",
+            lambda s: get_field_enum_val(EnumValueType, VFolderPermission, s),
+        ),
         "ownership_type": (
             "vfolders_ownership_type",
-            lambda s: get_enum_val(VFolderOwnershipType, s),
+            lambda s: get_field_enum_val(EnumValueType, VFolderOwnershipType, s),
         ),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
         "created_at": ("vfolders_created_at", dtparse),
         "last_used": ("vfolders_last_used", dtparse),
         "cloneable": ("vfolders_cloneable", None),
-        "status": ("vfolders_status", lambda s: get_enum_val(VFolderOperationStatus, s)),
+        "status": (
+            "vfolders_status",
+            lambda s: get_field_enum_val(EnumValueType, VFolderOperationStatus, s),
+        ),
     }
 
     _queryorder_colmap = {
@@ -1045,7 +1054,7 @@ class VirtualFolderPermission(graphene.ObjectType):
     _queryfilter_fieldspec = {
         "permission": (
             "vfolder_permissions_permission",
-            lambda s: get_enum_val(VFolderPermission, s),
+            lambda s: get_field_enum_val(EnumValueType, VFolderPermission, s),
         ),
         "vfolder": ("vfolder_permissions_vfolder", None),
         "vfolder_name": ("vfolders_name", None),

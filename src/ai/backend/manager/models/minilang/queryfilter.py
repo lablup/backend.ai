@@ -1,8 +1,10 @@
 from enum import Enum
-from typing import Any, Mapping, Type, Union
+from typing import Any, Mapping, Optional, Type, Union
 
 import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer, Tree
+
+from ai.backend.manager.models.base import EnumType, EnumValueType
 
 from . import FieldSpecItem
 
@@ -48,16 +50,20 @@ _parser = Lark(
     maybe_placeholders=False,
 )
 
+EnumField = Union[Type[EnumType], Type[EnumValueType]]
 
-def get_enum_val(enum_cls: Type[Enum], value: str) -> Enum:
+
+def get_field_enum_val(field_cls: EnumField, enum_cls: Type[Enum], value: str) -> Enum:
+    enum_names: Optional[str] = None
     try:
-        return enum_cls[value]
+        if field_cls is EnumType:
+            return enum_cls[value]
+        return enum_cls(value)
     except KeyError:
-        try:
-            return enum_cls(value)
-        except ValueError:
-            names = ", ".join([e.name for e in enum_cls])
-            raise ValueError(f"expected one of `{names}` or in small lettering, got `{value}`")
+        enum_names = ", ".join([e.name for e in enum_cls])
+    except ValueError:
+        enum_names = ", ".join([e.value for e in enum_cls])
+    raise ValueError(f"expected one of `{enum_names}`, got `{value}`")
 
 
 class QueryFilterTransformer(Transformer):
