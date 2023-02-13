@@ -1216,6 +1216,7 @@ class ComputeSession(graphene.ObjectType):
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
     _queryfilter_fieldspec = {
+        "id": ("sessions_id", None),
         "session_type": ("sessions_session_type", lambda s: SessionTypes[s]),
         "name": ("sessions_name", None),
         "domain_name": ("sessions_domain_name", None),
