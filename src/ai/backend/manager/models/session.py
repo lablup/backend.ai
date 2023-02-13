@@ -1136,7 +1136,7 @@ class ComputeSession(graphene.ObjectType):
             "resource_opts": row.resource_opts,
             "scaling_group": row.scaling_group_name,
             "service_ports": row.main_kernel.service_ports,
-            "mounts": row.vfolder_mounts,
+            "mounts": [mount.name for mount in row.vfolder_mounts],
             "vfolder_mounts": row.vfolder_mounts,
             # statistics
             "num_queries": row.num_queries,

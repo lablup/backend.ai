@@ -71,7 +71,7 @@ from .kube_object import (
 )
 from .resources import detect_resources
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.kubernetes.agent"))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKernel]):
