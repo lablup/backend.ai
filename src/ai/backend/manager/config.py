@@ -191,7 +191,13 @@ from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import HostPortPair, SlotName, SlotTypes, current_resource_slots, LogSeverity
+from ai.backend.common.types import (
+    HostPortPair,
+    LogSeverity,
+    SlotName,
+    SlotTypes,
+    current_resource_slots,
+)
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
