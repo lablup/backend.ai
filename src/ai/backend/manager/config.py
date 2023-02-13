@@ -191,7 +191,13 @@ from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import HostPortPair, SlotName, SlotTypes, current_resource_slots
+from ai.backend.common.types import (
+    HostPortPair,
+    LogSeverity,
+    SlotName,
+    SlotTypes,
+    current_resource_slots,
+)
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
@@ -434,7 +440,7 @@ class LocalConfig(AbstractConfig):
         raise NotImplementedError
 
 
-def load(config_path: Path = None, debug: bool = False) -> LocalConfig:
+def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
 
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "manager")
@@ -465,11 +471,11 @@ def load(config_path: Path = None, debug: bool = False) -> LocalConfig:
     config.override_with_env(
         raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
     )
-    if debug:
-        config.override_key(raw_cfg, ("debug", "enabled"), True)
-        config.override_key(raw_cfg, ("logging", "level"), "DEBUG")
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), "DEBUG")
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), "DEBUG")
+
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
+    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
+    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
