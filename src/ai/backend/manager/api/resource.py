@@ -128,6 +128,8 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         params["scaling_group"],
     )
 
+    print("ResourceSlot.from_policy", ResourceSlot.from_policy)
+    print("root_ctx.db.__dict__:", root_ctx.db.__dict__)
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
         keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
@@ -135,7 +137,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             access_key, db_sess=SASession(conn)
         )
         keypair_remaining = keypair_limits - keypair_occupied
-
+        print("{} = {} - {}".format(keypair_remaining, keypair_limits, keypair_occupied))
         # Check group resource limit and get group_id.
         j = sa.join(
             groups,
@@ -153,6 +155,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         )
         result = await conn.execute(query)
         row = result.first()
+        print("row:", dir(row))
         group_id = row["id"]
         group_resource_slots = row["total_resource_slots"]
         if group_id is None:
@@ -214,7 +217,12 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                 & (kernels.c.scaling_group.in_(sgroup_names)),
             )
         )
+        print("row:", row)
+
+        print("query-using:\n", query)
+
         async for row in (await conn.stream(query)):
+            print("1111111111111")
             per_sgroup[row["scaling_group"]]["using"] += row["occupied_slots"]
 
         # Per scaling group resource remaining from agents stats.
@@ -227,8 +235,11 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             )
         )
         agent_slots = []
+        print("query-remaining:\n", query)
         async for row in (await conn.stream(query)):
+            print("2222222222222")
             remaining = row["available_slots"] - row["occupied_slots"]
+            print("{} = {} - {}".format(remaining, row["available_slots"], row["occupied_slots"]))
             remaining += ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
             sgroup_remaining += remaining
             agent_slots.append(remaining)
