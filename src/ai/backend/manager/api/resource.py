@@ -292,6 +292,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
 async def recalculate_usage(request: web.Request) -> web.Response:
     """
     Update `keypair_resource_usages` in redis and `agents.c.occupied_slots`.
+
     Those two values are sometimes out of sync. In that case, calling this API
     re-calculates the values for running containers and updates them in DB.
     """
@@ -498,6 +499,7 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
     """
     Return usage statistics of terminated containers for a specified month.
     The date/time comparison is done using the configured timezone.
+
     :param group_ids: If not None, query containers only in those groups.
     :param month: The year-month to query usage statistics. ex) "202006" to query for Jun 2020
     """
@@ -531,6 +533,7 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     Return usage statistics of terminated containers belonged to the given group for a specified
     period in dates.
     The date/time comparison is done using the configured timezone.
+
     :param group_id: If not None, query containers only in the group.
     :param start_date str: "yyyymmdd" format.
     :param end_date str: "yyyymmdd" format.
@@ -559,6 +562,7 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
     """
     Generate time-binned (15 min) stats for the last one month (2880 points).
     The structure of the result would be:
+
         [
           # [
           #     timestamp, num_sessions,
@@ -568,6 +572,7 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
             [1562083808.657106, 1, 1.2, 1073741824, ...],
             [1562084708.657106, 2, 4.0, 1073741824, ...],
         ]
+
     Note that the timestamp is in UNIX-timestamp.
     """
     # Get all or user kernels for the last month from DB.
@@ -692,6 +697,7 @@ async def admin_month_stats(request: web.Request) -> web.Response:
 async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
     """
     Get watcher information.
+
     :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
     :return token: agent watcher token ("insecure" if not set in config server)
     """
