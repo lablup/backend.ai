@@ -128,8 +128,6 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         params["scaling_group"],
     )
 
-    print("ResourceSlot.from_policy", ResourceSlot.from_policy)
-    print("root_ctx.db.__dict__:", root_ctx.db.__dict__)
     async with root_ctx.db.begin_readonly() as conn:
         # Check keypair resource limit.
         keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
@@ -137,7 +135,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             access_key, db_sess=SASession(conn)
         )
         keypair_remaining = keypair_limits - keypair_occupied
-        print("{} = {} - {}".format(keypair_remaining, keypair_limits, keypair_occupied))
+
         # Check group resource limit and get group_id.
         j = sa.join(
             groups,
@@ -155,7 +153,6 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         )
         result = await conn.execute(query)
         row = result.first()
-        print("row:", dir(row))
         group_id = row["id"]
         group_resource_slots = row["total_resource_slots"]
         if group_id is None:
@@ -217,12 +214,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
                 & (kernels.c.scaling_group.in_(sgroup_names)),
             )
         )
-        print("row:", row)
-
-        print("query-using:\n", query)
-
         async for row in (await conn.stream(query)):
-            print("1111111111111")
             per_sgroup[row["scaling_group"]]["using"] += row["occupied_slots"]
 
         # Per scaling group resource remaining from agents stats.
@@ -235,11 +227,8 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             )
         )
         agent_slots = []
-        print("query-remaining:\n", query)
         async for row in (await conn.stream(query)):
-            print("2222222222222")
             remaining = row["available_slots"] - row["occupied_slots"]
-            print("{} = {} - {}".format(remaining, row["available_slots"], row["occupied_slots"]))
             remaining += ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
             sgroup_remaining += remaining
             agent_slots.append(remaining)
@@ -303,7 +292,6 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
 async def recalculate_usage(request: web.Request) -> web.Response:
     """
     Update `keypair_resource_usages` in redis and `agents.c.occupied_slots`.
-
     Those two values are sometimes out of sync. In that case, calling this API
     re-calculates the values for running containers and updates them in DB.
     """
@@ -510,7 +498,6 @@ async def usage_per_month(request: web.Request, params: Any) -> web.Response:
     """
     Return usage statistics of terminated containers for a specified month.
     The date/time comparison is done using the configured timezone.
-
     :param group_ids: If not None, query containers only in those groups.
     :param month: The year-month to query usage statistics. ex) "202006" to query for Jun 2020
     """
@@ -544,7 +531,6 @@ async def usage_per_period(request: web.Request, params: Any) -> web.Response:
     Return usage statistics of terminated containers belonged to the given group for a specified
     period in dates.
     The date/time comparison is done using the configured timezone.
-
     :param group_id: If not None, query containers only in the group.
     :param start_date str: "yyyymmdd" format.
     :param end_date str: "yyyymmdd" format.
@@ -573,7 +559,6 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
     """
     Generate time-binned (15 min) stats for the last one month (2880 points).
     The structure of the result would be:
-
         [
           # [
           #     timestamp, num_sessions,
@@ -583,7 +568,6 @@ async def get_time_binned_monthly_stats(request: web.Request, user_uuid=None):
             [1562083808.657106, 1, 1.2, 1073741824, ...],
             [1562084708.657106, 2, 4.0, 1073741824, ...],
         ]
-
     Note that the timestamp is in UNIX-timestamp.
     """
     # Get all or user kernels for the last month from DB.
@@ -708,7 +692,6 @@ async def admin_month_stats(request: web.Request) -> web.Response:
 async def get_watcher_info(request: web.Request, agent_id: str) -> dict:
     """
     Get watcher information.
-
     :return addr: address of agent watcher (eg: http://127.0.0.1:6009)
     :return token: agent watcher token ("insecure" if not set in config server)
     """
