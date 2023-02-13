@@ -44,5 +44,3 @@ if result:
     print("There is not change log file for this PR in changes folder.")
     print("Also, there is not feature named file in changes folder.")
     exit(0)
-        
-        
