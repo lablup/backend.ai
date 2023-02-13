@@ -5,7 +5,7 @@ from pathlib import Path
 
 import tomlkit
 
-pr_number = "${{github.event.pull_request.number}}"
+pr_number = args[1]
 path = Path("./changes")
 
 with open("./pyproject.toml", "r") as f:
