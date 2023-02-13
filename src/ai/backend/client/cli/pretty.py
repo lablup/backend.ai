@@ -242,7 +242,7 @@ class ProgressViewer:
 
     def __init__(self, spinner_msg: str, unit: str = "it", delay: float = 0.3):
         self.spinner = Spinner(spinner_msg, delay)
-        self.tqdm = tqdm(unit=unit)
+        self.tqdm = tqdm(total=0, unit=unit)
         print(end="\x1b[2K\r", file=sys.stderr)  # clear line
 
     async def __aenter__(self):
@@ -251,6 +251,8 @@ class ProgressViewer:
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         await self.spinner.stop()
+        if self.tqdm.total == 0:
+            self.tqdm.disable = True
         self.tqdm.close()
 
     async def to_tqdm(self):
