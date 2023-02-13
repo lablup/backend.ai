@@ -105,12 +105,12 @@ class BackgroundTaskManager:
     event_producer: EventProducer
     ongoing_tasks: weakref.WeakSet[asyncio.Task]
     task_update_queues: DefaultDict[uuid.UUID, Set[asyncio.Queue[Sentinel | BgtaskEvents]]]
-    dict_lock: asyncio.Lock = asyncio.Lock()
 
     def __init__(self, event_producer: EventProducer) -> None:
         self.event_producer = event_producer
         self.ongoing_tasks = weakref.WeakSet()
         self.task_update_queues = defaultdict(set)
+        self.dict_lock: asyncio.Lock = asyncio.Lock()
 
     def register_event_handlers(self, event_dispatcher: EventDispatcher) -> None:
         """
