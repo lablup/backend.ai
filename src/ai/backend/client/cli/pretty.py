@@ -217,6 +217,26 @@ class Spinner:
 
 
 class ProgressViewer:
+    """
+
+    A context manager that displays a spinner and a tqdm progress bar.
+
+    It shows the spinner until it is switched explicitly to the tqdm progress bar.
+
+    Usage:
+
+    ```
+    async with ProgressViewer("Waiting...") as (viewer, tqdm):
+        for i in range(10):
+            await asyncio.sleep(0.2)
+        await viewer.to_tqdm()
+        tqdm.total = 10
+        for i in range(10):
+            await asyncio.sleep(0.2)
+            tqdm.update(1)
+    ```
+    """
+
     spinner: Spinner
     tqdm: tqdm
 
