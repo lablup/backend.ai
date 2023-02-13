@@ -7,7 +7,7 @@ import logging
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from pathlib import Path
-from typing import Awaitable, Callable, Iterator, List
+from typing import Awaitable, Callable, Iterator, List, cast
 from uuid import UUID
 
 import attr
@@ -242,7 +242,7 @@ async def get_performance_metric(request: web.Request) -> web.Response:
             metric = await volume.get_performance_metric()
             return web.json_response(
                 {
-                    "metric": attr.asdict(metric),
+                    "metric": attr.asdict(cast(attr.AttrsInstance, metric)),
                 },
             )
 
@@ -365,6 +365,33 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
                     {
                         "file_count": usage.file_count,
                         "used_bytes": usage.used_bytes,
+                    },
+                )
+        except ExecutionError:
+            return web.Response(
+                status=500,
+                reason="Storage server is busy. Please try again",
+            )
+
+
+async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
+    async with check_params(
+        request,
+        t.Dict(
+            {
+                t.Key("volume"): t.String(),
+                t.Key("vfid"): tx.UUID(),
+            },
+        ),
+    ) as params:
+        try:
+            await log_manager_api_entry(log, "get_vfolder_used_bytes", params)
+            ctx: Context = request.app["ctx"]
+            async with ctx.get_volume(params["volume"]) as volume:
+                usage = await volume.get_used_bytes(params["vfid"])
+                return web.json_response(
+                    {
+                        "used_bytes": usage,
                     },
                 )
         except ExecutionError:
@@ -642,6 +669,7 @@ async def init_manager_app(ctx: Context) -> web.Application:
     app.router.add_route("GET", "/volume/quota", get_quota)
     app.router.add_route("PATCH", "/volume/quota", set_quota)
     app.router.add_route("GET", "/folder/usage", get_vfolder_usage)
+    app.router.add_route("GET", "/folder/used-bytes", get_vfolder_used_bytes)
     app.router.add_route("GET", "/folder/fs-usage", get_vfolder_fs_usage)
     app.router.add_route("POST", "/folder/file/mkdir", mkdir)
     app.router.add_route("POST", "/folder/file/list", list_files)

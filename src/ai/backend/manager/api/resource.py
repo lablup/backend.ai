@@ -148,7 +148,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             .where(
                 (association_groups_users.c.user_id == request["user"]["uuid"])
                 & (groups.c.name == params["group"])
-                & (domains.c.name == domain_name),
+                & (groups.c.domain_name == domain_name),
             )
         )
         result = await conn.execute(query)
