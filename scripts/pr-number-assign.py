@@ -13,10 +13,9 @@ with open("./pyproject.toml", "r") as f:
     t_types = [sub["directory"] for sub in data["tool"]["towncrier"]["type"]]
 
 pattern = r"^(\.)?(" + "|".join(t_types) + ")(\.)?(md)?$"
-result = None
 
 files = [f.name for f in path.iterdir() if f.is_file()]
-print(str(files) + " are in changes floder.")
+print(str(files) + " are in changes folder.")
 
 for file in files:
     if str(file[0 : file.find(".")]) == pr_number:
@@ -33,14 +32,13 @@ for file in files:
 
         env_file = os.getenv("GITHUB_ENV")
         myfile = open(env_file, "a")
-        myfile.write("ORIGINAL_FILENAME=" + original_filename + "\n")
-        myfile.write("FEAT=" + feat)
+        myfile.write(f"ORIGINAL_FILENAME={original_filename}\n")
+        myfile.write(f"FEAT={feat}\n")
         myfile.close()
 
         print(original_filename + " file changed to " + pr_number + "." + feat + ".md")
         exit(0)
 
-if result:
-    print("There is not change log file for this PR in changes folder.")
-    print("Also, there is not feature named file in changes folder.")
-    exit(0)
+print("There is not change log file for this PR in changes folder.")
+print("Also, there is not feature named file in changes folder.")
+exit(0)
