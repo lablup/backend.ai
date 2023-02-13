@@ -1217,7 +1217,7 @@ class ComputeSession(graphene.ObjectType):
 
     _queryfilter_fieldspec = {
         "id": ("sessions_id", None),
-        "session_type": ("sessions_session_type", lambda s: SessionTypes[s]),
+        "type": ("sessions_session_type", lambda s: SessionTypes[s]),
         "name": ("sessions_name", None),
         "domain_name": ("sessions_domain_name", None),
         "group_name": ("groups_name", None),
@@ -1239,7 +1239,7 @@ class ComputeSession(graphene.ObjectType):
 
     _queryorder_colmap = {
         "id": "sessions_id",
-        "session_type": "sessions_session_type",
+        "type": "sessions_session_type",
         "name": "sessions_name",
         # "image": "image",
         # "architecture": "architecture",
