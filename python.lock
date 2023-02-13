@@ -32,7 +32,7 @@
 //     "asynctest>=0.13.0",
 //     "asyncudp>=0.4",
 //     "attrs>=20.3",
-//     "backend.ai-krunner-alpine==5.0.1",
+//     "backend.ai-krunner-alpine==5.0.2",
 //     "backend.ai-krunner-static-gnu==4.0.1",
 //     "boto3~=1.26",
 //     "cachetools~=5.2.0",
@@ -719,18 +719,18 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "449f515cd2bf8ddcae487e7a02cc3f909170f305f54235bd0a3b2875673aa465",
-              "url": "https://files.pythonhosted.org/packages/b7/75/0a2c0281b1d1d889373190944e7068b96bcab24671ae5d6e56c65d2bdcc3/backend.ai_krunner_alpine-5.0.1-py3-none-manylinux2014_x86_64.musllinux_1_1_x86_64.macosx_11_0_x86_64.whl"
+              "hash": "724556a22afc51bb02a0a6856e0e803b29dc49d6b444fe12940045d88a857d3d",
+              "url": "https://files.pythonhosted.org/packages/98/26/713ff9be103529cf014c88b77f26f4d78c4b75029f614dd117b5f217c730/backend.ai_krunner_alpine-5.0.2-py3-none-manylinux2014_x86_64.musllinux_1_1_x86_64.macosx_11_0_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5afede4b6f0cf4fc8f698793fdd54844df727022c518d37c516c60a658d8768c",
-              "url": "https://files.pythonhosted.org/packages/26/07/a5c238e94f15c63198365f53f57847fabd97bba5ff657472ae9cc4510248/backend.ai-krunner-alpine-5.0.1.tar.gz"
+              "hash": "ba94807316af23d5d575499430e84ce560fc514945e92fb5a9b44f73d9cd66ac",
+              "url": "https://files.pythonhosted.org/packages/1c/7b/8038803df282d0b0becef17e94e1febb9af6f17c8b8af88240c988003a5e/backend.ai_krunner_alpine-5.0.2-py3-none-manylinux2014_aarch64.musllinux_1_1_aarch64.macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5701de23d90ebab9edd994e393635b969ba035e87fb1daba1fbdbf09a75a561b",
-              "url": "https://files.pythonhosted.org/packages/ec/c3/0d8a996b69ca2f7402c8b1fff0cb01a9db32ea6a2e851f14c47362bd6e6e/backend.ai_krunner_alpine-5.0.1-py3-none-manylinux2014_aarch64.musllinux_1_1_aarch64.macosx_11_0_arm64.whl"
+              "hash": "4b0cb0e747b5f3c57e47709602d38dd4ef60ff0ff5f8ef4b5791b5dc77673ec4",
+              "url": "https://files.pythonhosted.org/packages/38/16/c49f295e07d49c587267d16a91e9f5d568dd90aebb41a8c37ed51880ea74/backend.ai-krunner-alpine-5.0.2.tar.gz"
             }
           ],
           "project_name": "backend-ai-krunner-alpine",
@@ -743,7 +743,7 @@
             "wheel>=0.34.2; extra == \"build\""
           ],
           "requires_python": ">=3.6",
-          "version": "5.0.1"
+          "version": "5.0.2"
         },
         {
           "artifacts": [
@@ -4316,7 +4316,7 @@
     "asynctest>=0.13.0",
     "asyncudp>=0.4",
     "attrs>=20.3",
-    "backend.ai-krunner-alpine==5.0.1",
+    "backend.ai-krunner-alpine==5.0.2",
     "backend.ai-krunner-static-gnu==4.0.1",
     "boto3~=1.26",
     "cachetools~=5.2.0",
