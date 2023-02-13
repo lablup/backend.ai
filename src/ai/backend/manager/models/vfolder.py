@@ -533,7 +533,7 @@ async def get_allowed_vfolder_hosts_by_user(
         sa.select([groups.c.allowed_vfolder_hosts])
         .select_from(j)
         .where(
-            (domains.c.name == domain_name) & (groups.c.is_active),
+            (groups.c.domain_name == domain_name) & (groups.c.is_active),
         )
     )
     if rows := (await conn.execute(query)).fetchall():
