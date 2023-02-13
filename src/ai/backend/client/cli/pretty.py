@@ -6,6 +6,7 @@ import textwrap
 import traceback
 
 from click import echo, style
+from tqdm import tqdm
 
 from ..exceptions import BackendAPIError
 
@@ -186,23 +187,53 @@ def show_warning(message, category, filename, lineno, file=None, line=None):
 
 
 class Spinner:
-    def __init__(self, fixed_msg: str, delay: float = 0.3):
-        self.fixed_msg = fixed_msg
-        self.spinner_task = None
+    def __init__(self, msg: str, delay: float = 0.3):
+        self.msg = msg
+        self.task = None
         self.delay = delay
 
     async def __aenter__(self):
-        self.spinner_task = asyncio.create_task(self.run())
+        self.run()
+        return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        self.spinner_task.cancel()
-        await self.spinner_task
+        await self.stop()
 
-    async def run(self):
+    def run(self):
+        self.task = asyncio.create_task(self.spin())
+
+    async def spin(self):
         try:
             while True:
                 for char in "|/-\\":
-                    print_wait("{} {}".format(self.fixed_msg, char))
+                    print_wait("{} {}".format(self.msg, char))
                     await asyncio.sleep(self.delay)
         except asyncio.CancelledError:
             pass
+
+    async def stop(self):
+        self.task.cancel()
+        await self.task
+
+
+class ProgressViewer:
+    spinner: Spinner
+    tqdm: tqdm
+
+    def __init__(self, spinner_msg: str, unit: str = "it", delay: float = 0.3):
+        self.spinner = Spinner(spinner_msg, delay)
+        self.tqdm = tqdm(unit=unit)
+        print(end="\x1b[2K\r", file=sys.stderr)  # clear line
+
+    async def __aenter__(self):
+        self.spinner.run()
+        return self, self.tqdm
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.spinner.stop()
+        self.tqdm.close()
+
+    async def to_tqdm(self):
+        await self.spinner.stop()
+        print(end="\x1b[2K\r", file=sys.stderr)  # clear line
+        self.tqdm.disable = False
