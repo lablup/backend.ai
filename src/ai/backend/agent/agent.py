@@ -132,7 +132,7 @@ from .utils import generate_local_instance_id, get_arch_name
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.agent.agent"))
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 _sentinel = Sentinel.TOKEN
 
