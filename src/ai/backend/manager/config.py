@@ -191,7 +191,7 @@ from ai.backend.common import validators as tx
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.identity import get_instance_id
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import HostPortPair, SlotName, SlotTypes, current_resource_slots
+from ai.backend.common.types import HostPortPair, SlotName, SlotTypes, current_resource_slots, LogSeverity
 
 from ..manager.defs import INTRINSIC_SLOTS
 from .api import ManagerStatus
@@ -466,7 +466,7 @@ def load(config_path: Path = None, log_level: str = "info") -> LocalConfig:
         raw_cfg, ("docker-registry", "ssl-verify"), "BACKEND_SKIP_SSLCERT_VALIDATION"
     )
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "debug")
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogSeverity.DEBUG)
     config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
     config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
     config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
