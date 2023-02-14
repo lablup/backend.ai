@@ -1,3 +1,4 @@
+import asyncio
 import enum
 import functools
 import sys
@@ -182,3 +183,26 @@ def show_warning(message, category, filename, lineno, file=None, line=None):
         ),
         file=file,
     )
+
+
+class Spinner:
+    def __init__(self, fixed_msg: str, delay: float = 0.3):
+        self.fixed_msg = fixed_msg
+        self.spinner_task = None
+        self.delay = delay
+
+    async def __aenter__(self):
+        self.spinner_task = asyncio.create_task(self.run())
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        self.spinner_task.cancel()
+        await self.spinner_task
+
+    async def run(self):
+        try:
+            while True:
+                for char in "|/-\\":
+                    print_wait("{} {}".format(self.fixed_msg, char))
+                    await asyncio.sleep(self.delay)
+        except asyncio.CancelledError:
+            pass
