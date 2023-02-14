@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: pr-number-assign
-      uses: ./.github/workflows/pr-number-assign.yml
+      run: ./.github/workflows/pr-number-assign.yml
 
   towncrier:
     needs: [pr-number-assign]
