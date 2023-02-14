@@ -4,11 +4,9 @@ import asyncio
 import functools
 import json
 import logging
-import re
 from contextlib import asynccontextmanager as actxmgr
 from typing import TYPE_CHECKING, Any, AsyncIterator, Awaitable, Callable, Mapping, Tuple, TypeVar
 from urllib.parse import quote_plus as urlquote
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
@@ -147,17 +145,6 @@ class ExtendedAsyncSAEngine(SAEngine):
 def create_async_engine(*args, **kwargs) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
     sync_engine = _create_engine(*args, **kwargs)
-
-    @sa.event.listens_for(sync_engine, "do_execute")
-    def receive_do_execute(cursor, statement: str, parameters: tuple, context):
-        if not statement.startswith("UPDATE kernels"):
-            return
-        kernel_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
-        if matches := re.search("status=([A-Z]*)[,]+", statement % parameters):
-            _, status = matches.group().strip(",").split("=")
-            log.warning('EXECUTE(): kernel({}) status="{}"', str(kernel_id), status)
-            # TODO: Send message (kernel_id=kernel_id, status=status)
-
     return ExtendedAsyncSAEngine(sync_engine)
 
 

@@ -264,6 +264,11 @@ manager_local_config_iv = (
                     t.Key("aiomonitor-port", default=48100): t.Int[1:65535],
                 }
             ).allow_extra("*"),
+            t.Key("pipeline"): t.Dict(
+                {
+                    t.Key("event-queue", default=None): t.Null | t.String,
+                },
+            ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(
                 {  # deprecated in v20.09
                     t.Key("ssl-verify", default=True): t.ToBool,

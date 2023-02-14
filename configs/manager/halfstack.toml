@@ -31,6 +31,10 @@ disabled-plugins = []
 hide-agents = true
 
 
+[pipeline]
+# event-queue = "redis://127.0.0.1:6379/0"
+
+
 [docker-registry]
 ssl-verify = false
 

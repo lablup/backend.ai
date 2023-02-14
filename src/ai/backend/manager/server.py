@@ -7,6 +7,7 @@ import importlib
 import logging
 import os
 import pwd
+import re
 import ssl
 import sys
 import traceback
@@ -24,11 +25,13 @@ from typing import (
     Sequence,
     cast,
 )
+from uuid import UUID
 
 import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
+import sqlalchemy as sa
 from aiohttp import web
 from redis.asyncio import Redis
 from setproctitle import setproctitle
@@ -327,6 +330,19 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.utils import connect_database
 
     async with connect_database(root_ctx.local_config) as db:
+
+        @sa.event.listens_for(db.sync_engine, "do_execute")
+        def receive_do_execute(cursor, statement: str, parameters: tuple, context):
+            if not statement.startswith("UPDATE kernels"):
+                return
+            kernel_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
+            if matches := re.search("status=([A-Z]*)[,]+", statement % parameters):
+                _, status = matches.group().strip(",").split("=")
+                log.warning(
+                    '[manager.server] EXECUTE(): kernel({}) status="{}"', str(kernel_id), status
+                )
+                # TODO: Send message (kernel_id=kernel_id, status=status)
+
         root_ctx.db = db
         yield
 
@@ -789,6 +805,8 @@ def main(ctx: click.Context, config_path: Path, debug: bool) -> None:
     """
 
     cfg = load_config(config_path, debug)
+
+    # pipeline_event_queue = cfg["pipeline"]["event-queue"]
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))
