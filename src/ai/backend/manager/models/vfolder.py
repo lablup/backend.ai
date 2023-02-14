@@ -34,7 +34,7 @@ from .base import (
     metadata,
 )
 from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser, get_field_enum_val
+from .minilang.queryfilter import QueryFilterParser, enum_field_getter
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
@@ -873,15 +873,15 @@ class VirtualFolder(graphene.ObjectType):
         "unmanaged_path": ("vfolders_unmanaged_path", None),
         "usage_mode": (
             "vfolders_usage_mode",
-            lambda s: get_field_enum_val(EnumValueType, VFolderUsageMode, s),
+            enum_field_getter(EnumValueType, VFolderUsageMode),
         ),
         "permission": (
             "vfolders_permission",
-            lambda s: get_field_enum_val(EnumValueType, VFolderPermission, s),
+            enum_field_getter(EnumValueType, VFolderPermission),
         ),
         "ownership_type": (
             "vfolders_ownership_type",
-            lambda s: get_field_enum_val(EnumValueType, VFolderOwnershipType, s),
+            enum_field_getter(EnumValueType, VFolderOwnershipType),
         ),
         "max_files": ("vfolders_max_files", None),
         "max_size": ("vfolders_max_size", None),
@@ -890,7 +890,7 @@ class VirtualFolder(graphene.ObjectType):
         "cloneable": ("vfolders_cloneable", None),
         "status": (
             "vfolders_status",
-            lambda s: get_field_enum_val(EnumValueType, VFolderOperationStatus, s),
+            enum_field_getter(EnumValueType, VFolderOperationStatus),
         ),
     }
 
@@ -1054,7 +1054,7 @@ class VirtualFolderPermission(graphene.ObjectType):
     _queryfilter_fieldspec = {
         "permission": (
             "vfolder_permissions_permission",
-            lambda s: get_field_enum_val(EnumValueType, VFolderPermission, s),
+            enum_field_getter(EnumValueType, VFolderPermission),
         ),
         "vfolder": ("vfolder_permissions_vfolder", None),
         "vfolder_name": ("vfolders_name", None),

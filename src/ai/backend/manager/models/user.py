@@ -40,7 +40,7 @@ from .base import (
     simple_db_mutate_returning_item,
 )
 from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser, get_field_enum_val
+from .minilang.queryfilter import QueryFilterParser, enum_field_getter
 from .storage import StorageSessionManager
 from .utils import ExtendedAsyncSAEngine
 
@@ -272,12 +272,12 @@ class User(graphene.ObjectType):
         "full_name": ("full_name", None),
         "description": ("description", None),
         "is_active": ("is_active", None),
-        "status": ("status", lambda s: get_field_enum_val(EnumValueType, UserStatus, s)),
+        "status": ("status", enum_field_getter(EnumValueType, UserStatus)),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
         "modified_at": ("modified_at", dtparse),
         "domain_name": ("domain_name", None),
-        "role": ("role", lambda s: get_field_enum_val(EnumValueType, UserRole, s)),
+        "role": ("role", enum_field_getter(EnumValueType, UserRole)),
         "allowed_client_ip": ("allowed_client_ip", None),
     }
 

@@ -70,7 +70,7 @@ from .base import (
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser, get_field_enum_val
+from .minilang.queryfilter import QueryFilterParser, enum_field_getter
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -1216,7 +1216,7 @@ class ComputeSession(graphene.ObjectType):
         return [(await con.resolve_abusing_report(info, self.access_key)) for con in containers]
 
     _queryfilter_fieldspec = {
-        "session_type": ("session_type", lambda s: get_field_enum_val(EnumType, SessionTypes, s)),
+        "session_type": ("session_type", enum_field_getter(EnumType, SessionTypes)),
         "name": ("name", None),
         "image": ("image", None),
         "architecture": ("architecture", None),
@@ -1228,10 +1228,10 @@ class ComputeSession(graphene.ObjectType):
         "cluster_mode": ("cluster_mode", None),
         "cluster_template": ("cluster_template", None),
         "cluster_size": ("cluster_size", None),
-        "status": ("status", lambda s: get_field_enum_val(EnumType, SessionStatus, s)),
+        "status": ("status", enum_field_getter(EnumType, SessionStatus)),
         "status_info": ("status_info", None),
         # "status_changed": ("status_changed", dtparse),
-        "result": ("result", lambda s: get_field_enum_val(EnumType, SessionResult, s)),
+        "result": ("result", enum_field_getter(EnumType, SessionResult)),
         "created_at": ("created_at", dtparse),
         "terminated_at": ("terminated_at", dtparse),
         "starts_at": ("starts_at", dtparse),
@@ -1273,9 +1273,7 @@ class ComputeSession(graphene.ObjectType):
         filter: Optional[str] = None,
     ) -> int:
         if isinstance(status, str):
-            status_list = [
-                get_field_enum_val(EnumType, SessionStatus, s) for s in status.split(",")
-            ]
+            status_list = [SessionStatus[s] for s in status.split(",")]
         elif isinstance(status, SessionStatus):
             status_list = [status]
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(
@@ -1314,9 +1312,7 @@ class ComputeSession(graphene.ObjectType):
         if status is None:
             status_list = None
         elif isinstance(status, str):
-            status_list = [
-                get_field_enum_val(EnumType, SessionStatus, s) for s in status.split(",")
-            ]
+            status_list = [SessionStatus[s] for s in status.split(",")]
         elif isinstance(status, SessionStatus):
             status_list = [status]
         j = sa.join(SessionRow, GroupRow, SessionRow.group_id == GroupRow.id).join(

@@ -73,7 +73,7 @@ from .base import (
 )
 from .group import groups
 from .minilang.ordering import QueryOrderParser
-from .minilang.queryfilter import QueryFilterParser, get_field_enum_val
+from .minilang.queryfilter import QueryFilterParser, enum_field_getter
 from .user import users
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -771,7 +771,7 @@ class ComputeContainer(graphene.ObjectType):
         "local_rank": ("local_rank", None),
         "cluster_role": ("cluster_role", None),
         "cluster_hostname": ("cluster_hostname", None),
-        "status": ("status", lambda s: get_field_enum_val(EnumType, KernelStatus, s)),
+        "status": ("status", enum_field_getter(EnumType, KernelStatus)),
         "status_info": ("status_info", None),
         "created_at": ("created_at", dtparse),
         "status_changed": ("status_changed", dtparse),
