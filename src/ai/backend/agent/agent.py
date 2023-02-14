@@ -9,6 +9,7 @@ import re
 import shutil
 import signal
 import sys
+import textwrap
 import time
 import traceback
 import weakref
@@ -1235,7 +1236,7 @@ class AbstractAgent(
                         )
                         await self.loop.run_in_executor(None, _rm, reported_kernel)
                     else:
-                        abuse_report[kern_id] = AbuseReport.CLEANING.value
+                        abuse_report[kern_id] = AbuseReport.DETECTED.value
                         log.debug(
                             "abusing container detected, skipping auto-termination: {} ({})",
                             kern_id,
@@ -1245,22 +1246,32 @@ class AbstractAgent(
             for kernel_id, ev in terminated_kernels.items():
                 await self.container_lifecycle_queue.put(ev)
 
-            async def _set_abuse_report(r: Redis):
-                pipe = r.pipeline()
-                hash_name = "abuse_report"
-                all_reports = await pipe.hgetall(hash_name)
-                deleting_reports: list[str] = []
-                for kern_id in self.kernel_registry:
-                    str_kern_id = str(kern_id)
-                    if str_kern_id in all_reports and str_kern_id not in abuse_report:
-                        deleting_reports.append(str_kern_id)
-                await pipe.hdel(hash_name, *deleting_reports)
-                await pipe.hset(hash_name, mapping=cast(Mapping, abuse_report))
-                return pipe
-
-            await redis_helper.execute(
+            hash_name = "abuse_report"
+            abuse_report_script = textwrap.dedent(
+                f"""
+                local key = '{hash_name}'
+                # local new_report_key = KEYS
+                # local new_report_val = ARGV
+                local new_report = {{}}
+                for i, v in ipairs(KEYS) do
+                    new_report[v] = ARGV[i]
+                end
+                local all_report = redis.call('HKEYS', key)
+                for _, v in ipairs(all_report) do
+                    if not new_report[v] then
+                        redis.call('HDEL', key, v)
+                    end
+                for kern_id, status in ipairs(new_report) do
+                    redis.call('HSET', key, kern_id, status)
+                end
+            """
+            )
+            await redis_helper.execute_script(
                 self.redis_stat_pool,
-                _set_abuse_report,
+                "report_abusing_kernels",
+                abuse_report_script,
+                [*abuse_report.keys()],
+                [*abuse_report.values()],
             )
 
     @abstractmethod

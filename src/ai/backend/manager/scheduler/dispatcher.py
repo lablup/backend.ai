@@ -16,6 +16,7 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, selectinload
 
+from ai.backend.common import redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events import (
     AgentStartedEvent,
@@ -201,6 +202,30 @@ class SchedulerDispatcher(aobject):
             registry=self.registry,
             known_slot_types=known_slot_types,
         )
+
+        key = "abuse_report"
+        test_script = f"""
+        local key = '{key}'
+        local all_reports = redis.call('HKEYS', key)
+        local set = {{["test"] = "value"}}
+        for i, v in ipairs(KEYS) do
+            set[v] = ARGV[i]
+        end
+        return {{all_reports, set}}
+        """
+        # argv = ['argv1', 'argv2']
+        report_map = {"random": "balh", "rrandomm": "oaaa"}
+        reports, r_argv = await redis_helper.execute_script(
+            sched_ctx.registry.redis_stat,
+            "test_execution",
+            test_script,
+            [*report_map.keys()],
+            [*report_map.values()],
+        )
+        print(f"{reports = }")
+        print(f"{type(reports) = }")
+        print(f"{r_argv = }")
+        print(f"{type(r_argv) = }")
 
         try:
             # The schedule() method should be executed with a global lock

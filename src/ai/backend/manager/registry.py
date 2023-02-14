@@ -66,6 +66,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
+    AbuseReport,
     AccessKey,
     AgentId,
     BinarySize,
@@ -2770,12 +2771,18 @@ class AgentRegistry:
         agent_id: AgentId,
         agent_addr: str,
     ) -> Optional[Mapping[str, str]]:
-        async with RPCContext(
-            agent_id,
-            agent_addr,
-            invoke_timeout=None,
-        ) as rpc:
-            return await rpc.call.get_abusing_report(str(kernel_id))
+        hash_name = "abuse_report"
+        abusing_report: Mapping[str, str] = await redis_helper.execute(
+            self.redis_stat,
+            lambda r: r.hgetall(hash_name),
+        )
+        kern_id = str(kernel_id)
+        if abusing_report is None:
+            return {"kernel": kern_id, "abuse_report": AbuseReport.NONE.value}
+        return {
+            "kernel": kern_id,
+            "abuse_report": abusing_report.get(kern_id, AbuseReport.NONE.value),
+        }
 
 
 async def check_scaling_group(
