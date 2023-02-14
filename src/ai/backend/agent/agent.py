@@ -1280,6 +1280,10 @@ class AbstractAgent(
                     kernel_obj.agent_config = self.local_config
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.__ainit__()
+        except EOFError:
+            log.warning(
+                "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
+            )
         except FileNotFoundError:
             pass
         async with self.resource_lock:
