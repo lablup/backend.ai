@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import enum
+import logging
 import os.path
 import uuid
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, List, Mapping, NamedTuple, Optional, Sequence
 
+import aiohttp
+import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
@@ -14,6 +17,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderMount
 
 from ..api.exceptions import InvalidAPIParameters, VFolderNotFound, VFolderOperationFailed
@@ -32,6 +36,7 @@ from .base import (
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import UserRole
+from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
@@ -49,7 +54,9 @@ __all__: Sequence[str] = (
     "VFolderPermissionValidator",
     "VFolderOperationStatus",
     "VFolderAccessStatus",
+    "VFolderDeletionInfo",
     "query_accessible_vfolders",
+    "initiate_vfolder_removal",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
     "verify_vfolder_name",
@@ -57,6 +64,9 @@ __all__: Sequence[str] = (
     "filter_host_allowed_permission",
     "ensure_host_permission_allowed",
 )
+
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class VFolderUsageMode(str, enum.Enum):
@@ -133,6 +143,11 @@ class VFolderAccessStatus(str, enum.Enum):
     READABLE = "readable"
     UPDATABLE = "updatable"
     DELETABLE = "deletable"
+
+
+class VFolderDeletionInfo(NamedTuple):
+    vfolder_id: uuid.UUID
+    host: str
 
 
 vfolders = sa.Table(
@@ -291,6 +306,7 @@ async def query_accessible_vfolders(
         vfolders.c.unmanaged_path,
         vfolders.c.cloneable,
         vfolders.c.status,
+        vfolders.c.cur_size,
         # vfolders.c.permission,
         # users.c.email,
     ]
@@ -329,6 +345,7 @@ async def query_accessible_vfolders(
                     "unmanaged_path": row.vfolders_unmanaged_path,
                     "cloneable": row.vfolders_cloneable,
                     "status": row.vfolders_status,
+                    "cur_size": row.vfolders_cur_size,
                 }
             )
 
@@ -516,7 +533,7 @@ async def get_allowed_vfolder_hosts_by_user(
         sa.select([groups.c.allowed_vfolder_hosts])
         .select_from(j)
         .where(
-            (domains.c.name == domain_name) & (groups.c.is_active),
+            (groups.c.domain_name == domain_name) & (groups.c.is_active),
         )
     )
     if rows := (await conn.execute(query)).fetchall():
@@ -734,6 +751,59 @@ async def filter_host_allowed_permission(
     return allowed_hosts
 
 
+async def initiate_vfolder_removal(
+    engine: ExtendedAsyncSAEngine,
+    requested_vfolders: Sequence[VFolderDeletionInfo],
+    storage_manager: StorageSessionManager,
+    storage_ptask_group: aiotools.PersistentTaskGroup,
+) -> int:
+    vfolder_info_len = len(requested_vfolders)
+    vfolder_ids = tuple(vf_id for vf_id, _ in requested_vfolders)
+    cond = vfolders.c.id.in_(vfolder_ids)
+    if vfolder_info_len == 0:
+        return 0
+    elif vfolder_info_len == 1:
+        cond = vfolders.c.id == vfolder_ids[0]
+
+    async with engine.begin_session() as db_session:
+
+        async def _update_vfolder_status() -> None:
+            query = sa.update(vfolders).values(status=VFolderOperationStatus.DELETING).where(cond)
+            await db_session.execute(query)
+
+        await execute_with_retry(_update_vfolder_status)
+
+    async def _delete():
+        for folder_id, host_name in requested_vfolders:
+            proxy_name, volume_name = storage_manager.split_host(host_name)
+            try:
+                async with storage_manager.request(
+                    proxy_name,
+                    "POST",
+                    "folder/delete",
+                    json={
+                        "volume": volume_name,
+                        "vfid": str(folder_id),
+                    },
+                ):
+                    pass
+            except aiohttp.ClientResponseError:
+                raise VFolderOperationFailed(extra_msg=str(folder_id))
+
+        async with engine.begin_session() as db_session:
+
+            async def _delete_row() -> None:
+                await db_session.execute(sa.delete(vfolders).where(cond))
+
+            await execute_with_retry(_delete_row)
+        log.debug("Successfully removed vFolders {}", [str(x) for x in vfolder_ids])
+
+    storage_ptask_group.create_task(_delete())
+    log.debug("Started removing vFolders {}", [str(x) for x in vfolder_ids])
+
+    return vfolder_info_len
+
+
 class VirtualFolder(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)
@@ -784,13 +854,10 @@ class VirtualFolder(graphene.ObjectType):
             # num_attached=row['num_attached'],
             cloneable=row["cloneable"],
             status=row["status"],
+            cur_size=row["cur_size"],
         )
 
     async def resolve_num_files(self, info: graphene.ResolveInfo) -> int:
-        # TODO: measure on-the-fly
-        return 0
-
-    async def resolve_cur_size(self, info: graphene.ResolveInfo) -> int:
         # TODO: measure on-the-fly
         return 0
 
@@ -833,6 +900,7 @@ class VirtualFolder(graphene.ObjectType):
         "last_used": ("vfolders_last_used", None),
         "cloneable": ("vfolders_cloneable", None),
         "status": ("vfolders_status", None),
+        "cur_size": ("vfolders_cur_size", None),
     }
 
     @classmethod

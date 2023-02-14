@@ -19,6 +19,7 @@ from setproctitle import setproctitle
 from ai.backend.common import config
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.logging import BraceStyleAdapter, Logger
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__ as VERSION
@@ -163,10 +164,24 @@ async def server_main(
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(cli_ctx, config_path, debug):
+def main(cli_ctx, config_path, log_level, debug=False):
+
+    if debug:
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
+        log_level = LogSeverity.DEBUG
+
+    click.echo("Selected logging level for storage : " + log_level.value)
+
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "storage-proxy")
 
@@ -174,7 +189,7 @@ def main(cli_ctx, config_path, debug):
     config.override_with_env(raw_cfg, ("etcd", "addr"), "BACKEND_ETCD_ADDR")
     config.override_with_env(raw_cfg, ("etcd", "user"), "BACKEND_ETCD_USER")
     config.override_with_env(raw_cfg, ("etcd", "password"), "BACKEND_ETCD_PASSWORD")
-    if debug:
+    if log_level == LogSeverity.DEBUG:
         config.override_key(raw_cfg, ("debug", "enabled"), True)
 
     try:
@@ -188,9 +203,8 @@ def main(cli_ctx, config_path, debug):
         print(pformat(e.invalid_data), file=sys.stderr)
         raise click.Abort()
 
-    if local_config["debug"]["enabled"]:
-        config.override_key(local_config, ("logging", "level"), "DEBUG")
-        config.override_key(local_config, ("logging", "pkg-ns", "ai.backend"), "DEBUG")
+    config.override_key(local_config, ("logging", "level"), log_level.name)
+    config.override_key(local_config, ("logging", "pkg-ns", "ai.backend"), log_level.name)
 
     # if os.getuid() != 0:
     #     print('Storage agent can only be run as root', file=sys.stderr)
