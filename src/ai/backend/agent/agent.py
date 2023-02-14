@@ -2038,3 +2038,7 @@ class AbstractAgent(
             log.debug("saved {}", last_registry_file)
         except Exception as e:
             log.exception("unable to save {}", last_registry_file, exc_info=e)
+            try:
+                os.remove(var_base_path / last_registry_file)
+            except FileNotFoundError:
+                pass
