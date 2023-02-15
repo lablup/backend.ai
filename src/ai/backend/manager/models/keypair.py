@@ -40,7 +40,7 @@ from .base import (
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .user import ModifyUserInput, UserRole
-from .utils import agg_str
+from .utils import agg_to_array
 
 __all__: Sequence[str] = (
     "keypairs",
@@ -213,7 +213,7 @@ class KeyPair(graphene.ObjectType):
             user=row["user"],
             ssh_public_key=row["ssh_public_key"],
             concurrency_limit=0,  # deprecated
-            projects=row["groups_name"].split(","),
+            projects=row["groups_name"],
         )
 
     async def resolve_num_queries(self, info: graphene.ResolveInfo) -> int:
@@ -307,7 +307,7 @@ class KeyPair(graphene.ObjectType):
         "last_used": ("keypairs_last_used", None),
         "rate_limit": ("keypairs_rate_limit", None),
         "num_queries": ("keypairs_num_queries", None),
-        "projects": ("groups_name", agg_str),
+        "projects": ("groups_name", agg_to_array),
     }
 
     @classmethod
@@ -369,7 +369,7 @@ class KeyPair(graphene.ObjectType):
                     keypairs,
                     users.c.email,
                     users.c.full_name,
-                    agg_str(groups.c.name).label("groups_name"),
+                    agg_to_array(groups.c.name).label("groups_name"),
                 ]
             )
             .select_from(j)

@@ -9,7 +9,7 @@ __all__ = (
     "OrderSpecItem",
 )
 
-OrderSpecItem = tuple[str, Optional[Callable[[str], Any]]]
+OrderSpecItem = tuple[str, Optional[Callable[[sa.Column], Any]]]
 
 _grammar = r"""
     ?start: expr
@@ -40,7 +40,7 @@ class QueryOrderTransformer(Transformer):
             if self._column_map:
                 col_value, func = self._column_map[col_name]
                 if func is not None:
-                    col = func(col_value)
+                    col = func(self._sa_table.c[col_value])
                 else:
                     col = self._sa_table.c[col_value]
             else:

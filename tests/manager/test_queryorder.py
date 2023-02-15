@@ -3,7 +3,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
 
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
-from ai.backend.manager.models.utils import agg_str
+from ai.backend.manager.models.utils import agg_to_str
 
 
 @pytest.fixture
@@ -150,7 +150,7 @@ async def test_aggregated_foreign_fields(virtual_grid_db) -> None:
     conn, grid, foreign_grid = virtual_grid_db
     parser = QueryOrderParser(
         {
-            "dogs_name": ("dogs_name", agg_str),
+            "dogs_name": ("dogs_name", agg_to_str),
         }
     )
 
@@ -158,7 +158,7 @@ async def test_aggregated_foreign_fields(virtual_grid_db) -> None:
         sa.select(
             [
                 grid.c.id,
-                agg_str(foreign_grid.c.name).label("dogs_name"),
+                agg_to_str(foreign_grid.c.name).label("dogs_name"),
             ]
         )
         .select_from(sa.join(grid, foreign_grid, grid.c.id == foreign_grid.c.user_id))
