@@ -206,6 +206,36 @@ def umount_host(name, edit_fstab):
 
 
 @vfolder.command
+def list_shared_vfolders():
+    """
+    List all shared vfolder.
+    (superadmin privilege required)
+    """
+    with Session() as session:
+        try:
+            resp = session.VFolder.list_shared_vfolders()
+            result = resp.get("shared", [])
+            for _result in result:
+                print(
+                    'Virtual folder "{0}" (ID: {1})'.format(
+                        _result["vfolder_name"], _result["vfolder_id"]
+                    )
+                )
+                print("- Owner: {0}".format(_result["owner"]))
+                print("- Status: {0}".format(_result["status"]))
+                print("- Permission: {0}".format(_result["perm"]))
+                print("- Folder Type: {0}".format(_result["type"]))
+                shared_to = _result.get("shared_to", {})
+                if shared_to:
+                    print("- Shared to:")
+                    for k, v in shared_to.items():
+                        print("\t- {0}: {1}\n".format(k, v))
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@vfolder.command
 @click.argument("vfolder_id", type=str)
 def shared_vfolder_info(vfolder_id):
     """Show the vfolder permission information of the given virtual folder.
@@ -225,9 +255,10 @@ def shared_vfolder_info(vfolder_id):
                     )
                 )
                 print("- Owner: {0}".format(_result["owner"]))
+                print("- Status: {0}".format(_result["status"]))
                 print("- Permission: {0}".format(_result["perm"]))
                 print("- Folder Type: {0}".format(_result["type"]))
-                shared_to = _result.get("shared_to", [])
+                shared_to = _result.get("shared_to", {})
                 if shared_to:
                     print("- Shared to:")
                     for k, v in shared_to.items():

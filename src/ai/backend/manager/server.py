@@ -40,6 +40,7 @@ from ai.backend.common.events import EventDispatcher, EventProducer
 from ai.backend.common.logging import BraceStyleAdapter, Logger
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.plugin.monitor import INCREMENT
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.utils import env_info
 
 from . import __version__
@@ -780,15 +781,29 @@ async def server_main_logwrapper(
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, debug: bool) -> None:
+def main(
+    ctx: click.Context, config_path: Path, log_level: LogSeverity, debug: bool = False
+) -> None:
     """
     Start the manager service as a foreground process.
     """
+    if debug:
+        click.echo("Please use --log-level options instead")
+        click.echo("--debug options will soon change to --log-level TEXT option.")
+        log_level = LogSeverity.DEBUG
 
-    cfg = load_config(config_path, debug)
+    click.echo("Selected logging level for manager : " + log_level.value)
+
+    cfg = load_config(config_path, log_level.value)
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))

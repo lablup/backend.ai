@@ -37,6 +37,7 @@ _default_list_fields = (
     vfolder_fields["group_id"],
     vfolder_fields["permission"],
     vfolder_fields["ownership_type"],
+    vfolder_fields["status"],
 )
 
 
@@ -589,6 +590,13 @@ class VFolder(BaseFunction):
         )
         async with rqst.fetch() as resp:
             return await resp.text()
+
+    @api_function
+    @classmethod
+    async def list_shared_vfolders(cls):
+        rqst = Request("GET", "folders/_/shared")
+        async with rqst.fetch() as resp:
+            return await resp.json()
 
     @api_function
     @classmethod
