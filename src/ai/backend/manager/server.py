@@ -357,7 +357,7 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 async def _dispatch():
                     stream_key = "events"
                     raw_event = {
-                        b"kernel": kernel_id.encode(),
+                        b"kernel": str(kernel_id).encode(),
                         b"status": status.encode(),
                     }
                     await redis_helper.execute(
