@@ -6,7 +6,7 @@ from pathlib import Path
 
 import tomlkit
 
-pr_number = sys.args[1]
+pr_number = sys.argv[1]
 path = Path("./changes")
 
 with open("./pyproject.toml", "r") as f:
