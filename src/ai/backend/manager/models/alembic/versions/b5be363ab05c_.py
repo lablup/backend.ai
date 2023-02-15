@@ -5,8 +5,10 @@ Revises: cace152eefac
 Create Date: 2023-02-15 15:24:29.112938
 
 """
-import sqlalchemy as sa
+import textwrap
+
 from alembic import op
+from sqlalchemy.sql import text
 
 # revision identifiers, used by Alembic.
 revision = "b5be363ab05c"
@@ -16,8 +18,28 @@ depends_on = None
 
 
 def upgrade():
-    pass
+    conn = op.get_bind()
+    conn.execute(
+        text(
+            textwrap.dedent(
+                """\
+            ALTER TABLE sessions
+                ALTER COLUMN session_type ADD VALUE 'INFERENCE'
+            """
+            )
+        )
+    )
 
 
 def downgrade():
-    pass
+    conn = op.get_bind()
+    conn.execute(
+        text(
+            textwrap.dedent(
+                """\
+            ALTER TABLE sessions
+                ALTER COLUMN session_type DROP INFERENCE
+            """
+            )
+        )
+    )
