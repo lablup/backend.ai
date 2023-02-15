@@ -58,7 +58,7 @@ __all__: Sequence[str] = (
 @attr.define(slots=True)
 class ScalingGroupOpts(JSONSerializableMixin):
     allowed_session_types: list[SessionTypes] = attr.Factory(
-        lambda: [SessionTypes.INTERACTIVE, SessionTypes.BATCH],
+        lambda: [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.INFERENCE],
     )
     pending_timeout: timedelta = timedelta(seconds=0)
     config: Mapping[str, Any] = attr.Factory(dict)

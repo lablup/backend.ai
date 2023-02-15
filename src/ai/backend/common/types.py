@@ -271,6 +271,7 @@ class ServicePortProtocols(str, enum.Enum):
 class SessionTypes(str, enum.Enum):
     INTERACTIVE = "interactive"
     BATCH = "batch"
+    INFERENCE = "inference"
 
 
 class SessionResult(str, enum.Enum):
