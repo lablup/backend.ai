@@ -37,6 +37,7 @@ class RootContext(BaseContext):
     redis_image: RedisConnectionInfo
     redis_stream: RedisConnectionInfo
     redis_lock: RedisConnectionInfo
+    redis_pipeline_event: RedisConnectionInfo
     shared_config: SharedConfig
     local_config: LocalConfig
     cors_options: CORSOptions

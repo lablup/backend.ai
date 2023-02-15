@@ -266,7 +266,7 @@ manager_local_config_iv = (
             ).allow_extra("*"),
             t.Key("pipeline"): t.Dict(
                 {
-                    t.Key("event-queue", default=None): t.Null | t.String,
+                    t.Key("event-queue", default=None): t.Null | tx.HostPortPair,
                 },
             ).allow_extra("*"),
             t.Key("docker-registry"): t.Dict(

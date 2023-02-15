@@ -308,21 +308,32 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_LOCK,
     )
-    for redis_info in (
+    root_ctx.redis_pipeline_event = redis_helper.get_redis_object(
+        {
+            "addr": root_ctx.local_config["pipeline"]["event-queue"],
+            "sentinel": None,
+            "service_name": None,
+            "password": None,
+        },
+        db=1,  # REDIS_PIPELINE_EVENT
+    )
+
+    redis_objects = (
         root_ctx.redis_live,
         root_ctx.redis_stat,
         root_ctx.redis_image,
         root_ctx.redis_stream,
         root_ctx.redis_lock,
-    ):
+        root_ctx.redis_pipeline_event,
+    )
+    for redis_info in redis_objects:
         assert isinstance(redis_info.client, Redis)
         await redis_helper.ping_redis_connection(redis_info.client)
+
     yield
-    await root_ctx.redis_stream.close()
-    await root_ctx.redis_image.close()
-    await root_ctx.redis_stat.close()
-    await root_ctx.redis_live.close()
-    await root_ctx.redis_lock.close()
+
+    for redis_object in redis_objects:
+        await redis_object.close()
 
 
 @actxmgr
@@ -342,6 +353,23 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                     '[manager.server] EXECUTE(): kernel({}) status="{}"', str(kernel_id), status
                 )
                 # TODO: Send message (kernel_id=kernel_id, status=status)
+
+                async def _dispatch():
+                    stream_key = "events"
+                    raw_event = {
+                        b"kernel": kernel_id.encode(),
+                        b"status": status.encode(),
+                    }
+                    await redis_helper.execute(
+                        root_ctx.redis_pipeline_event.client,
+                        lambda r: r.xadd(stream_key, raw_event),  # type: ignore # aio-libs/aioredis-py#1182
+                    )
+
+                # asyncio.run(_dispatch())
+                # asyncio.get_event_loop_policy().get_event_loop().run_
+                # asyncio.get_running_loop().run_until_complete(_dispatch())
+                # asyncio.get_event_loop().run_until_complete(_dispatch())
+                # await redis_helper.execute()
 
         root_ctx.db = db
         yield
