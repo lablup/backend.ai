@@ -283,6 +283,31 @@ Example: An Ubuntu-based Kernel
     COPY policy.yml /etc/backend.ai/jail/policy.yml
 
 
+
+Custom startup scripts (aka custom entrypoint)
+----------------------------------------------
+
+When the image has preopen service ports and/or an endpoint port, Backend.AI automatically sets up application proxy tunnels
+as if the listening applications are already started.
+
+To initialize and start such applications, put a shell script as ``/opt/container/bootstrap.sh`` when building the image.
+This per-image bootstrap script is executed by the agent-injected ``entrypoint.sh``.
+
+.. warning::
+
+   Since Backend.AI overrides the command and the entrypoint of container images to run the kernel runner regardless of the image content,
+   setting ``CMD`` or ``ENTRYPOINT`` in Dockerfile has **no effects**.
+   You should use ``/opt/container/bootstrap.sh`` to migrate existing entrypoint/command wrappers.
+
+``/opt/container/bootstrap.sh`` is executed as root and it must return immediately to prevent the session from staying in the ``PREPARING`` status.
+This means that it should run service applications in background by *daemonization*.
+To run a process as the user privilege, you should use ``su-exec`` which is also injected by the agent like:
+
+.. code-block:: shell
+
+   /opt/kernel/su-exec "${LOCAL_GROUP_ID}:${LOCAL_USER_ID}" /path/to/your/service
+
+
 Implementation details
 ----------------------
 
