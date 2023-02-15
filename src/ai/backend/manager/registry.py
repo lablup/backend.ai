@@ -2703,11 +2703,14 @@ class AgentRegistry:
         session: SessionRow,
     ) -> Mapping[str, str]:
         hash_name = "kernel_commit_status"
-        commit_status_map: Mapping[str, str] = await redis_helper.execute(
+        result: Mapping[bytes, bytes] = await redis_helper.execute(
             self.redis_stat,
             lambda r: r.hgetall(hash_name),
         )
-        kern_id = str(session.main_kernel)
+        commit_status_map: Mapping[str, str] = {
+            str(k, "utf-8"): str(v, "utf-8") for k, v in result.items()
+        }
+        kern_id = str(session.main_kernel.id)
         if commit_status_map is None:
             return {"kernel": kern_id, "status": CommitStatus.READY.value}
         return {

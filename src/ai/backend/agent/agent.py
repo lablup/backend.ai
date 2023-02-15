@@ -631,14 +631,14 @@ class AbstractAgent(
             abuse_report_path.mkdir(exist_ok=True, parents=True)
             self.timer_tasks.append(aiotools.create_timer(self._cleanup_reported_kernels, 30.0))
 
+        # Report commit status
+        self.timer_tasks.append(
+            aiotools.create_timer(self._report_all_kernel_commit_status_map, 3.0)
+        )
+
         loop = current_loop()
         self.last_registry_written_time = time.monotonic()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
-
-        # Report commit status
-        self.timer_tasks.append(
-            aiotools.create_timer(self._report_all_kernel_commit_status_map, 20.0)
-        )
 
         # Notify the gateway.
         await self.produce_event(AgentStartedEvent(reason="self-started"))
@@ -710,7 +710,7 @@ class AbstractAgent(
         pretty_tb = "".join(traceback.format_tb(tb)).strip()
         await self.produce_event(AgentErrorEvent(pretty_message, pretty_tb))
 
-    async def _report_all_kernel_commit_status_map(self) -> None:
+    async def _report_all_kernel_commit_status_map(self, interval: float) -> None:
         """
         Commit statuses are managed by `lock` file.
         +- base_commit_path
@@ -747,16 +747,23 @@ class AbstractAgent(
             f"""
             local key = '{hash_name}'
             local new_statuses = {{}}
-            for i, v in ipairs(KEYS) do
-                new_statuses[v] = ARGV[i]
+            if next(KEYS) ~= nil then
+                for i, v in ipairs(KEYS) do
+                    new_statuses[v] = ARGV[i]
+                end
             end
             local all_commit_statuses = redis.call('HKEYS', key)
-            for _, v in ipairs(all_commit_statuses) do
-                if not new_statuses[v] then
-                    redis.call('HDEL', key, v)
+            if all_commit_statuses ~= nil and next(all_commit_statuses) ~= nil then
+                for _, v in ipairs(all_commit_statuses) do
+                    if next(new_statuses) == nil or not new_statuses[v] then
+                        redis.call('HDEL', key, v)
+                    end
                 end
-            for kern_id, status in ipairs(new_statuses) do
-                redis.call('HSET', key, kern_id, status)
+            end
+            if next(new_statuses) ~= nil then
+                for kern_id, status in pairs(new_statuses) do
+                    redis.call('HSET', key, kern_id, status)
+                end
             end
         """
         )
