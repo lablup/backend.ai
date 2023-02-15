@@ -287,11 +287,11 @@ Example: An Ubuntu-based Kernel
 Custom startup scripts (aka custom entrypoint)
 ----------------------------------------------
 
-When the image has preopen service ports and/or an endpoint port, Backend.AI automatically sets up application proxy tunnels
+When the image has *preopen* service ports and/or an endpoint port, Backend.AI automatically sets up application proxy tunnels
 as if the listening applications are already started.
 
 To initialize and start such applications, put a shell script as ``/opt/container/bootstrap.sh`` when building the image.
-This per-image bootstrap script is executed by the agent-injected ``entrypoint.sh``.
+This per-image bootstrap script is executed as *root* by the agent-injected ``entrypoint.sh``.
 
 .. warning::
 
@@ -301,7 +301,7 @@ This per-image bootstrap script is executed by the agent-injected ``entrypoint.s
 
 .. warning::
 
-   ``/opt/container/bootstrap.sh`` is executed as root and it must return immediately to prevent the session from staying in the ``PREPARING`` status.
+   ``/opt/container/bootstrap.sh`` **must return immediately** to prevent the session from staying in the ``PREPARING`` status.
    This means that it should run service applications in background by *daemonization*.
 
 To run a process as the user privilege, you should use ``su-exec`` which is also injected by the agent like:
