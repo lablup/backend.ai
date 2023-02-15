@@ -42,14 +42,17 @@ Note that these three base distributions practically cover all commonly availabl
 Image Prerequisites
 ~~~~~~~~~~~~~~~~~~~
 
-Currently Python does not officially support static-linking OpenSSL it depends on until `bpo-38794 <https://bugs.python.org/issue38794>`_ is resolved.
-Therefore, All Docker images to be used as Backend.AI kernel images should have its own OpenSSL system packages, such as ``libssl`` or ``openssl`` depending on the distributions.
+For glibc-based (most) Linux kernel images, you don't have to add anything to the existing container image as we use a statically built Python distribution with precompiled wheels to run the kernel runner.
+The only requirement is that it should be compatible with `manylinux2014 <https://peps.python.org/pep-0599/#the-manylinux2014-policy>`_ or later.
+
+For musl-based Linux kernel images (e.g., Alpine), you have to install ``libffi`` and ``sqlite-libs`` as the minimum.
+Please also refer `the Dockerfile to build a minimal compatible image <https://github.com/lablup/backend.ai-krunner-alpine/blob/master/compat-test.Dockerfile>`_.
 
 
 Metadata Labels
 ---------------
 
-Any Docker image based on Alpine 3.8+, CentOS 7+, and Ubuntu 16.04+ become a Backend.AI kernel image if you add the following image labels:
+Any Docker image based on Alpine 3.17+, CentOS 7+, and Ubuntu 16.04+ which satisfies the above prerequisites may become a Backend.AI kernel image if you add the following image labels:
 
 * Required Labels
 
@@ -80,8 +83,11 @@ Any Docker image based on Alpine 3.8+, CentOS 7+, and Ubuntu 16.04+ become a Bac
 
 * Optional Labels
 
+  * ``ai.backend.role``: ``COMPUTE`` (default if unspecified) or ``INFERENCE``
   * ``ai.backend.service-ports``: A list of port mapping declaration strings for services supported by the image. (See the next section for details)
     Backend.AI manages the host-side port mapping and network tunneling via the API gateway automagically.
+  * ``ai.backend.endpoint-port``: The name of a service port to be bound with the service endpoint. (Required in inference sessions)
+  * ``ai.backend.model-path``: The path to mount the target model's target version storage folder. (Required in inference sessions)
   * ``ai.backend.envs.corecount``: A comma-separated string list of environment variable names.
     They are set to the number of available CPU cores to the kernel container.
     It allows the CPU core restriction to be enforced to legacy parallel computation libraries.

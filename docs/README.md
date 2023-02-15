@@ -16,12 +16,17 @@ Developer guide for Backend.AI documentation
 Then, follow the instructions below:
 
 ```console
-$ pyenv virtualenv $(pyenv latest 3.11) venv-bai-docs
-$ git clone https://github.com/lablup/backend.ai backend.ai
-$ cd ~/backend.ai/docs
-$ pyenv local venv-bai-docs
+$ pyenv virtualenv $(pyenv latest 3.11) bai-docs
+$ git clone https://github.com/lablup/backend.ai bai-dev
+$ cd ./bai-dev/docs
+$ pyenv local bai-docs
 $ pip install -U pip setuptools wheel
-$ pip install -U -r requirements.txt   # docs/requirements.txt
+$ pip install -U \
+>     --find-links=https://dist.backend.ai/pypi/simple/grpcio \
+>     --find-links=https://dist.backend.ai/pypi/simple/grpcio-tools \
+>     --find-links=https://dist.backend.ai/pypi/simple/hiredis \
+>     --find-links=https://dist.backend.ai/pypi/simple/psycopg-binary \
+>     -r requirements.txt
 ```
 
 ## Building HTML document

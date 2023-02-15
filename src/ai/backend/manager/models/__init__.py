@@ -2,6 +2,7 @@ from . import acl as _acl
 from . import agent as _agent
 from . import domain as _domain
 from . import dotfile as _dotfile
+from . import endpoint as _endpoint
 from . import error_logs as _errorlogs
 from . import group as _group
 from . import image as _image
@@ -22,6 +23,7 @@ __all__ = (
     *_acl.__all__,
     *_agent.__all__,
     *_domain.__all__,
+    *_endpoint.__all__,
     *_group.__all__,
     *_image.__all__,
     *_kernel.__all__,
@@ -42,6 +44,7 @@ from .acl import *  # noqa
 from .agent import *  # noqa
 from .domain import *  # noqa
 from .dotfile import *  # noqa
+from .endpoint import *  # noqa
 from .error_logs import *  # noqa
 from .group import *  # noqa
 from .image import *  # noqa
