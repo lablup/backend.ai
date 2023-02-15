@@ -349,10 +349,6 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             kernel_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
             if matches := re.search("status=([A-Z]*)[,]+", statement % parameters):
                 _, status = matches.group().strip(",").split("=")
-                log.warning(
-                    '[manager.server] EXECUTE(): kernel({}) status="{}"', str(kernel_id), status
-                )
-                # TODO: Send message (kernel_id=kernel_id, status=status)
 
                 async def _dispatch():
                     stream_key = "events"
@@ -365,11 +361,7 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                         lambda r: r.xadd(stream_key, raw_event),  # type: ignore # aio-libs/aioredis-py#1182
                     )
 
-                # asyncio.run(_dispatch())
-                # asyncio.get_event_loop_policy().get_event_loop().run_
-                # asyncio.get_running_loop().run_until_complete(_dispatch())
-                # asyncio.get_event_loop().run_until_complete(_dispatch())
-                # await redis_helper.execute()
+                asyncio.create_task(_dispatch())
 
         root_ctx.db = db
         yield
