@@ -42,9 +42,9 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `./pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.10.9"]
+interpreter_constraints = ["CPython==3.11.2"]
 tailor_pex_binary_targets = false
-resolves_to_interpreter_constraints = "{'python-kernel': ['==3.10.*'], 'pants-plugins': ['==3.9.*']}"
+resolves_to_interpreter_constraints = "{'python-kernel': ['==3.11.*'], 'pants-plugins': ['==3.9.*']}"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
@@ -73,7 +73,7 @@ pants-plugins = "tools/pants-plugins.lock"
 
 [black]
 version = "black~=22.6"
-interpreter_constraints = ["CPython>=3.10,<4"]
+interpreter_constraints = ["CPython>=3.11,<4"]
 lockfile = "tools/black.lock"
 
 [flake8]
@@ -85,7 +85,7 @@ lockfile = "tools/flake8.lock"
 
 [isort]
 lockfile = "tools/isort.lock"
-interpreter_constraints = ["CPython>=3.10,<4"]
+interpreter_constraints = ["CPython>=3.11,<4"]
 
 [pytest]
 version = "pytest>=7.1.2"
@@ -103,13 +103,13 @@ execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 
 [coverage-py]
 version = "coverage[toml]>=6.4,<7.0"
-interpreter_constraints = ["CPython>=3.10,<4"]
+interpreter_constraints = ["CPython>=3.11,<4"]
 report = ["xml", "console"]
 lockfile = "tools/coverage-py.lock"
 
 [mypy]
 version = "mypy==1.0.0"
-interpreter_constraints = ["CPython>=3.10,<4"]
+interpreter_constraints = ["CPython>=3.11,<4"]
 extra_requirements.add = [
 ]
 lockfile = "tools/mypy.lock"

@@ -363,19 +363,13 @@ class DockerCodeRunner(AbstractCodeRunner):
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
 
-async def prepare_krunner_env_impl(distro: str) -> Tuple[str, Optional[str]]:
-    if distro.startswith("static-"):
-        distro_name = distro.replace("-", "_")  # pkg/mod name use underscores
-    else:
-        if (m := re.search(r"^([a-z]+)\d+\.\d+$", distro)) is None:
-            raise ValueError('Unrecognized "distro[version]" format string.')
-        distro_name = m.group(1)
+async def prepare_krunner_env_impl(distro: str, entrypoint_name: str) -> Tuple[str, Optional[str]]:
     docker = Docker()
     arch = get_arch_name()
     current_version = int(
         Path(
             pkg_resources.resource_filename(
-                f"ai.backend.krunner.{distro_name}", f"./krunner-version.{distro}.txt"
+                f"ai.backend.krunner.{entrypoint_name}", f"./krunner-version.{distro}.txt"
             )
         )
         .read_text()
@@ -416,7 +410,7 @@ async def prepare_krunner_env_impl(distro: str) -> Tuple[str, Optional[str]]:
         if do_create:
             archive_path = Path(
                 pkg_resources.resource_filename(
-                    f"ai.backend.krunner.{distro_name}", f"krunner-env.{distro}.{arch}.tar.xz"
+                    f"ai.backend.krunner.{entrypoint_name}", f"krunner-env.{distro}.{arch}.tar.xz"
                 )
             ).resolve()
             if not archive_path.exists():
@@ -467,7 +461,7 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, S
     tar archives.
     """
 
-    all_distros = []
+    all_distros: list[tuple[str, str]] = []
     entry_prefix = "backendai_krunner_v10"
     for entrypoint in scan_entrypoints(entry_prefix):
         log.debug("loading krunner pkg: {}", entrypoint.module)
@@ -483,12 +477,12 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, S
             .read_text()
             .splitlines()
         )
-        all_distros.extend(provided_versions)
+        all_distros.extend((distro, entrypoint.name) for distro in provided_versions)
 
     tasks = []
     async with TaskGroup() as tg:
-        for distro in all_distros:
-            tasks.append(tg.create_task(prepare_krunner_env_impl(distro)))
+        for distro, entrypoint_name in all_distros:
+            tasks.append(tg.create_task(prepare_krunner_env_impl(distro, entrypoint_name)))
     distro_volumes = [t.result() for t in tasks if not t.cancelled()]
     result = {}
     for distro_name_and_version, volume_name in distro_volumes:
