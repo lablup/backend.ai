@@ -70,18 +70,17 @@ def rescan(registry: str) -> None:
                 completion_msg_func = lambda: print_done("Finished registry scanning.")
                 async with (
                     bgtask.listen_events() as response,
-                    ProgressViewer(
-                        spinner_msg="Scanning the registry...",
-                        unit="image",
-                    ) as (pv, pbar),
+                    ProgressViewer("Scanning the registry...") as viewer,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
                         if ev.event == "bgtask_updated":
-                            await pv.to_tqdm()
-                            pbar.total = data["total_progress"]
-                            pbar.write(data["message"])
-                            pbar.update(data["current_progress"] - pbar.n)
+                            if viewer.tqdm is None:
+                                pbar = await viewer.to_tqdm(unit="images")
+                            else:
+                                pbar.total = data["total_progress"]
+                                pbar.write(data["message"])
+                                pbar.update(data["current_progress"] - pbar.n)
                         elif ev.event == "bgtask_failed":
                             error_msg = data["message"]
                             completion_msg_func = lambda: print_fail(f"Error occurred: {error_msg}")

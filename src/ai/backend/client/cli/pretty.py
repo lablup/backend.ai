@@ -226,10 +226,10 @@ class ProgressViewer:
     Usage:
 
     ```
-    async with ProgressViewer("Waiting...") as (viewer, tqdm):
+    async with ProgressViewer("Waiting...") as viewer:
         for i in range(10):
             await asyncio.sleep(0.2)
-        await viewer.to_tqdm()
+        tqdm = await viewer.to_tqdm()
         tqdm.total = 10
         for i in range(10):
             await asyncio.sleep(0.2)
@@ -237,25 +237,20 @@ class ProgressViewer:
     ```
     """
 
-    spinner: Spinner
-    tqdm: tqdm
-
-    def __init__(self, spinner_msg: str, unit: str = "it", delay: float = 0.3):
+    def __init__(self, spinner_msg: str = "", delay: float = 0.3) -> None:
         self.spinner = Spinner(spinner_msg, delay)
-        self.tqdm = tqdm(total=0, unit=unit)
-        print(end="\x1b[2K\r", file=sys.stderr)  # clear line
+        self.tqdm = None
 
     async def __aenter__(self):
         self.spinner.run()
-        return self, self.tqdm
+        return self
 
-    async def __aexit__(self, exc_type, exc_value, traceback):
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
         await self.spinner.stop()
-        if self.tqdm.total == 0:
-            self.tqdm.disable = True
-        self.tqdm.close()
+        if self.tqdm:
+            self.tqdm.close()
 
-    async def to_tqdm(self):
+    async def to_tqdm(self, unit: str = "it") -> tqdm:
         await self.spinner.stop()
-        print(end="\x1b[2K\r", file=sys.stderr)  # clear line
-        self.tqdm.disable = False
+        self.tqdm = tqdm(total=0, unit=unit)
+        return self.tqdm

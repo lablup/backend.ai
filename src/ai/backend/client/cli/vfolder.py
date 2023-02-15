@@ -729,15 +729,17 @@ def clone(name, target_name, target_host, usage_mode, permission):
                     ProgressViewer(
                         "Cloning the vfolder... "
                         "(This may take a while depending on its size and number of files!)",
-                    ) as (pv, pbar),
+                    ) as viewer,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
                         if ev.event == "bgtask_updated":
-                            await pv.to_tqdm()
-                            pbar.total = data["total_progress"]
-                            pbar.write(data["message"])
-                            pbar.update(data["current_progress"] - pbar.n)
+                            if viewer.tqdm is None:
+                                pbar = await viewer.to_tqdm()
+                            else:
+                                pbar.total = data["total_progress"]
+                                pbar.write(data["message"])
+                                pbar.update(data["current_progress"] - pbar.n)
                         elif ev.event == "bgtask_failed":
                             error_msg = data["message"]
                             completion_msg_func = lambda: print_fail(
