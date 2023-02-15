@@ -299,8 +299,11 @@ This per-image bootstrap script is executed by the agent-injected ``entrypoint.s
    setting ``CMD`` or ``ENTRYPOINT`` in Dockerfile has **no effects**.
    You should use ``/opt/container/bootstrap.sh`` to migrate existing entrypoint/command wrappers.
 
-``/opt/container/bootstrap.sh`` is executed as root and it must return immediately to prevent the session from staying in the ``PREPARING`` status.
-This means that it should run service applications in background by *daemonization*.
+.. warning::
+
+   ``/opt/container/bootstrap.sh`` is executed as root and it must return immediately to prevent the session from staying in the ``PREPARING`` status.
+   This means that it should run service applications in background by *daemonization*.
+
 To run a process as the user privilege, you should use ``su-exec`` which is also injected by the agent like:
 
 .. code-block:: shell
