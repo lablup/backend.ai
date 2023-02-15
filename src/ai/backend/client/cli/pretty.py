@@ -6,6 +6,7 @@ import textwrap
 import traceback
 
 from click import echo, style
+from tqdm import tqdm
 
 from ..exceptions import BackendAPIError
 
@@ -186,23 +187,70 @@ def show_warning(message, category, filename, lineno, file=None, line=None):
 
 
 class Spinner:
-    def __init__(self, fixed_msg: str, delay: float = 0.3):
-        self.fixed_msg = fixed_msg
-        self.spinner_task = None
+    def __init__(self, msg: str, delay: float = 0.3):
+        self.msg = msg
+        self.task = None
         self.delay = delay
 
     async def __aenter__(self):
-        self.spinner_task = asyncio.create_task(self.run())
+        self.run()
+        return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        self.spinner_task.cancel()
-        await self.spinner_task
+        await self.stop()
 
-    async def run(self):
+    def run(self):
+        self.task = asyncio.create_task(self.spin())
+
+    async def spin(self):
         try:
             while True:
                 for char in "|/-\\":
-                    print_wait("{} {}".format(self.fixed_msg, char))
+                    print_wait("{} {}".format(self.msg, char))
                     await asyncio.sleep(self.delay)
         except asyncio.CancelledError:
             pass
+
+    async def stop(self):
+        self.task.cancel()
+        await self.task
+
+
+class ProgressViewer:
+    """
+
+    A context manager that displays a spinner and a tqdm progress bar.
+
+    It shows the spinner until it is switched explicitly to the tqdm progress bar.
+
+    Usage:
+
+    ```
+    async with ProgressViewer("Waiting...") as viewer:
+        for i in range(10):
+            await asyncio.sleep(0.2)
+        tqdm = await viewer.to_tqdm()
+        tqdm.total = 10
+        for i in range(10):
+            await asyncio.sleep(0.2)
+            tqdm.update(1)
+    ```
+    """
+
+    def __init__(self, spinner_msg: str = "", delay: float = 0.3) -> None:
+        self.spinner = Spinner(spinner_msg, delay)
+        self.tqdm = None
+
+    async def __aenter__(self):
+        self.spinner.run()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
+        await self.spinner.stop()
+        if self.tqdm:
+            self.tqdm.close()
+
+    async def to_tqdm(self, unit: str = "it") -> tqdm:
+        await self.spinner.stop()
+        self.tqdm = tqdm(total=0, unit=unit)
+        return self.tqdm
