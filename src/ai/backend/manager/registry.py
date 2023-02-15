@@ -2702,21 +2702,17 @@ class AgentRegistry:
         self,
         session: SessionRow,
     ) -> Mapping[str, str]:
-        kernel: KernelRow = session.main_kernel
-        kern_id = str(kernel.id)
-        if kernel.status != KernelStatus.RUNNING:
-            return {"status": "", "kernel": kern_id}
-        email = await self._get_user_email(kernel)
-        hash_name = f"kernel_commit_status.{email}"
-        commit_status_info: Mapping[str, str] = await redis_helper.execute(
+        hash_name = "kernel_commit_status"
+        commit_status_map: Mapping[str, str] = await redis_helper.execute(
             self.redis_stat,
             lambda r: r.hgetall(hash_name),
         )
-        if commit_status_info is None:
+        kern_id = str(session.main_kernel)
+        if commit_status_map is None:
             return {"kernel": kern_id, "status": CommitStatus.READY.value}
         return {
             "kernel": kern_id,
-            "status": commit_status_info.get(kern_id, CommitStatus.READY.value),
+            "status": commit_status_map.get(kern_id, CommitStatus.READY.value),
         }
 
     async def commit_session(

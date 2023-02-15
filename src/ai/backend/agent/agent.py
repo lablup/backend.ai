@@ -9,6 +9,7 @@ import re
 import shutil
 import signal
 import sys
+import textwrap
 import time
 import traceback
 import weakref
@@ -723,44 +724,48 @@ class AbstractAgent(
         ...
         `status_map` is like below.
         {
-            str(subdir1): {
-                str(kernel_id1): CommitStatus.ONGOING.value,
-                str(kernel_id2): CommitStatus.ONGOING.value,
-            },
-            str(subdir2): ...,
+            str(kernel_id1): CommitStatus.ONGOING.value,
+            str(kernel_id2): CommitStatus.ONGOING.value,
+            ...,
         }
         """
         loop = current_loop()
         base_commit_path: Path = self.local_config["agent"]["image-commit-path"]
-        status_map = {}
+        status_map: MutableMapping[str, str] = {}
 
         def _map_commit_status() -> None:
             for subdir in base_commit_path.iterdir():
-                ongoing_list = [commit_path.name for commit_path in subdir.glob("./**/lock/*")]
-                status_map[str(subdir)] = {
-                    kern: CommitStatus.ONGOING.value for kern in ongoing_list
-                }
+                for commit_path in subdir.glob("./**/lock/*"):
+                    kern = commit_path.name
+                    if kern not in status_map:
+                        status_map[kern] = CommitStatus.ONGOING.value
 
         await loop.run_in_executor(None, _map_commit_status)
 
-        async def _set_all_commit_status(r: Redis):
-            pipe = r.pipeline()
-            for subdir, ongoing_kernel_map in status_map.items():
-                hash_name = f"kernel_commit_status.{subdir}"
-                all_kern_statuses = await pipe.hgetall(hash_name)
-                deleting_statuses: list[str] = []
-                for kern_id in self.kernel_registry:
-                    str_kern_id = str(kern_id)
-                    if str_kern_id in all_kern_statuses and str_kern_id not in ongoing_kernel_map:
-                        deleting_statuses.append(str_kern_id)
-
-                await pipe.hdel(hash_name, *deleting_statuses)
-                await pipe.hset(hash_name, mapping=cast(Mapping, ongoing_kernel_map))
-            return pipe
-
-        await redis_helper.execute(
+        hash_name = "kernel_commit_status"
+        commit_status_script = textwrap.dedent(
+            f"""
+            local key = '{hash_name}'
+            local new_statuses = {{}}
+            for i, v in ipairs(KEYS) do
+                new_statuses[v] = ARGV[i]
+            end
+            local all_commit_statuses = redis.call('HKEYS', key)
+            for _, v in ipairs(all_commit_statuses) do
+                if not new_statuses[v] then
+                    redis.call('HDEL', key, v)
+                end
+            for kern_id, status in ipairs(new_statuses) do
+                redis.call('HSET', key, kern_id, status)
+            end
+        """
+        )
+        await redis_helper.execute_script(
             self.redis_stat_pool,
-            _set_all_commit_status,
+            "check_kernel_commit_statuses",
+            commit_status_script,
+            [*status_map.keys()],
+            [*status_map.values()],
         )
 
     async def heartbeat(self, interval: float):
