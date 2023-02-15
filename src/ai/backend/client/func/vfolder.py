@@ -278,6 +278,7 @@ class VFolder(BaseFunction):
         relative_paths: Sequence[Union[str, Path]],
         *,
         basedir: Union[str, Path] = None,
+        dst_dir: Union[str, Path] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         show_progress: bool = False,
         address_map: Optional[Mapping[str, str]] = None,
@@ -306,11 +307,10 @@ class VFolder(BaseFunction):
                             "but no url matches with any of them.\n",
                         )
 
-                download_url = URL(overriden_url).with_query(
-                    {
-                        "token": download_info["token"],
-                    }
-                )
+                params = {"token": download_info["token"]}
+                if dst_dir is not None:
+                    params["dst_dir"] = dst_dir
+                download_url = URL(overriden_url).with_query(params)
             await self._download_file(
                 file_path, download_url, chunk_size, max_retries, show_progress
             )
@@ -321,6 +321,7 @@ class VFolder(BaseFunction):
         files: Sequence[Union[str, Path]],
         *,
         basedir: Union[str, Path] = None,
+        dst_dir: Union[str, Path] = None,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         address_map: Optional[Mapping[str, str]] = None,
         show_progress: bool = False,
@@ -350,11 +351,10 @@ class VFolder(BaseFunction):
                             "Overriding storage proxy addresses are given, "
                             "but no url matches with any of them.\n",
                         )
-                upload_url = URL(overriden_url).with_query(
-                    {
-                        "token": upload_info["token"],
-                    }
-                )
+                params = {"token": upload_info["token"]}
+                if dst_dir is not None:
+                    params["dst_dir"] = dst_dir
+                upload_url = URL(overriden_url).with_query(params)
             tus_client = client.TusClient()
             if basedir:
                 input_file = open(base_path / file_path, "rb")
@@ -368,7 +368,9 @@ class VFolder(BaseFunction):
                 upload_checksum=False,
                 chunk_size=chunk_size,
             )
-            return await uploader.upload()
+            await uploader.upload()
+            input_file.close()
+        return None
 
     @api_function
     async def mkdir(

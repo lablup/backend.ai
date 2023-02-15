@@ -71,6 +71,7 @@ async def download(request: web.Request) -> web.StreamResponse:
                     secret=secret,
                     inner_iv=download_token_data_iv,
                 ),
+                t.Key("dst_dir", default=None): t.Null | t.String,
                 t.Key("archive", default=False): t.ToBool,
                 t.Key("no_cache", default=False): t.ToBool,
             },
@@ -84,7 +85,10 @@ async def download(request: web.Request) -> web.StreamResponse:
             else:
                 vfpath = volume.mangle_vfpath(token_data["vfid"])
             try:
-                file_path = (vfpath / token_data["relpath"]).resolve()
+                parent_dir = vfpath
+                if (dst_dir := params["dst_dir"]) is not None:
+                    parent_dir = vfpath / dst_dir
+                file_path = parent_dir / token_data["relpath"]
                 file_path.relative_to(vfpath)
                 if not file_path.exists():
                     raise FileNotFoundError
@@ -221,6 +225,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
                     secret=secret,
                     inner_iv=upload_token_data_iv,
                 ),
+                t.Key("dst_dir", default=None): t.Null | t.String,
             },
         ),
         read_from=CheckParamSource.QUERY,
@@ -245,6 +250,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     secret=secret,
                     inner_iv=upload_token_data_iv,
                 ),
+                t.Key("dst_dir", default=None): t.Null | t.String,
             },
         ),
         read_from=CheckParamSource.QUERY,
@@ -266,7 +272,12 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 
             current_size = Path(upload_temp_path).stat().st_size
             if current_size >= int(token_data["size"]):
-                target_path = vfpath / token_data["relpath"]
+                parent_dir = vfpath
+                if (dst_dir := params["dst_dir"]) is not None:
+                    parent_dir = vfpath / dst_dir
+                if not parent_dir.exists():
+                    parent_dir.mkdir(parents=True, exist_ok=True)
+                target_path = parent_dir / token_data["relpath"]
                 upload_temp_path.rename(target_path)
                 try:
                     loop = asyncio.get_running_loop()

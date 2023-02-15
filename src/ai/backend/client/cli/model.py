@@ -1,13 +1,16 @@
 import sys
+from pathlib import Path
 
 import click
+import humanize
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
+from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
 from ai.backend.client.session import Session
 
 from .extensions import pass_ctx_obj
-from .params import ByteSizeParamCheckType
+from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
 from .pretty import print_done, print_error
 from .types import CLIContext
 
@@ -47,15 +50,15 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 
 
 @model.command()
-@click.argument("model_id", metavar="MODEL", type=str)
-def info(model_id):
+@click.argument("model_name", metavar="MODEL", type=str)
+def info(model_name):
     """
     Info models.
     """
 
     with Session() as session:
         try:
-            result = session.Model(model_id).info()
+            result = session.Model(model_name).info()
             print("Model info")
             print("- ID: {0}".format(result["id"]))
             print("- Name: {0}".format(result["name"]))
@@ -143,8 +146,8 @@ def create(name, host, group, host_path, permission, quota, cloneable):
 
 
 @model.command()
-@click.argument("model_id", metavar="MODEL", type=str)
-def rm(model_id):
+@click.argument("model_name", metavar="MODEL", type=str)
+def rm(model_name):
     """
     Remove model.
 
@@ -154,9 +157,128 @@ def rm(model_id):
 
     with Session() as session:
         try:
-            serving = session.Model(model_id)
+            serving = session.Model(model_name)
             serving.delete()
             print_done("Model deleted.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@model.command()
+@click.argument("model_name", metavar="MODEL", type=str)
+@click.argument("filenames", type=Path, nargs=-1)
+@click.argument("model_version", metavar="MODEL_VER", type=str)
+@click.option(
+    "-b",
+    "--base-dir",
+    type=Path,
+    default=None,
+    help="The local parent directory which contains the file to be uploaded.  "
+    "[default: current working directry]",
+)
+@click.option(
+    "--chunk-size",
+    type=ByteSizeParamType(),
+    default=humanize.naturalsize(DEFAULT_CHUNK_SIZE, binary=True, gnu=True),
+    help='Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
+    "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
+    "and networks (e.g., 40 GbE) for the maximum throughput.",
+)
+@click.option(
+    "--override-storage-proxy",
+    type=CommaSeparatedKVListParamType(),
+    default=None,
+    help="Overrides storage proxy address. "
+    'The value must shape like "X1=Y1,X2=Y2...". '
+    "Each Yn address must at least include the IP address "
+    "or the hostname and may include the protocol part and the port number to replace.",
+)
+def upload(model_name, filenames, model_version, base_dir, chunk_size, override_storage_proxy):
+    """
+    TUS Upload a file to the model from the current working directory.
+    The files with the same names will be overwirtten.
+
+    \b
+    NAME: Name of a model.
+    FILENAMES: Paths of the files to be uploaded.
+    """
+    with Session() as session:
+        try:
+            session.VFolder(model_name).upload(
+                filenames,
+                dst_dir=Path("versions", model_version),
+                basedir=base_dir,
+                chunk_size=chunk_size,
+                show_progress=True,
+                address_map=override_storage_proxy
+                or APIConfig.DEFAULTS["storage_proxy_address_map"],
+            )
+            print_done("Done.")
+        except Exception as e:
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@model.command()
+@click.argument("model_name", type=str)
+@click.argument("filenames", type=Path, nargs=-1)
+@click.argument("model_version", metavar="MODEL_VER", type=str)
+@click.option(
+    "-b",
+    "--base-dir",
+    type=Path,
+    default=None,
+    help="The local parent directory which will contain the downloaded file.  "
+    "[default: current working directry]",
+)
+@click.option(
+    "--chunk-size",
+    type=ByteSizeParamType(),
+    default=humanize.naturalsize(DEFAULT_CHUNK_SIZE, binary=True, gnu=True),
+    help='Transfer the file with the given chunk size with binary suffixes (e.g., "16m"). '
+    "Set this between 8 to 64 megabytes for high-speed disks (e.g., SSD RAID) "
+    "and networks (e.g., 40 GbE) for the maximum throughput.",
+)
+@click.option(
+    "--override-storage-proxy",
+    type=CommaSeparatedKVListParamType(),
+    default=None,
+    help="Overrides storage proxy address. "
+    'The value must shape like "X1=Y1,X2=Y2...". '
+    "Each Yn address must at least include the IP address "
+    "or the hostname and may include the protocol part and the port number to replace.",
+)
+@click.option(
+    "--max-retries",
+    type=int,
+    default=20,
+    help="Maximum retry attempt when any failure occurs.",
+)
+def download(
+    model_name, filenames, model_version, base_dir, chunk_size, override_storage_proxy, max_retries
+):
+    """
+    Download a model from the virtual folder to the current working directory.
+    The models with the same names will be overwirtten.
+
+    \b
+    NAME: Name of a model.
+    FILENAMES: Paths of the files to be downloaded inside a vfolder.
+    """
+    with Session() as session:
+        try:
+            session.VFolder(model_name).download(
+                filenames,
+                dst_dir=Path("versions", model_version),
+                basedir=base_dir,
+                chunk_size=chunk_size,
+                show_progress=True,
+                address_map=override_storage_proxy
+                or APIConfig.DEFAULTS["storage_proxy_address_map"],
+                max_retries=max_retries,
+            )
+            print_done("Done.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)

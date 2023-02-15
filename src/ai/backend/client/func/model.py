@@ -19,10 +19,10 @@ _default_list_fields: Sequence[FieldSpec] = (
 
 
 class Model(BaseFunction):
-    model_id: str
+    model_name: str
 
-    def __init__(self, model_id: UUID):
-        self.model_id = str(model_id)
+    def __init__(self, model_name: UUID):
+        self.model_name = str(model_name)
 
     @api_function
     @classmethod
@@ -54,7 +54,7 @@ class Model(BaseFunction):
 
     @api_function
     async def info(self):
-        rqst = Request("GET", "/folders/{0}".format(self.model_id))
+        rqst = Request("GET", "/folders/{0}".format(self.model_name))
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -88,6 +88,6 @@ class Model(BaseFunction):
     @api_function
     async def delete(self):
         rqst = Request("DELETE", "/folders")
-        rqst.set_json({"id": self.model_id})
+        rqst.set_json({"id": self.model_name})
         async with rqst.fetch():
             return {}
