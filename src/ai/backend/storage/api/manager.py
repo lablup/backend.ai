@@ -25,7 +25,7 @@ from ..exception import InvalidSubpathError, VFolderNotFoundError
 from ..types import VFolderCreationOptions
 from ..utils import check_params, log_manager_api_entry
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @web.middleware

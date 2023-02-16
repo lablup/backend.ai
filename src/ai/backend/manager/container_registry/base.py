@@ -20,7 +20,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.models.image import ImageRow, ImageType
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class BaseContainerRegistry(metaclass=ABCMeta):

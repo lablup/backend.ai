@@ -32,7 +32,7 @@ from .types import (
     GPFSSystemHealthState,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 def error_handler(inner):

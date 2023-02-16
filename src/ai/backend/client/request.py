@@ -40,7 +40,7 @@ from .session import AsyncSession, BaseSession
 from .session import Session as SyncSession
 from .session import api_session
 
-log = logging.getLogger(__spec__.name)
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 __all__ = [
     "Request",

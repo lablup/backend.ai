@@ -57,7 +57,7 @@ if TYPE_CHECKING:
 
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 __all__ = (
     "rescan_images",

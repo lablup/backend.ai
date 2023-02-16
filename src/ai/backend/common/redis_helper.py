@@ -66,7 +66,7 @@ _default_conn_opts: Mapping[str, Any] = {
 
 _scripts: Dict[str, str] = {}
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class ConnectionNotAvailable(Exception):

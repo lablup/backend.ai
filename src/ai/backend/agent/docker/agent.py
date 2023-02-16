@@ -90,7 +90,7 @@ from .utils import PersistentServiceContainer
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 eof_sentinel = Sentinel.TOKEN
 
 

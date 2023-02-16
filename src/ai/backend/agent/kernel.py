@@ -43,7 +43,7 @@ from ai.backend.common.types import KernelId, ServicePort, aobject
 from .exception import UnsupportedBaseDistroError
 from .resources import KernelResourceSpec
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'

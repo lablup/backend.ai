@@ -32,7 +32,7 @@ from ..types import (
 )
 from ..utils import fstime2datetime
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 async def run(cmd: Sequence[Union[str, Path]]) -> str:

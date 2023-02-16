@@ -14,7 +14,7 @@ from .image_impl import list_images as list_images_impl
 from .image_impl import rescan_images as rescan_images_impl
 from .image_impl import set_image_resource_limit as set_image_resource_limit_impl
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @click.group()

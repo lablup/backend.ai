@@ -14,7 +14,7 @@ from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image import rescan_images as rescan_images_func
 from ai.backend.manager.models.utils import connect_database
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @contextlib.asynccontextmanager

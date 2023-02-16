@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from .lock import AbstractDistributedLock
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class GlobalTimer:

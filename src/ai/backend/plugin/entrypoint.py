@@ -7,7 +7,7 @@ from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 from typing import Iterable, Iterator, Optional
 
-log = logging.getLogger(__spec__.name)
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 def scan_entrypoints(
