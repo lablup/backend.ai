@@ -10,10 +10,11 @@ from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
 from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.session import Session
 
+from ..exceptions import BackendAPIError
 from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
 from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
-from .pretty import print_done, print_error
+from .pretty import print_done, print_error, print_fail
 from .types import CLIContext
 
 
@@ -59,7 +60,7 @@ def info(ctx: CLIContext, model_name):
     Display the detail of a model with its backing storage vfolder.
 
     \b
-    MODEL: The model ID
+    MODEL: The model name
     """
 
     with Session() as session:
@@ -73,6 +74,14 @@ def info(ctx: CLIContext, model_name):
                     FieldSpec("versions"),
                 ],
             )
+        except BackendAPIError as e:
+            print_fail(
+                "Not a valid model storage. "
+                "There is no directory named `versions` under the model storage "
+                "or model storage not found."
+            )
+            print_error(e)
+            sys.exit(ExitCode.FAILURE)
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
