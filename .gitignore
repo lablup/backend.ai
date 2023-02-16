@@ -105,6 +105,7 @@ ENV/
 /docker-compose.halfstack.current.yml
 /alembic.ini
 /dev.etcd.volumes.json
+/dev.etcd.installed.json
 /env-*.sh
 
 # Local temp
