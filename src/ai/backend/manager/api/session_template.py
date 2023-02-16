@@ -18,7 +18,7 @@ from ..models.session_template import check_task_template
 from .auth import auth_required
 from .exceptions import InvalidAPIParameters, TaskTemplateNotFound
 from .manager import READ_ALLOWED, server_status_required
-from .session import _query_userinfo
+from .session import query_userinfo
 from .types import CORSOptions, Iterable, WebMiddleware
 from .utils import check_api_params, get_access_key_scopes
 
@@ -51,7 +51,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     )
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
-        user_uuid, group_id, _ = await _query_userinfo(request, params, conn)
+        user_uuid, group_id, _ = await query_userinfo(request, params, conn)
         log.debug("Params: {0}", params)
         try:
             body = json.loads(params["payload"])
@@ -247,7 +247,7 @@ async def put(request: web.Request, params: Any) -> web.Response:
     )
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
-        user_uuid, group_id, _ = await _query_userinfo(request, params, conn)
+        user_uuid, group_id, _ = await query_userinfo(request, params, conn)
         query = (
             sa.select([session_templates.c.id])
             .select_from(session_templates)

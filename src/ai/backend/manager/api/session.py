@@ -321,7 +321,7 @@ def drop(d, dropval):
     return newd
 
 
-async def _query_userinfo(
+async def query_userinfo(
     request: web.Request,
     params: Any,
     conn: SAConnection,
@@ -457,6 +457,10 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 
     # Check work directory and reserved name directory.
     mount_map = params["config"].get("mount_map")
+    from pprint import pprint
+
+    print("config ---")
+    pprint(params["config"])
     if mount_map is not None:
         original_folders = mount_map.keys()
         alias_folders = mount_map.values()
@@ -561,7 +565,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     session_creation_tracker[session_creation_id] = start_event
 
     async with root_ctx.db.begin_readonly() as conn:
-        owner_uuid, group_id, resource_policy = await _query_userinfo(request, params, conn)
+        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
         # Use keypair bootstrap_script if it is not delivered as a parameter
         if not params["bootstrap_script"]:
@@ -1123,7 +1127,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
 
     try:
         async with root_ctx.db.begin_readonly() as conn:
-            owner_uuid, group_id, resource_policy = await _query_userinfo(request, params, conn)
+            owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
         session_id = await asyncio.shield(
             app_ctx.database_ptask_group.create_task(
