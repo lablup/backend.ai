@@ -6,10 +6,12 @@ from typing import AsyncIterator
 import sqlalchemy as sa
 from tabulate import tabulate
 
+from ai.backend.common import redis_helper
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.manager.cli.context import redis_ctx
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image import rescan_images as rescan_images_func
 from ai.backend.manager.models.utils import connect_database
@@ -42,7 +44,8 @@ async def etcd_ctx(cli_ctx) -> AsyncIterator[AsyncEtcd]:
         await etcd.close()
 
 
-async def list_images(cli_ctx, short, installed):
+async def list_images(cli_ctx, short, installed_flag):
+    # Connect to postgreSQL DB
     async with connect_database(cli_ctx.local_config) as db:
         async with db.begin_readonly_session() as session:
             displayed_items = []
@@ -50,15 +53,27 @@ async def list_images(cli_ctx, short, installed):
                 items = await ImageRow.list(session)
                 # NOTE: installed/installed_agents fields are no longer provided in CLI,
                 #       until we finish the epic refactoring of image metadata db.
-                for item in items:
-                    if installed and not item.installed:
-                        continue
+                async with redis_ctx(cli_ctx) as redis_conn_set:
+                    for item in items:
+                        installed = (
+                            await redis_helper.execute(
+                                redis_conn_set.image, lambda r: r.scard(item.name)
+                            )
+                        ) > 0
+                        installed_agents = await redis_helper.execute(
+                            redis_conn_set.image, lambda r: r.smembers(item.name)
+                        )
+
+                        if installed_flag and not installed:
+                            continue
+                        if short:
+                            displayed_items.append((item.image_ref.canonical, item.config_digest))
+                        elif installed_flag:
+                            pprint(f"{item} @ {installed_agents}")
+                        else:
+                            pprint(item)
                     if short:
-                        displayed_items.append((item.image_ref.canonical, item.config_digest))
-                    else:
-                        pprint(item)
-                if short:
-                    print(tabulate(displayed_items, tablefmt="plain"))
+                        print(tabulate(displayed_items, tablefmt="plain"))
             except Exception:
                 log.exception("An error occurred.")
 
