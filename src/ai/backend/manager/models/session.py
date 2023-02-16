@@ -93,6 +93,8 @@ __all__ = (
     "check_all_dependencies",
     "ComputeSession",
     "ComputeSessionList",
+    "InferenceSession",
+    "InferenceSessionList",
 )
 
 
@@ -1417,3 +1419,15 @@ class ComputeSessionList(graphene.ObjectType):
         interfaces = (PaginatedList,)
 
     items = graphene.List(ComputeSession, required=True)
+
+
+class InferenceSession(graphene.ObjectType):
+    class Meta:
+        interfaces = (Item,)
+
+
+class InferenceSessionList(graphene.ObjectType):
+    class Meta:
+        interfaces = (PaginatedList,)
+
+    items = graphene.List(InferenceSession, required=True)

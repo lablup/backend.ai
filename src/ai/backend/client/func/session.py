@@ -28,6 +28,7 @@ from tqdm import tqdm
 
 from ai.backend.client.output.fields import session_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
+from ai.backend.common.types import SessionTypes
 
 from ..compat import current_loop
 from ..config import DEFAULT_CHUNK_SIZE
@@ -46,7 +47,7 @@ from ..utils import ProgressReportingReader
 from ..versioning import get_id_or_name, get_naming
 from .base import BaseFunction, api_function
 
-__all__ = ("ComputeSession",)
+__all__ = ("ComputeSession", "InferenceSession")
 
 _default_list_fields = (
     session_fields["session_id"],
@@ -108,10 +109,13 @@ class ComputeSession(BaseFunction):
         order: str = None,
     ) -> PaginatedResult[dict]:
         """
-        Fetches the list of users. Domain admins can only get domain users.
+        Fetches the list of sessions.
 
-        :param is_active: Fetches active or inactive users only if not None.
-        :param fields: Additional per-user query fields to fetch.
+        :param status: Fetches sessions in a specific status
+                       (PENDING, SCHEDULED, PULLING, PREPARING,
+                        RUNNING, RESTARTING, RUNNING_DEGRADED,
+                        TERMINATING, TERMINATED, ERROR, CANCELLED)
+        :param fields: Additional per-session query fields to fetch.
         """
         return await fetch_paginated_result(
             "compute_session_list",
@@ -163,7 +167,7 @@ class ComputeSession(BaseFunction):
         image: str,
         *,
         name: str = None,
-        type_: str = "interactive",
+        type_: str = SessionTypes.INTERACTIVE.value,
         starts_at: str = None,
         enqueue_only: bool = False,
         max_wait: int = 0,
@@ -1078,6 +1082,271 @@ class ComputeSession(BaseFunction):
             )
 
         return request.connect_websocket(on_enter=send_code)
+
+
+class InferenceSession(BaseFunction):
+    """
+    Provides various iteractions with inference sessions in Backend.AI.
+    """
+
+    id: Optional[UUID]
+    name: Optional[str]
+    owner_access_key: Optional[str]
+    created: bool
+    status: str
+    service_ports: List[str]
+    domain: str
+    group: str
+    # endpoint: Endpoint
+
+    @api_function
+    @classmethod
+    async def paginated_list(
+        cls,
+        status: str | None = None,
+        access_key: str | None = None,
+        *,
+        fields: Sequence[FieldSpec] = _default_list_fields,
+        page_offset: int = 0,
+        page_size: int = 20,
+        filter: str = None,
+        order: str = None,
+    ) -> PaginatedResult[dict]:
+        """
+        Fetches the list of inference sessions.
+        """
+        return await fetch_paginated_result(
+            "inference_session_list",
+            {
+                "status": (status, "String"),
+                "access_key": (access_key, "String"),
+            },
+            fields,
+            page_offset=page_offset,
+            page_size=page_size,
+        )
+
+    @api_function
+    @classmethod
+    async def hello(cls) -> str:
+        rqst = Request("GET", "/")
+        async with rqst.fetch() as resp:
+            return await resp.json()
+
+    @api_function
+    @classmethod
+    async def get_task_logs(
+        cls,
+        task_id: str,
+        *,
+        chunk_size: int = 8192,
+    ) -> AsyncIterator[bytes]:
+        raise NotImplementedError
+
+    @api_function
+    @classmethod
+    async def get_or_create(
+        cls,
+        image: str,
+        *,
+        name: Optional[str] = None,
+        type_: str = SessionTypes.INFERENCE.value,
+        starts_at: Optional[str] = None,
+        enqueue_only: bool = False,
+        max_wait: int = 0,
+        no_reuse: bool = False,
+        dependencies: Optional[Sequence[str]] = None,
+        callback_url: Optional[str] = None,
+        mounts: Optional[List[str]] = None,
+        mount_map: Optional[Mapping[str, str]] = None,
+        envs: Optional[Mapping[str, str]] = None,
+        startup_command: Optional[str] = None,
+        resources: Optional[Mapping[str, str]] = None,
+        resource_opts: Optional[Mapping[str, str]] = None,
+        cluster_size: int = 1,
+        cluster_mode: Literal["single-node", "multi-node"] = "single-node",
+        domain_name: Optional[str] = None,
+        group_name: Optional[str] = None,
+        bootstrap_script: Optional[str] = None,
+        tag: Optional[str] = None,
+        scaling_group: Optional[str] = None,
+        owner_access_key: Optional[str] = None,
+        preopen_ports: Optional[List[int]] = None,
+        assign_agent: Optional[List[str]] = None,
+    ) -> InferenceSession:
+        """
+        Get-or-creates an inference session.
+        """
+        raise NotImplementedError
+
+    @api_function
+    @classmethod
+    async def create_from_template(
+        cls,
+        template_id: str,
+        *,
+        name: Union[str, Undefined] = undefined,
+        type_: Union[str, Undefined] = undefined,
+        starts_at: Optional[str] = None,
+        enqueue_only: Union[bool, Undefined] = undefined,
+        max_wait: Union[int, Undefined] = undefined,
+        dependencies: Sequence[str] = None,  # cannot be stored in templates
+        no_reuse: Union[bool, Undefined] = undefined,
+        image: Union[str, Undefined] = undefined,
+        mounts: Union[List[str], Undefined] = undefined,
+        mount_map: Union[Mapping[str, str], Undefined] = undefined,
+        envs: Union[Mapping[str, str], Undefined] = undefined,
+        startup_command: Union[str, Undefined] = undefined,
+        resources: Union[Mapping[str, int], Undefined] = undefined,
+        resource_opts: Union[Mapping[str, int], Undefined] = undefined,
+        cluster_size: Union[int, Undefined] = undefined,
+        cluster_mode: Union[Literal["single-node", "multi-node"], Undefined] = undefined,
+        domain_name: Union[str, Undefined] = undefined,
+        group_name: Union[str, Undefined] = undefined,
+        bootstrap_script: Union[str, Undefined] = undefined,
+        tag: Union[str, Undefined] = undefined,
+        scaling_group: Union[str, Undefined] = undefined,
+        owner_access_key: Union[str, Undefined] = undefined,
+    ) -> InferenceSession:
+        """
+        Get-or-creates an inference session from template.
+        """
+        raise NotImplementedError
+
+    def __init__(self, name: str, owner_access_key: Optional[str] = None) -> None:
+        self.id = None
+        self.name = name
+        self.owner_access_key = owner_access_key
+
+    @classmethod
+    def from_session_id(cls, session_id: UUID) -> InferenceSession:
+        o = cls(None, None)  # type: ignore
+        o.id = session_id
+        return o
+
+    def get_session_identity_params(self) -> Mapping[str, str]:
+        if self.id:
+            identity_params = {
+                "sessionId": str(self.id),
+            }
+        else:
+            assert self.name is not None
+            identity_params = {
+                "sessionName": self.name,
+            }
+            if self.owner_access_key:
+                identity_params["owner_access_key"] = self.owner_access_key
+        return identity_params
+
+    @api_function
+    async def destroy(self, *, forced: bool = False):
+        """
+        Destroys the inference session.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def restart(self):
+        """
+        Restarts the inference session.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def rename(self, new_id):
+        """
+        Renames Session ID or running inference session.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def commit(self):
+        """
+        Commit a running session to a tar file in the agent host.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def interrupt(self):
+        """
+        Tries to interrupt the current ongoing code execution.
+        This may fail without any explicit errors depending on the code being
+        executed.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def complete(self, code: str, opts: Optional[dict] = None) -> Iterable[str]:
+        """
+        Gets the auto-completion candidates from the given code string,
+        as if an user has passed the tab key just after the code in
+        IDEs.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def get_info(self):
+        """
+        Retrieves a brief information about the inference session.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def get_logs(self):
+        """
+        Retrieves the console log of the inference session container.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def get_status_history(self):
+        """
+        Retrieves the status transition history of the inference session.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def upload(
+        self,
+        files: Sequence[Union[str, Path]],
+        basedir: Union[str, Path] = None,
+        show_progress: bool = False,
+    ):
+        """
+        Uploads the given list of files to the inference session.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def download(
+        self,
+        files: Sequence[Union[str, Path]],
+        dest: Union[str, Path] = ".",
+        show_progress: bool = False,
+    ):
+        """
+        Downloads the given list of files from the inference session.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def list_files(self, path: Union[str, Path] = "."):
+        """
+        Gets the list of files in the given path inside the inference session
+        container.
+        """
+        raise NotImplementedError
+
+    @api_function
+    async def stream_app_info(self):
+        raise NotImplementedError
+
+    @api_function
+    async def get_abusing_report(self):
+        """
+        Retrieves abusing reports of session's sibling kernels.
+        """
+        raise NotImplementedError
 
 
 class StreamPty(WebSocketResponse):

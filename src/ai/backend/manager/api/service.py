@@ -217,7 +217,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_folders:
                 raise InvalidAPIParameters(
-                    "Alias name cannot be set to an existing folder name: " + str(alias_name)
+                    f"Alias name cannot be set to an existing folder name: {alias_name}"
                 )
 
     # Append model mount path
@@ -489,7 +489,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
         UserRole.ADMIN,
         UserRole.SUPERADMIN,
     ):
-        raise InsufficientPrivilege("You are not allowed to force-terminate others's sessions")
+        raise InsufficientPrivilege("You are not allowed to delete others's sessions")
 
     async with root_ctx.db.begin_session() as db_sess:
         # Delete endpoint first
