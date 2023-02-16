@@ -40,11 +40,14 @@ class Model(BaseFunction):
         filter: str = None,
         order: str = None,
     ) -> PaginatedResult:
-        """ """
+        if filter:
+            composed_filter = f'({filter}) & (usage_mode == "MODEL")'
+        else:
+            composed_filter = '(usage_mode == "MODEL")'
         return await fetch_paginated_result(
             "vfolder_list",
             {
-                "filter": (filter, "String"),
+                "filter": (composed_filter, "String"),
                 "order": (order, "String"),
             },
             fields,
