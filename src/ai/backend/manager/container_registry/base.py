@@ -259,7 +259,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             skip_reason = error_msg
                         case dict() as error_data:
                             skip_reason = "; ".join(
-                                f"{field}: {reason}" for field, reason in error_data.items()
+                                f"{field} {reason}" for field, reason in error_data.items()
                             )
                     continue
                 update_key = ImageRef(
