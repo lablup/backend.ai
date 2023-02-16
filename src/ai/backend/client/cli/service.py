@@ -30,7 +30,7 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 
     with Session() as session:
         try:
-            fetch_func = lambda pg_offset, pg_size: session.Serve.paginated_list(
+            fetch_func = lambda pg_offset, pg_size: session.Service.paginated_list(
                 page_offset=pg_offset,
                 page_size=pg_size,
                 filter=filter_,
@@ -57,7 +57,7 @@ def info(endpoint_id):
     """
     with Session() as session:
         try:
-            result = session.Serve(endpoint_id).info()
+            result = session.Service(endpoint_id).info()
             print("Serve info")
             print("- Endpoint ID: {0}".format(result["endpoint_id"]))
         except Exception as e:
@@ -86,7 +86,7 @@ def create(endpoint_id, model_id, model_version, image_ref, project, resource_op
     """
     with Session() as session:
         try:
-            serving = session.Serve(endpoint_id)
+            serving = session.Service(endpoint_id)
             serving.create(
                 model_id=model_id,
                 model_version=model_version,
@@ -110,7 +110,7 @@ def start(endpoint_id):
     """
     with Session() as session:
         try:
-            serving = session.Serve(endpoint_id)
+            serving = session.Service(endpoint_id)
             serving.start()
         except Exception as e:
             print_error(e)
@@ -128,7 +128,7 @@ def stop(endpoint_id):
     """
     with Session() as session:
         try:
-            serving = session.Serve(endpoint_id)
+            serving = session.Service(endpoint_id)
             serving.stop()
         except Exception as e:
             print_error(e)
@@ -145,7 +145,7 @@ def rm(endpoint_id):
     ENDPOINT: The endpoint ID"""
     with Session() as session:
         try:
-            serving = session.Serve(endpoint_id)
+            serving = session.Service(endpoint_id)
             serving.delete()
         except Exception as e:
             print_error(e)
@@ -166,7 +166,7 @@ def _invoke_cmd(name: str = "predict", docs: str = None):
         """
         with Session() as session:
             try:
-                serving = session.Serve(endpoint_id)
+                serving = session.Service(endpoint_id)
                 serving.invoke(input_args)
             except Exception as e:
                 print_error(e)

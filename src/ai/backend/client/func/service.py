@@ -9,14 +9,14 @@ from ai.backend.client.session import api_session
 
 from .base import BaseFunction, api_function
 
-__all__ = ("Serve",)
+__all__ = ("Service",)
 
 _default_list_fields: Sequence[FieldSpec] = tuple()
 
 _default_detail_fields: Sequence[FieldSpec] = tuple()
 
 
-class Serve(BaseFunction):
+class Service(BaseFunction):
     endpoint_id: str
 
     def __init__(self, endpoint_id: UUID):

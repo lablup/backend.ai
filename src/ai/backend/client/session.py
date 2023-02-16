@@ -270,7 +270,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "Dotfile",
         "ServerLog",
         "Permission",
-        "Serve",
+        "Service",
         "Model",
     )
 
@@ -308,8 +308,8 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.model import Model
         from .func.resource import Resource
         from .func.scaling_group import ScalingGroup
-        from .func.serve import Serve
         from .func.server_log import ServerLog
+        from .func.service import Service
         from .func.session import ComputeSession
         from .func.session_template import SessionTemplate
         from .func.storage import Storage
@@ -340,7 +340,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.Dotfile = Dotfile
         self.ServerLog = ServerLog
         self.Permission = Permission
-        self.Serve = Serve
+        self.Service = Service
         self.Model = Model
 
     @property
