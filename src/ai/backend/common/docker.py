@@ -21,9 +21,11 @@ from typing import (
 )
 
 import aiohttp
+import trafaret as t
 import yarl
 from packaging import version
 
+from . import validators as tx
 from .etcd import AsyncEtcd
 from .etcd import quote as etcd_quote
 from .etcd import unquote as etcd_unquote
@@ -35,6 +37,7 @@ __all__ = (
     "default_registry",
     "default_repository",
     "docker_api_arch_aliases",
+    "image_label_schema",
     "login",
     "get_known_registries",
     "is_known_registry",
@@ -71,6 +74,25 @@ default_repository = "lablup"
 
 MIN_KERNELSPEC = 1
 MAX_KERNELSPEC = 1
+
+image_label_schema = t.Dict(
+    {
+        # Required labels
+        t.Key("ai.backend.kernelspec"): t.ToInt(lte=MAX_KERNELSPEC, gte=MIN_KERNELSPEC),
+        t.Key("ai.backend.features"): tx.StringList(delimiter=" "),
+        # ai.backend.resource.min.*
+        t.Key("ai.backend.base-distro"): t.String(),
+        t.Key("ai.backend.runtime-type"): t.String(),
+        t.Key("ai.backend.runtime-path"): tx.PurePath(),
+        # Optional labels
+        t.Key("ai.backend.role", default="COMPUTE"): t.Enum("COMPUTE", "INFERENCE"),
+        t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
+        t.Key("ai.backend.accelerators", optional=True): tx.StringList(allow_blank=True),
+        t.Key("ai.backend.service-ports", optional=True): tx.StringList(allow_blank=True),
+        t.Key("ai.backend.endpoint-ports", optional=True): tx.StringList(allow_blank=True),
+        t.Key("ai.backend.model-path", optional=True): tx.PurePath(),
+    }
+).allow_extra("*")
 
 
 def get_docker_connector() -> tuple[yarl.URL, aiohttp.BaseConnector]:
@@ -229,14 +251,14 @@ class PlatformTagSet(Mapping):
     def __init__(self, tags: Iterable[str]):
         self._data = dict()
         rx = type(self)._rx_ver
-        for t in tags:
-            match = rx.search(t)
+        for tag in tags:
+            match = rx.search(tag)
             if match is None:
-                raise InvalidImageTag(t)
+                raise InvalidImageTag(tag)
             key = match.group("tag")
             value = match.group("version")
             if key in self._data:
-                raise InvalidImageTag(t)
+                raise InvalidImageTag(tag)
             if value is None:
                 value = ""
             self._data[key] = value
