@@ -13,11 +13,11 @@ from .types import CLIContext
 
 
 @main.group()
-def serve():
+def service():
     """Set of service operations"""
 
 
-@serve.command()
+@service.command()
 @pass_ctx_obj
 @click.option("--filter", "filter_", default=None, help="Set the query filter expression.")
 @click.option("--order", default=None, help="Set the query ordering expression.")
@@ -46,7 +46,7 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
             sys.exit(ExitCode.FAILURE)
 
 
-@serve.command()
+@service.command()
 @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
 def info(endpoint_id):
     """
@@ -65,7 +65,7 @@ def info(endpoint_id):
             sys.exit(ExitCode.FAILURE)
 
 
-@serve.command()
+@service.command()
 @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
 @click.argument("model_id", metavar="MODEL", type=str)
 @click.argument("model_version", metavar="MODEL_VER", type=str)
@@ -103,7 +103,7 @@ def create(endpoint_id, model_id, model_version, image_ref, project, resource_op
             sys.exit(ExitCode.FAILURE)
 
 
-@serve.command()
+@service.command()
 @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
 def start(endpoint_id):
     """
@@ -121,7 +121,7 @@ def start(endpoint_id):
             sys.exit(ExitCode.FAILURE)
 
 
-@serve.command()
+@service.command()
 @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
 def stop(endpoint_id):
     """
@@ -139,7 +139,7 @@ def stop(endpoint_id):
             sys.exit(ExitCode.FAILURE)
 
 
-@serve.command()
+@service.command()
 @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
 def rm(endpoint_id):
     """
@@ -185,5 +185,5 @@ def _invoke_cmd(docs: str = None):
     return invoke
 
 
-main.command(aliases=["predict"])(_invoke_cmd(docs='Alias of "serve invoke"'))
-serve.command()(_invoke_cmd())
+main.command(aliases=["predict"])(_invoke_cmd(docs='Alias of "service invoke"'))
+service.command()(_invoke_cmd())
