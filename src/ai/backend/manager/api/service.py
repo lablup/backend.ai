@@ -21,7 +21,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ClusterMode, SessionTypes
 from ai.backend.common.utils import str_to_timedelta
 
-from ..defs import DEFAULT_ROLE
+from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from ..models import (
     ImageRow,
     UserRole,
@@ -47,12 +47,21 @@ from .exceptions import (
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params, get_access_key_scopes
+from .utils import check_api_params, get_access_key_scopes, undefined
 
 if TYPE_CHECKING:
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
+
+
+class UndefChecker(t.Trafaret):
+    def check_and_return(self, value: Any) -> object:
+        if value == undefined:
+            return value
+        else:
+            self._failure("Invalid Undef format", value=value)
+            return None
 
 
 @auth_required
@@ -137,11 +146,13 @@ async def get_info(request: web.Request, params: Any) -> web.Response:
             tx.AliasedKey(["model_id", "modelId"]): tx.UUID,
             tx.AliasedKey(["model_version", "modelVersion"]): t.String,
             tx.AliasedKey(["image_ref", "imageRef"]): t.String,
+            tx.AliasedKey(["arch", "architecture"], default=DEFAULT_IMAGE_ARCH)
+            >> "architecture": t.String,
             tx.AliasedKey(
-                ["group", "group_name", "groupName", "project_name", "projectName"], default=None
-            ): tx.UUID
-            | t.String
-            | t.Null,
+                ["group", "groupName", "group_name", "project", "project_name", "projectName"],
+                default="default",
+            ): t.String,
+            tx.AliasedKey(["domain", "domainName", "domain_name"], default="default"): t.String,
             tx.AliasedKey(["resource_opts", "resourceOpts"], default=dict): t.Mapping(
                 t.String, t.Any
             ),
@@ -156,12 +167,13 @@ async def get_info(request: web.Request, params: Any) -> web.Response:
 )
 async def create(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["session.context"]
+    app_ctx: PrivateContext = request.app["services.context"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
     model_id = params["model_id"]
 
+    params["owner_access_key"] = access_key
     async with root_ctx.db.begin_readonly() as db_conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, db_conn)
 
@@ -174,8 +186,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
             image_row = await ImageRow.resolve(
                 session,
                 [
-                    ImageRef(params["image"], ["*"], params["architecture"]),
-                    params["image"],
+                    ImageRef(params["image_ref"], ["*"], params["architecture"]),
+                    params["image_ref"],
                 ],
             )
             img_id = image_row.id
@@ -194,7 +206,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         raise ImageNotFound("unknown alias or disallowed registry")
 
     # Check work directory and reserved name directory.
-    mount_map = params["config"].get("mount_map")
+    mount_map = params["config"].get("mount_map", {})
     if mount_map is not None:
         original_folders = mount_map.keys()
         alias_folders = mount_map.values()
@@ -221,7 +233,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 )
 
     # Append model mount path
-    mounts: list[str] = params["config"].get("mounts")
+    mounts: list[str] = params["config"].get("mounts", [])
     async with root_ctx.db.begin_readonly() as db_conn:
         query = sa.select([vfolders.c.name]).where(vfolders.c.id == model_id)
         result = await db_conn.execute(query)
