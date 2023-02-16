@@ -10,11 +10,11 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ..api.exceptions import RoutingNotFound
 from .base import GUID, Base, IDColumn, Item, PaginatedList
-from .utils import execute_with_retry
+from .utils import ExtendedAsyncSAEngine, execute_with_retry
 
 if TYPE_CHECKING:
     # from .gql import GraphQueryContext
-    from .utils import ExtendedAsyncSAEngine
+    pass
 
 
 __all__ = ("RoutingRow", "Routing", "RoutingList")
