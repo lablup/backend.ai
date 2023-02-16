@@ -100,11 +100,22 @@ class Model(BaseFunction):
             }
         )
         async with rqst.fetch() as resp:
-            return await resp.json()
+            result = await resp.json()
+        rqst = Request("POST", "/folders/{}/mkdir".format(name))
+        rqst.set_json(
+            {
+                "path": "versions",
+                "parents": True,
+                "exist_ok": True,
+            }
+        )
+        async with rqst.fetch() as resp:
+            await resp.text()
+        return result
 
     @api_function
     async def delete(self):
-        rqst = Request("DELETE", "/folders")
+        rqst = Request("DELETE", "/folders/{0}".format(self.model_name))
         rqst.set_json({"id": self.model_name})
         async with rqst.fetch():
             return {}
