@@ -52,6 +52,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AbstractPermission,
     BinarySize,
+    EndpointId,
     JSONSerializableMixin,
     KernelId,
     ReadableCIDR,
@@ -422,7 +423,7 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
             return dialect.type_descriptor(CHAR(16))
 
     def process_bind_param(self, value: Union[UUID_SubType, uuid.UUID], dialect):
-        # NOTE: SessionId, KernelId are *not* actual types defined as classes,
+        # NOTE: EndpointId, SessionId, KernelId are *not* actual types defined as classes,
         #       but a "virtual" type that is an identity function at runtime.
         #       The type checker treats them as distinct derivatives of uuid.UUID.
         #       Therefore, we just do isinstance on uuid.UUID only below.
@@ -450,6 +451,11 @@ class GUID(TypeDecorator, Generic[UUID_SubType]):
                 return cast(UUID_SubType, cls.uuid_subtype_func(uuid.UUID(value)))
 
 
+class EndpointIDColumnType(GUID[EndpointId]):
+    uuid_subtype_func = EndpointId
+    cache_ok = True
+
+
 class SessionIDColumnType(GUID[SessionId]):
     uuid_subtype_func = SessionId
     cache_ok = True
@@ -462,6 +468,12 @@ class KernelIDColumnType(GUID[KernelId]):
 
 def IDColumn(name="id"):
     return sa.Column(name, GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()"))
+
+
+def EndpointIDColumn(name="id"):
+    return sa.Column(
+        name, EndpointIDColumnType, primary_key=True, server_default=sa.text("uuid_generate_v4()")
+    )
 
 
 def SessionIDColumn(name="id"):
