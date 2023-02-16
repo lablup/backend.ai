@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import secrets
+import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Tuple, Union
 
@@ -12,6 +13,7 @@ import trafaret as t
 from aiohttp import web
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
+from sqlalchemy.dialects import postgresql as psql
 
 from ai.backend.common import validators as tx
 from ai.backend.common.docker import ImageRef
@@ -21,15 +23,24 @@ from ai.backend.common.types import ClusterMode, SessionTypes
 from ai.backend.common.utils import str_to_timedelta
 
 from ..defs import DEFAULT_ROLE
-from ..models import ImageRow, domains, query_bootstrap_script, verify_vfolder_name, vfolders
+from ..models import (
+    ImageRow,
+    UserRole,
+    domains,
+    query_bootstrap_script,
+    verify_vfolder_name,
+    vfolders,
+)
 from ..models.endpoint import EndpointRow
 from ..models.routing import RoutingRow
 from ..models.session import SessionRow, SessionStatus
+from ..models.utils import execute_with_retry
 from ..types import UserScope
 from .auth import auth_required
 from .exceptions import (
     BackendError,
     ImageNotFound,
+    InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
     UnknownImageReferenceError,
@@ -37,7 +48,7 @@ from .exceptions import (
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
 from .session import query_userinfo
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params
+from .utils import check_api_params, get_access_key_scopes
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -150,6 +161,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
+    model_id = params["model_id"]
+
+    async with root_ctx.db.begin_readonly() as db_conn:
+        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, db_conn)
 
     log.info("SERVE.CREATE (email:{}, ak:{})", request["user"]["email"], access_key)
     resp: MutableMapping[str, Any] = {}
@@ -164,6 +179,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                     params["image"],
                 ],
             )
+            img_id = image_row.id
         requested_image_ref = image_row.image_ref
         model_mount_path = image_row.labels.get("ai.backend.model-path")
         async with root_ctx.db.begin_readonly() as conn:
@@ -208,7 +224,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     # Append model mount path
     mounts: list[str] = params["config"].get("mounts")
     async with root_ctx.db.begin_readonly() as db_conn:
-        query = sa.select([vfolders.c.name]).where(vfolders.c.id == params["model_id"])
+        query = sa.select([vfolders.c.name]).where(vfolders.c.id == model_id)
         result = await db_conn.execute(query)
         vfolder_name = result.first()["name"]
     model_path = f"{vfolder_name}/versions/{params['model_version']}"
@@ -222,6 +238,23 @@ async def create(request: web.Request, params: Any) -> web.Response:
     for kern_config in params["config"]["kernel_configs"]:
         kern_config["mounts"] = mounts
         kern_config["mount_map"] = mount_map
+
+    # Create endpoint
+    async def _create_endpoint() -> uuid.UUID:
+        async with root_ctx.db.begin_session() as db_sess:
+            endpoint_id = uuid.uuid4()
+            endpoint = EndpointRow(
+                id=endpoint_id,
+                image=img_id,
+                model=model_id,
+                domain=domain_name,
+                project=group_id,
+                resource_group=params["config"]["scaling_group"],
+            )
+            db_sess.add(endpoint)
+            return endpoint_id
+
+    endpoint_id = await execute_with_retry(_create_endpoint)
 
     # # Check existing (owner_access_key, session_name) instance
     # try:
@@ -281,8 +314,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
     session_creation_id = secrets.token_urlsafe(16)
 
     async with root_ctx.db.begin_readonly() as conn:
-        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
-
         # Use keypair bootstrap_script if it is not delivered as a parameter
         if not params["bootstrap_script"]:
             script, _ = await query_bootstrap_script(conn, access_key)
@@ -311,7 +342,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
                         ],
                     },
                     params["config"]["scaling_group"],
-                    SessionTypes.INTERACTIVE,
+                    SessionTypes.INFERENCE,
                     resource_policy,
                     user_scope=UserScope(
                         domain_name=domain_name,
@@ -328,6 +359,29 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 )
             ),
         )
+
+        # Create routing
+        # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_nothing
+        async def _create_routing() -> uuid.UUID:
+            async with root_ctx.db.begin_session() as db_sess:
+                routing_id = uuid.uuid4()
+                query = (
+                    psql.insert(RoutingRow)
+                    .values(
+                        id=routing_id,
+                        endpoint=endpoint_id,
+                        session=session_id,
+                        traffic_ratio=100.0,
+                    )
+                    .on_conflict_do_nothing(
+                        index_elements=[RoutingRow.endpoint, RoutingRow.session]
+                    )
+                )
+                await db_sess.execute(query)
+                return routing_id
+
+        await execute_with_retry(_create_routing)
+
         resp["sessionId"] = str(session_id)  # changed since API v5
         resp["sessionName"] = str(params["serving_name"])
         resp["status"] = SessionStatus.PENDING.name
@@ -438,15 +492,40 @@ async def invoke_serving(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID | t.String,
+            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID,
         }
     ),
 )
 async def delete(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
+    session_name = request.match_info["session_name"]
+    endpoint_id = params["endpoint_id"]
 
     log.info("SERVE.DELETE (email:{}, ak:{})", request["user"]["email"], access_key)
-    return web.Response(status=204)
+
+    requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
+    if requester_access_key != owner_access_key and request["user"]["role"] not in (
+        UserRole.ADMIN,
+        UserRole.SUPERADMIN,
+    ):
+        raise InsufficientPrivilege("You are not allowed to force-terminate others's sessions")
+
+    async with root_ctx.db.begin_session() as db_sess:
+        # Delete endpoint first
+        await db_sess.execute(sa.delete(EndpointRow).where(id=endpoint_id))
+
+        session = await SessionRow.get_session_with_kernels(
+            session_name, owner_access_key, db_session=db_sess
+        )
+    last_stat = await root_ctx.registry.destroy_session(
+        session,
+        forced=params["forced"],
+    )
+    resp = {
+        "stats": last_stat,
+    }
+    return web.json_response(resp, status=200)
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
