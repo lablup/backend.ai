@@ -1264,7 +1264,7 @@ async def start_service(request: web.Request, params: Mapping[str, Any]) -> web.
     query = (
         sa.select([scaling_groups.c.wsproxy_addr])
         .select_from(scaling_groups)
-        .where((scaling_groups.c.name == session.main_kernel.scaling_group))
+        .where((scaling_groups.c.name == session.scaling_group_name))
     )
 
     async with root_ctx.db.begin_readonly() as conn:
