@@ -14,7 +14,7 @@ from .types import CLIContext
 
 @main.group()
 def serve():
-    """Set of serving operations"""
+    """Set of service operations"""
 
 
 @serve.command()
@@ -25,7 +25,7 @@ def serve():
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
 def list(ctx: CLIContext, filter_, order, offset, limit):
     """
-    List serving
+    List the service endpoints.
     """
 
     with Session() as session:
@@ -50,10 +50,10 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
 def info(endpoint_id):
     """
-    Info serving
+    Display the detail of a service endpoint
 
     \b
-    ENDPOINT: Endpoint id
+    ENDPOINT: The endpoint ID
     """
     with Session() as session:
         try:
@@ -76,13 +76,13 @@ def info(endpoint_id):
 )
 def create(endpoint_id, model_id, model_version, image_ref, project, resource_opts):
     """
-    Create serve.
+    Create a service endpoint.
 
     \b
-    ENDPOINT: Endpoint id
-    MODEL: Model id
-    MODEL_VER: Model version
-    IMAGE_REF: Image reference
+    ENDPOINT: The endpoint ID
+    MODEL: The model ID
+    MODEL_VER: The version number or name of a model
+    IMAGE_REF: The reference of container image to provide the serving framework
     """
     with Session() as session:
         try:
@@ -103,10 +103,10 @@ def create(endpoint_id, model_id, model_version, image_ref, project, resource_op
 @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
 def start(endpoint_id):
     """
-    Start serving.
+    Start or resume the service endpoint to handle the incoming traffic.
 
     \b
-    ENDPOINT: Endpoint ID of serving.
+    ENDPOINT: The endpoint ID
     """
     with Session() as session:
         try:
@@ -121,10 +121,10 @@ def start(endpoint_id):
 @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
 def stop(endpoint_id):
     """
-    Stop serving
+    Stop the service endpoint without destroying it.
 
     \b
-    ENDPOINT: Endpoint ID of serving.
+    ENDPOINT: The endpoint ID
     """
     with Session() as session:
         try:
@@ -139,10 +139,10 @@ def stop(endpoint_id):
 @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
 def rm(endpoint_id):
     """
-    Remove serving
+    Remove the service endpoint.
 
     \b
-    ENDPOINT: Endpoint ID of serving."""
+    ENDPOINT: The endpoint ID"""
     with Session() as session:
         try:
             serving = session.Serve(endpoint_id)
@@ -159,10 +159,10 @@ def _invoke_cmd(name: str = "predict", docs: str = None):
     )
     def invoke(endpoint_id, input_args):
         """
-        Invoke serving
+        Invoke the service endpoint using the given parameters.
 
         \b
-        ENDPOINT: Endpoint ID of serving.
+        ENDPOINT: The endpoint ID
         """
         with Session() as session:
             try:

@@ -28,7 +28,7 @@ def model():
 @click.option("--limit", type=int, default=None, help="The page size for pagination.")
 def list(ctx: CLIContext, filter_, order, offset, limit):
     """
-    List models.
+    List the models.
     """
 
     with Session() as session:
@@ -53,7 +53,9 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 @click.argument("model_name", metavar="MODEL", type=str)
 def info(model_name):
     """
-    Info models.
+    Display the detail of a model
+    \b
+    MODEL: The model ID
     """
 
     with Session() as session:
@@ -115,7 +117,7 @@ def info(model_name):
 )
 def create(name, host, group, host_path, permission, quota, cloneable):
     """
-    Create model.
+    Create a new model with the given configuration.
     """
     with Session() as session:
         try:
@@ -149,10 +151,10 @@ def create(name, host, group, host_path, permission, quota, cloneable):
 @click.argument("model_name", metavar="MODEL", type=str)
 def rm(model_name):
     """
-    Remove model.
+    Remove the given model.
 
     \b
-    MODEL: Model ID.
+    MODEL: The model ID.
     """
 
     with Session() as session:
@@ -196,12 +198,12 @@ def rm(model_name):
 )
 def upload(model_name, filenames, model_version, base_dir, chunk_size, override_storage_proxy):
     """
-    TUS Upload a file to the model from the current working directory.
+    Upload a file to the model as the given version.
     The files with the same names will be overwirtten.
 
     \b
-    NAME: Name of a model.
-    FILENAMES: Paths of the files to be uploaded.
+    MODEL: The model ID
+    FILENAMES: The uploaded files paths relative to the current working directory
     """
     with Session() as session:
         try:
@@ -259,12 +261,13 @@ def download(
     model_name, filenames, model_version, base_dir, chunk_size, override_storage_proxy, max_retries
 ):
     """
-    Download a model from the virtual folder to the current working directory.
-    The models with the same names will be overwirtten.
+    Download a file from the model storage.
+    The files with the same names will be overwirtten.
 
     \b
-    NAME: Name of a model.
-    FILENAMES: Paths of the files to be downloaded inside a vfolder.
+    MODEL: The model ID
+    FILENAMES: The file paths in the model storage vfolder to download to the current working
+               directory.
     """
     with Session() as session:
         try:
