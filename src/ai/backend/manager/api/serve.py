@@ -21,14 +21,10 @@ from ai.backend.common.types import ClusterMode, SessionTypes
 from ai.backend.common.utils import str_to_timedelta
 
 from ..defs import DEFAULT_ROLE
-from ..models import (
-    ImageRow,
-    SessionStatus,
-    domains,
-    query_bootstrap_script,
-    verify_vfolder_name,
-    vfolders,
-)
+from ..models import ImageRow, domains, query_bootstrap_script, verify_vfolder_name, vfolders
+from ..models.endpoint import EndpointRow
+from ..models.routing import RoutingRow
+from ..models.session import SessionRow, SessionStatus
 from ..types import UserScope
 from .auth import auth_required
 from .exceptions import (
@@ -54,19 +50,34 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 @check_api_params(
     t.Dict(
         {
-            t.Key("all", default=False): t.ToBool,
-            tx.AliasedKey(["project_id", "projectId"], default=None): tx.UUID | t.String | t.Null,
-            tx.AliasedKey(["owner_user_email", "ownerUserEmail"], default=None): t.Email | t.Null,
+            tx.AliasedKey(["project_id", "projectId"]): tx.UUID,
         }
     ),
 )
 async def list_serve(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
+    project_id = params["project_id"]
 
     log.info("SERVE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
 
-    resp = []
-    return web.json_response(resp, status=200)
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        j = sa.join(SessionRow, RoutingRow, SessionRow.id == RoutingRow.session).join(
+            EndpointRow, RoutingRow.endpoint == EndpointRow.id
+        )
+        query = (
+            sa.select(
+                SessionRow.id,
+                SessionRow.name,
+                SessionRow.status,
+            )
+            .select_from(j)
+            .where(SessionRow.group_id == project_id)
+        )
+        result = await db_sess.execute(query)
+        rows = result.scalars().all()
+
+    return web.json_response(rows, status=200)
 
 
 @auth_required
@@ -74,14 +85,36 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID | t.String,
+            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID,
         }
     ),
 )
 async def get_info(request: web.Request, params: Any) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
 
     log.info("SERVE.GET_INFO (email:{}, ak:{})", request["user"]["email"], access_key)
+
+    async with root_ctx.db.begin_readonly_session() as db_sess:
+        j = sa.join(SessionRow, RoutingRow, SessionRow.id == RoutingRow.session).join(
+            EndpointRow, RoutingRow.endpoint == EndpointRow.id
+        )
+        query = (
+            sa.select(
+                SessionRow.id,
+                SessionRow.name,
+                SessionRow.status,
+                EndpointRow.image,
+                EndpointRow.model,
+                EndpointRow.url,
+            )
+            .select_from(j)
+            .where(RoutingRow.endpoint == params["endpoint_id"])
+        )
+        result = await db_sess.execute(query)
+        rows = result.scalars().all()
+
+    return web.json_response(rows, status=200)
 
 
 @auth_required
@@ -364,6 +397,23 @@ async def start(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
 
     log.info("SERVE.START (email:{}, ak:{})", request["user"]["email"], access_key)
+    return web.Response(status=204)
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@check_api_params(
+    t.Dict(
+        {
+            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID | t.String,
+        }
+    ),
+)
+async def stop(request: web.Request, params: Any) -> web.Response:
+    access_key = request["keypair"]["access_key"]
+
+    log.info("SERVE.STOP (email:{}, ak:{})", request["user"]["email"], access_key)
+    return web.Response(status=204)
 
 
 @auth_required
@@ -380,21 +430,6 @@ async def invoke_serve(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
 
     log.info("SERVE.INVOKE (email:{}, ak:{})", request["user"]["email"], access_key)
-
-
-@auth_required
-@server_status_required(READ_ALLOWED)
-@check_api_params(
-    t.Dict(
-        {
-            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID | t.String,
-        }
-    ),
-)
-async def stop(request: web.Request, params: Any) -> web.Response:
-    access_key = request["keypair"]["access_key"]
-
-    log.info("SERVE.STOP (email:{}, ak:{})", request["user"]["email"], access_key)
 
 
 @auth_required
