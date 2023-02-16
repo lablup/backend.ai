@@ -455,12 +455,12 @@ class PrivateContext:
 
 
 async def init(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["serve.context"]
+    app_ctx: PrivateContext = app["service.context"]
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
 
 
 async def shutdown(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["serve.context"]
+    app_ctx: PrivateContext = app["service.context"]
     await app_ctx.database_ptask_group.shutdown()
 
 
@@ -471,7 +471,7 @@ def create_app(
     app["api_versions"] = (4, 5)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
-    app["serve.context"] = PrivateContext()
+    app["service.context"] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     root_resource = cors.add(app.router.add_resource(r""))
