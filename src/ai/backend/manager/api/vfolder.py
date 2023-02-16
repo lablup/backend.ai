@@ -89,7 +89,7 @@ from .utils import check_api_params, get_user_scopes
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 VFolderRow = Mapping[str, Any]
 

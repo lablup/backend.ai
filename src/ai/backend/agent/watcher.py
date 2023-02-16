@@ -23,7 +23,7 @@ from ai.backend.common.utils import Fstab
 
 from . import __version__ as VERSION
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 shutdown_enabled = False
 

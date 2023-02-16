@@ -12,7 +12,7 @@ from ai.backend.agent.utils import closing_async
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import KernelId
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @web.middleware

@@ -69,7 +69,7 @@ if TYPE_CHECKING:
     from ..config import SharedConfig
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @server_status_required(READ_ALLOWED)

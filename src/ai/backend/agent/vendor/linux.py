@@ -12,7 +12,7 @@ import aiotools
 from ai.backend.common.docker import get_docker_connector
 from ai.backend.common.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 _numa_supported = False
 
 if sys.platform == "linux":

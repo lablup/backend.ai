@@ -77,7 +77,7 @@ from .utils import get_subnet_ip
 if TYPE_CHECKING:
     from .agent import AbstractAgent
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 deeplearning_image_keys = {
     "tensorflow",
@@ -820,7 +820,6 @@ def main(
     config_path: Path,
     debug: bool,
 ) -> int:
-
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
 

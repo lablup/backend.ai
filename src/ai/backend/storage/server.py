@@ -27,7 +27,7 @@ from .api.manager import init_manager_app
 from .config import local_config_iv
 from .context import Context
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @aiotools.server

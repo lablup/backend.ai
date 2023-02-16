@@ -45,7 +45,7 @@ from .utils import ExtendedAsyncSAEngine
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 __all__: Sequence[str] = (
