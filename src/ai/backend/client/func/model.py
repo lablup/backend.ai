@@ -37,14 +37,14 @@ class Model(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter_: str = None,
+        filter: str = None,
         order: str = None,
     ) -> PaginatedResult:
         """ """
         return await fetch_paginated_result(
             "vfolder_list",
             {
-                "filter": (filter_, "String"),
+                "filter": (filter, "String"),
                 "order": (order, "String"),
             },
             fields,
