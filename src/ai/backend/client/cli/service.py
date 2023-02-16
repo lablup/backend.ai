@@ -152,7 +152,7 @@ def rm(endpoint_id):
             sys.exit(ExitCode.FAILURE)
 
 
-def _invoke_cmd(name: str = "predict", docs: str = None):
+def _invoke_cmd(docs: str = None):
     @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
     @click.option(
         "--input-args", metavar="KEY=VAL", type=CommaSeparatedKVListParamType(), default=None
@@ -172,11 +172,10 @@ def _invoke_cmd(name: str = "predict", docs: str = None):
                 print_error(e)
                 sys.exit(ExitCode.FAILURE)
 
-    invoke.__name__ = name
     if docs is not None:
         invoke.__doc__ = docs
     return invoke
 
 
-main.command()(_invoke_cmd(name="predict", docs='Alias of "serve invoke"'))
+main.command(aliases=["predict"])(_invoke_cmd(docs='Alias of "serve invoke"'))
 serve.command()(_invoke_cmd())
