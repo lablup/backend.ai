@@ -1,8 +1,18 @@
+import uuid
+from typing import TYPE_CHECKING, Sequence
+
+import graphene
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import relationship
+from sqlalchemy.orm.exc import NoResultFound
 
-from .base import GUID, Base, IDColumn
+from .base import GUID, Base, IDColumn, Item, PaginatedList
 
-__all__ = ("RoutingRow",)
+if TYPE_CHECKING:
+    pass  # from .gql import GraphQueryContext
+
+__all__ = ("RoutingRow", "Routing", "RoutingList")
 
 
 class RoutingRow(Base):
@@ -20,3 +30,107 @@ class RoutingRow(Base):
     )
 
     traffic_ratio = sa.Column("traffic_ratio", sa.Float(), nullable=False)
+
+    endpoint_row = relationship("EndpointRow", back_populates="routings")
+
+    @classmethod
+    async def get(cls, session: AsyncSession, routing_id: uuid.UUID) -> "RoutingRow":
+        """
+        :raises: sqlalchemy.orm.exc.NoResultFound
+        """
+        query = sa.select(RoutingRow).filter(RoutingRow.id == routing_id)
+        result = await session.execute(query)
+        try:
+            return result.one()
+        except NoResultFound:
+            raise
+
+
+class Routing(graphene.ObjectType):
+    class Meta:
+        interfaces = (Item,)
+
+    routing_id = graphene.UUID()
+    endpoint = graphene.String()
+    session = graphene.UUID()
+    traffic_ratio = graphene.Float()
+
+    @classmethod
+    async def from_row(
+        cls,
+        ctx,  # ctx: GraphQueryContext,
+        row: RoutingRow,
+    ) -> "Routing":
+        return cls(
+            routing_id=row.id,
+            endpoint=row.endpoint_row.url,
+            session=row.session,
+            traffic_ratio=row.traffic_ratio,
+        )
+
+    @classmethod
+    async def load_count(
+        cls,
+        ctx,  # ctx: GraphQueryContext,
+        *,
+        endpoint_id: uuid.UUID | None = None,
+    ) -> int:
+        query = sa.select([sa.func.count()]).select_from(RoutingRow)
+        if endpoint_id is not None:
+            query = query.where(RoutingRow.endpoint == endpoint_id)
+        async with ctx.db.begin_readonly() as conn:
+            result = await conn.execute(query)
+            return result.scalar()
+
+    @classmethod
+    async def load_slice(
+        cls,
+        ctx,  # ctx: GraphQueryContext,
+        limit: int,
+        offset: int,
+        *,
+        endpoint_id: uuid.UUID | None = None,
+        filter: str | None = None,
+        order: str | None = None,
+    ) -> Sequence["Routing"]:
+        query = sa.select(RoutingRow).limit(limit).offset(offset)
+        if endpoint_id is not None:
+            query = query.where(RoutingRow.endpoint == endpoint_id)
+        """
+        if filter is not None:
+            parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = parser.append_filter(query, filter)
+        if order is not None:
+            parser = QueryOrderParser(cls._queryorder_colmap)
+            query = parser.append_ordering(query, order)
+        """
+        async with ctx.db.begin_readonly_session() as session:
+            return [await cls.from_row(ctx, row) async for row in (await session.stream(query))]
+
+    @classmethod
+    async def load_all(
+        cls, ctx, *, endpoint_id: uuid.UUID | None = None  # ctx: GraphQueryContext,
+    ) -> Sequence["Routing"]:
+        async with ctx.db.begin_readonly_session() as session:
+            rows = await RoutingRow.list(session, endpoint_id=endpoint_id)
+        return [await Routing.from_row(ctx, row) for row in rows]
+
+    @classmethod
+    async def load_item(
+        cls,
+        ctx,  # ctx: GraphQueryContext,
+        *,
+        routing_id: uuid.UUID,
+    ) -> "Routing":
+        async with ctx.db.begin_readonly_session() as session:
+            row = await RoutingRow.get(session, routing_id=routing_id)
+        if row is None:
+            raise NoResultFound
+        return await Routing.from_row(ctx, row)
+
+
+class RoutingList(graphene.ObjectType):
+    class Meta:
+        interfaces = (PaginatedList,)
+
+    items = graphene.List(Routing, required=True)

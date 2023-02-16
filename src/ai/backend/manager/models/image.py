@@ -196,6 +196,7 @@ class ImageRow(Base):
     aliases: relationship
     # sessions = relationship("SessionRow", back_populates="image_row")
     # kernels = relationship("KernelRow", back_populates="image_row")
+    endpoints = relationship("EndpointRow", back_populates="image_row")
 
     def __init__(
         self,
