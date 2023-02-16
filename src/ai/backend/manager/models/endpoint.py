@@ -28,8 +28,8 @@ class EndpointRow(Base):
     )
     project = sa.Column(
         "project",
-        sa.String(length=64),
-        sa.ForeignKey("domains.name", ondelete="RESTRICT"),
+        GUID,
+        sa.ForeignKey("groups.id", ondelete="RESTRICT"),
         nullable=False,
     )
     resource_group = sa.Column(
@@ -58,7 +58,9 @@ class EndpointRow(Base):
             raise
 
     @classmethod
-    async def list(cls, session: AsyncSession, project: str | None = None) -> List["EndpointRow"]:
+    async def list(
+        cls, session: AsyncSession, project: uuid.UUID | None = None
+    ) -> List["EndpointRow"]:
         query = sa.select(EndpointRow)
         if project:
             query = query.filter(EndpointRow.project == project)
@@ -73,7 +75,7 @@ class Endpoint(graphene.ObjectType):
     endpoint_id = graphene.UUID()
     image = graphene.String()
     model = graphene.UUID()
-    project = graphene.String()
+    project = graphene.UUID()
     resource_group = graphene.String()
     resource_slots = graphene.JSONString()
     url = graphene.String()
@@ -101,7 +103,7 @@ class Endpoint(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         *,
-        project: str | None = None,
+        project: uuid.UUID | None = None,
     ) -> int:
         query = sa.select([sa.func.count()]).select_from(EndpointRow)
         if project is not None:
@@ -117,7 +119,7 @@ class Endpoint(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        project: Optional[str] = None,
+        project: Optional[uuid.UUID] = None,
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence["Endpoint"]:
@@ -140,7 +142,7 @@ class Endpoint(graphene.ObjectType):
         cls,
         ctx,  # ctx: GraphQueryContext,
         *,
-        project: str | None = None,
+        project: uuid.UUID | None = None,
     ) -> Sequence["Endpoint"]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await EndpointRow.list(session, project=project)

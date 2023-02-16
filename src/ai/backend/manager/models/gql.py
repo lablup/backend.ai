@@ -504,7 +504,7 @@ class Queries(graphene.ObjectType):
         filter=graphene.String(),
         order=graphene.String(),
         # filters
-        project=graphene.String(required=True),
+        project=graphene.UUID(),
     )
 
     routing = graphene.Field(
@@ -519,7 +519,7 @@ class Queries(graphene.ObjectType):
         filter=graphene.String(),
         order=graphene.String(),
         # filters
-        endpoint_id=graphene.UUID(required=True),
+        endpoint_id=graphene.UUID(),
     )
 
     @staticmethod
@@ -1467,9 +1467,9 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: str = None,
-        order: str = None,
-        project: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        project: Optional[uuid.UUID] = None,
     ) -> EndpointList:
         total_count = await Endpoint.load_count(
             info.context,
@@ -1501,9 +1501,9 @@ class Queries(graphene.ObjectType):
         limit: int,
         offset: int,
         *,
-        filter: str = None,
-        order: str = None,
-        endpoint_id: uuid.UUID = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
+        endpoint_id: Optional[uuid.UUID] = None,
     ) -> RoutingList:
         total_count = await Routing.load_count(
             info.context,
