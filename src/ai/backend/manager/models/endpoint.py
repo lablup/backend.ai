@@ -27,6 +27,12 @@ class EndpointRow(Base):
     model = sa.Column(
         "model", GUID, sa.ForeignKey("vfolders.id", ondelete="RESTRICT"), nullable=False
     )
+    domain = sa.Column(
+        "domain",
+        sa.String(length=64),
+        sa.ForeignKey("domains.name", ondelete="RESTRICT"),
+        nullable=False,
+    )
     project = sa.Column(
         "project",
         GUID,
@@ -76,6 +82,7 @@ class Endpoint(graphene.ObjectType):
     endpoint_id = graphene.UUID()
     image = graphene.String()
     model = graphene.UUID()
+    domain = graphene.String()
     project = graphene.UUID()
     resource_group = graphene.String()
     resource_slots = graphene.JSONString()
@@ -92,6 +99,7 @@ class Endpoint(graphene.ObjectType):
             endpoint_id=row.id,
             image=row.image_row.image,
             model=row.model,
+            domain=row.domain,
             project=row.project,
             resource_group=row.resource_group,
             resource_slots=row.resource_slots,
