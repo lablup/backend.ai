@@ -457,10 +457,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 
     # Check work directory and reserved name directory.
     mount_map = params["config"].get("mount_map")
-    from pprint import pprint
 
-    print("config ---")
-    pprint(params["config"])
     if mount_map is not None:
         original_folders = mount_map.keys()
         alias_folders = mount_map.values()
