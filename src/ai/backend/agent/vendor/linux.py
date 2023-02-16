@@ -75,6 +75,9 @@ class libnuma:
                     except (RuntimeError, aiohttp.ClientError):
                         pass
                     else:
+                        # Assume cgroup v1 if CgroupVersion key is absent
+                        if "CgroupVersion" not in data:
+                            data["CgroupVersion"] = "1"
                         try:
                             driver = data["CgroupDriver"]
                             version = data["CgroupVersion"]
