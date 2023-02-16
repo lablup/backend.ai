@@ -46,7 +46,6 @@ __all__ = (
     "JSONSerializableMixin",
     "DeviceId",
     "ContainerId",
-    "EndpointId",
     "SessionId",
     "KernelId",
     "MetricKey",
@@ -201,7 +200,6 @@ HostPID = NewType("HostPID", PID)
 ContainerPID = NewType("ContainerPID", PID)
 
 ContainerId = NewType("ContainerId", str)
-EndpointId = NewType("EndpointId", uuid.UUID)
 SessionId = NewType("SessionId", uuid.UUID)
 KernelId = NewType("KernelId", uuid.UUID)
 ImageAlias = NewType("ImageAlias", str)
