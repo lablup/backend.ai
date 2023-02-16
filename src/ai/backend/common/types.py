@@ -924,6 +924,7 @@ class KernelCreationConfig(TypedDict):
     allocated_host_ports: List[int]
     scaling_group: str
     agent_addr: str
+    endpoint_id: Optional[str]
 
 
 class SessionEnqueueingConfig(TypedDict):

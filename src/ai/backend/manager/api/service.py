@@ -13,7 +13,6 @@ import trafaret as t
 from aiohttp import web
 from dateutil.parser import isoparse
 from dateutil.tz import tzutc
-from sqlalchemy.dialects import postgresql as psql
 
 from ai.backend.common import validators as tx
 from ai.backend.common.docker import ImageRef
@@ -361,26 +360,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         )
 
         # Create routing
-        # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_nothing
-        async def _create_routing() -> uuid.UUID:
-            async with root_ctx.db.begin_session() as db_sess:
-                routing_id = uuid.uuid4()
-                query = (
-                    psql.insert(RoutingRow)
-                    .values(
-                        id=routing_id,
-                        endpoint=endpoint_id,
-                        session=session_id,
-                        traffic_ratio=100.0,
-                    )
-                    .on_conflict_do_nothing(
-                        index_elements=[RoutingRow.endpoint, RoutingRow.session]
-                    )
-                )
-                await db_sess.execute(query)
-                return routing_id
-
-        await execute_with_retry(_create_routing)
+        await RoutingRow.create(root_ctx.db, endpoint_id, session_id)
 
         resp["sessionId"] = str(session_id)  # changed since API v5
         resp["sessionName"] = str(params["serving_name"])

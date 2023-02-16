@@ -102,6 +102,7 @@ from ..models import (
     AgentStatus,
     KernelRow,
     KernelStatus,
+    RoutingRow,
     SessionRow,
     SessionStatus,
     UserRole,
@@ -1497,6 +1498,9 @@ async def handle_kernel_creation_lifecycle(
         # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
             tracker.set_result(None)
+        if (endpoint_id := event.creation_info.get("endpoint_id")) is not None:
+            session_id = event.creation_info.get("session_id")
+            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(session_id))
     elif isinstance(event, KernelCancelledEvent):
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
             tracker.cancel()

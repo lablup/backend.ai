@@ -3,15 +3,19 @@ from typing import TYPE_CHECKING, Sequence
 
 import graphene
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm.exc import NoResultFound
 
 from ..api.exceptions import RoutingNotFound
 from .base import GUID, Base, IDColumn, Item, PaginatedList
+from .utils import execute_with_retry
 
 if TYPE_CHECKING:
-    pass  # from .gql import GraphQueryContext
+    # from .gql import GraphQueryContext
+    from .utils import ExtendedAsyncSAEngine
+
 
 __all__ = ("RoutingRow", "Routing", "RoutingList")
 
@@ -45,6 +49,36 @@ class RoutingRow(Base):
             return result.one()
         except NoResultFound:
             raise
+
+    @classmethod
+    async def create(
+        cls,
+        engine: ExtendedAsyncSAEngine,
+        endpoint_id: uuid.UUID,
+        session_id: uuid.UUID,
+        traffic_ratio: float = 100.0,
+    ) -> uuid.UUID:
+        # https://docs.sqlalchemy.org/en/14/dialects/postgresql.html#sqlalchemy.dialects.postgresql.Insert.on_conflict_do_nothing
+
+        async def _create_routing() -> uuid.UUID:
+            async with engine.begin_session() as db_sess:
+                routing_id = uuid.uuid4()
+                query = (
+                    psql.insert(RoutingRow)
+                    .values(
+                        id=routing_id,
+                        endpoint=endpoint_id,
+                        session=session_id,
+                        traffic_ratio=traffic_ratio,
+                    )
+                    .on_conflict_do_nothing(
+                        index_elements=[RoutingRow.endpoint, RoutingRow.session]
+                    )
+                )
+                await db_sess.execute(query)
+                return routing_id
+
+        return await execute_with_retry(_create_routing)
 
 
 class Routing(graphene.ObjectType):
