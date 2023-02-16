@@ -431,6 +431,8 @@ async def invoke_serve(request: web.Request, params: Any) -> web.Response:
 
     log.info("SERVE.INVOKE (email:{}, ak:{})", request["user"]["email"], access_key)
 
+    return web.json_response({}, status=200)  # TODO
+
 
 @auth_required
 @server_status_required(READ_ALLOWED)
@@ -445,6 +447,8 @@ async def delete(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
 
     log.info("SERVE.DELETE (email:{}, ak:{})", request["user"]["email"], access_key)
+
+    return web.json_response({}, status=200)  # TODO
 
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
