@@ -47,8 +47,8 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 
 
 @service.command()
-@click.argument("endpoint_id", metavar="ENDPOINT", type=str)
-def info(endpoint_id):
+@click.argument("service_id", metavar="SERVICE_ID", type=str)
+def info(service_id):
     """
     Display the detail of a service endpoint with its backing inference session.
 
@@ -57,55 +57,57 @@ def info(endpoint_id):
     """
     with Session() as session:
         try:
-            result = session.Service(endpoint_id).info()
+            result = session.Service.info(service_id)
             print("Serve info")
-            print("- Endpoint ID: {0}".format(result["endpoint_id"]))
+            print("- Endpoint ID: {0}".format(result["service_id"]))
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @service.command()
-@click.argument("endpoint_id", metavar="ENDPOINT", type=str)
 @click.argument("model_id", metavar="MODEL", type=str)
 @click.argument("model_version", metavar="MODEL_VER", type=str)
 @click.argument("image_ref", metavar="IMAGE_REF", type=str)
+@click.option("-t", "--name", metavar="NAME", type=str, default=None)
+@click.option("-e", "--endpoint", type=str, default=None)
 @click.option("-p", "--project", type=str, default=None)
 @click.option(
     "--resource-opts",
     metavar="KEY=VAL[,KEY=VAL...]",
     type=CommaSeparatedKVListParamType(),
-    default=None,
+    default=dict,
     help="The resource options",
 )
-def create(endpoint_id, model_id, model_version, image_ref, project, resource_opts):
+def create(model_id, model_version, image_ref, name, endpoint, project, resource_opts):
     """
     Create a service endpoint with a backing inference session.
 
     \b
-    ENDPOINT: The endpoint ID
     MODEL: The model ID
     MODEL_VER: The version number or name of a model
     IMAGE_REF: The reference of container image to provide the serving framework
     """
     with Session() as session:
         try:
-            serving = session.Service(endpoint_id)
-            serving.create(
+            result = session.Service.create(
                 model_id=model_id,
                 model_version=model_version,
                 image_ref=image_ref,
                 project=project,
                 resource_opts=resource_opts,
+                endpoint_id=endpoint,
+                service_name=name,
             )
+            print(result)
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @service.command()
-@click.argument("endpoint_id", metavar="ENDPOINT", type=str)
-def start(endpoint_id):
+@click.argument("service_id", metavar="SERVICE_ID", type=str)
+def start(service_id):
     """
     Start or resume the service endpoint to handle the incoming traffic.
 
@@ -114,16 +116,15 @@ def start(endpoint_id):
     """
     with Session() as session:
         try:
-            serving = session.Service(endpoint_id)
-            serving.start()
+            session.Service.start(service_id)
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @service.command()
-@click.argument("endpoint_id", metavar="ENDPOINT", type=str)
-def stop(endpoint_id):
+@click.argument("service_id", metavar="SERVICE_ID", type=str)
+def stop(service_id):
     """
     Stop the service endpoint without destroying it.
 
@@ -132,16 +133,15 @@ def stop(endpoint_id):
     """
     with Session() as session:
         try:
-            serving = session.Service(endpoint_id)
-            serving.stop()
+            session.Service.stop(service_id)
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @service.command()
-@click.argument("endpoint_id", metavar="ENDPOINT", type=str)
-def rm(endpoint_id):
+@click.argument("service_id", metavar="SERVICE_ID", type=str)
+def rm(service_id):
     """
     Remove the service endpoint.
 
@@ -149,15 +149,14 @@ def rm(endpoint_id):
     ENDPOINT: The endpoint ID"""
     with Session() as session:
         try:
-            serving = session.Service(endpoint_id)
-            serving.delete()
+            session.Service.delete(service_id)
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 def _invoke_cmd(docs: str = None):
-    @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
+    @click.argument("service_id", metavar="SERVICE_ID", type=str)
     @click.option(
         "--input-args",
         metavar="KEY=VAL[,KEY=VAL...]",
@@ -165,7 +164,7 @@ def _invoke_cmd(docs: str = None):
         default=None,
         help="The input arguments",
     )
-    def invoke(endpoint_id, input_args):
+    def invoke(service_id, input_args):
         """
         Invoke the service endpoint using the given parameters.
 
@@ -174,8 +173,7 @@ def _invoke_cmd(docs: str = None):
         """
         with Session() as session:
             try:
-                serving = session.Service(endpoint_id)
-                serving.invoke(input_args)
+                session.Service.invoke(service_id, input_args)
             except Exception as e:
                 print_error(e)
                 sys.exit(ExitCode.FAILURE)

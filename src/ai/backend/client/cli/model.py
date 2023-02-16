@@ -119,6 +119,10 @@ def info(model_name):
 def create(name, host, group, host_path, permission, quota, cloneable):
     """
     Create a new model with the given configuration.
+
+    \b
+    NAME: Name of a model.
+    HOST: Name of a virtual folder host in which the model will be created.
     """
     with Session() as session:
         try:

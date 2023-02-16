@@ -58,6 +58,7 @@ class Model(BaseFunction):
         async with rqst.fetch() as resp:
             return await resp.json()
 
+    @api_function
     @classmethod
     async def create(
         cls,

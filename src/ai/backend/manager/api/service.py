@@ -132,8 +132,8 @@ async def get_info(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID,
-            tx.AliasedKey(["serving_name", "servingName"]): t.String,
+            tx.AliasedKey(["endpoint_id", "endpointId"], default=None): tx.UUID | t.Null,
+            tx.AliasedKey(["service_name", "serviceName"]): t.String,
             tx.AliasedKey(["model_id", "modelId"]): tx.UUID,
             tx.AliasedKey(["model_version", "modelVersion"]): t.String,
             tx.AliasedKey(["image_ref", "imageRef"]): t.String,
@@ -253,7 +253,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
             db_sess.add(endpoint)
             return endpoint_id
 
-    endpoint_id = await execute_with_retry(_create_endpoint)
+    if params["endpoint_id"] is None:
+        endpoint_id = await execute_with_retry(_create_endpoint)
+    else:
+        endpoint_id = params["endpoint_id"]
 
     # # Check existing (owner_access_key, session_name) instance
     # try:
@@ -323,7 +326,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
             app_ctx.database_ptask_group.create_task(
                 root_ctx.registry.enqueue_session(
                     session_creation_id,
-                    params["serving_name"],
+                    params["service_name"],
                     access_key,
                     {
                         "creation_config": params["config"],
@@ -363,7 +366,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         await RoutingRow.create(root_ctx.db, endpoint_id, session_id)
 
         resp["sessionId"] = str(session_id)  # changed since API v5
-        resp["sessionName"] = str(params["serving_name"])
+        resp["sessionName"] = str(params["service_name"])
         resp["status"] = SessionStatus.PENDING.name
         resp["servicePorts"] = []
         resp["created"] = True
@@ -472,15 +475,15 @@ async def invoke_serving(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID,
+            tx.AliasedKey(["service_id", "serviceId"]): tx.UUID,
         }
     ),
 )
 async def delete(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
-    session_name = request.match_info["session_name"]
-    endpoint_id = params["endpoint_id"]
+    # session_name = request.match_info["session_name"]
+    service_id = params["service_id"]
 
     log.info("SERVE.DELETE (email:{}, ak:{})", request["user"]["email"], access_key)
 
@@ -489,18 +492,15 @@ async def delete(request: web.Request, params: Any) -> web.Response:
         UserRole.ADMIN,
         UserRole.SUPERADMIN,
     ):
-        raise InsufficientPrivilege("You are not allowed to delete others's sessions")
+        raise InsufficientPrivilege("You are not allowed to delete others's services")
 
     async with root_ctx.db.begin_session() as db_sess:
         # Delete endpoint first
-        await db_sess.execute(sa.delete(EndpointRow).where(id=endpoint_id))
+        await db_sess.execute(sa.delete(EndpointRow).where(session=service_id))
 
-        session = await SessionRow.get_session_with_kernels(
-            session_name, owner_access_key, db_session=db_sess
-        )
+        session = await SessionRow.get_session_with_kernels(service_id, db_session=db_sess)
     last_stat = await root_ctx.registry.destroy_session(
         session,
-        forced=params["forced"],
     )
     resp = {
         "stats": last_stat,
@@ -514,12 +514,12 @@ class PrivateContext:
 
 
 async def init(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["service.context"]
+    app_ctx: PrivateContext = app["services.context"]
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
 
 
 async def shutdown(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["service.context"]
+    app_ctx: PrivateContext = app["services.context"]
     await app_ctx.database_ptask_group.shutdown()
 
 
@@ -527,10 +527,11 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
+    app["prefix"] = "services"
     app["api_versions"] = (4, 5)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
-    app["service.context"] = PrivateContext()
+    app["services.context"] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     root_resource = cors.add(app.router.add_resource(r""))
