@@ -54,6 +54,7 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 def info(model_name):
     """
     Display the detail of a model
+
     \b
     MODEL: The model ID
     """
