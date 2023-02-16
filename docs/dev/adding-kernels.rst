@@ -86,7 +86,7 @@ Any Docker image based on Alpine 3.17+, CentOS 7+, and Ubuntu 16.04+ which satis
   * ``ai.backend.role``: ``COMPUTE`` (default if unspecified) or ``INFERENCE``
   * ``ai.backend.service-ports``: A list of port mapping declaration strings for services supported by the image. (See the next section for details)
     Backend.AI manages the host-side port mapping and network tunneling via the API gateway automagically.
-  * ``ai.backend.endpoint-port``: The name of a service port to be bound with the service endpoint. (Required in inference sessions)
+  * ``ai.backend.endpoint-ports``: A comma-separated name(s) of service port(s) to be bound with the service endpoint. (At least one is required in inference sessions)
   * ``ai.backend.model-path``: The path to mount the target model's target version storage folder. (Required in inference sessions)
   * ``ai.backend.envs.corecount``: A comma-separated string list of environment variable names.
     They are set to the number of available CPU cores to the kernel container.
