@@ -40,11 +40,14 @@ class Model(BaseFunction):
         filter: str = None,
         order: str = None,
     ) -> PaginatedResult:
-        """ """
+        if filter:
+            composed_filter = f'({filter}) & (usage_mode == "MODEL")'
+        else:
+            composed_filter = '(usage_mode == "MODEL")'
         return await fetch_paginated_result(
             "vfolder_list",
             {
-                "filter": (filter, "String"),
+                "filter": (composed_filter, "String"),
                 "order": (order, "String"),
             },
             fields,
@@ -56,7 +59,20 @@ class Model(BaseFunction):
     async def info(self):
         rqst = Request("GET", "/folders/{0}".format(self.model_name))
         async with rqst.fetch() as resp:
-            return await resp.json()
+            info = await resp.json()
+        rqst = Request("GET", "/folders/{}/files".format(self.model_name))
+        rqst.set_json(
+            {
+                "path": "versions",
+            }
+        )
+        async with rqst.fetch() as resp:
+            versions = await resp.json()
+        info["versions"] = [
+            item["name"] for item in versions["items"] if item["type"] == "DIRECTORY"
+        ]
+        info["versions"].sort(reverse=True)
+        return info
 
     @api_function
     @classmethod
