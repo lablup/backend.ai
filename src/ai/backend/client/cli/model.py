@@ -7,8 +7,10 @@ import humanize
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.config import DEFAULT_CHUNK_SIZE, APIConfig
+from ai.backend.client.output.fields import vfolder_fields
 from ai.backend.client.session import Session
 
+from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
 from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
 from .pretty import print_done, print_error
@@ -50,8 +52,9 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 
 
 @model.command()
+@pass_ctx_obj
 @click.argument("model_name", metavar="MODEL", type=str)
-def info(model_name):
+def info(ctx: CLIContext, model_name):
     """
     Display the detail of a model with its backing storage vfolder.
 
@@ -62,9 +65,14 @@ def info(model_name):
     with Session() as session:
         try:
             result = session.Model(model_name).info()
-            print("Model info")
-            print("- ID: {0}".format(result["id"]))
-            print("- Name: {0}".format(result["name"]))
+            ctx.output.print_item(
+                result,
+                [
+                    vfolder_fields["id"],
+                    vfolder_fields["name"],
+                    FieldSpec("versions"),
+                ],
+            )
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
