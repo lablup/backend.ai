@@ -973,6 +973,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     docker_version["ApiVersion"],
                 )
             docker_info = await docker.system.info()
+            docker_info = dict(docker_info)
+            # Assume cgroup v1 if CgroupVersion key is absent
+            if "CgroupVersion" not in docker_info:
+                docker_info["CgroupVersion"] = "1"
             log.info(
                 "Cgroup Driver: {0}, Cgroup Version: {1}",
                 docker_info["CgroupDriver"],
