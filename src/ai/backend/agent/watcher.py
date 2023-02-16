@@ -24,7 +24,7 @@ from ai.backend.common.utils import Fstab
 
 from . import __version__ as VERSION
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 shutdown_enabled = False
 
@@ -357,8 +357,6 @@ def main(cli_ctx, config_path, log_level, debug=False):
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = LogSeverity.DEBUG
-
-    click.echo("Selected logging level for watcher : " + log_level.value)
 
     watcher_config_iv = (
         t.Dict(

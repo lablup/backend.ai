@@ -78,7 +78,7 @@ from .utils import get_subnet_ip
 if TYPE_CHECKING:
     from .agent import AbstractAgent
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 deeplearning_image_keys = {
     "tensorflow",
@@ -835,7 +835,6 @@ def main(
         click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = LogSeverity.DEBUG
 
-    click.echo("Selected logging level for agent : " + log_level.value)
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
 
