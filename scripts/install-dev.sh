@@ -899,6 +899,9 @@ configure_backendai() {
   ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-user.sh
   ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_USER_CONF_FOR_API}@" ./env-tester-user.sh
 
+  show_info "Dumping the installed etcd configuration to ./dev.etcd.installed.json as a backup."
+  ./backend.ai mgr etcd get --prefix '' > ./dev.etcd.installed.json
+
   show_info "Installation finished."
   show_note "Check out the default API keypairs and account credentials for local development and testing:"
   echo "> ${WHITE}cat env-local-admin-api.sh${NC}"
