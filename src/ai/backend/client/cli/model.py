@@ -53,7 +53,7 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 @click.argument("model_name", metavar="MODEL", type=str)
 def info(model_name):
     """
-    Display the detail of a model
+    Display the detail of a model with its backing storage vfolder.
 
     \b
     MODEL: The model ID

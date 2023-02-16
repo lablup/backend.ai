@@ -50,7 +50,7 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
 @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
 def info(endpoint_id):
     """
-    Display the detail of a service endpoint
+    Display the detail of a service endpoint with its backing inference session.
 
     \b
     ENDPOINT: The endpoint ID
@@ -76,7 +76,7 @@ def info(endpoint_id):
 )
 def create(endpoint_id, model_id, model_version, image_ref, project, resource_opts):
     """
-    Create a service endpoint.
+    Create a service endpoint with a backing inference session.
 
     \b
     ENDPOINT: The endpoint ID
