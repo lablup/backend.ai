@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
+    AsyncIterator,
     List,
     Mapping,
     MutableMapping,
@@ -23,6 +24,8 @@ import sqlalchemy as sa
 import trafaret as t
 import yaml
 from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
+from redis.asyncio import Redis
+from redis.asyncio.client import Pipeline
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 
@@ -497,24 +500,12 @@ class Image(graphene.ObjectType):
     hash = graphene.String()
 
     @classmethod
-    async def from_row(
+    def populate_row(
         cls,
         ctx: GraphQueryContext,
         row: ImageRow,
+        installed_agents: List[str],
     ) -> Image:
-        # TODO: add architecture
-        installed = (await redis_helper.execute(ctx.redis_image, lambda r: r.scard(row.name))) > 0
-        _installed_agents = await redis_helper.execute(
-            ctx.redis_image,
-            lambda r: r.smembers(row.name),
-        )
-        installed_agents: List[str] = []
-        if installed_agents is not None:
-            for agent_id in _installed_agents:
-                if isinstance(agent_id, bytes):
-                    installed_agents.append(agent_id.decode())
-                else:
-                    installed_agents.append(agent_id)
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         hide_agents = False if is_superadmin else ctx.local_config["manager"]["hide-agents"]
         return cls(
@@ -537,11 +528,53 @@ class Image(graphene.ObjectType):
                 for k, v in row.resources.items()
             ],
             supported_accelerators=(row.accelerators or "").split(","),
-            installed=installed,
+            installed=len(installed_agents) > 0,
             installed_agents=installed_agents if not hide_agents else None,
             # legacy
             hash=row.config_digest,
         )
+
+    @classmethod
+    async def from_row(
+        cls,
+        ctx: GraphQueryContext,
+        row: ImageRow,
+    ) -> Image:
+        # TODO: add architecture
+        _installed_agents = await redis_helper.execute(
+            ctx.redis_image,
+            lambda r: r.smembers(row.name),
+        )
+        installed_agents: List[str] = []
+        for agent_id in _installed_agents:
+            if isinstance(agent_id, bytes):
+                installed_agents.append(agent_id.decode())
+            else:
+                installed_agents.append(agent_id)
+        return cls.populate_row(ctx, row, installed_agents)
+
+    @classmethod
+    async def bulk_load(
+        cls,
+        ctx: GraphQueryContext,
+        rows: List[ImageRow],
+    ) -> AsyncIterator[Image]:
+        async def _pipe(r: Redis) -> Pipeline:
+            pipe = r.pipeline()
+            for row in rows:
+                await pipe.smembers(row.name)
+            return pipe
+
+        results = await redis_helper.execute(ctx.redis_image, _pipe)
+        for idx, row in enumerate(rows):
+            installed_agents: List[str] = []
+            _installed_agents = results[idx]
+            for agent_id in _installed_agents:
+                if isinstance(agent_id, bytes):
+                    installed_agents.append(agent_id.decode())
+                else:
+                    installed_agents.append(agent_id)
+            yield cls.populate_row(ctx, row, installed_agents)
 
     @classmethod
     async def batch_load_by_canonical(
@@ -597,11 +630,8 @@ class Image(graphene.ObjectType):
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
-        items: List[Image] = []
+        items = [gen async for gen in cls.bulk_load(ctx, rows)]
         # Convert to GQL objects
-        for r in rows:
-            item = await cls.from_row(ctx, r)
-            items.append(item)
         if is_installed is not None:
             items = [*filter(lambda item: item.installed == is_installed, items)]
         if is_operation is not None:
