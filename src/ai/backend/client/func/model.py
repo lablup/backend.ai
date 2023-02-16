@@ -71,6 +71,7 @@ class Model(BaseFunction):
         info["versions"] = [
             item["name"] for item in versions["items"] if item["type"] == "DIRECTORY"
         ]
+        info["versions"].sort(reverse=True)
         return info
 
     @classmethod
