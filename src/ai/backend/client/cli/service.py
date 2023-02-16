@@ -72,7 +72,11 @@ def info(endpoint_id):
 @click.argument("image_ref", metavar="IMAGE_REF", type=str)
 @click.option("-p", "--project", type=str, default=None)
 @click.option(
-    "--resource-opts", metavar="KEY=VAL", type=CommaSeparatedKVListParamType(), default=None
+    "--resource-opts",
+    metavar="KEY=VAL[,KEY=VAL...]",
+    type=CommaSeparatedKVListParamType(),
+    default=None,
+    help="The resource options",
 )
 def create(endpoint_id, model_id, model_version, image_ref, project, resource_opts):
     """
@@ -155,7 +159,11 @@ def rm(endpoint_id):
 def _invoke_cmd(docs: str = None):
     @click.argument("endpoint_id", metavar="ENDPOINT", type=str)
     @click.option(
-        "--input-args", metavar="KEY=VAL", type=CommaSeparatedKVListParamType(), default=None
+        "--input-args",
+        metavar="KEY=VAL[,KEY=VAL...]",
+        type=CommaSeparatedKVListParamType(),
+        default=None,
+        help="The input arguments",
     )
     def invoke(endpoint_id, input_args):
         """
