@@ -38,7 +38,7 @@ from .exceptions import GenericForbidden, InvalidAPIParameters, QueryNotImplemen
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _rx_sitepkg_path = re.compile(r"^.+/site-packages/")
 

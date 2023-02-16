@@ -14,7 +14,7 @@ from ..etcd import AsyncEtcd
 from ..exception import ConfigurationError
 from ..logging_utils import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = (
     "AbstractPlugin",

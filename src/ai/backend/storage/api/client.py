@@ -27,7 +27,7 @@ from ..exception import InvalidAPIParameters
 from ..types import SENTINEL
 from ..utils import CheckParamSource, check_params
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8

@@ -23,7 +23,7 @@ __all__ = (
     "get_instance_region",
 )
 
-log = logging.getLogger(__name__)
+log = logging.getLogger(__spec__.name)
 
 
 def is_containerized() -> bool:

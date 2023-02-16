@@ -66,7 +66,7 @@ __all__: Sequence[str] = (
 )
 
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VFolderUsageMode(str, enum.Enum):

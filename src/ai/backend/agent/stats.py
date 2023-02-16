@@ -54,7 +54,7 @@ __all__ = (
     "Measurement",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 def check_cgroup_available():

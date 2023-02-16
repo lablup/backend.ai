@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SchedulerOps(enum.Enum):

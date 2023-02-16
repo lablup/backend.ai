@@ -25,7 +25,7 @@ from ai.backend.plugin.entrypoint import scan_entrypoints
 from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class KubernetesKernel(AbstractKernel):

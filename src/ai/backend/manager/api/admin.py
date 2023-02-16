@@ -28,7 +28,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _rx_mutation_hdr = re.compile(r"^mutation(\s+\w+)?\s*(\(|{|@)", re.M)
 

@@ -29,7 +29,7 @@ from .image_impl import set_image_resource_limit as set_image_resource_limit_imp
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()

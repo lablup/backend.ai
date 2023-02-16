@@ -19,7 +19,7 @@ from ai.backend.common.types import KernelId, aobject
 from .plugin import MetadataPlugin
 from .root import ContainerMetadataPlugin
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class MetadataPluginContext(BasePluginContext[MetadataPlugin]):

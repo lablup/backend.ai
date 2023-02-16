@@ -28,7 +28,7 @@ from ai.backend.common.types import RedisConnectionInfo
 
 from .logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AbstractDistributedLock(metaclass=abc.ABCMeta):

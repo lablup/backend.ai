@@ -61,7 +61,7 @@ if TYPE_CHECKING:
     from .config import SharedConfig
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AppStreamingStatus(enum.Enum):
