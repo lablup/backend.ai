@@ -801,8 +801,6 @@ def main(
         click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = LogSeverity.DEBUG
 
-    click.echo("Selected logging level for manager : " + log_level.value)
-
     cfg = load_config(config_path, log_level.value)
 
     if ctx.invoked_subcommand is None:

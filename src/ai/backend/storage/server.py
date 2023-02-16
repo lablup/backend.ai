@@ -180,8 +180,6 @@ def main(cli_ctx, config_path, log_level, debug=False):
         click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = LogSeverity.DEBUG
 
-    click.echo("Selected logging level for storage : " + log_level.value)
-
     # Determine where to read configuration.
     raw_cfg, cfg_src_path = config.read_from_file(config_path, "storage-proxy")
 
