@@ -211,6 +211,14 @@ class MainKernelNotFound(ObjectNotFound):
     object_name = "main kernel"
 
 
+class EndpointNotFound(ObjectNotFound):
+    object_name = "endpoint"
+
+
+class RoutingNotFound(ObjectNotFound):
+    object_name = "routing"
+
+
 class TooManySessionsMatched(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-sessions-matched"
     error_title = "Too many sessions matched."

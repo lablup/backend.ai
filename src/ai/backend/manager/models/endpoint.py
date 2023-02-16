@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm.exc import NoResultFound
 
+from ..api.exceptions import EndpointNotFound
 from .base import GUID, Base, EndpointIDColumn, Item, PaginatedList, ResourceSlotColumn
 from .routing import Routing
 
@@ -156,12 +157,13 @@ class Endpoint(graphene.ObjectType):
         endpoint_id: uuid.UUID,
     ) -> "Endpoint":
         """
-        :raises: sqlalchemy.orm.exc.NoResultFound
+        :raises: ai.backend.manager.api.exceptions.EndpointNotFound
         """
-        async with ctx.db.begin_readonly_session() as session:
-            row = await EndpointRow.get(session, endpoint_id=endpoint_id)
-        if row is None:
-            raise NoResultFound
+        try:
+            async with ctx.db.begin_readonly_session() as session:
+                row = await EndpointRow.get(session, endpoint_id=endpoint_id)
+        except NoResultFound:
+            raise EndpointNotFound
         return await Endpoint.from_row(ctx, row)
 
 

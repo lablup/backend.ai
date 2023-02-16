@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm.exc import NoResultFound
 
+from ..api.exceptions import RoutingNotFound
 from .base import GUID, Base, IDColumn, Item, PaginatedList
 
 if TYPE_CHECKING:
@@ -122,10 +123,11 @@ class Routing(graphene.ObjectType):
         *,
         routing_id: uuid.UUID,
     ) -> "Routing":
-        async with ctx.db.begin_readonly_session() as session:
-            row = await RoutingRow.get(session, routing_id=routing_id)
-        if row is None:
-            raise NoResultFound
+        try:
+            async with ctx.db.begin_readonly_session() as session:
+                row = await RoutingRow.get(session, routing_id=routing_id)
+        except NoResultFound:
+            raise RoutingNotFound
         return await Routing.from_row(ctx, row)
 
 
