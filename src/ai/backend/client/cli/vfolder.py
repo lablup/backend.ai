@@ -16,7 +16,15 @@ from ai.backend.client.session import Session
 from ..compat import asyncio_run
 from ..session import AsyncSession
 from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
-from .pretty import Spinner, print_done, print_error, print_fail, print_info, print_wait, print_warn
+from .pretty import (
+    ProgressViewer,
+    print_done,
+    print_error,
+    print_fail,
+    print_info,
+    print_wait,
+    print_warn,
+)
 
 
 @main.group()
@@ -716,25 +724,32 @@ def clone(name, target_name, target_host, usage_mode, permission):
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
                 completion_msg_func = lambda: print_done("Cloning the vfolder is complete.")
-                async with bgtask.listen_events() as response:
-                    async with Spinner(
+                async with (
+                    bgtask.listen_events() as response,
+                    ProgressViewer(
                         "Cloning the vfolder... "
                         "(This may take a while depending on its size and number of files!)",
-                    ):
-                        async for ev in response:
-                            data = json.loads(ev.data)
-                            if ev.event == "bgtask_updated":
-                                pass  # currently, we don't show any progress
-                            elif ev.event == "bgtask_failed":
-                                error_msg = data["message"]
-                                completion_msg_func = lambda: print_fail(
-                                    f"Error during the operation: {error_msg}",
-                                )
-                            elif ev.event == "bgtask_cancelled":
-                                completion_msg_func = lambda: print_warn(
-                                    "The operation has been cancelled in the middle. "
-                                    "(This may be due to server shutdown.)",
-                                )
+                    ) as viewer,
+                ):
+                    async for ev in response:
+                        data = json.loads(ev.data)
+                        if ev.event == "bgtask_updated":
+                            if viewer.tqdm is None:
+                                pbar = await viewer.to_tqdm()
+                            else:
+                                pbar.total = data["total_progress"]
+                                pbar.write(data["message"])
+                                pbar.update(data["current_progress"] - pbar.n)
+                        elif ev.event == "bgtask_failed":
+                            error_msg = data["message"]
+                            completion_msg_func = lambda: print_fail(
+                                f"Error during the operation: {error_msg}",
+                            )
+                        elif ev.event == "bgtask_cancelled":
+                            completion_msg_func = lambda: print_warn(
+                                "The operation has been cancelled in the middle. "
+                                "(This may be due to server shutdown.)",
+                            )
             finally:
                 completion_msg_func()
 

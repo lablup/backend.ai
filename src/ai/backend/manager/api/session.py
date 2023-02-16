@@ -149,7 +149,7 @@ from .utils import catch_unexpected, check_api_params, get_access_key_scopes, un
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 

@@ -106,7 +106,7 @@ LATEST_REV_DATES: Final = {
 }
 LATEST_API_VERSION: Final = "v6.20220615"
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 PUBLIC_INTERFACES: Final = [
     "pidx",
@@ -801,8 +801,6 @@ def main(
         click.echo("Please use --log-level options instead")
         click.echo("--debug options will soon change to --log-level TEXT option.")
         log_level = LogSeverity.DEBUG
-
-    click.echo("Selected logging level for manager : " + log_level.value)
 
     cfg = load_config(config_path, log_level.value)
 

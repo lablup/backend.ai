@@ -12,7 +12,7 @@ from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.docker import get_docker_connector
 from ai.backend.common.logging import BraceStyleAdapter
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 _numa_supported = False
 
 if sys.platform == "linux":
@@ -75,6 +75,9 @@ class libnuma:
                     except (RuntimeError, aiohttp.ClientError):
                         pass
                     else:
+                        # Assume cgroup v1 if CgroupVersion key is absent
+                        if "CgroupVersion" not in data:
+                            data["CgroupVersion"] = "1"
                         try:
                             driver = data["CgroupDriver"]
                             version = data["CgroupVersion"]

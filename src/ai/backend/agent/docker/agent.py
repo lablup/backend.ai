@@ -90,7 +90,7 @@ from .utils import PersistentServiceContainer
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 eof_sentinel = Sentinel.TOKEN
 
 
@@ -972,6 +972,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     docker_version["ApiVersion"],
                 )
             docker_info = await docker.system.info()
+            docker_info = dict(docker_info)
+            # Assume cgroup v1 if CgroupVersion key is absent
+            if "CgroupVersion" not in docker_info:
+                docker_info["CgroupVersion"] = "1"
             log.info(
                 "Cgroup Driver: {0}, Cgroup Version: {1}",
                 docker_info["CgroupDriver"],

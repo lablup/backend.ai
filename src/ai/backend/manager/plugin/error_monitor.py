@@ -15,7 +15,7 @@ from ..models import error_logs
 if TYPE_CHECKING:
     from ai.backend.manager.api.context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class ErrorMonitor(AbstractErrorReporterPlugin):
