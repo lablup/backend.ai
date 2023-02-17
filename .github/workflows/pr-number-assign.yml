@@ -29,7 +29,8 @@ jobs:
         response=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0]')
         echo $response | jq 'type'
         echo $response | jq '.id'
-        echo $response | jq '.payload'
+        echo $response | jq '.payload.commits[-1].author.email'
+        echo $response | jq '.payload.commits[-1].message'
         echo "====================="
         echo "email=$(echo $response | jq -r '.[0].payload.commits[-1].author.email')" >> $GITHUB_OUTPUT
         echo "id=$(echo $response | jq -r '.[0].id')" >> $GITHUB_OUTPUT
