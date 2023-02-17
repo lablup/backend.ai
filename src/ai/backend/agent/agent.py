@@ -633,7 +633,7 @@ class AbstractAgent(
 
         # Report commit status
         self.timer_tasks.append(
-            aiotools.create_timer(self._report_all_kernel_commit_status_map, 3.0)
+            aiotools.create_timer(self._report_all_kernel_commit_status_map, 7.0)
         )
 
         loop = current_loop()
