@@ -10,7 +10,7 @@ jobs:
 
     env:
       FEAT: default
-      actor_event_data: $(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public)
+      actor_event_data: $(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0])
 
     steps:
     - name: Checks-out repository
