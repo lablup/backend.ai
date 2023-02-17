@@ -27,6 +27,7 @@ jobs:
       id: get_user_info
       run: | 
         response=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public)
+        echo $response | jq 'type'
         echo "email=$(echo $response | jq -r '.[0].payload.commits[-1].author.email')" >> $GITHUB_OUTPUT
         echo "id=$(echo $response | jq -r '.[0].id')" >> $GITHUB_OUTPUT
         echo "message=$(echo $response | jq -r '.[0].payload.commits[-1].message')" >> $GITHUB_OUTPUT
