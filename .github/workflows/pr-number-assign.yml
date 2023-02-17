@@ -25,15 +25,15 @@ jobs:
     - name: Get user info
       id: get_user_info
       env: 
-        actor_event_data: echo "curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public"
+        actor_event_data: $(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public)
       run: | 
-        echo "email=$(echo $actor_event_data | jq -r '.[0].payload.commits[-1].author.email')" >> $GITHUB_OUTPUT
-        echo "id=$(echo $actor_event_data | jq -r '.[0].id')" >> $GITHUB_OUTPUT
-        echo "message=$(echo $actor_event_data | jq -r '.[0].payload.commits[-1].message')" >> $GITHUB_OUTPUT
+        echo $autor_event_data
+        echo autor_event_data
+        echo "email=$($actor_event_data | jq -r '.[0].payload.commits[-1].author.email')" >> $GITHUB_OUTPUT
+        echo "id=$($actor_event_data | jq -r '.[0].id')" >> $GITHUB_OUTPUT
+        echo "message=$($actor_event_data | jq -r '.[0].payload.commits[-1].message')" >> $GITHUB_OUTPUT
 
-        echo "email=$( | jq -r '.[0].payload.commits[-1].author.email')" >> $GITHUB_OUTPUT
-        echo "id=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].id')" >> $GITHUB_OUTPUT
-        echo "message=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0].payload.commits[-1].message')" >> $GITHUB_OUTPUT
+        
 
     - name: Check user info
       run: |
