@@ -56,7 +56,7 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 PTGExceptionHandler: TypeAlias = Callable[
     [Type[Exception], Exception, TracebackType], Awaitable[None]

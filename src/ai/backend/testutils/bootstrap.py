@@ -11,7 +11,7 @@ import pytest
 from ai.backend.common.types import HostPortPair
 from ai.backend.testutils.pants import get_parallel_slot
 
-log = logging.getLogger(__name__)
+log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
 
 
 def wait_health_check(container_id):
