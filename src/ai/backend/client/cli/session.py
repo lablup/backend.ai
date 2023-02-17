@@ -1237,7 +1237,7 @@ def _fetch_session_names():
     )
     fields: List[FieldSpec] = [
         session_fields["name"],
-        session_fields["id"],
+        session_fields["session_id"],
         session_fields["project_name"],
         session_fields["main_kernel_id"],
         session_fields["image"],

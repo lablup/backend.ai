@@ -280,6 +280,7 @@ vfolder_fields = FieldSet(
         FieldSpec("user", alt_name="user_id"),
         FieldSpec("project_id"),
         FieldSpec("creator"),
+        FieldSpec("status"),
         FieldSpec("unmanaged_path"),
         FieldSpec("usage_mode"),
         FieldSpec("permission"),

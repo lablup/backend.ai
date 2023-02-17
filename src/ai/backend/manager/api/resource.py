@@ -36,6 +36,8 @@ from ..models import (
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
     AgentStatus,
+    KernelRow,
+    SessionRow,
     agents,
     association_projects_users,
     domains,
@@ -54,7 +56,7 @@ from .utils import check_api_params
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _json_loads = functools.partial(json.loads, parse_float=Decimal)
 
@@ -148,7 +150,7 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
             .where(
                 (association_projects_users.c.user_id == request["user"]["uuid"])
                 & (projects.c.name == params["project"])
-                & (domains.c.name == domain_name),
+                & (projects.c.domain_name == domain_name),
             )
         )
         result = await conn.execute(query)
@@ -205,17 +207,18 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         }
 
         # Per scaling group resource using from resource occupying kernels.
+        j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
         query = (
-            sa.select([kernels.c.occupied_slots, kernels.c.scaling_group])
-            .select_from(kernels)
+            sa.select([KernelRow.occupied_slots, SessionRow.scaling_group_name])
+            .select_from(j)
             .where(
-                (kernels.c.user_uuid == request["user"]["uuid"])
-                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (kernels.c.scaling_group.in_(sgroup_names)),
+                (KernelRow.user_uuid == request["user"]["uuid"])
+                & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                & (SessionRow.scaling_group_name.in_(sgroup_names)),
             )
         )
         async for row in (await conn.stream(query)):
-            per_sgroup[row["scaling_group"]]["using"] += row["occupied_slots"]
+            per_sgroup[row["scaling_group_name"]]["using"] += row["occupied_slots"]
 
         # Per scaling group resource remaining from agents stats.
         sgroup_remaining = ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})

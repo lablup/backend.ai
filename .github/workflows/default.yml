@@ -210,6 +210,8 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Prepare cache dir for Pants
+      run: mkdir -p .tmp
     - name: Bootstrap Pants
       uses: pantsbuild/actions/init-pants@v2
       # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
