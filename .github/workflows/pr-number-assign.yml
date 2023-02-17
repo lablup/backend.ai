@@ -10,7 +10,6 @@ jobs:
 
     env:
       FEAT: default
-      actor_event_data: $(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0]')
 
     steps:
     - name: Checks-out repository
@@ -27,18 +26,10 @@ jobs:
       id: get_user_info
       run: | 
         response=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0]')
-        echo $response | jq 'type'
-        echo $response | jq '.id'
-        echo $response | jq '.payload.commits[-1].author.email'
-        echo $response | jq '.payload.commits[-1].message'
-        echo "====================="
         echo "email=$(echo $response | jq '.payload.commits[-1].author.email')" >> $GITHUB_OUTPUT
         echo "id=$(echo $response | jq '.id')" >> $GITHUB_OUTPUT
         echo "message=$(echo $response | jq '.payload.commits[-1].message')" >> $GITHUB_OUTPUT
         
-
-        
-
     - name: Check user info
       run: |
         echo "Actor: $GITHUB_ACTOR"
