@@ -114,7 +114,7 @@ else
         fi
     done
 
-    /usr/bin/ssh-keyscan github.com >> "$HOME/.ssh/known_hosts" >/dev/null 2>&1
+    /usr/bin/ssh-keyscan github.com >> "$HOME/.ssh/known_hosts" 2>&1
   fi
 
   echo "Generate random alpha-numeric password"
