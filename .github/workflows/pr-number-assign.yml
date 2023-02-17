@@ -25,7 +25,7 @@ jobs:
     - name: Get user info
       id: get_user_info
       env: 
-        actor_event_data: $(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public)
+        actor_event_data: echo "curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public"
       run: | 
         echo "email=$(echo $actor_event_data | jq -r '.[0].payload.commits[-1].author.email')" >> $GITHUB_OUTPUT
         echo "id=$(echo $actor_event_data | jq -r '.[0].id')" >> $GITHUB_OUTPUT
