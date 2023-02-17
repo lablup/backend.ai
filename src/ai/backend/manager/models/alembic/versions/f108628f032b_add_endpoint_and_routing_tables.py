@@ -5,11 +5,10 @@ Revises: b5be363ab05c
 Create Date: 2023-02-17 05:47:48.060365
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
-from ai.backend.manager.models.base import EndpointIDColumnType, GUID, ResourceSlotColumn
-
+from ai.backend.manager.models.base import GUID, EndpointIDColumnType, ResourceSlotColumn
 
 # revision identifiers, used by Alembic.
 revision = "f108628f032b"
