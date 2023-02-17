@@ -29,7 +29,7 @@ from ..kernel import AbstractCodeRunner, AbstractKernel
 from ..resources import KernelResourceSpec
 from ..utils import closing_async, get_arch_name
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
