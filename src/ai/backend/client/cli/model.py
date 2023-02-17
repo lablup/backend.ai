@@ -14,7 +14,7 @@ from ..exceptions import BackendAPIError
 from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
 from .params import ByteSizeParamCheckType, ByteSizeParamType, CommaSeparatedKVListParamType
-from .pretty import print_done, print_error, print_fail
+from .pretty import print_done
 from .types import CLIContext
 
 
@@ -48,7 +48,7 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
                 page_size=limit,
             )
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
@@ -75,19 +75,20 @@ def info(ctx: CLIContext, model_name):
                 ],
             )
         except BackendAPIError as e:
-            print_fail(
+            ctx.output.print_fail(
                 "Not a valid model storage. "
                 "There is no directory named `versions` under the model storage "
                 "or model storage not found."
             )
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @model.command()
+@pass_ctx_obj
 @click.argument("name", type=str)
 @click.argument("host", type=str, default=None)
 @click.option(
@@ -133,7 +134,7 @@ def info(ctx: CLIContext, model_name):
     is_flag=True,
     help="Allows the virtual folder to be cloned by users.",
 )
-def create(name, host, group, host_path, permission, quota, cloneable):
+def create(ctx: CLIContext, name, host, group, host_path, permission, quota, cloneable):
     """
     Create a new model with the given configuration.
 
@@ -146,7 +147,8 @@ def create(name, host, group, host_path, permission, quota, cloneable):
             if host_path:
                 result = session.Model.create(
                     name=name,
-                    unmanaged_path=host,
+                    host=host,
+                    unmanaged_path=host_path,
                     group=group,
                     permission=permission,
                     quota=quota,
@@ -161,17 +163,17 @@ def create(name, host, group, host_path, permission, quota, cloneable):
                     quota=quota,
                     cloneable=cloneable,
                 )
-            print_done("Model created.")
-            print(f"ID: {result['id']}")
-            print(f"Name: {result['name']}")
+            print_done("Created the model.")
+            ctx.output.print_item(result, [FieldSpec("id"), FieldSpec("name")])
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @model.command()
+@pass_ctx_obj
 @click.argument("model_name", metavar="MODEL", type=str)
-def rm(model_name):
+def rm(ctx: CLIContext, model_name):
     """
     Remove the given model.
 
@@ -185,11 +187,12 @@ def rm(model_name):
             serving.delete()
             print_done("Model deleted.")
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @model.command()
+@pass_ctx_obj
 @click.argument("model_name", metavar="MODEL", type=str)
 @click.argument("filenames", type=Path, nargs=-1)
 @click.argument("model_version", metavar="MODEL_VER", type=str)
@@ -218,7 +221,15 @@ def rm(model_name):
     "Each Yn address must at least include the IP address "
     "or the hostname and may include the protocol part and the port number to replace.",
 )
-def upload(model_name, filenames, model_version, base_dir, chunk_size, override_storage_proxy):
+def upload(
+    ctx: CLIContext,
+    model_name,
+    filenames,
+    model_version,
+    base_dir,
+    chunk_size,
+    override_storage_proxy,
+):
     """
     Upload a file to the model as the given version.
     The files with the same names will be overwirtten.
@@ -235,16 +246,18 @@ def upload(model_name, filenames, model_version, base_dir, chunk_size, override_
                 basedir=base_dir,
                 chunk_size=chunk_size,
                 show_progress=True,
-                address_map=override_storage_proxy
-                or APIConfig.DEFAULTS["storage_proxy_address_map"],
+                address_map=(
+                    override_storage_proxy or APIConfig.DEFAULTS["storage_proxy_address_map"]
+                ),
             )
             print_done("Done.")
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @model.command()
+@pass_ctx_obj
 @click.argument("model_name", type=str)
 @click.argument("filenames", type=Path, nargs=-1)
 @click.argument("model_version", metavar="MODEL_VER", type=str)
@@ -280,7 +293,14 @@ def upload(model_name, filenames, model_version, base_dir, chunk_size, override_
     help="Maximum retry attempt when any failure occurs.",
 )
 def download(
-    model_name, filenames, model_version, base_dir, chunk_size, override_storage_proxy, max_retries
+    ctx: CLIContext,
+    model_name,
+    filenames,
+    model_version,
+    base_dir,
+    chunk_size,
+    override_storage_proxy,
+    max_retries,
 ):
     """
     Download a file from the model storage.
@@ -299,11 +319,12 @@ def download(
                 basedir=base_dir,
                 chunk_size=chunk_size,
                 show_progress=True,
-                address_map=override_storage_proxy
-                or APIConfig.DEFAULTS["storage_proxy_address_map"],
+                address_map=(
+                    override_storage_proxy or APIConfig.DEFAULTS["storage_proxy_address_map"]
+                ),
                 max_retries=max_retries,
             )
             print_done("Done.")
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)

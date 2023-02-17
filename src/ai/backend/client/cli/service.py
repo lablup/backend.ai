@@ -6,9 +6,11 @@ from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.session import Session
 
+from ..output.fields import service_fields
+from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
 from .params import CommaSeparatedKVListParamType
-from .pretty import print_error
+from .pretty import print_done, print_error
 from .types import CLIContext
 
 
@@ -42,13 +44,14 @@ def list(ctx: CLIContext, filter_, order, offset, limit):
                 page_size=limit,
             )
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @service.command()
+@pass_ctx_obj
 @click.argument("service_id", metavar="SERVICE_ID", type=str)
-def info(service_id):
+def info(ctx: CLIContext, service_id: str):
     """
     Display the detail of a service endpoint with its backing inference session.
 
@@ -58,14 +61,19 @@ def info(service_id):
     with Session() as session:
         try:
             result = session.Service.info(service_id)
-            print("Serve info")
-            print("- Endpoint ID: {0}".format(result["service_id"]))
+            ctx.output.print_item(
+                result,
+                [
+                    FieldSpec("service_id"),
+                ],
+            )
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @service.command()
+@pass_ctx_obj
 @click.argument("model_id", metavar="MODEL", type=str)
 @click.argument("model_version", metavar="MODEL_VER", type=str)
 @click.argument("image_ref", metavar="IMAGE_REF", type=str)
@@ -79,7 +87,16 @@ def info(service_id):
     default=dict,
     help="The resource options",
 )
-def create(model_id, model_version, image_ref, name, endpoint, project, resource_opts):
+def create(
+    ctx: CLIContext,
+    model_id,
+    model_version,
+    image_ref,
+    name,
+    endpoint,
+    project,
+    resource_opts,
+):
     """
     Create a service endpoint with a backing inference session.
 
@@ -99,15 +116,19 @@ def create(model_id, model_version, image_ref, name, endpoint, project, resource
                 endpoint_id=endpoint,
                 service_name=name,
             )
-            print(result)
+            ctx.output.print_item(
+                result,
+                [*service_fields.values()],
+            )
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @service.command()
+@pass_ctx_obj
 @click.argument("service_id", metavar="SERVICE_ID", type=str)
-def start(service_id):
+def start(ctx: CLIContext, service_id):
     """
     Start or resume the service endpoint to handle the incoming traffic.
 
@@ -117,14 +138,16 @@ def start(service_id):
     with Session() as session:
         try:
             session.Service.start(service_id)
+            print_done("Started.")
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @service.command()
+@pass_ctx_obj
 @click.argument("service_id", metavar="SERVICE_ID", type=str)
-def stop(service_id):
+def stop(ctx: CLIContext, service_id):
     """
     Stop the service endpoint without destroying it.
 
@@ -134,14 +157,16 @@ def stop(service_id):
     with Session() as session:
         try:
             session.Service.stop(service_id)
+            print_done("Stopped.")
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
 @service.command()
+@pass_ctx_obj
 @click.argument("service_id", metavar="SERVICE_ID", type=str)
-def rm(service_id):
+def rm(ctx: CLIContext, service_id):
     """
     Remove the service endpoint.
 
@@ -150,8 +175,9 @@ def rm(service_id):
     with Session() as session:
         try:
             session.Service.delete(service_id)
+            print_done("Removed.")
         except Exception as e:
-            print_error(e)
+            ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
 
 
