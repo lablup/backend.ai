@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 import os
 import re
+import sys
 from pathlib import Path
 
 import tomlkit
 
-pr_number = args[1]
+pr_number = sys.argv[1]
 path = Path("./changes")
 
 with open("./pyproject.toml", "r") as f:
