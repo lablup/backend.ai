@@ -1250,19 +1250,30 @@ class AbstractAgent(
             abuse_report_script = textwrap.dedent(
                 f"""
                 local key = '{hash_name}'
-                # local new_report_key = KEYS
-                # local new_report_val = ARGV
                 local new_report = {{}}
-                for i, v in ipairs(KEYS) do
-                    new_report[v] = ARGV[i]
-                end
-                local all_report = redis.call('HKEYS', key)
-                for _, v in ipairs(all_report) do
-                    if not new_report[v] then
-                        redis.call('HDEL', key, v)
+
+                -- Assign abusing report table to new_report
+                if next(KEYS) ~= nil then
+                    for i, v in ipairs(KEYS) do
+                        new_report[v] = ARGV[i]
                     end
-                for kern_id, status in ipairs(new_report) do
-                    redis.call('HSET', key, kern_id, status)
+                end
+
+                -- Delete dangling reports
+                local all_report = redis.call('HKEYS', key)
+                if all_report ~= nil and next(all_report) ~= nil then
+                    for _, v in ipairs(all_report) do
+                        if next(all_report) == nil or not new_report[v] then
+                            redis.call('HDEL', key, v)
+                        end
+                    end
+                end
+
+                -- Update new reports
+                if next(new_report) ~= nil then
+                    for kern_id, report_val in pairs(new_report) do
+                        redis.call('HSET', key, kern_id, report_val)
+                    end
                 end
             """
             )
