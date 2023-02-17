@@ -460,6 +460,14 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         _mount(MountTypes.BIND, helpers_pkg_path, pylib_path + "ai/backend/helpers")
         environ["LD_PRELOAD"] = "/opt/kernel/libbaihook.so"
 
+        # Mount all ssh key files from agent
+        ssh_dir = os.path.expanduser("~/.ssh")
+
+        for filename in os.listdir(ssh_dir):
+            if filename.startswith("id_"):
+                sshkey_file_path = os.path.join(ssh_dir, filename)
+                _mount(MountTypes.BIND, sshkey_file_path, f"/home/work/.ssh/{filename}")
+
         # Inject ComputeDevice-specific env-varibles and hooks
         already_injected_hooks: Set[Path] = set()
         for dev_type, device_alloc in resource_spec.allocations.items():

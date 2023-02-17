@@ -94,6 +94,29 @@ else
   # Extract dotfiles
   /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python /opt/kernel/extract_dotfiles.py
 
+  # Start ssh-agent if it is available
+  if test -x /usr/bin/ssh-agent; then
+    echo 'Start ssh-agent for registering ssh keys not having passphrase'
+    eval "ssh-agent"
+    SSH_ENV="$HOME/.ssh/agent-environment"
+    /usr/bin/ssh-agent | sed 's/^echo/#echo/' > "${SSH_ENV}"
+    chmod 0600 "${SSH_ENV}"
+    . "${SSH_ENV}" > /dev/null
+
+    for file in ~/.ssh/id_*; do
+        if [ -e "$file.pub" ]; then
+            # filter ssh keys not having passphrase
+            /usr/bin/ssh-keygen -q -y -P "" -f "$file" >/dev/null 2>&1
+
+            if [ $? -eq 0 ]; then
+                /usr/bin/ssh-add "$file"
+            fi
+        fi
+    done
+
+    /usr/bin/ssh-keyscan github.com >> "$HOME/.ssh/known_hosts" >/dev/null 2>&1
+  fi
+
   echo "Generate random alpha-numeric password"
   if [ ! -f "$HOME/.password" ]; then
     /opt/kernel/su-exec $USER_ID:$GROUP_ID  /opt/backend.ai/bin/python /opt/kernel/fantompass.py > "$HOME/.password"
