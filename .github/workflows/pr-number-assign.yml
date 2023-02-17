@@ -26,7 +26,7 @@ jobs:
     - name: Get user info
       id: get_user_info
       run: | 
-        response=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public)
+        response=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0]')
         echo $response | jq 'type'
         echo $response[0]
         echo $response | jq -r '.[0]'
