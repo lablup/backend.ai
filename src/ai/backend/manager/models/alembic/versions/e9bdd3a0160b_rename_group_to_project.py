@@ -1,8 +1,8 @@
-"""migrate_group_to_project
+"""rename_group_to_project
 
-Revision ID: eb8f901bdf4f
-Revises: b6b884fbae1f
-Create Date: 2023-01-30 15:11:28.759396
+Revision ID: e9bdd3a0160b
+Revises: cace152eefac
+Create Date: 2023-02-17 14:42:52.448045
 
 """
 import enum
@@ -18,8 +18,8 @@ from ai.backend.manager.models import VFolderOwnershipType
 from ai.backend.manager.models.base import GUID, JSONB, ResourceSlotColumn, convention
 
 # revision identifiers, used by Alembic.
-revision = "eb8f901bdf4f"
-down_revision = "b6b884fbae1f"
+revision = "e9bdd3a0160b"
+down_revision = "cace152eefac"
 branch_labels = None
 depends_on = None
 
