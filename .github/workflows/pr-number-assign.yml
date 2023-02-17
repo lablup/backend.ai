@@ -26,10 +26,11 @@ jobs:
     - name: Get user info
       id: get_user_info
       run: | 
-        echo ${{ env.actor_event_data }}
+        
         echo "email=$( ${{env.actor_event_data}} | jq -r '.payload.commits[-1].author.email')" >> $GITHUB_OUTPUT
         echo "id=$("${{env.actor_event_data}}" | jq -r '.id')" >> $GITHUB_OUTPUT
-        echo "message=$(env.actor_event_data | jq -r '.[0].payload.commits[-1].message')" >> $GITHUB_OUTPUT
+        echo "id=$("${{env.actor_event_data}}".id)" >> $GITHUB_OUTPUT
+        echo "message=$(env.actor_event_data | jq -r '.payload.commits[-1].message')" >> $GITHUB_OUTPUT
 
         
 
