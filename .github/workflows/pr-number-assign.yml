@@ -27,8 +27,8 @@ jobs:
       env: 
         actor_event_data: $(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public)
       run: | 
-        echo $autor_event_data
-        echo autor_event_data
+        echo "$autor_event_data"
+        echo "autor_event_data"
         echo "email=$($actor_event_data | jq -r '.[0].payload.commits[-1].author.email')" >> $GITHUB_OUTPUT
         echo "id=$($actor_event_data | jq -r '.[0].id')" >> $GITHUB_OUTPUT
         echo "message=$($actor_event_data | jq -r '.[0].payload.commits[-1].message')" >> $GITHUB_OUTPUT
