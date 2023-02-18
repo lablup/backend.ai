@@ -295,7 +295,13 @@ async def login_handler(request: web.Request) -> web.Response:
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
             fill_forwarding_hdrs_to_api_session(request, api_session)
-            token = await api_session.User.authorize(creds["username"], creds["password"])
+            extra_args = {}
+            extra_keys = set(creds.keys()) ^ {"username", "password"}
+            for extra_key in extra_keys:
+                extra_args[extra_key] = creds[extra_key]
+            token = await api_session.User.authorize(
+                creds["username"], creds["password"], extra_args=extra_args
+            )
             stored_token = {
                 "type": "keypair",
                 "access_key": token.content["access_key"],
