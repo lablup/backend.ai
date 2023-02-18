@@ -1628,14 +1628,8 @@ async def invoke_session_callback(
     | SessionSuccessEvent
     | SessionFailureEvent,
 ) -> None:
-    app_ctx: PrivateContext = app["session.context"]
+    # app_ctx: PrivateContext = app["session.context"]
     root_ctx: RootContext = app["_root.context"]
-    data = {
-        "type": "session_lifecycle",
-        "event": event.name.removeprefix("session_"),
-        "session_id": str(event.session_id),
-        "when": datetime.now(tzutc()).isoformat(),
-    }
     try:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session_with_main_kernel(
@@ -1646,9 +1640,18 @@ async def invoke_session_callback(
     url = session.callback_url
     if url is None:
         return
+    """
+    data = {
+        "type": "session_lifecycle",
+        "event": event.name.removeprefix("session_"),
+        "session_id": str(event.session_id),
+        "when": datetime.now(tzutc()).isoformat(),
+    }
     app_ctx.webhook_ptask_group.create_task(
         _make_session_callback(data, url),
     )
+    """
+    # TODO: Redis
 
 
 async def handle_batch_result(

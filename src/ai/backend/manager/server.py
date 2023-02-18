@@ -62,6 +62,7 @@ from .config import load as load_config
 from .config import volume_config_iv
 from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
+from .models import kernels
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset(
@@ -341,6 +342,9 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.utils import connect_database
 
     async with connect_database(root_ctx.local_config) as db:
+        # _SECRET_KEY = "wIUmG5qvls4XCAS64FizhtF7u7EMTS2ZDn89AncuwzDi5X9uIT0fcbL21FNUQJz9"
+        _SESSION_ID = 1
+        _CALLBACK_URL = 49
 
         @sa.event.listens_for(db.sync_engine, "do_execute")
         def receive_do_execute(cursor, statement: str, parameters: tuple, context):
@@ -351,9 +355,28 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 _, status = matches.group().strip(",").split("=")
 
                 async def _dispatch():
+                    token = ""
+                    session_id = ""
+                    log.warning("_dispatch(): kernel_id={}", kernel_id)
+                    if kernel_id is None:
+                        return
+                    async with root_ctx.db.begin_readonly_session() as session:
+                        query = sa.select(kernels).where(kernels.c.id == str(kernel_id))
+                        result = await session.execute(query)
+                    if (kernel := result.first()) and (callback_url := kernel[_CALLBACK_URL]):
+                        session_id = kernel[_SESSION_ID]
+                        *_, querystring = str(callback_url).partition("?")
+                        for qs in querystring.split("&"):
+                            key, value = qs.split("=")
+                            if key == "token":
+                                token = value
+                                break
+                    if not token or not session_id:
+                        return
                     stream_key = "events"
                     raw_event = {
-                        b"kernel": str(kernel_id).encode(),
+                        b"token": token.encode(),
+                        b"session_id": str(session_id).encode(),
                         b"status": status.encode(),
                     }
                     await redis_helper.execute(
