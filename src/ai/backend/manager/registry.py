@@ -1426,19 +1426,25 @@ class AgentRegistry:
             # perform DB update only if requested slots and actual allocated value differs
             if actual_allocated_slots != requested_slots:
                 log.debug("calibrating resource slot usage for agent {}", agent_id)
-                async with self.db.begin_session() as db_sess:
-                    select_query = sa.select(AgentRow.occupied_slots).where(AgentRow.id == agent_id)
-                    result = await db_sess.execute(select_query)
-                    occupied_slots: ResourceSlot = result.scalar()
-                    diff = actual_allocated_slots - requested_slots
-                    update_query = (
-                        sa.update(AgentRow)
-                        .values(
-                            occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
+
+                async def _update_agent_resource():
+                    async with self.db.begin_session() as db_sess:
+                        select_query = sa.select(AgentRow.occupied_slots).where(
+                            AgentRow.id == agent_id
                         )
-                        .where(AgentRow.id == agent_id)
-                    )
-                    await db_sess.execute(update_query)
+                        result = await db_sess.execute(select_query)
+                        occupied_slots: ResourceSlot = result.scalar()
+                        diff = actual_allocated_slots - requested_slots
+                        update_query = (
+                            sa.update(AgentRow)
+                            .values(
+                                occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
+                            )
+                            .where(AgentRow.id == agent_id)
+                        )
+                        await db_sess.execute(update_query)
+
+                await execute_with_retry(_update_agent_resource)
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
