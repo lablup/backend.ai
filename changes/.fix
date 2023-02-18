@@ -1,0 +1,1 @@
+Add a new line in SSH keypairs to prevent possible errors for some keys in registering the keypairs in `ssh-agent`.
