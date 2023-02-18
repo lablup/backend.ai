@@ -2580,6 +2580,21 @@ class AgentRegistry:
                 return session_id, access_key, agent
 
         result = await execute_with_retry(_update_kernel_status)
+
+        async def _recalc() -> None:
+            async with self.db.begin() as conn:
+                log.debug(
+                    "recalculate concurrency used in kernel termination (ak: {})",
+                    access_key,
+                )
+                await recalc_concurrency_used(conn, self.redis_stat, access_key)
+                log.debug(
+                    "recalculate agent resource occupancy in kernel termination (agent: {})",
+                    agent,
+                )
+                await recalc_agent_resource_occupancy(conn, agent)
+
+        await execute_with_retry(_recalc)
         if result is None:
             return
 
@@ -2618,21 +2633,6 @@ class AgentRegistry:
                     await db_sess.execute(update_query)
 
         await execute_with_retry(_check_session)
-
-        async def _recalc() -> None:
-            async with self.db.begin() as conn:
-                log.debug(
-                    "recalculate concurrency used in kernel termination (ak: {})",
-                    access_key,
-                )
-                await recalc_concurrency_used(conn, self.redis_stat, access_key)
-                log.debug(
-                    "recalculate agent resource occupancy in kernel termination (agent: {})",
-                    agent,
-                )
-                await recalc_agent_resource_occupancy(conn, agent)
-
-        await execute_with_retry(_recalc)
 
         # Perform statistics sync in a separate transaction block, since
         # it may take a while to fetch stats from Redis.
