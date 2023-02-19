@@ -348,7 +348,19 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
         @sa.event.listens_for(db.sync_engine, "do_execute")
         def receive_do_execute(cursor, statement: str, parameters: tuple, context):
-            if not statement.startswith("UPDATE kernels"):
+            if not (
+                statement.startswith("UPDATE kernels") or statement.startswith("UPDATE sessions")
+            ):
+                return
+            log.warning("EVENT.LISTENER - {}", statement)
+            log.warning("EVENT.LISTENER - {}", parameters)
+            if statement.startswith("UPDATE sessions"):
+                """
+                UPDATE sessions SET status=%s, status_info=%s, status_data=%s, status_history=(coalesce(sessions.status_history, '{}'::jsonb) || CAST(%s AS JSONB)) WHERE sessions.status = %s RETURNING sessions.id
+                """
+                session_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
+                if matches := re.search("status=([A-Z]*)[,]+", statement % parameters):
+                    pass
                 return
             kernel_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
             if matches := re.search("status=([A-Z]*)[,]+", statement % parameters):

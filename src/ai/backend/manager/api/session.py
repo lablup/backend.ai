@@ -1651,7 +1651,35 @@ async def invoke_session_callback(
         _make_session_callback(data, url),
     )
     """
+    data = {
+        "type": "session_lifecycle",
+        # "event": event.name.removeprefix("session_"),
+        "status": "",
+        "session_id": str(event.session_id),
+        "when": datetime.now(tzutc()).isoformat(),
+    }
+    if isinstance(event, SessionEnqueuedEvent):
+        data["status"] = "PENDING"
+    elif isinstance(event, SessionScheduledEvent):
+        data["status"] = "SCHEDULED"
+    elif isinstance(event, SessionPreparingEvent):
+        data["status"] = "PREPARING"
+    elif isinstance(event, SessionStartedEvent):
+        data["status"] = "RUNNING"
+    elif isinstance(event, SessionCancelledEvent):
+        data["status"] = "CANCELED"
+    elif isinstance(event, SessionTerminatedEvent):
+        data["status"] = "TERMINATED"
+    elif isinstance(event, SessionSuccessEvent):
+        # data["status"] = "PREPARING"
+        # result = "SUCCEED"
+        pass
+    elif isinstance(event, SessionFailureEvent):
+        # data["status"] = "PREPARING"
+        # result = "FAILED"
+        pass
     # TODO: Redis
+    # Redis.from_url(str(url), **kwargs)
 
 
 async def handle_batch_result(
@@ -1668,7 +1696,13 @@ async def handle_batch_result(
     elif isinstance(event, SessionFailureEvent):
         await SessionRow.set_session_result(root_ctx.db, event.session_id, False, event.exit_code)
     async with root_ctx.db.begin_session() as db_sess:
-        session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
+        # SessionNotFound
+        try:
+            session = await SessionRow.get_session_with_kernels(
+                event.session_id, db_session=db_sess
+            )
+        except SessionNotFound:
+            return
     await root_ctx.registry.destroy_session(
         session,
         reason=KernelLifecycleEventReason.TASK_FINISHED,
