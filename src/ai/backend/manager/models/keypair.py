@@ -588,6 +588,8 @@ def generate_ssh_keypair() -> Tuple[str, str]:
         )
         .decode("utf-8")
     )
+    public_key = f"{public_key.rstrip()}\n"
+    private_key = f"{private_key.rstrip()}\n"
     return (public_key, private_key)
 
 
