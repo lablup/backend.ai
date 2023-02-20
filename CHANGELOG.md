@@ -16,6 +16,19 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 22.09.12 (2023-02-20)
+
+Ai.Backend.Manager 22.09.12 (2023-02-20)
+
+### Features
+* When rescanning container image registries, skip misformatted image names and tag names instead of failing the entire process. ([#933](https://github.com/lablup/backend.ai/issues/933))
+* Make the dev-setup installer to preserve a full dump of the initial etcd configuration as `./dev.etcd.installed.json` for easier restoration of etcd if corrupted during development ([#1061](https://github.com/lablup/backend.ai/issues/1061))
+
+### Fixes
+* Fix the agent logs partially missing depending on how the `ai.backend.agent.server` module is executed ([#1064](https://github.com/lablup/backend.ai/issues/1064))
+* Add a new line in SSH keypairs to prevent possible errors for some keys in registering them to `ssh-agent`. ([#1071](https://github.com/lablup/backend.ai/issues/1071))
+
+
 ## 22.09.11 (2023-02-12)
 
 Ai.Backend.Manager 22.09.11 (2023-02-12)
