@@ -149,7 +149,7 @@ if TYPE_CHECKING:
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 __all__ = ["AgentRegistry", "InstanceNotFound"]
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 SESSION_NAME_LEN_LIMIT = 10
 _read_only_txn_opts = {
@@ -2163,13 +2163,10 @@ class AgentRegistry:
     async def download_file(
         self,
         session: SessionRow,
-        access_key: AccessKey,
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel
-        async with handle_session_exception(
-            self.db, "download_file", kernel.session_id, access_key
-        ):
+        async with handle_session_exception(self.db, "download_file", kernel.session_id):
             async with RPCContext(
                 kernel.agent,
                 kernel.agent_addr,
@@ -2186,9 +2183,7 @@ class AgentRegistry:
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel
-        async with handle_session_exception(
-            self.db, "download_single", kernel.session_id, access_key
-        ):
+        async with handle_session_exception(self.db, "download_single", kernel.session_id):
             async with RPCContext(
                 kernel.agent,
                 kernel.agent_addr,
