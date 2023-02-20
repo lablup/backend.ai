@@ -132,7 +132,7 @@ from .utils import generate_local_instance_id, get_arch_name
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 _sentinel = Sentinel.TOKEN
 
@@ -1280,6 +1280,10 @@ class AbstractAgent(
                     kernel_obj.agent_config = self.local_config
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.__ainit__()
+        except EOFError:
+            log.warning(
+                "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
+            )
         except FileNotFoundError:
             pass
         async with self.resource_lock:
@@ -2038,3 +2042,7 @@ class AbstractAgent(
             log.debug("saved {}", last_registry_file)
         except Exception as e:
             log.exception("unable to save {}", last_registry_file, exc_info=e)
+            try:
+                os.remove(var_base_path / last_registry_file)
+            except FileNotFoundError:
+                pass
