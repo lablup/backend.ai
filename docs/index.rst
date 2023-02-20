@@ -52,3 +52,4 @@ Functions and classes
    .. automethod:: asyncudp.Socket.close
    .. automethod:: asyncudp.Socket.sendto
    .. automethod:: asyncudp.Socket.recvfrom
+   .. automethod:: asyncudp.Socket.getsockname
