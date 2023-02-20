@@ -41,4 +41,4 @@ jobs:
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_author: ${{ github.actor }} <${{ steps.get_user_info.outputs.email }}>
-        commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{ github.event.pull_request.number }}.${{ env.FEAT }}.md'
+        commit_message: "docs: Rename the news fragment: '${{ env.ORIGINAL_FILENAME }}' -> '${{ github.event.pull_request.number }}.${{ env.FEAT }}.md'"
