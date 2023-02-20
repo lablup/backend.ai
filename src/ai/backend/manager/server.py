@@ -328,6 +328,32 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.utils import connect_database
 
+    """
+    async def _publish(session_id: UUID, token: str, status: str):
+        stream_key = "events"
+        data = {
+            "type": "session_lifecycle",
+            "event": "",
+            "session_id": str(session_id),
+            "when": datetime.now(tzutc()).isoformat(),
+            "token": token,
+            "status": status,
+        }
+        redis_conn = redis_helper.get_redis_object(
+            {
+                "addr": root_ctx.local_config["pipeline"]["event-queue"],
+                "sentinel": None,
+                "service_name": None,
+                "password": None,
+            },
+            db=1,  # REDIS_PIPELINE_EVENT
+        )
+        await redis_helper.execute(
+            redis_conn.client,
+            lambda r: r.xadd(stream_key, data),  # type: ignore
+        )
+    """
+
     async with connect_database(root_ctx.local_config) as db:
         """
         _SESSION_ID = 1
@@ -340,13 +366,28 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             ):
                 return
             log.warning("EVENT.LISTENER - {}", statement)
-            log.warning("EVENT.LISTENER - {}", parameters)
+            # log.warning("EVENT.LISTENER - {}", parameters)
             if statement.startswith("UPDATE sessions"):
                 # UPDATE sessions SET status=%s, status_info=%s, status_data=%s, status_history=(coalesce(sessions.status_history, '{}'::jsonb) || CAST(%s AS JSONB)) WHERE sessions.status = %s RETURNING sessions.id
-                # session_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
+                session_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
+                log.info("UPDATE.SESSIONS (sid:{})", session_id)
                 if matches := re.search("status=([A-Z]*)[,]+", statement % parameters):
-                    pass
+                    _, status = matches.group().strip(",").split("=")
+                    log.info("UPDATE.SESSIONS (sid:{}, status:{})", session_id, status)
+
+                    async def _dispatch():
+                        async with root_ctx.db.begin_readonly_session() as session:
+                            query = sa.select(SessionRow.id == session_id)
+                            result = await session.execute(query)
+                        if (session := result.scalars().first()):
+                            # TODO
+                            token = session.callback_url.query.get("token")
+                            await _publish(session_id, token, status)
+
+                    asyncio.create_task(_dispatch())
+
                 return
+
             kernel_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
             if matches := re.search("status=([A-Z]*)[,]+", statement % parameters):
                 _, status = matches.group().strip(",").split("=")
@@ -362,14 +403,8 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                         result = await session.execute(query)
                     if (kernel := result.first()) and (callback_url := kernel[_CALLBACK_URL]):
                         session_id = kernel[_SESSION_ID]
-                        *_, querystring = str(callback_url).partition("?")
-                        for qs in querystring.split("&"):
-                            key, value = qs.split("=")
-                            if key == "token":
-                                token = value
-                                break
-                    if not token or not session_id:
-                        return
+                        token = callback_url.query.get("token")
+                        await _publish(session_id, token, status)
 
                 asyncio.create_task(_dispatch())
         """
