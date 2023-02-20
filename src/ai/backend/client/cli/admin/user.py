@@ -70,21 +70,19 @@ def info(ctx: CLIContext, email: str) -> None:
     "--group",
     type=str,
     default=None,
-    help="""\b
+    help="""
     Filter by group ID.
 
     \b
     EXAMPLE
         --group "$(backend.ai admin group list | grep 'example-group-name' | awk '{print $1}')"
-
-    \b
     """,
 )
 @click.option(
     "--filter",
     "filter_",
     default=None,
-    help="""\b
+    help="""
     Set the query filter expression.
 
     \b
@@ -103,14 +101,12 @@ def info(ctx: CLIContext, email: str) -> None:
         --filter 'status == "ACTIVE" & role in ["ADMIN", "SUPERADMIN"]'
         --filter 'created_at >= "2021-01-01" & created_at < "2023-01-01"'
         --filter 'email ilike "%@example.com"'
-
-    \b
     """,
 )
 @click.option(
     "--order",
     default=None,
-    help="""\b
+    help="""
     Set the query ordering expression.
 
     \b
@@ -128,8 +124,6 @@ def info(ctx: CLIContext, email: str) -> None:
         --order 'uuid'
         --order '+uuid'
         --order '-created_at'
-
-    \b
     """,
 )
 @click.option("--offset", default=0, help="The index of the current page start for pagination.")
@@ -138,8 +132,6 @@ def list(ctx: CLIContext, status, group, filter_, order, offset, limit) -> None:
     """
     List users.
     (admin privilege required)
-
-
     """
     fields = [
         user_fields["uuid"],
@@ -315,6 +307,7 @@ def update(
     """
     Update an existing user.
 
+    \b
     EMAIL: Email of user to update.
     """
     with Session() as session:
@@ -360,6 +353,7 @@ def delete(ctx: CLIContext, email):
     """
     Inactivate an existing user.
 
+    \b
     EMAIL: Email of user to inactivate.
     """
     with Session() as session:
@@ -402,6 +396,7 @@ def purge(ctx: CLIContext, email, purge_shared_vfolders):
     """
     Delete an existing user. This action cannot be undone.
 
+    \b
     NAME: Name of a domain to delete.
     """
     with Session() as session:
