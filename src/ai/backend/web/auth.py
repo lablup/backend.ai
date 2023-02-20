@@ -98,7 +98,7 @@ def fill_forwarding_hdrs_to_api_session(
 ) -> None:
     _headers = {
         "X-Forwarded-Host": request.headers.get("X-Forwarded-Host", request.host),
-        "X-Forwarded-Proto": request.headers.get("X-Forwarded-Proto", request.protocol),
+        "X-Forwarded-Proto": request.headers.get("X-Forwarded-Proto", request.scheme),
     }
     client_ip = get_client_ip(request)
     if client_ip:
