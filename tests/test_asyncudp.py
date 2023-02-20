@@ -109,3 +109,25 @@ class AsyncudpTest(unittest.TestCase):
 
         self.assertEqual(server._transport.is_closing(), True)
         self.assertEqual(client._transport.is_closing(), True)
+
+    def test_packets_queue_max_size(self):
+        asyncio.run(self.packets_queue_max_size())
+
+    async def packets_queue_max_size(self):
+        server = await asyncudp.create_socket(local_addr=('127.0.0.1', 0),
+                                              packets_queue_max_size=1)
+        server_addr = server.getsockname()
+        client = await asyncudp.create_socket(remote_addr=server_addr)
+
+        client.sendto(b'local_addresses to server 1')
+        client.sendto(b'local_addresses to server 2')
+        await asyncio.sleep(1.0)
+        data, _ = await server.recvfrom()
+        self.assertEqual(data, b'local_addresses to server 1')
+
+        client.sendto(b'local_addresses to server 3')
+        data, _ = await server.recvfrom()
+        self.assertEqual(data, b'local_addresses to server 3')
+
+        server.close()
+        client.close()
