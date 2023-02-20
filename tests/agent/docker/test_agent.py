@@ -1,5 +1,7 @@
 import platform
+import secrets
 import signal
+from pickle import PickleError
 from typing import Any, Mapping
 from unittest.mock import AsyncMock, MagicMock
 
@@ -18,10 +20,11 @@ class DummyEtcd:
 
 
 @pytest.fixture
-async def agent(local_config, mocker):
+async def agent(local_config, test_id, mocker):
     dummy_etcd = DummyEtcd()
     mocked_etcd_get_prefix = AsyncMock(return_value={})
     mocker.patch.object(dummy_etcd, "get_prefix", new=mocked_etcd_get_prefix)
+    test_case_id = secrets.token_hex(8)
     agent = await DockerAgent.new(
         dummy_etcd,
         local_config,
@@ -29,6 +32,7 @@ async def agent(local_config, mocker):
         error_monitor=None,
         skip_initial_scan=True,
     )  # for faster test iteration
+    agent.local_instance_id = test_case_id  # use per-test private registry file
     try:
         yield agent
     finally:
@@ -206,3 +210,15 @@ async def test_auto_pull_none_when_missing(agent, mocker):
         await agent.check_image(imgref, query_digest, behavior)
     assert e.value.args[0] is imgref
     inspect_mock.assert_called_with(imgref.canonical)
+
+
+@pytest.mark.asyncio
+async def test_save_last_registry_exception(agent, mocker):
+    agent.latest_registry_written_time = MagicMock(return_value=0)
+    mocker.patch("ai.backend.agent.agent.pickle.dump", side_effect=PickleError)
+    registry_state_path = (
+        agent.local_config["agent"]["var-base-path"]
+        / f"last_registry.{agent.local_instance_id}.dat"
+    )
+    await agent.save_last_registry()
+    assert not registry_state_path.exists()
