@@ -37,6 +37,7 @@ import aiohttp_cors
 import aiotools
 import attrs
 import multidict
+import redis
 import sqlalchemy as sa
 import sqlalchemy.exc
 import trafaret as t
@@ -1628,6 +1629,7 @@ async def invoke_session_callback(
     | SessionSuccessEvent
     | SessionFailureEvent,
 ) -> None:
+    log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
     # app_ctx: PrivateContext = app["session.context"]
     root_ctx: RootContext = app["_root.context"]
     try:
@@ -1640,24 +1642,19 @@ async def invoke_session_callback(
     url = session.callback_url
     if url is None:
         return
-    """
     data = {
         "type": "session_lifecycle",
         "event": event.name.removeprefix("session_"),
         "session_id": str(event.session_id),
         "when": datetime.now(tzutc()).isoformat(),
+        "token": url.query.get("token"),
+        "status": "",
     }
+    """
     app_ctx.webhook_ptask_group.create_task(
         _make_session_callback(data, url),
     )
     """
-    data = {
-        "type": "session_lifecycle",
-        # "event": event.name.removeprefix("session_"),
-        "status": "",
-        "session_id": str(event.session_id),
-        "when": datetime.now(tzutc()).isoformat(),
-    }
     if isinstance(event, SessionEnqueuedEvent):
         data["status"] = "PENDING"
     elif isinstance(event, SessionScheduledEvent):
@@ -1678,8 +1675,26 @@ async def invoke_session_callback(
         # data["status"] = "PREPARING"
         # result = "FAILED"
         pass
-    # TODO: Redis
-    # Redis.from_url(str(url), **kwargs)
+
+    stream_key = "events"
+    try:
+        redis_conn = redis_helper.get_redis_object(
+            {
+                "addr": root_ctx.local_config["pipeline"]["event-queue"],
+                "sentinel": None,
+                "service_name": None,
+                "password": None,
+            },
+            db=1,  # REDIS_PIPELINE_EVENT
+        )
+        await redis_helper.execute(
+            redis_conn.client,
+            lambda r: r.xadd(stream_key, data),  # type: ignore
+        )
+    except redis.exceptions.ConnectionError:
+        pass
+    # except redis.exceptions.TimeoutError:
+    #     pass
 
 
 async def handle_batch_result(

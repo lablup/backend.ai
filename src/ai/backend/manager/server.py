@@ -7,7 +7,6 @@ import importlib
 import logging
 import os
 import pwd
-import re
 import ssl
 import sys
 import traceback
@@ -25,13 +24,11 @@ from typing import (
     Sequence,
     cast,
 )
-from uuid import UUID
 
 import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
-import sqlalchemy as sa
 from aiohttp import web
 from redis.asyncio import Redis
 from setproctitle import setproctitle
@@ -62,7 +59,6 @@ from .config import load as load_config
 from .config import volume_config_iv
 from .defs import REDIS_IMAGE_DB, REDIS_LIVE_DB, REDIS_STAT_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK
 from .exceptions import InvalidArgument
-from .models import kernels
 from .types import DistributedLockFactory
 
 VALID_VERSIONS: Final = frozenset(
@@ -309,15 +305,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_LOCK,
     )
-    root_ctx.redis_pipeline_event = redis_helper.get_redis_object(
-        {
-            "addr": root_ctx.local_config["pipeline"]["event-queue"],
-            "sentinel": None,
-            "service_name": None,
-            "password": None,
-        },
-        db=1,  # REDIS_PIPELINE_EVENT
-    )
 
     redis_objects = (
         root_ctx.redis_live,
@@ -325,7 +312,6 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.redis_image,
         root_ctx.redis_stream,
         root_ctx.redis_lock,
-        root_ctx.redis_pipeline_event,
     )
     for redis_info in redis_objects:
         assert isinstance(redis_info.client, Redis)
@@ -342,7 +328,7 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.utils import connect_database
 
     async with connect_database(root_ctx.local_config) as db:
-        # _SECRET_KEY = "wIUmG5qvls4XCAS64FizhtF7u7EMTS2ZDn89AncuwzDi5X9uIT0fcbL21FNUQJz9"
+        """
         _SESSION_ID = 1
         _CALLBACK_URL = 49
 
@@ -355,10 +341,8 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             log.warning("EVENT.LISTENER - {}", statement)
             log.warning("EVENT.LISTENER - {}", parameters)
             if statement.startswith("UPDATE sessions"):
-                """
-                UPDATE sessions SET status=%s, status_info=%s, status_data=%s, status_history=(coalesce(sessions.status_history, '{}'::jsonb) || CAST(%s AS JSONB)) WHERE sessions.status = %s RETURNING sessions.id
-                """
-                session_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
+                # UPDATE sessions SET status=%s, status_info=%s, status_data=%s, status_history=(coalesce(sessions.status_history, '{}'::jsonb) || CAST(%s AS JSONB)) WHERE sessions.status = %s RETURNING sessions.id
+                # session_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
                 if matches := re.search("status=([A-Z]*)[,]+", statement % parameters):
                     pass
                 return
@@ -385,18 +369,9 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                                 break
                     if not token or not session_id:
                         return
-                    stream_key = "events"
-                    raw_event = {
-                        b"token": token.encode(),
-                        b"session_id": str(session_id).encode(),
-                        b"status": status.encode(),
-                    }
-                    await redis_helper.execute(
-                        root_ctx.redis_pipeline_event.client,
-                        lambda r: r.xadd(stream_key, raw_event),  # type: ignore # aio-libs/aioredis-py#1182
-                    )
 
                 asyncio.create_task(_dispatch())
+        """
 
         root_ctx.db = db
         yield
