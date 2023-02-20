@@ -1,12 +1,12 @@
 name: pr-number-assign
-on: 
+on:
   [workflow_call]
 permissions:
   contents: write
 
 jobs:
   pr-number-assign:
-    runs-on: ubuntu-latest 
+    runs-on: ubuntu-latest
 
     env:
       FEAT: default
@@ -17,30 +17,28 @@ jobs:
       with:
         ref: ${{ github.head_ref }}
 
-    - name: Assign pr-number 
+    - name: Assign pr-number
       run: |
         pip install tomlkit
         python scripts/pr-number-assign.py ${{github.event.pull_request.number}}
 
     - name: Get user info
       id: get_user_info
-      run: | 
+      run: |
         response=$(curl -Ls https://api.github.com/users/$GITHUB_ACTOR/events/public | jq -r '.[0]')
         echo "email=$(echo $response | jq '.payload.commits[-1].author.email')" >> $GITHUB_OUTPUT
         echo "id=$(echo $response | jq '.id')" >> $GITHUB_OUTPUT
         echo "message=$(echo $response | jq '.payload.commits[-1].message')" >> $GITHUB_OUTPUT
-        
+
     - name: Check user info
       run: |
         echo "Actor: $GITHUB_ACTOR"
         echo "User email: ${{ steps.get_user_info.outputs.email }}"
         echo "Recent id in github api(https://api.github.com/users/${{github.actor}}/events/public): ${{ steps.get_user_info.outputs.id }}"
         echo "Workflow-Triggered commit message: ${{ steps.get_user_info.outputs.message }}"
-        
+
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
-        commit_user_name: ${{ github.actor }}
-        commit_user_email: ${{ steps.get_user_info.outputs.email }}
-
+        commit_author: ${{ github.actor }} <${{ steps.get_user_info.outputs.email }}>
         commit_message: GitHub Actions changed file name. '${{ env.ORIGINAL_FILENAME }}' -> '${{ github.event.pull_request.number }}.${{ env.FEAT }}.md'
