@@ -2074,6 +2074,7 @@ class AgentRegistry:
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
                 return await rpc.call.execute(
+                    str(session.id),
                     str(session.main_kernel.id),
                     major_api_version,
                     run_id,

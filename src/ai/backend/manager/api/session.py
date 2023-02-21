@@ -1625,8 +1625,8 @@ async def invoke_session_callback(
     | SessionStartedEvent
     | SessionCancelledEvent
     | SessionTerminatedEvent
-    | SessionSuccessEvent  # TODO: KernelId
-    | SessionFailureEvent,  # TODO: KernelId
+    | SessionSuccessEvent
+    | SessionFailureEvent,
 ) -> None:
     app_ctx: PrivateContext = app["session.context"]
     root_ctx: RootContext = app["_root.context"]
