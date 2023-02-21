@@ -57,3 +57,7 @@ src/ai/backend/runner/scp.centos7.6.x86_64.bin filter=lfs diff=lfs merge=lfs -te
 src/ai/backend/runner/scp.ubuntu16.04.x86_64.bin filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/sftp-server.ubuntu16.04.aarch64.bin filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/tmux.alpine3.8.aarch64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/tmux.ubuntu22.04.x86_64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/dropbear.ubuntu22.04.x86_64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/dropbearconvert.ubuntu22.04.x86_64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/dropbearkey.ubuntu22.04.x86_64.bin filter=lfs diff=lfs merge=lfs -text
