@@ -11,7 +11,7 @@ import aiohttp
 import async_timeout
 import pytest
 
-from ai.backend.common.lock import FileLock
+# from ai.backend.common.lock import FileLock
 from ai.backend.testutils.bootstrap import get_free_port
 from ai.backend.testutils.pants import get_parallel_slot
 
@@ -145,40 +145,37 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             await asyncio.get_running_loop().run_in_executor(None, _copy_files)
             compose_cfg = snap_compose_dir / "redis-cluster.yml"
 
-        async with FileLock(Path("/tmp/bai-test-port-alloc.lock", debug=True)):
-            print("acquired filelock")
+        # async with FileLock(Path("/tmp/bai-test-port-alloc.lock", debug=True)):
 
-            async def _get_free_port() -> int:
-                return await asyncio.get_running_loop().run_in_executor(None, get_free_port)
+        async def _get_free_port() -> int:
+            return await asyncio.get_running_loop().run_in_executor(None, get_free_port)
 
-            ports = {
-                "REDIS_MASTER_PORT": await _get_free_port(),
-                "REDIS_SLAVE1_PORT": await _get_free_port(),
-                "REDIS_SLAVE2_PORT": await _get_free_port(),
-                "REDIS_SENTINEL1_PORT": await _get_free_port(),
-                "REDIS_SENTINEL2_PORT": await _get_free_port(),
-                "REDIS_SENTINEL3_PORT": await _get_free_port(),
-            }
-            os.environ.update({k: str(v) for k, v in ports.items()})
-            print(f"Loaded redis ports {ports}")
+        ports = {
+            "REDIS_MASTER_PORT": await _get_free_port(),
+            "REDIS_SLAVE1_PORT": await _get_free_port(),
+            "REDIS_SLAVE2_PORT": await _get_free_port(),
+            "REDIS_SENTINEL1_PORT": await _get_free_port(),
+            "REDIS_SENTINEL2_PORT": await _get_free_port(),
+            "REDIS_SENTINEL3_PORT": await _get_free_port(),
+        }
+        os.environ.update({k: str(v) for k, v in ports.items()})
 
-            async with async_timeout.timeout(30.0):
-                p = await simple_run_cmd(
-                    [
-                        *compose_cmd,
-                        "-p",
-                        project_name,
-                        "-f",
-                        os.fsencode(compose_cfg),
-                        "up",
-                        "-d",
-                        "--build",
-                    ],
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
-                )
-                assert p.returncode == 0, "Compose cluster creation has failed."
-        print(f"Created redis cluster with port {ports}")
+        async with async_timeout.timeout(30.0):
+            p = await simple_run_cmd(
+                [
+                    *compose_cmd,
+                    "-p",
+                    project_name,
+                    "-f",
+                    os.fsencode(compose_cfg),
+                    "up",
+                    "-d",
+                    "--build",
+                ],
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            assert p.returncode == 0, "Compose cluster creation has failed."
         await asyncio.sleep(2)
         try:
             p = await simple_run_cmd(
