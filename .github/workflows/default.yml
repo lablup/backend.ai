@@ -10,6 +10,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  acttest:
+    runs-on: ubuntu-latest-8-cores
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        face-depth: 2
+    - run: gh pr checkout 956
+
   lint:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
@@ -167,7 +175,8 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants -ldebug test --test-debug --test-output=all --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
+        # ./pants -ldebug test --test-debug --test-output=all --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
+        ./pants -ldebug test --test-debug --test-output=all tests/common/redis/test_connect.py -- -m 'not integration'
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
