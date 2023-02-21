@@ -168,7 +168,7 @@ jobs:
           BASE_REF="HEAD~1"
         fi
         # ./pants -ldebug test --test-debug --test-output=all --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
-        ./pants -ldebug test --test-debug --test-output=all tests/common/redis/test_connect.py -- -m 'not integration'
+        ./pants -ldebug test --test-debug --test-output=all tests/common/redis/test_connect.py -- -m 'not integration' --full-trace
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
