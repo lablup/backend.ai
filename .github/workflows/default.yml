@@ -167,7 +167,7 @@ jobs:
         else
           BASE_REF="HEAD~1"
         fi
-        ./pants --no-pantsd --no-filesystem-changes test --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
+        ./pants --no-pantsd --no-watch-filesystem test --changed-since=$BASE_REF --changed-dependees=transitive -- -m 'not integration'
     - name: Upload pants log
       uses: actions/upload-artifact@v3
       with:
