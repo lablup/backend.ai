@@ -77,13 +77,13 @@ from ai.backend.common.events import (
     ExecutionStartedEvent,
     ExecutionTimeoutEvent,
     KernelCreatingEvent,
-    KernelFailureEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
-    KernelSuccessEvent,
     KernelTerminatedEvent,
+    SessionFailureEvent,
+    SessionSuccessEvent,
 )
 from ai.backend.common.lock import FileLock
 from ai.backend.common.logging import BraceStyleAdapter, pretty
@@ -1375,12 +1375,14 @@ class AbstractAgent(
                 if result["status"] == "finished":
                     if result["exitCode"] == 0:
                         await self.produce_event(
-                            KernelSuccessEvent(kernel_id, KernelLifecycleEventReason.TASK_DONE, 0),
+                            SessionSuccessEvent(
+                                SessionId(kernel_id), KernelLifecycleEventReason.TASK_DONE, 0
+                            ),
                         )
                     else:
                         await self.produce_event(
-                            KernelFailureEvent(
-                                kernel_id,
+                            SessionFailureEvent(
+                                SessionId(kernel_id),
                                 KernelLifecycleEventReason.TASK_FAILED,
                                 result["exitCode"],
                             ),
@@ -1388,7 +1390,9 @@ class AbstractAgent(
                     break
                 if result["status"] == "exec-timeout":
                     await self.produce_event(
-                        KernelFailureEvent(kernel_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2),
+                        SessionFailureEvent(
+                            SessionId(kernel_id), KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                        ),
                     )
                     break
                 opts = {
@@ -1397,7 +1401,9 @@ class AbstractAgent(
                 mode = "continue"
         except asyncio.CancelledError:
             await self.produce_event(
-                KernelFailureEvent(kernel_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
+                SessionFailureEvent(
+                    SessionId(kernel_id), KernelLifecycleEventReason.TASK_CANCELLED, -2
+                ),
             )
 
     async def create_kernel(
@@ -1946,7 +1952,6 @@ class AbstractAgent(
             await restart_tracker.done_event.wait()
 
         await self.produce_event(
-            # TODO: Correct SessionId
             ExecutionStartedEvent(SessionId(kernel_id)),
         )
         try:
@@ -1956,7 +1961,6 @@ class AbstractAgent(
             )
         except asyncio.CancelledError:
             await self.produce_event(
-                # TODO: Correct SessionId
                 ExecutionCancelledEvent(SessionId(kernel_id)),
             )
             raise
@@ -1971,12 +1975,10 @@ class AbstractAgent(
             log.debug("_execute({0}) {1}", kernel_id, result["status"])
         if result["status"] == "finished":
             await self.produce_event(
-                # TODO: Correct SessionId
                 ExecutionFinishedEvent(SessionId(kernel_id)),
             )
         elif result["status"] == "exec-timeout":
             await self.produce_event(
-                # TODO: Correct SessionId
                 ExecutionTimeoutEvent(SessionId(kernel_id)),
             )
             await self.inject_container_lifecycle_event(

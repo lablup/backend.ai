@@ -65,12 +65,10 @@ from ai.backend.common.events import (
     DoTerminateSessionEvent,
     KernelCancelledEvent,
     KernelCreatingEvent,
-    KernelFailureEvent,
     KernelLifecycleEventReason,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
-    KernelSuccessEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
     SessionCancelledEvent,
@@ -1618,36 +1616,6 @@ async def _make_session_callback(data: dict[str, Any], url: yarl.URL) -> None:
         )
 
 
-async def invoke_kernel_callback(
-    app: web.Application,
-    source: AgentId,
-    event: KernelSuccessEvent | KernelFailureEvent,
-) -> None:
-    app_ctx: PrivateContext = app["session.context"]
-    root_ctx: RootContext = app["_root.context"]
-    log.info("INVOKE_KERNEL_CALLBACK (event:{})", event)
-    kernel = await KernelRow.get_kernel(root_ctx.db, event.kernel_id)
-    try:
-        async with root_ctx.db.begin_readonly_session() as db_sess:
-            session = await SessionRow.get_session_with_main_kernel(
-                kernel.session_id, db_session=db_sess
-            )
-    except SessionNotFound:
-        return
-    data = {
-        "type": "kernel_lifecycle",
-        "event": event.name.removeprefix("kernel_"),
-        "session_id": str(session.id),
-        "when": datetime.now(tzutc()).isoformat(),
-    }
-    url = session.callback_url
-    if url is None:
-        return
-    app_ctx.webhook_ptask_group.create_task(
-        _make_session_callback(data, url),
-    )
-
-
 async def invoke_session_callback(
     app: web.Application,
     source: AgentId,
@@ -1662,7 +1630,12 @@ async def invoke_session_callback(
 ) -> None:
     app_ctx: PrivateContext = app["session.context"]
     root_ctx: RootContext = app["_root.context"]
-    log.info("INVOKE_SESSION_CALLBACK (event:{})", event)
+    data = {
+        "type": "session_lifecycle",
+        "event": event.name.removeprefix("session_"),
+        "session_id": str(event.session_id),
+        "when": datetime.now(tzutc()).isoformat(),
+    }
     try:
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session_with_main_kernel(
@@ -1670,12 +1643,6 @@ async def invoke_session_callback(
             )
     except SessionNotFound:
         return
-    data = {
-        "type": "session_lifecycle",
-        "event": event.name.removeprefix("session_"),
-        "session_id": str(event.session_id),
-        "when": datetime.now(tzutc()).isoformat(),
-    }
     url = session.callback_url
     if url is None:
         return
@@ -1687,22 +1654,18 @@ async def invoke_session_callback(
 async def handle_batch_result(
     app: web.Application,
     source: AgentId,
-    event: KernelSuccessEvent | KernelFailureEvent,
+    event: SessionSuccessEvent | SessionFailureEvent,
 ) -> None:
     """
     Update the database according to the batch-job completion results
     """
     root_ctx: RootContext = app["_root.context"]
-    async with root_ctx.db.begin_readonly_session() as db_sess:
-        query = sa.select(KernelRow.session_id).where(KernelRow.id == event.kernel_id)
-        result = await db_sess.execute(query)
-        row = result.first()
-    if isinstance(event, KernelSuccessEvent):
-        await SessionRow.set_session_result(root_ctx.db, row.session_id, True, event.exit_code)
-    elif isinstance(event, KernelFailureEvent):
-        await SessionRow.set_session_result(root_ctx.db, row.session_id, False, event.exit_code)
+    if isinstance(event, SessionSuccessEvent):
+        await SessionRow.set_session_result(root_ctx.db, event.session_id, True, event.exit_code)
+    elif isinstance(event, SessionFailureEvent):
+        await SessionRow.set_session_result(root_ctx.db, event.session_id, False, event.exit_code)
     async with root_ctx.db.begin_session() as db_sess:
-        session = await SessionRow.get_session_with_kernels(row.session_id, db_session=db_sess)
+        session = await SessionRow.get_session_with_kernels(event.session_id, db_session=db_sess)
     await root_ctx.registry.destroy_session(
         session,
         reason=KernelLifecycleEventReason.TASK_FINISHED,
@@ -2637,8 +2600,6 @@ async def init(app: web.Application) -> None:
         handle_session_termination_lifecycle,
         name="api.session.sterm",
     )
-    evd.consume(KernelSuccessEvent, app, invoke_kernel_callback)
-    evd.consume(KernelFailureEvent, app, invoke_kernel_callback)
     evd.consume(SessionEnqueuedEvent, app, invoke_session_callback)
     evd.consume(SessionScheduledEvent, app, invoke_session_callback)
     evd.consume(SessionPreparingEvent, app, invoke_session_callback)
@@ -2647,8 +2608,8 @@ async def init(app: web.Application) -> None:
     evd.consume(SessionTerminatedEvent, app, invoke_session_callback)
     evd.consume(SessionSuccessEvent, app, invoke_session_callback)
     evd.consume(SessionFailureEvent, app, invoke_session_callback)
-    evd.consume(KernelSuccessEvent, app, handle_batch_result)
-    evd.consume(KernelFailureEvent, app, handle_batch_result)
+    evd.consume(SessionSuccessEvent, app, handle_batch_result)
+    evd.consume(SessionFailureEvent, app, handle_batch_result)
     evd.consume(AgentStartedEvent, app, handle_agent_lifecycle)
     evd.consume(AgentTerminatedEvent, app, handle_agent_lifecycle)
     evd.consume(AgentHeartbeatEvent, app, handle_agent_heartbeat)
