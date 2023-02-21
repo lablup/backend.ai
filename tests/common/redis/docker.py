@@ -147,16 +147,16 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
 
         # async with FileLock(Path("/tmp/bai-test-port-alloc.lock", debug=True)):
 
-        async def _get_free_port() -> int:
-            return await asyncio.get_running_loop().run_in_executor(None, get_free_port)
+        # async def _get_free_port() -> int:
+        #     return await asyncio.get_running_loop().run_in_executor(None, get_free_port)
 
         ports = {
-            "REDIS_MASTER_PORT": await _get_free_port(),
-            "REDIS_SLAVE1_PORT": await _get_free_port(),
-            "REDIS_SLAVE2_PORT": await _get_free_port(),
-            "REDIS_SENTINEL1_PORT": await _get_free_port(),
-            "REDIS_SENTINEL2_PORT": await _get_free_port(),
-            "REDIS_SENTINEL3_PORT": await _get_free_port(),
+            "REDIS_MASTER_PORT": get_free_port(),
+            "REDIS_SLAVE1_PORT": get_free_port(),
+            "REDIS_SLAVE2_PORT": get_free_port(),
+            "REDIS_SENTINEL1_PORT": get_free_port(),
+            "REDIS_SENTINEL2_PORT": get_free_port(),
+            "REDIS_SENTINEL3_PORT": get_free_port(),
         }
         os.environ.update({k: str(v) for k, v in ports.items()})
 
