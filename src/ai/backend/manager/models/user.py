@@ -130,6 +130,8 @@ users = sa.Table(
     sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), index=True),
     sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
     sa.Column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True),
+    sa.Column("totp_key", sa.String(length=32)),
+    sa.Column("totp_activated", sa.Boolean),
 )
 
 
@@ -193,6 +195,7 @@ class User(graphene.ObjectType):
     domain_name = graphene.String()
     role = graphene.String()
     allowed_client_ip = graphene.List(lambda: graphene.String)
+    totp_activated = graphene.Boolean()
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -227,6 +230,7 @@ class User(graphene.ObjectType):
             domain_name=row["domain_name"],
             role=row["role"],
             allowed_client_ip=row["allowed_client_ip"],
+            totp_activated=row["totp_activated"],
         )
 
     @classmethod
@@ -279,6 +283,7 @@ class User(graphene.ObjectType):
         "domain_name": ("domain_name", None),
         "role": ("role", enum_field_getter(EnumValueType, UserRole)),
         "allowed_client_ip": ("allowed_client_ip", None),
+        "totp_activated": ("totp_activated", None),
     }
 
     _queryorder_colmap = {
