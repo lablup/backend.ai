@@ -36,11 +36,12 @@ def sync_file_lock(path: Path, max_retries: int = 30, retry_interval: int = 5):
                 fcntl.flock(file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 acquired = True
                 yield
-                return
+                break
             except BlockingIOError:
                 log.exception("error while trying to acquire filelock")
                 time.sleep(retry_interval)
-        raise RuntimeError(f"failed to acquire filelock from path {path}")
+        if not acquired:
+            raise RuntimeError(f"failed to acquire filelock from path {path}")
     finally:
         if acquired:
             fcntl.flock(file.fileno(), fcntl.LOCK_UN)
