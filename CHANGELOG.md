@@ -18,7 +18,7 @@ Changes
 
 ## 22.09.12 (2023-02-20)
 
-Ai.Backend.Manager 22.09.12 (2023-02-20)
+22.09.12 (2023-02-20)
 
 ### Features
 * When rescanning container image registries, skip misformatted image names and tag names instead of failing the entire process. ([#933](https://github.com/lablup/backend.ai/issues/933))
@@ -31,7 +31,7 @@ Ai.Backend.Manager 22.09.12 (2023-02-20)
 
 ## 22.09.11 (2023-02-12)
 
-Ai.Backend.Manager 22.09.11 (2023-02-12)
+22.09.11 (2023-02-12)
 
 ### Features
 * Add vfolder status in api response and update vfolder cli `list`, `info` commands to show vfolder's status. ([#1017](https://github.com/lablup/backend.ai/issues/1017))
@@ -47,7 +47,7 @@ Ai.Backend.Manager 22.09.11 (2023-02-12)
 
 ## 22.09.10 (2023-02-04)
 
-Ai.Backend.Manager 22.09.10 (2023-02-04)
+22.09.10 (2023-02-04)
 
 ### Breaking Changes
 * Now the mono-repo is updated to use Pants 2.16.0.dev5. Check out the PR description for the migration guide. ([#998](https://github.com/lablup/backend.ai/issues/998))
@@ -70,7 +70,7 @@ Ai.Backend.Manager 22.09.10 (2023-02-04)
 
 ## 22.09.9 (2023-01-25)
 
-Ai.Backend.Manager 22.09.9 (2023-01-25)
+22.09.9 (2023-01-25)
 
 ### Fixes
 * Add comment out on gpfs sample volume when setting up the development environment with ./script/install-dev.sh ([#965](https://github.com/lablup/backend.ai/issues/965))
@@ -82,7 +82,7 @@ Ai.Backend.Manager 22.09.9 (2023-01-25)
 
 ## 22.09.8 (2023-01-10)
 
-Ai.Backend.Manager 22.09.8 (2023-01-10)
+22.09.8 (2023-01-10)
 
 ### Features
 * Support setting the `use_host_network` option of scaling group in the client-py. ([#941](https://github.com/lablup/backend.ai/issues/941))
@@ -90,7 +90,7 @@ Ai.Backend.Manager 22.09.8 (2023-01-10)
 
 ## 22.09.7 (2023-01-09)
 
-Ai.Backend.Manager 22.09.7 (2023-01-09)
+22.09.7 (2023-01-09)
 
 ### Features
 * Support IBM Spectrum Scale storage ([#744](https://github.com/lablup/backend.ai/issues/744))
@@ -110,7 +110,7 @@ Ai.Backend.Manager 22.09.7 (2023-01-09)
 
 ## 22.09.6 (2022-12-09)
 
-Ai.Backend.Manager 22.09.6 (2022-12-09)
+22.09.6 (2022-12-09)
 
 ### Features
 * Add the `local_rank` column in the `kernels` table and the `BACKENDAI_CLUSTER_LOCAL_RANK` environment variable in session containers to simplify execution of distributed computing/ML frameworks with one shell command ([#826](https://github.com/lablup/backend.ai/issues/826))
@@ -130,7 +130,7 @@ Ai.Backend.Manager 22.09.6 (2022-12-09)
 
 ## 22.09.5 (2022-11-28)
 
-Ai.Backend.Manager 22.09.5 (2022-11-28)
+22.09.5 (2022-11-28)
 
 ### Features
 * Make the listening port of the container metadata server configurable ([#447](https://github.com/lablup/backend.ai/issues/447))
