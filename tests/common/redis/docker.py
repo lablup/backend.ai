@@ -11,6 +11,8 @@ import aiohttp
 import async_timeout
 import pytest
 
+from ai.backend.common.lock import FileLock
+from ai.backend.testutils.bootstrap import get_free_port
 from ai.backend.testutils.pants import get_parallel_slot
 
 from .types import AbstractRedisNode, AbstractRedisSentinelCluster, RedisClusterInfo
@@ -143,32 +145,37 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             await asyncio.get_running_loop().run_in_executor(None, _copy_files)
             compose_cfg = snap_compose_dir / "redis-cluster.yml"
 
-        ports = {
-            "REDIS_MASTER_PORT": 16379 + get_parallel_slot() * 10,
-            "REDIS_SLAVE1_PORT": 16380 + get_parallel_slot() * 10,
-            "REDIS_SLAVE2_PORT": 16381 + get_parallel_slot() * 10,
-            "REDIS_SENTINEL1_PORT": 26379 + get_parallel_slot() * 10,
-            "REDIS_SENTINEL2_PORT": 26380 + get_parallel_slot() * 10,
-            "REDIS_SENTINEL3_PORT": 26381 + get_parallel_slot() * 10,
-        }
-        os.environ.update({k: str(v) for k, v in ports.items()})
+        async with FileLock(Path("/tmp/bai-test-port-alloc.lock")):
 
-        async with async_timeout.timeout(30.0):
-            p = await simple_run_cmd(
-                [
-                    *compose_cmd,
-                    "-p",
-                    project_name,
-                    "-f",
-                    os.fsencode(compose_cfg),
-                    "up",
-                    "-d",
-                    "--build",
-                ],
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
-            assert p.returncode == 0, "Compose cluster creation has failed."
+            async def _get_free_port() -> int:
+                return await asyncio.get_running_loop().run_in_executor(None, get_free_port)
+
+            ports = {
+                "REDIS_MASTER_PORT": await _get_free_port(),
+                "REDIS_SLAVE1_PORT": await _get_free_port(),
+                "REDIS_SLAVE2_PORT": await _get_free_port(),
+                "REDIS_SENTINEL1_PORT": await _get_free_port(),
+                "REDIS_SENTINEL2_PORT": await _get_free_port(),
+                "REDIS_SENTINEL3_PORT": await _get_free_port(),
+            }
+            os.environ.update({k: str(v) for k, v in ports.items()})
+
+            async with async_timeout.timeout(30.0):
+                p = await simple_run_cmd(
+                    [
+                        *compose_cmd,
+                        "-p",
+                        project_name,
+                        "-f",
+                        os.fsencode(compose_cfg),
+                        "up",
+                        "-d",
+                        "--build",
+                    ],
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                assert p.returncode == 0, "Compose cluster creation has failed."
 
         await asyncio.sleep(2)
         try:
