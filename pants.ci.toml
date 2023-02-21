@@ -2,6 +2,8 @@
 dynamic_ui = false
 colors = true
 
+pants_ignore.add = ["/tmp/bai-test-port-alloc.lock"]
+
 [python-bootstrap]
 search_path = ["<PATH>"]
 
