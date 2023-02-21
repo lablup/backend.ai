@@ -303,36 +303,6 @@ class KernelCancelledEvent(KernelCreationEventArgs, AbstractEvent):
 
 
 @attrs.define(slots=True, frozen=True)
-class KernelResultEventArgs:
-    kernel_id: KernelId = attrs.field()
-    reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
-    exit_code: int = attrs.field(default=-1)
-
-    def serialize(self) -> tuple:
-        return (
-            str(self.kernel_id),
-            self.reason,
-            self.exit_code,
-        )
-
-    @classmethod
-    def deserialize(cls, value: tuple) -> "KernelResultEventArgs":
-        return cls(
-            KernelId(uuid.UUID(value[0])),
-            value[1],
-            value[2],
-        )
-
-
-class KernelSuccessEvent(KernelResultEventArgs, AbstractEvent):
-    name = "kernel_success"
-
-
-class KernelFailureEvent(KernelResultEventArgs, AbstractEvent):
-    name = "kernel_failure"
-
-
-@attrs.define(slots=True, frozen=True)
 class KernelTerminationEventArgs:
     kernel_id: KernelId = attrs.field()
     reason: KernelLifecycleEventReason = attrs.field(default=KernelLifecycleEventReason.UNKNOWN)
