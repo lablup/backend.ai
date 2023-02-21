@@ -1376,12 +1376,16 @@ class AbstractAgent(
                     if result["exitCode"] == 0:
                         await self.produce_event(
                             SessionSuccessEvent(
-                                SessionId(kernel_id), KernelLifecycleEventReason.TASK_DONE, 0
+                                # TODO: Correct SessionId
+                                SessionId(kernel_id),
+                                KernelLifecycleEventReason.TASK_DONE,
+                                0,
                             ),
                         )
                     else:
                         await self.produce_event(
                             SessionFailureEvent(
+                                # TODO: Correct SessionId
                                 SessionId(kernel_id),
                                 KernelLifecycleEventReason.TASK_FAILED,
                                 result["exitCode"],
@@ -1391,7 +1395,10 @@ class AbstractAgent(
                 if result["status"] == "exec-timeout":
                     await self.produce_event(
                         SessionFailureEvent(
-                            SessionId(kernel_id), KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                            # TODO: Correct SessionId
+                            SessionId(kernel_id),
+                            KernelLifecycleEventReason.TASK_TIMEOUT,
+                            -2,
                         ),
                     )
                     break
@@ -1402,7 +1409,10 @@ class AbstractAgent(
         except asyncio.CancelledError:
             await self.produce_event(
                 SessionFailureEvent(
-                    SessionId(kernel_id), KernelLifecycleEventReason.TASK_CANCELLED, -2
+                    # TODO: Correct SessionId
+                    SessionId(kernel_id),
+                    KernelLifecycleEventReason.TASK_CANCELLED,
+                    -2,
                 ),
             )
 
@@ -1952,6 +1962,7 @@ class AbstractAgent(
             await restart_tracker.done_event.wait()
 
         await self.produce_event(
+            # TODO: Correct SessionId
             ExecutionStartedEvent(SessionId(kernel_id)),
         )
         try:
@@ -1961,6 +1972,7 @@ class AbstractAgent(
             )
         except asyncio.CancelledError:
             await self.produce_event(
+                # TODO: Correct SessionId
                 ExecutionCancelledEvent(SessionId(kernel_id)),
             )
             raise
@@ -1975,10 +1987,12 @@ class AbstractAgent(
             log.debug("_execute({0}) {1}", kernel_id, result["status"])
         if result["status"] == "finished":
             await self.produce_event(
+                # TODO: Correct SessionId
                 ExecutionFinishedEvent(SessionId(kernel_id)),
             )
         elif result["status"] == "exec-timeout":
             await self.produce_event(
+                # TODO: Correct SessionId
                 ExecutionTimeoutEvent(SessionId(kernel_id)),
             )
             await self.inject_container_lifecycle_event(

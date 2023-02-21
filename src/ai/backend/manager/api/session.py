@@ -1625,11 +1625,12 @@ async def invoke_session_callback(
     | SessionStartedEvent
     | SessionCancelledEvent
     | SessionTerminatedEvent
-    | SessionSuccessEvent
-    | SessionFailureEvent,
+    | SessionSuccessEvent  # TODO: KernelId
+    | SessionFailureEvent,  # TODO: KernelId
 ) -> None:
     app_ctx: PrivateContext = app["session.context"]
     root_ctx: RootContext = app["_root.context"]
+    log.info("INVOKE_SESSION_CALLBACK (event:{})", event)
     data = {
         "type": "session_lifecycle",
         "event": event.name.removeprefix("session_"),
