@@ -1,7 +1,6 @@
 [GLOBAL]
 dynamic_ui = false
 colors = true
-watch_filesystem = false
 
 [python-bootstrap]
 search_path = ["<PATH>"]
