@@ -1247,16 +1247,18 @@ class AgentRegistry:
             except (asyncio.TimeoutError, asyncio.CancelledError) as e:
                 for binding in items:
                     kernel_id = binding.kernel.kernel_id
-                    self.kernel_creation_tracker[kernel_id].cancel()
-                    self._post_kernel_creation_infos[kernel_id].set_exception(e)
+                    if not self.kernel_creation_tracker[kernel_id].done():
+                        self.kernel_creation_tracker[kernel_id].cancel()
+                        self._post_kernel_creation_infos[kernel_id].set_exception(e)
                 await asyncio.gather(*post_tasks, return_exceptions=True)
             except Exception as e:
                 # The agent has already cancelled or issued the destruction lifecycle event
                 # for this batch of kernels.
                 for binding in items:
                     kernel_id = binding.kernel.id
-                    self.kernel_creation_tracker[kernel_id].cancel()
-                    self._post_kernel_creation_infos[kernel_id].set_exception(e)
+                    if not self.kernel_creation_tracker[kernel_id].done():
+                        self.kernel_creation_tracker[kernel_id].cancel()
+                        self._post_kernel_creation_infos[kernel_id].set_exception(e)
                     ex = e
 
                     async def _update_failure() -> None:

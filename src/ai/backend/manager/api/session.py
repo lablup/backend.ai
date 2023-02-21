@@ -1494,6 +1494,7 @@ async def handle_kernel_creation_lifecycle(
             tracker.set_result(None)
     elif isinstance(event, KernelCancelledEvent):
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
+            log.warning(f"Kernel cancelled, {event.reason = }")
             tracker.cancel()
 
 
