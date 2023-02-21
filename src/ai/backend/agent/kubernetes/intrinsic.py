@@ -28,7 +28,7 @@ from ..stats import ContainerMeasurement, NodeMeasurement, StatContext
 from .agent import Container
 from .resources import get_resource_spec_from_container
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 async def fetch_api_stats(container: DockerContainer) -> Optional[Dict[str, Any]]:

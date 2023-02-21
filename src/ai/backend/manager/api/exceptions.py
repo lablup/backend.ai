@@ -207,6 +207,10 @@ class SessionNotFound(ObjectNotFound):
     object_name = "session"
 
 
+class MainKernelNotFound(ObjectNotFound):
+    object_name = "main kernel"
+
+
 class TooManySessionsMatched(BackendError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-sessions-matched"
     error_title = "Too many sessions matched."

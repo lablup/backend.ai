@@ -26,7 +26,7 @@ from ai.backend.common.types import ReadableCIDR
 from ..models import keypair_resource_policies, keypairs, users
 from ..models.group import association_groups_users, groups
 from ..models.keypair import generate_keypair as _gen_keypair
-from ..models.keypair import generate_ssh_keypair
+from ..models.keypair import generate_ssh_keypair as _gen_ssh_keypair
 from ..models.user import INACTIVE_USER_STATUSES, UserRole, UserStatus, check_credential
 from ..models.utils import execute_with_retry
 from .exceptions import (
@@ -45,9 +45,9 @@ from .utils import check_api_params, get_handler_attr, set_handler_attr
 if TYPE_CHECKING:
     from .context import RootContext
 
-log: Final = BraceStyleAdapter(logging.getLogger(__name__))
+log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
-whois_timezone_info: Final = {
+_whois_timezone_info: Final = {
     "A": 1 * 3600,
     "ACDT": 10.5 * 3600,
     "ACST": 9.5 * 3600,
@@ -276,6 +276,7 @@ whois_timezone_info: Final = {
     "YEKT": 5 * 3600,
     "Z": 0 * 3600,
 }
+whois_timezone_info: Final[Mapping[str, int]] = {k: int(v) for k, v in _whois_timezone_info.items()}
 
 
 def _extract_auth_params(request):
@@ -636,7 +637,7 @@ async def get_role(request: web.Request, params: Any) -> web.Response:
             t.Key("username"): t.String,
             t.Key("password"): t.String,
         }
-    )
+    ).allow_extra("*")
 )
 async def authorize(request: web.Request, params: Any) -> web.Response:
     if params["type"] != "keypair":
@@ -687,12 +688,15 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
         keypair = result.first()
     if keypair is None:
         raise AuthorizationFailed("No API keypairs found.")
-    # [Hooking point for POST_AUTHORIZE as one-way notification]
+    # [Hooking point for POST_AUTHORIZE]
     # The hook handlers should accept a tuple of the request, user, and keypair objects.
-    await root_ctx.hook_plugin_ctx.notify(
+    hook_result = await root_ctx.hook_plugin_ctx.dispatch(
         "POST_AUTHORIZE",
-        (request, user, keypair),
+        (request, params, user, keypair),
+        return_when=FIRST_COMPLETED,
     )
+    if hook_result.status != PASSED:
+        raise RejectedByHook.from_hook_result(hook_result)
     return web.json_response(
         {
             "data": {
@@ -736,6 +740,19 @@ async def signup(request: web.Request, params: Any) -> web.Response:
     else:
         # Merge the hook results as a single map.
         user_data_overriden = ChainMap(*cast(Mapping, hook_result.result))
+
+    # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
+    # The hook handlers should accept the request and whole ``params` dict.
+    # They should return None if the validation is successful and raise the
+    # Reject error otherwise.
+    hook_result = await root_ctx.hook_plugin_ctx.dispatch(
+        "VERIFY_PASSWORD_FORMAT",
+        (request, params),
+        return_when=ALL_COMPLETED,
+    )
+    if hook_result.status != PASSED:
+        hook_result.reason = hook_result.reason or "invalid password format"
+        raise RejectedByHook.from_hook_result(hook_result)
 
     async with root_ctx.db.begin() as conn:
         # Check if email already exists.
@@ -921,13 +938,12 @@ async def update_password(request: web.Request, params: Any) -> web.Response:
         return web.json_response({"error_msg": "new password mismitch"}, status=400)
 
     # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
-    # The hook handlers should accept the old password and the new password and implement their
-    # own password validation rules.
-    # They should return None if the validation is successful and raise the Reject error
-    # otherwise.
+    # The hook handlers should accept the request and whole ``params` dict.
+    # They should return None if the validation is successful and raise the
+    # Reject error otherwise.
     hook_result = await root_ctx.hook_plugin_ctx.dispatch(
         "VERIFY_PASSWORD_FORMAT",
-        (params["old_password"], params["new_password"]),
+        (request, params),
         return_when=ALL_COMPLETED,
     )
     if hook_result.status != PASSED:
@@ -961,7 +977,7 @@ async def get_ssh_keypair(request: web.Request) -> web.Response:
 
 
 @auth_required
-async def refresh_ssh_keypair(request: web.Request) -> web.Response:
+async def generate_ssh_keypair(request: web.Request) -> web.Response:
     domain_name = request["user"]["domain_name"]
     access_key = request["keypair"]["access_key"]
     log_fmt = "AUTH.REFRESH_SSH_KEYPAIR(d:{}, ak:{})"
@@ -969,7 +985,35 @@ async def refresh_ssh_keypair(request: web.Request) -> web.Response:
     log.info(log_fmt, *log_args)
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin() as conn:
-        pubkey, privkey = generate_ssh_keypair()
+        pubkey, privkey = _gen_ssh_keypair()
+        data = {
+            "ssh_public_key": pubkey,
+            "ssh_private_key": privkey,
+        }
+        query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
+        await conn.execute(query)
+    return web.json_response(data, status=200)
+
+
+@auth_required
+@check_api_params(
+    t.Dict(
+        {
+            t.Key("pubkey"): t.String,
+            t.Key("privkey"): t.String,
+        }
+    )
+)
+async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
+    domain_name = request["user"]["domain_name"]
+    access_key = request["keypair"]["access_key"]
+    pubkey = f"{params['pubkey'].rstrip()}\n"
+    privkey = f"{params['privkey'].rstrip()}\n"
+    log_fmt = "AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})"
+    log_args = (domain_name, access_key)
+    log.info(log_fmt, *log_args)
+    root_ctx: RootContext = request.app["_root.context"]
+    async with root_ctx.db.begin() as conn:
         data = {
             "ssh_public_key": pubkey,
             "ssh_private_key": privkey,
@@ -999,5 +1043,6 @@ def create_app(
     cors.add(app.router.add_route("POST", "/update-password", update_password))
     cors.add(app.router.add_route("POST", "/update-full-name", update_full_name))
     cors.add(app.router.add_route("GET", "/ssh-keypair", get_ssh_keypair))
-    cors.add(app.router.add_route("PATCH", "/ssh-keypair", refresh_ssh_keypair))
+    cors.add(app.router.add_route("PATCH", "/ssh-keypair", generate_ssh_keypair))
+    cors.add(app.router.add_route("POST", "/ssh-keypair", upload_ssh_keypair))
     return app, [auth_middleware]

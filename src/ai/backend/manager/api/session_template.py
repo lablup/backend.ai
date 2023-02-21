@@ -25,7 +25,7 @@ from .utils import check_api_params, get_access_key_scopes
 if TYPE_CHECKING:
     from .context import RootContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 @server_status_required(READ_ALLOWED)
@@ -63,10 +63,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
         for st in body["session_templates"]:
             template_data = check_task_template(st["template"])
             template_id = uuid.uuid4().hex
-            resp = {
-                "id": template_id,
-                "user": user_uuid.hex,
-            }
             name = st["name"] if "name" in st else template_data["metadata"]["name"]
             if "group_id" in st:
                 group_id = st["group_id"]
@@ -85,6 +81,10 @@ async def create(request: web.Request, params: Any) -> web.Response:
                 }
             )
             result = await conn.execute(query)
+            resp = {
+                "id": template_id,
+                "user": user_uuid if isinstance(user_uuid, str) else user_uuid.hex,
+            }
             assert result.rowcount == 1
     return web.json_response(resp)
 

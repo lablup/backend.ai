@@ -177,12 +177,19 @@ To (re-)generate the virtualenv, run:
 
 .. code-block:: console
 
-    $ ./pants export ::
+    $ ./pants export
 
 Then configure your IDEs/editors to use
 ``dist/export/python/virtualenvs/python-default/VERSION/bin/python`` as the
 interpreter for your code, where ``VERSION`` is the interpreter version
 specified in ``pants.toml``.
+
+As of Pants 2.16, you may also export the virtualenvs by the individual lockfiles
+using the ``--resolve`` option like:
+
+.. code-block:: console
+
+    $ ./pants export --resolve=python-default --resolve=mypy
 
 To make LSP (language server protocol) services like PyLance to detect our source packages correctly,
 you should also configure ``PYTHONPATH`` to include the repository root's ``src`` directory and
@@ -233,7 +240,7 @@ Set the following keys in the workspace settings:
 
 .. warning::
 
-   When the target Python version has changed when you pull a new version/branch, you need to re-run ``./pants export ::``
+   When the target Python version has changed when you pull a new version/branch, you need to re-run ``./pants export``
    and manually update the Python interpreter path and mypy executable path configurations.
 
 Vim/NeoVim
@@ -275,7 +282,7 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
      "coc.preferences.formatOnType": true,
      "coc.preferences.formatOnSaveFiletypes": ["python"],
      "coc.preferences.willSaveHandlerTimeout": 5000,
-     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.8/bin/python",
+     "python.pythonPath": "dist/export/python/virtualenvs/python-default/3.10.9/bin/python",
      "python.formatting.provider": "black",
      "python.formatting.blackPath": "dist/export/python/virtualenvs/tools/black/bin/black",
      "python.sortImports.path": "dist/export/python/virtualenvs/tools/isort/bin/isort",
@@ -289,7 +296,7 @@ just like VSCode (see `the official reference <https://www.npmjs.com/package/coc
 Switching between branches
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-When each branch has different external package requirements, you should run ``./pants export ::``
+When each branch has different external package requirements, you should run ``./pants export``
 before running codes after ``git switch``-ing between such branches.
 
 Sometimes, you may experience bogus "glob" warning from pants because it sees a stale cache.
@@ -398,7 +405,7 @@ Writing documentation
 
   .. code-block:: console
 
-     $ pyenv virtualenv 3.10.8 venv-bai-docs
+     $ pyenv virtualenv 3.10.9 venv-bai-docs
 
 * Activate the virtualenv and run:
 
@@ -445,7 +452,7 @@ Adding new external dependencies
   .. code-block:: console
 
      $ ./pants generate-lockfiles
-     $ ./pants export ::
+     $ ./pants export
 
 Merging lockfile conflicts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -478,6 +485,15 @@ If Pants behaves strangely, you could simply reset all its runtime-generated fil
 
 After this, re-running any Pants command will automatically reinitialize itself and
 all cached data as necessary.
+
+Changing or updating the Python runtime for Pants
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you run ``scripts/install-dev.sh``, it automatically creates ``.pants.bootstrap``
+to explicitly set a specific pyenv Python version to run Pants.
+
+If you have removed/upgraded this specific Python version from pyenv, you also need to
+update ``.pants.bootstrap`` accordingly.
 
 .. _debugging-tests:
 

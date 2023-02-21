@@ -5,7 +5,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Sequence
 from uuid import UUID, uuid4
 
-import aiohttp
+import aiotools
 import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -16,6 +16,7 @@ from sqlalchemy.engine.result import Result
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql.expression import bindparam
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
@@ -25,6 +26,7 @@ from ai.backend.common.types import RedisConnectionInfo
 
 from ..api.exceptions import VFolderOperationFailed
 from .base import (
+    Base,
     EnumValueType,
     IDColumn,
     IPColumn,
@@ -32,7 +34,7 @@ from .base import (
     PaginatedList,
     batch_multiresult,
     batch_result,
-    metadata,
+    mapper_registry,
     set_if_set,
     simple_db_mutate,
     simple_db_mutate_returning_item,
@@ -40,15 +42,17 @@ from .base import (
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
 from .storage import StorageSessionManager
+from .utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
     from .gql import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__file__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 __all__: Sequence[str] = (
     "users",
+    "UserRow",
     "User",
     "UserList",
     "UserGroup",
@@ -104,7 +108,7 @@ INACTIVE_USER_STATUSES = (
 
 users = sa.Table(
     "users",
-    metadata,
+    mapper_registry.metadata,
     IDColumn("uuid"),
     sa.Column("username", sa.String(length=64), unique=True),
     sa.Column("email", sa.String(length=64), index=True, nullable=False, unique=True),
@@ -126,7 +130,16 @@ users = sa.Table(
     sa.Column("domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), index=True),
     sa.Column("role", EnumValueType(UserRole), default=UserRole.USER),
     sa.Column("allowed_client_ip", pgsql.ARRAY(IPColumn), nullable=True),
+    sa.Column("totp_key", sa.String(length=32)),
+    sa.Column("totp_activated", sa.Boolean),
 )
+
+
+class UserRow(Base):
+    __table__ = users
+    sessions = relationship("SessionRow", back_populates="user")
+    domain = relationship("DomainRow", back_populates="users")
+    groups = relationship("AssocGroupUserRow", back_populates="user")
 
 
 class UserGroup(graphene.ObjectType):
@@ -182,6 +195,7 @@ class User(graphene.ObjectType):
     domain_name = graphene.String()
     role = graphene.String()
     allowed_client_ip = graphene.List(lambda: graphene.String)
+    totp_activated = graphene.Boolean()
 
     groups = graphene.List(lambda: UserGroup)
 
@@ -216,6 +230,7 @@ class User(graphene.ObjectType):
             domain_name=row["domain_name"],
             role=row["role"],
             allowed_client_ip=row["allowed_client_ip"],
+            totp_activated=row["totp_activated"],
         )
 
     @classmethod
@@ -268,6 +283,7 @@ class User(graphene.ObjectType):
         "domain_name": ("domain_name", None),
         "role": ("role", lambda s: UserRole[s]),
         "allowed_client_ip": ("allowed_client_ip", None),
+        "totp_activated": ("totp_activated", None),
     }
 
     _queryorder_colmap = {
@@ -846,7 +862,7 @@ class PurgeUser(graphene.Mutation):
                     target_user_uuid=graph_ctx.user["uuid"],
                     target_user_email=graph_ctx.user["email"],
                 )
-            await cls.delete_vfolders(conn, user_uuid, graph_ctx.storage_manager)
+            await cls.delete_vfolders(graph_ctx.db, user_uuid, graph_ctx.storage_manager)
             await cls.delete_kernels(conn, user_uuid)
             await cls.delete_keypairs(conn, graph_ctx.redis_stat, user_uuid)
 
@@ -942,7 +958,7 @@ class PurgeUser(graphene.Mutation):
     @classmethod
     async def delete_vfolders(
         cls,
-        conn: SAConnection,
+        engine: ExtendedAsyncSAEngine,
         user_uuid: UUID,
         storage_manager: StorageSessionManager,
     ) -> int:
@@ -954,39 +970,33 @@ class PurgeUser(graphene.Mutation):
 
         :return: number of deleted rows
         """
-        from . import vfolder_permissions, vfolders
+        from . import VFolderDeletionInfo, initiate_vfolder_removal, vfolder_permissions, vfolders
 
-        await conn.execute(
-            vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
-        )
-        result = await conn.execute(
-            sa.select([vfolders.c.id, vfolders.c.host])
-            .select_from(vfolders)
-            .where(vfolders.c.user == user_uuid),
-        )
-        target_vfs = result.fetchall()
-        result = await conn.execute(
-            sa.delete(vfolders).where(vfolders.c.user == user_uuid),
-        )
-        for row in target_vfs:
-            try:
-                async with storage_manager.request(
-                    row["host"],
-                    "POST",
-                    "folder/delete",
-                    json={
-                        "volume": storage_manager.split_host(row["host"])[1],
-                        "vfid": str(row["id"]),
-                    },
-                    raise_for_status=True,
-                ):
-                    pass
-            except aiohttp.ClientResponseError:
-                log.error("error on deleting vfolder filesystem directory: {0}", row["id"])
-                raise VFolderOperationFailed
-        if result.rowcount > 0:
-            log.info("deleted {0} user's virtual folders ({1})", result.rowcount, user_uuid)
-        return result.rowcount
+        async with engine.begin_session() as conn:
+            await conn.execute(
+                vfolder_permissions.delete().where(vfolder_permissions.c.user == user_uuid),
+            )
+            result = await conn.execute(
+                sa.select([vfolders.c.id, vfolders.c.host])
+                .select_from(vfolders)
+                .where(vfolders.c.user == user_uuid),
+            )
+            target_vfs = result.fetchall()
+
+        storage_ptask_group = aiotools.PersistentTaskGroup()
+        try:
+            deleted_count = await initiate_vfolder_removal(
+                engine,
+                [VFolderDeletionInfo(vf["id"], vf["host"]) for vf in target_vfs],
+                storage_manager,
+                storage_ptask_group,
+            )
+        except VFolderOperationFailed as e:
+            log.error("error on deleting vfolder filesystem directory: {0}", e.extra_msg)
+            raise
+        if deleted_count > 0:
+            log.info("deleted {0} user's virtual folders ({1})", deleted_count, user_uuid)
+        return deleted_count
 
     @classmethod
     async def user_vfolder_mounted_to_active_kernels(
