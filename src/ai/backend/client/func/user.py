@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import textwrap
 import uuid
-from typing import Iterable, Sequence, Union
+from typing import Any, Iterable, Mapping, Sequence, Union
 
 from ai.backend.client.auth import AuthToken, AuthTokenTypes
 from ai.backend.client.output.fields import user_fields
@@ -78,7 +78,12 @@ class User(BaseFunction):
     @api_function
     @classmethod
     async def authorize(
-        cls, username: str, password: str, *, token_type: AuthTokenTypes = AuthTokenTypes.KEYPAIR
+        cls,
+        username: str,
+        password: str,
+        *,
+        extra_args: Mapping[str, Any] = {},
+        token_type: AuthTokenTypes = AuthTokenTypes.KEYPAIR,
     ) -> AuthToken:
         """
         Authorize the given credentials and get the API authentication token.
@@ -89,14 +94,15 @@ class User(BaseFunction):
         of authentication methods.
         """
         rqst = Request("POST", "/auth/authorize")
-        rqst.set_json(
-            {
-                "type": token_type.value,
-                "domain": api_session.get().config.domain,
-                "username": username,
-                "password": password,
-            }
-        )
+        body = {
+            "type": token_type.value,
+            "domain": api_session.get().config.domain,
+            "username": username,
+            "password": password,
+        }
+        for k, v in extra_args.items():
+            body[k] = v
+        rqst.set_json(body)
         async with rqst.fetch() as resp:
             data = await resp.json()
             return AuthToken(

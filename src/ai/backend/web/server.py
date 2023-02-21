@@ -32,7 +32,7 @@ from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 
 from . import __version__, user_agent
-from .auth import fill_x_forwarded_for_header_to_api_session, get_client_ip
+from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
 from .config import config_iv
 from .logging import BraceStyleAdapter
 from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
@@ -294,8 +294,14 @@ async def login_handler(request: web.Request) -> web.Response:
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
-            fill_x_forwarded_for_header_to_api_session(request, api_session)
-            token = await api_session.User.authorize(creds["username"], creds["password"])
+            fill_forwarding_hdrs_to_api_session(request, api_session)
+            extra_args = {}
+            extra_keys = set(creds.keys()) ^ {"username", "password"}
+            for extra_key in extra_keys:
+                extra_args[extra_key] = creds[extra_key]
+            token = await api_session.User.authorize(
+                creds["username"], creds["password"], extra_args=extra_args
+            )
             stored_token = {
                 "type": "keypair",
                 "access_key": token.content["access_key"],
@@ -412,7 +418,7 @@ async def token_login_handler(request: web.Request) -> web.Response:
         )
         assert anon_api_config.is_anonymous
         async with APISession(config=anon_api_config) as api_session:
-            fill_x_forwarded_for_header_to_api_session(request, api_session)
+            fill_forwarding_hdrs_to_api_session(request, api_session)
             # Instead of email and password, cookie token will be used for auth.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             token = await api_session.User.authorize("fake-email", "fake-pwd")
