@@ -375,8 +375,7 @@ async def enqueue_batch_task_result_update(
                 )
                 .select_from(kernels)
                 .where(
-                    # TODO: kernels.c.session_id
-                    (kernels.c.id == event.session_id),
+                    (kernels.c.session_id == event.session_id),
                 )
             )
             result = await conn.execute(query)
