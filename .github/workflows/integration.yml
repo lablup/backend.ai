@@ -47,7 +47,7 @@ jobs:
       # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
       with:
         pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-py${{ env.PROJECT_PYTHON_VERSION }}
+        gha-cache-key: pants-cache0-integration-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
         named-caches-hash: ${{ hashFiles('*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test

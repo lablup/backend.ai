@@ -8,7 +8,7 @@ from ai.backend.common.logging import BraceStyleAdapter
 
 from .base import BaseContainerRegistry
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class HarborRegistry_v1(BaseContainerRegistry):

@@ -813,8 +813,18 @@ configure_backendai() {
   chmod +x "${CLIENT_ADMIN_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" > "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
-  echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+
+  case $(basename $SHELL) in
+    fish)
+        echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+        echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+    ;;
+    *)
+        echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+        echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
+    ;;
+  esac
+
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
   echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="admin") | .email')'" >> "${CLIENT_ADMIN_CONF_FOR_SESSION}"
@@ -830,8 +840,18 @@ configure_backendai() {
   chmod +x "${CLIENT_DOMAINADMIN_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server a using cookie-based login session (admin)" > "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
-  echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+
+  case $(basename $SHELL) in
+    fish)
+        echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+        echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+    ;;
+    *)
+        echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+        echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
+    ;;
+  esac
+
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
   echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="domain-admin") | .email')'" >> "${CLIENT_DOMAINADMIN_CONF_FOR_SESSION}"
@@ -855,8 +875,18 @@ configure_backendai() {
   chmod +x "${CLIENT_USER2_CONF_FOR_API}"
   echo "# Indirectly access to the manager via the web server a using cookie-based login session (user)" > "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "export BACKEND_ENDPOINT=http://127.0.0.1:${WEBSERVER_PORT}" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
-  echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+
+  case $(basename $SHELL) in
+    fish)
+        echo "set -e BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+        echo "set -e BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+    ;;
+    *)
+        echo "unset BACKEND_ACCESS_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+        echo "unset BACKEND_SECRET_KEY" >> "${CLIENT_USER_CONF_FOR_SESSION}"
+    ;;
+  esac
+
   echo "export BACKEND_ENDPOINT_TYPE=session" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "echo 'Run backend.ai login to make an active session.'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
   echo "echo 'Username: $(cat fixtures/manager/example-keypairs.json | jq -r '.users[] | select(.username=="user") | .email')'" >> "${CLIENT_USER_CONF_FOR_SESSION}"
@@ -868,6 +898,9 @@ configure_backendai() {
   ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_ADMIN_CONF_FOR_API}@" ./env-tester-admin.sh
   ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_VENV=/home/user/.pyenv/versions/venv-dev-client@export BACKENDAI_TEST_CLIENT_VENV=${VENV_PATH}@" ./env-tester-user.sh
   ## sed_inplace "s@export BACKENDAI_TEST_CLIENT_ENV=/home/user/bai-dev/client-py/my-backend-session.sh@export BACKENDAI_TEST_CLIENT_ENV=${INSTALL_PATH}/client-py/${CLIENT_USER_CONF_FOR_API}@" ./env-tester-user.sh
+
+  show_info "Dumping the installed etcd configuration to ./dev.etcd.installed.json as a backup."
+  ./backend.ai mgr etcd get --prefix '' > ./dev.etcd.installed.json
 
   show_info "Installation finished."
   show_note "Check out the default API keypairs and account credentials for local development and testing:"

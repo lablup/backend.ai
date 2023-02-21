@@ -9,14 +9,14 @@ from uuid import UUID
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import BinarySize, HardwareMetadata
-from ai.backend.storage.abc import CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
+from ai.backend.storage.abc import CAP_FAST_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER
 from ai.backend.storage.types import FSPerfMetric, FSUsage, VFolderCreationOptions
 from ai.backend.storage.vfs import BaseVolume
 
 from .exceptions import WekaAPIError, WekaInitError, WekaNoMetricError, WekaNotFoundError
 from .weka_client import WekaAPIClient
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class WekaVolume(BaseVolume):
@@ -59,7 +59,7 @@ class WekaVolume(BaseVolume):
         )
 
     async def get_capabilities(self) -> FrozenSet[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
+        return frozenset([CAP_VFOLDER, CAP_QUOTA, CAP_METRIC, CAP_FAST_SIZE])
 
     async def get_hwinfo(self) -> HardwareMetadata:
         assert self._fs_uid is not None
@@ -160,3 +160,15 @@ class WekaVolume(BaseVolume):
         if not weka_path.startswith("/"):
             weka_path = "/" + weka_path
         await self.api_client.set_quota_v1(weka_path, inode_id, hard_limit=size_bytes)
+
+    async def get_used_bytes(self, vfid: UUID) -> BinarySize:
+        assert self._fs_uid is not None
+        vfpath = self.mangle_vfpath(vfid)
+        inode_id = await self._get_inode_id(vfpath)
+        try:
+            quota = await self.api_client.get_quota(self._fs_uid, inode_id)
+            if quota.used_bytes is None:
+                return BinarySize(-1)
+            return BinarySize(quota.used_bytes)
+        except WekaNotFoundError:
+            return BinarySize(-1)

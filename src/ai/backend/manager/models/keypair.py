@@ -80,8 +80,8 @@ keypairs = sa.Table(
     sa.Column("rate_limit", sa.Integer),
     sa.Column("num_queries", sa.Integer, server_default="0"),
     # SSH Keypairs.
-    sa.Column("ssh_public_key", sa.String(length=750), nullable=True),
-    sa.Column("ssh_private_key", sa.String(length=2000), nullable=True),
+    sa.Column("ssh_public_key", sa.Text, nullable=True),
+    sa.Column("ssh_private_key", sa.Text, nullable=True),
     ForeignKeyIDColumn("user", "users.uuid", nullable=False),
     sa.Column(
         "resource_policy",
@@ -602,6 +602,8 @@ def generate_ssh_keypair() -> Tuple[str, str]:
         )
         .decode("utf-8")
     )
+    public_key = f"{public_key.rstrip()}\n"
+    private_key = f"{private_key.rstrip()}\n"
     return (public_key, private_key)
 
 

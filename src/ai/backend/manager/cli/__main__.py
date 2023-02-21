@@ -16,6 +16,7 @@ from ai.backend.cli.types import ExitCode
 from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.types import LogSeverity
 from ai.backend.common.validators import TimeDuration
 
 from ..config import load as load_config
@@ -36,10 +37,16 @@ log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.cli"))
 @click.option(
     "--debug",
     is_flag=True,
-    help="Enable the debug mode and override the global log level to DEBUG.",
+    help="This option will soon change to --log-level TEXT option.",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice(LogSeverity, case_sensitive=False),
+    default=LogSeverity.INFO,
+    help="Choose logging level from... debug, info, warning, error, critical",
 )
 @click.pass_context
-def main(ctx, config_path, debug):
+def main(ctx, config_path, log_level, debug):
     """
     Manager Administration CLI
     """
