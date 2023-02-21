@@ -33,17 +33,17 @@ from ai.backend.common.events import (
     EventDispatcher,
     KernelCancelledEvent,
     KernelCreatingEvent,
+    KernelFailureEvent,
     KernelPreparingEvent,
     KernelPullingEvent,
     KernelStartedEvent,
+    KernelSuccessEvent,
     KernelTerminatedEvent,
     KernelTerminatingEvent,
     SessionCancelledEvent,
     SessionEnqueuedEvent,
-    SessionFailureEvent,
     SessionScheduledEvent,
     SessionStartedEvent,
-    SessionSuccessEvent,
     SessionTerminatedEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
@@ -354,7 +354,7 @@ async def enqueue_session_termination_status_update(
 async def enqueue_batch_task_result_update(
     app: web.Application,
     agent_id: AgentId,
-    event: SessionSuccessEvent | SessionFailureEvent,
+    event: KernelSuccessEvent | KernelFailureEvent,
 ) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["events.context"]
@@ -375,7 +375,7 @@ async def enqueue_batch_task_result_update(
                 )
                 .select_from(kernels)
                 .where(
-                    (kernels.c.id == event.session_id),
+                    (kernels.c.id == event.kernel_id),
                 )
             )
             result = await conn.execute(query)
@@ -414,8 +414,8 @@ async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
         SessionTerminatedEvent, app, enqueue_session_termination_status_update
     )
     event_dispatcher.subscribe(SessionCancelledEvent, app, enqueue_session_creation_status_update)
-    event_dispatcher.subscribe(SessionSuccessEvent, app, enqueue_batch_task_result_update)
-    event_dispatcher.subscribe(SessionFailureEvent, app, enqueue_batch_task_result_update)
+    event_dispatcher.subscribe(KernelSuccessEvent, app, enqueue_batch_task_result_update)
+    event_dispatcher.subscribe(KernelFailureEvent, app, enqueue_batch_task_result_update)
     root_ctx.background_task_manager.register_event_handlers(event_dispatcher)
     yield
 
