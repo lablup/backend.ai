@@ -61,6 +61,7 @@ from ai.backend.common.events import (
     SessionEnqueuedEvent,
     SessionStartedEvent,
     SessionTerminatedEvent,
+    SessionTerminatingEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
@@ -1640,9 +1641,15 @@ class AgentRegistry:
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.TERMINATING
                     )
+                    await self.event_producer.produce_event(
+                        SessionTerminatingEvent(session_id, reason),
+                    )
                 case _:
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.TERMINATING
+                    )
+                    await self.event_producer.produce_event(
+                        SessionTerminatingEvent(session_id, reason),
                     )
 
             kernel_list = target_session.kernels
@@ -2674,6 +2681,13 @@ class AgentRegistry:
             await self.event_producer.produce_event(
                 SessionTerminatedEvent(session_id, reason),
             )
+
+    async def mark_session_terminating(
+        self,
+        session_id: SessionId,
+        reason: str,
+    ) -> None:
+        pass
 
     async def mark_session_terminated(
         self,
