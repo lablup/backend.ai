@@ -19,8 +19,10 @@ def setproctitle(title):
     # setproctitle package doesn't work for unknown reasons
     # We don't need a portable implementation, so here is a Linux-only version
     import ctypes
+    import ctypes.util
 
-    libc = ctypes.CDLL("libc.so.6")
+    libc_path = ctypes.util.find_library("c")
+    libc = ctypes.CDLL(libc_path)
     PR_SET_NAME = 15
     title = ctypes.c_char_p(bytes(title, "utf-8"))
     libc.prctl(PR_SET_NAME, title)
