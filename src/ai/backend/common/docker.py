@@ -38,6 +38,7 @@ __all__ = (
     "default_repository",
     "docker_api_arch_aliases",
     "image_label_schema",
+    "inference_image_label_schema",
     "login",
     "get_known_registries",
     "is_known_registry",
@@ -89,8 +90,14 @@ image_label_schema = t.Dict(
         t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
         t.Key("ai.backend.accelerators", optional=True): tx.StringList(allow_blank=True),
         t.Key("ai.backend.service-ports", optional=True): tx.StringList(allow_blank=True),
-        t.Key("ai.backend.endpoint-ports", optional=True): tx.StringList(allow_blank=True),
-        t.Key("ai.backend.model-path", optional=True): tx.PurePath(),
+    }
+).allow_extra("*")
+
+inference_image_label_schema = t.Dict(
+    {
+        t.Key("ai.backend.endpoint-ports"): tx.StringList(allow_blank=True),
+        t.Key("ai.backend.model-path"): tx.PurePath(),
+        t.Key("ai.backend.model-format"): t.String(),
     }
 ).allow_extra("*")
 

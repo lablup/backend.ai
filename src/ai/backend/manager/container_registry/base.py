@@ -14,7 +14,12 @@ import trafaret as t
 import yarl
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef, arch_name_aliases, image_label_schema
+from ai.backend.common.docker import (
+    ImageRef,
+    arch_name_aliases,
+    image_label_schema,
+    inference_image_label_schema,
+)
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.logging import BraceStyleAdapter
@@ -252,7 +257,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
             try:
                 try:
-                    image_label_schema.check(manifest["labels"])
+                    _labels = image_label_schema.check(manifest["labels"])
+                    match _labels["ai.backend.role"]:
+                        case "INFERENCE":
+                            inference_image_label_schema.check(manifest["labels"])
+                        case _:
+                            pass
                 except t.DataError as e:
                     match e.as_dict():
                         case str() as error_msg:
