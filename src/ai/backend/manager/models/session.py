@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import logging
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from decimal import Decimal
@@ -23,14 +24,17 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
+from dateutil.tz.tz import tzfile
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import noload, relationship, selectinload
 
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
+    RedisConnectionInfo,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -71,6 +75,7 @@ from .group import GroupRow
 from .kernel import ComputeContainer, KernelRow, KernelStatus
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
+from .resource_usage import ResourceGroupUnit, ResourceUsageGroup
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -96,6 +101,8 @@ __all__ = (
     "InferenceSession",
     "InferenceSessionList",
 )
+
+log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.session"))
 
 
 class SessionStatus(enum.Enum):
@@ -710,6 +717,29 @@ class SessionRow(Base):
                 f"Session (id: {self.id}) has no kernel with {cluster_name = }.",
             )
         return kerns[0]
+
+    async def parse_session_resource_usage(
+        self,
+        redis_stat: RedisConnectionInfo,
+        local_tz: tzfile,
+    ) -> ResourceUsageGroup:
+        kernel_usages = await KernelRow.parse_container_resource_usage(
+            self.kernels, redis_stat, local_tz
+        )
+        session_usage = ResourceUsageGroup(
+            group_unit=ResourceGroupUnit.SESSION,
+            created_at=self.created_at,
+            user_id=self.user_uuid,
+            user_email=self.user.email,
+            access_key=self.access_key,
+            project_id=self.group_id,
+            project_name=self.group.name,
+            session_id=self.id,
+            session_name=self.name,
+            domain_name=self.domain_name,
+        )
+        session_usage.register_resource_group(kernel_usages)
+        return session_usage
 
     @staticmethod
     async def set_session_status(

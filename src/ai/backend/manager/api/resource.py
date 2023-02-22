@@ -7,9 +7,11 @@ import functools
 import json
 import logging
 import re
+from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Tuple
+from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Optional, Sequence, Tuple
+from uuid import UUID
 
 import aiohttp
 import aiohttp_cors
@@ -37,6 +39,7 @@ from ..models import (
     RESOURCE_USAGE_KERNEL_STATUSES,
     AgentStatus,
     KernelRow,
+    ResourceUsageGroup,
     SessionRow,
     agents,
     association_groups_users,
@@ -305,7 +308,12 @@ async def recalculate_usage(request: web.Request) -> web.Response:
     return web.json_response({}, status=200)
 
 
-async def get_stats_for_period(request: web.Request, start_date, end_date, group_ids=None):
+async def get_stats_for_period(
+    request: web.Request,
+    start_date: datetime,
+    end_date: datetime,
+    group_ids: Optional[Sequence[UUID]] = None,
+):
     """
     Returns the usage statistics of sessions used within a given time period, group_ids, aggregated by group.
     """
@@ -356,7 +364,12 @@ async def get_stats_for_period(request: web.Request, start_date, end_date, group
     return list(objs_per_group.values())
 
 
-async def get_session_stats_for_period(request: web.Request, start_date, end_date, group_ids=None):
+async def get_session_stats_for_period(
+    request: web.Request,
+    start_date: datetime,
+    end_date: datetime,
+    group_ids: Optional[Sequence[UUID]] = None,
+):
     """
     Returns usage statistics for sessions used within a given time period, group_ids.
     """
@@ -622,7 +635,10 @@ async def get_container_stats_by_session_id(request: web.Request, session_id):
 
 
 async def get_container_stats_for_period(
-    request: web.Request, start_date, end_date, group_ids=None
+    request: web.Request,
+    start_date: datetime,
+    end_date: datetime,
+    group_ids: Optional[Sequence[UUID]] = None,
 ):
     root_ctx: RootContext = request.app["_root.context"]
     async with root_ctx.db.begin_readonly() as conn:
@@ -801,6 +817,30 @@ async def get_container_stats_for_period(
             objs_per_group[group_id]["g_gpu_allocated"] += c_info["gpu_allocated"]
             objs_per_group[group_id]["c_infos"].append(c_info)
     return list(objs_per_group.values())
+
+
+def jsonify_resource_usage_group(usage_group: ResourceUsageGroup) -> dict[str, Any]:
+    belonged_infos = defaultdict(list)
+    for g in usage_group.belonged_usage_groups:
+        belonged_infos[f"{g.group_unit.value}_infos"].append(jsonify_resource_usage_group(g))
+    return {
+        "user_id": usage_group.user_id,
+        "user_email": usage_group.user_email,
+        "access_key": usage_group.access_key,
+        "project_id": usage_group.project_id,
+        "project_name": usage_group.project_name,
+        "group_id": usage_group.project_id,  # legacy
+        "group_name": usage_group.project_name,  # legacy
+        "kernel_id": usage_group.kernel_id,
+        "container_id": usage_group.container_id,
+        "session_id": usage_group.session_id,
+        "session_name": usage_group.session_name,
+        "domain_name": usage_group.domain_name,
+        "agents": usage_group.total_usage.agent_ids,
+        "group_unit": usage_group.group_unit.value,
+        "total_usage": usage_group.total_usage.to_json(),
+        **belonged_infos,
+    }
 
 
 @server_status_required(READ_ALLOWED)
