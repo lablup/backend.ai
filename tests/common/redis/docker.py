@@ -145,7 +145,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
             await asyncio.get_running_loop().run_in_executor(None, _copy_files)
             compose_cfg = snap_compose_dir / "redis-cluster.yml"
 
-        async with FileLock(Path("/tmp/bai-test-port-alloc.lock", debug=True)):
+        async with FileLock(Path("/tmp/bai-test-port-alloc.lock", debug=True, timeout=30)):
 
             async def _get_free_port() -> int:
                 return await asyncio.get_running_loop().run_in_executor(None, get_free_port)
@@ -159,7 +159,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 "REDIS_SENTINEL3_PORT": await _get_free_port(),
             }
             os.environ.update({k: str(v) for k, v in ports.items()})
-            os.environ["DOCKER_BUILDKIT"] = "0"
+            os.environ["DOCKER_BUILDKIT"] = "0"  # ref: https://stackoverflow.com/q/73240283
             async with async_timeout.timeout(30.0):
                 p = await simple_run_cmd(
                     [

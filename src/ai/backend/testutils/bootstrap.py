@@ -25,7 +25,7 @@ def get_free_port():
 
 
 @contextlib.contextmanager
-def sync_file_lock(path: Path, max_retries: int = 30, retry_interval: int = 5):
+def sync_file_lock(path: Path, max_retries: int = 60, retry_interval: int = 2):
     if not path.exists():
         path.touch()
     file = open(path, "rb")
