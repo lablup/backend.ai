@@ -78,7 +78,7 @@ async def list_serve(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
     project_id = params["project_id"]
 
-    log.info("SERVE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
+    log.info("SERVICE.LIST (email:{}, ak:{})", request["user"]["email"], access_key)
 
     async with root_ctx.db.begin_readonly_session() as db_sess:
         j = sa.join(SessionRow, RoutingRow, SessionRow.id == RoutingRow.session).join(
@@ -112,7 +112,7 @@ async def get_info(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
 
-    log.info("SERVE.GET_INFO (email:{}, ak:{})", request["user"]["email"], access_key)
+    log.info("SERVICE.GET_INFO (email:{}, ak:{})", request["user"]["email"], access_key)
 
     async with root_ctx.db.begin_readonly_session() as db_sess:
         j = sa.join(SessionRow, RoutingRow, SessionRow.id == RoutingRow.session).join(
@@ -177,7 +177,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
     async with root_ctx.db.begin_readonly() as db_conn:
         owner_uuid, group_id, resource_policy = await query_userinfo(request, params, db_conn)
 
-    log.info("SERVE.CREATE (email:{}, ak:{})", request["user"]["email"], access_key)
+    log.info("SERVICE.CREATE (email:{}, ak:{})", request["user"]["email"], access_key)
     resp: MutableMapping[str, Any] = {}
 
     # Resolve the image reference.
@@ -445,7 +445,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 async def start(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
 
-    log.info("SERVE.START (email:{}, ak:{})", request["user"]["email"], access_key)
+    log.info("SERVICE.START (email:{}, ak:{})", request["user"]["email"], access_key)
     return web.Response(status=204)
 
 
@@ -461,7 +461,7 @@ async def start(request: web.Request, params: Any) -> web.Response:
 async def stop(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
 
-    log.info("SERVE.STOP (email:{}, ak:{})", request["user"]["email"], access_key)
+    log.info("SERVICE.STOP (email:{}, ak:{})", request["user"]["email"], access_key)
     return web.Response(status=204)
 
 
@@ -478,7 +478,7 @@ async def stop(request: web.Request, params: Any) -> web.Response:
 async def invoke_serving(request: web.Request, params: Any) -> web.Response:
     access_key = request["keypair"]["access_key"]
 
-    log.info("SERVE.INVOKE (email:{}, ak:{})", request["user"]["email"], access_key)
+    log.info("SERVICE.INVOKE (email:{}, ak:{})", request["user"]["email"], access_key)
     return web.Response(status=204)
 
 
@@ -497,7 +497,7 @@ async def delete(request: web.Request, params: Any) -> web.Response:
     # session_name = request.match_info["session_name"]
     service_id = params["service_id"]
 
-    log.info("SERVE.DELETE (email:{}, ak:{})", request["user"]["email"], access_key)
+    log.info("SERVICE.DELETE (email:{}, ak:{})", request["user"]["email"], access_key)
 
     requester_access_key, owner_access_key = await get_access_key_scopes(request, params)
     if requester_access_key != owner_access_key and request["user"]["role"] not in (
