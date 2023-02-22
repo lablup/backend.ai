@@ -102,6 +102,7 @@ from ..models import (
     AgentStatus,
     KernelRow,
     KernelStatus,
+    RoutingRow,
     SessionRow,
     SessionStatus,
     UserRole,
@@ -321,7 +322,7 @@ def drop(d, dropval):
     return newd
 
 
-async def _query_userinfo(
+async def query_userinfo(
     request: web.Request,
     params: Any,
     conn: SAConnection,
@@ -457,6 +458,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
 
     # Check work directory and reserved name directory.
     mount_map = params["config"].get("mount_map")
+
     if mount_map is not None:
         original_folders = mount_map.keys()
         alias_folders = mount_map.values()
@@ -561,7 +563,7 @@ async def _create(request: web.Request, params: dict[str, Any]) -> web.Response:
     session_creation_tracker[session_creation_id] = start_event
 
     async with root_ctx.db.begin_readonly() as conn:
-        owner_uuid, group_id, resource_policy = await _query_userinfo(request, params, conn)
+        owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
         # Use keypair bootstrap_script if it is not delivered as a parameter
         if not params["bootstrap_script"]:
@@ -779,6 +781,8 @@ async def create_from_template(request: web.Request, params: dict[str, Any]) -> 
         param_from_template["session_type"] = SessionTypes.INTERACTIVE
     elif template["spec"]["session_type"] == "batch":
         param_from_template["session_type"] = SessionTypes.BATCH
+    elif template["spec"]["session_type"] == "inference":
+        param_from_template["session_type"] = SessionTypes.INFERENCE
 
     # TODO: Remove `type: ignore` when mypy supports type inference for walrus operator
     # Check https://github.com/python/mypy/issues/7316
@@ -1040,6 +1044,8 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
             kernel_config["sess_type"] = SessionTypes.INTERACTIVE
         elif template["spec"]["sess_type"] == "batch":
             kernel_config["sess_type"] = SessionTypes.BATCH
+        elif template["spec"]["sess_type"] == "inference":
+            kernel_config["sess_type"] = SessionTypes.INFERENCE
 
         if tag := template["metadata"].get("tag", None):
             kernel_config["tag"] = tag
@@ -1119,7 +1125,7 @@ async def create_cluster(request: web.Request, params: dict[str, Any]) -> web.Re
 
     try:
         async with root_ctx.db.begin_readonly() as conn:
-            owner_uuid, group_id, resource_policy = await _query_userinfo(request, params, conn)
+            owner_uuid, group_id, resource_policy = await query_userinfo(request, params, conn)
 
         session_id = await asyncio.shield(
             app_ctx.database_ptask_group.create_task(
@@ -1492,6 +1498,9 @@ async def handle_kernel_creation_lifecycle(
         # post_create_kernel() coroutines are waiting for the creation tracker events to be set.
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
             tracker.set_result(None)
+        if (endpoint_id := event.creation_info.get("endpoint_id")) is not None:
+            session_id = event.creation_info.get("session_id")
+            await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(session_id))
     elif isinstance(event, KernelCancelledEvent):
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
             tracker.cancel()
