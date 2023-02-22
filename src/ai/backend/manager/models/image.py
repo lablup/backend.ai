@@ -631,7 +631,7 @@ class Image(graphene.ObjectType):
     ) -> Sequence[Image]:
         async with ctx.db.begin_readonly_session() as session:
             rows = await ImageRow.list(session, load_aliases=True)
-        items = [gen async for gen in cls.bulk_load(ctx, rows)]
+        items = [item async for item in cls.bulk_load(ctx, rows)]
         # Convert to GQL objects
         if is_installed is not None:
             items = [*filter(lambda item: item.installed == is_installed, items)]

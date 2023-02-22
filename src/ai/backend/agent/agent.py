@@ -383,21 +383,20 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     artifacts[m.group(1)] = p.name
             return artifacts
 
-        suexec_candidates = find_artifacts(f"su-exec.*.{arch}.bin")
-        _, suexec_candidate = match_distro_data(suexec_candidates, distro)
-        suexec_path = self.resolve_krunner_filepath("runner/" + suexec_candidate)
+        def mount_versioned_binary(candidate_glob: str, target_path: str) -> None:
+            candidates = find_artifacts(candidate_glob)
+            _, candidate = match_distro_data(candidates, distro)
+            resolved_path = self.resolve_krunner_filepath("runner/" + candidate)
+            _mount(MountTypes.BIND, resolved_path, target_path)
 
-        hook_candidates = find_artifacts(f"libbaihook.*.{arch}.so")
-        _, hook_candidate = match_distro_data(hook_candidates, distro)
-        hook_path = self.resolve_krunner_filepath("runner/" + hook_candidate)
-
-        sftp_server_candidates = find_artifacts(f"sftp-server.*.{arch}.bin")
-        _, sftp_server_candidate = match_distro_data(sftp_server_candidates, distro)
-        sftp_server_path = self.resolve_krunner_filepath("runner/" + sftp_server_candidate)
-
-        scp_candidates = find_artifacts(f"scp.*.{arch}.bin")
-        _, scp_candidate = match_distro_data(scp_candidates, distro)
-        scp_path = self.resolve_krunner_filepath("runner/" + scp_candidate)
+        mount_versioned_binary(f"su-exec.*.{arch}.bin", "/opt/kernel/su-exec")
+        mount_versioned_binary(f"libbaihook.*.{arch}.so", "/opt/kernel/libbaihook.so")
+        mount_versioned_binary(f"sftp-server.*.{arch}.bin", "/opt/kernel/sftp-server")
+        mount_versioned_binary(f"scp.*.{arch}.bin", "/opt/kernel/scp")
+        mount_versioned_binary(f"dropbear.*.{arch}.bin", "/opt/kernel/dropbear")
+        mount_versioned_binary(f"dropbearconvert.*.{arch}.bin", "/opt/kernel/dropbearconvert")
+        mount_versioned_binary(f"dropbearkey.*.{arch}.bin", "/opt/kernel/dropbearkey")
+        mount_versioned_binary(f"tmux.*.{arch}.bin", "/opt/kernel/tmux")
 
         jail_path: Optional[Path]
         if self.local_config["container"]["sandbox-type"] == "jail":
@@ -407,18 +406,6 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         else:
             jail_path = None
 
-        kernel_pkg_path = self.resolve_krunner_filepath("kernel")
-        helpers_pkg_path = self.resolve_krunner_filepath("helpers")
-        dropbear_path = self.resolve_krunner_filepath(
-            f"runner/dropbear.{matched_libc_style}.{arch}.bin"
-        )
-        dropbearconv_path = self.resolve_krunner_filepath(
-            f"runner/dropbearconvert.{matched_libc_style}.{arch}.bin"
-        )
-        dropbearkey_path = self.resolve_krunner_filepath(
-            f"runner/dropbearkey.{matched_libc_style}.{arch}.bin"
-        )
-        tmux_path = self.resolve_krunner_filepath(f"runner/tmux.{matched_libc_style}.{arch}.bin")
         dotfile_extractor_path = self.resolve_krunner_filepath("runner/extract_dotfiles.py")
         persistent_files_warning_doc_path = self.resolve_krunner_filepath(
             "runner/DO_NOT_STORE_PERSISTENT_FILES_HERE.md"
@@ -435,19 +422,11 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         _mount(MountTypes.BIND, dotfile_extractor_path, "/opt/kernel/extract_dotfiles.py")
         _mount(MountTypes.BIND, entrypoint_sh_path, "/opt/kernel/entrypoint.sh")
-        _mount(MountTypes.BIND, suexec_path, "/opt/kernel/su-exec")
         _mount(MountTypes.BIND, fantompass_path, "/opt/kernel/fantompass.py")
         _mount(MountTypes.BIND, hash_phrase_path, "/opt/kernel/hash_phrase.py")
         _mount(MountTypes.BIND, words_json_path, "/opt/kernel/words.json")
         if jail_path is not None:
             _mount(MountTypes.BIND, jail_path, "/opt/kernel/jail")
-        _mount(MountTypes.BIND, hook_path, "/opt/kernel/libbaihook.so")
-        _mount(MountTypes.BIND, dropbear_path, "/opt/kernel/dropbear")
-        _mount(MountTypes.BIND, dropbearconv_path, "/opt/kernel/dropbearconvert")
-        _mount(MountTypes.BIND, dropbearkey_path, "/opt/kernel/dropbearkey")
-        _mount(MountTypes.BIND, tmux_path, "/opt/kernel/tmux")
-        _mount(MountTypes.BIND, sftp_server_path, "/usr/libexec/sftp-server")
-        _mount(MountTypes.BIND, scp_path, "/usr/bin/scp")
         _mount(
             MountTypes.BIND,
             persistent_files_warning_doc_path,
@@ -456,6 +435,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         _mount(MountTypes.VOLUME, krunner_volume, "/opt/backend.ai")
         pylib_path = f"/opt/backend.ai/lib/python{krunner_pyver}/site-packages/"
+        kernel_pkg_path = self.resolve_krunner_filepath("kernel")
+        helpers_pkg_path = self.resolve_krunner_filepath("helpers")
         _mount(MountTypes.BIND, kernel_pkg_path, pylib_path + "ai/backend/kernel")
         _mount(MountTypes.BIND, helpers_pkg_path, pylib_path + "ai/backend/helpers")
         environ["LD_PRELOAD"] = "/opt/kernel/libbaihook.so"
@@ -1280,6 +1261,10 @@ class AbstractAgent(
                     kernel_obj.agent_config = self.local_config
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.__ainit__()
+        except EOFError:
+            log.warning(
+                "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
+            )
         except FileNotFoundError:
             pass
         async with self.resource_lock:
@@ -2038,3 +2023,7 @@ class AbstractAgent(
             log.debug("saved {}", last_registry_file)
         except Exception as e:
             log.exception("unable to save {}", last_registry_file, exc_info=e)
+            try:
+                os.remove(var_base_path / last_registry_file)
+            except FileNotFoundError:
+                pass
