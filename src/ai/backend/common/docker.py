@@ -97,7 +97,7 @@ common_image_label_schema = t.Dict(
 
 inference_image_label_schema = t.Dict(
     {
-        t.Key("ai.backend.endpoint-ports"): tx.StringList(),
+        t.Key("ai.backend.endpoint-ports"): tx.StringList(min_length=1),
         t.Key("ai.backend.model-path"): tx.PurePath(),
         t.Key("ai.backend.model-format"): t.String(),
     }
