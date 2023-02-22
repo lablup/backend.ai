@@ -70,7 +70,7 @@ docker_api_arch_aliases: Final[Mapping[str, str]] = {
     "386": "386",
 }
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-undefined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 default_registry = "index.docker.io"
 default_repository = "lablup"
