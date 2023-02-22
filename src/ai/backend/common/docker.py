@@ -31,13 +31,16 @@ from .etcd import quote as etcd_quote
 from .etcd import unquote as etcd_unquote
 from .exception import InvalidImageName, InvalidImageTag, UnknownImageRegistry
 from .logging import BraceStyleAdapter
+from .service_ports import parse_service_ports
 
 __all__ = (
     "arch_name_aliases",
     "default_registry",
     "default_repository",
     "docker_api_arch_aliases",
-    "image_label_schema",
+    "common_image_label_schema",
+    "inference_image_label_schema",
+    "validate_image_labels",
     "login",
     "get_known_registries",
     "is_known_registry",
@@ -67,7 +70,7 @@ docker_api_arch_aliases: Final[Mapping[str, str]] = {
     "386": "386",
 }
 
-log = BraceStyleAdapter(logging.Logger("ai.backend.common.docker"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 default_registry = "index.docker.io"
 default_repository = "lablup"
@@ -75,7 +78,7 @@ default_repository = "lablup"
 MIN_KERNELSPEC = 1
 MAX_KERNELSPEC = 1
 
-image_label_schema = t.Dict(
+common_image_label_schema = t.Dict(
     {
         # Required labels
         t.Key("ai.backend.kernelspec"): t.ToInt(lte=MAX_KERNELSPEC, gte=MIN_KERNELSPEC),
@@ -89,10 +92,16 @@ image_label_schema = t.Dict(
         t.Key("ai.backend.envs.corecount", optional=True): tx.StringList(allow_blank=True),
         t.Key("ai.backend.accelerators", optional=True): tx.StringList(allow_blank=True),
         t.Key("ai.backend.service-ports", optional=True): tx.StringList(allow_blank=True),
-        t.Key("ai.backend.endpoint-ports", optional=True): tx.StringList(allow_blank=True),
-        t.Key("ai.backend.model-path", optional=True): tx.PurePath(),
     }
 ).allow_extra("*")
+
+inference_image_label_schema = t.Dict(
+    {
+        t.Key("ai.backend.endpoint-ports"): tx.StringList(min_length=1),
+        t.Key("ai.backend.model-path"): tx.PurePath(),
+        t.Key("ai.backend.model-format"): t.String(),
+    }
+).ignore_extra("*")
 
 
 def get_docker_connector() -> tuple[yarl.URL, aiohttp.BaseConnector]:
@@ -240,6 +249,30 @@ async def get_registry_info(etcd: AsyncEtcd, name: str) -> Tuple[yarl.URL, dict]
     if password is not None:
         creds["password"] = password
     return yarl.URL(registry_addr), creds
+
+
+def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
+    common_labels = common_image_label_schema.check(labels)
+    service_ports = {
+        item["name"]: item
+        for item in parse_service_ports(common_labels.get("ai.backend.service-ports", ""))
+    }
+    match common_labels["ai.backend.role"]:
+        case "INFERENCE":
+            inference_labels = inference_image_label_schema.check(labels)
+            for name in inference_labels["ai.backend.endpoint-ports"]:
+                if name not in service_ports:
+                    raise ValueError(
+                        f"ai.backend.endpoint-ports contains an undefined service port: {name}"
+                    )
+                # inference images should launch the serving daemons when they start as a container.
+                # TODO: enforce this restriction??
+                if service_ports[name]["protocol"] != "preopen":
+                    raise ValueError(f"The endpoint-port {name} must be a preopen service-port.")
+            common_labels.update(inference_labels)
+        case _:
+            pass
+    return common_labels
 
 
 class PlatformTagSet(Mapping):

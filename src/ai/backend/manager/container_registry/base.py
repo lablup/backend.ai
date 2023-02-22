@@ -14,8 +14,9 @@ import trafaret as t
 import yarl
 
 from ai.backend.common.bgtask import ProgressReporter
-from ai.backend.common.docker import ImageRef, arch_name_aliases, image_label_schema
+from ai.backend.common.docker import ImageRef, arch_name_aliases
 from ai.backend.common.docker import login as registry_login
+from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.models.image import ImageRow, ImageType
@@ -252,7 +253,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
             try:
                 try:
-                    image_label_schema.check(manifest["labels"])
+                    validate_image_labels(manifest["labels"])
                 except t.DataError as e:
                     match e.as_dict():
                         case str() as error_msg:
@@ -261,6 +262,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             skip_reason = "; ".join(
                                 f"{field} {reason}" for field, reason in error_data.items()
                             )
+                    continue
+                except ValueError as e:
+                    skip_reason = str(e)
                     continue
                 update_key = ImageRef(
                     f"{self.registry_name}/{image}:{tag}",
