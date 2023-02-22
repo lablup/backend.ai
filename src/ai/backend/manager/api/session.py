@@ -27,7 +27,6 @@ from typing import (
     Optional,
     Set,
     Tuple,
-    Type,
     Union,
     cast,
 )
@@ -59,7 +58,6 @@ from ai.backend.common import redis_helper
 from ai.backend.common import validators as tx
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events import (
-    AbstractEvent,
     AgentHeartbeatEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
@@ -1654,27 +1652,12 @@ async def invoke_session_callback(
         _make_session_callback(data, url),
     )
     """
-    session_status_event_map: Mapping[Type[AbstractEvent], str] = {
-        SessionEnqueuedEvent: "PENDING",
-        SessionScheduledEvent: "SCHEDULED",
-        SessionPreparingEvent: "PREPARING",
-        SessionStartedEvent: "RUNNING",
-        SessionCancelledEvent: "CANCELLED",
-        SessionTerminatingEvent: "TERMINATING",
-        SessionTerminatedEvent: "TERMINATED",
-    }
-    session_result_event_map: Mapping[Type[AbstractEvent], str] = {
-        SessionSuccessEvent: "SUCCESS",
-        SessionFailureEvent: "FAILURE",
-    }
     data = {
         "type": "session_lifecycle",
         "event": event.name.removeprefix("session_"),
         "session_id": str(event.session_id),
         "when": datetime.now(tzutc()).isoformat(),
         "token": url.query.get("token"),
-        "status": session_status_event_map.get(type(event), ""),
-        "result": session_result_event_map.get(type(event), ""),
     }
 
     stream_key = "events"
