@@ -61,6 +61,7 @@ from ai.backend.common.events import (
     SessionEnqueuedEvent,
     SessionStartedEvent,
     SessionTerminatedEvent,
+    SessionTerminatingEvent,
 )
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
@@ -1640,9 +1641,15 @@ class AgentRegistry:
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.TERMINATING
                     )
+                    await self.event_producer.produce_event(
+                        SessionTerminatingEvent(session_id, reason),
+                    )
                 case _:
                     await SessionRow.set_session_status(
                         self.db, session_id, SessionStatus.TERMINATING
+                    )
+                    await self.event_producer.produce_event(
+                        SessionTerminatingEvent(session_id, reason),
                     )
 
             kernel_list = target_session.kernels
@@ -2074,6 +2081,7 @@ class AgentRegistry:
                 keepalive_timeout=self.rpc_keepalive_timeout,
             ) as rpc:
                 return await rpc.call.execute(
+                    str(session.id),
                     str(session.main_kernel.id),
                     major_api_version,
                     run_id,
@@ -2163,13 +2171,10 @@ class AgentRegistry:
     async def download_file(
         self,
         session: SessionRow,
-        access_key: AccessKey,
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel
-        async with handle_session_exception(
-            self.db, "download_file", kernel.session_id, access_key
-        ):
+        async with handle_session_exception(self.db, "download_file", kernel.session_id):
             async with RPCContext(
                 kernel.agent,
                 kernel.agent_addr,
@@ -2186,9 +2191,7 @@ class AgentRegistry:
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel
-        async with handle_session_exception(
-            self.db, "download_single", kernel.session_id, access_key
-        ):
+        async with handle_session_exception(self.db, "download_single", kernel.session_id):
             async with RPCContext(
                 kernel.agent,
                 kernel.agent_addr,
@@ -2678,6 +2681,13 @@ class AgentRegistry:
             await self.event_producer.produce_event(
                 SessionTerminatedEvent(session_id, reason),
             )
+
+    async def mark_session_terminating(
+        self,
+        session_id: SessionId,
+        reason: str,
+    ) -> None:
+        pass
 
     async def mark_session_terminated(
         self,

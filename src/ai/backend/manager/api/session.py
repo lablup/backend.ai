@@ -80,6 +80,7 @@ from ai.backend.common.events import (
     SessionStartedEvent,
     SessionSuccessEvent,
     SessionTerminatedEvent,
+    SessionTerminatingEvent,
 )
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
@@ -1538,14 +1539,16 @@ async def handle_session_creation_lifecycle(
 async def handle_session_termination_lifecycle(
     app: web.Application,
     agent_id: AgentId,
-    event: SessionTerminatedEvent,
+    event: SessionTerminatingEvent | SessionTerminatedEvent,
 ) -> None:
     """
     Update the database according to the session-level lifecycle events
     published by the manager.
     """
     root_ctx: RootContext = app["_root.context"]
-    if isinstance(event, SessionTerminatedEvent):
+    if isinstance(event, SessionTerminatingEvent):
+        await root_ctx.registry.mark_session_terminating(event.session_id, event.reason)
+    elif isinstance(event, SessionTerminatedEvent):
         await root_ctx.registry.mark_session_terminated(event.session_id, event.reason)
 
 
@@ -1625,6 +1628,7 @@ async def invoke_session_callback(
     | SessionPreparingEvent
     | SessionStartedEvent
     | SessionCancelledEvent
+    | SessionTerminatingEvent
     | SessionTerminatedEvent
     | SessionSuccessEvent
     | SessionFailureEvent,
@@ -2647,6 +2651,12 @@ async def init(app: web.Application) -> None:
         name="api.session.kterm",
     )
     evd.consume(
+        SessionTerminatingEvent,
+        app,
+        handle_session_termination_lifecycle,
+        name="api.session.sterming",
+    ),
+    evd.consume(
         SessionTerminatedEvent,
         app,
         handle_session_termination_lifecycle,
@@ -2657,6 +2667,7 @@ async def init(app: web.Application) -> None:
     evd.consume(SessionPreparingEvent, app, invoke_session_callback)
     evd.consume(SessionStartedEvent, app, invoke_session_callback)
     evd.consume(SessionCancelledEvent, app, invoke_session_callback)
+    evd.consume(SessionTerminatingEvent, app, invoke_session_callback)
     evd.consume(SessionTerminatedEvent, app, invoke_session_callback)
     evd.consume(SessionSuccessEvent, app, invoke_session_callback)
     evd.consume(SessionFailureEvent, app, invoke_session_callback)
