@@ -17,8 +17,7 @@ from ai.backend.common.bgtask import ProgressReporter
 from ai.backend.common.docker import (
     ImageRef,
     arch_name_aliases,
-    image_label_schema,
-    inference_image_label_schema,
+    validate_image_labels,
 )
 from ai.backend.common.docker import login as registry_login
 from ai.backend.common.exception import InvalidImageName, InvalidImageTag
@@ -257,12 +256,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
             try:
                 try:
-                    _labels = image_label_schema.check(manifest["labels"])
-                    match _labels["ai.backend.role"]:
-                        case "INFERENCE":
-                            inference_image_label_schema.check(manifest["labels"])
-                        case _:
-                            pass
+                    validate_image_labels(manifest["labels"])
                 except t.DataError as e:
                     match e.as_dict():
                         case str() as error_msg:
@@ -271,6 +265,9 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             skip_reason = "; ".join(
                                 f"{field} {reason}" for field, reason in error_data.items()
                             )
+                    continue
+                except ValueError as e:
+                    skip_reason = str(e)
                     continue
                 update_key = ImageRef(
                     f"{self.registry_name}/{image}:{tag}",
