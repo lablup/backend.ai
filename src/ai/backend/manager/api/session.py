@@ -1503,7 +1503,6 @@ async def handle_kernel_termination_lifecycle(
     source: AgentId,
     event: KernelTerminatingEvent | KernelTerminatedEvent,
 ) -> None:
-    log.info("KERNEL_TERMINATION_LIFECYCLE (source:{}, event:{})", source, event)
     root_ctx: RootContext = app["_root.context"]
     if isinstance(event, KernelTerminatingEvent):
         # The destroy_kernel() API handler will set the "TERMINATING" status.
@@ -1545,10 +1544,8 @@ async def handle_session_termination_lifecycle(
     Update the database according to the session-level lifecycle events
     published by the manager.
     """
-    log.info("SESSION_TERMINATION_LIFECYCLE (agent:{}, event:{})", agent_id, event)
     root_ctx: RootContext = app["_root.context"]
     if isinstance(event, SessionTerminatedEvent):
-        # TODO
         await root_ctx.registry.mark_session_terminated(event.session_id, event.reason)
 
 
@@ -1629,39 +1626,26 @@ async def invoke_session_callback(
     | SessionStartedEvent
     | SessionCancelledEvent
     | SessionTerminatedEvent
-    | SessionSuccessEvent  # Kernel Id
-    | SessionFailureEvent,  # Kernel Id
+    | SessionSuccessEvent
+    | SessionFailureEvent,
 ) -> None:
     log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
     # app_ctx: PrivateContext = app["session.context"]
     root_ctx: RootContext = app["_root.context"]
-    if isinstance(event, (SessionSuccessEvent, SessionFailureEvent)):
+    try:
         async with root_ctx.db.begin_readonly_session() as db_sess:
-            query = sa.select(kernels).where(kernels.c.id == event.session_id)
-            result = await db_sess.execute(query)
-            # log.info("INVOKE_SESSION_CALLBACK (result:{})", result)
-            if kernel := result.first():
-                log.info("INVOKE_SESSION_CALLBACK (kernel:{})", kernel)
-                session_id = kernel.session_id
-                url = kernel.callback_url
-            else:
-                return
-    else:
-        try:
-            async with root_ctx.db.begin_readonly_session() as db_sess:
-                session = await SessionRow.get_session_with_main_kernel(
-                    event.session_id, db_session=db_sess
-                )
-                session_id = session.id
-                url = session.callback_url
-        except SessionNotFound:
-            return
+            session = await SessionRow.get_session_with_main_kernel(
+                event.session_id, db_session=db_sess
+            )
+    except SessionNotFound:
+        return
+    url = session.callback_url
     if url is None:
         return
     data = {
         "type": "session_lifecycle",
         "event": event.name.removeprefix("session_"),
-        "session_id": str(session_id),
+        "session_id": str(event.session_id),
         "when": datetime.now(tzutc()).isoformat(),
         "token": url.query.get("token"),
         "status": "",
@@ -1684,11 +1668,13 @@ async def invoke_session_callback(
     elif isinstance(event, SessionTerminatedEvent):
         data["status"] = "TERMINATED"
     elif isinstance(event, SessionSuccessEvent):
-        data["status"] = "TERMINATING"
-        # result = "SUCCESS"
+        # data["status"] = "PREPARING"
+        # result = "SUCCEED"
+        pass
     elif isinstance(event, SessionFailureEvent):
-        data["status"] = "TERMINATING"
-        # result = "FAILURE"
+        # data["status"] = "PREPARING"
+        # result = "FAILED"
+        pass
 
     stream_key = "events"
     try:
