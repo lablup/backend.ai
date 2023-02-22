@@ -1653,6 +1653,7 @@ async def invoke_session_callback(
         "when": datetime.now(tzutc()).isoformat(),
         "token": url.query.get("token"),
         "status": "",
+        "result": "",
     }
     """
     app_ctx.webhook_ptask_group.create_task(
@@ -1668,17 +1669,15 @@ async def invoke_session_callback(
     elif isinstance(event, SessionStartedEvent):
         data["status"] = "RUNNING"
     elif isinstance(event, SessionCancelledEvent):
-        data["status"] = "CANCELED"
+        data["status"] = "CANCELLED"
+    elif isinstance(event, SessionTerminatingEvent):
+        data["status"] = "TERMINATING"
     elif isinstance(event, SessionTerminatedEvent):
         data["status"] = "TERMINATED"
     elif isinstance(event, SessionSuccessEvent):
-        # data["status"] = "PREPARING"
-        # result = "SUCCEED"
-        pass
+        data["result"] = "SUCCESS"
     elif isinstance(event, SessionFailureEvent):
-        # data["status"] = "PREPARING"
-        # result = "FAILED"
-        pass
+        data["result"] = "FAILURE"
 
     stream_key = "events"
     try:
