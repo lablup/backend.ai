@@ -1637,9 +1637,10 @@ async def invoke_session_callback(
     # app_ctx: PrivateContext = app["session.context"]
     root_ctx: RootContext = app["_root.context"]
     try:
+        allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
         async with root_ctx.db.begin_readonly_session() as db_sess:
             session = await SessionRow.get_session_with_main_kernel(
-                event.session_id, db_session=db_sess
+                event.session_id, db_session=db_sess, allow_stale=allow_stale
             )
     except SessionNotFound:
         return
