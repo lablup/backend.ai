@@ -159,7 +159,7 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                 "REDIS_SENTINEL3_PORT": await _get_free_port(),
             }
             os.environ.update({k: str(v) for k, v in ports.items()})
-
+            os.environ["DOCKER_BUILDKIT"] = "0"
             async with async_timeout.timeout(30.0):
                 p = await simple_run_cmd(
                     [
@@ -167,12 +167,11 @@ class DockerComposeRedisSentinelCluster(AbstractRedisSentinelCluster):
                         "-p",
                         project_name,
                         "-f",
-                        os.fsencode(compose_cfg),
+                        str(compose_cfg),
                         "up",
                         "-d",
                         "--build",
                     ],
-                    env={"DOCKER_BUILDKIT": "0"},
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                 )
