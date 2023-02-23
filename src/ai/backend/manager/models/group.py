@@ -19,7 +19,6 @@ from typing import (
 import aiotools
 import graphene
 import sqlalchemy as sa
-from dateutil.tz.tz import tzfile
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
@@ -27,7 +26,7 @@ from sqlalchemy.orm import relationship
 
 from ai.backend.common import msgpack
 from ai.backend.common.logging import BraceStyleAdapter
-from ai.backend.common.types import RedisConnectionInfo, ResourceSlot
+from ai.backend.common.types import ResourceSlot
 
 from ..api.exceptions import VFolderOperationFailed
 from ..defs import RESERVED_DOTFILES
@@ -45,7 +44,6 @@ from .base import (
     simple_db_mutate,
     simple_db_mutate_returning_item,
 )
-from .resource_usage import ResourceGroupUnit, ResourceUsageGroup
 from .storage import StorageSessionManager
 from .user import ModifyUserInput, UserRole
 from .utils import ExtendedAsyncSAEngine, execute_with_retry
@@ -152,25 +150,6 @@ class GroupRow(Base):
         "ScalingGroupRow", secondary="sgroups_for_groups", back_populates="groups"
     )
     users = relationship("AssocGroupUserRow", back_populates="group")
-
-    async def parse_project_resource_usage(
-        self,
-        redis_stat: RedisConnectionInfo,
-        local_tz: tzfile,
-    ) -> ResourceUsageGroup:
-        usages = [
-            await session.parse_session_resource_usage(redis_stat, local_tz)
-            for session in self.sessions
-        ]
-        project_usage = ResourceUsageGroup(
-            group_unit=ResourceGroupUnit.PROJECT,
-            created_at=self.created_at,
-            project_id=self.id,
-            project_name=self.name,
-            domain_name=self.domain_name,
-        )
-        project_usage.register_resource_group(usages)
-        return project_usage
 
 
 def _build_group_query(cond: sa.sql.BinaryExpression, domain_name: str) -> sa.sql.Select:

@@ -2,21 +2,26 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence
 from uuid import UUID
 
 import attr
 import msgpack
+import sqlalchemy as sa
 from dateutil.tz.tz import tzfile
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline as RedisPipeline
+from sqlalchemy.orm import joinedload, load_only
 
 from ai.backend.common import redis_helper
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.common.utils import nmget
 
-if TYPE_CHECKING:
-    from .kernel import KernelRow
+from .group import GroupRow
+from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow
+from .session import SessionRow
+from .user import UserRow
+from .utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (
     "ResourceGroupUnit",
@@ -24,6 +29,7 @@ __all__: Sequence[str] = (
     "ResourceUsageGroup",
     "parse_resource_usage",
     "parse_resource_usage_groups",
+    "fetch_resource_usage",
 )
 
 
@@ -132,6 +138,7 @@ class ResourceUsageGroup:
     domain_name: Optional[str] = attr.field(default=None)
 
     last_stat: Optional[Mapping[str, Any]] = attr.field(default=None)
+    extra_info: Mapping[str, Any] = attr.field(factory=dict)
     belonged_usage_groups: list[ResourceUsageGroup] = attr.field(factory=list)
     total_usage: ResourceUsage = attr.field(factory=ResourceUsage)
 
@@ -140,6 +147,7 @@ class ResourceUsageGroup:
         # for g in self.belonged_usage_groups:
         #     belonged_infos[f"{g.group_unit.value}_infos"].append(g.to_json())
         return {
+            **self.extra_info,
             "user_id": self.user_id,
             "user_email": self.user_email,
             "access_key": self.access_key,
@@ -232,6 +240,8 @@ def parse_resource_usage(
 
 async def parse_resource_usage_groups(
     kernels: list[KernelRow],
+    session: SessionRow,
+    project: GroupRow,
     redis_stat: RedisConnectionInfo,
     local_tz: tzfile,
 ) -> list[ResourceUsageGroup]:
@@ -257,18 +267,162 @@ async def parse_resource_usage_groups(
             used_time=kern.used_time,
             used_days=kern.get_used_days(local_tz),
             last_stat=stat_map[kern.id],
-            user_id=kern.session.user_uuid,
-            user_email=kern.session.user.email,
-            access_key=kern.session.access_key,
-            project_id=kern.session.group_id,
-            project_name=kern.session.group.name,
+            user_id=session.user_uuid,
+            user_email=session.user.email,
+            access_key=session.access_key,
+            project_id=project.id,
+            project_name=project.name,
             kernel_id=kern.id,
             container_id=kern.container_id,
             session_id=kern.session_id,
-            session_name=kern.session.name,
-            domain_name=kern.session.domain_name,
+            session_name=session.name,
+            domain_name=session.domain_name,
             group_unit=ResourceGroupUnit.CONTAINER,
             total_usage=parse_resource_usage(kern, stat_map[kern.id]),
         )
         for kern in kernels
     ]
+
+
+async def parse_container_resource_usages(
+    kernels: list[KernelRow],
+    session: SessionRow,
+    project: GroupRow,
+    redis_stat: RedisConnectionInfo,
+    local_tz: tzfile,
+) -> list[ResourceUsageGroup]:
+    return await parse_resource_usage_groups(kernels, session, project, redis_stat, local_tz)
+
+
+async def parse_session_resource_usage(
+    session: SessionRow,
+    project: GroupRow,
+    redis_stat: RedisConnectionInfo,
+    local_tz: tzfile,
+) -> ResourceUsageGroup:
+    kernel_usages = await parse_container_resource_usages(
+        session.kernels, session, project, redis_stat, local_tz
+    )
+    session_usage = ResourceUsageGroup(
+        group_unit=ResourceGroupUnit.SESSION,
+        created_at=session.created_at,
+        user_id=session.user_uuid,
+        user_email=session.user.email,
+        access_key=session.access_key,
+        project_id=project.id,
+        project_name=project.name,
+        session_id=session.id,
+        session_name=session.name,
+        domain_name=session.domain_name,
+    )
+    session_usage.register_resource_group(kernel_usages)
+    return session_usage
+
+
+async def parse_project_resource_usage(
+    project: GroupRow,
+    redis_stat: RedisConnectionInfo,
+    local_tz: tzfile,
+) -> ResourceUsageGroup:
+    usages = [
+        await parse_session_resource_usage(session, project, redis_stat, local_tz)
+        for session in project.sessions
+    ]
+    project_usage = ResourceUsageGroup(
+        group_unit=ResourceGroupUnit.PROJECT,
+        created_at=project.created_at,
+        project_id=project.id,
+        project_name=project.name,
+        domain_name=project.domain_name,
+    )
+    project_usage.register_resource_group(usages)
+    return project_usage
+
+
+SESSION_RESOURCE_SELECT_COLS = (
+    SessionRow.created_at,
+    SessionRow.user_uuid,
+    SessionRow.name,
+    SessionRow.domain_name,
+    SessionRow.id,
+    SessionRow.group_id,
+    SessionRow.access_key,
+)
+
+PROJECT_RESOURCE_SELECT_COLS = (
+    GroupRow.created_at,
+    GroupRow.id,
+    GroupRow.name,
+    GroupRow.domain_name,
+)
+
+KERNEL_RESOURCE_SELECT_COLS = (
+    KernelRow.created_at,
+    KernelRow.terminated_at,
+    KernelRow.last_stat,
+    KernelRow.session_id,
+    KernelRow.id,
+    KernelRow.container_id,
+    KernelRow.occupied_slots,
+    KernelRow.attached_devices,
+    KernelRow.vfolder_mounts,
+    KernelRow.mounts,
+    KernelRow.resource_opts,
+)
+
+
+def _parse_query(
+    kernel_cond: Optional[sa.sql.BinaryExpression] = None,
+    session_cond: Optional[sa.sql.BinaryExpression] = None,
+    project_cond: Optional[sa.sql.BinaryExpression] = None,
+) -> sa.sql.Select:
+    session_load = joinedload(KernelRow.session)
+    if session_cond is not None:
+        session_load = joinedload(KernelRow.session.and_(session_cond))
+
+    project_load = joinedload(SessionRow.group)
+    if project_cond is not None:
+        project_load = joinedload(SessionRow.group.and_(project_cond))
+    query = sa.select(KernelRow).options(
+        load_only(*KERNEL_RESOURCE_SELECT_COLS),
+        (
+            session_load.options(
+                load_only(*SESSION_RESOURCE_SELECT_COLS),
+                joinedload(SessionRow.user).options(load_only(UserRow.email, UserRow.username)),
+                project_load.options(load_only(*PROJECT_RESOURCE_SELECT_COLS)),
+            )
+        ),
+    )
+    if kernel_cond is not None:
+        query = query.where(kernel_cond)
+    return query
+
+
+async def fetch_resource_usage(
+    db_engine: ExtendedAsyncSAEngine,
+    start_date: datetime,
+    end_date: datetime,
+    project_ids: Optional[Sequence[UUID]] = None,
+) -> list[KernelRow]:
+    project_cond = None
+    if project_ids:
+        project_cond = GroupRow.id.in_(project_ids)
+    query = _parse_query(
+        kernel_cond=(
+            # Filter sessions which existence period overlaps with requested period
+            (
+                (KernelRow.terminated_at >= start_date)
+                & (KernelRow.created_at < end_date)
+                & (KernelRow.status.in_(RESOURCE_USAGE_KERNEL_STATUSES))
+            )
+            |
+            # Or, filter running sessions which created before requested end_date
+            ((KernelRow.created_at < end_date) & (KernelRow.status.in_(LIVE_STATUS))),
+        ),
+        project_cond=project_cond,
+    )
+    async with db_engine.begin_readonly_session() as db_sess:
+        result = await db_sess.execute(query)
+        kernels = result.scalars().all()
+
+    return kernels

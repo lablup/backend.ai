@@ -75,7 +75,6 @@ from .base import (
 from .group import groups
 from .minilang.ordering import QueryOrderParser
 from .minilang.queryfilter import QueryFilterParser
-from .resource_usage import ResourceUsageGroup, parse_resource_usage_groups
 from .user import users
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, sql_json_merge
 
@@ -557,14 +556,6 @@ class KernelRow(Base):
                 + 1
             )
         return None
-
-    @staticmethod
-    async def parse_container_resource_usage(
-        kernels: list[KernelRow],
-        redis_stat: RedisConnectionInfo,
-        local_tz: tzfile,
-    ) -> list[ResourceUsageGroup]:
-        return await parse_resource_usage_groups(kernels, redis_stat, local_tz)
 
     @staticmethod
     async def get_kernel(
