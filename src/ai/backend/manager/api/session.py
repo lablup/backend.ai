@@ -1644,6 +1644,8 @@ async def invoke_session_callback(
             )
     except SessionNotFound:
         return
+    if session.session_type != SessionTypes.BATCH:
+        return
     url = session.callback_url
     if url is None:
         return

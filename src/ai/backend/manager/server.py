@@ -329,51 +329,6 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.utils import connect_database
 
     async with connect_database(root_ctx.local_config) as db:
-        """
-        _SESSION_ID = 1
-        _CALLBACK_URL = 49
-
-        @sa.event.listens_for(db.sync_engine, "do_execute")
-        def receive_do_execute(cursor, statement: str, parameters: tuple, context):
-            if not (
-                statement.startswith("UPDATE kernels") or statement.startswith("UPDATE sessions")
-            ):
-                return
-            log.warning("EVENT.LISTENER - {}", statement)
-            log.warning("EVENT.LISTENER - {}", parameters)
-            if statement.startswith("UPDATE sessions"):
-                # UPDATE sessions SET status=%s, status_info=%s, status_data=%s, status_history=(coalesce(sessions.status_history, '{}'::jsonb) || CAST(%s AS JSONB)) WHERE sessions.status = %s RETURNING sessions.id
-                # session_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
-                if matches := re.search("status=([A-Z]*)[,]+", statement % parameters):
-                    pass
-                return
-            kernel_id = next(filter(lambda x: isinstance(x, UUID), parameters), None)
-            if matches := re.search("status=([A-Z]*)[,]+", statement % parameters):
-                _, status = matches.group().strip(",").split("=")
-
-                async def _dispatch():
-                    token = ""
-                    session_id = ""
-                    log.warning("_dispatch(): kernel_id={}", kernel_id)
-                    if kernel_id is None:
-                        return
-                    async with root_ctx.db.begin_readonly_session() as session:
-                        query = sa.select(kernels).where(kernels.c.id == str(kernel_id))
-                        result = await session.execute(query)
-                    if (kernel := result.first()) and (callback_url := kernel[_CALLBACK_URL]):
-                        session_id = kernel[_SESSION_ID]
-                        *_, querystring = str(callback_url).partition("?")
-                        for qs in querystring.split("&"):
-                            key, value = qs.split("=")
-                            if key == "token":
-                                token = value
-                                break
-                    if not token or not session_id:
-                        return
-
-                asyncio.create_task(_dispatch())
-        """
-
         root_ctx.db = db
         yield
 
