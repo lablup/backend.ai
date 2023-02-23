@@ -1,6 +1,5 @@
-import json
 import logging
-from typing import AsyncIterator, Optional, cast
+from typing import AsyncIterator
 
 import aiohttp
 import yarl
