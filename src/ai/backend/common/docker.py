@@ -251,7 +251,7 @@ async def get_registry_info(etcd: AsyncEtcd, name: str) -> Tuple[yarl.URL, dict]
     return yarl.URL(registry_addr), creds
 
 
-def validate_image_labels(labels: dict[str, str]) -> dict[str, str]:
+def validate_image_labels(labels: dict[str, str]) -> dict[str, Any]:
     common_labels = common_image_label_schema.check(labels)
     service_ports = {
         item["name"]: item

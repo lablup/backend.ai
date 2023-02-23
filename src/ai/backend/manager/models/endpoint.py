@@ -49,20 +49,18 @@ class EndpointRow(Base):
     resource_slots = sa.Column("resource_slots", ResourceSlotColumn(), nullable=False)
     url = sa.Column("url", sa.String(length=1024), nullable=False, unique=True)
 
-    routings = relationship("RoutingRow", back_populates="endpoint_row")
-    image_row = relationship("ImageRow", back_populates="endpoints")
+    routings = relationship("RoutingRow", back_populates="endpoint")
+    image = relationship("ImageRow", back_populates="endpoints")
 
     @classmethod
     async def get(cls, session: AsyncSession, endpoint_id: uuid.UUID) -> "EndpointRow":
         """
-        :raises: sqlalchemy.orm.exc.NoResultFound
+        :raises: ai.backend.manager.api.exceptions.EndpointNotFound
         """
-        query = sa.select(EndpointRow).filter(EndpointRow.id == endpoint_id)
-        result = await session.execute(query)
-        try:
-            return result.one()
-        except NoResultFound:
-            raise
+        endpoint_row = await session.get(EndpointRow, endpoint_id)
+        if endpoint_row is None:
+            raise EndpointNotFound()
+        return endpoint_row
 
     @classmethod
     async def list(

@@ -28,15 +28,38 @@ class RoutingRow(Base):
 
     id = IDColumn("id")
     endpoint = sa.Column(
-        "endpoint", GUID, sa.ForeignKey("endpoints.id", ondelete="CASCADE"), nullable=False
+        "endpoint",
+        GUID,
+        sa.ForeignKey("endpoints.id", ondelete="CASCADE"),
+        nullable=False,
     )
-    session = sa.Column(
-        "session", GUID, sa.ForeignKey("sessions.id", ondelete="RESTRICT"), nullable=False
-    )
-
     traffic_ratio = sa.Column("traffic_ratio", sa.Float(), nullable=False)
 
-    endpoint_row = relationship("EndpointRow", back_populates="routings")
+    # Backing inference session
+    session = sa.Column(
+        "session",
+        GUID,
+        sa.ForeignKey("sessions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    # TODO: create alembic migration for endpoint_*, model* columns
+    endpoint_name = ...  # TODO: which endpoint is bound?
+    endpoint_port = ...  # TODO: host-side port number of the endpoint service
+
+    # Mounted model vfolder and the version being used
+    model = sa.Column(
+        "model",
+        GUID,
+        sa.ForeignKey("vfolders.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    model_version = sa.Column(
+        "model_version",
+        sa.String(length=64),
+        nullable=False,
+    )
+
+    endpoint = relationship("EndpointRow", back_populates="routings")
 
     @classmethod
     async def get(cls, session: AsyncSession, routing_id: uuid.UUID) -> "RoutingRow":

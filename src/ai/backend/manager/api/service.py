@@ -3,7 +3,15 @@ import logging
 import secrets
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Iterable, MutableMapping, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    MutableMapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import aiohttp_cors
 import aiotools
@@ -15,7 +23,7 @@ from dateutil.parser import isoparse
 from dateutil.tz import tzutc
 
 from ai.backend.common import validators as tx
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.docker import ImageRef, validate_image_labels
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import ClusterMode, SessionTypes
@@ -42,6 +50,7 @@ from .exceptions import (
     InsufficientPrivilege,
     InternalServerError,
     InvalidAPIParameters,
+    EndpointNotFound,
     UnknownImageReferenceError,
 )
 from .manager import ALL_ALLOWED, READ_ALLOWED, server_status_required
@@ -192,7 +201,11 @@ async def create(request: web.Request, params: Any) -> web.Response:
             )
             img_id = image_row.id
         requested_image_ref = image_row.image_ref
-        model_mount_path = image_row.labels.get("ai.backend.model-path")
+        parsed_labels = validate_image_labels(image_row.labels)
+        model_mount_path = parsed_labels["ai.backend.model-path"]
+        service_ports = {item["name"]: item for item in parsed_labels["ai.backend.service-ports"]}
+        endpoints = parsed_labels["ai.backend.endpoint-ports"]
+        # TODO: use endpoints & service_ports to populate the routing table
         async with root_ctx.db.begin_readonly() as conn:
             query = (
                 sa.select([domains.c.allowed_docker_registries])
@@ -251,6 +264,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
         kern_config["mount_map"] = mount_map
 
     # Create endpoint
+    # TODO: attach to existing endpoint
     async def _create_endpoint() -> uuid.UUID:
         async with root_ctx.db.begin_session() as db_sess:
             endpoint_id = uuid.uuid4()
@@ -270,47 +284,6 @@ async def create(request: web.Request, params: Any) -> web.Response:
     else:
         endpoint_id = params["endpoint_id"]
 
-    # # Check existing (owner_access_key, session_name) instance
-    # try:
-    #     # NOTE: We can reuse the session IDs of TERMINATED sessions only.
-    #     # NOTE: Reusing a session in the PENDING status returns an empty value in service_ports.
-    #     async with root_ctx.db.begin_readonly_session() as db_sess:
-    #         sess = await SessionRow.get_session_with_main_kernel(
-    #             params["session_name"],
-    #             access_key,
-    #             db_session=db_sess,
-    #         )
-    #     running_image_ref = ImageRef(
-    #         sess.main_kernel.image, [sess.main_kernel.registry], sess.main_kernel.architecture
-    #     )
-    #     if running_image_ref != requested_image_ref:
-    #         # The image must be same if get_or_create() called multiple times
-    #         # against an existing (non-terminated) session
-    #         raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
-    #     if not params["reuse"]:
-    #         # Respond as error since the client did not request to reuse,
-    #         # but provide the overlapping session ID for later use.
-    #         raise SessionAlreadyExists(extra_data={"existingSessionId": str(sess.id)})
-    #     # Respond as success with the reused session's information.
-    #     return web.json_response(
-    #         {
-    #             "sessionId": str(sess.id),
-    #             "sessionName": str(sess.name),
-    #             "status": sess.status.name,
-    #             "service_ports": sess.main_kernel.service_ports,
-    #             "created": False,
-    #         },
-    #         status=200,
-    #     )
-    # except SessionNotFound:
-    #     # It's time to create a new session.
-    #     pass
-
-    # if params["session_type"] == SessionTypes.BATCH and not params["startup_command"]:
-    #     raise InvalidAPIParameters("Batch sessions must have a non-empty startup command.")
-    # if params["session_type"] != SessionTypes.BATCH and params["starts_at"]:
-    #     raise InvalidAPIParameters("Parameter starts_at should be used only for batch sessions")
-
     starts_at: Union[datetime, None] = None
     if params["starts_at"]:
         try:
@@ -319,11 +292,9 @@ async def create(request: web.Request, params: Any) -> web.Response:
             _td = str_to_timedelta(params["starts_at"])
             starts_at = datetime.now(tzutc()) + _td
 
+    # TODO: consider clustered inference session
     # if params["cluster_size"] > 1:
     #     log.debug(" -> cluster_mode:{} (replicate)", params["cluster_mode"])
-
-    # if params["dependencies"] is None:
-    #     params["dependencies"] = []
 
     session_creation_id = secrets.token_urlsafe(16)
 
@@ -374,52 +345,24 @@ async def create(request: web.Request, params: Any) -> web.Response:
             ),
         )
 
-        # Create routing
-        await RoutingRow.create(root_ctx.db, endpoint_id, session_id)
+        # Create the routing between the inference session and the endpoint
+        await RoutingRow.create(
+            root_ctx.db,
+            endpoint_id,
+            session_id,
+            # TODO: set the following columns when creating the routing row
+            model=model_id,
+            model_version=params["model_version"],
+            endpoint_name=...,
+            endpoint_port=...,  # TODO: get the preopen host-side port number
+            traffic_ratio=1.0,
+        )
 
         resp["sessionId"] = str(session_id)  # changed since API v5
         resp["sessionName"] = str(params["service_name"])
         resp["status"] = SessionStatus.PENDING.name
         resp["servicePorts"] = []
         resp["created"] = True
-
-        # if not params["enqueue_only"]:
-        #     app_ctx.pending_waits.add(current_task)
-        #     max_wait = params["max_wait_seconds"]
-        #     try:
-        #         if max_wait > 0:
-        #             with timeout(max_wait):
-        #                 await start_event.wait()
-        #         else:
-        #             await start_event.wait()
-        #     except asyncio.TimeoutError:
-        #         resp["status"] = "TIMEOUT"
-        #     else:
-        #         await asyncio.sleep(0.5)
-        #         async with root_ctx.db.begin_readonly_session() as db_sess:
-        #             query = sa.select(KernelRow.status, KernelRow.service_ports).where(
-        #                 (KernelRow.session_id == session_id)
-        #                 & (KernelRow.cluster_role == DEFAULT_ROLE)
-        #             )
-        #             result = await db_sess.execute(query)
-        #             row = result.first()
-        #         if row.status == KernelStatus.RUNNING:
-        #             resp["status"] = "RUNNING"
-        #             for item in row.service_ports:
-        #                 response_dict = {
-        #                     "name": item["name"],
-        #                     "protocol": item["protocol"],
-        #                     "ports": item["container_ports"],
-        #                 }
-        #                 if "url_template" in item.keys():
-        #                     response_dict["url_template"] = item["url_template"]
-        #                 if "allowed_arguments" in item.keys():
-        #                     response_dict["allowed_arguments"] = item["allowed_arguments"]
-        #                 if "allowed_envs" in item.keys():
-        #                     response_dict["allowed_envs"] = item["allowed_envs"]
-        #                 resp["servicePorts"].append(response_dict)
-        #         else:
-        #             resp["status"] = row.status.name
     except asyncio.CancelledError:
         raise
     except BackendError:
@@ -438,7 +381,7 @@ async def create(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID | t.String,
+            tx.AliasedKey(["service_id", "serviceId"]): tx.UUID | t.String,
         }
     ),
 )
@@ -454,7 +397,7 @@ async def start(request: web.Request, params: Any) -> web.Response:
 @check_api_params(
     t.Dict(
         {
-            tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID | t.String,
+            tx.AliasedKey(["service_id", "serviceId"]): tx.UUID | t.String,
         }
     ),
 )
@@ -472,18 +415,27 @@ async def stop(request: web.Request, params: Any) -> web.Response:
         {
             tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID | t.String,
             tx.AliasedKey(["input_args", "inputArgs"], default=dict): t.Mapping(t.String, t.Any),
+            tx.AliasedKey(["force_route", "forceRoute"], default=None): tx.UUID | t.Null,
             # the request body can be an arbitrary binary blob.
         }
     ),
 )
 async def invoke(request: web.Request, params: Any) -> web.StreamResponse:
+    root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
 
     log.info("SERVICE.INVOKE (email:{}, ak:{})", request["user"]["email"], access_key)
 
-    # TODO: get the endpoint info
+    # TODO: get the first attached endpoint and routing info
+    #       If force_route is given, use that route.
+    async with root_ctx.db.begin_readonly_session() as db_session:
+        endpoint_row = await db_session.get(EndpointRow, params["endpoint_id"])
+        if endpoint_row is None:
+            raise EndpointNotFound()
+
     # TODO: make a direct HTTP request to the container's endpoint port.
-    return web.StreamResponse(status=204)
+    response = web.StreamResponse(status=200)
+    return response
 
 
 @auth_required
