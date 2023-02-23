@@ -667,6 +667,7 @@ async def server_main(
         ".ratelimit",
         ".vfolder",
         ".admin",
+        ".service",
         ".session",
         ".stream",
         ".manager",

@@ -2169,13 +2169,10 @@ class AgentRegistry:
     async def download_file(
         self,
         session: SessionRow,
-        access_key: AccessKey,
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel
-        async with handle_session_exception(
-            self.db, "download_file", kernel.session_id, access_key
-        ):
+        async with handle_session_exception(self.db, "download_file", kernel.session_id):
             async with RPCContext(
                 kernel.agent,
                 kernel.agent_addr,
@@ -2192,9 +2189,7 @@ class AgentRegistry:
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel
-        async with handle_session_exception(
-            self.db, "download_single", kernel.session_id, access_key
-        ):
+        async with handle_session_exception(self.db, "download_single", kernel.session_id):
             async with RPCContext(
                 kernel.agent,
                 kernel.agent_addr,
