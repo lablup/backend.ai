@@ -60,6 +60,7 @@ REDIS_LIVE_DB: Final = 2
 REDIS_IMAGE_DB: Final = 3
 REDIS_STREAM_DB: Final = 4
 REDIS_STREAM_LOCK: Final = 5
+REDIS_EVENT_STREAM_DB: Final = 1
 
 
 # The unique identifiers for distributed locks.

@@ -37,7 +37,6 @@ import aiohttp_cors
 import aiotools
 import attrs
 import multidict
-import redis
 import sqlalchemy as sa
 import sqlalchemy.exc
 import trafaret as t
@@ -84,17 +83,20 @@ from ai.backend.common.events import (
 )
 from ai.backend.common.exception import AliasResolutionFailed, UnknownImageReference
 from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.common.plugin.hook import HookResults
 from ai.backend.common.plugin.monitor import GAUGE
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
+    EtcdRedisConfig,
     KernelEnqueueingConfig,
     KernelId,
     SessionTypes,
     check_typed_dict,
 )
 from ai.backend.common.utils import cancel_tasks, str_to_timedelta
+from ai.backend.manager.defs import REDIS_EVENT_STREAM_DB
 
 from ..config import DEFAULT_CHUNK_SIZE
 from ..defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, REDIS_STREAM_DB
@@ -134,6 +136,7 @@ from .exceptions import (
     InternalServerError,
     InvalidAPIParameters,
     ObjectNotFound,
+    RejectedByHook,
     ServiceUnavailable,
     SessionAlreadyExists,
     SessionNotFound,
@@ -1644,8 +1647,6 @@ async def invoke_session_callback(
             )
     except SessionNotFound:
         return
-    if session.session_type != SessionTypes.BATCH:
-        return
     url = session.callback_url
     if url is None:
         return
@@ -1654,7 +1655,16 @@ async def invoke_session_callback(
         _make_session_callback(data, url),
     )
     """
-    data = {
+    if (addr := root_ctx.local_config["pipeline"]["event-queue"]) is None:
+        return
+    etcd_redis_config: EtcdRedisConfig = {
+        "addr": addr,
+        "sentinel": None,
+        "service_name": None,
+        "password": None,
+    }
+    stream_key = "events"
+    payload = {
         "type": "session_lifecycle",
         "event": event.name.removeprefix("session_"),
         "session_id": str(event.session_id),
@@ -1662,25 +1672,15 @@ async def invoke_session_callback(
         "token": url.query.get("token"),
     }
 
-    stream_key = "events"
-    try:
-        redis_conn = redis_helper.get_redis_object(
-            {
-                "addr": root_ctx.local_config["pipeline"]["event-queue"],
-                "sentinel": None,
-                "service_name": None,
-                "password": None,
-            },
-            db=1,  # REDIS_PIPELINE_EVENT
+    async def _dispatch() -> None:
+        hook_result = await root_ctx.hook_plugin_ctx.dispatch(
+            "PUBLISH_EVENT",
+            (etcd_redis_config, REDIS_EVENT_STREAM_DB, stream_key, payload),
         )
-        await redis_helper.execute(
-            redis_conn.client,
-            lambda r: r.xadd(stream_key, data),  # type: ignore
-        )
-    except redis.exceptions.ConnectionError:
-        pass
-    # except redis.exceptions.TimeoutError:
-    #     pass
+        if hook_result.status != HookResults.PASSED:
+            raise RejectedByHook.from_hook_result(hook_result)
+
+    await execute_with_retry(_dispatch)
 
 
 async def handle_batch_result(
