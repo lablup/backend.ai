@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from abc import ABCMeta, abstractmethod
+from contextlib import asynccontextmanager as actxmgr
 from contextvars import ContextVar
 from typing import Any, AsyncIterator, Dict, Mapping, Optional, cast
 
@@ -63,6 +64,14 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         self.reporter = ContextVar("reporter", default=None)
         self.all_updates = ContextVar("all_updates")
 
+    async def prepare_client_session(self) -> AsyncIterator[tuple[yarl.URL, aiohttp.ClientSession]]:
+        ssl_ctx = None  # default
+        if not self.registry_info["ssl-verify"]:
+            ssl_ctx = False
+        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+        async with aiohttp.ClientSession(connector=connector) as sess:
+            yield self.registry_url, sess
+
     async def rescan_single_registry(
         self,
         reporter: ProgressReporter = None,
@@ -85,15 +94,12 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             "backendai",
             "geofront",
         )
-        ssl_ctx = None  # default
-        if not self.registry_info["ssl-verify"]:
-            ssl_ctx = False
-        connector = aiohttp.TCPConnector(ssl=ssl_ctx)
-        async with aiohttp.ClientSession(connector=connector) as sess:
+        async with actxmgr(self.prepare_client_session)() as (url, client_session):
+            self.registry_url = url
             async with aiotools.TaskGroup() as tg:
-                async for image in self.fetch_repositories(sess):
+                async for image in self.fetch_repositories(client_session):
                     if not any((w in image) for w in non_kernel_words):  # skip non-kernel images
-                        tg.create_task(self._scan_image(sess, image))
+                        tg.create_task(self._scan_image(client_session, image))
 
         all_updates = self.all_updates.get()
         if not all_updates:

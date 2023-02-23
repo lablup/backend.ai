@@ -83,25 +83,37 @@ async def rescan_images(
     etcd: AsyncEtcd,
     db: ExtendedAsyncSAEngine,
     registry: str = None,
+    local: bool = False,
     *,
     reporter: ProgressReporter = None,
 ) -> None:
     # cannot import ai.backend.manager.config at start due to circular import
     from ai.backend.manager.config import container_registry_iv
 
-    registry_config_iv = t.Mapping(t.String, container_registry_iv)
-    latest_registry_config = registry_config_iv.check(
-        await etcd.get_prefix("config/docker/registry"),
-    )
-    # TODO: delete images from registries removed from the previous config?
-    if registry is None:
-        # scan all configured registries
-        registries = latest_registry_config
+    if local:
+        registries = {
+            "local": {
+                "": "http://localhost",
+                "type": "local",
+                "username": None,
+                "password": None,
+                "project": None,
+            },
+        }
     else:
-        try:
-            registries = {registry: latest_registry_config[registry]}
-        except KeyError:
-            raise RuntimeError("It is an unknown registry.", registry)
+        registry_config_iv = t.Mapping(t.String, container_registry_iv)
+        latest_registry_config = registry_config_iv.check(
+            await etcd.get_prefix("config/docker/registry"),
+        )
+        # TODO: delete images from registries removed from the previous config?
+        if registry is None:
+            # scan all configured registries
+            registries = latest_registry_config
+        else:
+            try:
+                registries = {registry: latest_registry_config[registry]}
+            except KeyError:
+                raise RuntimeError("It is an unknown registry.", registry)
     async with aiotools.TaskGroup() as tg:
         for registry_name, registry_info in registries.items():
             log.info('Scanning kernel images from the registry "{0}"', registry_name)

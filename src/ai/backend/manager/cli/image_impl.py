@@ -123,11 +123,11 @@ async def set_image_resource_limit(
                 log.exception("An error occurred.")
 
 
-async def rescan_images(cli_ctx, registry):
+async def rescan_images(cli_ctx, registry: str, local: bool):
     async with connect_database(cli_ctx.local_config) as db:
         async with etcd_ctx(cli_ctx) as etcd:
             try:
-                await rescan_images_func(etcd, db, registry=registry)
+                await rescan_images_func(etcd, db, registry=registry, local=local)
             except Exception:
                 log.exception("An error occurred.")
 
