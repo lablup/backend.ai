@@ -494,24 +494,6 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
-    async def execute_batch(
-        self,
-        session_id: str,
-        kernel_id: str,
-        startup_command: str,
-    ) -> None:
-        # DEPRECATED
-        asyncio.create_task(
-            self.agent.execute_batch(
-                SessionId(UUID(session_id)),
-                KernelId(UUID(kernel_id)),
-                startup_command,
-            )
-        )
-        await asyncio.sleep(0)
-
-    @rpc_function
-    @collect_error
     async def start_service(
         self,
         kernel_id: str,
