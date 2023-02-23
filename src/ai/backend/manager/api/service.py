@@ -73,7 +73,7 @@ class UndefChecker(t.Trafaret):
         }
     ),
 )
-async def list_serve(request: web.Request, params: Any) -> web.Response:
+async def list_(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     access_key = request["keypair"]["access_key"]
     project_id = params["project_id"]
@@ -167,7 +167,7 @@ async def get_info(request: web.Request, params: Any) -> web.Response:
 )
 async def create(request: web.Request, params: Any) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
-    app_ctx: PrivateContext = request.app["services.context"]
+    app_ctx: PrivateContext = request.app["service.context"]
     access_key = request["keypair"]["access_key"]
     domain_name = request["user"]["domain_name"]
     user_role = request["user"]["role"]
@@ -472,14 +472,18 @@ async def stop(request: web.Request, params: Any) -> web.Response:
         {
             tx.AliasedKey(["endpoint_id", "endpointId"]): tx.UUID | t.String,
             tx.AliasedKey(["input_args", "inputArgs"], default=dict): t.Mapping(t.String, t.Any),
+            # the request body can be an arbitrary binary blob.
         }
     ),
 )
-async def invoke_serving(request: web.Request, params: Any) -> web.Response:
+async def invoke(request: web.Request, params: Any) -> web.StreamResponse:
     access_key = request["keypair"]["access_key"]
 
     log.info("SERVICE.INVOKE (email:{}, ak:{})", request["user"]["email"], access_key)
-    return web.Response(status=204)
+
+    # TODO: get the endpoint info
+    # TODO: make a direct HTTP request to the container's endpoint port.
+    return web.StreamResponse(status=204)
 
 
 @auth_required
@@ -526,12 +530,12 @@ class PrivateContext:
 
 
 async def init(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["services.context"]
+    app_ctx: PrivateContext = app["service.context"]
     app_ctx.database_ptask_group = aiotools.PersistentTaskGroup()
 
 
 async def shutdown(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["services.context"]
+    app_ctx: PrivateContext = app["service.context"]
     await app_ctx.database_ptask_group.shutdown()
 
 
@@ -539,19 +543,19 @@ def create_app(
     default_cors_options: CORSOptions,
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
-    app["prefix"] = "services"
+    app["prefix"] = "service"
     app["api_versions"] = (4, 5)
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
-    app["services.context"] = PrivateContext()
+    app["service.context"] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
     root_resource = cors.add(app.router.add_resource(r""))
-    cors.add(root_resource.add_route("GET", list_serve))
+    cors.add(root_resource.add_route("GET", list_))
     cors.add(root_resource.add_route("POST", create))
     cors.add(root_resource.add_route("DELETE", delete))
-    cors.add(add_route("GET", r"/_/info", get_info))
-    cors.add(add_route("POST", r"/_/start", start))
-    cors.add(add_route("POST", r"/_/stop", stop))
-    cors.add(add_route("POST", r"/_/invoke", invoke_serving))
+    cors.add(add_route("GET", r"/info", get_info))
+    cors.add(add_route("POST", r"/start", start))
+    cors.add(add_route("POST", r"/stop", stop))
+    cors.add(add_route("POST", r"/invoke", invoke))
     return app, []

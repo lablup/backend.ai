@@ -1,4 +1,5 @@
 import textwrap
+from io import BytesIO
 from typing import Any, Mapping, Optional, Sequence
 from uuid import UUID
 
@@ -26,7 +27,7 @@ class Service(BaseFunction):
     @classmethod
     async def list(cls):
         """ """
-        rqst = Request("GET", "/services")
+        rqst = Request("GET", "/service")
         async with rqst.fetch() as resp:
             return await resp.json()
 
@@ -38,12 +39,12 @@ class Service(BaseFunction):
         fields: Sequence[FieldSpec] = _default_list_fields,
         page_offset: int = 0,
         page_size: int = 20,
-        filter: str = None,
-        order: str = None,
+        filter: Optional[str] = None,
+        order: Optional[str] = None,
     ) -> PaginatedResult:
         """ """
         return await fetch_paginated_result(
-            "serve_list",
+            "service_list",
             {
                 "filter": (filter, "String"),
                 "order": (order, "String"),
@@ -75,7 +76,7 @@ class Service(BaseFunction):
     @api_function
     @classmethod
     async def info(cls, service_id: str):
-        rqst = Request("GET", "/services/_/info")
+        rqst = Request("GET", "/service/info")
         rqst.set_json(
             {
                 "service_id": service_id,
@@ -100,7 +101,7 @@ class Service(BaseFunction):
             faker = Faker()
             service_name = f"bai-serve-{faker.user_name()}"
 
-        rqst = Request("POST", "/services")
+        rqst = Request("POST", "/service")
         rqst.set_json(
             {
                 "model_id": model_id,
@@ -117,7 +118,7 @@ class Service(BaseFunction):
     @api_function
     @classmethod
     async def delete(self, service_id: str):
-        rqst = Request("DELETE", "/services")
+        rqst = Request("DELETE", "/service")
         rqst.set_json(
             {
                 "service_id": service_id,
@@ -142,5 +143,16 @@ class Service(BaseFunction):
         self,
         service_id: str,
         input_args: Mapping[str, Any],
+        input_data: Optional[bytes | bytearray | memoryview | BytesIO] = None,
     ):
-        pass
+        rqst = Request("POST", "/service/invoke")
+        rqst.set_json(
+            {
+                "service_id": service_id,
+                "input_args": input_args,
+            }
+        )
+        if input_data:
+            rqst.set_content(input_data)
+        async with rqst.fetch() as resp:
+            return await resp.json()
