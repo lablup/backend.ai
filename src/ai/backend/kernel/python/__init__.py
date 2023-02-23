@@ -9,6 +9,7 @@ from typing import List
 import janus
 
 from .. import BaseRunner
+from ..base import promote_path
 
 log = logging.getLogger()
 
@@ -38,6 +39,7 @@ class Runner(BaseRunner):
                 "/bin",
             ]
         ),
+        "PYTHONPATH": os.environ.get("PYTHONPATH", ""),
         "LD_LIBRARY_PATH": os.environ.get("LD_LIBRARY_PATH", ""),
         "LD_PRELOAD": os.environ.get("LD_PRELOAD", ""),
     }
@@ -66,7 +68,7 @@ class Runner(BaseRunner):
         )
         stdout, _ = await proc.communicate()
         user_site = stdout.decode("utf8").strip()
-        self.child_env["PYTHONPATH"] = user_site
+        self.child_env["PYTHONPATH"] = promote_path(self.child_env["PYTHONPATH"], user_site)
 
         # Add support for interactive input in batch mode by copying
         # sitecustomize.py to USER_SITE of runtime python.
