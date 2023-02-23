@@ -79,7 +79,7 @@ def set_resource_limit(
 
 
 @cli.command()
-@click.argument("registry")
+@click.argument("registry", required=False, default="")
 @click.option(
     "--local",
     is_flag=True,

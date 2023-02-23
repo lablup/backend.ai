@@ -183,12 +183,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     async def _scan_tag(
         self,
         sess: aiohttp.ClientSession,
-        rqst_args,
+        rqst_args: dict[str, Any],
         image: str,
         tag: str,
     ) -> None:
-        skip_reason = None
-
         async def _load_manifest(_tag: str):
             async with sess.get(
                 self.registry_url / f"v2/{image}/manifests/{_tag}", **rqst_args
@@ -244,7 +242,10 @@ class BaseContainerRegistry(metaclass=ABCMeta):
 
         async with self.sema.get():
             manifests = await _load_manifest(tag)
+        await self._read_manifest(image, tag, manifests)
 
+    async def _read_manifest(self, image: str, tag: str, manifests: dict[str, dict]):
+        skip_reason: Optional[str] = None
         if len(manifests.keys()) == 0:
             log.warning("Skipped image - {}:{} (missing/deleted)", image, tag)
             progress_msg = f"Skipped {image}:{tag} (missing/deleted)"
