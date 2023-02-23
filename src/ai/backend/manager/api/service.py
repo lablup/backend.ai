@@ -353,8 +353,8 @@ async def create(request: web.Request, params: Any) -> web.Response:
             # TODO: set the following columns when creating the routing row
             model=model_id,
             model_version=params["model_version"],
-            endpoint_name=...,
-            endpoint_port=...,  # TODO: get the preopen host-side port number
+            session_endpoint_name=...,
+            session_endpoint_port=...,  # TODO: get the preopen host-side port number
             traffic_ratio=1.0,
         )
 
