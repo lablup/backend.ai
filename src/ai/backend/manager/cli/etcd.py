@@ -306,7 +306,7 @@ def rescan_images(cli_ctx: CLIContext, registry) -> None:
     """
     with cli_ctx.logger:
         log.warn("etcd rescan-images command is deprecated, use image rescan instead")
-        asyncio.run(rescan_images_impl(cli_ctx, registry))
+        asyncio.run(rescan_images_impl(cli_ctx, registry, False))
 
 
 @cli.command()
