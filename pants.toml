@@ -126,7 +126,7 @@ extra_type_stubs = [
     "types-redis",
     "types-tabulate",
 ]
-extra_type_stubs_lockfile = "tools/pytest-type-stubs.lock"
+extra_type_stubs_lockfile = "tools/mypy-extra-type-stubs.lock"
 
 [towncrier]
 version = "towncrier>=21.9"
