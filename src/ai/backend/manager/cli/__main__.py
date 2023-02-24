@@ -168,9 +168,9 @@ def generate_keypair(cli_ctx: CLIContext):
     type=bool,
     default=False,
     help="Reclaim storage occupied by dead tuples."
-    "If not set or set False, it will run VACUUM without FULL."
-    "If set True, it will run VACUUM FULL."
-    "When VACUUM FULL is being processed, the database is locked."
+    "If not set or set False, it will run VACUUM without FULL. "
+    "If set True, it will run VACUUM FULL. "
+    "When VACUUM FULL is being processed, the database is locked. "
     "[default: False]",
 )
 @click.pass_obj

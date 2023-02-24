@@ -764,6 +764,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 {
                     "HostConfig": {
                         "SecurityOpt": ["seccomp=unconfined", "apparmor=unconfined"],
+                        "CapAdd": ["SYS_PTRACE"],
                     },
                 },
             )

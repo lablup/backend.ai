@@ -65,7 +65,7 @@ PTGExceptionHandler: TypeAlias = Callable[
 
 class AbstractEvent(metaclass=abc.ABCMeta):
 
-    # derivatives shoudld define the fields.
+    # derivatives should define the fields.
 
     name: ClassVar[str] = "undefined"
 
@@ -391,6 +391,10 @@ class SessionTerminationEventArgs:
             SessionId(uuid.UUID(value[0])),
             value[1],
         )
+
+
+class SessionTerminatingEvent(SessionTerminationEventArgs, AbstractEvent):
+    name = "session_terminating"
 
 
 class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
