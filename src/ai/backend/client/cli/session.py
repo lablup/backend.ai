@@ -1241,7 +1241,7 @@ def _fetch_session_names():
             order=None,
         )
 
-    return tuple(map(lambda x: x.get("session_id"), sessions.items))
+    return tuple(map(lambda x: x.get("name"), sessions.items))
 
 
 def _watch_cmd(docs: Optional[str] = None):
