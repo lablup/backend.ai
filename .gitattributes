@@ -9,7 +9,10 @@ src/ai/backend/agent/docker/linuxkit-metadata-proxy-worker.x86_64.bin filter=lfs
 src/ai/backend/agent/kubernetes/backendai-socket-relay.img.tar.gz filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/roboto-italic.ttf filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/roboto.ttf filter=lfs diff=lfs merge=lfs -text
-src/ai/backend/runner/jail.ubuntu16.04.x86_64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/jail.alpine3.8.x86_64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/jail.ubuntu18.04.x86_64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/jail.ubuntu20.04.x86_64.bin filter=lfs diff=lfs merge=lfs -text
+src/ai/backend/runner/jail.ubuntu22.04.x86_64.bin filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/sftp-server.ubuntu16.04.x86_64.bin filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/sftp-server.ubuntu18.04.aarch64.bin filter=lfs diff=lfs merge=lfs -text
 src/ai/backend/runner/tmux.alpine3.8.x86_64.bin filter=lfs diff=lfs merge=lfs -text
