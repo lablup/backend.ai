@@ -184,6 +184,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.image_ref = ImageRef(
             kernel_config["image"]["canonical"],
             known_registries=[kernel_config["image"]["registry"]["name"]],
+            is_local=kernel_config["image"]["is_local"],
             architecture=kernel_config["image"].get("architecture", get_arch_name()),
         )
         self.internal_data = kernel_config["internal_data"] or {}
@@ -1436,7 +1437,7 @@ class AbstractAgent(
             )
 
         # Check if we need to pull the container image
-        do_pull = await self.check_image(
+        do_pull = (not ctx.image_ref.is_local) and await self.check_image(
             ctx.image_ref,
             kernel_config["image"]["digest"],
             AutoPullBehavior(kernel_config.get("auto_pull", "digest")),

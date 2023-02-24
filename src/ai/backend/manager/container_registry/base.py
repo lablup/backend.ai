@@ -112,6 +112,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         sa.func.ROW(ImageRow.name, ImageRow.architecture).in_(image_identifiers),
                     ),
                 )
+                is_local = self.registry_name == "local"
 
                 for image_row in existing_images:
                     key = image_row.image_ref
@@ -123,6 +124,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     image_row.size_bytes = values["size_bytes"]
                     image_row.accelerators = values.get("accels")
                     image_row.labels = values["labels"]
+                    image_row.is_local = is_local
                     image_row.resources = values["resources"]
 
                 session.add_all(
@@ -133,6 +135,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                             image=k.name,
                             tag=k.tag,
                             architecture=k.architecture,
+                            is_local=is_local,
                             config_digest=v["config_digest"],
                             size_bytes=v["size_bytes"],
                             type=ImageType.COMPUTE,
