@@ -1503,6 +1503,7 @@ async def handle_kernel_creation_lifecycle(
             await RoutingRow.create(root_ctx.db, uuid.UUID(endpoint_id), uuid.UUID(session_id))
     elif isinstance(event, KernelCancelledEvent):
         if (tracker := root_ctx.registry.kernel_creation_tracker.get(ck_id)) and not tracker.done():
+            log.warning(f"Kernel cancelled, {event.reason = }")
             tracker.cancel()
 
 
