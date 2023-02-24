@@ -118,6 +118,13 @@ extra_type_stubs = [
     "types-setuptools",
     "types-pkg_resources",
     "types-python-dateutil",
+    "types-aiofiles",
+    "types-click",
+    "types-cachetools",
+    "types-Jinja2",
+    "types-PyYAML",
+    "types-redis",
+    "types-tabulate",
 ]
 extra_type_stubs_lockfile = "tools/pytest-type-stubs.lock"
 
