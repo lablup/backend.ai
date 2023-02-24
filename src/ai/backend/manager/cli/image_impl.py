@@ -1,6 +1,6 @@
 import contextlib
 import logging
-from pprint import pprint
+from pprint import pformat, pprint
 from typing import AsyncIterator
 
 import sqlalchemy as sa
@@ -44,7 +44,7 @@ async def etcd_ctx(cli_ctx) -> AsyncIterator[AsyncEtcd]:
         await etcd.close()
 
 
-async def list_images(cli_ctx, short, installed_flag):
+async def list_images(cli_ctx, short, installed_only):
     # Connect to postgreSQL DB
     async with (
         connect_database(cli_ctx.local_config) as db,
@@ -57,21 +57,33 @@ async def list_images(cli_ctx, short, installed_flag):
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
             #       until we finish the epic refactoring of image metadata db.
             for item in items:
-                installed = (
-                    await redis_helper.execute(redis_conn_set.image, lambda r: r.scard(item.name))
-                ) > 0
-                installed_agents = await redis_helper.execute(
-                    redis_conn_set.image, lambda r: r.smembers(item.name)
-                )
-
-                if installed_flag and not installed:
-                    continue
-                if short:
-                    displayed_items.append((item.image_ref.canonical, item.config_digest))
-                elif installed_flag:
-                    pprint(f"{item} @ {installed_agents}")
+                if installed_only:
+                    installed = (
+                        await redis_helper.execute(
+                            redis_conn_set.image, lambda r: r.scard(item.name)
+                        )
+                    ) > 0
+                    if not installed:
+                        continue
+                    installed_agents = " ".join(
+                        map(
+                            lambda item: item.decode(),
+                            await redis_helper.execute(
+                                redis_conn_set.image, lambda r: r.smembers(item.name)
+                            ),
+                        )
+                    )
+                    if short:
+                        displayed_items.append(
+                            (item.image_ref.canonical, item.config_digest, installed_agents)
+                        )
+                    else:
+                        print(f"{pformat(item)} @ {installed_agents}")
                 else:
-                    pprint(item)
+                    if short:
+                        displayed_items.append((item.image_ref.canonical, item.config_digest))
+                    else:
+                        pprint(item)
             if short:
                 print(tabulate(displayed_items, tablefmt="plain"))
         except Exception:
