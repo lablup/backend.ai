@@ -112,7 +112,7 @@ def get(template_id, template_format, owner_access_key):
 )
 def list(list_all):
     """
-    List all availabe task templates by user.
+    List all available task templates by user.
     """
     fields = [
         ("Name", "name"),

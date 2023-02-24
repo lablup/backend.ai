@@ -4,7 +4,7 @@
 sudo chmod 755 /
 cd $HOME/
 sudo apt update
-sudo apt-get install -y build-essential git-core libreadline-dev libsqlite3-dev libssl-dev libbz2-dev tk-dev libzmq3-dev libsnappy-dev libffi-dev zlib1g-dev wget curl llvm libncursesw5-dev xz-utils  libxml2-dev libxmlsec1-dev  liblzma-dev
+sudo apt-get install -y build-essential git-core libreadline-dev libsqlite3-dev libssl-dev libbz2-dev tk-dev libzmq3-dev libffi-dev zlib1g-dev wget curl llvm libncursesw5-dev xz-utils  libxml2-dev libxmlsec1-dev  liblzma-dev
 
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh

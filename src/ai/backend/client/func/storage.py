@@ -3,7 +3,7 @@ from typing import Sequence
 
 from ai.backend.client.output.fields import storage_fields
 from ai.backend.client.output.types import FieldSpec, PaginatedResult
-from ai.backend.client.pagination import generate_paginated_results
+from ai.backend.client.pagination import fetch_paginated_result
 from ai.backend.client.session import api_session
 
 from .base import BaseFunction, api_function
@@ -29,7 +29,7 @@ _default_detail_fields = (
 class Storage(BaseFunction):
     """
     Provides a shortcut of :func:`Admin.query()
-    <ai.backend.client.admin.Admin.query>` that fetches various straoge volume
+    <ai.backend.client.admin.Admin.query>` that fetches various storage volume
     information keyed by vfolder hosts.
 
     .. note::
@@ -54,7 +54,7 @@ class Storage(BaseFunction):
         Lists the keypairs.
         You need an admin privilege for this operation.
         """
-        return await generate_paginated_results(
+        return await fetch_paginated_result(
             "storage_volume_list",
             {
                 "filter": (filter, "String"),
