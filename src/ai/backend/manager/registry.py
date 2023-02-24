@@ -1786,25 +1786,27 @@ class AgentRegistry:
             # perform DB update only if requested slots and actual allocated value differs
             if actual_allocated_slots != requested_slots:
                 log.debug("calibrating resource slot usage for agent {}", agent_id)
-                async with self.db.begin() as conn:
-                    select_query = (
-                        sa.select([agents.c.occupied_slots])
-                        .select_from(agents)
-                        .where(agents.c.id == agent_id)
-                    )
-                    result = await conn.execute(select_query)
-                    occupied_slots: ResourceSlot = result.scalar()
-                    diff = actual_allocated_slots - requested_slots
-                    update_query = (
-                        sa.update(agents)
-                        .values(
-                            {
-                                "occupied_slots": ResourceSlot.from_json(occupied_slots) + diff,
-                            }
+                async def _update_agent_resource():
+                    async with self.db.begin() as conn:
+                        select_query = (
+                            sa.select([agents.c.occupied_slots])
+                            .select_from(agents)
+                            .where(agents.c.id == agent_id)
                         )
-                        .where(agents.c.id == agent_id)
-                    )
-                    await conn.execute(update_query)
+                        result = await conn.execute(select_query)
+                        occupied_slots: ResourceSlot = result.scalar()
+                        diff = actual_allocated_slots - requested_slots
+                        update_query = (
+                            sa.update(agents)
+                            .values(
+                                {
+                                    "occupied_slots": ResourceSlot.from_json(occupied_slots) + diff,
+                                }
+                            )
+                            .where(agents.c.id == agent_id)
+                        )
+                        await conn.execute(update_query)
+                await execute_with_retry(_update_agent_resource)
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         concurrency_used_per_key: MutableMapping[str, set] = defaultdict(

@@ -984,8 +984,6 @@ class SchedulerDispatcher(aobject):
             async def _mark_session_cancelled() -> None:
                 async with self.db.begin() as db_conn:
                     affected_agents = set(k.agent_id for k in session.kernels)
-                    for agent_id in affected_agents:
-                        await recalc_agent_resource_occupancy(db_conn, agent_id)
                     await _rollback_predicate_mutations(db_conn, sched_ctx, session)
                     now = datetime.now(tzutc())
                     update_query = (
@@ -1009,6 +1007,8 @@ class SchedulerDispatcher(aobject):
                         .where(kernels.c.session_id == session.session_id)
                     )
                     await db_conn.execute(update_query)
+                    for agent_id in affected_agents:
+                        await recalc_agent_resource_occupancy(db_conn, agent_id)
 
             log.debug(log_fmt + "cleanup-start-failure: begin", *log_args)
             try:
