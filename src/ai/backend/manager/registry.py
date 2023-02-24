@@ -1426,19 +1426,25 @@ class AgentRegistry:
             # perform DB update only if requested slots and actual allocated value differs
             if actual_allocated_slots != requested_slots:
                 log.debug("calibrating resource slot usage for agent {}", agent_id)
-                async with self.db.begin_session() as db_sess:
-                    select_query = sa.select(AgentRow.occupied_slots).where(AgentRow.id == agent_id)
-                    result = await db_sess.execute(select_query)
-                    occupied_slots: ResourceSlot = result.scalar()
-                    diff = actual_allocated_slots - requested_slots
-                    update_query = (
-                        sa.update(AgentRow)
-                        .values(
-                            occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
+
+                async def _update_agent_resource():
+                    async with self.db.begin_session() as db_sess:
+                        select_query = sa.select(AgentRow.occupied_slots).where(
+                            AgentRow.id == agent_id
                         )
-                        .where(AgentRow.id == agent_id)
-                    )
-                    await db_sess.execute(update_query)
+                        result = await db_sess.execute(select_query)
+                        occupied_slots: ResourceSlot = result.scalar()
+                        diff = actual_allocated_slots - requested_slots
+                        update_query = (
+                            sa.update(AgentRow)
+                            .values(
+                                occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
+                            )
+                            .where(AgentRow.id == agent_id)
+                        )
+                        await db_sess.execute(update_query)
+
+                await execute_with_retry(_update_agent_resource)
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
@@ -2569,6 +2575,21 @@ class AgentRegistry:
                 return session_id, access_key, agent
 
         result = await execute_with_retry(_update_kernel_status)
+
+        async def _recalc() -> None:
+            async with self.db.begin() as conn:
+                log.debug(
+                    "recalculate concurrency used in kernel termination (ak: {})",
+                    access_key,
+                )
+                await recalc_concurrency_used(conn, self.redis_stat, access_key)
+                log.debug(
+                    "recalculate agent resource occupancy in kernel termination (agent: {})",
+                    agent,
+                )
+                await recalc_agent_resource_occupancy(conn, agent)
+
+        await execute_with_retry(_recalc)
         if result is None:
             return
 
@@ -2607,21 +2628,6 @@ class AgentRegistry:
                     await db_sess.execute(update_query)
 
         await execute_with_retry(_check_session)
-
-        async def _recalc() -> None:
-            async with self.db.begin() as conn:
-                log.debug(
-                    "recalculate concurrency used in kernel termination (ak: {})",
-                    access_key,
-                )
-                await recalc_concurrency_used(conn, self.redis_stat, access_key)
-                log.debug(
-                    "recalculate agent resource occupancy in kernel termination (agent: {})",
-                    agent,
-                )
-                await recalc_agent_resource_occupancy(conn, agent)
-
-        await execute_with_retry(_recalc)
 
         # Perform statistics sync in a separate transaction block, since
         # it may take a while to fetch stats from Redis.
