@@ -55,7 +55,7 @@
 //     "kubernetes~=10.0.0",
 //     "lark-parser~=0.11.3",
 //     "more-itertools~=8.13.0",
-//     "msgpack>=1.0.0",
+//     "msgpack>=1.0.5rc1",
 //     "multidict>=6.0",
 //     "namedlist~=1.8",
 //     "netifaces~=0.11.0",
@@ -94,7 +94,7 @@
 //     "types-six",
 //     "types-tabulate",
 //     "typing_extensions~=4.3",
-//     "uvloop>=0.17",
+//     "uvloop>=0.17; sys_platform != \"Windows\"",
 //     "yarl>=1.7",
 //     "zipstream-new~=1.1.8"
 //   ],
@@ -863,36 +863,36 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "b4c2969b7677762914394b8273cc1905dfe5b71f250741c1a575487ae357e729",
-              "url": "https://files.pythonhosted.org/packages/2c/95/a43050c34b38d38379a9fea1986492c9d70b7ee4522f80a0f09117443b55/boto3-1.26.76-py3-none-any.whl"
+              "hash": "0c593017fa49dbc34dcdbd5659208f2daf293a499d5f4d7e61978cd6b5d72a97",
+              "url": "https://files.pythonhosted.org/packages/7b/5b/d9e87155ebdb65bd2fc6985546d43746a56643aa3eac3ae51ceb524c5300/boto3-1.26.78-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "30c7d967ed1c6b5a05643e42cae9d4d36c3f1cb6782637ddc7007a104cfd9027",
-              "url": "https://files.pythonhosted.org/packages/29/a8/3ffdf9744fd5d0330cd0303ff3bd52c1491934e5bd5fba2353d14641685f/boto3-1.26.76.tar.gz"
+              "hash": "488bf63d65864ab7fcdf9337c5aa4d825d444e253738a60f80789916bacc47dc",
+              "url": "https://files.pythonhosted.org/packages/6d/d8/d0356ea9252e17387bde638032216cab0699aea50386f00feb09a42fb362/boto3-1.26.78.tar.gz"
             }
           ],
           "project_name": "boto3",
           "requires_dists": [
-            "botocore<1.30.0,>=1.29.76",
+            "botocore<1.30.0,>=1.29.78",
             "botocore[crt]<2.0a0,>=1.21.0; extra == \"crt\"",
             "jmespath<2.0.0,>=0.7.1",
             "s3transfer<0.7.0,>=0.6.0"
           ],
           "requires_python": ">=3.7",
-          "version": "1.26.76"
+          "version": "1.26.78"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "70735b00cd529f152992231ca6757e458e5ec25db43767b3526e9a35b2f143b7",
-              "url": "https://files.pythonhosted.org/packages/87/93/e862d4b2ec9b0c8f7a6ee3141df138c00aa91de42839e55b68e3ebb53bf2/botocore-1.29.76-py3-none-any.whl"
+              "hash": "656ac8822a1b6c887a8efe1172bcefa9c9c450face26dc39998a249e8c340a23",
+              "url": "https://files.pythonhosted.org/packages/28/50/79c77af6caa09f689fc1c7e5bb29668d71b7ad5ca69ac013ff0a29da164e/botocore-1.29.78-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c2f67b6b3f8acf2968eafca06526f07b9fb0d27bac4c68a635d51abb675134a7",
-              "url": "https://files.pythonhosted.org/packages/fb/4b/87b54878085654cd3a01175b849e273cbf049bc01a141e1b9b512d956a9a/botocore-1.29.76.tar.gz"
+              "hash": "2bee6ed037590ef1e4884d944486232871513915f12a8590c63e3bb6046479bf",
+              "url": "https://files.pythonhosted.org/packages/8f/34/d4bcefeabfb8e4b46157e84ea55c3ecc7399d5f9a3454728e1d0d5f9cb83/botocore-1.29.78.tar.gz"
             }
           ],
           "project_name": "botocore",
@@ -903,7 +903,7 @@
             "urllib3<1.27,>=1.25.4"
           ],
           "requires_python": ">=3.7",
-          "version": "1.29.76"
+          "version": "1.29.78"
         },
         {
           "artifacts": [
@@ -2251,14 +2251,54 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "f5d869c18f030202eb412f08b28d2afeea553d6613aee89e200d7aca7ef01f5f",
-              "url": "https://files.pythonhosted.org/packages/22/44/0829b19ac243211d1d2bd759999aa92196c546518b0be91de9cacc98122a/msgpack-1.0.4.tar.gz"
+              "hash": "04366c754ac3bfecf589ea0578599f0c26a3b6558e44cc94d5078bedc67ebfb8",
+              "url": "https://files.pythonhosted.org/packages/64/9a/30d1ff643c0c7c7304723c5e16a37d0d7bcfbf99694362766610d3d3def8/msgpack-1.0.5rc1-cp311-cp311-musllinux_1_1_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "90703d9c8eae435fcb2f84a545183a23670b5662e6e9e7ee6dfdcd8f69a373f5",
+              "url": "https://files.pythonhosted.org/packages/04/67/985311e251085e67ef4501c19f14812e5480991ea33aecfe29706f20a390/msgpack-1.0.5rc1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "469c8f3d9458b0d4fc2fa691b914eced40465a95a623e87f75bc40a74e31dfea",
+              "url": "https://files.pythonhosted.org/packages/1e/22/efd5339f080e4813c73b5361d7263c567c1c26f3cbf76aab2aa77b1bf60a/msgpack-1.0.5rc1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "290f9a656d34aa20cb672ee11ebd5c6647d08419c88614823562997ecb566c16",
+              "url": "https://files.pythonhosted.org/packages/54/16/46db7c54ecc15ad9b675365eefa4e1841cb956b27a2de2ca9cf048364fbc/msgpack-1.0.5rc1-cp311-cp311-musllinux_1_1_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "d98a89e53df1540f3f465a510b511e97d21e1b1777b9f5e030184e1cc68d1072",
+              "url": "https://files.pythonhosted.org/packages/75/48/90be379bb59ade21a68ece4e5f08b9cad4fde97276452ff331f13da0fdf2/msgpack-1.0.5rc1-cp311-cp311-macosx_11_0_arm64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "f25c3553c5b7b07ecff4a3b88024477a08b568edf9566cccb662b31803649919",
+              "url": "https://files.pythonhosted.org/packages/7b/17/55ba6ed0aa725fc15011f8c5e550e791eaa210d7705f32a29c01301edcf3/msgpack-1.0.5rc1-cp311-cp311-macosx_10_9_x86_64.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "a34b0dfb71eb8807cf082d59c0666715df51fc49e734c0f171df5bbb86e02570",
+              "url": "https://files.pythonhosted.org/packages/9b/c5/bd107ac6cf03ffef2397a3273b3f245f8f17dce18e6a36491ea4773e1d25/msgpack-1.0.5rc1-cp311-cp311-macosx_10_9_universal2.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "31b4112b43af2a78d005c9192d2a5f0cec62c6a731ca93e77a0d3979da585d9b",
+              "url": "https://files.pythonhosted.org/packages/e0/41/ffb1e705bb6900c5e24c43630846f7349fe165db714f449a4124b0bc6133/msgpack-1.0.5rc1-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "68726d2404250b6b3b3e63df7e2c4243d46846c630d356a8d129f4aec72ced56",
+              "url": "https://files.pythonhosted.org/packages/f8/f7/b5459019d3be7900954e4bbeee7969b13854979d03dd0ec63dc57ddad515/msgpack-1.0.5rc1-cp311-cp311-musllinux_1_1_aarch64.whl"
             }
           ],
           "project_name": "msgpack",
           "requires_dists": [],
           "requires_python": null,
-          "version": "1.0.4"
+          "version": "1.0.5rc1"
         },
         {
           "artifacts": [
@@ -3785,19 +3825,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "2a59e253d2c4321e93333837f3c2c992c33c2efc96b7249042701eb909e2ba3d",
-              "url": "https://files.pythonhosted.org/packages/6f/31/a625c0919803337359ae7c08f2d967a1df09a56c13f1be159b25b1a0be56/types_cachetools-5.3.0.2-py3-none-any.whl"
+              "hash": "13bc10afc3d8038b0eeb7c684239ca5ec15329dc6a8571fce13448200049fbb7",
+              "url": "https://files.pythonhosted.org/packages/ff/c7/89ddf9d6c25a8ca3633eca467fb6f7d9a78a6075be143483a71b81930716/types_cachetools-5.3.0.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "bd4be85c086d002ba215c1c1c888d78bdafdcbc6a6d6813cd43b0b327ff4aa58",
-              "url": "https://files.pythonhosted.org/packages/96/30/6d1ec03c814b96a3164d7e7fa082bf125f927c884d0a0eff23b79a60e5ec/types-cachetools-5.3.0.2.tar.gz"
+              "hash": "f8077c7de6810bb347e243a2d4fa08ef301dba9ce5f697892db58ecb5c304d10",
+              "url": "https://files.pythonhosted.org/packages/a4/f6/a3a34afaba99ba1770c2499fda6a081d8ea87607170e3ba335f088cc1d41/types-cachetools-5.3.0.3.tar.gz"
             }
           ],
           "project_name": "types-cachetools",
           "requires_dists": [],
           "requires_python": null,
-          "version": "5.3.0.2"
+          "version": "5.3.0.3"
         },
         {
           "artifacts": [
@@ -4289,7 +4329,7 @@
     }
   ],
   "path_mappings": {},
-  "pex_version": "2.1.120",
+  "pex_version": "2.1.122",
   "pip_version": "20.3.4-patched",
   "prefer_older_binary": false,
   "requirements": [
@@ -4339,7 +4379,7 @@
     "kubernetes~=10.0.0",
     "lark-parser~=0.11.3",
     "more-itertools~=8.13.0",
-    "msgpack>=1.0.0",
+    "msgpack>=1.0.5rc1",
     "multidict>=6.0",
     "namedlist~=1.8",
     "netifaces~=0.11.0",
@@ -4378,7 +4418,7 @@
     "types-six",
     "types-tabulate",
     "typing_extensions~=4.3",
-    "uvloop>=0.17",
+    "uvloop>=0.17; sys_platform != \"Windows\"",
     "yarl>=1.7",
     "zipstream-new~=1.1.8"
   ],
