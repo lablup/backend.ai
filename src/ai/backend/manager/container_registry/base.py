@@ -273,11 +273,18 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 except ValueError as e:
                     skip_reason = str(e)
                     continue
-                update_key = ImageRef(
-                    f"{self.registry_name}/{image}:{tag}",
-                    [self.registry_name],
-                    architecture,
-                )
+                if self.registry_name == "local":
+                    update_key = ImageRef(
+                        f"{image}:{tag}",
+                        [],
+                        architecture,
+                    )
+                else:
+                    update_key = ImageRef(
+                        f"{self.registry_name}/{image}:{tag}",
+                        [self.registry_name],
+                        architecture,
+                    )
                 updates = {
                     "config_digest": manifest["digest"],
                     "size_bytes": manifest["size"],
