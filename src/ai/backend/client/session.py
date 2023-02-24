@@ -453,7 +453,7 @@ class Session(BaseSession):
                 if payload["enabled"]:
                     self.config.announcement_handler(payload["message"])
             except (BackendClientError, BackendAPIError):
-                # The server may be an old one without annoucement API.
+                # The server may be an old one without announcement API.
                 pass
         return self
 
@@ -509,7 +509,7 @@ class AsyncSession(BaseSession):
                 if payload["enabled"]:
                     self.config.announcement_handler(payload["message"])
             except (BackendClientError, BackendAPIError):
-                # The server may be an old one without annoucement API.
+                # The server may be an old one without announcement API.
                 pass
         return self
 

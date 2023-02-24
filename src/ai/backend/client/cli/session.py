@@ -427,7 +427,7 @@ def _create_from_template_cmd(docs: str = None):
         metavar="CALLBACK_URL",
         type=str,
         default=None,
-        help="Callback URL which will be called upon sesison lifecycle events.",
+        help="Callback URL which will be called upon session lifecycle events.",
     )
     # execution environment
     @click.option(
@@ -564,8 +564,7 @@ def _create_from_template_cmd(docs: str = None):
         command.
 
         \b
-        IMAGE: The name (and version/platform tags appended after a colon) of session
-               runtime or programming language.
+        TEMPLATE_ID: The template ID to create a session from.
         """
         if name is undefined:
             name = f"pysdk-{secrets.token_hex(5)}"

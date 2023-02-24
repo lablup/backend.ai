@@ -65,7 +65,7 @@ PTGExceptionHandler: TypeAlias = Callable[
 
 class AbstractEvent(metaclass=abc.ABCMeta):
 
-    # derivatives shoudld define the fields.
+    # derivatives should define the fields.
 
     name: ClassVar[str] = "undefined"
 

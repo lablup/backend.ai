@@ -86,8 +86,8 @@ def list_allowed_types():
     type=str,
     default="rw",
     help="Folder's innate permission. "
-    'Group folders can be shared as read-only by setting this option to "ro".'
-    "Invited folders override this setting by its own invitation permission.",
+    'Group folders can be shared as read-only by setting this option to "ro". '
+    "Invited folders override this setting by its own invitation permission. ",
 )
 @click.option(
     "-q",
@@ -146,6 +146,7 @@ def create(name, host, group, host_path, usage_mode, permission, quota, cloneabl
 def delete(name):
     """Delete the given virtual folder. This operation is irreversible!
 
+    \b
     NAME: Name of a virtual folder.
     """
     with Session() as session:
@@ -166,6 +167,7 @@ def rename(old_name, new_name):
     and the new name must be unique among all your accessible vfolders
     including the shared ones.
 
+    \b
     OLD_NAME: The current name of a virtual folder.
     NEW_NAME: The new name of a virtual folder.
     """
@@ -183,6 +185,7 @@ def rename(old_name, new_name):
 def info(name):
     """Show the information of the given virtual folder.
 
+    \b
     NAME: Name of a virtual folder.
     """
     with Session() as session:
@@ -212,8 +215,8 @@ def info(name):
     "--base-dir",
     type=Path,
     default=None,
-    help="Set the parent directory from where the file is uploaded.  "
-    "[default: current working directry]",
+    help="The local parent directory which contains the file to be uploaded. "
+    "[default: current working directory]",
 )
 @click.option(
     "--chunk-size",
@@ -235,7 +238,7 @@ def info(name):
 def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     """
     TUS Upload a file to the virtual folder from the current working directory.
-    The files with the same names will be overwirtten.
+    The files with the same names will be overwritten.
 
     \b
     NAME: Name of a virtual folder.
@@ -265,8 +268,8 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
     "--base-dir",
     type=Path,
     default=None,
-    help="Set the parent directory from where the file is uploaded.  "
-    "[default: current working directry]",
+    help="The local parent directory which will contain the downloaded file.  "
+    "[default: current working directory]",
 )
 @click.option(
     "--chunk-size",
@@ -294,7 +297,7 @@ def upload(name, filenames, base_dir, chunk_size, override_storage_proxy):
 def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_retries):
     """
     Download a file from the virtual folder to the current working directory.
-    The files with the same names will be overwirtten.
+    The files with the same names will be overwritten.
 
     \b
     NAME: Name of a virtual folder.
@@ -322,7 +325,7 @@ def download(name, filenames, base_dir, chunk_size, override_storage_proxy, max_
 @click.argument("filename", type=Path)
 def request_download(name, filename):
     """
-    Request JWT-formated download token for later use.
+    Request JWT-formatted download token for later use.
 
     \b
     NAME: Name of a virtual folder.
@@ -342,6 +345,7 @@ def request_download(name, filename):
 def cp(filenames):
     """An scp-like shortcut for download/upload commands.
 
+    \b
     FILENAMES: Paths of the files to operate on. The last one is the target while all
                others are the sources.  Either source paths or the target path should
                be prefixed with "<vfolder-name>:" like when using the Linux scp
@@ -481,7 +485,7 @@ def ls(name, path):
                 mtime = mdt.strftime("%b %d %Y %H:%M:%S")
                 row = [file["filename"], file["size"], mtime, file["mode"]]
                 table.append(row)
-            print_done("Retrived.")
+            print_done("Retrieved.")
             print(tabulate(table, headers=headers))
         except Exception as e:
             print_error(e)
@@ -642,8 +646,9 @@ def unshare(name, emails):
     help="The ID of the person who wants to leave (the person who shared the vfolder).",
 )
 def leave(name, shared_user_uuid):
-    """Leave the shared virutal folder.
+    """Leave the shared virtual folder.
 
+    \b
     NAME: Name of a virtual folder
     """
     with Session() as session:

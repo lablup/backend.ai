@@ -224,11 +224,11 @@ class ComputeSession(BaseFunction):
             of it.
 
             .. versionadded:: 19.09.0
-        :param mounts: The list of vfolder names that belongs to the currrent API
+        :param mounts: The list of vfolder names that belongs to the current API
             access key.
         :param mount_map: Mapping which contains custom path to mount vfolder.
             Key and value of this map should be vfolder name and custom path.
-            Defalut mounts or relative paths are under /home/work.
+            Default mounts or relative paths are under /home/work.
             If you want different paths, names should be absolute paths.
             The target mount path of vFolders should not overlap with the linux system folders.
             vFolders which has a dot(.) prefix in its name are not affected.
@@ -407,11 +407,11 @@ class ComputeSession(BaseFunction):
             of it.
 
             .. versionadded:: 19.09.0
-        :param mounts: The list of vfolder names that belongs to the currrent API
+        :param mounts: The list of vfolder names that belongs to the current API
             access key.
         :param mount_map: Mapping which contains custom path to mount vfolder.
             Key and value of this map should be vfolder name and custom path.
-            Defalut mounts or relative paths are under /home/work.
+            Default mounts or relative paths are under /home/work.
             If you want different paths, names should be absolute paths.
             The target mount path of vFolders should not overlap with the linux system folders.
             vFolders which has a dot(.) prefix in its name are not affected.
