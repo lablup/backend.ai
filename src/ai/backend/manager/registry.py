@@ -1786,6 +1786,7 @@ class AgentRegistry:
             # perform DB update only if requested slots and actual allocated value differs
             if actual_allocated_slots != requested_slots:
                 log.debug("calibrating resource slot usage for agent {}", agent_id)
+
                 async def _update_agent_resource():
                     async with self.db.begin() as conn:
                         select_query = (
@@ -1806,6 +1807,7 @@ class AgentRegistry:
                             .where(agents.c.id == agent_id)
                         )
                         await conn.execute(update_query)
+
                 await execute_with_retry(_update_agent_resource)
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
