@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import AsyncIterator
 
@@ -28,14 +29,14 @@ class LocalRegistry(BaseContainerRegistry):
                 reporter.total_progress = len(items)
             for item in items:
                 labels = item["Labels"]
-                if item["RepoTags"][0] == "<none>:<none>":
-                    # cache images
-                    continue
                 if not labels:
                     continue
                 if "ai.backend.kernelspec" in labels:
-                    repo = item["RepoTags"][0]
-                    yield repo
+                    for image_ref_str in item["RepoTags"]:
+                        if image_ref_str == "<none>:<none>":
+                            # cache images
+                            continue
+                        yield image_ref_str  # this includes the tag part
 
     async def _scan_image(
         self,
@@ -60,14 +61,30 @@ class LocalRegistry(BaseContainerRegistry):
                 architecture = data["Architecture"]
                 if (reporter := self.reporter.get()) is not None:
                     reporter.total_progress += 1
+                summary = {
+                    "Id": data["Id"],
+                    "RepoDigests": data["RepoDigests"],
+                    "Config.Image": data["Config"]["Image"],
+                    "ContainerConfig.Image": data["ContainerConfig"]["Image"],
+                    "Architecture": data["Architecture"],
+                }
+                log.debug(
+                    "Scanned image info: {}:{}\n{}", image, tag, json.dumps(summary, indent=2)
+                )
+                if not data["RepoDigests"]:
+                    # images not pushed to registry v2 do not have the manifest yet.
+                    digest = data["Id"]
+                else:
+                    digest = data["RepoDigests"][0].rpartition("@")[2]
                 return {
                     architecture: {
                         "size": data["Size"],
                         "labels": data["Config"]["Labels"],
-                        "digest": data["RepoDigests"][0].rpartition("@")[2],
+                        "digest": digest,
                     },
                 }
 
         async with self.sema.get():
             manifests = await _read_image_info(tag)
-        await self._read_manifest(image, tag, manifests)
+        if manifests:
+            await self._read_manifest(image, tag, manifests)

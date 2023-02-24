@@ -143,6 +143,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         for k, v in all_updates.items()
                     ]
                 )
+                await session.flush()
 
     async def _scan_image(
         self,
@@ -252,6 +253,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             if (reporter := self.reporter.get()) is not None:
                 await reporter.update(1, message=progress_msg)
 
+        assert ImageRow.resources is not None
         for architecture, manifest in manifests.items():
             if manifest is None:
                 skip_reason = "missing/deleted"
@@ -274,9 +276,11 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     skip_reason = str(e)
                     continue
                 if self.registry_name == "local":
+                    if image.partition("/")[1] == "":
+                        image = "library/" + image
                     update_key = ImageRef(
                         f"{image}:{tag}",
-                        [],
+                        ["index.docker.io"],
                         architecture,
                     )
                 else:
@@ -294,14 +298,17 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                 if accels:
                     updates["accels"] = accels
 
-                resources = {}
+                resources = {  # default fallback if not defined
+                    "cpu": {"min": "1", "max": None},
+                    "mem": {"min": "1g", "max": None},
+                }
                 res_prefix = "ai.backend.resource.min."
                 for k, v in filter(
                     lambda pair: pair[0].startswith(res_prefix), manifest["labels"].items()
                 ):
                     res_key = k[len(res_prefix) :]
                     resources[res_key] = {"min": v}
-                updates["resources"] = resources
+                updates["resources"] = ImageRow.resources.type._schema.check(resources)
                 self.all_updates.get().update(
                     {
                         update_key: updates,
