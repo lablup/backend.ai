@@ -113,6 +113,13 @@ interpreter_constraints = ["CPython>=3.11,<4"]
 extra_requirements.add = [
 ]
 lockfile = "tools/mypy.lock"
+extra_type_stubs = [
+    "types-six",
+    "types-setuptools",
+    "types-pkg_resources",
+    "types-python-dateutil",
+]
+extra_type_stubs_lockfile = "tools/pytest-type-stubs.lock"
 
 [towncrier]
 version = "towncrier>=21.9"
