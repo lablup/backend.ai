@@ -4,6 +4,7 @@ from pprint import pformat, pprint
 from typing import AsyncIterator
 
 import sqlalchemy as sa
+from redis.asyncio.client import Pipeline, Redis
 from tabulate import tabulate
 
 from ai.backend.common import redis_helper
@@ -56,30 +57,47 @@ async def list_images(cli_ctx, short, installed_only):
             items = await ImageRow.list(session)
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
             #       until we finish the epic refactoring of image metadata db.
-            for item in items:
-                if installed_only:
-                    installed = (
-                        await redis_helper.execute(
-                            redis_conn_set.image, lambda r: r.scard(item.name)
-                        )
-                    ) > 0
-                    if not installed:
-                        continue
-                    installed_agents = " ".join(
-                        map(
-                            lambda item: item.decode(),
-                            await redis_helper.execute(
-                                redis_conn_set.image, lambda r: r.smembers(item.name)
-                            ),
-                        )
+            if installed_only:
+
+                async def _build_scard_pipeline(redis: Redis) -> Pipeline:
+                    pipe = redis.pipeline()
+                    for item in items:
+                        await pipe.scard(item.name)
+                    return pipe
+
+                installed_counts = await redis_helper.execute(
+                    redis_conn_set.image, _build_scard_pipeline
+                )
+                installed_items = []
+
+                async def _build_smembers_pipeline(redis: Redis) -> Pipeline:
+                    pipe = redis.pipeline()
+                    for item, installed_count in zip(items, installed_counts):
+                        if installed_count > 0:
+                            installed_items.append(item)
+                            await pipe.smembers(item.name)
+                    return pipe
+
+                agents_per_installed_items = await redis_helper.execute(
+                    redis_conn_set.image,
+                    _build_smembers_pipeline,
+                )
+                for item, installed_agents in zip(installed_items, agents_per_installed_items):
+                    formatted_installed_agents = " ".join(
+                        map(lambda s: s.decode(), installed_agents)
                     )
                     if short:
                         displayed_items.append(
-                            (item.image_ref.canonical, item.config_digest, installed_agents)
+                            (
+                                item.image_ref.canonical,
+                                item.config_digest,
+                                formatted_installed_agents,
+                            )
                         )
                     else:
-                        print(f"{pformat(item)} @ {installed_agents}")
-                else:
+                        print(f"{pformat(item)} @ {formatted_installed_agents}")
+            else:
+                for item in items:
                     if short:
                         displayed_items.append((item.image_ref.canonical, item.config_digest))
                     else:
