@@ -463,6 +463,7 @@ class AgentRPCServer(aobject):
     @collect_error
     async def execute(
         self,
+        session_id: str,
         kernel_id: str,
         api_version: int,
         run_id: str,
@@ -480,6 +481,7 @@ class AgentRPCServer(aobject):
                 code[:20] + "..." if len(code) > 20 else code,
             )
         result = await self.agent.execute(
+            SessionId(UUID(session_id)),
             KernelId(UUID(kernel_id)),
             run_id,
             mode,
@@ -489,22 +491,6 @@ class AgentRPCServer(aobject):
             flush_timeout=flush_timeout,
         )
         return result
-
-    @rpc_function
-    @collect_error
-    async def execute_batch(
-        self,
-        kernel_id: str,
-        startup_command: str,
-    ) -> None:
-        # DEPRECATED
-        asyncio.create_task(
-            self.agent.execute_batch(
-                KernelId(UUID(kernel_id)),
-                startup_command,
-            )
-        )
-        await asyncio.sleep(0)
 
     @rpc_function
     @collect_error

@@ -39,7 +39,7 @@ kubernetes~=10.0.0
 kubernetes-asyncio~=9.1.0
 lark-parser~=0.11.3
 more-itertools~=8.13.0
-msgpack>=1.0.0
+msgpack>=1.0.5rc1
 multidict>=6.0
 namedlist~=1.8
 netifaces~=0.11.0
@@ -69,7 +69,7 @@ tqdm>=4.61
 trafaret~=2.1
 typeguard~=2.10
 typing_extensions~=4.3
-uvloop>=0.17
+uvloop>=0.17; sys_platform != "Windows"
 yarl>=1.7
 zipstream-new~=1.1.8
 
@@ -78,16 +78,8 @@ pytest>=7.1.2
 pytest-dependency>=0.5.1
 
 # type stubs
-types-aiofiles
-types-click
-types-cachetools
-types-Jinja2
-types-PyYAML
-types-python-dateutil
-types-redis
-types-setuptools
+types-pkg_resources
 types-six
-types-tabulate
 
 backend.ai-krunner-alpine==5.1.0
 backend.ai-krunner-static-gnu==4.1.0
