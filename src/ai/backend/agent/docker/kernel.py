@@ -284,11 +284,10 @@ class DockerKernel(AbstractKernel):
         container_id = self.data["container_id"]
 
         # Confine the lookable paths in the home directory
-        home_path = Path("/home/work")
-        try:
-            resolved_path = (home_path / container_path).resolve()
-            resolved_path.relative_to(home_path)
-        except ValueError:
+        home_path = Path("/home/work").resolve()
+        resolved_path = (home_path / container_path).resolve()
+
+        if str(os.path.commonpath([resolved_path, home_path])) != str(home_path):
             raise PermissionError("You cannot list files outside /home/work")
 
         # Gather individual file information in the target path.
