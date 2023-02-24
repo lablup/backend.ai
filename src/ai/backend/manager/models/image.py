@@ -4,7 +4,6 @@ import enum
 import functools
 import logging
 from decimal import Decimal
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -22,7 +21,6 @@ import aiotools
 import graphene
 import sqlalchemy as sa
 import trafaret as t
-import yaml
 from graphql.execution.executors.asyncio import AsyncioExecutor  # pants: no-infer-dep
 from redis.asyncio import Redis
 from redis.asyncio.client import Pipeline
@@ -64,7 +62,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 
 __all__ = (
     "rescan_images",
-    "update_aliases_from_file",
     "ImageType",
     "ImageAliasRow",
     "ImageRow",
@@ -121,46 +118,6 @@ async def rescan_images(
             scanner = scanner_cls(db, registry_name, registry_info)
             tg.create_task(scanner.rescan_single_registry(reporter))
     # TODO: delete images removed from registry?
-
-
-async def update_aliases_from_file(session: AsyncSession, file: Path) -> List[ImageAliasRow]:
-    log.info('Updating image aliases from "{0}"', file)
-    ret: List[ImageAliasRow] = []
-    try:
-        data = yaml.safe_load(open(file, "r", encoding="utf-8"))
-    except IOError:
-        log.error('Cannot open "{0}".', file)
-        return []
-    for item in data["aliases"]:
-        alias = item[0]
-        target = item[1]
-        if len(item) >= 2:
-            architecture = item[2]
-        else:
-            log.warn(
-                "architecture not set for {} => {}, assuming as {}",
-                target,
-                alias,
-                DEFAULT_IMAGE_ARCH,
-            )
-            architecture = DEFAULT_IMAGE_ARCH
-        try:
-            image_row = await ImageRow.from_image_ref(
-                session,
-                ImageRef(target, ["*"], architecture),
-            )
-            image_alias = ImageAliasRow(
-                alias=alias,
-                image=image_row,
-            )
-            # let user call session.begin()
-            session.add(image_alias)
-            ret.append(image_alias)
-            print(f"{alias} -> {image_row.image_ref}")
-        except UnknownImageReference:
-            print(f"{alias} -> target image not found")
-    log.info("Done.")
-    return ret
 
 
 class ImageType(enum.Enum):
