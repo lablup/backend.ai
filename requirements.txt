@@ -80,16 +80,8 @@ pytest>=7.1.2
 pytest-dependency>=0.5.1
 
 # type stubs
-types-aiofiles
-types-click
-types-cachetools
-types-Jinja2
-types-PyYAML
-types-python-dateutil
-types-redis
-types-setuptools
+types-pkg_resources
 types-six
-types-tabulate
 
 backend.ai-krunner-alpine~=4.0.0
 backend.ai-krunner-static-gnu~=3.0.0
