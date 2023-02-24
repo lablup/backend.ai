@@ -429,7 +429,7 @@ def _create_from_template_cmd(docs: str = None):
         metavar="CALLBACK_URL",
         type=str,
         default=None,
-        help="Callback URL which will be called upon sesison lifecycle events.",
+        help="Callback URL which will be called upon session lifecycle events.",
     )
     # execution environment
     @click.option(
@@ -566,8 +566,7 @@ def _create_from_template_cmd(docs: str = None):
         command.
 
         \b
-        IMAGE: The name (and version/platform tags appended after a colon) of session
-               runtime or programming language.
+        TEMPLATE_ID: The template ID to create a session from.
         """
         if name is undefined:
             name = f"pysdk-{secrets.token_hex(5)}"
@@ -1220,7 +1219,7 @@ def _fetch_session_names():
     )
     fields: List[FieldSpec] = [
         session_fields["name"],
-        session_fields["id"],
+        session_fields["session_id"],
         session_fields["group_name"],
         session_fields["main_kernel_id"],
         session_fields["image"],
@@ -1241,7 +1240,7 @@ def _fetch_session_names():
             order=None,
         )
 
-    return tuple(map(lambda x: x.get("session_id"), sessions.items))
+    return tuple(map(lambda x: x.get("name"), sessions.items))
 
 
 def _watch_cmd(docs: Optional[str] = None):

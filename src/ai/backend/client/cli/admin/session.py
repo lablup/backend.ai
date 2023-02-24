@@ -243,7 +243,7 @@ def _info_cmd(docs: str = None):
                 session_fields["name"],
             ]
             if session_.api_version[0] >= 6:
-                fields.append(session_fields["id"])
+                fields.append(session_fields["session_id"])
                 fields.append(session_fields["main_kernel_id"])
             fields.extend(
                 [

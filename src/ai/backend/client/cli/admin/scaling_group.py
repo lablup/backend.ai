@@ -268,7 +268,7 @@ def associate_scaling_group(ctx: CLIContext, scaling_group, domain):
         ctx.output.print_mutation_result(
             data,
             extra_info={
-                "detail_msg": "Scaling group {} is assocatiated with domain {}.".format(
+                "detail_msg": "Scaling group {} is associated with domain {}.".format(
                     scaling_group, domain
                 ),
             },

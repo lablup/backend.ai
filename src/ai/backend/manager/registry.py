@@ -149,7 +149,7 @@ if TYPE_CHECKING:
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
 __all__ = ["AgentRegistry", "InstanceNotFound"]
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.registry"))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 SESSION_NAME_LEN_LIMIT = 10
 _read_only_txn_opts = {
@@ -1247,16 +1247,18 @@ class AgentRegistry:
             except (asyncio.TimeoutError, asyncio.CancelledError) as e:
                 for binding in items:
                     kernel_id = binding.kernel.kernel_id
-                    self.kernel_creation_tracker[kernel_id].cancel()
-                    self._post_kernel_creation_infos[kernel_id].set_exception(e)
+                    if not self.kernel_creation_tracker[kernel_id].done():
+                        self.kernel_creation_tracker[kernel_id].cancel()
+                        self._post_kernel_creation_infos[kernel_id].set_exception(e)
                 await asyncio.gather(*post_tasks, return_exceptions=True)
             except Exception as e:
                 # The agent has already cancelled or issued the destruction lifecycle event
                 # for this batch of kernels.
                 for binding in items:
                     kernel_id = binding.kernel.id
-                    self.kernel_creation_tracker[kernel_id].cancel()
-                    self._post_kernel_creation_infos[kernel_id].set_exception(e)
+                    if not self.kernel_creation_tracker[kernel_id].done():
+                        self.kernel_creation_tracker[kernel_id].cancel()
+                        self._post_kernel_creation_infos[kernel_id].set_exception(e)
                     ex = e
 
                     async def _update_failure() -> None:
@@ -1426,22 +1428,30 @@ class AgentRegistry:
             # perform DB update only if requested slots and actual allocated value differs
             if actual_allocated_slots != requested_slots:
                 log.debug("calibrating resource slot usage for agent {}", agent_id)
-                async with self.db.begin_session() as db_sess:
-                    select_query = sa.select(AgentRow.occupied_slots).where(AgentRow.id == agent_id)
-                    result = await db_sess.execute(select_query)
-                    occupied_slots: ResourceSlot = result.scalar()
-                    diff = actual_allocated_slots - requested_slots
-                    update_query = (
-                        sa.update(AgentRow)
-                        .values(
-                            occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
+
+                async def _update_agent_resource():
+                    async with self.db.begin_session() as db_sess:
+                        select_query = sa.select(AgentRow.occupied_slots).where(
+                            AgentRow.id == agent_id
                         )
-                        .where(AgentRow.id == agent_id)
-                    )
-                    await db_sess.execute(update_query)
+                        result = await db_sess.execute(select_query)
+                        occupied_slots: ResourceSlot = result.scalar()
+                        diff = actual_allocated_slots - requested_slots
+                        update_query = (
+                            sa.update(AgentRow)
+                            .values(
+                                occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
+                            )
+                            .where(AgentRow.id == agent_id)
+                        )
+                        await db_sess.execute(update_query)
+
+                await execute_with_retry(_update_agent_resource)
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
-        concurrency_used_per_key: MutableMapping[str, int] = defaultdict(lambda: 0)
+        concurrency_used_per_key: MutableMapping[str, set] = defaultdict(
+            set
+        )  # key: access_key, value: set of session_id
         occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
             lambda: ResourceSlot({"cpu": 0, "mem": 0})
         )
@@ -1458,12 +1468,19 @@ class AgentRegistry:
                 async for row in (await conn.stream(query)):
                     occupied_slots_per_agent[row.agent] += ResourceSlot(row.occupied_slots)
                 query = (
-                    sa.select([kernels.c.access_key, kernels.c.agent, kernels.c.occupied_slots])
+                    sa.select(
+                        [
+                            kernels.c.access_key,
+                            kernels.c.session_id,
+                            kernels.c.agent,
+                            kernels.c.occupied_slots,
+                        ]
+                    )
                     .where(kernels.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
                     .order_by(sa.asc(kernels.c.access_key))
                 )
                 async for row in (await conn.stream(query)):
-                    concurrency_used_per_key[row.access_key] += 1
+                    concurrency_used_per_key[row.access_key].add(row.session_id)
 
                 if len(occupied_slots_per_agent) > 0:
                     # Update occupied_slots for agents with running containers.
@@ -1495,7 +1512,8 @@ class AgentRegistry:
 
         async def _update(r: Redis):
             updates = {
-                f"{kp_key}.{k}": concurrency_used_per_key[k] for k in concurrency_used_per_key
+                f"{kp_key}.{ak}": len(session_ids)
+                for ak, session_ids in concurrency_used_per_key.items()
             }
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
@@ -1504,7 +1522,8 @@ class AgentRegistry:
             updates = {}
             keys = await r.keys(f"{kp_key}.*")
             for ak in keys:
-                usage = concurrency_used_per_key.get(ak, 0)
+                session_concurrency = concurrency_used_per_key.get(ak)
+                usage = len(session_concurrency) if session_concurrency is not None else 0
                 updates[f"{kp_key}.{ak}"] = usage
             if updates:
                 await r.mset(typing.cast(MSetType, updates))
@@ -2152,13 +2171,10 @@ class AgentRegistry:
     async def download_file(
         self,
         session: SessionRow,
-        access_key: AccessKey,
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel
-        async with handle_session_exception(
-            self.db, "download_file", kernel.session_id, access_key
-        ):
+        async with handle_session_exception(self.db, "download_file", kernel.session_id):
             async with RPCContext(
                 kernel.agent,
                 kernel.agent_addr,
@@ -2175,9 +2191,7 @@ class AgentRegistry:
         filepath: str,
     ) -> bytes:
         kernel = session.main_kernel
-        async with handle_session_exception(
-            self.db, "download_single", kernel.session_id, access_key
-        ):
+        async with handle_session_exception(self.db, "download_single", kernel.session_id):
             async with RPCContext(
                 kernel.agent,
                 kernel.agent_addr,
@@ -2563,6 +2577,21 @@ class AgentRegistry:
                 return session_id, access_key, agent
 
         result = await execute_with_retry(_update_kernel_status)
+
+        async def _recalc() -> None:
+            async with self.db.begin() as conn:
+                log.debug(
+                    "recalculate concurrency used in kernel termination (ak: {})",
+                    access_key,
+                )
+                await recalc_concurrency_used(conn, self.redis_stat, access_key)
+                log.debug(
+                    "recalculate agent resource occupancy in kernel termination (agent: {})",
+                    agent,
+                )
+                await recalc_agent_resource_occupancy(conn, agent)
+
+        await execute_with_retry(_recalc)
         if result is None:
             return
 
@@ -2601,21 +2630,6 @@ class AgentRegistry:
                     await db_sess.execute(update_query)
 
         await execute_with_retry(_check_session)
-
-        async def _recalc() -> None:
-            async with self.db.begin() as conn:
-                log.debug(
-                    "recalculate concurrency used in kernel termination (ak: {})",
-                    access_key,
-                )
-                await recalc_concurrency_used(conn, self.redis_stat, access_key)
-                log.debug(
-                    "recalculate agent resource occupancy in kernel termination (agent: {})",
-                    agent,
-                )
-                await recalc_agent_resource_occupancy(conn, agent)
-
-        await execute_with_retry(_recalc)
 
         # Perform statistics sync in a separate transaction block, since
         # it may take a while to fetch stats from Redis.
