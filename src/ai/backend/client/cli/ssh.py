@@ -12,6 +12,12 @@ from ai.backend.cli.types import ExitCode
 from .pretty import print_fail, print_info
 
 
+def find_backendai_executable():
+    if __debug__ and os.path.isfile("./backend.ai"):
+        return "./backend.ai"
+    return "backend.ai"
+
+
 @contextlib.contextmanager
 def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     random_id = secrets.token_hex(16)
@@ -19,7 +25,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     key_path = Path(f"~/.ssh/id_{random_id}").expanduser()
     try:
         subprocess.run(
-            ["backend.ai", "session", "download", session_ref, key_filename],
+            [find_backendai_executable(), "session", "download", session_ref, key_filename],
             shell=False,
             check=True,
             stdout=subprocess.PIPE,
@@ -34,7 +40,7 @@ def container_ssh_ctx(session_ref: str, port: int) -> Iterator[Path]:
     # proxy_proc is a background process
     proxy_proc = subprocess.Popen(
         [
-            "backend.ai",
+            find_backendai_executable(),
             "app",
             session_ref,
             "sshd",
