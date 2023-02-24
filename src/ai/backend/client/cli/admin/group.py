@@ -47,9 +47,7 @@ def info(ctx: CLIContext, id_or_name: str) -> None:
             # interpret as name
             try:
                 groups = session.Group.from_name(id_or_name)
-                item = {}
-                for group in groups:
-                    item.update(group)
+                item = groups[0]  # take the first one
                 ctx.output.print_item(item, _default_detail_fields)
             except Exception as e:
                 ctx.output.print_error(e)
