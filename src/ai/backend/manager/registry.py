@@ -2587,6 +2587,7 @@ class AgentRegistry:
         result = await execute_with_retry(_update_kernel_status)
 
         async def _recalc() -> None:
+            nonlocal access_key, agent
             async with self.db.begin() as conn:
                 log.debug(
                     "recalculate concurrency used in kernel termination (ak: {})",
@@ -2599,12 +2600,12 @@ class AgentRegistry:
                 )
                 await recalc_agent_resource_occupancy(conn, agent)
 
-        await execute_with_retry(_recalc)
         if result is None:
             return
 
-        assert result is not None
         session_id, access_key, agent = result
+
+        await execute_with_retry(_recalc)
 
         async def _check_session() -> None:
             async with self.db.begin_session() as db_sess:
