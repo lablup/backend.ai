@@ -23,13 +23,17 @@ def main(pr_number: str) -> None:
     )
 
     files = [f.name for f in base_path.iterdir() if f.is_file()]
-    print("Existing news fragments:")
-    for file in files:
-        print(f"  {file}")
+    existing_fragments = []
     for file in files:
         if file[0 : file.find(".")] == pr_number:
-            print(f"The news fragment the PR #{pr_number} already exists.")
-            sys.exit(0)
+            existing_fragments.append(file)
+    if existing_fragments:
+        print(f"The news fragment(s) for the PR #{pr_number} already exists:")
+        for file in existing_fragments:
+            print(file)
+        with open(os.getenv("GITHUB_OUTPUT", os.devnull), "a") as ghoutput:
+            print("has_renamed_pairs=false", file=ghoutput)
+        sys.exit(0)
 
     renamed_pairs = []
     for file in files:
