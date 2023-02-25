@@ -393,10 +393,6 @@ class SessionTerminationEventArgs:
         )
 
 
-class SessionTerminatingEvent(SessionTerminationEventArgs, AbstractEvent):
-    name = "session_terminating"
-
-
 class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
     name = "session_terminated"
 

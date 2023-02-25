@@ -92,15 +92,10 @@ def get_client_ip(request: web.Request) -> Optional[str]:
     return client_ip
 
 
-def fill_forwarding_hdrs_to_api_session(
-    request: web.Request,
-    api_session: APISession,
+def fill_x_forwarded_for_header_to_api_session(
+    request: web.Request, api_session: APISession
 ) -> None:
-    _headers = {
-        "X-Forwarded-Host": request.headers.get("X-Forwarded-Host", request.host),
-        "X-Forwarded-Proto": request.headers.get("X-Forwarded-Proto", request.scheme),
-    }
     client_ip = get_client_ip(request)
     if client_ip:
-        _headers["X-Forwarded-For"] = client_ip
+        _headers = {"X-Forwarded-For": client_ip}
         api_session.aiohttp_session.headers.update(_headers)

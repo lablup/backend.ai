@@ -16,7 +16,7 @@ from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.request import Request
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 
-from .auth import fill_forwarding_hdrs_to_api_session, get_anonymous_session, get_api_session
+from .auth import fill_x_forwarded_for_header_to_api_session, get_anonymous_session, get_api_session
 from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -173,7 +173,7 @@ async def web_handler(request, *, is_anonymous=False) -> web.StreamResponse:
                 decrypted_payload_length = len(payload)
             else:
                 payload = request.content
-            fill_forwarding_hdrs_to_api_session(request, api_session)
+            fill_x_forwarded_for_header_to_api_session(request, api_session)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             # We treat all requests and responses as streaming universally
@@ -266,7 +266,7 @@ async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamRespon
                 body["domain"] = request.app["config"]["api"]["domain"]
                 content = json.dumps(body).encode("utf8")
             request_api_version = request.headers.get("X-BackendAI-Version", None)
-            fill_forwarding_hdrs_to_api_session(request, api_session)
+            fill_x_forwarded_for_header_to_api_session(request, api_session)
             # Deliver cookie for token-based authentication.
             api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
             api_rqst = Request(
@@ -353,7 +353,7 @@ async def websocket_handler(request, *, is_anonymous=False) -> web.StreamRespons
     try:
         async with api_session:
             request_api_version = request.headers.get("X-BackendAI-Version", None)
-            fill_forwarding_hdrs_to_api_session(request, api_session)
+            fill_x_forwarded_for_header_to_api_session(request, api_session)
             api_rqst = Request(
                 request.method,
                 path,

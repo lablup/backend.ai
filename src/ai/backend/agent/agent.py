@@ -1280,10 +1280,6 @@ class AbstractAgent(
                     kernel_obj.agent_config = self.local_config
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.__ainit__()
-        except EOFError:
-            log.warning(
-                "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
-            )
         except FileNotFoundError:
             pass
         async with self.resource_lock:
@@ -1340,7 +1336,6 @@ class AbstractAgent(
 
     async def execute_batch(
         self,
-        session_id: SessionId,
         kernel_id: KernelId,
         startup_command: str,
     ) -> None:
@@ -1357,7 +1352,6 @@ class AbstractAgent(
             while True:
                 try:
                     result = await self.execute(
-                        session_id,
                         kernel_id,
                         "batch-job",  # a reserved run ID
                         mode,
@@ -1378,13 +1372,13 @@ class AbstractAgent(
                     if result["exitCode"] == 0:
                         await self.produce_event(
                             SessionSuccessEvent(
-                                session_id, KernelLifecycleEventReason.TASK_DONE, 0
+                                SessionId(kernel_id), KernelLifecycleEventReason.TASK_DONE, 0
                             ),
                         )
                     else:
                         await self.produce_event(
                             SessionFailureEvent(
-                                session_id,
+                                SessionId(kernel_id),
                                 KernelLifecycleEventReason.TASK_FAILED,
                                 result["exitCode"],
                             ),
@@ -1393,7 +1387,7 @@ class AbstractAgent(
                 if result["status"] == "exec-timeout":
                     await self.produce_event(
                         SessionFailureEvent(
-                            session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                            SessionId(kernel_id), KernelLifecycleEventReason.TASK_TIMEOUT, -2
                         ),
                     )
                     break
@@ -1403,7 +1397,9 @@ class AbstractAgent(
                 mode = "continue"
         except asyncio.CancelledError:
             await self.produce_event(
-                SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
+                SessionFailureEvent(
+                    SessionId(kernel_id), KernelLifecycleEventReason.TASK_CANCELLED, -2
+                ),
             )
 
     async def create_kernel(
@@ -1775,9 +1771,7 @@ class AbstractAgent(
         if kernel_config["session_type"] == "batch" and kernel_config["cluster_role"] == "main":
             self._ongoing_exec_batch_tasks.add(
                 asyncio.create_task(
-                    self.execute_batch(
-                        session_id, kernel_id, kernel_config["startup_command"] or ""
-                    ),
+                    self.execute_batch(kernel_id, kernel_config["startup_command"] or ""),
                 ),
             )
 
@@ -1939,7 +1933,6 @@ class AbstractAgent(
 
     async def execute(
         self,
-        session_id: SessionId,
         kernel_id: KernelId,
         run_id: Optional[str],
         mode: Literal["query", "batch", "input", "continue"],
@@ -1955,7 +1948,7 @@ class AbstractAgent(
             await restart_tracker.done_event.wait()
 
         await self.produce_event(
-            ExecutionStartedEvent(session_id),
+            ExecutionStartedEvent(SessionId(kernel_id)),
         )
         try:
             kernel_obj = self.kernel_registry[kernel_id]
@@ -1964,7 +1957,7 @@ class AbstractAgent(
             )
         except asyncio.CancelledError:
             await self.produce_event(
-                ExecutionCancelledEvent(session_id),
+                ExecutionCancelledEvent(SessionId(kernel_id)),
             )
             raise
         except KeyError:
@@ -1978,11 +1971,11 @@ class AbstractAgent(
             log.debug("_execute({0}) {1}", kernel_id, result["status"])
         if result["status"] == "finished":
             await self.produce_event(
-                ExecutionFinishedEvent(session_id),
+                ExecutionFinishedEvent(SessionId(kernel_id)),
             )
         elif result["status"] == "exec-timeout":
             await self.produce_event(
-                ExecutionTimeoutEvent(session_id),
+                ExecutionTimeoutEvent(SessionId(kernel_id)),
             )
             await self.inject_container_lifecycle_event(
                 kernel_id,
@@ -2045,7 +2038,3 @@ class AbstractAgent(
             log.debug("saved {}", last_registry_file)
         except Exception as e:
             log.exception("unable to save {}", last_registry_file, exc_info=e)
-            try:
-                os.remove(var_base_path / last_registry_file)
-            except FileNotFoundError:
-                pass
