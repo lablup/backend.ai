@@ -15,29 +15,10 @@ jobs:
     - name: Parse versions from config
       run: |
         PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
-        ALEMBIC_VERSION=$(grep 'alembic' requirements.txt)
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
-        echo "PROJECT_ALEMBIC_VERSION=$ALEMBIC_VERSION" >> $GITHUB_ENV
-    - name: Set up Python for Pants
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.9"
     - name: Set up Python as Runtime
       uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
-    - name: Prepare cache dir for Pants
-      run: mkdir -p .tmp
-    - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v2
-      # See: https://github.com/pantsbuild/actions/tree/main/init-pants/
-      # See: https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L27-L47
-      with:
-        pants-python-version: "3.9"
-        gha-cache-key: pants-cache0-alembic-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
-        cache-lmdb-store: 'true'
-    - name: Create venv
-      run: ./pants export --resolve=python-default
     - name: Check for multiple heads
-      run: ./py scripts/check-multiple-alembic-heads.py
+      run: python scripts/check-multiple-alembic-heads.py
