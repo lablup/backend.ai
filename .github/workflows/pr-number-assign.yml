@@ -1,11 +1,11 @@
-name: pr-number-assign
+name: assign-pr-number
 on:
   [workflow_call]
 permissions:
   contents: write
 
 jobs:
-  pr-number-assign:
+  update-news-fragments:
     runs-on: ubuntu-latest
 
     steps:
@@ -31,15 +31,16 @@ jobs:
         pip install tomlkit
         python scripts/pr-number-assign.py ${{ github.event.pull_request.number }}
 
-    - name: Get user info
-      id: get_user_info
+    - name: Get user email for commit message
+      id: get_email
       run: |
         curl -Ls "https://api.github.com/users/${{ github.actor }}/events/public" > .response
         email=$(cat .response | jq '.[0].payload.commits[-1].author.email')
         echo "email=$email" >> $GITHUB_OUTPUT
+        rm -f .response
 
     - name: Make commit message for changing change log file
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
-        commit_author: ${{ github.actor }} <${{ steps.get_user_info.outputs.email }}>
+        commit_author: ${{ github.actor }} <${{ steps.get_email.outputs.email }}>
         commit_message: "docs: Rename the news fragment with the PR number\n\n${{ join(fromJSON(env.RENAME_RESULTS), '\n') }}"
