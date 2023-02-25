@@ -56,7 +56,7 @@ __all__ = (
     "EventProducer",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 PTGExceptionHandler: TypeAlias = Callable[
     [Type[Exception], Exception, TracebackType], Awaitable[None]
@@ -65,7 +65,7 @@ PTGExceptionHandler: TypeAlias = Callable[
 
 class AbstractEvent(metaclass=abc.ABCMeta):
 
-    # derivatives shoudld define the fields.
+    # derivatives should define the fields.
 
     name: ClassVar[str] = "undefined"
 
@@ -391,6 +391,10 @@ class SessionTerminationEventArgs:
             SessionId(uuid.UUID(value[0])),
             value[1],
         )
+
+
+class SessionTerminatingEvent(SessionTerminationEventArgs, AbstractEvent):
+    name = "session_terminating"
 
 
 class SessionTerminatedEvent(SessionTerminationEventArgs, AbstractEvent):
