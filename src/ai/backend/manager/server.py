@@ -306,22 +306,21 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.shared_config.data["redis"],
         db=REDIS_STREAM_LOCK,
     )
-
-    redis_objects = (
+    for redis_info in (
         root_ctx.redis_live,
         root_ctx.redis_stat,
         root_ctx.redis_image,
         root_ctx.redis_stream,
         root_ctx.redis_lock,
-    )
-    for redis_info in redis_objects:
+    ):
         assert isinstance(redis_info.client, Redis)
         await redis_helper.ping_redis_connection(redis_info.client)
-
     yield
-
-    for redis_object in redis_objects:
-        await redis_object.close()
+    await root_ctx.redis_stream.close()
+    await root_ctx.redis_image.close()
+    await root_ctx.redis_stat.close()
+    await root_ctx.redis_live.close()
+    await root_ctx.redis_lock.close()
 
 
 @actxmgr
@@ -804,8 +803,6 @@ def main(
         log_level = LogSeverity.DEBUG
 
     cfg = load_config(config_path, log_level.value)
-
-    # pipeline_event_queue = cfg["pipeline"]["event-queue"]
 
     if ctx.invoked_subcommand is None:
         cfg["manager"]["pid-file"].write_text(str(os.getpid()))

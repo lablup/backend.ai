@@ -1647,7 +1647,6 @@ async def invoke_session_callback(
     | SessionFailureEvent,
 ) -> None:
     log.info("INVOKE_SESSION_CALLBACK (source:{}, event:{})", source, event)
-    # app_ctx: PrivateContext = app["session.context"]
     root_ctx: RootContext = app["_root.context"]
     try:
         allow_stale = isinstance(event, (SessionCancelledEvent, SessionTerminatedEvent))
@@ -1660,11 +1659,6 @@ async def invoke_session_callback(
     url = session.callback_url
     if url is None:
         return
-    """
-    app_ctx.webhook_ptask_group.create_task(
-        _make_session_callback(data, url),
-    )
-    """
     if (addr := root_ctx.local_config["pipeline"]["event-queue"]) is None:
         return
     etcd_redis_config: EtcdRedisConfig = {
@@ -1707,7 +1701,6 @@ async def handle_batch_result(
     elif isinstance(event, SessionFailureEvent):
         await SessionRow.set_session_result(root_ctx.db, event.session_id, False, event.exit_code)
     async with root_ctx.db.begin_session() as db_sess:
-        # SessionNotFound
         try:
             session = await SessionRow.get_session_with_kernels(
                 event.session_id, db_session=db_sess
