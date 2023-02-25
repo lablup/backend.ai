@@ -1,0 +1,49 @@
+name: assign-pr-number
+on:
+  [workflow_call]
+permissions:
+  contents: write
+
+jobs:
+  update-news-fragments:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 2
+
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
+
+    - name: Assign pr-number
+      id: assign_pr_number
+      run: |
+        pip install tomlkit
+        python scripts/pr-number-assign.py ${{ github.event.pull_request.number }}
+
+    - name: Get user email for commit message
+      id: get_email
+      run: |
+        curl -Ls "https://api.github.com/users/${{ github.actor }}/events/public" > .response
+        email=$(cat .response | jq '.[0].payload.commits[-1].author.email')
+        echo "Found the actor's email: $email"
+        echo "email=$email" >> $GITHUB_OUTPUT
+        rm -f .response
+
+    - name: Make commit message for changing change log file
+      uses: stefanzweifel/git-auto-commit-action@v4
+      if: ${{ steps.assign_pr_number.outputs.has_renamed_pairs == 'true' }}
+      with:
+        commit_author: ${{ github.actor }} <${{ steps.get_email.outputs.email }}>
+        commit_message: "docs: Rename the news fragment with the PR number\n\n${{ join(fromJSON(steps.assign_pr_number.outputs.rename_results), '\n') }}"

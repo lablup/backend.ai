@@ -429,7 +429,7 @@ def _create_from_template_cmd(docs: str = None):
         metavar="CALLBACK_URL",
         type=str,
         default=None,
-        help="Callback URL which will be called upon sesison lifecycle events.",
+        help="Callback URL which will be called upon session lifecycle events.",
     )
     # execution environment
     @click.option(
@@ -566,8 +566,7 @@ def _create_from_template_cmd(docs: str = None):
         command.
 
         \b
-        IMAGE: The name (and version/platform tags appended after a colon) of session
-               runtime or programming language.
+        TEMPLATE_ID: The template ID to create a session from.
         """
         if name is undefined:
             name = f"pysdk-{secrets.token_hex(5)}"
@@ -937,21 +936,21 @@ def status_history(session_id):
 
 @session.command()
 @click.argument("session_id", metavar="SESSID")
-@click.argument("new_id", metavar="NEWID")
-def rename(session_id, new_id):
+@click.argument("new_name", metavar="NEWNAME")
+def rename(session_id, new_name):
     """
     Renames session name of running session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
-    NEWID: New Session ID to rename to.
+    NEWNAME: New Session name.
     """
 
     with Session() as session:
         try:
             kernel = session.ComputeSession(session_id)
-            kernel.rename(new_id)
-            print_done(f"Session renamed to {new_id}.")
+            kernel.rename(new_name)
+            print_done(f"Session renamed to {new_name}.")
         except Exception as e:
             print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -1211,12 +1210,10 @@ def _fetch_session_names():
             "PENDING",
             "SCHEDULED",
             "PREPARING",
-            "PULLING",
             "RUNNING",
+            "RUNNING_DEGRADED",
             "RESTARTING",
             "TERMINATING",
-            "RESIZING",
-            "SUSPENDED",
             "ERROR",
         ]
     )
@@ -1224,7 +1221,7 @@ def _fetch_session_names():
         session_fields["name"],
         session_fields["session_id"],
         session_fields["group_name"],
-        session_fields["kernel_id"],
+        session_fields["main_kernel_id"],
         session_fields["image"],
         session_fields["type"],
         session_fields["status"],
@@ -1243,7 +1240,7 @@ def _fetch_session_names():
             order=None,
         )
 
-    return tuple(map(lambda x: x.get("session_id"), sessions.items))
+    return tuple(map(lambda x: x.get("name"), sessions.items))
 
 
 def _watch_cmd(docs: Optional[str] = None):
