@@ -307,8 +307,7 @@ async def host_pid_to_container_pid(container_id: str, host_pid: HostPID) -> Con
                 return container_pid
             except asyncio.CancelledError:
                 raise
-            except (IndexError, KeyError, aiodocker.exceptions.DockerError) as e:
-                print(type(e), e)
+            except (IndexError, KeyError, aiodocker.exceptions.DockerError):
                 return NotContainerPID
             finally:
                 await docker.close()
@@ -350,8 +349,7 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
                 return host_pid
             except asyncio.CancelledError:
                 raise
-            except (IndexError, KeyError, aiodocker.exceptions.DockerError) as e:
-                print(type(e), e)
+            except (IndexError, KeyError, aiodocker.exceptions.DockerError):
                 return NotHostPID
             finally:
                 await docker.close()
@@ -362,7 +360,8 @@ async def container_pid_to_host_pid(container_id: str, container_pid: ContainerP
         for pid in cgtasks:
             proc_path = Path(f"/proc/{pid}/status")
             proc_status = {
-                k: v for k, v in map(lambda l: l.split(":\t"), proc_path.read_text().splitlines())
+                k: v
+                for k, v in map(lambda line: line.split(":\t"), proc_path.read_text().splitlines())
             }
             nspids = proc_status["NSpid"].split()
             if nspids[1] == str(container_pid):
