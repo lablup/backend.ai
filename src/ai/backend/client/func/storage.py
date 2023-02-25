@@ -29,7 +29,7 @@ _default_detail_fields = (
 class Storage(BaseFunction):
     """
     Provides a shortcut of :func:`Admin.query()
-    <ai.backend.client.admin.Admin.query>` that fetches various straoge volume
+    <ai.backend.client.admin.Admin.query>` that fetches various storage volume
     information keyed by vfolder hosts.
 
     .. note::

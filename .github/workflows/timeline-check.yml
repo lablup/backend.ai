@@ -5,8 +5,12 @@ on:
     types: [labeled, unlabeled, opened, synchronize, reopened]
 
 jobs:
-  towncrier:
+  pr-number-assign:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:changelog') }}
+    uses: ./.github/workflows/pr-number-assign.yml
+
+  towncrier:
+    needs: [pr-number-assign]
     runs-on: ubuntu-latest
     steps:
     - name: Sparse-checkout

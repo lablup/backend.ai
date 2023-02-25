@@ -637,7 +637,7 @@ async def get_role(request: web.Request, params: Any) -> web.Response:
             t.Key("username"): t.String,
             t.Key("password"): t.String,
         }
-    )
+    ).allow_extra("*")
 )
 async def authorize(request: web.Request, params: Any) -> web.Response:
     if params["type"] != "keypair":
@@ -688,12 +688,15 @@ async def authorize(request: web.Request, params: Any) -> web.Response:
         keypair = result.first()
     if keypair is None:
         raise AuthorizationFailed("No API keypairs found.")
-    # [Hooking point for POST_AUTHORIZE as one-way notification]
+    # [Hooking point for POST_AUTHORIZE]
     # The hook handlers should accept a tuple of the request, user, and keypair objects.
-    await root_ctx.hook_plugin_ctx.notify(
+    hook_result = await root_ctx.hook_plugin_ctx.dispatch(
         "POST_AUTHORIZE",
-        (request, user, keypair),
+        (request, params, user, keypair),
+        return_when=FIRST_COMPLETED,
     )
+    if hook_result.status != PASSED:
+        raise RejectedByHook.from_hook_result(hook_result)
     return web.json_response(
         {
             "data": {
@@ -1004,8 +1007,8 @@ async def generate_ssh_keypair(request: web.Request) -> web.Response:
 async def upload_ssh_keypair(request: web.Request, params: Any) -> web.Response:
     domain_name = request["user"]["domain_name"]
     access_key = request["keypair"]["access_key"]
-    pubkey = params["pubkey"]
-    privkey = params["privkey"]
+    pubkey = f"{params['pubkey'].rstrip()}\n"
+    privkey = f"{params['privkey'].rstrip()}\n"
     log_fmt = "AUTH.SAVE_SSH_KEYPAIR(d:{}, ak:{})"
     log_args = (domain_name, access_key)
     log.info(log_fmt, *log_args)

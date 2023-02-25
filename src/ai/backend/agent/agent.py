@@ -385,42 +385,31 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
                     artifacts[m.group(1)] = p.name
             return artifacts
 
-        suexec_candidates = find_artifacts(f"su-exec.*.{arch}.bin")
-        _, suexec_candidate = match_distro_data(suexec_candidates, distro)
-        suexec_path = self.resolve_krunner_filepath("runner/" + suexec_candidate)
+        def mount_versioned_binary(candidate_glob: str, target_path: str) -> None:
+            candidates = find_artifacts(candidate_glob)
+            _, candidate = match_distro_data(candidates, distro)
+            resolved_path = self.resolve_krunner_filepath("runner/" + candidate)
+            _mount(MountTypes.BIND, resolved_path, target_path)
 
-        hook_candidates = find_artifacts(f"libbaihook.*.{arch}.so")
-        _, hook_candidate = match_distro_data(hook_candidates, distro)
-        hook_path = self.resolve_krunner_filepath("runner/" + hook_candidate)
-
-        sftp_server_candidates = find_artifacts(f"sftp-server.*.{arch}.bin")
-        _, sftp_server_candidate = match_distro_data(sftp_server_candidates, distro)
-        sftp_server_path = self.resolve_krunner_filepath("runner/" + sftp_server_candidate)
-
-        scp_candidates = find_artifacts(f"scp.*.{arch}.bin")
-        _, scp_candidate = match_distro_data(scp_candidates, distro)
-        scp_path = self.resolve_krunner_filepath("runner/" + scp_candidate)
+        mount_versioned_binary(f"su-exec.*.{arch}.bin", "/opt/kernel/su-exec")
+        mount_versioned_binary(f"libbaihook.*.{arch}.so", "/opt/kernel/libbaihook.so")
+        mount_versioned_binary(f"sftp-server.*.{arch}.bin", "/opt/kernel/sftp-server")
+        mount_versioned_binary(f"scp.*.{arch}.bin", "/opt/kernel/scp")
+        mount_versioned_binary(f"dropbear.*.{arch}.bin", "/opt/kernel/dropbear")
+        mount_versioned_binary(f"dropbearconvert.*.{arch}.bin", "/opt/kernel/dropbearconvert")
+        mount_versioned_binary(f"dropbearkey.*.{arch}.bin", "/opt/kernel/dropbearkey")
+        mount_versioned_binary(f"tmux.*.{arch}.bin", "/opt/kernel/tmux")
 
         jail_path: Optional[Path]
         if self.local_config["container"]["sandbox-type"] == "jail":
-            jail_candidates = find_artifacts(f"jail.*.{arch}.bin")
+            jail_candidates = find_artifacts(
+                f"jail.*.{arch}.bin"
+            )  # architecture check is already done when starting agent
             _, jail_candidate = match_distro_data(jail_candidates, distro)
             jail_path = self.resolve_krunner_filepath("runner/" + jail_candidate)
         else:
             jail_path = None
 
-        kernel_pkg_path = self.resolve_krunner_filepath("kernel")
-        helpers_pkg_path = self.resolve_krunner_filepath("helpers")
-        dropbear_path = self.resolve_krunner_filepath(
-            f"runner/dropbear.{matched_libc_style}.{arch}.bin"
-        )
-        dropbearconv_path = self.resolve_krunner_filepath(
-            f"runner/dropbearconvert.{matched_libc_style}.{arch}.bin"
-        )
-        dropbearkey_path = self.resolve_krunner_filepath(
-            f"runner/dropbearkey.{matched_libc_style}.{arch}.bin"
-        )
-        tmux_path = self.resolve_krunner_filepath(f"runner/tmux.{matched_libc_style}.{arch}.bin")
         dotfile_extractor_path = self.resolve_krunner_filepath("runner/extract_dotfiles.py")
         persistent_files_warning_doc_path = self.resolve_krunner_filepath(
             "runner/DO_NOT_STORE_PERSISTENT_FILES_HERE.md"
@@ -437,19 +426,11 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         _mount(MountTypes.BIND, dotfile_extractor_path, "/opt/kernel/extract_dotfiles.py")
         _mount(MountTypes.BIND, entrypoint_sh_path, "/opt/kernel/entrypoint.sh")
-        _mount(MountTypes.BIND, suexec_path, "/opt/kernel/su-exec")
         _mount(MountTypes.BIND, fantompass_path, "/opt/kernel/fantompass.py")
         _mount(MountTypes.BIND, hash_phrase_path, "/opt/kernel/hash_phrase.py")
         _mount(MountTypes.BIND, words_json_path, "/opt/kernel/words.json")
         if jail_path is not None:
             _mount(MountTypes.BIND, jail_path, "/opt/kernel/jail")
-        _mount(MountTypes.BIND, hook_path, "/opt/kernel/libbaihook.so")
-        _mount(MountTypes.BIND, dropbear_path, "/opt/kernel/dropbear")
-        _mount(MountTypes.BIND, dropbearconv_path, "/opt/kernel/dropbearconvert")
-        _mount(MountTypes.BIND, dropbearkey_path, "/opt/kernel/dropbearkey")
-        _mount(MountTypes.BIND, tmux_path, "/opt/kernel/tmux")
-        _mount(MountTypes.BIND, sftp_server_path, "/usr/libexec/sftp-server")
-        _mount(MountTypes.BIND, scp_path, "/usr/bin/scp")
         _mount(
             MountTypes.BIND,
             persistent_files_warning_doc_path,
@@ -458,6 +439,8 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
 
         _mount(MountTypes.VOLUME, krunner_volume, "/opt/backend.ai")
         pylib_path = f"/opt/backend.ai/lib/python{krunner_pyver}/site-packages/"
+        kernel_pkg_path = self.resolve_krunner_filepath("kernel")
+        helpers_pkg_path = self.resolve_krunner_filepath("helpers")
         _mount(MountTypes.BIND, kernel_pkg_path, pylib_path + "ai/backend/kernel")
         _mount(MountTypes.BIND, helpers_pkg_path, pylib_path + "ai/backend/helpers")
         environ["LD_PRELOAD"] = "/opt/kernel/libbaihook.so"
@@ -1329,6 +1312,10 @@ class AbstractAgent(
                     kernel_obj.agent_config = self.local_config
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.__ainit__()
+        except EOFError:
+            log.warning(
+                "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
+            )
         except FileNotFoundError:
             pass
         async with self.resource_lock:
@@ -1385,6 +1372,7 @@ class AbstractAgent(
 
     async def execute_batch(
         self,
+        session_id: SessionId,
         kernel_id: KernelId,
         startup_command: str,
     ) -> None:
@@ -1401,6 +1389,7 @@ class AbstractAgent(
             while True:
                 try:
                     result = await self.execute(
+                        session_id,
                         kernel_id,
                         "batch-job",  # a reserved run ID
                         mode,
@@ -1421,13 +1410,13 @@ class AbstractAgent(
                     if result["exitCode"] == 0:
                         await self.produce_event(
                             SessionSuccessEvent(
-                                SessionId(kernel_id), KernelLifecycleEventReason.TASK_DONE, 0
+                                session_id, KernelLifecycleEventReason.TASK_DONE, 0
                             ),
                         )
                     else:
                         await self.produce_event(
                             SessionFailureEvent(
-                                SessionId(kernel_id),
+                                session_id,
                                 KernelLifecycleEventReason.TASK_FAILED,
                                 result["exitCode"],
                             ),
@@ -1436,7 +1425,7 @@ class AbstractAgent(
                 if result["status"] == "exec-timeout":
                     await self.produce_event(
                         SessionFailureEvent(
-                            SessionId(kernel_id), KernelLifecycleEventReason.TASK_TIMEOUT, -2
+                            session_id, KernelLifecycleEventReason.TASK_TIMEOUT, -2
                         ),
                     )
                     break
@@ -1446,9 +1435,7 @@ class AbstractAgent(
                 mode = "continue"
         except asyncio.CancelledError:
             await self.produce_event(
-                SessionFailureEvent(
-                    SessionId(kernel_id), KernelLifecycleEventReason.TASK_CANCELLED, -2
-                ),
+                SessionFailureEvent(session_id, KernelLifecycleEventReason.TASK_CANCELLED, -2),
             )
 
     async def create_kernel(
@@ -1670,11 +1657,13 @@ class AbstractAgent(
         if self.local_config["container"]["sandbox-type"] == "jail":
             cmdargs += [
                 "/opt/kernel/jail",
-                "-policy",
-                "/etc/backend.ai/jail/policy.yml",
+                # "--policy",
+                # "/etc/backend.ai/jail/policy.yml",
+                # TODO: Update default Jail policy in images
             ]
             if self.local_config["container"]["jail-args"]:
                 cmdargs += map(lambda s: s.strip(), self.local_config["container"]["jail-args"])
+            cmdargs += ["--"]
         if self.local_config["debug"]["kernel-runner"]:
             krunner_opts.append("--debug")
         cmdargs += [
@@ -1820,7 +1809,9 @@ class AbstractAgent(
         if kernel_config["session_type"] == "batch" and kernel_config["cluster_role"] == "main":
             self._ongoing_exec_batch_tasks.add(
                 asyncio.create_task(
-                    self.execute_batch(kernel_id, kernel_config["startup_command"] or ""),
+                    self.execute_batch(
+                        session_id, kernel_id, kernel_config["startup_command"] or ""
+                    ),
                 ),
             )
 
@@ -1982,6 +1973,7 @@ class AbstractAgent(
 
     async def execute(
         self,
+        session_id: SessionId,
         kernel_id: KernelId,
         run_id: Optional[str],
         mode: Literal["query", "batch", "input", "continue"],
@@ -1997,7 +1989,7 @@ class AbstractAgent(
             await restart_tracker.done_event.wait()
 
         await self.produce_event(
-            ExecutionStartedEvent(SessionId(kernel_id)),
+            ExecutionStartedEvent(session_id),
         )
         try:
             kernel_obj = self.kernel_registry[kernel_id]
@@ -2006,7 +1998,7 @@ class AbstractAgent(
             )
         except asyncio.CancelledError:
             await self.produce_event(
-                ExecutionCancelledEvent(SessionId(kernel_id)),
+                ExecutionCancelledEvent(session_id),
             )
             raise
         except KeyError:
@@ -2020,11 +2012,11 @@ class AbstractAgent(
             log.debug("_execute({0}) {1}", kernel_id, result["status"])
         if result["status"] == "finished":
             await self.produce_event(
-                ExecutionFinishedEvent(SessionId(kernel_id)),
+                ExecutionFinishedEvent(session_id),
             )
         elif result["status"] == "exec-timeout":
             await self.produce_event(
-                ExecutionTimeoutEvent(SessionId(kernel_id)),
+                ExecutionTimeoutEvent(session_id),
             )
             await self.inject_container_lifecycle_event(
                 kernel_id,
@@ -2087,3 +2079,7 @@ class AbstractAgent(
             log.debug("saved {}", last_registry_file)
         except Exception as e:
             log.exception("unable to save {}", last_registry_file, exc_info=e)
+            try:
+                os.remove(var_base_path / last_registry_file)
+            except FileNotFoundError:
+                pass
